@@ -1,0 +1,254 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Ocarina",
+ "zones": [
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Ocarina, Typical/Sustains/Sus/StdOcarina_Sus_A3.wav",
+   "root": 69,
+   "keys": [
+    0,
+    70
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 5.7,
+   "tune": 0.1,
+   "start": 0,
+   "end": 278712,
+   "endFade": 2646,
+   "loop": [
+    173584,
+    252252
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Ocarina, Typical/Sustains/Sus/StdOcarina_Sus_B3.wav",
+   "root": 71,
+   "keys": [
+    71,
+    72
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 5.7,
+   "tune": -4.7,
+   "start": 0,
+   "end": 246078,
+   "endFade": 2646,
+   "loop": [
+    151907,
+    218736
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Ocarina, Typical/Sustains/Sus/StdOcarina_Sus_C#4.wav",
+   "root": 73,
+   "keys": [
+    73,
+    73
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 5.7,
+   "tune": -2.0,
+   "start": 0,
+   "end": 281358,
+   "endFade": 2646,
+   "loop": [
+    147772,
+    250488
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Ocarina, Typical/Sustains/Sus/StdOcarina_Sus_D4.wav",
+   "root": 74,
+   "keys": [
+    74,
+    75
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 5.7,
+   "tune": -3.8,
+   "start": 0,
+   "end": 263718,
+   "endFade": 2646,
+   "loop": [
+    173508,
+    234612
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Ocarina, Typical/Sustains/Sus/StdOcarina_Sus_E4.wav",
+   "root": 76,
+   "keys": [
+    76,
+    77
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 5.7,
+   "tune": 0.9,
+   "start": 0,
+   "end": 272538,
+   "endFade": 2646,
+   "loop": [
+    178057,
+    239904
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Ocarina, Typical/Sustains/Sus/StdOcarina_Sus_F#4.wav",
+   "root": 78,
+   "keys": [
+    78,
+    79
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 5.7,
+   "tune": -2.0,
+   "start": 0,
+   "end": 285768,
+   "endFade": 2646,
+   "loop": [
+    85045,
+    249606
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Ocarina, Typical/Sustains/Sus/StdOcarina_Sus_G#4.wav",
+   "root": 80,
+   "keys": [
+    80,
+    80
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 5.7,
+   "tune": -9.8,
+   "start": 0,
+   "end": 286650,
+   "endFade": 2646,
+   "loop": [
+    179778,
+    257544
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Ocarina, Typical/Sustains/Sus/StdOcarina_Sus_A4.wav",
+   "root": 81,
+   "keys": [
+    81,
+    81
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 5.7,
+   "tune": -7.5,
+   "start": 0,
+   "end": 276066,
+   "endFade": 2646,
+   "loop": [
+    161947,
+    250488
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Ocarina, Typical/Sustains/Sus/StdOcarina_Sus_A#4.wav",
+   "root": 82,
+   "keys": [
+    82,
+    83
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 5.7,
+   "tune": -4.6,
+   "start": 0,
+   "end": 285768,
+   "endFade": 2646,
+   "loop": [
+    100036,
+    257544
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Ocarina, Typical/Sustains/Sus/StdOcarina_Sus_C5.wav",
+   "root": 84,
+   "keys": [
+    84,
+    84
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 5.7,
+   "tune": 0.1,
+   "start": 0,
+   "end": 264600,
+   "endFade": 2646,
+   "loop": [
+    156514,
+    238140
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Ocarina, Typical/Sustains/Sus/StdOcarina_Sus_C#5.wav",
+   "root": 85,
+   "keys": [
+    85,
+    127
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 5.7,
+   "tune": -4.1,
+   "start": 0,
+   "end": 232848,
+   "endFade": 2646,
+   "loop": [
+    136506,
+    204624
+   ],
+   "loopCrossfade": 3528
+  }
+ ],
+ "settings": {
+  "velocity-db": 12,
+  "velocity-crossfade": 1,
+  "loop": 1
+ }
+}

@@ -1,0 +1,979 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "FM clavisynth (TX81Z)",
+ "zones": [
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_C0_vl1.wav",
+   "root": 36,
+   "keys": [
+    0,
+    38
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 8.5,
+   "tune": -5.3,
+   "start": 0,
+   "end": 434197,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_C0_vl2.wav",
+   "root": 36,
+   "keys": [
+    0,
+    38
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 8.5,
+   "tune": -6.6,
+   "start": 0,
+   "end": 529891,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_C0_vl3.wav",
+   "root": 36,
+   "keys": [
+    0,
+    38
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 8.5,
+   "tune": -3.1,
+   "start": 0,
+   "end": 529825,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_E0_vl1.wav",
+   "root": 40,
+   "keys": [
+    39,
+    42
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 8.5,
+   "tune": -5.7,
+   "start": 0,
+   "end": 326382,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_E0_vl2.wav",
+   "root": 40,
+   "keys": [
+    39,
+    42
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 8.5,
+   "tune": -7.1,
+   "start": 0,
+   "end": 514613,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_E0_vl3.wav",
+   "root": 40,
+   "keys": [
+    39,
+    42
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 8.5,
+   "tune": -46.3,
+   "start": 0,
+   "end": 529883,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_G#0_vl1.wav",
+   "root": 44,
+   "keys": [
+    43,
+    46
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 8.5,
+   "tune": -4.9,
+   "start": 0,
+   "end": 301144,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_G#0_vl2.wav",
+   "root": 44,
+   "keys": [
+    43,
+    46
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 8.5,
+   "tune": -6.0,
+   "start": 0,
+   "end": 458336,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_G#0_vl3.wav",
+   "root": 44,
+   "keys": [
+    43,
+    46
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 8.5,
+   "tune": -46.4,
+   "start": 0,
+   "end": 529536,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_C1_vl1.wav",
+   "root": 48,
+   "keys": [
+    47,
+    50
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 8.5,
+   "tune": -3.9,
+   "start": 0,
+   "end": 225030,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_C1_vl2.wav",
+   "root": 48,
+   "keys": [
+    47,
+    50
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 8.5,
+   "tune": -4.8,
+   "start": 0,
+   "end": 324252,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_C1_vl3.wav",
+   "root": 48,
+   "keys": [
+    47,
+    50
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 8.5,
+   "tune": -42.5,
+   "start": 0,
+   "end": 434846,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_E1_vl1.wav",
+   "root": 52,
+   "keys": [
+    51,
+    54
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 8.5,
+   "tune": -4.5,
+   "start": 0,
+   "end": 163339,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_E1_vl2.wav",
+   "root": 52,
+   "keys": [
+    51,
+    54
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 8.5,
+   "tune": -5.3,
+   "start": 0,
+   "end": 249560,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_E1_vl3.wav",
+   "root": 52,
+   "keys": [
+    51,
+    54
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 8.5,
+   "tune": -38.7,
+   "start": 0,
+   "end": 321255,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_G#1_vl1.wav",
+   "root": 56,
+   "keys": [
+    55,
+    58
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 8.5,
+   "tune": -3.1,
+   "start": 0,
+   "end": 214355,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_G#1_vl2.wav",
+   "root": 56,
+   "keys": [
+    55,
+    58
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 8.5,
+   "tune": -3.9,
+   "start": 0,
+   "end": 257595,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_G#1_vl3.wav",
+   "root": 56,
+   "keys": [
+    55,
+    58
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 8.5,
+   "tune": -36.0,
+   "start": 0,
+   "end": 355912,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_C2_vl1.wav",
+   "root": 60,
+   "keys": [
+    59,
+    62
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 8.5,
+   "tune": -3.2,
+   "start": 0,
+   "end": 180426,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_C2_vl2.wav",
+   "root": 60,
+   "keys": [
+    59,
+    62
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 8.5,
+   "tune": -3.9,
+   "start": 0,
+   "end": 265206,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_C2_vl3.wav",
+   "root": 60,
+   "keys": [
+    59,
+    62
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 8.5,
+   "tune": -25.1,
+   "start": 0,
+   "end": 292923,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_E2_vl1.wav",
+   "root": 64,
+   "keys": [
+    63,
+    66
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 8.5,
+   "tune": -3.4,
+   "start": 0,
+   "end": 155635,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_E2_vl2.wav",
+   "root": 64,
+   "keys": [
+    63,
+    66
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 8.5,
+   "tune": -4.0,
+   "start": 0,
+   "end": 196292,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_E2_vl3.wav",
+   "root": 64,
+   "keys": [
+    63,
+    66
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 8.5,
+   "tune": -12.3,
+   "start": 0,
+   "end": 227902,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_G#2_vl1.wav",
+   "root": 68,
+   "keys": [
+    67,
+    70
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 8.5,
+   "tune": -2.2,
+   "start": 0,
+   "end": 131614,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_G#2_vl2.wav",
+   "root": 68,
+   "keys": [
+    67,
+    70
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 8.5,
+   "tune": -2.7,
+   "start": 0,
+   "end": 178364,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_G#2_vl3.wav",
+   "root": 68,
+   "keys": [
+    67,
+    70
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 8.5,
+   "tune": -7.1,
+   "start": 0,
+   "end": 190358,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_C3_vl1.wav",
+   "root": 72,
+   "keys": [
+    71,
+    74
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 8.5,
+   "tune": -2.2,
+   "start": 0,
+   "end": 110022,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_C3_vl2.wav",
+   "root": 72,
+   "keys": [
+    71,
+    74
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 8.5,
+   "tune": -2.5,
+   "start": 0,
+   "end": 135430,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_C3_vl3.wav",
+   "root": 72,
+   "keys": [
+    71,
+    74
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 8.5,
+   "tune": -4.3,
+   "start": 0,
+   "end": 158239,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_E3_vl1.wav",
+   "root": 76,
+   "keys": [
+    75,
+    78
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 8.5,
+   "tune": -2.4,
+   "start": 0,
+   "end": 74507,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_E3_vl2.wav",
+   "root": 76,
+   "keys": [
+    75,
+    78
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 8.5,
+   "tune": -2.6,
+   "start": 0,
+   "end": 110312,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_E3_vl3.wav",
+   "root": 76,
+   "keys": [
+    75,
+    78
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 8.5,
+   "tune": -3.6,
+   "start": 0,
+   "end": 110865,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_G#3_vl1.wav",
+   "root": 80,
+   "keys": [
+    79,
+    82
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 8.5,
+   "tune": -1.8,
+   "start": 0,
+   "end": 69884,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_G#3_vl2.wav",
+   "root": 80,
+   "keys": [
+    79,
+    82
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 8.5,
+   "tune": -1.9,
+   "start": 0,
+   "end": 91593,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_G#3_vl3.wav",
+   "root": 80,
+   "keys": [
+    79,
+    82
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 8.5,
+   "tune": -2.3,
+   "start": 0,
+   "end": 97753,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_C4_vl1.wav",
+   "root": 84,
+   "keys": [
+    83,
+    86
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 8.5,
+   "tune": -1.9,
+   "start": 0,
+   "end": 53800,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_C4_vl2.wav",
+   "root": 84,
+   "keys": [
+    83,
+    86
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 8.5,
+   "tune": -2.0,
+   "start": 0,
+   "end": 68699,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_C4_vl3.wav",
+   "root": 84,
+   "keys": [
+    83,
+    86
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 8.5,
+   "tune": -2.0,
+   "start": 0,
+   "end": 86371,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_E4_vl1.wav",
+   "root": 88,
+   "keys": [
+    87,
+    90
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 8.5,
+   "tune": -2.3,
+   "start": 0,
+   "end": 41964,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_E4_vl2.wav",
+   "root": 88,
+   "keys": [
+    87,
+    90
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 8.5,
+   "tune": -2.3,
+   "start": 0,
+   "end": 54851,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_E4_vl3.wav",
+   "root": 88,
+   "keys": [
+    87,
+    90
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 8.5,
+   "tune": -2.4,
+   "start": 0,
+   "end": 55447,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_G#4_vl1.wav",
+   "root": 92,
+   "keys": [
+    91,
+    94
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 8.5,
+   "tune": -1.1,
+   "start": 0,
+   "end": 37230,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_G#4_vl2.wav",
+   "root": 92,
+   "keys": [
+    91,
+    94
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 8.5,
+   "tune": -1.1,
+   "start": 0,
+   "end": 49742,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_G#4_vl3.wav",
+   "root": 92,
+   "keys": [
+    91,
+    94
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 8.5,
+   "tune": -1.2,
+   "start": 0,
+   "end": 53836,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_C5_vl1.wav",
+   "root": 96,
+   "keys": [
+    95,
+    98
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 8.5,
+   "tune": -3.0,
+   "start": 0,
+   "end": 27734,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_C5_vl2.wav",
+   "root": 96,
+   "keys": [
+    95,
+    98
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 8.5,
+   "tune": -3.0,
+   "start": 0,
+   "end": 35497,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_C5_vl3.wav",
+   "root": 96,
+   "keys": [
+    95,
+    98
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 8.5,
+   "tune": -3.0,
+   "start": 0,
+   "end": 43852,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_E5_vl1.wav",
+   "root": 100,
+   "keys": [
+    99,
+    102
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 8.5,
+   "tune": -1.2,
+   "start": 0,
+   "end": 19227,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_E5_vl2.wav",
+   "root": 100,
+   "keys": [
+    99,
+    102
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 8.5,
+   "tune": -1.2,
+   "start": 0,
+   "end": 27337,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_E5_vl3.wav",
+   "root": 100,
+   "keys": [
+    99,
+    102
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 8.5,
+   "tune": -1.2,
+   "start": 0,
+   "end": 26739,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_G#5_vl1.wav",
+   "root": 104,
+   "keys": [
+    103,
+    106
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 8.5,
+   "tune": -7.5,
+   "start": 0,
+   "end": 17693,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_G#5_vl2.wav",
+   "root": 104,
+   "keys": [
+    103,
+    106
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 8.5,
+   "tune": -7.5,
+   "start": 0,
+   "end": 20851,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_G#5_vl3.wav",
+   "root": 104,
+   "keys": [
+    103,
+    106
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 8.5,
+   "tune": -7.5,
+   "start": 0,
+   "end": 23360,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_C6_vl1.wav",
+   "root": 108,
+   "keys": [
+    107,
+    127
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 8.5,
+   "tune": -1.5,
+   "start": 0,
+   "end": 12586,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_C6_vl2.wav",
+   "root": 108,
+   "keys": [
+    107,
+    127
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 8.5,
+   "tune": -1.4,
+   "start": 0,
+   "end": 16717,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/Clavisynth/Clavisynth_C6_vl3.wav",
+   "root": 108,
+   "keys": [
+    107,
+    127
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 8.5,
+   "tune": -1.4,
+   "start": 0,
+   "end": 17983,
+   "endFade": 2646
+  }
+ ],
+ "settings": {
+  "velocity-db": 18
+ }
+}

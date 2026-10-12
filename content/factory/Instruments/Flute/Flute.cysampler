@@ -1,0 +1,430 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Flute",
+ "zones": [
+  {
+   "file": "bank:vsco/Woodwinds/Flute/susNV/LDFlute_susNV_C3_v1_1.wav",
+   "root": 60,
+   "keys": [
+    0,
+    62
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 7.7,
+   "tune": -2.4,
+   "start": 0,
+   "end": 440306,
+   "endFade": 2646,
+   "loop": [
+    322669,
+    420714
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Flute/susNV/LDFlute_susNV_C3_v3_1.wav",
+   "root": 60,
+   "keys": [
+    0,
+    62
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 7.7,
+   "tune": 0.9,
+   "start": 0,
+   "end": 454846,
+   "endFade": 2646,
+   "loop": [
+    324684,
+    437206
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Flute/susNV/LDFlute_susNV_E3_v1_1.wav",
+   "root": 64,
+   "keys": [
+    63,
+    66
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 7.7,
+   "tune": 0.7,
+   "start": 0,
+   "end": 478912,
+   "endFade": 2646,
+   "loop": [
+    166065,
+    441882
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Flute/susNV/LDFlute_susNV_E3_v3_1.wav",
+   "root": 64,
+   "keys": [
+    63,
+    66
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 7.7,
+   "tune": -0.3,
+   "start": 0,
+   "end": 469028,
+   "endFade": 2646,
+   "loop": [
+    250851,
+    443646
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Flute/susNV/LDFlute_susNV_A3_v1_1.wav",
+   "root": 69,
+   "keys": [
+    67,
+    70
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 7.7,
+   "tune": -0.1,
+   "start": 0,
+   "end": 450927,
+   "endFade": 2646,
+   "loop": [
+    48156,
+    393372
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Flute/susNV/LDFlute_susNV_A3_v3_1.wav",
+   "root": 69,
+   "keys": [
+    67,
+    70
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 7.7,
+   "tune": -0.1,
+   "start": 0,
+   "end": 460844,
+   "endFade": 2646,
+   "loop": [
+    342055,
+    424242
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Flute/susNV/LDFlute_susNV_C4_v1_1.wav",
+   "root": 72,
+   "keys": [
+    71,
+    74
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 7.7,
+   "tune": -0.1,
+   "start": 0,
+   "end": 453567,
+   "endFade": 2646,
+   "loop": [
+    317901,
+    417186
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Flute/susNV/LDFlute_susNV_C4_v3_1.wav",
+   "root": 72,
+   "keys": [
+    71,
+    74
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 7.7,
+   "tune": -0.1,
+   "start": 0,
+   "end": 423143,
+   "endFade": 2646,
+   "loop": [
+    319971,
+    391608
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Flute/susNV/LDFlute_susNV_E4_v1_1.wav",
+   "root": 76,
+   "keys": [
+    75,
+    78
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 7.7,
+   "tune": -0.1,
+   "start": 0,
+   "end": 431767,
+   "endFade": 2646,
+   "loop": [
+    26874,
+    399546
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Flute/susNV/LDFlute_susNV_E4_v3_1.wav",
+   "root": 76,
+   "keys": [
+    75,
+    78
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 7.7,
+   "tune": -0.1,
+   "start": 0,
+   "end": 408104,
+   "endFade": 2646,
+   "loop": [
+    175515,
+    380142
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Flute/susNV/LDFlute_susNV_A4_v1_1.wav",
+   "root": 81,
+   "keys": [
+    79,
+    82
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 7.7,
+   "tune": -0.4,
+   "start": 0,
+   "end": 576698,
+   "endFade": 2646,
+   "loop": [
+    491225,
+    544194
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Flute/susNV/LDFlute_susNV_A4_v3_1.wav",
+   "root": 81,
+   "keys": [
+    79,
+    82
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 7.7,
+   "tune": -0.4,
+   "start": 0,
+   "end": 357806,
+   "endFade": 2646,
+   "loop": [
+    246079,
+    321048
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Flute/susNV/LDFlute_susNV_C5_v1_1.wav",
+   "root": 84,
+   "keys": [
+    83,
+    86
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 7.7,
+   "tune": -0.5,
+   "start": 0,
+   "end": 415127,
+   "endFade": 2646,
+   "loop": [
+    274109,
+    369558
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Flute/susNV/LDFlute_susNV_C5_v2_1.wav",
+   "root": 84,
+   "keys": [
+    83,
+    86
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 7.7,
+   "tune": -0.5,
+   "start": 0,
+   "end": 397011,
+   "endFade": 2646,
+   "loop": [
+    295570,
+    353682
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Flute/susNV/LDFlute_susNV_E5_v1_1.wav",
+   "root": 88,
+   "keys": [
+    87,
+    90
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 7.7,
+   "tune": -4.1,
+   "start": 0,
+   "end": 492691,
+   "endFade": 2646,
+   "loop": [
+    393250,
+    455994
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Flute/susNV/LDFlute_susNV_E5_v2_1.wav",
+   "root": 88,
+   "keys": [
+    87,
+    90
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 7.7,
+   "tune": -0.3,
+   "start": 0,
+   "end": 353432,
+   "endFade": 2646,
+   "loop": [
+    187266,
+    295470
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Flute/susNV/LDFlute_susNV_A5_v1_1.wav",
+   "root": 93,
+   "keys": [
+    91,
+    94
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 7.7,
+   "tune": -1.4,
+   "start": 0,
+   "end": 480886,
+   "endFade": 2646,
+   "loop": [
+    70737,
+    439236
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Flute/susNV/LDFlute_susNV_A5_v3_1.wav",
+   "root": 93,
+   "keys": [
+    91,
+    94
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 7.7,
+   "tune": -1.4,
+   "start": 0,
+   "end": 350020,
+   "endFade": 2646,
+   "loop": [
+    241047,
+    299880
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Flute/susNV/LDFlute_susNV_C6_v1_1.wav",
+   "root": 96,
+   "keys": [
+    95,
+    127
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 7.7,
+   "tune": -2.0,
+   "start": 0,
+   "end": 255780,
+   "endFade": 2646,
+   "loop": [
+    166499,
+    219618
+   ],
+   "loopCrossfade": 3528
+  }
+ ],
+ "settings": {
+  "velocity-db": 12,
+  "velocity-crossfade": 1,
+  "loop": 1
+ }
+}

@@ -1,0 +1,277 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "House kit",
+ "settings": {
+  "one-shot": 1,
+  "velocity-db": 10
+ },
+ "zones": [
+  {
+   "file": "bank:cydaw-electro/Kicks/Deep House.wav",
+   "root": 35,
+   "keys": [
+    35,
+    35
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 0.0
+  },
+  {
+   "file": "bank:cydaw-electro/Kicks/House Classic.wav",
+   "root": 36,
+   "keys": [
+    36,
+    36
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 0.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/808 Rim.wav",
+   "root": 37,
+   "keys": [
+    37,
+    37
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/Snares/House Snare.wav",
+   "root": 38,
+   "keys": [
+    38,
+    38
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -2.0
+  },
+  {
+   "file": "bank:cydaw-electro/Claps/House Clap.wav",
+   "root": 39,
+   "keys": [
+    39,
+    39
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -3.0
+  },
+  {
+   "file": "bank:cydaw-electro/Claps/Snap.wav",
+   "root": 40,
+   "keys": [
+    40,
+    40
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -3.0
+  },
+  {
+   "file": "bank:cydaw-electro/Hats/909 Closed Hat.wav",
+   "root": 42,
+   "keys": [
+    42,
+    42
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -9.0,
+   "group": 1,
+   "offBy": 1
+  },
+  {
+   "file": "bank:cydaw-electro/Hats/808 Pedal Hat.wav",
+   "root": 44,
+   "keys": [
+    44,
+    44
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -9.0,
+   "group": 1,
+   "offBy": 1
+  },
+  {
+   "file": "bank:cydaw-electro/Hats/House Open Hat.wav",
+   "root": 46,
+   "keys": [
+    46,
+    46
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -8.0,
+   "group": 1,
+   "offBy": 1
+  },
+  {
+   "file": "bank:cydaw-electro/Cymbals/Crash.wav",
+   "root": 49,
+   "keys": [
+    49,
+    49
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -11.0
+  },
+  {
+   "file": "bank:cydaw-electro/Cymbals/Ride.wav",
+   "root": 51,
+   "keys": [
+    51,
+    51
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -11.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/Tambourine.wav",
+   "root": 54,
+   "keys": [
+    54,
+    54
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/808 Cowbell.wav",
+   "root": 56,
+   "keys": [
+    56,
+    56
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/Bongo.wav",
+   "root": 60,
+   "keys": [
+    60,
+    60
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/808 Conga High.wav",
+   "root": 62,
+   "keys": [
+    62,
+    62
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/808 Conga Mid.wav",
+   "root": 63,
+   "keys": [
+    63,
+    63
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/808 Conga Low.wav",
+   "root": 64,
+   "keys": [
+    64,
+    64
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/Shaker Long.wav",
+   "root": 69,
+   "keys": [
+    69,
+    69
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/Shaker.wav",
+   "root": 70,
+   "keys": [
+    70,
+    70
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/Claves.wav",
+   "root": 75,
+   "keys": [
+    75,
+    75
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  }
+ ]
+}

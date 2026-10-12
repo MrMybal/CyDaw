@@ -1,0 +1,282 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Italian harpsichord",
+ "zones": [
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Italian/Sustains/stop1/Harpsichord_stop1_F#0_1.wav",
+   "root": 30,
+   "keys": [
+    0,
+    32
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -5.0,
+   "start": 0,
+   "end": 724122,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Italian/Sustains/stop1/Harpsichord_stop1_A#0_1.wav",
+   "root": 34,
+   "keys": [
+    33,
+    35
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -4.0,
+   "start": 0,
+   "end": 935802,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Italian/Sustains/stop1/Harpsichord_stop1_C#1_1.wav",
+   "root": 37,
+   "keys": [
+    36,
+    38
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -6.6,
+   "start": 0,
+   "end": 576828,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Italian/Sustains/stop1/Harpsichord_stop1_E1_1.wav",
+   "root": 40,
+   "keys": [
+    39,
+    42
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -3.3,
+   "start": 0,
+   "end": 533610,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Italian/Sustains/stop1/Harpsichord_stop1_G#1_1.wav",
+   "root": 44,
+   "keys": [
+    43,
+    45
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -7.6,
+   "start": 0,
+   "end": 508914,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Italian/Sustains/stop1/Harpsichord_stop1_B1_1.wav",
+   "root": 47,
+   "keys": [
+    46,
+    49
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -9.4,
+   "start": 0,
+   "end": 567126,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Italian/Sustains/stop1/Harpsichord_stop1_D#2_1.wav",
+   "root": 51,
+   "keys": [
+    50,
+    52
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -11.1,
+   "start": 0,
+   "end": 647388,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Italian/Sustains/stop1/Harpsichord_stop1_F#2_1.wav",
+   "root": 54,
+   "keys": [
+    53,
+    56
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -7.6,
+   "start": 0,
+   "end": 452466,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Italian/Sustains/stop1/Harpsichord_stop1_A#2_1.wav",
+   "root": 58,
+   "keys": [
+    57,
+    59
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -16.1,
+   "start": 0,
+   "end": 423360,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Italian/Sustains/stop1/Harpsichord_stop1_C#3_1.wav",
+   "root": 61,
+   "keys": [
+    60,
+    62
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -5.6,
+   "start": 0,
+   "end": 325458,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Italian/Sustains/stop1/Harpsichord_stop1_E3_1.wav",
+   "root": 64,
+   "keys": [
+    63,
+    66
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -6.3,
+   "start": 0,
+   "end": 309582,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Italian/Sustains/stop1/Harpsichord_stop1_G#3_1.wav",
+   "root": 68,
+   "keys": [
+    67,
+    69
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -14.2,
+   "start": 0,
+   "end": 401310,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Italian/Sustains/stop1/Harpsichord_stop1_B3_1.wav",
+   "root": 71,
+   "keys": [
+    70,
+    73
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -9.5,
+   "start": 0,
+   "end": 261072,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Italian/Sustains/stop1/Harpsichord_stop1_D#4_1.wav",
+   "root": 75,
+   "keys": [
+    74,
+    76
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -4.1,
+   "start": 0,
+   "end": 306054,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Italian/Sustains/stop1/Harpsichord_stop1_F#4_1.wav",
+   "root": 78,
+   "keys": [
+    77,
+    80
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -4.0,
+   "start": 0,
+   "end": 223146,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Italian/Sustains/stop1/Harpsichord_stop1_A#4_1.wav",
+   "root": 82,
+   "keys": [
+    81,
+    127
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -13.4,
+   "start": 0,
+   "end": 170226,
+   "endFade": 2646
+  }
+ ],
+ "settings": {
+  "velocity-db": 4
+ }
+}

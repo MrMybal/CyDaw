@@ -1,0 +1,40 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "kick-synth",
+ "name": "Techno Hard",
+ "state": {
+  "type": "kick-synth",
+  "parameters": {
+   "kick.bodyShape": 0.0,
+   "kick.bodyPhase": 0.0,
+   "kick.pitchStart": 500.0,
+   "kick.pitchEnd": 50.0,
+   "kick.pitchTime": 70.0,
+   "kick.pitchCurve": 5.0,
+   "kick.bodyLevel": 0.0,
+   "kick.attack": 0.400000005960464,
+   "kick.hold": 40.0,
+   "kick.decay": 380.0,
+   "kick.decayCurve": 2.0,
+   "kick.length": 1500.0,
+   "kick.clickType": 2.0,
+   "kick.clickLevel": -6.0,
+   "kick.clickDecay": 3.0,
+   "kick.clickTone": 5000.0,
+   "kick.subLevel": -60.0,
+   "kick.subDecay": 600.0,
+   "kick.subOctave": 0.0,
+   "kick.driveType": 1.0,
+   "kick.drive": 9.0,
+   "kick.driveTone": 9000.0,
+   "kick.lowCut": 15.0,
+   "kick.highCut": 20000.0,
+   "kick.lowBoost": 0.0,
+   "kick.keyTrack": 1.0,
+   "kick.velocity": 0.5,
+   "kick.output": -5.590000152587891
+  }
+ }
+}

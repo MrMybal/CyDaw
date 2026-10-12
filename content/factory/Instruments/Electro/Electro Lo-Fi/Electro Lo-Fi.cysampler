@@ -1,0 +1,186 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Lo-fi kit",
+ "settings": {
+  "one-shot": 1,
+  "velocity-db": 10
+ },
+ "zones": [
+  {
+   "file": "bank:cydaw-electro/Kicks/Acoustic Felt.wav",
+   "root": 35,
+   "keys": [
+    35,
+    35
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 0.0
+  },
+  {
+   "file": "bank:cydaw-electro/Kicks/Lo-Fi Dusty.wav",
+   "root": 36,
+   "keys": [
+    36,
+    36
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 0.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/Wood Block.wav",
+   "root": 37,
+   "keys": [
+    37,
+    37
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/Snares/Lo-Fi Snare.wav",
+   "root": 38,
+   "keys": [
+    38,
+    38
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -2.0
+  },
+  {
+   "file": "bank:cydaw-electro/Claps/Snap.wav",
+   "root": 39,
+   "keys": [
+    39,
+    39
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -3.0
+  },
+  {
+   "file": "bank:cydaw-electro/Snares/Fat Snare.wav",
+   "root": 40,
+   "keys": [
+    40,
+    40
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -2.0
+  },
+  {
+   "file": "bank:cydaw-electro/Hats/Lo-Fi Hat.wav",
+   "root": 42,
+   "keys": [
+    42,
+    42
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -9.0,
+   "group": 1,
+   "offBy": 1
+  },
+  {
+   "file": "bank:cydaw-electro/Hats/Dark Hat.wav",
+   "root": 44,
+   "keys": [
+    44,
+    44
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -9.0,
+   "group": 1,
+   "offBy": 1
+  },
+  {
+   "file": "bank:cydaw-electro/Hats/808 Open Hat.wav",
+   "root": 46,
+   "keys": [
+    46,
+    46
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -8.0,
+   "group": 1,
+   "offBy": 1
+  },
+  {
+   "file": "bank:cydaw-electro/Cymbals/Ride.wav",
+   "root": 51,
+   "keys": [
+    51,
+    51
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -11.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/Tambourine Short.wav",
+   "root": 54,
+   "keys": [
+    54,
+    54
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/Maracas.wav",
+   "root": 70,
+   "keys": [
+    70,
+    70
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/Claves.wav",
+   "root": 75,
+   "keys": [
+    75,
+    75
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  }
+ ]
+}

@@ -1,0 +1,141 @@
+CyDAW factory instruments
+=========================
+
+The sampler instruments (Instruments/) and the sound models made from them (Sound Models/) are
+built from recordings released under Creative Commons Zero (CC0 1.0, public domain) or the
+Unlicense: no rights reserved; use, change and share them, commercially too, without credit.
+The credits below are given with thanks.
+
+CyDAW does not ship the recordings: it downloads them from each bank's repository (Options >
+Sound banks), at the commit banks.json names, with the bank's own licence file. It plays each
+note as recorded (from where its sound starts to where it has faded), tuned and mapped to keys
+and velocities; an SFZ bank is played as its own mapping opens (its controllers at their
+starting values).
+
+The electronic drums (CyDAW Electro) are not recorded: CyDAW makes them on the computer it runs
+on, from the recipes BankLists/cydaw-electro.json lists, with its own drum and Kick engines. They
+and their kits are CyDAW's own, dedicated to the public domain (CC0 1.0).
+
+  - Versilian Community Sample Library, Versilian Studios LLC
+    CC0-1.0  https://github.com/sgossner/VCSL
+    Steinway B grand piano, Kawai grand piano, Felt piano, Yamaha upright piano, Honky-tonk upright
+    piano, Knight upright piano, FM piano (TX81Z), Flemish harpsichord I, Flemish harpsichord II,
+    French harpsichord, Italian harpsichord, English harpsichord, English harpsichord, lute stop,
+    Concert harp, Folk harp, Pipe organ (full), Pipe organ (soft), Renaissance organ (8 foot), Alto
+    recorder, Tenor recorder, Ocarina, Tenor saxophone, Chromatic harmonica, Bowed psaltery, Đàn
+    tranh (Vietnamese zither), Marimba, Vibraphone, Xylophone, Glockenspiel, Tubular bells, Hand
+    chimes, FM clavisynth (TX81Z)
+  - Versilian Studios Chamber Orchestra 2, Community Edition, Versilian Studios LLC
+    CC0-1.0  https://github.com/sgossner/VSCO-2-CE
+    Violin (bowed, vibrato), Violin pizzicato, Violin section, Viola section, Cello section, Double
+    bass (bowed), Violin section pizzicato, Cello section pizzicato, Double bass pizzicato, French
+    horn, Trumpet, Tenor trombone, Tuba, Flute, Oboe, Clarinet, Bassoon
+  - CyDAW Electro, CyDAW
+    CC0-1.0  
+    808 drum machine, 909 drum machine, Techno kit, House kit, Trap kit, Lo-fi kit, Hard dance kit,
+    Drum and bass kit, Kick collection, Electro percussion and FX
+  - Emilyguitar, Karoryfer Samples
+    CC0-1.0  https://github.com/sfzinstruments/karoryfer.emilyguitar
+    Epiphone electric guitar
+  - Shinyguitar, Karoryfer Samples
+    CC0-1.0  https://github.com/sfzinstruments/karoryfer.shinyguitar
+    Archtop guitar (electric), Archtop guitar (acoustic)
+  - Black And Green Guitars, Karoryfer Samples
+    CC0-1.0  https://github.com/sfzinstruments/karoryfer.black-and-green-guitars
+    Gretsch Anniversary guitar, Hofner Club guitar
+  - Ganjo, itsclipping
+    CC0-1.0  https://github.com/sfzinstruments/ganjo
+    Six-string banjo
+  - Growlybass, Karoryfer Samples
+    CC0-1.0  https://github.com/sfzinstruments/karoryfer.growlybass
+    Jazz bass
+  - Black And Blue Basses, Karoryfer Samples
+    CC0-1.0  https://github.com/sfzinstruments/karoryfer.black-and-blue-basses
+    "Dark Black" electric bass, "Baby Blue" electric bass
+  - Fashionbass, Karoryfer Samples
+    CC0-1.0  https://github.com/sfzinstruments/karoryfer.fashionbass
+    Killer KB-Simmony bass
+  - Swagbass, Karoryfer Samples
+    CC0-1.0  https://github.com/sfzinstruments/karoryfer.swagbass
+    Swagbass
+  - Pastabass, Karoryfer Samples
+    CC0-1.0  https://github.com/sfzinstruments/karoryfer.pastabass
+    Bass VI
+  - Big Little Bass, Karoryfer Samples
+    CC0-1.0  https://github.com/sfzinstruments/karoryfer.big-little-bass
+    Big Little acoustic bass
+  - Meatbass, Karoryfer Samples
+    CC0-1.0  https://github.com/sfzinstruments/karoryfer.meatbass
+    Jazz double bass (pizzicato), Otto Rubner double bass (bowed)
+  - Sneakybass, Karoryfer Samples
+    CC0-1.0  https://github.com/sfzinstruments/karoryfer.sneakybass
+    Hushed double bass
+  - Ergo, Karoryfer Samples
+    CC0-1.0  https://github.com/sfzinstruments/karoryfer.ergo
+    Ergo electric upright bass
+  - Karoryfer x bigcat Cello, Karoryfer Samples
+    CC0-1.0  https://github.com/sfzinstruments/karoryfer-bigcat.cello
+    Solo cello (bowed), Solo cello pizzicato
+  - Bear Sax, Karoryfer Samples
+    CC0-1.0  https://github.com/sfzinstruments/karoryfer.bear-sax
+    Baritone saxophone
+  - Weresax, Karoryfer Samples
+    CC0-1.0  https://github.com/sfzinstruments/karoryfer.weresax
+    Alto saxophone
+  - War Tuba, Karoryfer Samples
+    CC0-1.0  https://github.com/sfzinstruments/karoryfer.war-tuba
+    Tuba (War Tuba)
+  - Osiris Piano
+    CC0-1.0  https://github.com/sfzinstruments/Osiris_Piano
+    Osiris piano (una corda)
+  - Scarypiano, Karoryfer Samples
+    CC0-1.0  https://github.com/sfzinstruments/karoryfer.scarypiano
+    Haunted piano (Scarypiano)
+  - Erhu
+    CC0-1.0  https://github.com/sfzinstruments/aliexpress-erhu
+    Erhu (Chinese fiddle)
+  - Cithara Barbarica
+    CC0-1.0  https://github.com/sfzinstruments/cithara-barbarica
+    Cithara barbarica (medieval lyre)
+  - Hungarian Zither
+    CC0-1.0  https://github.com/sfzinstruments/hungarian_zither
+    Hungarian zither
+  - Horse Pulse, Karoryfer Samples
+    CC0-1.0  https://github.com/sfzinstruments/Karoryfer.HorsePulse
+    Bass tagelharpa (plucked)
+  - jSteelDrum, J. Learman
+    Unlicense  https://github.com/sfzinstruments/jlearman.SteelDrum
+    Steel drum
+  - Virtuosity Drums, Versilian Studios, Karoryfer Samples
+    CC0-1.0  https://github.com/sfzinstruments/virtuosity_drums
+    Jazz kit (Virtuosity)
+  - Big Rusty Drums, Karoryfer Samples
+    CC0-1.0  https://github.com/sfzinstruments/karoryfer.big-rusty-drums
+    Big Rusty kit
+  - Swirly Drums, Karoryfer Samples
+    CC0-1.0  https://github.com/sfzinstruments/karoryfer.swirly-drums
+    Swirly kit
+  - Unruly Drums, Karoryfer Samples
+    CC0-1.0  https://github.com/sfzinstruments/karoryfer.unruly-drums
+    Unruly kit (sticks), Unruly kit (brushes)
+  - Gogodze Phu Vol. II, Karoryfer Samples
+    CC0-1.0  https://github.com/sfzinstruments/karoryfer.gogodze-phu-vol-ii
+    Seventies kit (Gogodze Phu)
+  - Gogodze Phu Vol. I, Karoryfer Samples
+    CC0-1.0  https://github.com/sfzinstruments/karoryfer.gogodze-phu-vol-i
+    Bobobo drums (Ghana)
+  - Body Percussion
+    CC0-1.0  https://github.com/sfzinstruments/body_percussion
+    Body percussion
+  - Caveman Cosmonaut, Karoryfer Samples
+    CC0-1.0  https://github.com/sfzinstruments/karoryfer.caveman-cosmonaut
+    Caveman Cosmonaut (organ synth)
+  - Cowsynth, Karoryfer Samples
+    CC0-1.0  https://github.com/sfzinstruments/karoryfer.cowsynth
+    Cowsynth (bagpipe synth)
+  - String Cyborgs, Karoryfer Samples
+    CC0-1.0  https://github.com/sfzinstruments/karoryfer.string-cyborgs
+    String Cyborgs (string synth)
+  - Legato Vocal, Karoryfer Samples
+    CC0-1.0  https://github.com/sfzinstruments/legato_vocal_tutorial
+    Sung voice "a"

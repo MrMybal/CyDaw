@@ -1,0 +1,332 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Hand chimes",
+ "zones": [
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Hand Chimes/sus_C3_r01_main.wav",
+   "root": 60,
+   "keys": [
+    0,
+    61
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.0,
+   "tune": -13.5,
+   "start": 0,
+   "end": 572175,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Hand Chimes/sus_D3_r01_main.wav",
+   "root": 62,
+   "keys": [
+    62,
+    63
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.0,
+   "tune": -11.7,
+   "start": 0,
+   "end": 497362,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Hand Chimes/sus_E3_r01_main.wav",
+   "root": 64,
+   "keys": [
+    64,
+    65
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.0,
+   "tune": -6.3,
+   "start": 0,
+   "end": 704718,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Hand Chimes/sus_F#3_r01_main.wav",
+   "root": 66,
+   "keys": [
+    66,
+    67
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.0,
+   "tune": -12.4,
+   "start": 0,
+   "end": 588294,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Hand Chimes/sus_G#3_r01_main.wav",
+   "root": 68,
+   "keys": [
+    68,
+    69
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.0,
+   "tune": -2.1,
+   "start": 0,
+   "end": 509796,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Hand Chimes/sus_A#3_r01_main.wav",
+   "root": 70,
+   "keys": [
+    70,
+    71
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.0,
+   "tune": -3.3,
+   "start": 0,
+   "end": 368234,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Hand Chimes/sus_C4_r01_main.wav",
+   "root": 72,
+   "keys": [
+    72,
+    73
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.0,
+   "tune": -0.9,
+   "start": 0,
+   "end": 297234,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Hand Chimes/sus_D4_r01_main.wav",
+   "root": 74,
+   "keys": [
+    74,
+    75
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.0,
+   "tune": -0.3,
+   "start": 0,
+   "end": 431773,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Hand Chimes/sus_E4_r01_main.wav",
+   "root": 76,
+   "keys": [
+    76,
+    77
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.0,
+   "tune": -3.0,
+   "start": 0,
+   "end": 219618,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Hand Chimes/sus_F#4_r01_main.wav",
+   "root": 78,
+   "keys": [
+    78,
+    79
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.0,
+   "tune": -4.9,
+   "start": 0,
+   "end": 175518,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Hand Chimes/sus_G#4_r01_main.wav",
+   "root": 80,
+   "keys": [
+    80,
+    80
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.0,
+   "tune": -2.6,
+   "start": 0,
+   "end": 371322,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Hand Chimes/sus_A4_r01_main.wav",
+   "root": 81,
+   "keys": [
+    81,
+    82
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.0,
+   "tune": -10.9,
+   "start": 0,
+   "end": 323694,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Hand Chimes/sus_C5_r01_main.wav",
+   "root": 84,
+   "keys": [
+    83,
+    85
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.0,
+   "tune": -1.5,
+   "start": 0,
+   "end": 291060,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Hand Chimes/sus_D5_r01_main.wav",
+   "root": 86,
+   "keys": [
+    86,
+    87
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.0,
+   "tune": 2.3,
+   "start": 0,
+   "end": 397782,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Hand Chimes/sus_E5_r01_main.wav",
+   "root": 88,
+   "keys": [
+    88,
+    89
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.0,
+   "tune": -4.2,
+   "start": 0,
+   "end": 173754,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Hand Chimes/sus_F#5_r01_main.wav",
+   "root": 90,
+   "keys": [
+    90,
+    91
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.0,
+   "tune": -2.5,
+   "start": 0,
+   "end": 206388,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Hand Chimes/sus_G#5_r01_main.wav",
+   "root": 92,
+   "keys": [
+    92,
+    93
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.0,
+   "tune": -5.0,
+   "start": 0,
+   "end": 154350,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Hand Chimes/sus_A#5_r01_main.wav",
+   "root": 94,
+   "keys": [
+    94,
+    95
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.0,
+   "tune": -4.1,
+   "start": 0,
+   "end": 141120,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Hand Chimes/sus_C6_r01_main.wav",
+   "root": 96,
+   "keys": [
+    96,
+    127
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.0,
+   "start": 0,
+   "end": 114660,
+   "endFade": 2646
+  }
+ ],
+ "settings": {
+  "velocity-db": 16
+ }
+}

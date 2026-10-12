@@ -1,0 +1,248 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Flemish harpsichord I",
+ "zones": [
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Flemish/Sustains/Low/HarpsiRH_Low_Far_F#0_rr1.wav",
+   "root": 30,
+   "keys": [
+    0,
+    32
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 8.2,
+   "tune": -2.7,
+   "start": 0,
+   "end": 752346,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Flemish/Sustains/Low/HarpsiRH_Low_Far_A#0_rr1.wav",
+   "root": 34,
+   "keys": [
+    33,
+    36
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 8.2,
+   "tune": -4.9,
+   "start": 0,
+   "end": 648270,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Flemish/Sustains/Low/HarpsiRH_Low_Far_D1_rr1.wav",
+   "root": 38,
+   "keys": [
+    37,
+    40
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 8.2,
+   "tune": -2.2,
+   "start": 0,
+   "end": 594468,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Flemish/Sustains/Low/HarpsiRH_Low_Far_F#1_rr1.wav",
+   "root": 42,
+   "keys": [
+    41,
+    44
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 8.2,
+   "tune": -4.0,
+   "start": 0,
+   "end": 491274,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Flemish/Sustains/Low/HarpsiRH_Low_Far_A#1_rr1.wav",
+   "root": 46,
+   "keys": [
+    45,
+    49
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 8.2,
+   "tune": -4.2,
+   "start": 0,
+   "end": 425124,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Flemish/Sustains/Low/HarpsiRH_Low_Far_E2_rr1.wav",
+   "root": 52,
+   "keys": [
+    50,
+    54
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 8.2,
+   "tune": -6.5,
+   "start": 0,
+   "end": 443648,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Flemish/Sustains/Low/HarpsiRH_Low_Far_G#2_rr1.wav",
+   "root": 56,
+   "keys": [
+    55,
+    58
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 8.2,
+   "tune": -3.8,
+   "start": 0,
+   "end": 403956,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Flemish/Sustains/Low/HarpsiRH_Low_Far_C3_rr1.wav",
+   "root": 60,
+   "keys": [
+    59,
+    62
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 8.2,
+   "tune": -4.1,
+   "start": 0,
+   "end": 311346,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Flemish/Sustains/Low/HarpsiRH_Low_Far_E3_rr1.wav",
+   "root": 64,
+   "keys": [
+    63,
+    66
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 8.2,
+   "tune": -2.1,
+   "start": 0,
+   "end": 221382,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Flemish/Sustains/Low/HarpsiRH_Low_Far_G#3_rr1.wav",
+   "root": 68,
+   "keys": [
+    67,
+    70
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 8.2,
+   "tune": -3.2,
+   "start": 0,
+   "end": 220500,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Flemish/Sustains/Low/HarpsiRH_Low_Far_C4_rr1.wav",
+   "root": 72,
+   "keys": [
+    71,
+    74
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 8.2,
+   "tune": -4.0,
+   "start": 0,
+   "end": 211680,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Flemish/Sustains/Low/HarpsiRH_Low_Far_E4_rr1.wav",
+   "root": 76,
+   "keys": [
+    75,
+    78
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 8.2,
+   "tune": -5.3,
+   "start": 0,
+   "end": 217854,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Flemish/Sustains/Low/HarpsiRH_Low_Far_G#4_rr1.wav",
+   "root": 80,
+   "keys": [
+    79,
+    82
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 8.2,
+   "tune": -5.1,
+   "start": 0,
+   "end": 233730,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Flemish/Sustains/Low/HarpsiRH_Low_Far_C5_rr1.wav",
+   "root": 84,
+   "keys": [
+    83,
+    127
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 8.2,
+   "tune": -2.5,
+   "start": 0,
+   "end": 176400,
+   "endFade": 2646
+  }
+ ],
+ "settings": {
+  "velocity-db": 4
+ }
+}

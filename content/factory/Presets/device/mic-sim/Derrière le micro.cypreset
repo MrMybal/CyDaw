@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "mic-sim",
+ "name": "Derrière le micro",
+ "state": {
+  "type": "mic-sim",
+  "parameters": {
+   "micsim.distance": 15.0,
+   "micsim.angle": 150.0,
+   "micsim.drive": 0.0,
+   "micsim.lowCut": 20.0,
+   "micsim.highCut": 20000.0,
+   "micsim.room": 0.0,
+   "micsim.output": 0.0,
+   "micsim.mix": 1.0,
+   "micsim.model": 3.0,
+   "micsim.pattern": 2.0,
+   "micsim.preamp": 0.0,
+   "micsim.noise": -90.0,
+   "micsim.roomSize": 0.25,
+   "micsim.roomTone": 5000.0
+  }
+ }
+}

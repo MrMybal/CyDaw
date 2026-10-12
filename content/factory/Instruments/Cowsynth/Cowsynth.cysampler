@@ -1,0 +1,10 @@
+{"format":"cydaw-sampler","version":1,"name":"Cowsynth (bagpipe synth)","settings":{"velocity-db":18},"controllers":{"100":22.0,"101":0.0,"102":0.0,"103":127.0,"104":40.0,"105":0.0,"106":0.0,"107":127.0,"108":0.0},"zones":[
+{"file":"bank:cowsynth/tuned/g2.wav","root":43,"keys":[36,41],"velocities":[1,127]},
+{"file":"bank:cowsynth/tuned/a2.wav","root":45,"keys":[42,47],"velocities":[1,127]},
+{"file":"bank:cowsynth/tuned/f3.wav","root":53,"keys":[48,53],"velocities":[1,127]},
+{"file":"bank:cowsynth/tuned/g3.wav","root":55,"keys":[54,59],"velocities":[1,127]},
+{"file":"bank:cowsynth/tuned/a3.wav","root":57,"keys":[60,65],"velocities":[1,127]},
+{"file":"bank:cowsynth/tuned/c4.wav","root":60,"keys":[66,71],"velocities":[1,127]},
+{"file":"bank:cowsynth/tuned/d4.wav","root":62,"keys":[72,77],"velocities":[1,127]},
+{"file":"bank:cowsynth/tuned/e4.wav","root":64,"keys":[78,84],"velocities":[1,127]}
+]}

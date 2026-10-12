@@ -1,0 +1,809 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Đàn tranh (Vietnamese zither)",
+ "zones": [
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/B1_mf_1.wav",
+   "root": 47,
+   "keys": [
+    0,
+    48
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 4.0,
+   "tune": -2.9,
+   "start": 0,
+   "end": 296420,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/B1_f_1.wav",
+   "root": 47,
+   "keys": [
+    0,
+    48
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 4.0,
+   "tune": -0.5,
+   "start": 49,
+   "end": 287971,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/B1_ff_1.wav",
+   "root": 47,
+   "keys": [
+    0,
+    48
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 4.0,
+   "tune": -7.7,
+   "start": 0,
+   "end": 277349,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/C#2_mf_1.wav",
+   "root": 49,
+   "keys": [
+    49,
+    50
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 4.0,
+   "tune": -26.7,
+   "start": 0,
+   "end": 294102,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/C#2_f_1.wav",
+   "root": 49,
+   "keys": [
+    49,
+    50
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 4.0,
+   "tune": -7.1,
+   "start": 0,
+   "end": 276015,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/C#2_ff_1.wav",
+   "root": 49,
+   "keys": [
+    49,
+    50
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 4.0,
+   "tune": -7.1,
+   "start": 0,
+   "end": 274306,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/D#2_mf_1.wav",
+   "root": 51,
+   "keys": [
+    51,
+    52
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 4.0,
+   "tune": -18.1,
+   "start": 0,
+   "end": 266262,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/D#2_f_1.wav",
+   "root": 51,
+   "keys": [
+    51,
+    52
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 4.0,
+   "tune": -46.5,
+   "start": 0,
+   "end": 277870,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/D#2_ff_1.wav",
+   "root": 51,
+   "keys": [
+    51,
+    52
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 4.0,
+   "tune": -54.5,
+   "start": 0,
+   "end": 280439,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/F#2_mf_1.wav",
+   "root": 54,
+   "keys": [
+    53,
+    55
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 4.0,
+   "tune": -5.5,
+   "start": 0,
+   "end": 279758,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/F#2_f_1.wav",
+   "root": 54,
+   "keys": [
+    53,
+    55
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 4.0,
+   "tune": -32.7,
+   "start": 0,
+   "end": 284897,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/F#2_ff_1.wav",
+   "root": 54,
+   "keys": [
+    53,
+    55
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 4.0,
+   "tune": -7.1,
+   "start": 0,
+   "end": 279119,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/G#2_mf_1.wav",
+   "root": 56,
+   "keys": [
+    56,
+    57
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 4.0,
+   "tune": -15.2,
+   "start": 0,
+   "end": 265209,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/G#2_f_1.wav",
+   "root": 56,
+   "keys": [
+    56,
+    57
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 4.0,
+   "tune": -33.0,
+   "start": 0,
+   "end": 276952,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/G#2_ff_1.wav",
+   "root": 56,
+   "keys": [
+    56,
+    57
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 4.0,
+   "tune": -7.1,
+   "start": 0,
+   "end": 256829,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/B2_f_1.wav",
+   "root": 59,
+   "keys": [
+    58,
+    60
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 4.0,
+   "tune": -28.6,
+   "start": 0,
+   "end": 288904,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/B2_ff_1.wav",
+   "root": 59,
+   "keys": [
+    58,
+    60
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 4.0,
+   "tune": -46.1,
+   "start": 0,
+   "end": 288168,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/C#3_mf_1.wav",
+   "root": 61,
+   "keys": [
+    61,
+    62
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 4.0,
+   "tune": -40.8,
+   "start": 0,
+   "end": 266454,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/C#3_f_1.wav",
+   "root": 61,
+   "keys": [
+    61,
+    62
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 4.0,
+   "tune": -7.1,
+   "start": 0,
+   "end": 261806,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/C#3_ff_1.wav",
+   "root": 61,
+   "keys": [
+    61,
+    62
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 4.0,
+   "tune": -7.1,
+   "start": 0,
+   "end": 250750,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/D#3_mf_1.wav",
+   "root": 63,
+   "keys": [
+    63,
+    64
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 4.0,
+   "tune": -7.1,
+   "start": 0,
+   "end": 260376,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/D#3_f_1.wav",
+   "root": 63,
+   "keys": [
+    63,
+    64
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 4.0,
+   "tune": -30.5,
+   "start": 0,
+   "end": 284331,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/D#3_ff_1.wav",
+   "root": 63,
+   "keys": [
+    63,
+    64
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 4.0,
+   "tune": -38.6,
+   "start": 0,
+   "end": 280418,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/F#3_mf_1.wav",
+   "root": 66,
+   "keys": [
+    65,
+    67
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 4.0,
+   "tune": 9.3,
+   "start": 0,
+   "end": 242550,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/F#3_f_1.wav",
+   "root": 66,
+   "keys": [
+    65,
+    67
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 4.0,
+   "tune": -11.1,
+   "start": 0,
+   "end": 238140,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/F#3_ff_1.wav",
+   "root": 66,
+   "keys": [
+    65,
+    67
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 4.0,
+   "tune": -8.8,
+   "start": 0,
+   "end": 202860,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/G#3_mf_1.wav",
+   "root": 68,
+   "keys": [
+    68,
+    69
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 4.0,
+   "tune": 2.3,
+   "start": 0,
+   "end": 262503,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/G#3_f_1.wav",
+   "root": 68,
+   "keys": [
+    68,
+    69
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 4.0,
+   "tune": -0.8,
+   "start": 187,
+   "end": 160524,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/G#3_ff_1.wav",
+   "root": 68,
+   "keys": [
+    68,
+    69
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 4.0,
+   "tune": -0.4,
+   "start": 0,
+   "end": 158760,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/B3_mf_1.wav",
+   "root": 71,
+   "keys": [
+    70,
+    72
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 4.0,
+   "tune": -10.0,
+   "start": 0,
+   "end": 197568,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/B3_f_1.wav",
+   "root": 71,
+   "keys": [
+    70,
+    72
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 4.0,
+   "tune": -11.4,
+   "start": 0,
+   "end": 207270,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/B3_ff_1.wav",
+   "root": 71,
+   "keys": [
+    70,
+    72
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 4.0,
+   "tune": 11.0,
+   "start": 0,
+   "end": 176400,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/C#4_mf_1.wav",
+   "root": 73,
+   "keys": [
+    73,
+    74
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 4.0,
+   "tune": 3.2,
+   "start": 0,
+   "end": 254016,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/C#4_f_1.wav",
+   "root": 73,
+   "keys": [
+    73,
+    74
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 4.0,
+   "tune": -6.1,
+   "start": 0,
+   "end": 193158,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/C#4_ff_1.wav",
+   "root": 73,
+   "keys": [
+    73,
+    74
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 4.0,
+   "tune": -3.8,
+   "start": 0,
+   "end": 213444,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/D#4_mf_1.wav",
+   "root": 75,
+   "keys": [
+    75,
+    76
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 4.0,
+   "tune": -7.8,
+   "start": 0,
+   "end": 260300,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/D#4_f_1.wav",
+   "root": 75,
+   "keys": [
+    75,
+    76
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 4.0,
+   "tune": -12.3,
+   "start": 0,
+   "end": 192014,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/D#4_ff_1.wav",
+   "root": 75,
+   "keys": [
+    75,
+    76
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 4.0,
+   "tune": -9.4,
+   "start": 0,
+   "end": 179338,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/F#4_mf_1.wav",
+   "root": 78,
+   "keys": [
+    77,
+    79
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 4.0,
+   "tune": -3.8,
+   "start": 0,
+   "end": 180593,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/F#4_f_1.wav",
+   "root": 78,
+   "keys": [
+    77,
+    79
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 4.0,
+   "tune": 3.4,
+   "start": 0,
+   "end": 189443,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/F#4_ff_1.wav",
+   "root": 78,
+   "keys": [
+    77,
+    79
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 4.0,
+   "tune": 2.5,
+   "start": 0,
+   "end": 171108,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/G#4_mf_1.wav",
+   "root": 80,
+   "keys": [
+    80,
+    81
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 4.0,
+   "tune": -6.5,
+   "start": 0,
+   "end": 158975,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/G#4_f_1.wav",
+   "root": 80,
+   "keys": [
+    80,
+    81
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 4.0,
+   "tune": -0.7,
+   "start": 0,
+   "end": 148428,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/G#4_ff_1.wav",
+   "root": 80,
+   "keys": [
+    80,
+    81
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 4.0,
+   "tune": -3.0,
+   "start": 0,
+   "end": 139356,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/B4_mf_1.wav",
+   "root": 83,
+   "keys": [
+    82,
+    127
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 4.0,
+   "tune": 0.2,
+   "start": 0,
+   "end": 96138,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/B4_f_1.wav",
+   "root": 83,
+   "keys": [
+    82,
+    127
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 4.0,
+   "tune": 6.3,
+   "start": 0,
+   "end": 97479,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Dan Tranh/Normal/B4_ff_1.wav",
+   "root": 83,
+   "keys": [
+    82,
+    127
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 4.0,
+   "tune": 10.8,
+   "start": 0,
+   "end": 97429,
+   "endFade": 2646
+  }
+ ],
+ "settings": {
+  "velocity-db": 16
+ }
+}

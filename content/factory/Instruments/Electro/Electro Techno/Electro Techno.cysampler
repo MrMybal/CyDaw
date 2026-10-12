@@ -1,0 +1,316 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Techno kit",
+ "settings": {
+  "one-shot": 1,
+  "velocity-db": 10
+ },
+ "zones": [
+  {
+   "file": "bank:cydaw-electro/Kicks/Techno Rumble.wav",
+   "root": 35,
+   "keys": [
+    35,
+    35
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 0.0
+  },
+  {
+   "file": "bank:cydaw-electro/Kicks/Techno Hard.wav",
+   "root": 36,
+   "keys": [
+    36,
+    36
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 0.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/909 Rim.wav",
+   "root": 37,
+   "keys": [
+    37,
+    37
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/Snares/Techno Snare.wav",
+   "root": 38,
+   "keys": [
+    38,
+    38
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -2.0
+  },
+  {
+   "file": "bank:cydaw-electro/Claps/Tight Clap.wav",
+   "root": 39,
+   "keys": [
+    39,
+    39
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -3.0
+  },
+  {
+   "file": "bank:cydaw-electro/Claps/Snap.wav",
+   "root": 40,
+   "keys": [
+    40,
+    40
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -3.0
+  },
+  {
+   "file": "bank:cydaw-electro/Toms/Electro Tom.wav",
+   "root": 41,
+   "keys": [
+    41,
+    41
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -4.0
+  },
+  {
+   "file": "bank:cydaw-electro/Hats/Techno Hat.wav",
+   "root": 42,
+   "keys": [
+    42,
+    42
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -9.0,
+   "group": 1,
+   "offBy": 1
+  },
+  {
+   "file": "bank:cydaw-electro/Hats/Dark Hat.wav",
+   "root": 44,
+   "keys": [
+    44,
+    44
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -9.0,
+   "group": 1,
+   "offBy": 1
+  },
+  {
+   "file": "bank:cydaw-electro/Toms/Syn Tom Drop.wav",
+   "root": 45,
+   "keys": [
+    45,
+    45
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -4.0
+  },
+  {
+   "file": "bank:cydaw-electro/Hats/909 Open Hat.wav",
+   "root": 46,
+   "keys": [
+    46,
+    46
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -8.0,
+   "group": 1,
+   "offBy": 1
+  },
+  {
+   "file": "bank:cydaw-electro/Cymbals/Crash.wav",
+   "root": 49,
+   "keys": [
+    49,
+    49
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -11.0
+  },
+  {
+   "file": "bank:cydaw-electro/Cymbals/Ride.wav",
+   "root": 51,
+   "keys": [
+    51,
+    51
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -11.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/Cowbell Short.wav",
+   "root": 56,
+   "keys": [
+    56,
+    56
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/Perc Metal.wav",
+   "root": 60,
+   "keys": [
+    60,
+    60
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/Perc Blip.wav",
+   "root": 61,
+   "keys": [
+    61,
+    61
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/FX/Riser 2s.wav",
+   "root": 84,
+   "keys": [
+    84,
+    84
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/FX/Riser 4s.wav",
+   "root": 85,
+   "keys": [
+    85,
+    85
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/FX/Downlifter.wav",
+   "root": 86,
+   "keys": [
+    86,
+    86
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/FX/Impact.wav",
+   "root": 87,
+   "keys": [
+    87,
+    87
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/FX/Noise Hit.wav",
+   "root": 88,
+   "keys": [
+    88,
+    88
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/FX/Zap Fast.wav",
+   "root": 89,
+   "keys": [
+    89,
+    89
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/FX/Laser.wav",
+   "root": 90,
+   "keys": [
+    90,
+    90
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  }
+ ]
+}

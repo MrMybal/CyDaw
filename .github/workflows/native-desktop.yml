@@ -1,0 +1,101 @@
+name: Native desktop validation
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-worker:
+    name: Windows x64 plugin worker for Linux bridge
+    runs-on: windows-2022
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure Windows worker
+        run: cmake --preset desktop-windows-wasapi
+      - name: Build isolated worker
+        run: cmake --build build/windows-wasapi --config Release --target CyDAWPluginWorker --parallel 3
+      - name: Verify worker protocol
+        shell: pwsh
+        run: |
+          $worker = "build/windows-wasapi/CyDAWPluginWorker_artefacts/Release/CyDAWPluginWorker.exe"
+          $report = (& $worker --self-test) | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or $report.protocol -ne 4 -or $report.status -ne "ready" -or $report.isolation -ne "per-instance") {
+            throw "CyDAWPluginWorker handshake is incompatible"
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CyDAW-Windows-PluginWorker
+          path: build/windows-wasapi/CyDAWPluginWorker_artefacts/Release/CyDAWPluginWorker.exe
+          if-no-files-found: error
+
+  linux:
+    name: Linux x64 / ALSA + JACK
+    needs: windows-worker
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: CyDAW-Windows-PluginWorker
+          path: prebuilt/windows-worker
+      - name: Install JUCE and test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ninja-build pkg-config xvfb xauth \
+            libasound2-dev libjack-jackd2-dev ladspa-sdk \
+            libfreetype-dev libfontconfig1-dev \
+            libx11-dev libxcomposite-dev libxcursor-dev libxext-dev \
+            libxinerama-dev libxrandr-dev libxrender-dev
+      - name: Configure
+        run: >-
+          cmake --preset desktop-linux
+          -DCYDAW_WINDOWS_PLUGIN_WORKER="${{ github.workspace }}/prebuilt/windows-worker/CyDAWPluginWorker.exe"
+      - name: Build
+        run: cmake --build --preset desktop-linux --parallel 3
+      - name: Test under virtual X server
+        run: xvfb-run -a ctest --preset desktop-linux
+      - name: Install runtime
+        run: cmake --install build/linux --prefix stage/CyDAW-Linux-x64 --component CyDAWRuntime
+      - name: Verify Linux bridge payload
+        run: |
+          test -x stage/CyDAW-Linux-x64/bin/cydaw-windows-vst-bridge.sh
+          test -f stage/CyDAW-Linux-x64/windows-bridge/CyDAWPluginWorker.exe
+          stage/CyDAW-Linux-x64/bin/cydaw-windows-vst-bridge.sh status
+      - name: Archive runtime
+        run: tar -C stage -czf CyDAW-Linux-x64.tar.gz CyDAW-Linux-x64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CyDAW-Linux-x64
+          path: CyDAW-Linux-x64.tar.gz
+          if-no-files-found: error
+
+  macos:
+    name: macOS arm64 / CoreAudio
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: brew install ninja
+      - name: Configure
+        run: cmake --preset desktop-macos
+      - name: Build
+        run: cmake --build --preset desktop-macos --parallel 3
+      - name: Test
+        run: ctest --preset desktop-macos
+      - name: Install runtime
+        run: cmake --install build/macos --prefix stage/CyDAW-macOS-arm64 --component CyDAWRuntime
+      - name: Archive runtime
+        run: ditto -c -k --sequesterRsrc --keepParent stage/CyDAW-macOS-arm64 CyDAW-macOS-arm64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CyDAW-macOS-arm64
+          path: CyDAW-macOS-arm64.zip
+          if-no-files-found: error

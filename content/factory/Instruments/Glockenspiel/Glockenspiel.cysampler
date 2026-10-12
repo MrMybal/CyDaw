@@ -1,0 +1,282 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Glockenspiel",
+ "zones": [
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Glockenspiel/glock_soft_G4_01.wav",
+   "root": 79,
+   "keys": [
+    0,
+    81
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 17.8,
+   "tune": -9.1,
+   "start": 0,
+   "end": 176729,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Glockenspiel/glock_medium_G4_01.wav",
+   "root": 79,
+   "keys": [
+    0,
+    81
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 17.8,
+   "tune": -6.2,
+   "start": 0,
+   "end": 317816,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Glockenspiel/glock_loud_G4_01.wav",
+   "root": 79,
+   "keys": [
+    0,
+    81
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 17.8,
+   "tune": 18.4,
+   "start": 0,
+   "end": 330859,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Glockenspiel/glock_medium_C5_01.wav",
+   "root": 84,
+   "keys": [
+    82,
+    87
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 17.8,
+   "tune": 17.8,
+   "start": 0,
+   "end": 317816,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Glockenspiel/glock_loud_C5_01.wav",
+   "root": 84,
+   "keys": [
+    82,
+    87
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 17.8,
+   "tune": 7.6,
+   "start": 0,
+   "end": 330859,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Glockenspiel/glock_soft_G5_01.wav",
+   "root": 91,
+   "keys": [
+    88,
+    93
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 17.8,
+   "tune": 7.1,
+   "start": 0,
+   "end": 176729,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Glockenspiel/glock_medium_G5_01.wav",
+   "root": 91,
+   "keys": [
+    88,
+    93
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 17.8,
+   "tune": 55.5,
+   "start": 0,
+   "end": 209916,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Glockenspiel/glock_loud_G5_01.wav",
+   "root": 91,
+   "keys": [
+    88,
+    93
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 17.8,
+   "tune": 7.1,
+   "start": 0,
+   "end": 330859,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Glockenspiel/glock_soft_C6_01.wav",
+   "root": 96,
+   "keys": [
+    94,
+    99
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 17.8,
+   "tune": -2.2,
+   "start": 0,
+   "end": 176729,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Glockenspiel/glock_medium_C6_01.wav",
+   "root": 96,
+   "keys": [
+    94,
+    99
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 17.8,
+   "tune": 7.1,
+   "start": 0,
+   "end": 285768,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Glockenspiel/glock_loud_C6_01.wav",
+   "root": 96,
+   "keys": [
+    94,
+    99
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 17.8,
+   "tune": 7.1,
+   "start": 0,
+   "end": 330859,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Glockenspiel/glock_soft_G6_01.wav",
+   "root": 103,
+   "keys": [
+    100,
+    103
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 17.8,
+   "tune": -19.6,
+   "start": 0,
+   "end": 146479,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Glockenspiel/glock_medium_G6_01.wav",
+   "root": 103,
+   "keys": [
+    100,
+    103
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 17.8,
+   "tune": -19.7,
+   "start": 0,
+   "end": 175518,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Glockenspiel/glock_loud_G#6_01.wav",
+   "root": 104,
+   "keys": [
+    104,
+    106
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 17.8,
+   "tune": -19.2,
+   "start": 0,
+   "end": 232896,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Glockenspiel/glock_medium_C7_01.wav",
+   "root": 108,
+   "keys": [
+    107,
+    127
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 17.8,
+   "tune": 28.7,
+   "start": 0,
+   "end": 120834,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Glockenspiel/glock_loud_C7_01.wav",
+   "root": 108,
+   "keys": [
+    107,
+    127
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 17.8,
+   "tune": 58.3,
+   "start": 0,
+   "end": 116166,
+   "endFade": 2646
+  }
+ ],
+ "settings": {
+  "velocity-db": 16
+ }
+}

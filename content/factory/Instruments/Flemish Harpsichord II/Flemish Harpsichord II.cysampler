@@ -1,0 +1,231 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Flemish harpsichord II",
+ "zones": [
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Flemish/Sustains/High/HarpsiRH_High_Far_F#1_rr1.wav",
+   "root": 42,
+   "keys": [
+    0,
+    44
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 8.5,
+   "tune": 3.5,
+   "start": 0,
+   "end": 530964,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Flemish/Sustains/High/HarpsiRH_High_Far_A#1_rr1.wav",
+   "root": 46,
+   "keys": [
+    45,
+    47
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 8.5,
+   "tune": -3.4,
+   "start": 0,
+   "end": 455112,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Flemish/Sustains/High/HarpsiRH_High_Far_C#2_rr1.wav",
+   "root": 49,
+   "keys": [
+    48,
+    50
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 8.5,
+   "tune": -6.2,
+   "start": 0,
+   "end": 529200,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Flemish/Sustains/High/HarpsiRH_High_Far_E2_rr1.wav",
+   "root": 52,
+   "keys": [
+    51,
+    54
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 8.5,
+   "tune": -2.9,
+   "start": 0,
+   "end": 337515,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Flemish/Sustains/High/HarpsiRH_High_Far_G#2_rr1.wav",
+   "root": 56,
+   "keys": [
+    55,
+    60
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 8.5,
+   "tune": -12.5,
+   "start": 0,
+   "end": 294881,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Flemish/Sustains/High/HarpsiRH_High_Far_E3_rr1.wav",
+   "root": 64,
+   "keys": [
+    61,
+    66
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 8.5,
+   "tune": -16.6,
+   "start": 0,
+   "end": 347879,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Flemish/Sustains/High/HarpsiRH_High_Far_G#3_rr1.wav",
+   "root": 68,
+   "keys": [
+    67,
+    72
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 8.5,
+   "tune": -5.8,
+   "start": 0,
+   "end": 293706,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Flemish/Sustains/High/HarpsiRH_High_Far_E4_rr1.wav",
+   "root": 76,
+   "keys": [
+    73,
+    78
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 8.5,
+   "tune": -7.4,
+   "start": 0,
+   "end": 232572,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Flemish/Sustains/High/HarpsiRH_High_Far_G#4_rr1.wav",
+   "root": 80,
+   "keys": [
+    79,
+    82
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 8.5,
+   "tune": -3.4,
+   "start": 0,
+   "end": 219618,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Flemish/Sustains/High/HarpsiRH_High_Far_C5_rr1.wav",
+   "root": 84,
+   "keys": [
+    83,
+    86
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 8.5,
+   "tune": -2.1,
+   "start": 0,
+   "end": 180603,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Flemish/Sustains/High/HarpsiRH_High_Far_E5_rr1.wav",
+   "root": 88,
+   "keys": [
+    87,
+    90
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 8.5,
+   "tune": -3.1,
+   "start": 0,
+   "end": 178663,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Flemish/Sustains/High/HarpsiRH_High_Far_G#5_rr1.wav",
+   "root": 92,
+   "keys": [
+    91,
+    94
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 8.5,
+   "tune": -1.2,
+   "start": 0,
+   "end": 156046,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, Flemish/Sustains/High/HarpsiRH_High_Far_C6_rr1.wav",
+   "root": 96,
+   "keys": [
+    95,
+    127
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 8.5,
+   "tune": -5.8,
+   "start": 0,
+   "end": 117225,
+   "endFade": 2646
+  }
+ ],
+ "settings": {
+  "velocity-db": 4
+ }
+}

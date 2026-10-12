@@ -1,0 +1,688 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Tenor trombone",
+ "zones": [
+  {
+   "file": "bank:vsco/Brass/Tenor Trombone/sus/tenortbn_sus_A#0_v1_1.wav",
+   "root": 34,
+   "keys": [
+    0,
+    35
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 15.8,
+   "tune": 0.1,
+   "start": 0,
+   "end": 211849,
+   "endFade": 2646,
+   "loop": [
+    85352,
+    148176
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tenor Trombone/sus/tenortbn_sus_A#0_v2_1.wav",
+   "root": 34,
+   "keys": [
+    0,
+    35
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 15.8,
+   "start": 0,
+   "end": 183888,
+   "endFade": 2646,
+   "loop": [
+    41610,
+    127890
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tenor Trombone/sus/tenortbn_sus_C#1_v1_1.wav",
+   "root": 37,
+   "keys": [
+    36,
+    38
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 15.8,
+   "tune": 0.2,
+   "start": 0,
+   "end": 328270,
+   "endFade": 2646,
+   "loop": [
+    178546,
+    277830
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tenor Trombone/sus/tenortbn_sus_C#1_v2_1.wav",
+   "root": 37,
+   "keys": [
+    36,
+    38
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 15.8,
+   "start": 0,
+   "end": 197520,
+   "endFade": 2646,
+   "loop": [
+    33682,
+    155232
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tenor Trombone/sus/tenortbn_sus_D#1_v1_1.wav",
+   "root": 39,
+   "keys": [
+    39,
+    40
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 15.8,
+   "tune": 0.2,
+   "start": 0,
+   "end": 519994,
+   "endFade": 2646,
+   "loop": [
+    239349,
+    462168
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tenor Trombone/sus/tenortbn_sus_D#1_v2_1.wav",
+   "root": 39,
+   "keys": [
+    39,
+    40
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 15.8,
+   "tune": -0.4,
+   "start": 0,
+   "end": 291622,
+   "endFade": 2646,
+   "loop": [
+    170794,
+    225792
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tenor Trombone/sus/tenortbn_sus_D#1_v3_1.wav",
+   "root": 39,
+   "keys": [
+    39,
+    40
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 15.8,
+   "tune": 0.4,
+   "start": 0,
+   "end": 220454,
+   "endFade": 2646,
+   "loop": [
+    43204,
+    162288
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tenor Trombone/sus/tenortbn_sus_F1_v1_1.wav",
+   "root": 41,
+   "keys": [
+    41,
+    43
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 15.8,
+   "tune": -0.2,
+   "start": 0,
+   "end": 570405,
+   "endFade": 2646,
+   "loop": [
+    347897,
+    515088
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tenor Trombone/sus/tenortbn_sus_F1_v2_1.wav",
+   "root": 41,
+   "keys": [
+    41,
+    43
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 15.8,
+   "tune": -0.2,
+   "start": 0,
+   "end": 350194,
+   "endFade": 2646,
+   "loop": [
+    134848,
+    284886
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tenor Trombone/sus/tenortbn_sus_F1_v3_1.wav",
+   "root": 41,
+   "keys": [
+    41,
+    43
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 15.8,
+   "tune": 0.1,
+   "start": 0,
+   "end": 299476,
+   "endFade": 2646,
+   "loop": [
+    183336,
+    236376
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tenor Trombone/sus/tenortbn_sus_A#1_v1_1.wav",
+   "root": 46,
+   "keys": [
+    44,
+    48
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 15.8,
+   "tune": -0.1,
+   "start": 0,
+   "end": 788423,
+   "endFade": 2646,
+   "loop": [
+    582293,
+    762048
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tenor Trombone/sus/tenortbn_sus_A#1_v2_1.wav",
+   "root": 46,
+   "keys": [
+    44,
+    48
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 15.8,
+   "tune": 0.1,
+   "start": 0,
+   "end": 414549,
+   "endFade": 2646,
+   "loop": [
+    202023,
+    388962
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tenor Trombone/sus/tenortbn_sus_A#1_v3_1.wav",
+   "root": 46,
+   "keys": [
+    44,
+    48
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 15.8,
+   "tune": 0.2,
+   "start": 25,
+   "end": 232707,
+   "endFade": 2646,
+   "loop": [
+    95407,
+    197568
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tenor Trombone/sus/tenortbn_sus_D2_v1_1.wav",
+   "root": 50,
+   "keys": [
+    49,
+    51
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 15.8,
+   "tune": -0.3,
+   "start": 0,
+   "end": 683281,
+   "endFade": 2646,
+   "loop": [
+    472669,
+    656208
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tenor Trombone/sus/tenortbn_sus_D2_v2_1.wav",
+   "root": 50,
+   "keys": [
+    49,
+    51
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 15.8,
+   "tune": -0.1,
+   "start": 0,
+   "end": 433275,
+   "endFade": 2646,
+   "loop": [
+    303516,
+    381906
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tenor Trombone/sus/tenortbn_sus_D2_v3_1.wav",
+   "root": 50,
+   "keys": [
+    49,
+    51
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 15.8,
+   "tune": -0.1,
+   "start": 0,
+   "end": 290522,
+   "endFade": 2646,
+   "loop": [
+    180885,
+    246960
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tenor Trombone/sus/tenortbn_sus_F2_v1_1.wav",
+   "root": 53,
+   "keys": [
+    52,
+    56
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 15.8,
+   "tune": -0.1,
+   "start": 0,
+   "end": 903187,
+   "endFade": 2646,
+   "loop": [
+    775960,
+    853776
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tenor Trombone/sus/tenortbn_sus_F2_v2_1.wav",
+   "root": 53,
+   "keys": [
+    52,
+    56
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 15.8,
+   "start": 0,
+   "end": 438146,
+   "endFade": 2646,
+   "loop": [
+    311589,
+    372204
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tenor Trombone/sus/tenortbn_sus_F2_v3_1.wav",
+   "root": 53,
+   "keys": [
+    52,
+    56
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 15.8,
+   "tune": -0.2,
+   "start": 10,
+   "end": 276906,
+   "endFade": 2646,
+   "loop": [
+    150151,
+    224910
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tenor Trombone/sus/tenortbn_sus_C3_v1_1.wav",
+   "root": 60,
+   "keys": [
+    57,
+    60
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 15.8,
+   "start": 0,
+   "end": 980021,
+   "endFade": 2646,
+   "loop": [
+    613913,
+    911106
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tenor Trombone/sus/tenortbn_sus_C3_v2_1.wav",
+   "root": 60,
+   "keys": [
+    57,
+    60
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 15.8,
+   "tune": -0.1,
+   "start": 0,
+   "end": 402993,
+   "endFade": 2646,
+   "loop": [
+    162512,
+    349272
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tenor Trombone/sus/tenortbn_sus_C3_v3_1.wav",
+   "root": 60,
+   "keys": [
+    57,
+    60
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 15.8,
+   "tune": -0.1,
+   "start": 0,
+   "end": 337774,
+   "endFade": 2646,
+   "loop": [
+    113352,
+    278712
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tenor Trombone/sus/tenortbn_sus_C#3_v1_1.wav",
+   "root": 61,
+   "keys": [
+    61,
+    62
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 15.8,
+   "tune": -0.1,
+   "start": 0,
+   "end": 876776,
+   "endFade": 2646,
+   "loop": [
+    670524,
+    816732
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tenor Trombone/sus/tenortbn_sus_C#3_v2_1.wav",
+   "root": 61,
+   "keys": [
+    61,
+    62
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 15.8,
+   "tune": -0.1,
+   "start": 0,
+   "end": 474933,
+   "endFade": 2646,
+   "loop": [
+    362700,
+    418068
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tenor Trombone/sus/tenortbn_sus_C#3_v3_1.wav",
+   "root": 61,
+   "keys": [
+    61,
+    62
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 15.8,
+   "start": 0,
+   "end": 343337,
+   "endFade": 2646,
+   "loop": [
+    190278,
+    282240
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tenor Trombone/sus/tenortbn_sus_D#3_v1_1.wav",
+   "root": 63,
+   "keys": [
+    63,
+    64
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 15.8,
+   "tune": -0.1,
+   "start": 0,
+   "end": 1070862,
+   "endFade": 2646,
+   "loop": [
+    855326,
+    1016064
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tenor Trombone/sus/tenortbn_sus_D#3_v2_1.wav",
+   "root": 63,
+   "keys": [
+    63,
+    64
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 15.8,
+   "tune": -0.1,
+   "start": 0,
+   "end": 607429,
+   "endFade": 2646,
+   "loop": [
+    467822,
+    521262
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tenor Trombone/sus/tenortbn_sus_D#3_v3_1.wav",
+   "root": 63,
+   "keys": [
+    63,
+    64
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 15.8,
+   "tune": 0.1,
+   "start": 0,
+   "end": 309791,
+   "endFade": 2646,
+   "loop": [
+    79655,
+    217854
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tenor Trombone/sus/tenortbn_sus_F3_v1_1.wav",
+   "root": 65,
+   "keys": [
+    65,
+    127
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 15.8,
+   "tune": -0.3,
+   "start": 0,
+   "end": 1139250,
+   "endFade": 2646,
+   "loop": [
+    262035,
+    1057518
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tenor Trombone/sus/tenortbn_sus_F3_v2_1.wav",
+   "root": 65,
+   "keys": [
+    65,
+    127
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 15.8,
+   "tune": -0.1,
+   "start": 0,
+   "end": 531962,
+   "endFade": 2646,
+   "loop": [
+    385191,
+    438354
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tenor Trombone/sus/tenortbn_sus_F3_v3_1.wav",
+   "root": 65,
+   "keys": [
+    65,
+    127
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 15.8,
+   "start": 5,
+   "end": 324957,
+   "endFade": 2646,
+   "loop": [
+    89501,
+    240786
+   ],
+   "loopCrossfade": 3528
+  }
+ ],
+ "settings": {
+  "velocity-db": 12,
+  "velocity-crossfade": 1,
+  "loop": 1
+ }
+}

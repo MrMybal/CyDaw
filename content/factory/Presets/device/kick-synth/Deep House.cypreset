@@ -1,0 +1,40 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "kick-synth",
+ "name": "Deep House",
+ "state": {
+  "type": "kick-synth",
+  "parameters": {
+   "kick.bodyShape": 0.0,
+   "kick.bodyPhase": 0.0,
+   "kick.pitchStart": 200.0,
+   "kick.pitchEnd": 48.0,
+   "kick.pitchTime": 120.0,
+   "kick.pitchCurve": 3.0,
+   "kick.bodyLevel": 0.0,
+   "kick.attack": 0.400000005960464,
+   "kick.hold": 40.0,
+   "kick.decay": 520.0,
+   "kick.decayCurve": 1.600000023841858,
+   "kick.length": 1500.0,
+   "kick.clickType": 0.0,
+   "kick.clickLevel": -10.0,
+   "kick.clickDecay": 6.0,
+   "kick.clickTone": 4500.0,
+   "kick.subLevel": -60.0,
+   "kick.subDecay": 600.0,
+   "kick.subOctave": 0.0,
+   "kick.driveType": 0.0,
+   "kick.drive": 0.0,
+   "kick.driveTone": 20000.0,
+   "kick.lowCut": 15.0,
+   "kick.highCut": 20000.0,
+   "kick.lowBoost": 2.0,
+   "kick.keyTrack": 1.0,
+   "kick.velocity": 0.5,
+   "kick.output": -2.019999980926514
+  }
+ }
+}

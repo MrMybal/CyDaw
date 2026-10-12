@@ -1,0 +1,741 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Concert harp",
+ "zones": [
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_E1_f1.wav",
+   "root": 28,
+   "keys": [
+    0,
+    29
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 11.0,
+   "tune": 20.4,
+   "start": 0,
+   "end": 932252,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_G1_mp1.wav",
+   "root": 31,
+   "keys": [
+    30,
+    33
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 11.0,
+   "tune": 21.8,
+   "start": 0,
+   "end": 297461,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_G1_f1.wav",
+   "root": 31,
+   "keys": [
+    30,
+    33
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 11.0,
+   "tune": 18.9,
+   "start": 0,
+   "end": 696595,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_B1_mf1.wav",
+   "root": 35,
+   "keys": [
+    34,
+    36
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 11.0,
+   "tune": 14.7,
+   "start": 0,
+   "end": 570994,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_B1_f1.wav",
+   "root": 35,
+   "keys": [
+    34,
+    36
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 11.0,
+   "tune": 10.1,
+   "start": 0,
+   "end": 1118174,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_D2_mf1.wav",
+   "root": 38,
+   "keys": [
+    37,
+    39
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 11.0,
+   "tune": 3.0,
+   "start": 0,
+   "end": 435268,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_D2_f1.wav",
+   "root": 38,
+   "keys": [
+    37,
+    39
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 11.0,
+   "tune": -4.8,
+   "start": 0,
+   "end": 613070,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_F2_mf1.wav",
+   "root": 41,
+   "keys": [
+    40,
+    43
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 11.0,
+   "tune": 7.3,
+   "start": 0,
+   "end": 771636,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_F2_f1.wav",
+   "root": 41,
+   "keys": [
+    40,
+    43
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 11.0,
+   "tune": 3.4,
+   "start": 305,
+   "end": 1059827,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_A2_mf1.wav",
+   "root": 45,
+   "keys": [
+    44,
+    48
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 11.0,
+   "tune": 4.0,
+   "start": 0,
+   "end": 501906,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_A2_f1.wav",
+   "root": 45,
+   "keys": [
+    44,
+    48
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 11.0,
+   "tune": -2.6,
+   "start": 150,
+   "end": 489205,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_E3_mf1.wav",
+   "root": 52,
+   "keys": [
+    49,
+    53
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 11.0,
+   "tune": 3.4,
+   "start": 158,
+   "end": 615273,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_E3_f1.wav",
+   "root": 52,
+   "keys": [
+    49,
+    53
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 11.0,
+   "tune": -2.0,
+   "start": 1413,
+   "end": 702892,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_G3_mf1.wav",
+   "root": 55,
+   "keys": [
+    54,
+    57
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 11.0,
+   "tune": 8.1,
+   "start": 972,
+   "end": 451707,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_G3_f1.wav",
+   "root": 55,
+   "keys": [
+    54,
+    57
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 11.0,
+   "tune": 4.2,
+   "start": 2433,
+   "end": 615949,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_B3_mf1.wav",
+   "root": 59,
+   "keys": [
+    58,
+    60
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 11.0,
+   "tune": 11.2,
+   "start": 46,
+   "end": 495271,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_B3_f1.wav",
+   "root": 59,
+   "keys": [
+    58,
+    60
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 11.0,
+   "tune": 7.6,
+   "start": 392,
+   "end": 523764,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_D4_mf1.wav",
+   "root": 62,
+   "keys": [
+    61,
+    63
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 11.0,
+   "tune": 11.6,
+   "start": 634,
+   "end": 480411,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_D4_f1.wav",
+   "root": 62,
+   "keys": [
+    61,
+    63
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 11.0,
+   "tune": 10.6,
+   "start": 938,
+   "end": 498193,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_F4_mf1.wav",
+   "root": 65,
+   "keys": [
+    64,
+    67
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 11.0,
+   "tune": 0.7,
+   "start": 108,
+   "end": 478363,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_F4_f1.wav",
+   "root": 65,
+   "keys": [
+    64,
+    67
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 11.0,
+   "tune": -0.2,
+   "start": 387,
+   "end": 468299,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_A4_mf1.wav",
+   "root": 69,
+   "keys": [
+    68,
+    70
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 11.0,
+   "tune": 10.0,
+   "start": 696,
+   "end": 522144,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_A4_f1.wav",
+   "root": 69,
+   "keys": [
+    68,
+    70
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 11.0,
+   "tune": 9.3,
+   "start": 0,
+   "end": 500976,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_C5_mf1.wav",
+   "root": 72,
+   "keys": [
+    71,
+    74
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 11.0,
+   "tune": 10.1,
+   "start": 731,
+   "end": 309274,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_C5_f1.wav",
+   "root": 72,
+   "keys": [
+    71,
+    74
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 11.0,
+   "tune": 6.0,
+   "start": 927,
+   "end": 486864,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_E5_mf1.wav",
+   "root": 76,
+   "keys": [
+    75,
+    77
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 11.0,
+   "tune": 11.1,
+   "start": 679,
+   "end": 292885,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_E5_f1.wav",
+   "root": 76,
+   "keys": [
+    75,
+    77
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 11.0,
+   "tune": 12.0,
+   "start": 1452,
+   "end": 422478,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_G5_mf1.wav",
+   "root": 79,
+   "keys": [
+    78,
+    81
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 11.0,
+   "tune": 6.2,
+   "start": 274,
+   "end": 262433,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_G5_f1.wav",
+   "root": 79,
+   "keys": [
+    78,
+    81
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 11.0,
+   "tune": 7.1,
+   "start": 0,
+   "end": 227556,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_B5_mf1.wav",
+   "root": 83,
+   "keys": [
+    82,
+    84
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 11.0,
+   "tune": 5.5,
+   "start": 0,
+   "end": 194753,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_B5_f1.wav",
+   "root": 83,
+   "keys": [
+    82,
+    84
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 11.0,
+   "tune": 6.7,
+   "start": 282,
+   "end": 184907,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_D6_mf1.wav",
+   "root": 86,
+   "keys": [
+    85,
+    87
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 11.0,
+   "tune": 6.3,
+   "start": 179,
+   "end": 171926,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_D6_f1.wav",
+   "root": 86,
+   "keys": [
+    85,
+    87
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 11.0,
+   "tune": 10.5,
+   "start": 1668,
+   "end": 328560,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_F6_mf1.wav",
+   "root": 89,
+   "keys": [
+    88,
+    91
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 11.0,
+   "tune": 5.0,
+   "start": 249,
+   "end": 103270,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_F6_f1.wav",
+   "root": 89,
+   "keys": [
+    88,
+    91
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 11.0,
+   "tune": 7.9,
+   "start": 837,
+   "end": 182574,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_A6_mf1.wav",
+   "root": 93,
+   "keys": [
+    92,
+    94
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 11.0,
+   "tune": 15.4,
+   "start": 121,
+   "end": 159206,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_A6_f1.wav",
+   "root": 93,
+   "keys": [
+    92,
+    94
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 11.0,
+   "tune": 12.8,
+   "start": 582,
+   "end": 136001,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_B6_mf1.wav",
+   "root": 95,
+   "keys": [
+    95,
+    96
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 11.0,
+   "tune": 7.8,
+   "start": 0,
+   "end": 120980,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_B6_f1.wav",
+   "root": 95,
+   "keys": [
+    95,
+    96
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 11.0,
+   "tune": 10.6,
+   "start": 770,
+   "end": 130536,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_D7_p1.wav",
+   "root": 98,
+   "keys": [
+    97,
+    99
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 11.0,
+   "tune": -3.5,
+   "start": 0,
+   "end": 50104,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_D7_f1.wav",
+   "root": 98,
+   "keys": [
+    97,
+    99
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 11.0,
+   "tune": 7.3,
+   "start": 532,
+   "end": 124513,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_F7_p1.wav",
+   "root": 101,
+   "keys": [
+    100,
+    127
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 11.0,
+   "tune": 0.6,
+   "start": 0,
+   "end": 57692,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Concert Harp/KSHarp_F7_f1.wav",
+   "root": 101,
+   "keys": [
+    100,
+    127
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 11.0,
+   "tune": 24.8,
+   "start": 1304,
+   "end": 82026,
+   "endFade": 2646
+  }
+ ],
+ "settings": {
+  "velocity-db": 16
+ }
+}

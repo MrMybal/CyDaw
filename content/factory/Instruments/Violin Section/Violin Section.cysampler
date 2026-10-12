@@ -1,0 +1,495 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Violin section",
+ "zones": [
+  {
+   "file": "bank:vsco/Strings/Violin Section/susVib/VlnEns_susVib_G2_v1.wav",
+   "root": 55,
+   "keys": [
+    0,
+    56
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 9.4,
+   "tune": -0.4,
+   "start": 10,
+   "end": 584766,
+   "endFade": 2646,
+   "loop": [
+    248440,
+    500094
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/susVib/VlnEns_susVib_G2_v2.wav",
+   "root": 55,
+   "keys": [
+    0,
+    56
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 9.4,
+   "tune": 0.1,
+   "start": 0,
+   "end": 664146,
+   "endFade": 2646,
+   "loop": [
+    92122,
+    563598
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/susVib/VlnEns_susVib_A2_v1.wav",
+   "root": 57,
+   "keys": [
+    57,
+    58
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 9.4,
+   "tune": -1.1,
+   "start": 158,
+   "end": 493038,
+   "endFade": 2646,
+   "loop": [
+    340411,
+    441000
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/susVib/VlnEns_susVib_A2_v2.wav",
+   "root": 57,
+   "keys": [
+    57,
+    58
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 9.4,
+   "tune": -0.6,
+   "start": 58,
+   "end": 557865,
+   "endFade": 2646,
+   "loop": [
+    51934,
+    480690
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/susVib/VlnEns_susVib_B2_v1.wav",
+   "root": 59,
+   "keys": [
+    59,
+    60
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 9.4,
+   "tune": -0.3,
+   "start": 768,
+   "end": 578579,
+   "endFade": 2646,
+   "loop": [
+    345277,
+    527436
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/susVib/VlnEns_susVib_B2_v2.wav",
+   "root": 59,
+   "keys": [
+    59,
+    60
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 9.4,
+   "tune": -0.2,
+   "start": 0,
+   "end": 593334,
+   "endFade": 2646,
+   "loop": [
+    240316,
+    540666
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/susVib/VlnEns_susVib_D3_v1.wav",
+   "root": 62,
+   "keys": [
+    61,
+    64
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 9.4,
+   "tune": -0.5,
+   "start": 342,
+   "end": 515088,
+   "endFade": 2646,
+   "loop": [
+    337815,
+    439236
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/susVib/VlnEns_susVib_D3_v2.wav",
+   "root": 62,
+   "keys": [
+    61,
+    64
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 9.4,
+   "tune": -0.1,
+   "start": 391,
+   "end": 612990,
+   "endFade": 2646,
+   "loop": [
+    245166,
+    498330
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/susVib/VlnEns_susVib_F#3_v1.wav",
+   "root": 66,
+   "keys": [
+    65,
+    67
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 9.4,
+   "tune": 0.3,
+   "start": 0,
+   "end": 396392,
+   "endFade": 2646,
+   "loop": [
+    125808,
+    341334
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/susVib/VlnEns_susVib_F#3_v2.wav",
+   "root": 66,
+   "keys": [
+    65,
+    67
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 9.4,
+   "tune": -0.1,
+   "start": 346,
+   "end": 430189,
+   "endFade": 2646,
+   "loop": [
+    304508,
+    384552
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/susVib/VlnEns_susVib_A3_v1.wav",
+   "root": 69,
+   "keys": [
+    68,
+    70
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 9.4,
+   "tune": 0.1,
+   "start": 622,
+   "end": 472568,
+   "endFade": 2646,
+   "loop": [
+    102460,
+    409248
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/susVib/VlnEns_susVib_A3_v2.wav",
+   "root": 69,
+   "keys": [
+    68,
+    70
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 9.4,
+   "tune": -0.9,
+   "start": 96,
+   "end": 417915,
+   "endFade": 2646,
+   "loop": [
+    53866,
+    373968
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/susVib/VlnEns_susVib_C4_v1.wav",
+   "root": 72,
+   "keys": [
+    71,
+    74
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 9.4,
+   "tune": -0.3,
+   "start": 114,
+   "end": 515819,
+   "endFade": 2646,
+   "loop": [
+    90895,
+    467460
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/susVib/VlnEns_susVib_C4_v2.wav",
+   "root": 72,
+   "keys": [
+    71,
+    74
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 9.4,
+   "tune": 0.6,
+   "start": 0,
+   "end": 504367,
+   "endFade": 2646,
+   "loop": [
+    353774,
+    466578
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/susVib/VlnEns_susVib_E4_v1.wav",
+   "root": 76,
+   "keys": [
+    75,
+    77
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 9.4,
+   "start": 16,
+   "end": 578874,
+   "endFade": 2646,
+   "loop": [
+    378535,
+    530082
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/susVib/VlnEns_susVib_E4_v2.wav",
+   "root": 76,
+   "keys": [
+    75,
+    77
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 9.4,
+   "tune": 0.7,
+   "start": 0,
+   "end": 425644,
+   "endFade": 2646,
+   "loop": [
+    86130,
+    370440
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/susVib/VlnEns_susVib_G4_v1.wav",
+   "root": 79,
+   "keys": [
+    78,
+    81
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 9.4,
+   "tune": -0.4,
+   "start": 251,
+   "end": 582548,
+   "endFade": 2646,
+   "loop": [
+    97431,
+    518616
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/susVib/VlnEns_susVib_G4_v2.wav",
+   "root": 79,
+   "keys": [
+    78,
+    81
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 9.4,
+   "tune": 0.9,
+   "start": 100,
+   "end": 537523,
+   "endFade": 2646,
+   "loop": [
+    214363,
+    492156
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/susVib/VlnEns_susVib_B4_v1.wav",
+   "root": 83,
+   "keys": [
+    82,
+    84
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 9.4,
+   "tune": -0.4,
+   "start": 4,
+   "end": 514230,
+   "endFade": 2646,
+   "loop": [
+    95612,
+    447174
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/susVib/VlnEns_susVib_B4_v2.wav",
+   "root": 83,
+   "keys": [
+    82,
+    84
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 9.4,
+   "tune": -0.6,
+   "start": 0,
+   "end": 478926,
+   "endFade": 2646,
+   "loop": [
+    187816,
+    417186
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/susVib/VlnEns_susVib_D5_v1.wav",
+   "root": 86,
+   "keys": [
+    85,
+    127
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 9.4,
+   "tune": -0.8,
+   "start": 0,
+   "end": 529077,
+   "endFade": 2646,
+   "loop": [
+    349929,
+    464814
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/susVib/VlnEns_susVib_D5_v2.wav",
+   "root": 86,
+   "keys": [
+    85,
+    127
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 9.4,
+   "tune": 0.1,
+   "start": 0,
+   "end": 491274,
+   "endFade": 2646,
+   "loop": [
+    341807,
+    421596
+   ],
+   "loopCrossfade": 3528
+  }
+ ],
+ "settings": {
+  "velocity-db": 12,
+  "velocity-crossfade": 1,
+  "loop": 1
+ }
+}

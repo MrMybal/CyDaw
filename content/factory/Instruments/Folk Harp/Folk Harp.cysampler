@@ -1,0 +1,995 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Folk harp",
+ "zones": [
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_C1_v2_RR1.wav",
+   "root": 36,
+   "keys": [
+    0,
+    37
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.2,
+   "tune": -10.9,
+   "start": 0,
+   "end": 878858,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_C1_v3_RR1.wav",
+   "root": 36,
+   "keys": [
+    0,
+    37
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.2,
+   "tune": -39.2,
+   "start": 0,
+   "end": 1328174,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_D1_v2_RR1.wav",
+   "root": 38,
+   "keys": [
+    38,
+    39
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.2,
+   "tune": -5.2,
+   "start": 0,
+   "end": 795596,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_D1_v3_RR1.wav",
+   "root": 38,
+   "keys": [
+    38,
+    39
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.2,
+   "tune": -10.8,
+   "start": 0,
+   "end": 971252,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_E1_v2_RR1.wav",
+   "root": 40,
+   "keys": [
+    40,
+    41
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.2,
+   "tune": -7.0,
+   "start": 0,
+   "end": 629068,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_E1_v3_RR1.wav",
+   "root": 40,
+   "keys": [
+    40,
+    41
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.2,
+   "tune": -15.0,
+   "start": 0,
+   "end": 701190,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_F#1_v2_RR1.wav",
+   "root": 42,
+   "keys": [
+    42,
+    43
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.2,
+   "tune": -3.6,
+   "start": 0,
+   "end": 368484,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_F#1_v3_RR1.wav",
+   "root": 42,
+   "keys": [
+    42,
+    43
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.2,
+   "tune": -12.4,
+   "start": 0,
+   "end": 687339,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_G#1_v2_RR1.wav",
+   "root": 44,
+   "keys": [
+    44,
+    45
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.2,
+   "tune": -0.5,
+   "start": 0,
+   "end": 807968,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_G#1_v3_RR1.wav",
+   "root": 44,
+   "keys": [
+    44,
+    45
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.2,
+   "tune": -14.0,
+   "start": 0,
+   "end": 856152,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_A#1_v2_RR1.wav",
+   "root": 46,
+   "keys": [
+    46,
+    47
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.2,
+   "tune": -2.0,
+   "start": 0,
+   "end": 354735,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_A#1_v3_RR1.wav",
+   "root": 46,
+   "keys": [
+    46,
+    47
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.2,
+   "tune": -5.3,
+   "start": 0,
+   "end": 505410,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_C2_v2_RR1.wav",
+   "root": 48,
+   "keys": [
+    48,
+    49
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.2,
+   "tune": 1.6,
+   "start": 0,
+   "end": 451869,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_C2_v3_RR1.wav",
+   "root": 48,
+   "keys": [
+    48,
+    49
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.2,
+   "tune": -4.7,
+   "start": 0,
+   "end": 528318,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_D2_v2_RR1.wav",
+   "root": 50,
+   "keys": [
+    50,
+    51
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.2,
+   "tune": -4.0,
+   "start": 0,
+   "end": 294417,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_D2_v3_RR1.wav",
+   "root": 50,
+   "keys": [
+    50,
+    51
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.2,
+   "tune": -4.0,
+   "start": 0,
+   "end": 545958,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_E2_v2_RR1.wav",
+   "root": 52,
+   "keys": [
+    52,
+    53
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.2,
+   "tune": -0.7,
+   "start": 0,
+   "end": 342786,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_E2_v3_RR1.wav",
+   "root": 52,
+   "keys": [
+    52,
+    53
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.2,
+   "tune": -5.9,
+   "start": 0,
+   "end": 372090,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_F#2_v2_RR1.wav",
+   "root": 54,
+   "keys": [
+    54,
+    55
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.2,
+   "tune": -0.7,
+   "start": 0,
+   "end": 396757,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_F#2_v3_RR1.wav",
+   "root": 54,
+   "keys": [
+    54,
+    55
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.2,
+   "tune": -3.1,
+   "start": 0,
+   "end": 417314,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_G#2_v2_RR1.wav",
+   "root": 56,
+   "keys": [
+    56,
+    57
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.2,
+   "tune": -2.2,
+   "start": 0,
+   "end": 331898,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_G#2_v3_RR1.wav",
+   "root": 56,
+   "keys": [
+    56,
+    57
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.2,
+   "tune": -4.0,
+   "start": 0,
+   "end": 288942,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_A#2_v2_RR1.wav",
+   "root": 58,
+   "keys": [
+    58,
+    59
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.2,
+   "tune": -0.3,
+   "start": 0,
+   "end": 277435,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_A#2_v3_RR1.wav",
+   "root": 58,
+   "keys": [
+    58,
+    59
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.2,
+   "tune": -5.7,
+   "start": 0,
+   "end": 339570,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_C3_v2_RR1.wav",
+   "root": 60,
+   "keys": [
+    60,
+    61
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.2,
+   "tune": 1.4,
+   "start": 0,
+   "end": 345688,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_C3_v3_RR1.wav",
+   "root": 60,
+   "keys": [
+    60,
+    61
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.2,
+   "tune": 0.3,
+   "start": 0,
+   "end": 404838,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_D3_v2_RR1.wav",
+   "root": 62,
+   "keys": [
+    62,
+    63
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.2,
+   "tune": -0.1,
+   "start": 0,
+   "end": 252085,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_D3_v3_RR1.wav",
+   "root": 62,
+   "keys": [
+    62,
+    63
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.2,
+   "tune": -1.0,
+   "start": 0,
+   "end": 413658,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_E3_v2_RR1.wav",
+   "root": 64,
+   "keys": [
+    64,
+    65
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.2,
+   "tune": -2.0,
+   "start": 0,
+   "end": 294361,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_E3_v3_RR1.wav",
+   "root": 64,
+   "keys": [
+    64,
+    65
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.2,
+   "tune": -3.7,
+   "start": 0,
+   "end": 372204,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_F#3_v2_RR1.wav",
+   "root": 66,
+   "keys": [
+    66,
+    67
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.2,
+   "tune": -7.6,
+   "start": 0,
+   "end": 291714,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_F#3_v3_RR1.wav",
+   "root": 66,
+   "keys": [
+    66,
+    67
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.2,
+   "tune": -3.9,
+   "start": 0,
+   "end": 397782,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_G#3_v2_RR1.wav",
+   "root": 68,
+   "keys": [
+    68,
+    69
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.2,
+   "tune": -3.1,
+   "start": 0,
+   "end": 179521,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_G#3_v3_RR1.wav",
+   "root": 68,
+   "keys": [
+    68,
+    69
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.2,
+   "tune": -8.3,
+   "start": 0,
+   "end": 239904,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_A#3_v2_RR1.wav",
+   "root": 70,
+   "keys": [
+    70,
+    71
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.2,
+   "tune": -5.3,
+   "start": 0,
+   "end": 172762,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_A#3_v3_RR1.wav",
+   "root": 70,
+   "keys": [
+    70,
+    71
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.2,
+   "tune": -5.7,
+   "start": 0,
+   "end": 218736,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_C4_v2_RR1.wav",
+   "root": 72,
+   "keys": [
+    72,
+    73
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.2,
+   "tune": -4.1,
+   "start": 0,
+   "end": 193772,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_C4_v3_RR1.wav",
+   "root": 72,
+   "keys": [
+    72,
+    73
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.2,
+   "tune": 1.2,
+   "start": 0,
+   "end": 427770,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_D4_v2_RR1.wav",
+   "root": 74,
+   "keys": [
+    74,
+    75
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.2,
+   "tune": -2.5,
+   "start": 0,
+   "end": 238819,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_D4_v3_RR1.wav",
+   "root": 74,
+   "keys": [
+    74,
+    75
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.2,
+   "tune": -7.8,
+   "start": 0,
+   "end": 332514,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_E4_v2_RR1.wav",
+   "root": 76,
+   "keys": [
+    76,
+    77
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.2,
+   "tune": 5.6,
+   "start": 0,
+   "end": 180826,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_E4_v3_RR1.wav",
+   "root": 76,
+   "keys": [
+    76,
+    77
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.2,
+   "tune": 3.9,
+   "start": 0,
+   "end": 289296,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_F#4_v2_RR1.wav",
+   "root": 78,
+   "keys": [
+    78,
+    79
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.2,
+   "tune": 0.6,
+   "start": 0,
+   "end": 129342,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_F#4_v3_RR1.wav",
+   "root": 78,
+   "keys": [
+    78,
+    79
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.2,
+   "tune": -4.7,
+   "start": 0,
+   "end": 256728,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_G#4_v2_RR1.wav",
+   "root": 80,
+   "keys": [
+    80,
+    81
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.2,
+   "tune": -0.2,
+   "start": 0,
+   "end": 87155,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_G#4_v3_RR1.wav",
+   "root": 80,
+   "keys": [
+    80,
+    81
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.2,
+   "tune": -9.4,
+   "start": 0,
+   "end": 151546,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_A#4_v2_RR1.wav",
+   "root": 82,
+   "keys": [
+    82,
+    83
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.2,
+   "tune": -3.2,
+   "start": 0,
+   "end": 84749,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_A#4_v3_RR1.wav",
+   "root": 82,
+   "keys": [
+    82,
+    83
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.2,
+   "tune": -4.7,
+   "start": 0,
+   "end": 106722,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_C5_v2_RR1.wav",
+   "root": 84,
+   "keys": [
+    84,
+    85
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.2,
+   "start": 0,
+   "end": 91626,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_C5_v3_RR1.wav",
+   "root": 84,
+   "keys": [
+    84,
+    85
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.2,
+   "tune": -7.0,
+   "start": 0,
+   "end": 133948,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_D5_v2_RR1.wav",
+   "root": 86,
+   "keys": [
+    86,
+    87
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.2,
+   "tune": -6.9,
+   "start": 0,
+   "end": 115055,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_D5_v3_RR1.wav",
+   "root": 86,
+   "keys": [
+    86,
+    87
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.2,
+   "tune": -5.7,
+   "start": 0,
+   "end": 111357,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_E5_v2_RR1.wav",
+   "root": 88,
+   "keys": [
+    88,
+    89
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.2,
+   "tune": -4.0,
+   "start": 0,
+   "end": 71237,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_E5_v3_RR1.wav",
+   "root": 88,
+   "keys": [
+    88,
+    89
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.2,
+   "tune": -4.2,
+   "start": 0,
+   "end": 83022,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_F#5_v2_RR1.wav",
+   "root": 90,
+   "keys": [
+    90,
+    91
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.2,
+   "tune": -1.2,
+   "start": 0,
+   "end": 69019,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_F#5_v3_RR1.wav",
+   "root": 90,
+   "keys": [
+    90,
+    91
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.2,
+   "tune": -5.7,
+   "start": 0,
+   "end": 86436,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_G#5_v2_RR1.wav",
+   "root": 92,
+   "keys": [
+    92,
+    127
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.2,
+   "tune": 0.5,
+   "start": 0,
+   "end": 55711,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Composite Chordophones/Folk Harp/EWHarp_Normal_G#5_v3_RR1.wav",
+   "root": 92,
+   "keys": [
+    92,
+    127
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.2,
+   "tune": -0.5,
+   "start": 0,
+   "end": 63504,
+   "endFade": 2646
+  }
+ ],
+ "settings": {
+  "velocity-db": 16
+ }
+}

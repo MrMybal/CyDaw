@@ -1,0 +1,518 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Marimba",
+ "zones": [
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_F1_soft_01.wav",
+   "root": 41,
+   "keys": [
+    0,
+    44
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 14.5,
+   "tune": -0.6,
+   "start": 0,
+   "end": 110250,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_F1_med_01.wav",
+   "root": 41,
+   "keys": [
+    0,
+    44
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 14.5,
+   "tune": 0.7,
+   "start": 7,
+   "end": 170226,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_F1_loud_01.wav",
+   "root": 41,
+   "keys": [
+    0,
+    44
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 14.5,
+   "tune": 0.5,
+   "start": 2,
+   "end": 162058,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_C2_soft_01.wav",
+   "root": 48,
+   "keys": [
+    45,
+    51
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 14.5,
+   "tune": -1.7,
+   "start": 0,
+   "end": 244314,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_C2_med_01.wav",
+   "root": 48,
+   "keys": [
+    45,
+    51
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 14.5,
+   "tune": -3.5,
+   "start": 68,
+   "end": 297501,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_C2_loud_01.wav",
+   "root": 48,
+   "keys": [
+    45,
+    51
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 14.5,
+   "tune": -13.6,
+   "start": 33,
+   "end": 331632,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_G2_soft_01.wav",
+   "root": 55,
+   "keys": [
+    52,
+    57
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 14.5,
+   "tune": -0.3,
+   "start": 0,
+   "end": 199332,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_G2_med_01.wav",
+   "root": 55,
+   "keys": [
+    52,
+    57
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 14.5,
+   "tune": 0.3,
+   "start": 0,
+   "end": 242550,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_G2_loud_01.wav",
+   "root": 55,
+   "keys": [
+    52,
+    57
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 14.5,
+   "tune": -8.3,
+   "start": 73,
+   "end": 256662,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_B2_soft_01.wav",
+   "root": 59,
+   "keys": [
+    58,
+    62
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 14.5,
+   "tune": -2.9,
+   "start": 0,
+   "end": 168462,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_B2_med_01.wav",
+   "root": 59,
+   "keys": [
+    58,
+    62
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 14.5,
+   "tune": -2.8,
+   "start": 0,
+   "end": 197568,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_B2_loud_01.wav",
+   "root": 59,
+   "keys": [
+    58,
+    62
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 14.5,
+   "tune": -2.4,
+   "start": 93,
+   "end": 214326,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_F3_soft_01.wav",
+   "root": 65,
+   "keys": [
+    63,
+    68
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 14.5,
+   "tune": -0.1,
+   "start": 0,
+   "end": 164934,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_F3_med_01.wav",
+   "root": 65,
+   "keys": [
+    63,
+    68
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 14.5,
+   "start": 197,
+   "end": 169344,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_F3_loud_01.wav",
+   "root": 65,
+   "keys": [
+    63,
+    68
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 14.5,
+   "start": 117,
+   "end": 180810,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_C4_soft_01.wav",
+   "root": 72,
+   "keys": [
+    69,
+    75
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 14.5,
+   "tune": -4.7,
+   "start": 0,
+   "end": 152567,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_C4_med_01.wav",
+   "root": 72,
+   "keys": [
+    69,
+    75
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 14.5,
+   "tune": -4.6,
+   "start": 107,
+   "end": 109200,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_C4_loud_01.wav",
+   "root": 72,
+   "keys": [
+    69,
+    75
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 14.5,
+   "tune": -5.9,
+   "start": 103,
+   "end": 114660,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_G4_soft_01.wav",
+   "root": 79,
+   "keys": [
+    76,
+    81
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 14.5,
+   "tune": 1.6,
+   "start": 0,
+   "end": 68796,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_G4_med_01.wav",
+   "root": 79,
+   "keys": [
+    76,
+    81
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 14.5,
+   "tune": 1.7,
+   "start": 70,
+   "end": 71442,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_G4_loud_01.wav",
+   "root": 79,
+   "keys": [
+    76,
+    81
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 14.5,
+   "tune": 1.9,
+   "start": 79,
+   "end": 71442,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_B4_soft_01.wav",
+   "root": 83,
+   "keys": [
+    82,
+    86
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 14.5,
+   "tune": -1.6,
+   "start": 0,
+   "end": 57330,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_B4_med_01.wav",
+   "root": 83,
+   "keys": [
+    82,
+    86
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 14.5,
+   "tune": -0.8,
+   "start": 60,
+   "end": 63504,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_B4_loud_01.wav",
+   "root": 83,
+   "keys": [
+    82,
+    86
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 14.5,
+   "tune": -0.8,
+   "start": 60,
+   "end": 59976,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_F5_soft_01.wav",
+   "root": 89,
+   "keys": [
+    87,
+    92
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 14.5,
+   "tune": -0.8,
+   "start": 0,
+   "end": 50274,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_F5_med_01.wav",
+   "root": 89,
+   "keys": [
+    87,
+    92
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 14.5,
+   "tune": 2.5,
+   "start": 0,
+   "end": 65268,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_F5_loud_01.wav",
+   "root": 89,
+   "keys": [
+    87,
+    92
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 14.5,
+   "tune": 2.0,
+   "start": 25,
+   "end": 63504,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_C6_soft_01.wav",
+   "root": 96,
+   "keys": [
+    93,
+    127
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 14.5,
+   "tune": -0.8,
+   "start": 0,
+   "end": 50274,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_C6_med_01.wav",
+   "root": 96,
+   "keys": [
+    93,
+    127
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 14.5,
+   "tune": -3.7,
+   "start": 0,
+   "end": 65268,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Marimba/Marimba_hit_Outrigger_C6_loud_01.wav",
+   "root": 96,
+   "keys": [
+    93,
+    127
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 14.5,
+   "tune": -3.5,
+   "start": 0,
+   "end": 60858,
+   "endFade": 2646
+  }
+ ],
+ "settings": {
+  "velocity-db": 16
+ }
+}

@@ -1,0 +1,473 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Pipe organ (full)",
+ "zones": [
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Loud/Rode_Man3Open_C1.wav",
+   "root": 36,
+   "keys": [
+    0,
+    37
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 15.6,
+   "tune": 0.1,
+   "start": 1622,
+   "end": 557664,
+   "endFade": 2646,
+   "loop": [
+    245954,
+    458640
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Loud/Rode_Man3Open_D#1.wav",
+   "root": 39,
+   "keys": [
+    38,
+    40
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 15.6,
+   "tune": 0.1,
+   "start": 1349,
+   "end": 551589,
+   "endFade": 2646,
+   "loop": [
+    263048,
+    446292
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Loud/Rode_Man3Open_F#1.wav",
+   "root": 42,
+   "keys": [
+    41,
+    43
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 15.6,
+   "tune": 0.1,
+   "start": 1592,
+   "end": 558504,
+   "endFade": 2646,
+   "loop": [
+    210467,
+    452466
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Loud/Rode_Man3Open_A1.wav",
+   "root": 45,
+   "keys": [
+    44,
+    46
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 15.6,
+   "start": 1366,
+   "end": 551923,
+   "endFade": 2646,
+   "loop": [
+    168489,
+    448056
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Loud/Rode_Man3Open_C2.wav",
+   "root": 48,
+   "keys": [
+    47,
+    49
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 15.6,
+   "tune": 0.1,
+   "start": 1525,
+   "end": 542336,
+   "endFade": 2646,
+   "loop": [
+    172611,
+    440118
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Loud/Rode_Man3Open_D#2.wav",
+   "root": 51,
+   "keys": [
+    50,
+    52
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 15.6,
+   "tune": -1.3,
+   "start": 1598,
+   "end": 547717,
+   "endFade": 2646,
+   "loop": [
+    254849,
+    451584
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Loud/Rode_Man3Open_F#2.wav",
+   "root": 54,
+   "keys": [
+    53,
+    55
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 15.6,
+   "tune": 0.1,
+   "start": 1490,
+   "end": 549320,
+   "endFade": 2646,
+   "loop": [
+    224743,
+    442764
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Loud/Rode_Man3Open_A2.wav",
+   "root": 57,
+   "keys": [
+    56,
+    58
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 15.6,
+   "tune": 0.1,
+   "start": 1357,
+   "end": 541127,
+   "endFade": 2646,
+   "loop": [
+    290566,
+    441000
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Loud/Rode_Man3Open_C3.wav",
+   "root": 60,
+   "keys": [
+    59,
+    61
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 15.6,
+   "tune": 0.6,
+   "start": 1636,
+   "end": 545149,
+   "endFade": 2646,
+   "loop": [
+    379629,
+    440118
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Loud/Rode_Man3Open_D#3.wav",
+   "root": 63,
+   "keys": [
+    62,
+    64
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 15.6,
+   "tune": 2.6,
+   "start": 1268,
+   "end": 539791,
+   "endFade": 2646,
+   "loop": [
+    272109,
+    441000
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Loud/Rode_Man3Open_F#3.wav",
+   "root": 66,
+   "keys": [
+    65,
+    67
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 15.6,
+   "tune": 0.1,
+   "start": 1037,
+   "end": 541917,
+   "endFade": 2646,
+   "loop": [
+    116533,
+    447174
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Loud/Rode_Man3Open_A3.wav",
+   "root": 69,
+   "keys": [
+    68,
+    70
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 15.6,
+   "tune": 0.1,
+   "start": 1376,
+   "end": 547141,
+   "endFade": 2646,
+   "loop": [
+    133438,
+    448938
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Loud/Rode_Man3Open_C4.wav",
+   "root": 72,
+   "keys": [
+    71,
+    73
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 15.6,
+   "tune": 0.1,
+   "start": 1504,
+   "end": 546917,
+   "endFade": 2646,
+   "loop": [
+    34763,
+    450702
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Loud/Rode_Man3Open_D#4.wav",
+   "root": 75,
+   "keys": [
+    74,
+    76
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 15.6,
+   "tune": 0.1,
+   "start": 1601,
+   "end": 534696,
+   "endFade": 2646,
+   "loop": [
+    377355,
+    440118
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Loud/Rode_Man3Open_F#4.wav",
+   "root": 78,
+   "keys": [
+    77,
+    79
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 15.6,
+   "tune": 0.1,
+   "start": 1460,
+   "end": 529938,
+   "endFade": 2646,
+   "loop": [
+    111427,
+    440118
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Loud/Rode_Man3Open_A4.wav",
+   "root": 81,
+   "keys": [
+    80,
+    82
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 15.6,
+   "tune": -0.1,
+   "start": 1430,
+   "end": 532283,
+   "endFade": 2646,
+   "loop": [
+    151075,
+    448056
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Loud/Rode_Man3Open_C5.wav",
+   "root": 84,
+   "keys": [
+    83,
+    85
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 15.6,
+   "tune": 0.1,
+   "start": 1442,
+   "end": 533894,
+   "endFade": 2646,
+   "loop": [
+    363924,
+    447174
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Loud/Rode_Man3Open_D#5.wav",
+   "root": 87,
+   "keys": [
+    86,
+    88
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 15.6,
+   "tune": 1.3,
+   "start": 1473,
+   "end": 529415,
+   "endFade": 2646,
+   "loop": [
+    349003,
+    435708
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Loud/Rode_Man3Open_F#5.wav",
+   "root": 90,
+   "keys": [
+    89,
+    91
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 15.6,
+   "tune": -2.1,
+   "start": 1569,
+   "end": 530353,
+   "endFade": 2646,
+   "loop": [
+    231221,
+    441882
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Loud/Rode_Man3Open_A5.wav",
+   "root": 93,
+   "keys": [
+    92,
+    94
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 15.6,
+   "tune": 2.3,
+   "start": 1238,
+   "end": 535946,
+   "endFade": 2646,
+   "loop": [
+    203857,
+    448938
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Loud/Rode_Man3Open_C6.wav",
+   "root": 96,
+   "keys": [
+    95,
+    127
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 15.6,
+   "tune": 1.4,
+   "start": 1253,
+   "end": 524811,
+   "endFade": 2646,
+   "loop": [
+    297375,
+    439236
+   ],
+   "loopCrossfade": 3528
+  }
+ ],
+ "settings": {
+  "velocity-db": 0,
+  "velocity-crossfade": 1,
+  "loop": 1
+ }
+}

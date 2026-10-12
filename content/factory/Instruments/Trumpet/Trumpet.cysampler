@@ -1,0 +1,452 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Trumpet",
+ "zones": [
+  {
+   "file": "bank:vsco/Brass/Trumpet/sus/Sum_SHTrumpet_sus_F2_v1_rr1.wav",
+   "root": 53,
+   "keys": [
+    0,
+    55
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 0.3,
+   "tune": -3.6,
+   "start": 0,
+   "end": 551094,
+   "endFade": 2646,
+   "loop": [
+    389347,
+    508032
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Trumpet/sus/Sum_SHTrumpet_sus_F2_v3_rr1.wav",
+   "root": 53,
+   "keys": [
+    0,
+    55
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 0.3,
+   "tune": 4.0,
+   "start": 0,
+   "end": 243432,
+   "endFade": 2646,
+   "loop": [
+    132089,
+    187866
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Trumpet/sus/Sum_SHTrumpet_sus_A2_v1_rr1.wav",
+   "root": 57,
+   "keys": [
+    56,
+    58
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 0.3,
+   "tune": 2.1,
+   "start": 0,
+   "end": 525089,
+   "endFade": 2646,
+   "loop": [
+    217692,
+    494802
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Trumpet/sus/Sum_SHTrumpet_sus_A2_v3_rr1.wav",
+   "root": 57,
+   "keys": [
+    56,
+    58
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 0.3,
+   "tune": 3.1,
+   "start": 0,
+   "end": 258426,
+   "endFade": 2646,
+   "loop": [
+    153203,
+    209034
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Trumpet/sus/Sum_SHTrumpet_sus_C3_v1_rr1.wav",
+   "root": 60,
+   "keys": [
+    59,
+    61
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 0.3,
+   "tune": 3.9,
+   "start": 0,
+   "end": 669249,
+   "endFade": 2646,
+   "loop": [
+    263229,
+    629748
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Trumpet/sus/Sum_SHTrumpet_sus_C3_v3_rr1.wav",
+   "root": 60,
+   "keys": [
+    59,
+    61
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 0.3,
+   "tune": 1.6,
+   "start": 0,
+   "end": 306054,
+   "endFade": 2646,
+   "loop": [
+    143581,
+    254898
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Trumpet/sus/Sum_SHTrumpet_sus_D#3_v1_rr1.wav",
+   "root": 63,
+   "keys": [
+    62,
+    65
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 0.3,
+   "tune": -2.3,
+   "start": 0,
+   "end": 689451,
+   "endFade": 2646,
+   "loop": [
+    397686,
+    653562
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Trumpet/sus/Sum_SHTrumpet_sus_D#3_v3_rr1.wav",
+   "root": 63,
+   "keys": [
+    62,
+    65
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 0.3,
+   "tune": 0.8,
+   "start": 0,
+   "end": 404838,
+   "endFade": 2646,
+   "loop": [
+    97644,
+    347508
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Trumpet/sus/Sum_SHTrumpet_sus_G3_v1_rr1.wav",
+   "root": 67,
+   "keys": [
+    66,
+    68
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 0.3,
+   "tune": -7.1,
+   "start": 0,
+   "end": 752507,
+   "endFade": 2646,
+   "loop": [
+    637829,
+    711774
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Trumpet/sus/Sum_SHTrumpet_sus_G3_v3_rr1.wav",
+   "root": 67,
+   "keys": [
+    66,
+    68
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 0.3,
+   "tune": -3.9,
+   "start": 0,
+   "end": 400428,
+   "endFade": 2646,
+   "loop": [
+    264026,
+    347508
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Trumpet/sus/Sum_SHTrumpet_sus_A#3_v1_rr1.wav",
+   "root": 70,
+   "keys": [
+    69,
+    72
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 0.3,
+   "tune": 1.8,
+   "start": 0,
+   "end": 849366,
+   "endFade": 2646,
+   "loop": [
+    729639,
+    799974
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Trumpet/sus/Sum_SHTrumpet_sus_A#3_v3_rr1.wav",
+   "root": 70,
+   "keys": [
+    69,
+    72
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 0.3,
+   "tune": -1.0,
+   "start": 0,
+   "end": 413658,
+   "endFade": 2646,
+   "loop": [
+    265943,
+    361620
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Trumpet/sus/Sum_SHTrumpet_sus_D4_v1_rr1.wav",
+   "root": 74,
+   "keys": [
+    73,
+    75
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 0.3,
+   "tune": -0.6,
+   "start": 0,
+   "end": 717948,
+   "endFade": 2646,
+   "loop": [
+    158741,
+    677376
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Trumpet/sus/Sum_SHTrumpet_sus_D4_v3_rr1.wav",
+   "root": 74,
+   "keys": [
+    73,
+    75
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 0.3,
+   "tune": -0.2,
+   "start": 0,
+   "end": 346626,
+   "endFade": 2646,
+   "loop": [
+    145921,
+    291060
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Trumpet/sus/Sum_SHTrumpet_sus_F4_v1_rr1.wav",
+   "root": 77,
+   "keys": [
+    76,
+    79
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 0.3,
+   "tune": -0.1,
+   "start": 0,
+   "end": 608580,
+   "endFade": 2646,
+   "loop": [
+    315834,
+    551250
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Trumpet/sus/Sum_SHTrumpet_sus_F4_v3_rr1.wav",
+   "root": 77,
+   "keys": [
+    76,
+    79
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 0.3,
+   "tune": 2.7,
+   "start": 0,
+   "end": 306936,
+   "endFade": 2646,
+   "loop": [
+    204505,
+    257544
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Trumpet/sus/Sum_SHTrumpet_sus_A4_v1_rr1.wav",
+   "root": 81,
+   "keys": [
+    80,
+    82
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 0.3,
+   "tune": 0.9,
+   "start": 0,
+   "end": 623574,
+   "endFade": 2646,
+   "loop": [
+    449663,
+    575946
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Trumpet/sus/Sum_SHTrumpet_sus_A4_v3_rr1.wav",
+   "root": 81,
+   "keys": [
+    80,
+    82
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 0.3,
+   "tune": -1.5,
+   "start": 0,
+   "end": 421596,
+   "endFade": 2646,
+   "loop": [
+    313921,
+    366912
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Trumpet/sus/Sum_SHTrumpet_sus_C5_v1_rr1.wav",
+   "root": 84,
+   "keys": [
+    83,
+    127
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 0.3,
+   "tune": -1.0,
+   "start": 0,
+   "end": 632394,
+   "endFade": 2646,
+   "loop": [
+    486661,
+    587412
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Trumpet/sus/Sum_SHTrumpet_sus_C5_v3_rr1.wav",
+   "root": 84,
+   "keys": [
+    83,
+    127
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 0.3,
+   "tune": 3.5,
+   "start": 0,
+   "end": 326340,
+   "endFade": 2646,
+   "loop": [
+    119075,
+    272538
+   ],
+   "loopCrossfade": 3528
+  }
+ ],
+ "settings": {
+  "velocity-db": 12,
+  "velocity-crossfade": 1,
+  "loop": 1
+ }
+}

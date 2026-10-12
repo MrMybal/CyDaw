@@ -1,0 +1,248 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "English harpsichord, lute stop",
+ "zones": [
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, English/Sustains/Lute/ZuckermannKitHarpsi_Lute_Sus_A#0_rr1.wav",
+   "root": 34,
+   "keys": [
+    0,
+    36
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 7.9,
+   "tune": 2.8,
+   "start": 0,
+   "end": 282240,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, English/Sustains/Lute/ZuckermannKitHarpsi_Lute_Sus_D1_rr1.wav",
+   "root": 38,
+   "keys": [
+    37,
+    40
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 7.9,
+   "tune": 0.2,
+   "start": 0,
+   "end": 242550,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, English/Sustains/Lute/ZuckermannKitHarpsi_Lute_Sus_F#1_rr1.wav",
+   "root": 42,
+   "keys": [
+    41,
+    44
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 7.9,
+   "tune": -2.1,
+   "start": 0,
+   "end": 186102,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, English/Sustains/Lute/ZuckermannKitHarpsi_Lute_Sus_A#1_rr1.wav",
+   "root": 46,
+   "keys": [
+    45,
+    48
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 7.9,
+   "tune": 3.9,
+   "start": 0,
+   "end": 189630,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, English/Sustains/Lute/ZuckermannKitHarpsi_Lute_Sus_D2_rr1.wav",
+   "root": 50,
+   "keys": [
+    49,
+    52
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 7.9,
+   "tune": 1.3,
+   "start": 0,
+   "end": 141120,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, English/Sustains/Lute/ZuckermannKitHarpsi_Lute_Sus_F#2_rr1.wav",
+   "root": 54,
+   "keys": [
+    53,
+    56
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 7.9,
+   "tune": -0.7,
+   "start": 0,
+   "end": 159642,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, English/Sustains/Lute/ZuckermannKitHarpsi_Lute_Sus_A#2_rr1.wav",
+   "root": 58,
+   "keys": [
+    57,
+    60
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 7.9,
+   "tune": -2.8,
+   "start": 0,
+   "end": 143766,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, English/Sustains/Lute/ZuckermannKitHarpsi_Lute_Sus_D3_rr1.wav",
+   "root": 62,
+   "keys": [
+    61,
+    64
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 7.9,
+   "tune": -0.8,
+   "start": 0,
+   "end": 168462,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, English/Sustains/Lute/ZuckermannKitHarpsi_Lute_Sus_F#3_rr1.wav",
+   "root": 66,
+   "keys": [
+    65,
+    68
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 7.9,
+   "tune": -2.4,
+   "start": 0,
+   "end": 114660,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, English/Sustains/Lute/ZuckermannKitHarpsi_Lute_Sus_A#3_rr1.wav",
+   "root": 70,
+   "keys": [
+    69,
+    72
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 7.9,
+   "tune": -3.2,
+   "start": 0,
+   "end": 111132,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, English/Sustains/Lute/ZuckermannKitHarpsi_Lute_Sus_D4_rr1.wav",
+   "root": 74,
+   "keys": [
+    73,
+    76
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 7.9,
+   "tune": -3.3,
+   "start": 0,
+   "end": 98197,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, English/Sustains/Lute/ZuckermannKitHarpsi_Lute_Sus_F#4_rr1.wav",
+   "root": 78,
+   "keys": [
+    77,
+    80
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 7.9,
+   "tune": -0.2,
+   "start": 0,
+   "end": 71442,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, English/Sustains/Lute/ZuckermannKitHarpsi_Lute_Sus_A#4_rr1.wav",
+   "root": 82,
+   "keys": [
+    81,
+    84
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 7.9,
+   "tune": 4.0,
+   "start": 0,
+   "end": 97020,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, English/Sustains/Lute/ZuckermannKitHarpsi_Lute_Sus_D5_rr1.wav",
+   "root": 86,
+   "keys": [
+    85,
+    127
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 7.9,
+   "tune": -19.3,
+   "start": 0,
+   "end": 74970,
+   "endFade": 2646
+  }
+ ],
+ "settings": {
+  "velocity-db": 4
+ }
+}

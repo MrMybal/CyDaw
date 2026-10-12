@@ -1,0 +1,756 @@
+{
+ "format": "cydaw-banks",
+ "version": 1,
+ "banks": [
+  {
+   "id": "vcsl",
+   "title": "Versilian Community Sample Library",
+   "author": "Versilian Studios LLC",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sgossner/VCSL",
+   "repository": "sgossner/VCSL",
+   "commit": "c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e",
+   "description": {
+    "fr": "Pianos, clavecins, harpes, orgues, percussions mélodiques et du monde, flûtes à bec…",
+    "en": "Pianos, harpsichords, harps, organs, tuned and world percussion, recorders…"
+   },
+   "list": "BankLists/vcsl.json",
+   "count": 4265,
+   "bytes": 6151381994
+  },
+  {
+   "id": "vsco",
+   "title": "Versilian Studios Chamber Orchestra 2, Community Edition",
+   "author": "Versilian Studios LLC",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sgossner/VSCO-2-CE",
+   "repository": "sgossner/VSCO-2-CE",
+   "commit": "440300901dfe9275fd84e0b7763af1f8443ae62e",
+   "description": {
+    "fr": "Orchestre de chambre : cordes solo et en section, cuivres, bois, percussions, orgue, pianos droits.",
+    "en": "Chamber orchestra: solo and section strings, brass, woodwinds, percussion, organ, upright pianos."
+   },
+   "list": "BankLists/vsco.json",
+   "count": 3177,
+   "bytes": 3178124991
+  },
+  {
+   "id": "virtuosity-drums",
+   "title": "Virtuosity Drums",
+   "author": "Versilian Studios, Karoryfer Samples",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/virtuosity_drums",
+   "repository": "sfzinstruments/virtuosity_drums",
+   "commit": "9f04cf9a734527edfbb0a4eee1f674e45bbf71bc",
+   "description": {
+    "fr": "Batterie jazz complète, six micros, avec ses articulations.",
+    "en": "A complete jazz drum kit, six microphones, with its articulations."
+   },
+   "list": "BankLists/virtuosity-drums.json",
+   "count": 5282,
+   "bytes": 1473742795
+  },
+  {
+   "id": "osiris-piano",
+   "title": "Osiris Piano",
+   "author": "",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/Osiris_Piano",
+   "repository": "sfzinstruments/Osiris_Piano",
+   "commit": "18c6afccb60cff458edbf7c394571783e074e1e9",
+   "description": {
+    "fr": "Piano joué una corda, avec ou sans pédale de sustain, bruit réduit ou non.",
+    "en": "Piano played una corda, with or without the sustain pedal, noise-reduced or not."
+   },
+   "list": "BankLists/osiris-piano.json",
+   "count": 1319,
+   "bytes": 486465391
+  },
+  {
+   "id": "steel-drum",
+   "title": "jSteelDrum",
+   "author": "J. Learman",
+   "licence": "Unlicense",
+   "licenceUrl": "https://unlicense.org/",
+   "homepage": "https://github.com/sfzinstruments/jlearman.SteelDrum",
+   "repository": "sfzinstruments/jlearman.SteelDrum",
+   "commit": "dc15a36ad69a43b0d240fcbd0cc78fbc61b2b47e",
+   "description": {
+    "fr": "Steel drum en do, de C4 à B5, cinq couches de vélocité.",
+    "en": "C steel drum, C4 to B5, five velocity layers."
+   },
+   "list": "BankLists/steel-drum.json",
+   "count": 372,
+   "bytes": 38541639
+  },
+  {
+   "id": "erhu",
+   "title": "Erhu",
+   "author": "",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/aliexpress-erhu",
+   "repository": "sfzinstruments/aliexpress-erhu",
+   "commit": "6615047b2fd06126877483e97b8bb4af9d00b080",
+   "description": {
+    "fr": "Erhu (vièle chinoise) : tenu, court, sul tasto.",
+    "en": "Erhu (Chinese fiddle): long, short, sul tasto."
+   },
+   "list": "BankLists/erhu.json",
+   "count": 191,
+   "bytes": 92826029
+  },
+  {
+   "id": "body-percussion",
+   "title": "Body Percussion",
+   "author": "",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/body_percussion",
+   "repository": "sfzinstruments/body_percussion",
+   "commit": "4ac9d8966679c648b62fa10a188179e186b97f24",
+   "description": {
+    "fr": "Percussions corporelles : frappes, claquements, round robins.",
+    "en": "Body percussion: hits, claps, round robins."
+   },
+   "list": "BankLists/body-percussion.json",
+   "count": 233,
+   "bytes": 61733852
+  },
+  {
+   "id": "cithara-barbarica",
+   "title": "Cithara Barbarica",
+   "author": "",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/cithara-barbarica",
+   "repository": "sfzinstruments/cithara-barbarica",
+   "commit": "a47c10dc4a26538a8a56d31d3436488138292ca2",
+   "description": {
+    "fr": "Lyre médiévale à dix cordes métalliques, pincées de plusieurs façons.",
+    "en": "Medieval ten-string lyre with metal strings, plucked several ways."
+   },
+   "list": "BankLists/cithara-barbarica.json",
+   "count": 275,
+   "bytes": 239034087
+  },
+  {
+   "id": "ganjo",
+   "title": "Ganjo",
+   "author": "itsclipping",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/ganjo",
+   "repository": "sfzinstruments/ganjo",
+   "commit": "ccff5cd5cd3b513873a48994c07724d9d3c39e1c",
+   "description": {
+    "fr": "Banjo à six cordes (guitare-banjo).",
+    "en": "Six-string banjo (guitar banjo)."
+   },
+   "list": "BankLists/ganjo.json",
+   "count": 65,
+   "bytes": 24493786
+  },
+  {
+   "id": "hungarian-zither",
+   "title": "Hungarian Zither",
+   "author": "",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/hungarian_zither",
+   "repository": "sfzinstruments/hungarian_zither",
+   "commit": "973d9445ba890661a4f4cd8e417d36134fb5f337",
+   "description": {
+    "fr": "Cithare hongroise en sol : grattée et mélodique.",
+    "en": "Hungarian zither in G: strummed and melody."
+   },
+   "list": "BankLists/hungarian-zither.json",
+   "count": 219,
+   "bytes": 178322902
+  },
+  {
+   "id": "legato-vocal",
+   "title": "Legato Vocal",
+   "author": "Karoryfer Samples",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/legato_vocal_tutorial",
+   "repository": "sfzinstruments/legato_vocal_tutorial",
+   "commit": "fac6461ee4c7f498b23246eced644616fa58d2ec",
+   "description": {
+    "fr": "Voix chantée « a » en legato.",
+    "en": "A sung \"a\" vowel, legato."
+   },
+   "list": "BankLists/legato-vocal.json",
+   "count": 758,
+   "bytes": 172402716
+  },
+  {
+   "id": "stickmusterstuch",
+   "title": "Zamenhof Stickmusterstuch Error",
+   "author": "",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/zamenhof_stickmusterstuch_error",
+   "repository": "sfzinstruments/zamenhof_stickmusterstuch_error",
+   "commit": "338133ee7fe6a429576c0dea3edfa1b9270201b6",
+   "description": {
+    "fr": "Sons expérimentaux.",
+    "en": "Experimental sounds."
+   },
+   "list": "BankLists/stickmusterstuch.json",
+   "count": 173,
+   "bytes": 121111522
+  },
+  {
+   "id": "smolken-double-bass",
+   "title": "D. Smolken's Double Bass",
+   "author": "D. Smolken",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/dsmolken.double-bass",
+   "repository": "sfzinstruments/dsmolken.double-bass",
+   "commit": "c2985eb647109d2a8f30a70071e3e163339d7396",
+   "description": {
+    "fr": "Contrebasse Otto Rubner de 1958 : arco et pizzicato.",
+    "en": "1958 Otto Rubner double bass: arco and pizzicato."
+   },
+   "list": "BankLists/smolken-double-bass.json",
+   "count": 406,
+   "bytes": 288893197
+  },
+  {
+   "id": "bigcat-cello",
+   "title": "Karoryfer x bigcat Cello",
+   "author": "Karoryfer Samples",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/karoryfer-bigcat.cello",
+   "repository": "sfzinstruments/karoryfer-bigcat.cello",
+   "commit": "6fd75fbfc1dbb3109bf26220ba1adea46188a18b",
+   "description": {
+    "fr": "Violoncelle solo, joué par Kamila Borowiak.",
+    "en": "Solo cello, played by Kamila Borowiak."
+   },
+   "list": "BankLists/bigcat-cello.json",
+   "count": 520,
+   "bytes": 141812275
+  },
+  {
+   "id": "horse-pulse",
+   "title": "Horse Pulse",
+   "author": "Karoryfer Samples",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/Karoryfer.HorsePulse",
+   "repository": "sfzinstruments/Karoryfer.HorsePulse",
+   "commit": "6f4749d54512d762098ca726a3cbd13444562904",
+   "description": {
+    "fr": "Talharpa basse jouée en pizzicato.",
+    "en": "Bass tagelharpa played pizzicato."
+   },
+   "list": "BankLists/horse-pulse.json",
+   "count": 575,
+   "bytes": 191420150
+  },
+  {
+   "id": "hat-with-the-phat",
+   "title": "The Hat With The Phat",
+   "author": "Karoryfer Samples",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/Karoryfer.TheHatWithThePhat",
+   "repository": "sfzinstruments/Karoryfer.TheHatWithThePhat",
+   "commit": "afa76f2c9c88e2e27d72a0c2216b1eae3c47b835",
+   "description": {
+    "fr": "Charleston géant fait de deux cymbales ride.",
+    "en": "An oversized hi-hat made of two ride cymbals."
+   },
+   "list": "BankLists/hat-with-the-phat.json",
+   "count": 767,
+   "bytes": 978988403
+  },
+  {
+   "id": "merry-orks",
+   "title": "272 Merry Orks",
+   "author": "Karoryfer Samples",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/karoryfer.272-merry-orks",
+   "repository": "sfzinstruments/karoryfer.272-merry-orks",
+   "commit": "a437e2c02014e02710a104a6692193eab8672d0a",
+   "description": {
+    "fr": "Voix death metal féminines.",
+    "en": "Female death metal vocals."
+   },
+   "list": "BankLists/merry-orks.json",
+   "count": 277,
+   "bytes": 45627769
+  },
+  {
+   "id": "bear-sax",
+   "title": "Bear Sax",
+   "author": "Karoryfer Samples",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/karoryfer.bear-sax",
+   "repository": "sfzinstruments/karoryfer.bear-sax",
+   "commit": "7abb3c652525a15dfac80e1b5dfbba9964ee568f",
+   "description": {
+    "fr": "Saxophone baryton Conn de 1926.",
+    "en": "1926 Conn baritone saxophone."
+   },
+   "list": "BankLists/bear-sax.json",
+   "count": 805,
+   "bytes": 143844291
+  },
+  {
+   "id": "big-little-bass",
+   "title": "Big Little Bass",
+   "author": "Karoryfer Samples",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/karoryfer.big-little-bass",
+   "repository": "sfzinstruments/karoryfer.big-little-bass",
+   "commit": "4e92bdf54dcd2d6cfad968cc90542d5461c9b9fc",
+   "description": {
+    "fr": "Très grosse basse acoustique jouée dans l'aigu.",
+    "en": "A very big acoustic bass played high up."
+   },
+   "list": "BankLists/big-little-bass.json",
+   "count": 460,
+   "bytes": 313976292
+  },
+  {
+   "id": "big-rusty-drums",
+   "title": "Big Rusty Drums",
+   "author": "Karoryfer Samples",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/karoryfer.big-rusty-drums",
+   "repository": "sfzinstruments/karoryfer.big-rusty-drums",
+   "commit": "f07ce00df34a46b6b08375be56fe116cf15782bc",
+   "description": {
+    "fr": "Batterie.",
+    "en": "Drum kit."
+   },
+   "list": "BankLists/big-rusty-drums.json",
+   "count": 4815,
+   "bytes": 715303237
+  },
+  {
+   "id": "black-and-blue-basses",
+   "title": "Black And Blue Basses",
+   "author": "Karoryfer Samples",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/karoryfer.black-and-blue-basses",
+   "repository": "sfzinstruments/karoryfer.black-and-blue-basses",
+   "commit": "6e7d674cdb41be7a54dbccb15472401ad01099b9",
+   "description": {
+    "fr": "Basses électriques.",
+    "en": "Electric basses."
+   },
+   "list": "BankLists/black-and-blue-basses.json",
+   "count": 2275,
+   "bytes": 1130845177
+  },
+  {
+   "id": "black-and-green-guitars",
+   "title": "Black And Green Guitars",
+   "author": "Karoryfer Samples",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/karoryfer.black-and-green-guitars",
+   "repository": "sfzinstruments/karoryfer.black-and-green-guitars",
+   "commit": "b3b3249d37dc977a1a297bd2dc053e6d9b6b805c",
+   "description": {
+    "fr": "Guitares Gretsch Anniversary verte et Hofner Club noire.",
+    "en": "A green Gretsch Anniversary and a black Hofner Club."
+   },
+   "list": "BankLists/black-and-green-guitars.json",
+   "count": 1849,
+   "bytes": 579452636
+  },
+  {
+   "id": "caveman-cosmonaut",
+   "title": "Caveman Cosmonaut",
+   "author": "Karoryfer Samples",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/karoryfer.caveman-cosmonaut",
+   "repository": "sfzinstruments/karoryfer.caveman-cosmonaut",
+   "commit": "9de9bcfcbc6d2b20bea5c1116cd07a310febc339",
+   "description": {
+    "fr": "Orgue à transistors Unitra B-11 devenu synthétiseur analogique virtuel.",
+    "en": "A Unitra B-11 transistor organ turned into a virtual analog synthesizer."
+   },
+   "list": "BankLists/caveman-cosmonaut.json",
+   "count": 401,
+   "bytes": 106533934
+  },
+  {
+   "id": "cowsynth",
+   "title": "Cowsynth",
+   "author": "Karoryfer Samples",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/karoryfer.cowsynth",
+   "repository": "sfzinstruments/karoryfer.cowsynth",
+   "commit": "5a5b5afc2dabbe54cf9d75ab64711ce01862b42c",
+   "description": {
+    "fr": "Réplique de cornemuse médiévale, en oscillateurs de synthétiseur.",
+    "en": "A replica of medieval bagpipes, as synthesizer oscillators."
+   },
+   "list": "BankLists/cowsynth.json",
+   "count": 59,
+   "bytes": 14832493
+  },
+  {
+   "id": "emilyguitar",
+   "title": "Emilyguitar",
+   "author": "Karoryfer Samples",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/karoryfer.emilyguitar",
+   "repository": "sfzinstruments/karoryfer.emilyguitar",
+   "commit": "b4920dc662fd9cad6dcaccdeecffdd91c8725d8c",
+   "description": {
+    "fr": "Guitare électrique Epiphone Emily the Strange.",
+    "en": "Epiphone Emily the Strange electric guitar."
+   },
+   "list": "BankLists/emilyguitar.json",
+   "count": 331,
+   "bytes": 125538510
+  },
+  {
+   "id": "ergo",
+   "title": "Ergo",
+   "author": "Karoryfer Samples",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/karoryfer.ergo",
+   "repository": "sfzinstruments/karoryfer.ergo",
+   "commit": "c3232f03608e07e4e274c8ad9a1a4c32885f75c4",
+   "description": {
+    "fr": "Contrebasse électrique Ergo, jouée par D. Smolken.",
+    "en": "Ergo electric upright bass played by D. Smolken."
+   },
+   "list": "BankLists/ergo.json",
+   "count": 403,
+   "bytes": 249061978
+  },
+  {
+   "id": "fashionbass",
+   "title": "Fashionbass",
+   "author": "Karoryfer Samples",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/karoryfer.fashionbass",
+   "repository": "sfzinstruments/karoryfer.fashionbass",
+   "commit": "0703973b300a6bacb837602be9b588ab64732a72",
+   "description": {
+    "fr": "Basse électrique Killer KB-Simmony.",
+    "en": "Killer KB-Simmony bass guitar."
+   },
+   "list": "BankLists/fashionbass.json",
+   "count": 432,
+   "bytes": 345335319
+  },
+  {
+   "id": "frankensnare",
+   "title": "Frankensnare",
+   "author": "Karoryfer Samples",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/karoryfer.frankensnare",
+   "repository": "sfzinstruments/karoryfer.frankensnare",
+   "commit": "9151c2d79fcbb73c65d63f78918d4ba7abc91a81",
+   "description": {
+    "fr": "Caisses claires.",
+    "en": "Snare drums."
+   },
+   "list": "BankLists/frankensnare.json",
+   "count": 3891,
+   "bytes": 368105871
+  },
+  {
+   "id": "gogodze-phu-1",
+   "title": "Gogodze Phu Vol. I",
+   "author": "Karoryfer Samples",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/karoryfer.gogodze-phu-vol-i",
+   "repository": "sfzinstruments/karoryfer.gogodze-phu-vol-i",
+   "commit": "7452f62060cd3a468c78bc361d96a4dfb30879c9",
+   "description": {
+    "fr": "Cinq tambours bobobo du Ghana et un cajón.",
+    "en": "Five bobobo drums from Ghana and a cajón."
+   },
+   "list": "BankLists/gogodze-phu-1.json",
+   "count": 567,
+   "bytes": 89068008
+  },
+  {
+   "id": "gogodze-phu-2",
+   "title": "Gogodze Phu Vol. II",
+   "author": "Karoryfer Samples",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/karoryfer.gogodze-phu-vol-ii",
+   "repository": "sfzinstruments/karoryfer.gogodze-phu-vol-ii",
+   "commit": "69a0274cdc39c99c3098cde1bc3789690de86d62",
+   "description": {
+    "fr": "Batterie : grosse caisse, caisse claire, trois toms, charleston.",
+    "en": "Drum kit: kick, snare, three toms, hi-hat."
+   },
+   "list": "BankLists/gogodze-phu-2.json",
+   "count": 1797,
+   "bytes": 484017978
+  },
+  {
+   "id": "growlybass",
+   "title": "Growlybass",
+   "author": "Karoryfer Samples",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/karoryfer.growlybass",
+   "repository": "sfzinstruments/karoryfer.growlybass",
+   "commit": "4f483268fc66b5a6d5781d421c0d11b8d08d3fc6",
+   "description": {
+    "fr": "Basse Squier Jazz Bass.",
+    "en": "Squier Jazz Bass."
+   },
+   "list": "BankLists/growlybass.json",
+   "count": 389,
+   "bytes": 190765200
+  },
+  {
+   "id": "meatbass",
+   "title": "Meatbass",
+   "author": "Karoryfer Samples",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/karoryfer.meatbass",
+   "repository": "sfzinstruments/karoryfer.meatbass",
+   "commit": "ac9e859564bda286ab5ec672d00ff1aa2fef2895",
+   "description": {
+    "fr": "Contrebasse Otto Rubner de 1958, jouée par D. Smolken.",
+    "en": "1958 Otto Rubner double bass played by D. Smolken."
+   },
+   "list": "BankLists/meatbass.json",
+   "count": 577,
+   "bytes": 295508647
+  },
+  {
+   "id": "pastabass",
+   "title": "Pastabass",
+   "author": "Karoryfer Samples",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/karoryfer.pastabass",
+   "repository": "sfzinstruments/karoryfer.pastabass",
+   "commit": "90135cd026db5d4fa0fe538240b4203f085f5244",
+   "description": {
+    "fr": "Basse six cordes Squier Bass VI.",
+    "en": "Squier Bass VI six-string bass."
+   },
+   "list": "BankLists/pastabass.json",
+   "count": 781,
+   "bytes": 487225136
+  },
+  {
+   "id": "scarypiano",
+   "title": "Scarypiano",
+   "author": "Karoryfer Samples",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/karoryfer.scarypiano",
+   "repository": "sfzinstruments/karoryfer.scarypiano",
+   "commit": "46305e8cb71239bfa861fbe8487dd12b8d8de40c",
+   "description": {
+    "fr": "Piano (échantillons de l'Université d'Iowa) déformé pour Halloween.",
+    "en": "A piano (University of Iowa samples) twisted for Halloween."
+   },
+   "list": "BankLists/scarypiano.json",
+   "count": 433,
+   "bytes": 585677042
+  },
+  {
+   "id": "shinyguitar",
+   "title": "Shinyguitar",
+   "author": "Karoryfer Samples",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/karoryfer.shinyguitar",
+   "repository": "sfzinstruments/karoryfer.shinyguitar",
+   "commit": "57243cca85277dbcc120ce17c6178032f93c80f3",
+   "description": {
+    "fr": "Guitare archtop.",
+    "en": "Archtop guitar."
+   },
+   "list": "BankLists/shinyguitar.json",
+   "count": 864,
+   "bytes": 460038898
+  },
+  {
+   "id": "sneakybass",
+   "title": "Sneakybass",
+   "author": "Karoryfer Samples",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/karoryfer.sneakybass",
+   "repository": "sfzinstruments/karoryfer.sneakybass",
+   "commit": "cc1a67e5c913678b85eaad1a3b5cb180d3be3e2d",
+   "description": {
+    "fr": "La contrebasse Otto Rubner en pizzicato, très doucement.",
+    "en": "The Otto Rubner double bass played pizzicato, very quietly."
+   },
+   "list": "BankLists/sneakybass.json",
+   "count": 690,
+   "bytes": 415146553
+  },
+  {
+   "id": "squidpipes",
+   "title": "Squidpipes",
+   "author": "Karoryfer Samples",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/karoryfer.squidpipes",
+   "repository": "sfzinstruments/karoryfer.squidpipes",
+   "commit": "b258528c8f49d6389ec2b4ec04a8b10013169dd9",
+   "description": {
+    "fr": "Cornemuse dont la poche est un manteau de calmar.",
+    "en": "Bagpipes with a squid's mantle as the bag."
+   },
+   "list": "BankLists/squidpipes.json",
+   "count": 437,
+   "bytes": 51873578
+  },
+  {
+   "id": "string-cyborgs",
+   "title": "String Cyborgs",
+   "author": "Karoryfer Samples",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/karoryfer.string-cyborgs",
+   "repository": "sfzinstruments/karoryfer.string-cyborgs",
+   "commit": "f2238b3e36ae64c6383356221dc89c9c476c7b11",
+   "description": {
+    "fr": "Cordes frottées, en oscillateurs d'un synthétiseur soustractif.",
+    "en": "Bowed strings as the oscillators of a subtractive synthesizer."
+   },
+   "list": "BankLists/string-cyborgs.json",
+   "count": 261,
+   "bytes": 74403297
+  },
+  {
+   "id": "swagbass",
+   "title": "Swagbass",
+   "author": "Karoryfer Samples",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/karoryfer.swagbass",
+   "repository": "sfzinstruments/karoryfer.swagbass",
+   "commit": "9d10fcae71af1975988ddecd5af1c95d372c7355",
+   "description": {
+    "fr": "Basse électrique à finition Louis Vuitton.",
+    "en": "Bass guitar with a Louis Vuitton finish."
+   },
+   "list": "BankLists/swagbass.json",
+   "count": 348,
+   "bytes": 174246860
+  },
+  {
+   "id": "swirly-drums",
+   "title": "Swirly Drums",
+   "author": "Karoryfer Samples",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/karoryfer.swirly-drums",
+   "repository": "sfzinstruments/karoryfer.swirly-drums",
+   "commit": "c40dafe0011cb2e54c0c220ff0fa308a11fc60f5",
+   "description": {
+    "fr": "Batterie.",
+    "en": "Drum kit."
+   },
+   "list": "BankLists/swirly-drums.json",
+   "count": 5009,
+   "bytes": 1822447701
+  },
+  {
+   "id": "unruly-drums",
+   "title": "Unruly Drums",
+   "author": "Karoryfer Samples",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/karoryfer.unruly-drums",
+   "repository": "sfzinstruments/karoryfer.unruly-drums",
+   "commit": "9bf75c2a1392f190cd1c264645653629f0b3a097",
+   "description": {
+    "fr": "Batterie.",
+    "en": "Drum kit."
+   },
+   "list": "BankLists/unruly-drums.json",
+   "count": 6300,
+   "bytes": 799876965
+  },
+  {
+   "id": "war-tuba",
+   "title": "War Tuba",
+   "author": "Karoryfer Samples",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/karoryfer.war-tuba",
+   "repository": "sfzinstruments/karoryfer.war-tuba",
+   "commit": "5b62dd6ef6b00281bb734769e44a63f5e013018a",
+   "description": {
+    "fr": "Tuba joué par Jakub Lewicki.",
+    "en": "Tuba played by Jakub Lewicki."
+   },
+   "list": "BankLists/war-tuba.json",
+   "count": 1522,
+   "bytes": 138519785
+  },
+  {
+   "id": "weresax",
+   "title": "Weresax",
+   "author": "Karoryfer Samples",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "https://github.com/sfzinstruments/karoryfer.weresax",
+   "repository": "sfzinstruments/karoryfer.weresax",
+   "commit": "a4d756b21d2a573aca0d840cce7e71ba5effd4c6",
+   "description": {
+    "fr": "Saxophone alto.",
+    "en": "Alto saxophone."
+   },
+   "list": "BankLists/weresax.json",
+   "count": 271,
+   "bytes": 202534821
+  },
+  {
+   "id": "cydaw-electro",
+   "title": "CyDAW Electro",
+   "author": "CyDAW",
+   "licence": "CC0-1.0",
+   "licenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "homepage": "",
+   "repository": "",
+   "commit": "",
+   "generator": "cydaw-drums",
+   "rate": 48000,
+   "description": {
+    "fr": "Batteries électroniques générées par CyDAW, rien à télécharger : kicks, caisses claires, claps, charleys, cymbales, toms, percussions, effets.",
+    "en": "Electronic drums CyDAW generates, nothing to download: kicks, snares, claps, hats, cymbals, toms, percussion, effects."
+   },
+   "list": "BankLists/cydaw-electro.json",
+   "count": 95,
+   "bytes": 4883330
+  }
+ ]
+}

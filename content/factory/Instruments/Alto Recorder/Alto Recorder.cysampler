@@ -1,0 +1,276 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Alto recorder",
+ "zones": [
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Baroque Alto Recorder/Sustain/AltRecorder_Sus_F3_rr1_Main.wav",
+   "root": 65,
+   "keys": [
+    0,
+    66
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 18.0,
+   "tune": -0.1,
+   "start": 0,
+   "end": 813695,
+   "endFade": 2880,
+   "loop": [
+    674094,
+    792000
+   ],
+   "loopCrossfade": 3840
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Baroque Alto Recorder/Sustain/AltRecorder_Sus_G#3_rr1_Main.wav",
+   "root": 68,
+   "keys": [
+    67,
+    69
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 18.0,
+   "tune": -0.3,
+   "start": 0,
+   "end": 616630,
+   "endFade": 2880,
+   "loop": [
+    341835,
+    596160
+   ],
+   "loopCrossfade": 3840
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Baroque Alto Recorder/Sustain/AltRecorder_Sus_A#3_rr1_Main.wav",
+   "root": 70,
+   "keys": [
+    70,
+    71
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 18.0,
+   "tune": 2.3,
+   "start": 0,
+   "end": 750971,
+   "endFade": 2880,
+   "loop": [
+    554847,
+    725760
+   ],
+   "loopCrossfade": 3840
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Baroque Alto Recorder/Sustain/AltRecorder_Sus_C4_rr1_Main.wav",
+   "root": 72,
+   "keys": [
+    72,
+    73
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 18.0,
+   "tune": -1.2,
+   "start": 200,
+   "end": 393544,
+   "endFade": 2880,
+   "loop": [
+    234400,
+    368640
+   ],
+   "loopCrossfade": 3840
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Baroque Alto Recorder/Sustain/AltRecorder_Sus_D4_rr1_Main.wav",
+   "root": 74,
+   "keys": [
+    74,
+    75
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 18.0,
+   "tune": -1.0,
+   "start": 76,
+   "end": 439142,
+   "endFade": 2880,
+   "loop": [
+    252865,
+    415680
+   ],
+   "loopCrossfade": 3840
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Baroque Alto Recorder/Sustain/AltRecorder_Sus_E4_rr1_Main.wav",
+   "root": 76,
+   "keys": [
+    76,
+    77
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 18.0,
+   "tune": 0.2,
+   "start": 0,
+   "end": 578069,
+   "endFade": 2880,
+   "loop": [
+    315748,
+    552960
+   ],
+   "loopCrossfade": 3840
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Baroque Alto Recorder/Sustain/AltRecorder_Sus_F#4_rr1_Main.wav",
+   "root": 78,
+   "keys": [
+    78,
+    79
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 18.0,
+   "tune": 1.0,
+   "start": 0,
+   "end": 780442,
+   "endFade": 2880,
+   "loop": [
+    565220,
+    752640
+   ],
+   "loopCrossfade": 3840
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Baroque Alto Recorder/Sustain/AltRecorder_Sus_G#4_rr1_Main.wav",
+   "root": 80,
+   "keys": [
+    80,
+    81
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 18.0,
+   "tune": -5.9,
+   "start": 0,
+   "end": 598506,
+   "endFade": 2880,
+   "loop": [
+    425259,
+    571200
+   ],
+   "loopCrossfade": 3840
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Baroque Alto Recorder/Sustain/AltRecorder_Sus_A#4_rr1_Main.wav",
+   "root": 82,
+   "keys": [
+    82,
+    83
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 18.0,
+   "tune": -0.3,
+   "start": 0,
+   "end": 569778,
+   "endFade": 2880,
+   "loop": [
+    481599,
+    545280
+   ],
+   "loopCrossfade": 3840
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Baroque Alto Recorder/Sustain/AltRecorder_Sus_C5_rr1_Main.wav",
+   "root": 84,
+   "keys": [
+    84,
+    85
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 18.0,
+   "tune": -2.5,
+   "start": 175,
+   "end": 632497,
+   "endFade": 2880,
+   "loop": [
+    332641,
+    606720
+   ],
+   "loopCrossfade": 3840
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Baroque Alto Recorder/Sustain/AltRecorder_Sus_D5_rr1_Main.wav",
+   "root": 86,
+   "keys": [
+    86,
+    87
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 18.0,
+   "tune": 1.9,
+   "start": 0,
+   "end": 586393,
+   "endFade": 2880,
+   "loop": [
+    473715,
+    560640
+   ],
+   "loopCrossfade": 3840
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Baroque Alto Recorder/Sustain/AltRecorder_Sus_E5_rr1_Main.wav",
+   "root": 88,
+   "keys": [
+    88,
+    127
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 18.0,
+   "tune": -3.4,
+   "start": 0,
+   "end": 600399,
+   "endFade": 2880,
+   "loop": [
+    506108,
+    571200
+   ],
+   "loopCrossfade": 3840
+  }
+ ],
+ "settings": {
+  "velocity-db": 12,
+  "velocity-crossfade": 1,
+  "loop": 1
+ }
+}

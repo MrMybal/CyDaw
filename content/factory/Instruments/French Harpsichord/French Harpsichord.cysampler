@@ -1,0 +1,265 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "French harpsichord",
+ "zones": [
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, French/Sustains/Harpsi2_Normal_D0_rr1_Main.wav",
+   "root": 26,
+   "keys": [
+    0,
+    29
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.3,
+   "tune": -0.5,
+   "start": 0,
+   "end": 629066,
+   "endFade": 2880
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, French/Sustains/Harpsi2_Normal_G#0_rr1_Main.wav",
+   "root": 32,
+   "keys": [
+    30,
+    34
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.3,
+   "tune": -2.1,
+   "start": 0,
+   "end": 727219,
+   "endFade": 2880
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, French/Sustains/Harpsi2_Normal_C1_rr1_Main.wav",
+   "root": 36,
+   "keys": [
+    35,
+    38
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.3,
+   "tune": -5.3,
+   "start": 0,
+   "end": 670056,
+   "endFade": 2880
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, French/Sustains/Harpsi2_Normal_E1_rr1_Main.wav",
+   "root": 40,
+   "keys": [
+    39,
+    42
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.3,
+   "tune": 0.1,
+   "start": 0,
+   "end": 624960,
+   "endFade": 2880
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, French/Sustains/Harpsi2_Normal_G#1_rr1_Main.wav",
+   "root": 44,
+   "keys": [
+    43,
+    46
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.3,
+   "tune": -3.3,
+   "start": 0,
+   "end": 600000,
+   "endFade": 2880
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, French/Sustains/Harpsi2_Normal_C2_rr1_Main.wav",
+   "root": 48,
+   "keys": [
+    47,
+    50
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.3,
+   "tune": -4.4,
+   "start": 0,
+   "end": 564480,
+   "endFade": 2880
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, French/Sustains/Harpsi2_Normal_E2_rr1_Main.wav",
+   "root": 52,
+   "keys": [
+    51,
+    54
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.3,
+   "tune": -5.6,
+   "start": 0,
+   "end": 464640,
+   "endFade": 2880
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, French/Sustains/Harpsi2_Normal_G#2_rr1_Main.wav",
+   "root": 56,
+   "keys": [
+    55,
+    58
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.3,
+   "tune": -3.9,
+   "start": 0,
+   "end": 508800,
+   "endFade": 2880
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, French/Sustains/Harpsi2_Normal_C3_rr1_Main.wav",
+   "root": 60,
+   "keys": [
+    59,
+    62
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.3,
+   "tune": -3.5,
+   "start": 0,
+   "end": 434880,
+   "endFade": 2880
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, French/Sustains/Harpsi2_Normal_E3_rr1_Main.wav",
+   "root": 64,
+   "keys": [
+    63,
+    66
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.3,
+   "tune": -4.9,
+   "start": 0,
+   "end": 396480,
+   "endFade": 2880
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, French/Sustains/Harpsi2_Normal_G#3_rr1_Main.wav",
+   "root": 68,
+   "keys": [
+    67,
+    70
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.3,
+   "tune": -4.1,
+   "start": 0,
+   "end": 465600,
+   "endFade": 2880
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, French/Sustains/Harpsi2_Normal_C4_rr1_Main.wav",
+   "root": 72,
+   "keys": [
+    71,
+    74
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.3,
+   "tune": -5.3,
+   "start": 0,
+   "end": 288000,
+   "endFade": 2880
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, French/Sustains/Harpsi2_Normal_E4_rr1_Main.wav",
+   "root": 76,
+   "keys": [
+    75,
+    78
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.3,
+   "tune": -6.2,
+   "start": 0,
+   "end": 281280,
+   "endFade": 2880
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, French/Sustains/Harpsi2_Normal_G#4_rr1_Main.wav",
+   "root": 80,
+   "keys": [
+    79,
+    82
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.3,
+   "tune": -5.8,
+   "start": 0,
+   "end": 324480,
+   "endFade": 2880
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Harpsichord, French/Sustains/Harpsi2_Normal_C5_rr1_Main.wav",
+   "root": 84,
+   "keys": [
+    83,
+    127
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.3,
+   "tune": -5.1,
+   "start": 0,
+   "end": 235200,
+   "endFade": 2880
+  }
+ ],
+ "settings": {
+  "velocity-db": 4
+ }
+}

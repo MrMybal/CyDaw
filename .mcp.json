@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "cydaw": {
+      "command": "python",
+      "args": ["tools/mcp/cydaw_mcp_server.py"],
+      "env": {
+        "CYDAW_CONTROL_PORT": "47820"
+      }
+    }
+  }
+}

@@ -1,0 +1,568 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "FM piano (TX81Z)",
+ "zones": [
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/FM Piano/FMPiano_C0_vl1.wav",
+   "root": 12,
+   "keys": [
+    0,
+    16
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 8.7,
+   "start": 0,
+   "end": 504661,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/FM Piano/FMPiano_C0_vl2.wav",
+   "root": 12,
+   "keys": [
+    0,
+    16
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 8.7,
+   "start": 0,
+   "end": 537098,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/FM Piano/FMPiano_C0_vl3.wav",
+   "root": 12,
+   "keys": [
+    0,
+    16
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 8.7,
+   "start": 0,
+   "end": 550476,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/FM Piano/FMPiano_G#0_vl1.wav",
+   "root": 20,
+   "keys": [
+    17,
+    24
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 8.7,
+   "tune": -2.6,
+   "start": 0,
+   "end": 474412,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/FM Piano/FMPiano_G#0_vl2.wav",
+   "root": 20,
+   "keys": [
+    17,
+    24
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 8.7,
+   "tune": -3.1,
+   "start": 0,
+   "end": 533091,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/FM Piano/FMPiano_G#0_vl3.wav",
+   "root": 20,
+   "keys": [
+    17,
+    24
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 8.7,
+   "tune": -2.9,
+   "start": 0,
+   "end": 534769,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/FM Piano/FMPiano_E1_vl1.wav",
+   "root": 28,
+   "keys": [
+    25,
+    32
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 8.7,
+   "tune": -2.3,
+   "start": 0,
+   "end": 489545,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/FM Piano/FMPiano_E1_vl2.wav",
+   "root": 28,
+   "keys": [
+    25,
+    32
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 8.7,
+   "tune": -3.0,
+   "start": 0,
+   "end": 532431,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/FM Piano/FMPiano_E1_vl3.wav",
+   "root": 28,
+   "keys": [
+    25,
+    32
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 8.7,
+   "tune": -3.0,
+   "start": 0,
+   "end": 534017,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/FM Piano/FMPiano_C2_vl1.wav",
+   "root": 36,
+   "keys": [
+    33,
+    40
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 8.7,
+   "tune": -1.3,
+   "start": 0,
+   "end": 499666,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/FM Piano/FMPiano_C2_vl2.wav",
+   "root": 36,
+   "keys": [
+    33,
+    40
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 8.7,
+   "tune": -1.9,
+   "start": 0,
+   "end": 532010,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/FM Piano/FMPiano_C2_vl3.wav",
+   "root": 36,
+   "keys": [
+    33,
+    40
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 8.7,
+   "tune": -1.8,
+   "start": 0,
+   "end": 532025,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/FM Piano/FMPiano_G#2_vl1.wav",
+   "root": 44,
+   "keys": [
+    41,
+    48
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 8.7,
+   "tune": -0.6,
+   "start": 0,
+   "end": 382765,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/FM Piano/FMPiano_G#2_vl2.wav",
+   "root": 44,
+   "keys": [
+    41,
+    48
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 8.7,
+   "tune": -1.1,
+   "start": 0,
+   "end": 411423,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/FM Piano/FMPiano_G#2_vl3.wav",
+   "root": 44,
+   "keys": [
+    41,
+    48
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 8.7,
+   "tune": -1.1,
+   "start": 0,
+   "end": 440979,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/FM Piano/FMPiano_E3_vl1.wav",
+   "root": 52,
+   "keys": [
+    49,
+    56
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 8.7,
+   "tune": -1.0,
+   "start": 0,
+   "end": 333802,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/FM Piano/FMPiano_E3_vl2.wav",
+   "root": 52,
+   "keys": [
+    49,
+    56
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 8.7,
+   "tune": -1.1,
+   "start": 0,
+   "end": 369103,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/FM Piano/FMPiano_E3_vl3.wav",
+   "root": 52,
+   "keys": [
+    49,
+    56
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 8.7,
+   "tune": -1.2,
+   "start": 0,
+   "end": 377379,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/FM Piano/FMPiano_C4_vl1.wav",
+   "root": 60,
+   "keys": [
+    57,
+    64
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 8.7,
+   "tune": -0.5,
+   "start": 0,
+   "end": 288087,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/FM Piano/FMPiano_C4_vl2.wav",
+   "root": 60,
+   "keys": [
+    57,
+    64
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 8.7,
+   "tune": -0.5,
+   "start": 0,
+   "end": 313796,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/FM Piano/FMPiano_C4_vl3.wav",
+   "root": 60,
+   "keys": [
+    57,
+    64
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 8.7,
+   "tune": -0.5,
+   "start": 0,
+   "end": 327063,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/FM Piano/FMPiano_G#4_vl1.wav",
+   "root": 68,
+   "keys": [
+    65,
+    72
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 8.7,
+   "tune": -0.4,
+   "start": 0,
+   "end": 201348,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/FM Piano/FMPiano_G#4_vl2.wav",
+   "root": 68,
+   "keys": [
+    65,
+    72
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 8.7,
+   "tune": -0.7,
+   "start": 0,
+   "end": 222487,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/FM Piano/FMPiano_G#4_vl3.wav",
+   "root": 68,
+   "keys": [
+    65,
+    72
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 8.7,
+   "tune": -0.7,
+   "start": 0,
+   "end": 227797,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/FM Piano/FMPiano_E5_vl1.wav",
+   "root": 76,
+   "keys": [
+    73,
+    80
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 8.7,
+   "tune": -0.8,
+   "start": 0,
+   "end": 172854,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/FM Piano/FMPiano_E5_vl2.wav",
+   "root": 76,
+   "keys": [
+    73,
+    80
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 8.7,
+   "tune": -1.0,
+   "start": 0,
+   "end": 187869,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/FM Piano/FMPiano_E5_vl3.wav",
+   "root": 76,
+   "keys": [
+    73,
+    80
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 8.7,
+   "tune": -1.0,
+   "start": 0,
+   "end": 192675,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/FM Piano/FMPiano_C6_vl1.wav",
+   "root": 84,
+   "keys": [
+    81,
+    88
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 8.7,
+   "tune": -0.7,
+   "start": 0,
+   "end": 143580,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/FM Piano/FMPiano_C6_vl2.wav",
+   "root": 84,
+   "keys": [
+    81,
+    88
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 8.7,
+   "tune": -1.1,
+   "start": 0,
+   "end": 159980,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/FM Piano/FMPiano_C6_vl3.wav",
+   "root": 84,
+   "keys": [
+    81,
+    88
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 8.7,
+   "tune": -1.3,
+   "start": 0,
+   "end": 166298,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/FM Piano/FMPiano_G#6_vl1.wav",
+   "root": 92,
+   "keys": [
+    89,
+    127
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 8.7,
+   "tune": 0.2,
+   "start": 0,
+   "end": 102397,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/FM Piano/FMPiano_G#6_vl2.wav",
+   "root": 92,
+   "keys": [
+    89,
+    127
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 8.7,
+   "tune": 0.5,
+   "start": 0,
+   "end": 112604,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Electrophones/TX81Z/FM Piano/FMPiano_G#6_vl3.wav",
+   "root": 92,
+   "keys": [
+    89,
+    127
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 8.7,
+   "tune": 0.8,
+   "start": 0,
+   "end": 116035,
+   "endFade": 2646
+  }
+ ],
+ "settings": {
+  "velocity-db": 18
+ }
+}

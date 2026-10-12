@@ -1,0 +1,30 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "halo",
+ "name": "Plaque vocale",
+ "state": {
+  "type": "halo",
+  "parameters": {
+   "halo.mix": 0.25,
+   "halo.decay": 1.8,
+   "halo.predelay": 40.0,
+   "halo.size": 0.600000023841858,
+   "halo.highCut": 12000.0,
+   "halo.lowCut": 200.0,
+   "halo.modDepth": 0.400000005960464,
+   "halo.modRate": 0.600000023841858,
+   "halo.mode": 2.0,
+   "halo.colour": 2.0,
+   "halo.attack": 0.5,
+   "halo.earlyDiffusion": 0.699999988079071,
+   "halo.lateDiffusion": 0.699999988079071,
+   "halo.bassMultiplier": 1.200000047683716,
+   "halo.bassCrossover": 300.0,
+   "halo.damping": 7000.0,
+   "halo.sync": 0.0,
+   "halo.width": 1.0
+  }
+ }
+}

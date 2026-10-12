@@ -1,0 +1,191 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 24,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "dev",
+      "displayName": "CyDAW development core",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/dev",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CYDAW_BUILD_DESKTOP": "OFF",
+        "CYDAW_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "desktop",
+      "displayName": "CyDAW desktop with JUCE",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/desktop",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CYDAW_BUILD_DESKTOP": "ON",
+        "CYDAW_FETCH_JUCE": "ON",
+        "CYDAW_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "desktop-fast",
+      "displayName": "CyDAW desktop iteration build (no LTO)",
+      "description": "Same shell as the desktop preset with link-time optimisation off. LTO dominates the incremental link, so this is the preset to use while editing; build desktop for anything that ships.",
+      "inherits": "desktop",
+      "binaryDir": "${sourceDir}/build/desktop-fast",
+      "cacheVariables": {
+        "CYDAW_ENABLE_LTO": "OFF"
+      }
+    },
+    {
+      "name": "desktop-windows-wasapi",
+      "displayName": "CyDAW Windows x64 — WASAPI",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build/windows-wasapi",
+      "cacheVariables": {
+        "CYDAW_BUILD_DESKTOP": "ON",
+        "CYDAW_FETCH_JUCE": "ON",
+        "CYDAW_BUILD_TESTS": "ON",
+        "CYDAW_ENABLE_ASIO": "OFF",
+        "CYDAW_ENABLE_JACK": "OFF"
+      }
+    },
+    {
+      "name": "desktop-windows-asio",
+      "displayName": "CyDAW Windows x64 — ASIO + WASAPI",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build/windows-asio",
+      "cacheVariables": {
+        "CYDAW_BUILD_DESKTOP": "ON",
+        "CYDAW_FETCH_JUCE": "ON",
+        "CYDAW_BUILD_TESTS": "ON",
+        "CYDAW_ENABLE_ASIO": "ON",
+        "CYDAW_ENABLE_JACK": "OFF"
+      }
+    },
+    {
+      "name": "desktop-linux",
+      "displayName": "CyDAW Linux — ALSA + JACK",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/linux",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CYDAW_BUILD_DESKTOP": "ON",
+        "CYDAW_FETCH_JUCE": "ON",
+        "CYDAW_BUILD_TESTS": "ON",
+        "CYDAW_ENABLE_ASIO": "OFF",
+        "CYDAW_ENABLE_JACK": "ON"
+      }
+    },
+    {
+      "name": "desktop-macos",
+      "displayName": "CyDAW macOS — CoreAudio + JACK optionnel",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      },
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/macos",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CYDAW_BUILD_DESKTOP": "ON",
+        "CYDAW_FETCH_JUCE": "ON",
+        "CYDAW_BUILD_TESTS": "ON",
+        "CYDAW_ENABLE_ASIO": "OFF",
+        "CYDAW_ENABLE_JACK": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev"
+    },
+    {
+      "name": "desktop",
+      "configurePreset": "desktop"
+    },
+    {
+      "name": "desktop-fast",
+      "configurePreset": "desktop-fast",
+      "displayName": "CyDAW desktop iteration build (no LTO)"
+    },
+    {
+      "name": "desktop-windows-wasapi",
+      "configurePreset": "desktop-windows-wasapi",
+      "configuration": "Release"
+    },
+    {
+      "name": "desktop-windows-asio",
+      "configurePreset": "desktop-windows-asio",
+      "configuration": "Release"
+    },
+    {
+      "name": "desktop-linux",
+      "configurePreset": "desktop-linux"
+    },
+    {
+      "name": "desktop-macos",
+      "configurePreset": "desktop-macos"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "desktop-windows-wasapi",
+      "configurePreset": "desktop-windows-wasapi",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "desktop-windows-asio",
+      "configurePreset": "desktop-windows-asio",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "desktop-linux",
+      "configurePreset": "desktop-linux",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "desktop-macos",
+      "configurePreset": "desktop-macos",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

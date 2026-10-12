@@ -1,0 +1,32 @@
+/build/
+/out/
+/.cache/
+/.vs/
+/.vscode/
+/.idea/
+CMakeUserPresets.json
+*.user
+*.suo
+*.VC.db
+*.VC.opendb
+*.pdb
+*.ilk
+*.dSYM/
+Thumbs.db
+.DS_Store
+
+# Builds, packages, test runs and local analysis output.
+/artifacts/
+/output/
+/dist/
+/Testing/
+__pycache__/
+*.pyc
+
+# Local scratch files.
+/scratch_*
+
+# Recordings and transcriptions of third-party songs, kept local.
+/templates/19-medellin-comparaison-midi.cydaw
+/templates/20-this-old-tune-comparaison-midi.cydaw
+/tools/templates/audio_compare.py

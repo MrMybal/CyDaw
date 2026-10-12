@@ -1,0 +1,347 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Vibraphone",
+ "zones": [
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_F2_v1_rr1_Main.wav",
+   "root": 53,
+   "keys": [
+    0,
+    55
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 9.3,
+   "tune": -0.1,
+   "start": 0,
+   "end": 240786,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_F2_v2_rr1_Main.wav",
+   "root": 53,
+   "keys": [
+    0,
+    55
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 9.3,
+   "tune": -0.1,
+   "start": 57,
+   "end": 272538,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_A2_v1_rr1_Main.wav",
+   "root": 57,
+   "keys": [
+    56,
+    58
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 9.3,
+   "start": 0,
+   "end": 441882,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_A2_v2_rr1_Main.wav",
+   "root": 57,
+   "keys": [
+    56,
+    58
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 9.3,
+   "tune": -0.1,
+   "start": 0,
+   "end": 531846,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_C3_v2_rr1_Main.wav",
+   "root": 60,
+   "keys": [
+    59,
+    62
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.3,
+   "tune": 0.4,
+   "start": 0,
+   "end": 508032,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_E3_v2_rr1_Main.wav",
+   "root": 64,
+   "keys": [
+    63,
+    65
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 9.3,
+   "start": 0,
+   "end": 613872,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_G3_v1_rr1_Main.wav",
+   "root": 67,
+   "keys": [
+    66,
+    69
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 9.3,
+   "tune": 0.1,
+   "start": 0,
+   "end": 607698,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_G3_v2_rr1_Main.wav",
+   "root": 67,
+   "keys": [
+    66,
+    69
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 9.3,
+   "tune": 0.1,
+   "start": 8,
+   "end": 754992,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_B3_v1_rr1_Main.wav",
+   "root": 71,
+   "keys": [
+    70,
+    72
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 9.3,
+   "tune": 0.1,
+   "start": 0,
+   "end": 449820,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_B3_v2_rr1_Main.wav",
+   "root": 71,
+   "keys": [
+    70,
+    72
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 9.3,
+   "start": 42,
+   "end": 605934,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_D4_v1_rr1_Main.wav",
+   "root": 74,
+   "keys": [
+    73,
+    75
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 9.3,
+   "tune": -0.1,
+   "start": 0,
+   "end": 470988,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_D4_v2_rr1_Main.wav",
+   "root": 74,
+   "keys": [
+    73,
+    75
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 9.3,
+   "tune": -0.1,
+   "start": 63,
+   "end": 534492,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_F4_v1_rr1_Main.wav",
+   "root": 77,
+   "keys": [
+    76,
+    79
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 9.3,
+   "tune": -0.2,
+   "start": 0,
+   "end": 332514,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_F4_v2_rr1_Main.wav",
+   "root": 77,
+   "keys": [
+    76,
+    79
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 9.3,
+   "tune": -0.2,
+   "start": 13,
+   "end": 420714,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_A4_v1_rr1_Main.wav",
+   "root": 81,
+   "keys": [
+    80,
+    82
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 9.3,
+   "tune": -0.3,
+   "start": 0,
+   "end": 355446,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_A4_v2_rr1_Main.wav",
+   "root": 81,
+   "keys": [
+    80,
+    82
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 9.3,
+   "tune": -0.3,
+   "start": 151,
+   "end": 431298,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_C5_v1_rr1_Main.wav",
+   "root": 84,
+   "keys": [
+    83,
+    86
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 9.3,
+   "tune": -0.5,
+   "start": 0,
+   "end": 160472,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_C5_v2_rr1_Main.wav",
+   "root": 84,
+   "keys": [
+    83,
+    86
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 9.3,
+   "tune": -0.5,
+   "start": 151,
+   "end": 224028,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_E5_v1_rr1_Main.wav",
+   "root": 88,
+   "keys": [
+    87,
+    127
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 9.3,
+   "tune": -0.3,
+   "start": 0,
+   "end": 251370,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Vibraphone/Soft Mallets/Vibes_soft_E5_v2_rr1_Main.wav",
+   "root": 88,
+   "keys": [
+    87,
+    127
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 9.3,
+   "tune": -0.3,
+   "start": 131,
+   "end": 257544,
+   "endFade": 2646
+  }
+ ],
+ "settings": {
+  "velocity-db": 16
+ }
+}

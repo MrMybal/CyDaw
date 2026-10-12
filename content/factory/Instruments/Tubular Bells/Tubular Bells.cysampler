@@ -1,0 +1,299 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Tubular bells",
+ "zones": [
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_C4_v2_1.wav",
+   "root": 60,
+   "keys": [
+    0,
+    61
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 0.8,
+   "tune": -3.4,
+   "start": 0,
+   "end": 621673,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_C4_v4_1.wav",
+   "root": 60,
+   "keys": [
+    0,
+    61
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 0.8,
+   "tune": -3.4,
+   "start": 0,
+   "end": 838782,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_D4_v2_1.wav",
+   "root": 62,
+   "keys": [
+    62,
+    63
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 0.8,
+   "tune": -3.4,
+   "start": 0,
+   "end": 432404,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_E4_v2_1.wav",
+   "root": 64,
+   "keys": [
+    64,
+    64
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 0.8,
+   "tune": -15.3,
+   "start": 0,
+   "end": 1024773,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_E4_v4_1.wav",
+   "root": 64,
+   "keys": [
+    64,
+    64
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 0.8,
+   "tune": -10.1,
+   "start": 0,
+   "end": 1076922,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_F4_v4_1.wav",
+   "root": 65,
+   "keys": [
+    65,
+    66
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 0.8,
+   "tune": -3.4,
+   "start": 0,
+   "end": 1118376,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_G4_v2_1.wav",
+   "root": 67,
+   "keys": [
+    67,
+    68
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 0.8,
+   "tune": 3.3,
+   "start": 0,
+   "end": 547366,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_G4_v4_1.wav",
+   "root": 67,
+   "keys": [
+    67,
+    68
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 0.8,
+   "tune": 13.6,
+   "start": 0,
+   "end": 705600,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_A4_v2_1.wav",
+   "root": 69,
+   "keys": [
+    69,
+    70
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 0.8,
+   "tune": 6.2,
+   "start": 0,
+   "end": 427478,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_A4_v4_1.wav",
+   "root": 69,
+   "keys": [
+    69,
+    70
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 0.8,
+   "tune": -3.4,
+   "start": 0,
+   "end": 669438,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_B4_v2_1.wav",
+   "root": 71,
+   "keys": [
+    71,
+    71
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 0.8,
+   "tune": -3.4,
+   "start": 0,
+   "end": 910332,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_B4_v4_1.wav",
+   "root": 71,
+   "keys": [
+    71,
+    71
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 0.8,
+   "tune": -3.4,
+   "start": 0,
+   "end": 1584954,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_C5_v2_1.wav",
+   "root": 72,
+   "keys": [
+    72,
+    73
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 0.8,
+   "tune": -15.1,
+   "start": 0,
+   "end": 824025,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_C5_v4_1.wav",
+   "root": 72,
+   "keys": [
+    72,
+    73
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 0.8,
+   "tune": -13.6,
+   "start": 0,
+   "end": 1950984,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_D5_v4_1.wav",
+   "root": 74,
+   "keys": [
+    74,
+    75
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 0.8,
+   "tune": 8.0,
+   "start": 0,
+   "end": 1083096,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_E5_v2_1.wav",
+   "root": 76,
+   "keys": [
+    76,
+    76
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 0.8,
+   "tune": -3.4,
+   "start": 0,
+   "end": 532007,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Tubular Bells 2/TB_hit_F5_v4_1.wav",
+   "root": 77,
+   "keys": [
+    77,
+    127
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 0.8,
+   "tune": -3.4,
+   "start": 0,
+   "end": 530964,
+   "endFade": 2646
+  }
+ ],
+ "settings": {
+  "velocity-db": 16
+ }
+}

@@ -1,0 +1,383 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Violin section pizzicato",
+ "zones": [
+  {
+   "file": "bank:vsco/Strings/Violin Section/Pizz/VlnEns_Pizz_G2_v1_rr1.wav",
+   "root": 55,
+   "keys": [
+    0,
+    56
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 3.9,
+   "tune": -4.6,
+   "start": 0,
+   "end": 102299,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/Pizz/VlnEns_Pizz_G2_v2_rr1.wav",
+   "root": 55,
+   "keys": [
+    0,
+    56
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 3.9,
+   "tune": 5.1,
+   "start": 0,
+   "end": 132991,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/Pizz/VlnEns_Pizz_A2_v1_rr1.wav",
+   "root": 57,
+   "keys": [
+    57,
+    58
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 3.9,
+   "tune": 9.0,
+   "start": 0,
+   "end": 55220,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/Pizz/VlnEns_Pizz_A2_v2_rr1.wav",
+   "root": 57,
+   "keys": [
+    57,
+    58
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 3.9,
+   "tune": 5.1,
+   "start": 0,
+   "end": 46827,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/Pizz/VlnEns_Pizz_B2_v1_rr1.wav",
+   "root": 59,
+   "keys": [
+    59,
+    60
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 3.9,
+   "tune": 6.1,
+   "start": 0,
+   "end": 31210,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/Pizz/VlnEns_Pizz_B2_v2_rr1.wav",
+   "root": 59,
+   "keys": [
+    59,
+    60
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 3.9,
+   "tune": 5.1,
+   "start": 0,
+   "end": 45022,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/Pizz/VlnEns_Pizz_D3_v1_rr1.wav",
+   "root": 62,
+   "keys": [
+    61,
+    64
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 3.9,
+   "start": 0,
+   "end": 70065,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/Pizz/VlnEns_Pizz_D3_v2_rr1.wav",
+   "root": 62,
+   "keys": [
+    61,
+    64
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 3.9,
+   "tune": 6.3,
+   "start": 0,
+   "end": 97020,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/Pizz/VlnEns_Pizz_F#3_v1_rr1.wav",
+   "root": 66,
+   "keys": [
+    65,
+    67
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 3.9,
+   "tune": 2.2,
+   "start": 0,
+   "end": 49344,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/Pizz/VlnEns_Pizz_F#3_v2_rr1.wav",
+   "root": 66,
+   "keys": [
+    65,
+    67
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 3.9,
+   "tune": -5.5,
+   "start": 0,
+   "end": 39255,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/Pizz/VlnEns_Pizz_A3_v1_rr1.wav",
+   "root": 69,
+   "keys": [
+    68,
+    70
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 3.9,
+   "tune": 1.5,
+   "start": 0,
+   "end": 40861,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/Pizz/VlnEns_Pizz_A3_v2_rr1.wav",
+   "root": 69,
+   "keys": [
+    68,
+    70
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 3.9,
+   "tune": -4.6,
+   "start": 0,
+   "end": 48491,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/Pizz/VlnEns_Pizz_C4_v1_rr1.wav",
+   "root": 72,
+   "keys": [
+    71,
+    74
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 3.9,
+   "tune": 6.3,
+   "start": 0,
+   "end": 26467,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/Pizz/VlnEns_Pizz_C4_v2_rr1.wav",
+   "root": 72,
+   "keys": [
+    71,
+    74
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 3.9,
+   "tune": -4.1,
+   "start": 0,
+   "end": 37044,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/Pizz/VlnEns_Pizz_E4_v1_rr1.wav",
+   "root": 76,
+   "keys": [
+    75,
+    77
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 3.9,
+   "tune": 21.8,
+   "start": 0,
+   "end": 27318,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/Pizz/VlnEns_Pizz_E4_v2_rr1.wav",
+   "root": 76,
+   "keys": [
+    75,
+    77
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 3.9,
+   "tune": 11.4,
+   "start": 0,
+   "end": 36674,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/Pizz/VlnEns_Pizz_G4_v1_rr1.wav",
+   "root": 79,
+   "keys": [
+    78,
+    81
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 3.9,
+   "tune": 2.9,
+   "start": 0,
+   "end": 37180,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/Pizz/VlnEns_Pizz_G4_v2_rr1.wav",
+   "root": 79,
+   "keys": [
+    78,
+    81
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 3.9,
+   "tune": -7.4,
+   "start": 0,
+   "end": 46014,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/Pizz/VlnEns_Pizz_B4_v1_rr1.wav",
+   "root": 83,
+   "keys": [
+    82,
+    84
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 3.9,
+   "tune": 18.3,
+   "start": 0,
+   "end": 22002,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/Pizz/VlnEns_Pizz_B4_v2_rr1.wav",
+   "root": 83,
+   "keys": [
+    82,
+    84
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 3.9,
+   "tune": 8.0,
+   "start": 0,
+   "end": 26579,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/Pizz/VlnEns_Pizz_D5_v1_rr1.wav",
+   "root": 86,
+   "keys": [
+    85,
+    127
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 3.9,
+   "tune": 5.1,
+   "start": 0,
+   "end": 30706,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Violin Section/Pizz/VlnEns_Pizz_D5_v2_rr1.wav",
+   "root": 86,
+   "keys": [
+    85,
+    127
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 3.9,
+   "tune": 11.0,
+   "start": 0,
+   "end": 28310,
+   "endFade": 2646
+  }
+ ],
+ "settings": {
+  "velocity-db": 16
+ }
+}

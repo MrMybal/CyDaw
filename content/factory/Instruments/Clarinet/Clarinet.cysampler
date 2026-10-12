@@ -1,0 +1,738 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Clarinet",
+ "zones": [
+  {
+   "file": "bank:vsco/Woodwinds/Clarinet/susLong/DCClar_susLong_D2_v1_rr1_sum.wav",
+   "root": 50,
+   "keys": [
+    0,
+    51
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 6.0,
+   "tune": -0.6,
+   "start": 0,
+   "end": 201642,
+   "endFade": 2646,
+   "loop": [
+    94986,
+    160524
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Clarinet/susLong/DCClar_susLong_D2_v2_rr1_sum.wav",
+   "root": 50,
+   "keys": [
+    0,
+    51
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 6.0,
+   "tune": 0.8,
+   "start": 0,
+   "end": 422280,
+   "endFade": 2646,
+   "loop": [
+    304862,
+    373968
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Clarinet/susLong/DCClar_susLong_D2_v3_rr1_sum.wav",
+   "root": 50,
+   "keys": [
+    0,
+    51
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 6.0,
+   "tune": 2.0,
+   "start": 0,
+   "end": 345415,
+   "endFade": 2646,
+   "loop": [
+    198867,
+    298998
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Clarinet/susLong/DCClar_susLong_F2_v1_rr1_sum.wav",
+   "root": 53,
+   "keys": [
+    52,
+    55
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 6.0,
+   "tune": 0.7,
+   "start": 0,
+   "end": 381842,
+   "endFade": 2646,
+   "loop": [
+    251383,
+    308700
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Clarinet/susLong/DCClar_susLong_F2_v2_rr1_sum.wav",
+   "root": 53,
+   "keys": [
+    52,
+    55
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 6.0,
+   "tune": 1.0,
+   "start": 0,
+   "end": 458780,
+   "endFade": 2646,
+   "loop": [
+    327121,
+    380142
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Clarinet/susLong/DCClar_susLong_F2_v3_rr1_sum.wav",
+   "root": 53,
+   "keys": [
+    52,
+    55
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 6.0,
+   "tune": 1.0,
+   "start": 0,
+   "end": 436849,
+   "endFade": 2646,
+   "loop": [
+    26590,
+    358092
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Clarinet/susLong/DCClar_susLong_A#2_v1_rr1_sum.wav",
+   "root": 58,
+   "keys": [
+    56,
+    60
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 6.0,
+   "tune": -4.1,
+   "start": 0,
+   "end": 456320,
+   "endFade": 2646,
+   "loop": [
+    373062,
+    426888
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Clarinet/susLong/DCClar_susLong_A#2_v2_rr1_sum.wav",
+   "root": 58,
+   "keys": [
+    56,
+    60
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 6.0,
+   "tune": -0.9,
+   "start": 0,
+   "end": 477336,
+   "endFade": 2646,
+   "loop": [
+    382414,
+    437472
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Clarinet/susLong/DCClar_susLong_A#2_v3_rr1_sum.wav",
+   "root": 58,
+   "keys": [
+    56,
+    60
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 6.0,
+   "tune": 0.3,
+   "start": 0,
+   "end": 583874,
+   "endFade": 2646,
+   "loop": [
+    485391,
+    541548
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Clarinet/susLong/DCClar_susLong_D3_v1_rr1_sum.wav",
+   "root": 62,
+   "keys": [
+    61,
+    63
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 6.0,
+   "tune": 2.6,
+   "start": 0,
+   "end": 557726,
+   "endFade": 2646,
+   "loop": [
+    459570,
+    529200
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Clarinet/susLong/DCClar_susLong_D3_v2_rr1_sum.wav",
+   "root": 62,
+   "keys": [
+    61,
+    63
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 6.0,
+   "tune": 1.1,
+   "start": 0,
+   "end": 469036,
+   "endFade": 2646,
+   "loop": [
+    258730,
+    429534
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Clarinet/susLong/DCClar_susLong_D3_v3_rr1_sum.wav",
+   "root": 62,
+   "keys": [
+    61,
+    63
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 6.0,
+   "tune": 1.0,
+   "start": 0,
+   "end": 464020,
+   "endFade": 2646,
+   "loop": [
+    26591,
+    404838
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Clarinet/susLong/DCClar_susLong_F3_v1_rr1_sum.wav",
+   "root": 65,
+   "keys": [
+    64,
+    67
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 6.0,
+   "tune": -1.0,
+   "start": 0,
+   "end": 440733,
+   "endFade": 2646,
+   "loop": [
+    229196,
+    403956
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Clarinet/susLong/DCClar_susLong_F3_v2_rr1_sum.wav",
+   "root": 65,
+   "keys": [
+    64,
+    67
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 6.0,
+   "tune": -1.9,
+   "start": 0,
+   "end": 517382,
+   "endFade": 2646,
+   "loop": [
+    367741,
+    471870
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Clarinet/susLong/DCClar_susLong_F3_v3_rr1_sum.wav",
+   "root": 65,
+   "keys": [
+    64,
+    67
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 6.0,
+   "tune": 0.2,
+   "start": 0,
+   "end": 435917,
+   "endFade": 2646,
+   "loop": [
+    56855,
+    395136
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Clarinet/susLong/DCClar_susLong_A#3_v1_rr1_sum.wav",
+   "root": 70,
+   "keys": [
+    68,
+    72
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 6.0,
+   "tune": -3.9,
+   "start": 0,
+   "end": 399961,
+   "endFade": 2646,
+   "loop": [
+    208406,
+    341334
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Clarinet/susLong/DCClar_susLong_A#3_v2_rr1_sum.wav",
+   "root": 70,
+   "keys": [
+    68,
+    72
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 6.0,
+   "tune": -1.4,
+   "start": 0,
+   "end": 447774,
+   "endFade": 2646,
+   "loop": [
+    326515,
+    408366
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Clarinet/susLong/DCClar_susLong_A#3_v3_rr1_sum.wav",
+   "root": 70,
+   "keys": [
+    68,
+    72
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 6.0,
+   "tune": -0.8,
+   "start": 0,
+   "end": 514779,
+   "endFade": 2646,
+   "loop": [
+    342544,
+    464814
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Clarinet/susLong/DCClar_susLong_D4_v1_rr1_sum.wav",
+   "root": 74,
+   "keys": [
+    73,
+    75
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 6.0,
+   "tune": -3.2,
+   "start": 0,
+   "end": 496832,
+   "endFade": 2646,
+   "loop": [
+    112508,
+    441000
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Clarinet/susLong/DCClar_susLong_D4_v2_rr1_sum.wav",
+   "root": 74,
+   "keys": [
+    73,
+    75
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 6.0,
+   "tune": -2.1,
+   "start": 73,
+   "end": 510625,
+   "endFade": 2646,
+   "loop": [
+    65522,
+    443646
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Clarinet/susLong/DCClar_susLong_D4_v3_rr1_sum.wav",
+   "root": 74,
+   "keys": [
+    73,
+    75
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 6.0,
+   "tune": -2.5,
+   "start": 0,
+   "end": 521826,
+   "endFade": 2646,
+   "loop": [
+    290951,
+    461286
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Clarinet/susLong/DCClar_susLong_F4_v1_rr1_sum.wav",
+   "root": 77,
+   "keys": [
+    76,
+    79
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 6.0,
+   "tune": -2.1,
+   "start": 0,
+   "end": 508541,
+   "endFade": 2646,
+   "loop": [
+    319890,
+    450702
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Clarinet/susLong/DCClar_susLong_F4_v2_rr1_sum.wav",
+   "root": 77,
+   "keys": [
+    76,
+    79
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 6.0,
+   "tune": -1.9,
+   "start": 0,
+   "end": 535691,
+   "endFade": 2646,
+   "loop": [
+    436456,
+    489510
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Clarinet/susLong/DCClar_susLong_F4_v3_rr1_sum.wav",
+   "root": 77,
+   "keys": [
+    76,
+    79
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 6.0,
+   "tune": 0.1,
+   "start": 20,
+   "end": 593369,
+   "endFade": 2646,
+   "loop": [
+    293821,
+    545076
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Clarinet/susLong/DCClar_susLong_A#4_v1_rr1_sum.wav",
+   "root": 82,
+   "keys": [
+    80,
+    84
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 6.0,
+   "tune": -5.5,
+   "start": 0,
+   "end": 499005,
+   "endFade": 2646,
+   "loop": [
+    386703,
+    446292
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Clarinet/susLong/DCClar_susLong_A#4_v2_rr1_sum.wav",
+   "root": 82,
+   "keys": [
+    80,
+    84
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 6.0,
+   "tune": -4.2,
+   "start": 0,
+   "end": 455794,
+   "endFade": 2646,
+   "loop": [
+    346828,
+    422478
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Clarinet/susLong/DCClar_susLong_A#4_v3_rr1_sum.wav",
+   "root": 82,
+   "keys": [
+    80,
+    84
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 6.0,
+   "tune": -4.0,
+   "start": 0,
+   "end": 471476,
+   "endFade": 2646,
+   "loop": [
+    345696,
+    417186
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Clarinet/susLong/DCClar_susLong_D5_v1_rr1_sum.wav",
+   "root": 86,
+   "keys": [
+    85,
+    88
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 6.0,
+   "tune": -2.9,
+   "start": 23,
+   "end": 423077,
+   "endFade": 2646,
+   "loop": [
+    320736,
+    373968
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Clarinet/susLong/DCClar_susLong_D5_v2_rr1_sum.wav",
+   "root": 86,
+   "keys": [
+    85,
+    88
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 6.0,
+   "tune": -6.2,
+   "start": 0,
+   "end": 443045,
+   "endFade": 2646,
+   "loop": [
+    232214,
+    400428
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Clarinet/susLong/DCClar_susLong_D5_v3_rr1_sum.wav",
+   "root": 86,
+   "keys": [
+    85,
+    88
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 6.0,
+   "tune": -0.4,
+   "start": 365,
+   "end": 398402,
+   "endFade": 2646,
+   "loop": [
+    68561,
+    347508
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Clarinet/susLong/DCClar_susLong_F#5_v1_rr1_sum.wav",
+   "root": 90,
+   "keys": [
+    89,
+    127
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 6.0,
+   "tune": -0.9,
+   "start": 0,
+   "end": 256325,
+   "endFade": 2646,
+   "loop": [
+    98070,
+    201096
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Clarinet/susLong/DCClar_susLong_F#5_v2_rr1_sum.wav",
+   "root": 90,
+   "keys": [
+    89,
+    127
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 6.0,
+   "tune": -0.9,
+   "start": 0,
+   "end": 313100,
+   "endFade": 2646,
+   "loop": [
+    161424,
+    268128
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Clarinet/susLong/DCClar_susLong_F#5_v3_rr1_sum.wav",
+   "root": 90,
+   "keys": [
+    89,
+    127
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 6.0,
+   "tune": -0.9,
+   "start": 4,
+   "end": 396557,
+   "endFade": 2646,
+   "loop": [
+    206975,
+    350154
+   ],
+   "loopCrossfade": 3528
+  }
+ ],
+ "settings": {
+  "velocity-db": 12,
+  "velocity-crossfade": 1,
+  "loop": 1
+ }
+}

@@ -1,0 +1,602 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Renaissance organ (8 foot)",
+ "zones": [
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Renaissance Organ/8'/RenOrgan_8foot_Room_C1_rr1.wav",
+   "root": 36,
+   "keys": [
+    0,
+    37
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 17.2,
+   "tune": 3.6,
+   "start": 0,
+   "end": 325213,
+   "endFade": 2646,
+   "loop": [
+    47575,
+    305172
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Renaissance Organ/8'/RenOrgan_8foot_Room_D1_rr1.wav",
+   "root": 38,
+   "keys": [
+    38,
+    39
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 17.2,
+   "tune": 2.2,
+   "start": 0,
+   "end": 393372,
+   "endFade": 2646,
+   "loop": [
+    252616,
+    353682
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Renaissance Organ/8'/RenOrgan_8foot_Room_E1_rr1.wav",
+   "root": 40,
+   "keys": [
+    40,
+    41
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 17.2,
+   "tune": 1.6,
+   "start": 0,
+   "end": 388626,
+   "endFade": 2646,
+   "loop": [
+    85537,
+    350154
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Renaissance Organ/8'/RenOrgan_8foot_Room_F#1_rr1.wav",
+   "root": 42,
+   "keys": [
+    42,
+    43
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 17.2,
+   "tune": 0.8,
+   "start": 0,
+   "end": 375291,
+   "endFade": 2646,
+   "loop": [
+    115547,
+    336042
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Renaissance Organ/8'/RenOrgan_8foot_Room_G#1_rr1.wav",
+   "root": 44,
+   "keys": [
+    44,
+    45
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 17.2,
+   "tune": 1.5,
+   "start": 0,
+   "end": 321930,
+   "endFade": 2646,
+   "loop": [
+    33762,
+    277830
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Renaissance Organ/8'/RenOrgan_8foot_Room_A#1_rr1.wav",
+   "root": 46,
+   "keys": [
+    46,
+    47
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 17.2,
+   "tune": 1.5,
+   "start": 0,
+   "end": 381024,
+   "endFade": 2646,
+   "loop": [
+    121879,
+    340452
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Renaissance Organ/8'/RenOrgan_8foot_Room_C2_rr1.wav",
+   "root": 48,
+   "keys": [
+    48,
+    49
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 17.2,
+   "tune": 0.6,
+   "start": 0,
+   "end": 386448,
+   "endFade": 2646,
+   "loop": [
+    44732,
+    342216
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Renaissance Organ/8'/RenOrgan_8foot_Room_D2_rr1.wav",
+   "root": 50,
+   "keys": [
+    50,
+    51
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 17.2,
+   "tune": 0.3,
+   "start": 0,
+   "end": 337639,
+   "endFade": 2646,
+   "loop": [
+    42735,
+    298998
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Renaissance Organ/8'/RenOrgan_8foot_Room_E2_rr1.wav",
+   "root": 52,
+   "keys": [
+    52,
+    53
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 17.2,
+   "tune": 0.6,
+   "start": 0,
+   "end": 451025,
+   "endFade": 2646,
+   "loop": [
+    101037,
+    407484
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Renaissance Organ/8'/RenOrgan_8foot_Room_F#2_rr1.wav",
+   "root": 54,
+   "keys": [
+    54,
+    55
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 17.2,
+   "tune": 0.1,
+   "start": 0,
+   "end": 374411,
+   "endFade": 2646,
+   "loop": [
+    64151,
+    339570
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Renaissance Organ/8'/RenOrgan_8foot_Room_G#2_rr1.wav",
+   "root": 56,
+   "keys": [
+    56,
+    57
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 17.2,
+   "tune": 0.3,
+   "start": 0,
+   "end": 382963,
+   "endFade": 2646,
+   "loop": [
+    202179,
+    340452
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Renaissance Organ/8'/RenOrgan_8foot_Room_A#2_rr1.wav",
+   "root": 58,
+   "keys": [
+    58,
+    59
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 17.2,
+   "start": 0,
+   "end": 383385,
+   "endFade": 2646,
+   "loop": [
+    105941,
+    343980
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Renaissance Organ/8'/RenOrgan_8foot_Room_C3_rr1.wav",
+   "root": 60,
+   "keys": [
+    60,
+    61
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 17.2,
+   "tune": -0.4,
+   "start": 0,
+   "end": 380142,
+   "endFade": 2646,
+   "loop": [
+    282674,
+    341334
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Renaissance Organ/8'/RenOrgan_8foot_Room_D3_rr1.wav",
+   "root": 62,
+   "keys": [
+    62,
+    63
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 17.2,
+   "start": 0,
+   "end": 368065,
+   "endFade": 2646,
+   "loop": [
+    135808,
+    329868
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Renaissance Organ/8'/RenOrgan_8foot_Room_E3_rr1.wav",
+   "root": 64,
+   "keys": [
+    64,
+    65
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 17.2,
+   "tune": 0.4,
+   "start": 0,
+   "end": 391748,
+   "endFade": 2646,
+   "loop": [
+    33214,
+    356328
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Renaissance Organ/8'/RenOrgan_8foot_Room_F#3_rr1.wav",
+   "root": 66,
+   "keys": [
+    66,
+    67
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 17.2,
+   "tune": 0.3,
+   "start": 0,
+   "end": 389821,
+   "endFade": 2646,
+   "loop": [
+    270527,
+    350154
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Renaissance Organ/8'/RenOrgan_8foot_Room_G#3_rr1.wav",
+   "root": 68,
+   "keys": [
+    68,
+    69
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 17.2,
+   "tune": -1.1,
+   "start": 0,
+   "end": 375868,
+   "endFade": 2646,
+   "loop": [
+    31761,
+    332514
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Renaissance Organ/8'/RenOrgan_8foot_Room_A#3_rr1.wav",
+   "root": 70,
+   "keys": [
+    70,
+    71
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 17.2,
+   "tune": -0.6,
+   "start": 0,
+   "end": 336924,
+   "endFade": 2646,
+   "loop": [
+    116333,
+    294588
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Renaissance Organ/8'/RenOrgan_8foot_Room_C4_rr1.wav",
+   "root": 72,
+   "keys": [
+    72,
+    73
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 17.2,
+   "tune": 0.5,
+   "start": 0,
+   "end": 309582,
+   "endFade": 2646,
+   "loop": [
+    92352,
+    274302
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Renaissance Organ/8'/RenOrgan_8foot_Room_D4_rr1.wav",
+   "root": 74,
+   "keys": [
+    74,
+    75
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 17.2,
+   "start": 0,
+   "end": 290178,
+   "endFade": 2646,
+   "loop": [
+    78633,
+    248724
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Renaissance Organ/8'/RenOrgan_8foot_Room_E4_rr1.wav",
+   "root": 76,
+   "keys": [
+    76,
+    77
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 17.2,
+   "tune": 0.1,
+   "start": 0,
+   "end": 357471,
+   "endFade": 2646,
+   "loop": [
+    110901,
+    314874
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Renaissance Organ/8'/RenOrgan_8foot_Room_F#4_rr1.wav",
+   "root": 78,
+   "keys": [
+    78,
+    79
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 17.2,
+   "tune": 0.9,
+   "start": 0,
+   "end": 286382,
+   "endFade": 2646,
+   "loop": [
+    80928,
+    242550
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Renaissance Organ/8'/RenOrgan_8foot_Room_G#4_rr1.wav",
+   "root": 80,
+   "keys": [
+    80,
+    81
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 17.2,
+   "start": 0,
+   "end": 291585,
+   "endFade": 2646,
+   "loop": [
+    159932,
+    246960
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Renaissance Organ/8'/RenOrgan_8foot_Room_A#4_rr1.wav",
+   "root": 82,
+   "keys": [
+    82,
+    83
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 17.2,
+   "tune": -0.1,
+   "start": 0,
+   "end": 280507,
+   "endFade": 2646,
+   "loop": [
+    128631,
+    254898
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Renaissance Organ/8'/RenOrgan_8foot_Room_C5_rr1.wav",
+   "root": 84,
+   "keys": [
+    84,
+    85
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 17.2,
+   "tune": -0.2,
+   "start": 0,
+   "end": 275577,
+   "endFade": 2646,
+   "loop": [
+    35527,
+    249606
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Renaissance Organ/8'/RenOrgan_8foot_Room_D5_rr1.wav",
+   "root": 86,
+   "keys": [
+    86,
+    87
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 17.2,
+   "tune": -0.5,
+   "start": 0,
+   "end": 293884,
+   "endFade": 2646,
+   "loop": [
+    61589,
+    272538
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Renaissance Organ/8'/RenOrgan_8foot_Room_E5_rr1.wav",
+   "root": 88,
+   "keys": [
+    88,
+    127
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 17.2,
+   "tune": -4.0,
+   "start": 0,
+   "end": 310719,
+   "endFade": 2646,
+   "loop": [
+    88533,
+    289296
+   ],
+   "loopCrossfade": 3528
+  }
+ ],
+ "settings": {
+  "velocity-db": 0,
+  "velocity-crossfade": 1,
+  "loop": 1
+ }
+}

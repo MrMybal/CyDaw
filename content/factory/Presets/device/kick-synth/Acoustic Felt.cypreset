@@ -1,0 +1,40 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "kick-synth",
+ "name": "Acoustic Felt",
+ "state": {
+  "type": "kick-synth",
+  "parameters": {
+   "kick.bodyShape": 2.0,
+   "kick.bodyPhase": 0.0,
+   "kick.pitchStart": 150.0,
+   "kick.pitchEnd": 60.0,
+   "kick.pitchTime": 40.0,
+   "kick.pitchCurve": 2.0,
+   "kick.bodyLevel": 0.0,
+   "kick.attack": 0.400000005960464,
+   "kick.hold": 5.0,
+   "kick.decay": 250.0,
+   "kick.decayCurve": 1.600000023841858,
+   "kick.length": 1500.0,
+   "kick.clickType": 1.0,
+   "kick.clickLevel": -10.0,
+   "kick.clickDecay": 12.0,
+   "kick.clickTone": 2500.0,
+   "kick.subLevel": -60.0,
+   "kick.subDecay": 600.0,
+   "kick.subOctave": 0.0,
+   "kick.driveType": 0.0,
+   "kick.drive": 0.0,
+   "kick.driveTone": 20000.0,
+   "kick.lowCut": 15.0,
+   "kick.highCut": 8000.0,
+   "kick.lowBoost": 0.0,
+   "kick.keyTrack": 1.0,
+   "kick.velocity": 0.5,
+   "kick.output": -4.639999866485596
+  }
+ }
+}

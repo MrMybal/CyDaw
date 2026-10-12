@@ -1,0 +1,469 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Pipe organ (soft)",
+ "zones": [
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Quiet/NT5_Man3Quiet_C1_rr1.wav",
+   "root": 36,
+   "keys": [
+    0,
+    37
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 19.6,
+   "tune": 7.8,
+   "start": 0,
+   "end": 509387,
+   "endFade": 2646,
+   "loop": [
+    333824,
+    464814
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Quiet/NT5_Man3Quiet_D#1_rr1.wav",
+   "root": 39,
+   "keys": [
+    38,
+    40
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -0.1,
+   "start": 0,
+   "end": 513015,
+   "endFade": 2646,
+   "loop": [
+    167928,
+    431298
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Quiet/NT5_Man3Quiet_F#1_rr1.wav",
+   "root": 42,
+   "keys": [
+    41,
+    43
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -13.1,
+   "start": 0,
+   "end": 536076,
+   "endFade": 2646,
+   "loop": [
+    317032,
+    463932
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Quiet/NT5_Man3Quiet_A1_rr1.wav",
+   "root": 45,
+   "keys": [
+    44,
+    46
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -0.7,
+   "start": 665,
+   "end": 510316,
+   "endFade": 2646,
+   "loop": [
+    286751,
+    448056
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Quiet/NT5_Man3Quiet_C2_rr1.wav",
+   "root": 48,
+   "keys": [
+    47,
+    49
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 19.6,
+   "tune": 1.0,
+   "start": 0,
+   "end": 550639,
+   "endFade": 2646,
+   "loop": [
+    312949,
+    447174
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Quiet/NT5_Man3Quiet_D#2_rr1.wav",
+   "root": 51,
+   "keys": [
+    50,
+    52
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -1.9,
+   "start": 240,
+   "end": 572305,
+   "endFade": 2646,
+   "loop": [
+    401686,
+    494802
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Quiet/NT5_Man3Quiet_F#2_rr1.wav",
+   "root": 54,
+   "keys": [
+    53,
+    55
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -5.2,
+   "start": 1347,
+   "end": 534974,
+   "endFade": 2646,
+   "loop": [
+    76597,
+    448056
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Quiet/NT5_Man3Quiet_A2_rr1.wav",
+   "root": 57,
+   "keys": [
+    56,
+    58
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -4.1,
+   "start": 71,
+   "end": 545304,
+   "endFade": 2646,
+   "loop": [
+    380830,
+    448056
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Quiet/NT5_Man3Quiet_C3_rr1.wav",
+   "root": 60,
+   "keys": [
+    59,
+    61
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -2.7,
+   "start": 40,
+   "end": 535211,
+   "endFade": 2646,
+   "loop": [
+    287796,
+    473634
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Quiet/NT5_Man3Quiet_D#3_rr1.wav",
+   "root": 63,
+   "keys": [
+    62,
+    64
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -0.4,
+   "start": 310,
+   "end": 564420,
+   "endFade": 2646,
+   "loop": [
+    375477,
+    451584
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Quiet/NT5_Man3Quiet_F#3_rr1.wav",
+   "root": 66,
+   "keys": [
+    65,
+    67
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -0.7,
+   "start": 0,
+   "end": 540775,
+   "endFade": 2646,
+   "loop": [
+    339143,
+    436590
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Quiet/NT5_Man3Quiet_A3_rr1.wav",
+   "root": 69,
+   "keys": [
+    68,
+    70
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 19.6,
+   "tune": 3.5,
+   "start": 0,
+   "end": 535269,
+   "endFade": 2646,
+   "loop": [
+    144469,
+    448938
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Quiet/NT5_Man3Quiet_C4_rr1.wav",
+   "root": 72,
+   "keys": [
+    71,
+    73
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 19.6,
+   "tune": 3.7,
+   "start": 211,
+   "end": 535747,
+   "endFade": 2646,
+   "loop": [
+    257120,
+    448938
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Quiet/NT5_Man3Quiet_D#4_rr1.wav",
+   "root": 75,
+   "keys": [
+    74,
+    76
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -25.0,
+   "start": 1757,
+   "end": 537466,
+   "endFade": 2646,
+   "loop": [
+    373743,
+    478044
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Quiet/NT5_Man3Quiet_F#4_rr1.wav",
+   "root": 78,
+   "keys": [
+    77,
+    79
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 19.6,
+   "tune": 0.2,
+   "start": 0,
+   "end": 531763,
+   "endFade": 2646,
+   "loop": [
+    175349,
+    443646
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Quiet/NT5_Man3Quiet_A4_rr1.wav",
+   "root": 81,
+   "keys": [
+    80,
+    82
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 19.6,
+   "tune": 0.1,
+   "start": 1703,
+   "end": 542068,
+   "endFade": 2646,
+   "loop": [
+    368326,
+    443646
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Quiet/NT5_Man3Quiet_C5_rr1.wav",
+   "root": 84,
+   "keys": [
+    83,
+    85
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 19.6,
+   "tune": 2.8,
+   "start": 1794,
+   "end": 541297,
+   "endFade": 2646,
+   "loop": [
+    195046,
+    439236
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Quiet/NT5_Man3Quiet_D#5_rr1.wav",
+   "root": 87,
+   "keys": [
+    86,
+    88
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 19.6,
+   "tune": 7.4,
+   "start": 28,
+   "end": 530026,
+   "endFade": 2646,
+   "loop": [
+    46982,
+    451584
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Quiet/NT5_Man3Quiet_F#5_rr1.wav",
+   "root": 90,
+   "keys": [
+    89,
+    91
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 19.6,
+   "tune": 2.9,
+   "start": 0,
+   "end": 517313,
+   "endFade": 2646,
+   "loop": [
+    65333,
+    454230
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Quiet/NT5_Man3Quiet_A5_rr1.wav",
+   "root": 93,
+   "keys": [
+    92,
+    94
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 19.6,
+   "tune": 1.4,
+   "start": 1605,
+   "end": 504233,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Edge-blown Aerophones/Pipe Organ/Quiet/NT5_Man3Quiet_C6_rr1.wav",
+   "root": 96,
+   "keys": [
+    95,
+    127
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -0.5,
+   "start": 63,
+   "end": 528979,
+   "endFade": 2646,
+   "loop": [
+    130486,
+    448056
+   ],
+   "loopCrossfade": 3528
+  }
+ ],
+ "settings": {
+  "velocity-db": 0,
+  "velocity-crossfade": 1,
+  "loop": 1
+ }
+}

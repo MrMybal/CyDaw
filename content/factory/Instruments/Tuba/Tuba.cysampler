@@ -1,0 +1,503 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Tuba",
+ "zones": [
+  {
+   "file": "bank:vsco/Brass/Tuba/sus/Tuba3_sus_F0_v1_rr1_Mid.wav",
+   "root": 29,
+   "keys": [
+    0,
+    31
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 4.7,
+   "tune": 21.0,
+   "start": 0,
+   "end": 175454,
+   "endFade": 2646,
+   "loop": [
+    53889,
+    140238
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tuba/sus/Tuba3_sus_A#0_v1_rr1_Mid.wav",
+   "root": 34,
+   "keys": [
+    32,
+    36
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 4.7,
+   "tune": 5.8,
+   "start": 0,
+   "end": 354117,
+   "endFade": 2646,
+   "loop": [
+    87960,
+    304290
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tuba/sus/Tuba3_sus_A#0_v2_rr1_Mid.wav",
+   "root": 34,
+   "keys": [
+    32,
+    36
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 4.7,
+   "tune": 0.4,
+   "start": 0,
+   "end": 328484,
+   "endFade": 2646,
+   "loop": [
+    233800,
+    287532
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tuba/sus/Tuba3_sus_A#0_v3_rr1_Mid.wav",
+   "root": 34,
+   "keys": [
+    32,
+    36
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 4.7,
+   "tune": 2.7,
+   "start": 0,
+   "end": 178090,
+   "endFade": 2646,
+   "loop": [
+    56539,
+    120834
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tuba/sus/Tuba3_sus_D#1_v1_rr1_Mid.wav",
+   "root": 39,
+   "keys": [
+    37,
+    40
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 4.7,
+   "tune": -0.7,
+   "start": 0,
+   "end": 347113,
+   "endFade": 2646,
+   "loop": [
+    163751,
+    301644
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tuba/sus/Tuba3_sus_D#1_v2_rr1_Mid.wav",
+   "root": 39,
+   "keys": [
+    37,
+    40
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 4.7,
+   "tune": -0.1,
+   "start": 0,
+   "end": 281423,
+   "endFade": 2646,
+   "loop": [
+    38129,
+    233730
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tuba/sus/Tuba3_sus_D#1_v3_rr1_Mid.wav",
+   "root": 39,
+   "keys": [
+    37,
+    40
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 4.7,
+   "tune": -2.5,
+   "start": 0,
+   "end": 152122,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Brass/Tuba/sus/Tuba3_sus_F1_v1_rr1_Mid.wav",
+   "root": 41,
+   "keys": [
+    41,
+    43
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 4.7,
+   "tune": 7.3,
+   "start": 0,
+   "end": 427996,
+   "endFade": 2646,
+   "loop": [
+    309428,
+    388080
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tuba/sus/Tuba3_sus_F1_v2_rr1_Mid.wav",
+   "root": 41,
+   "keys": [
+    41,
+    43
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 4.7,
+   "tune": -1.0,
+   "start": 0,
+   "end": 291664,
+   "endFade": 2646,
+   "loop": [
+    173381,
+    227556
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tuba/sus/Tuba3_sus_F1_v3_rr1_Mid.wav",
+   "root": 41,
+   "keys": [
+    41,
+    43
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 4.7,
+   "tune": -3.3,
+   "start": 288,
+   "end": 142274,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Brass/Tuba/sus/Tuba3_sus_A#1_v1_rr1_Mid.wav",
+   "root": 46,
+   "keys": [
+    44,
+    48
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 4.7,
+   "tune": 0.4,
+   "start": 1490,
+   "end": 437639,
+   "endFade": 2646,
+   "loop": [
+    297650,
+    401310
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tuba/sus/Tuba3_sus_A#1_v2_rr1_Mid.wav",
+   "root": 46,
+   "keys": [
+    44,
+    48
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 4.7,
+   "tune": 0.1,
+   "start": 0,
+   "end": 355782,
+   "endFade": 2646,
+   "loop": [
+    235804,
+    293706
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tuba/sus/Tuba3_sus_A#1_v3_rr1_Mid.wav",
+   "root": 46,
+   "keys": [
+    44,
+    48
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 4.7,
+   "tune": -0.2,
+   "start": 379,
+   "end": 191154,
+   "endFade": 2646,
+   "loop": [
+    62162,
+    115542
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tuba/sus/Tuba3_sus_D2_v1_rr1_Mid.wav",
+   "root": 50,
+   "keys": [
+    49,
+    51
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 4.7,
+   "tune": 3.5,
+   "start": 0,
+   "end": 559464,
+   "endFade": 2646,
+   "loop": [
+    439895,
+    523026
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tuba/sus/Tuba3_sus_D2_v2_rr1_Mid.wav",
+   "root": 50,
+   "keys": [
+    49,
+    51
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 4.7,
+   "tune": 5.7,
+   "start": 0,
+   "end": 540363,
+   "endFade": 2646,
+   "loop": [
+    423781,
+    484218
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tuba/sus/Tuba3_sus_D2_v3_rr1_Mid.wav",
+   "root": 50,
+   "keys": [
+    49,
+    51
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 4.7,
+   "tune": 1.2,
+   "start": 314,
+   "end": 200940,
+   "endFade": 2646,
+   "loop": [
+    55488,
+    131418
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tuba/sus/Tuba3_sus_F2_v1_rr1_Mid.wav",
+   "root": 53,
+   "keys": [
+    52,
+    55
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 4.7,
+   "tune": -0.8,
+   "start": 0,
+   "end": 755177,
+   "endFade": 2646,
+   "loop": [
+    471602,
+    709128
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tuba/sus/Tuba3_sus_F2_v2_rr1_Mid.wav",
+   "root": 53,
+   "keys": [
+    52,
+    55
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 4.7,
+   "tune": 0.4,
+   "start": 0,
+   "end": 516315,
+   "endFade": 2646,
+   "loop": [
+    368625,
+    463050
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tuba/sus/Tuba3_sus_F2_v3_rr1_Mid.wav",
+   "root": 53,
+   "keys": [
+    52,
+    55
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 4.7,
+   "tune": 3.1,
+   "start": 0,
+   "end": 159877,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Brass/Tuba/sus/Tuba3_sus_A#2_v1_rr1_Mid.wav",
+   "root": 58,
+   "keys": [
+    56,
+    60
+   ],
+   "velocities": [
+    1,
+    42
+   ],
+   "gain": 4.7,
+   "tune": 0.6,
+   "start": 0,
+   "end": 316038,
+   "endFade": 2646,
+   "loop": [
+    210133,
+    263718
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tuba/sus/Tuba3_sus_A#2_v2_rr1_Mid.wav",
+   "root": 58,
+   "keys": [
+    56,
+    60
+   ],
+   "velocities": [
+    43,
+    84
+   ],
+   "gain": 4.7,
+   "tune": -6.8,
+   "start": 0,
+   "end": 431669,
+   "endFade": 2646,
+   "loop": [
+    245000,
+    375732
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tuba/sus/Tuba3_sus_A#2_v3_rr1_Mid.wav",
+   "root": 58,
+   "keys": [
+    56,
+    60
+   ],
+   "velocities": [
+    85,
+    127
+   ],
+   "gain": 4.7,
+   "tune": -0.2,
+   "start": 0,
+   "end": 243337,
+   "endFade": 2646,
+   "loop": [
+    99384,
+    176400
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Brass/Tuba/sus/Tuba3_sus_D3_v1_rr1_Mid.wav",
+   "root": 62,
+   "keys": [
+    61,
+    127
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 4.7,
+   "tune": 2.3,
+   "start": 0,
+   "end": 423168,
+   "endFade": 2646,
+   "loop": [
+    42478,
+    371322
+   ],
+   "loopCrossfade": 3528
+  }
+ ],
+ "settings": {
+  "velocity-db": 12,
+  "velocity-crossfade": 1,
+  "loop": 1
+ }
+}

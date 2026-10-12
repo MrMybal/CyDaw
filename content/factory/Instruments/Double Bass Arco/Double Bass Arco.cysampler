@@ -1,0 +1,584 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Double bass (bowed)",
+ "zones": [
+  {
+   "file": "bank:vsco/Strings/Solo Contrabass/SusVib/BKCtbss_SusVib_F#0_v1_rr1.wav",
+   "root": 30,
+   "keys": [
+    0,
+    30
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 12.7,
+   "tune": 0.1,
+   "start": 0,
+   "end": 399319,
+   "endFade": 2646,
+   "loop": [
+    69048,
+    371322
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Contrabass/SusVib/BKCtbss_SusVib_F#0_v3_rr1.wav",
+   "root": 30,
+   "keys": [
+    0,
+    30
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 12.7,
+   "tune": -1.0,
+   "start": 0,
+   "end": 544194,
+   "endFade": 2646,
+   "loop": [
+    393032,
+    479808
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Contrabass/SusVib/BKCtbss_SusVib_G0_v1_rr1.wav",
+   "root": 31,
+   "keys": [
+    31,
+    32
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 12.7,
+   "tune": -0.1,
+   "start": 0,
+   "end": 395898,
+   "endFade": 2646,
+   "loop": [
+    143878,
+    354564
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Contrabass/SusVib/BKCtbss_SusVib_G0_v3_rr1.wav",
+   "root": 31,
+   "keys": [
+    31,
+    32
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 12.7,
+   "tune": 0.5,
+   "start": 0,
+   "end": 497448,
+   "endFade": 2646,
+   "loop": [
+    163386,
+    423360
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Contrabass/SusVib/BKCtbss_SusVib_A#0_v1_rr1.wav",
+   "root": 34,
+   "keys": [
+    33,
+    35
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 12.7,
+   "tune": -0.6,
+   "start": 0,
+   "end": 331632,
+   "endFade": 2646,
+   "loop": [
+    213380,
+    271656
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Contrabass/SusVib/BKCtbss_SusVib_A#0_v3_rr1.wav",
+   "root": 34,
+   "keys": [
+    33,
+    35
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 12.7,
+   "tune": 0.2,
+   "start": 0,
+   "end": 545076,
+   "endFade": 2646,
+   "loop": [
+    185148,
+    493038
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Contrabass/SusVib/BKCtbss_SusVib_C1_v1_rr1.wav",
+   "root": 36,
+   "keys": [
+    36,
+    37
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 12.7,
+   "tune": -0.9,
+   "start": 0,
+   "end": 458959,
+   "endFade": 2646,
+   "loop": [
+    318208,
+    420714
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Contrabass/SusVib/BKCtbss_SusVib_C1_v3_rr1.wav",
+   "root": 36,
+   "keys": [
+    36,
+    37
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 12.7,
+   "tune": 0.3,
+   "start": 0,
+   "end": 619951,
+   "endFade": 2646,
+   "loop": [
+    235868,
+    564480
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Contrabass/SusVib/BKCtbss_SusVib_D1_v1_rr1.wav",
+   "root": 38,
+   "keys": [
+    38,
+    39
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 12.7,
+   "tune": 2.0,
+   "start": 0,
+   "end": 752346,
+   "endFade": 2646,
+   "loop": [
+    36586,
+    585648
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Contrabass/SusVib/BKCtbss_SusVib_D1_v3_rr1.wav",
+   "root": 38,
+   "keys": [
+    38,
+    39
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 12.7,
+   "tune": -1.2,
+   "start": 0,
+   "end": 598878,
+   "endFade": 2646,
+   "loop": [
+    344495,
+    465696
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Contrabass/SusVib/BKCtbss_SusVib_E1_v1_rr1.wav",
+   "root": 40,
+   "keys": [
+    40,
+    41
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 12.7,
+   "tune": -0.1,
+   "start": 0,
+   "end": 606816,
+   "endFade": 2646,
+   "loop": [
+    409148,
+    542430
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Contrabass/SusVib/BKCtbss_SusVib_E1_v3_rr1.wav",
+   "root": 40,
+   "keys": [
+    40,
+    41
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 12.7,
+   "tune": -0.7,
+   "start": 0,
+   "end": 508914,
+   "endFade": 2646,
+   "loop": [
+    177552,
+    377496
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Contrabass/SusVib/BKCtbss_SusVib_F#1_v1_rr1.wav",
+   "root": 42,
+   "keys": [
+    42,
+    43
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 12.7,
+   "tune": -0.5,
+   "start": 0,
+   "end": 288366,
+   "endFade": 2646,
+   "loop": [
+    46653,
+    241668
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Contrabass/SusVib/BKCtbss_SusVib_F#1_v3_rr1.wav",
+   "root": 42,
+   "keys": [
+    42,
+    43
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 12.7,
+   "tune": 1.2,
+   "start": 0,
+   "end": 427702,
+   "endFade": 2646,
+   "loop": [
+    275136,
+    363384
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Contrabass/SusVib/BKCtbss_SusVib_G#1_v1_rr1.wav",
+   "root": 44,
+   "keys": [
+    44,
+    44
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 12.7,
+   "tune": -0.7,
+   "start": 0,
+   "end": 314133,
+   "endFade": 2646,
+   "loop": [
+    26612,
+    248724
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Contrabass/SusVib/BKCtbss_SusVib_G#1_v3_rr1.wav",
+   "root": 44,
+   "keys": [
+    44,
+    44
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 12.7,
+   "tune": -0.2,
+   "start": 0,
+   "end": 445410,
+   "endFade": 2646,
+   "loop": [
+    77320,
+    316638
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Contrabass/SusVib/BKCtbss_SusVib_A1_v1_rr1.wav",
+   "root": 45,
+   "keys": [
+    45,
+    47
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 12.7,
+   "tune": -1.5,
+   "start": 0,
+   "end": 523026,
+   "endFade": 2646,
+   "loop": [
+    258882,
+    312228
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Contrabass/SusVib/BKCtbss_SusVib_A1_v3_rr1.wav",
+   "root": 45,
+   "keys": [
+    45,
+    47
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 12.7,
+   "tune": -0.7,
+   "start": 0,
+   "end": 490392,
+   "endFade": 2646,
+   "loop": [
+    122509,
+    396018
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Contrabass/SusVib/BKCtbss_SusVib_C#2_v1_rr1.wav",
+   "root": 49,
+   "keys": [
+    48,
+    50
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 12.7,
+   "tune": 0.7,
+   "start": 0,
+   "end": 337328,
+   "endFade": 2646,
+   "loop": [
+    232938,
+    297234
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Contrabass/SusVib/BKCtbss_SusVib_C#2_v3_rr1.wav",
+   "root": 49,
+   "keys": [
+    48,
+    50
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 12.7,
+   "tune": 2.1,
+   "start": 0,
+   "end": 464998,
+   "endFade": 2646,
+   "loop": [
+    142197,
+    407484
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Contrabass/SusVib/BKCtbss_SusVib_E2_v1_rr1.wav",
+   "root": 52,
+   "keys": [
+    51,
+    54
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 12.7,
+   "tune": 0.3,
+   "start": 0,
+   "end": 381906,
+   "endFade": 2646,
+   "loop": [
+    250745,
+    315756
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Contrabass/SusVib/BKCtbss_SusVib_E2_v3_rr1.wav",
+   "root": 52,
+   "keys": [
+    51,
+    54
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 12.7,
+   "tune": -0.2,
+   "start": 0,
+   "end": 461286,
+   "endFade": 2646,
+   "loop": [
+    306489,
+    361620
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Contrabass/SusVib/BKCtbss_SusVib_G#2_v1_rr1.wav",
+   "root": 56,
+   "keys": [
+    55,
+    57
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 12.7,
+   "tune": 0.9,
+   "start": 0,
+   "end": 334278,
+   "endFade": 2646,
+   "loop": [
+    174023,
+    267246
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Contrabass/SusVib/BKCtbss_SusVib_G#2_v3_rr1.wav",
+   "root": 56,
+   "keys": [
+    55,
+    57
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 12.7,
+   "tune": 0.5,
+   "start": 0,
+   "end": 449820,
+   "endFade": 2646,
+   "loop": [
+    144473,
+    371322
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Contrabass/SusVib/BKCtbss_SusVib_B2_v1_rr1.wav",
+   "root": 59,
+   "keys": [
+    58,
+    127
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 12.7,
+   "tune": 1.5,
+   "start": 0,
+   "end": 309582,
+   "endFade": 2646,
+   "loop": [
+    143858,
+    255780
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Contrabass/SusVib/BKCtbss_SusVib_B2_v3_rr1.wav",
+   "root": 59,
+   "keys": [
+    58,
+    127
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 12.7,
+   "tune": -1.1,
+   "start": 0,
+   "end": 403956,
+   "endFade": 2646,
+   "loop": [
+    168139,
+    341334
+   ],
+   "loopCrossfade": 3528
+  }
+ ],
+ "settings": {
+  "velocity-db": 12,
+  "velocity-crossfade": 1,
+  "loop": 1
+ }
+}

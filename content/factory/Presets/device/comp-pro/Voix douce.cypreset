@@ -1,0 +1,30 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "comp-pro",
+ "name": "Voix douce",
+ "state": {
+  "type": "comp-pro",
+  "parameters": {
+   "comppro.threshold": -22.0,
+   "comppro.ratio": 3.0,
+   "comppro.knee": 8.0,
+   "comppro.attack": 8.0,
+   "comppro.release": 140.0,
+   "comppro.makeup": 0.0,
+   "comppro.mix": 1.0,
+   "comppro.sidechain": 80.0,
+   "comppro.style": 3.0,
+   "comppro.range": 60.0,
+   "comppro.hold": 0.0,
+   "comppro.lookahead": 0.0,
+   "comppro.autoRelease": 0.0,
+   "comppro.autoGain": 1.0,
+   "comppro.sidechainLow": 20000.0,
+   "comppro.link": 1.0,
+   "comppro.channels": 0.0,
+   "comppro.audition": 0.0
+  }
+ }
+}

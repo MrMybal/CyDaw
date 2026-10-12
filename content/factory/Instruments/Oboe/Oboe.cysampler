@@ -1,0 +1,407 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Oboe",
+ "zones": [
+  {
+   "file": "bank:vsco/Woodwinds/Oboe/Sus/Oboe_Sus_A#2_v1_Main.wav",
+   "root": 58,
+   "keys": [
+    0,
+    60
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 12.9,
+   "tune": 0.5,
+   "start": 0,
+   "end": 1195748,
+   "endFade": 2646,
+   "loop": [
+    984317,
+    1069866
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Oboe/Sus/Oboe_Sus_A#2_v3_Main.wav",
+   "root": 58,
+   "keys": [
+    0,
+    60
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 12.9,
+   "tune": 0.4,
+   "start": 0,
+   "end": 594244,
+   "endFade": 2646,
+   "loop": [
+    413950,
+    538902
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Oboe/Sus/Oboe_Sus_D3_v1_Main.wav",
+   "root": 62,
+   "keys": [
+    61,
+    63
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 12.9,
+   "tune": -1.2,
+   "start": 0,
+   "end": 491612,
+   "endFade": 2646,
+   "loop": [
+    386444,
+    455994
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Oboe/Sus/Oboe_Sus_D3_v3_Main.wav",
+   "root": 62,
+   "keys": [
+    61,
+    63
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 12.9,
+   "tune": -2.8,
+   "start": 0,
+   "end": 554953,
+   "endFade": 2646,
+   "loop": [
+    450391,
+    520380
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Oboe/Sus/Oboe_Sus_F3_v1_Main.wav",
+   "root": 65,
+   "keys": [
+    64,
+    67
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 12.9,
+   "tune": 1.5,
+   "start": 0,
+   "end": 385665,
+   "endFade": 2646,
+   "loop": [
+    121756,
+    343098
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Oboe/Sus/Oboe_Sus_F3_v3_Main.wav",
+   "root": 65,
+   "keys": [
+    64,
+    67
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 12.9,
+   "tune": 0.3,
+   "start": 0,
+   "end": 429262,
+   "endFade": 2646,
+   "loop": [
+    318457,
+    389844
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Oboe/Sus/Oboe_Sus_A#3_v1_Main.wav",
+   "root": 70,
+   "keys": [
+    68,
+    72
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 12.9,
+   "tune": 0.6,
+   "start": 0,
+   "end": 474907,
+   "endFade": 2646,
+   "loop": [
+    255295,
+    428652
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Oboe/Sus/Oboe_Sus_A#3_v3_Main.wav",
+   "root": 70,
+   "keys": [
+    68,
+    72
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 12.9,
+   "tune": 0.2,
+   "start": 0,
+   "end": 448372,
+   "endFade": 2646,
+   "loop": [
+    211310,
+    377496
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Oboe/Sus/Oboe_Sus_D4_v1_Main.wav",
+   "root": 74,
+   "keys": [
+    73,
+    75
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 12.9,
+   "tune": -1.6,
+   "start": 0,
+   "end": 436807,
+   "endFade": 2646,
+   "loop": [
+    300755,
+    387198
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Oboe/Sus/Oboe_Sus_D4_v3_Main.wav",
+   "root": 74,
+   "keys": [
+    73,
+    75
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 12.9,
+   "tune": 0.3,
+   "start": 0,
+   "end": 424809,
+   "endFade": 2646,
+   "loop": [
+    147170,
+    388080
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Oboe/Sus/Oboe_Sus_F4_v1_Main.wav",
+   "root": 77,
+   "keys": [
+    76,
+    79
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 12.9,
+   "tune": -2.1,
+   "start": 0,
+   "end": 416549,
+   "endFade": 2646,
+   "loop": [
+    304369,
+    366912
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Oboe/Sus/Oboe_Sus_F4_v3_Main.wav",
+   "root": 77,
+   "keys": [
+    76,
+    79
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 12.9,
+   "tune": 0.3,
+   "start": 0,
+   "end": 363066,
+   "endFade": 2646,
+   "loop": [
+    185561,
+    330750
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Oboe/Sus/Oboe_Sus_A#4_v1_Main.wav",
+   "root": 82,
+   "keys": [
+    80,
+    84
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 12.9,
+   "tune": 0.6,
+   "start": 0,
+   "end": 463782,
+   "endFade": 2646,
+   "loop": [
+    181863,
+    411894
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Oboe/Sus/Oboe_Sus_A#4_v3_Main.wav",
+   "root": 82,
+   "keys": [
+    80,
+    84
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 12.9,
+   "tune": 0.8,
+   "start": 0,
+   "end": 386643,
+   "endFade": 2646,
+   "loop": [
+    291409,
+    349272
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Oboe/Sus/Oboe_Sus_D5_v1_Main.wav",
+   "root": 86,
+   "keys": [
+    85,
+    87
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 12.9,
+   "tune": 1.0,
+   "start": 0,
+   "end": 391047,
+   "endFade": 2646,
+   "loop": [
+    157404,
+    344862
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Oboe/Sus/Oboe_Sus_D5_v3_Main.wav",
+   "root": 86,
+   "keys": [
+    85,
+    87
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 12.9,
+   "tune": -1.0,
+   "start": 0,
+   "end": 412712,
+   "endFade": 2646,
+   "loop": [
+    319268,
+    377496
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Oboe/Sus/Oboe_Sus_F5_v1_Main.wav",
+   "root": 89,
+   "keys": [
+    88,
+    127
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 12.9,
+   "tune": -1.0,
+   "start": 0,
+   "end": 413152,
+   "endFade": 2646,
+   "loop": [
+    322626,
+    376614
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Oboe/Sus/Oboe_Sus_F5_v3_Main.wav",
+   "root": 89,
+   "keys": [
+    88,
+    127
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 12.9,
+   "start": 0,
+   "end": 430642,
+   "endFade": 2646,
+   "loop": [
+    310506,
+    393372
+   ],
+   "loopCrossfade": 3528
+  }
+ ],
+ "settings": {
+  "velocity-db": 12,
+  "velocity-crossfade": 1,
+  "loop": 1
+ }
+}

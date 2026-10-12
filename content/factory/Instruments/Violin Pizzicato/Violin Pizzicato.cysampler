@@ -1,0 +1,384 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Violin pizzicato",
+ "zones": [
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Pizz/LLVln_Pizz_G3_p_RR1.wav",
+   "root": 55,
+   "keys": [
+    0,
+    56
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 7.3,
+   "tune": 12.6,
+   "start": 0,
+   "end": 167681,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Pizz/LLVln_Pizz_G3_f_RR1.wav",
+   "root": 55,
+   "keys": [
+    0,
+    56
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 7.3,
+   "tune": 11.8,
+   "start": 0,
+   "end": 177167,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Pizz/LLVln_Pizz_A3_p_RR1.wav",
+   "root": 57,
+   "keys": [
+    57,
+    58
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 7.3,
+   "tune": 17.1,
+   "start": 0,
+   "end": 63045,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Pizz/LLVln_Pizz_A3_f_RR1.wav",
+   "root": 57,
+   "keys": [
+    57,
+    58
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 7.3,
+   "tune": 1.9,
+   "start": 0,
+   "end": 113749,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Pizz/LLVln_Pizz_C4_p_RR1.wav",
+   "root": 60,
+   "keys": [
+    59,
+    62
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 7.3,
+   "tune": 17.1,
+   "start": 0,
+   "end": 50660,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Pizz/LLVln_Pizz_C4_f_RR1.wav",
+   "root": 60,
+   "keys": [
+    59,
+    62
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 7.3,
+   "tune": 17.5,
+   "start": 0,
+   "end": 66672,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Pizz/LLVln_Pizz_E4_p_RR1.wav",
+   "root": 64,
+   "keys": [
+    63,
+    65
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 7.3,
+   "tune": 14.2,
+   "start": 0,
+   "end": 54935,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Pizz/LLVln_Pizz_E4_f_RR1.wav",
+   "root": 64,
+   "keys": [
+    63,
+    65
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 7.3,
+   "tune": 13.6,
+   "start": 0,
+   "end": 85938,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Pizz/LLVln_Pizz_G4_p_RR1.wav",
+   "root": 67,
+   "keys": [
+    66,
+    68
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 7.3,
+   "tune": 16.0,
+   "start": 0,
+   "end": 59431,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Pizz/LLVln_Pizz_G4_f_RR1.wav",
+   "root": 67,
+   "keys": [
+    66,
+    68
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 7.3,
+   "tune": 14.7,
+   "start": 0,
+   "end": 57297,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Pizz/LLVln_Pizz_A4_p_RR1.wav",
+   "root": 69,
+   "keys": [
+    69,
+    70
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 7.3,
+   "tune": 13.1,
+   "start": 0,
+   "end": 101787,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Pizz/LLVln_Pizz_A4_f_RR1.wav",
+   "root": 69,
+   "keys": [
+    69,
+    70
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 7.3,
+   "tune": 4.9,
+   "start": 0,
+   "end": 101902,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Pizz/LLVln_Pizz_C5_p_RR1.wav",
+   "root": 72,
+   "keys": [
+    71,
+    74
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 7.3,
+   "tune": 13.1,
+   "start": 0,
+   "end": 36575,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Pizz/LLVln_Pizz_C5_f_RR1.wav",
+   "root": 72,
+   "keys": [
+    71,
+    74
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 7.3,
+   "tune": 3.5,
+   "start": 0,
+   "end": 63504,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Pizz/LLVln_Pizz_E5_p_RR1.wav",
+   "root": 76,
+   "keys": [
+    75,
+    77
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 7.3,
+   "tune": -4.0,
+   "start": 0,
+   "end": 77296,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Pizz/LLVln_Pizz_E5_f_RR1.wav",
+   "root": 76,
+   "keys": [
+    75,
+    77
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 7.3,
+   "tune": -6.1,
+   "start": 0,
+   "end": 137352,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Pizz/LLVln_Pizz_G5_p_RR1.wav",
+   "root": 79,
+   "keys": [
+    78,
+    80
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 7.3,
+   "tune": 5.1,
+   "start": 0,
+   "end": 40050,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Pizz/LLVln_Pizz_G5_f_RR1.wav",
+   "root": 79,
+   "keys": [
+    78,
+    80
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 7.3,
+   "tune": 7.5,
+   "start": 0,
+   "end": 52631,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Pizz/LLVln_Pizz_A5_p_RR1.wav",
+   "root": 81,
+   "keys": [
+    81,
+    84
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 7.3,
+   "tune": 19.1,
+   "start": 0,
+   "end": 57953,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Pizz/LLVln_Pizz_A5_f_RR1.wav",
+   "root": 81,
+   "keys": [
+    81,
+    84
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 7.3,
+   "tune": 18.8,
+   "start": 0,
+   "end": 74088,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Pizz/LLVln_Pizz_E6_f_RR1.wav",
+   "root": 88,
+   "keys": [
+    85,
+    90
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 7.3,
+   "tune": 7.4,
+   "start": 0,
+   "end": 55398,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Pizz/LLVln_Pizz_A6_f_RR1.wav",
+   "root": 93,
+   "keys": [
+    91,
+    127
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 7.3,
+   "tune": 22.6,
+   "start": 0,
+   "end": 39707,
+   "endFade": 2646
+  }
+ ],
+ "settings": {
+  "velocity-db": 16
+ }
+}

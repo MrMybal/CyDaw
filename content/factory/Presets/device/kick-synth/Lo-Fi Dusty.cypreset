@@ -1,0 +1,40 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "kick-synth",
+ "name": "Lo-Fi Dusty",
+ "state": {
+  "type": "kick-synth",
+  "parameters": {
+   "kick.bodyShape": 0.0,
+   "kick.bodyPhase": 0.0,
+   "kick.pitchStart": 220.0,
+   "kick.pitchEnd": 52.0,
+   "kick.pitchTime": 60.0,
+   "kick.pitchCurve": 3.0,
+   "kick.bodyLevel": 0.0,
+   "kick.attack": 0.400000005960464,
+   "kick.hold": 20.0,
+   "kick.decay": 260.0,
+   "kick.decayCurve": 1.799999952316284,
+   "kick.length": 1500.0,
+   "kick.clickType": 1.0,
+   "kick.clickLevel": -16.0,
+   "kick.clickDecay": 10.0,
+   "kick.clickTone": 1500.0,
+   "kick.subLevel": -60.0,
+   "kick.subDecay": 600.0,
+   "kick.subOctave": 0.0,
+   "kick.driveType": 3.0,
+   "kick.drive": 6.0,
+   "kick.driveTone": 20000.0,
+   "kick.lowCut": 15.0,
+   "kick.highCut": 3500.0,
+   "kick.lowBoost": 0.0,
+   "kick.keyTrack": 1.0,
+   "kick.velocity": 0.5,
+   "kick.output": -5.679999828338623
+  }
+ }
+}

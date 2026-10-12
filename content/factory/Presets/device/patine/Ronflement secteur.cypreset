@@ -1,0 +1,28 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "patine",
+ "name": "Ronflement secteur",
+ "state": {
+  "type": "patine",
+  "parameters": {
+   "patine.noise": 0.5,
+   "patine.wobble": 0.0,
+   "patine.distort": 0.1,
+   "patine.digital": 0.0,
+   "patine.space": 0.0,
+   "patine.magnetic": 0.0,
+   "patine.magnitude": 1.0,
+   "patine.mix": 1.0,
+   "patine.noiseType": 2.0,
+   "patine.wobbleRate": 0.300000011920929,
+   "patine.distortType": 0.0,
+   "patine.spaceSize": 0.400000005960464,
+   "patine.tone": 0.0,
+   "patine.width": 1.0,
+   "patine.output": 0.0,
+   "patine.noiseFollow": 0.0
+  }
+ }
+}

@@ -1,0 +1,894 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Felt piano",
+ "zones": [
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_A#-1_v2_rr1_Player.wav",
+   "root": 22,
+   "keys": [
+    0,
+    24
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 636663,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_A#-1_v3_rr1_Player.wav",
+   "root": 22,
+   "keys": [
+    0,
+    24
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 746620,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_D#0_v1_rr1_Player.wav",
+   "root": 27,
+   "keys": [
+    25,
+    28
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 803748,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_D#0_v2_rr1_Player.wav",
+   "root": 27,
+   "keys": [
+    25,
+    28
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 960809,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_F#0_v1_rr1_Player.wav",
+   "root": 30,
+   "keys": [
+    29,
+    31
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 840268,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_F#0_v2_rr1_Player.wav",
+   "root": 30,
+   "keys": [
+    29,
+    31
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 1159224,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_A0_v1_rr1_Player.wav",
+   "root": 33,
+   "keys": [
+    32,
+    34
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 617000,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_A0_v2_rr1_Player.wav",
+   "root": 33,
+   "keys": [
+    32,
+    34
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 1279141,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_C1_v1_rr1_Player.wav",
+   "root": 36,
+   "keys": [
+    35,
+    37
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 650478,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_C1_v2_rr1_Player.wav",
+   "root": 36,
+   "keys": [
+    35,
+    37
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 1317074,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_D#1_v1_rr1_Player.wav",
+   "root": 39,
+   "keys": [
+    38,
+    40
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 1058477,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_D#1_v2_rr1_Player.wav",
+   "root": 39,
+   "keys": [
+    38,
+    40
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 1239112,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_F#1_v1_rr1_Player.wav",
+   "root": 42,
+   "keys": [
+    41,
+    43
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 975492,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_F#1_v2_rr1_Player.wav",
+   "root": 42,
+   "keys": [
+    41,
+    43
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 1136899,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_A1_v1_rr1_Player.wav",
+   "root": 45,
+   "keys": [
+    44,
+    46
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 903703,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_A1_v2_rr1_Player.wav",
+   "root": 45,
+   "keys": [
+    44,
+    46
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 1304349,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_C2_v1_rr1_Player.wav",
+   "root": 48,
+   "keys": [
+    47,
+    50
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 734924,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_C2_v2_rr1_Player.wav",
+   "root": 48,
+   "keys": [
+    47,
+    50
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 1029052,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_E2_v1_rr1_Player.wav",
+   "root": 52,
+   "keys": [
+    51,
+    54
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 821009,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_E2_v2_rr1_Player.wav",
+   "root": 52,
+   "keys": [
+    51,
+    54
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 887292,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_G#2_v1_rr1_Player.wav",
+   "root": 56,
+   "keys": [
+    55,
+    58
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 607810,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_G#2_v2_rr1_Player.wav",
+   "root": 56,
+   "keys": [
+    55,
+    58
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 996899,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_C3_v1_rr1_Player.wav",
+   "root": 60,
+   "keys": [
+    59,
+    62
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 593572,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_C3_v2_rr1_Player.wav",
+   "root": 60,
+   "keys": [
+    59,
+    62
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 945504,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_E3_v1_rr1_Player.wav",
+   "root": 64,
+   "keys": [
+    63,
+    66
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 420104,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_E3_v2_rr1_Player.wav",
+   "root": 64,
+   "keys": [
+    63,
+    66
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 612108,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_G#3_v1_rr1_Player.wav",
+   "root": 68,
+   "keys": [
+    67,
+    70
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 539391,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_G#3_v2_rr1_Player.wav",
+   "root": 68,
+   "keys": [
+    67,
+    70
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 600642,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_C4_v1_rr1_Player.wav",
+   "root": 72,
+   "keys": [
+    71,
+    74
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 442060,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_C4_v2_rr1_Player.wav",
+   "root": 72,
+   "keys": [
+    71,
+    74
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 466578,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_E4_v1_rr1_Player.wav",
+   "root": 76,
+   "keys": [
+    75,
+    78
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 402143,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_E4_v2_rr1_Player.wav",
+   "root": 76,
+   "keys": [
+    75,
+    78
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 246078,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_G#4_v1_rr1_Player.wav",
+   "root": 80,
+   "keys": [
+    79,
+    81
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 345385,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_G#4_v2_rr1_Player.wav",
+   "root": 80,
+   "keys": [
+    79,
+    81
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 224910,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_B4_v3_rr1_Player.wav",
+   "root": 83,
+   "keys": [
+    82,
+    85
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 371022,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_B4_v4_rr1_Player.wav",
+   "root": 83,
+   "keys": [
+    82,
+    85
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 428467,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_D#5_v1_rr1_Player.wav",
+   "root": 87,
+   "keys": [
+    86,
+    88
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 146231,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_D#5_v2_rr1_Player.wav",
+   "root": 87,
+   "keys": [
+    86,
+    88
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 164934,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_F#5_v1_rr1_Player.wav",
+   "root": 90,
+   "keys": [
+    89,
+    91
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 150104,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_F#5_v2_rr1_Player.wav",
+   "root": 90,
+   "keys": [
+    89,
+    91
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 152586,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_A5_v1_rr1_Player.wav",
+   "root": 93,
+   "keys": [
+    92,
+    94
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 105357,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_A5_v2_rr1_Player.wav",
+   "root": 93,
+   "keys": [
+    92,
+    94
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 119070,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_C6_v1_rr1_Player.wav",
+   "root": 96,
+   "keys": [
+    95,
+    97
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 131895,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_C6_v2_rr1_Player.wav",
+   "root": 96,
+   "keys": [
+    95,
+    97
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 117306,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_D#6_v1_rr1_Player.wav",
+   "root": 99,
+   "keys": [
+    98,
+    100
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 71488,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_D#6_v2_rr1_Player.wav",
+   "root": 99,
+   "keys": [
+    98,
+    100
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 79380,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_F#6_v3_rr1_Player.wav",
+   "root": 102,
+   "keys": [
+    101,
+    103
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 195746,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_F#6_v4_rr1_Player.wav",
+   "root": 102,
+   "keys": [
+    101,
+    103
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 212904,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_A6_v1_rr1_Player.wav",
+   "root": 105,
+   "keys": [
+    104,
+    106
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 61565,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_A6_v2_rr1_Player.wav",
+   "root": 105,
+   "keys": [
+    104,
+    106
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 98194,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_C7_v1_rr1_Player.wav",
+   "root": 108,
+   "keys": [
+    107,
+    127
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 46920,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Grand Piano, Kawai/Sustains/GPiano_sus_C7_v2_rr1_Player.wav",
+   "root": 108,
+   "keys": [
+    107,
+    127
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 19.6,
+   "tune": -1.1,
+   "start": 0,
+   "end": 107166,
+   "endFade": 2646
+  }
+ ],
+ "settings": {
+  "velocity-db": 14
+ }
+}

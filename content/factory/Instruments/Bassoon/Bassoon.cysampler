@@ -1,0 +1,561 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Bassoon",
+ "zones": [
+  {
+   "file": "bank:vsco/Woodwinds/Bassoon/sus/PSBassoon_A#0_v1_1.wav",
+   "root": 34,
+   "keys": [
+    0,
+    35
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 1.7,
+   "tune": 0.1,
+   "start": 0,
+   "end": 401073,
+   "endFade": 2646,
+   "loop": [
+    279623,
+    359856
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Bassoon/sus/PSBassoon_A#0_v2_1.wav",
+   "root": 34,
+   "keys": [
+    0,
+    35
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 1.7,
+   "tune": 0.1,
+   "start": 0,
+   "end": 319291,
+   "endFade": 2646,
+   "loop": [
+    171361,
+    279594
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Bassoon/sus/PSBassoon_C#1_v1_1.wav",
+   "root": 37,
+   "keys": [
+    36,
+    39
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 1.7,
+   "tune": 0.4,
+   "start": 0,
+   "end": 272698,
+   "endFade": 2646,
+   "loop": [
+    48735,
+    234612
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Bassoon/sus/PSBassoon_C#1_v2_1.wav",
+   "root": 37,
+   "keys": [
+    36,
+    39
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 1.7,
+   "tune": 0.1,
+   "start": 0,
+   "end": 263320,
+   "endFade": 2646,
+   "loop": [
+    166358,
+    224910
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Bassoon/sus/PSBassoon_F1_v1_1.wav",
+   "root": 41,
+   "keys": [
+    40,
+    43
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 1.7,
+   "tune": 0.1,
+   "start": 0,
+   "end": 437890,
+   "endFade": 2646,
+   "loop": [
+    345868,
+    400428
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Bassoon/sus/PSBassoon_F1_v2_1.wav",
+   "root": 41,
+   "keys": [
+    40,
+    43
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 1.7,
+   "tune": -0.1,
+   "start": 0,
+   "end": 354674,
+   "endFade": 2646,
+   "loop": [
+    79627,
+    313992
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Bassoon/sus/PSBassoon_A1_v1_1.wav",
+   "root": 45,
+   "keys": [
+    44,
+    45
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 1.7,
+   "tune": 0.1,
+   "start": 0,
+   "end": 397529,
+   "endFade": 2646,
+   "loop": [
+    153201,
+    353682
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Bassoon/sus/PSBassoon_A1_v2_1.wav",
+   "root": 45,
+   "keys": [
+    44,
+    45
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 1.7,
+   "start": 0,
+   "end": 318031,
+   "endFade": 2646,
+   "loop": [
+    145211,
+    269892
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Bassoon/sus/PSBassoon_A#1_v1_1.wav",
+   "root": 46,
+   "keys": [
+    46,
+    47
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 1.7,
+   "tune": 0.1,
+   "start": 0,
+   "end": 326478,
+   "endFade": 2646,
+   "loop": [
+    165687,
+    284886
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Bassoon/sus/PSBassoon_A#1_v2_1.wav",
+   "root": 46,
+   "keys": [
+    46,
+    47
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 1.7,
+   "tune": -0.4,
+   "start": 0,
+   "end": 284782,
+   "endFade": 2646,
+   "loop": [
+    168784,
+    239904
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Bassoon/sus/PSBassoon_C2_v1_1.wav",
+   "root": 48,
+   "keys": [
+    48,
+    51
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 1.7,
+   "tune": 0.2,
+   "start": 0,
+   "end": 280340,
+   "endFade": 2646,
+   "loop": [
+    182796,
+    240786
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Bassoon/sus/PSBassoon_C2_v2_1.wav",
+   "root": 48,
+   "keys": [
+    48,
+    51
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 1.7,
+   "tune": -0.1,
+   "start": 0,
+   "end": 279697,
+   "endFade": 2646,
+   "loop": [
+    167525,
+    234612
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Bassoon/sus/PSBassoon_G2_v1_1.wav",
+   "root": 55,
+   "keys": [
+    52,
+    57
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 1.7,
+   "tune": -0.4,
+   "start": 0,
+   "end": 377400,
+   "endFade": 2646,
+   "loop": [
+    84530,
+    336924
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Bassoon/sus/PSBassoon_G2_v2_1.wav",
+   "root": 55,
+   "keys": [
+    52,
+    57
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 1.7,
+   "tune": -0.5,
+   "start": 0,
+   "end": 318301,
+   "endFade": 2646,
+   "loop": [
+    153499,
+    275184
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Bassoon/sus/PSBassoon_C3_v1_1.wav",
+   "root": 60,
+   "keys": [
+    58,
+    61
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 1.7,
+   "tune": -0.3,
+   "start": 0,
+   "end": 385125,
+   "endFade": 2646,
+   "loop": [
+    227971,
+    350154
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Bassoon/sus/PSBassoon_C3_v2_1.wav",
+   "root": 60,
+   "keys": [
+    58,
+    61
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 1.7,
+   "tune": -0.1,
+   "start": 0,
+   "end": 348602,
+   "endFade": 2646,
+   "loop": [
+    252442,
+    309582
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Bassoon/sus/PSBassoon_D#3_v1_1.wav",
+   "root": 63,
+   "keys": [
+    62,
+    65
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 1.7,
+   "tune": -0.1,
+   "start": 0,
+   "end": 380998,
+   "endFade": 2646,
+   "loop": [
+    282907,
+    336042
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Bassoon/sus/PSBassoon_D#3_v2_1.wav",
+   "root": 63,
+   "keys": [
+    62,
+    65
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 1.7,
+   "tune": -0.9,
+   "start": 0,
+   "end": 277790,
+   "endFade": 2646,
+   "loop": [
+    185894,
+    239022
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Bassoon/sus/PSBassoon_G#3_v1_1.wav",
+   "root": 68,
+   "keys": [
+    66,
+    68
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 1.7,
+   "tune": -0.4,
+   "start": 0,
+   "end": 351320,
+   "endFade": 2646,
+   "loop": [
+    253455,
+    310464
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Bassoon/sus/PSBassoon_G#3_v2_1.wav",
+   "root": 68,
+   "keys": [
+    66,
+    68
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 1.7,
+   "tune": -0.1,
+   "start": 0,
+   "end": 317938,
+   "endFade": 2646,
+   "loop": [
+    172635,
+    278712
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Bassoon/sus/PSBassoon_A3_v1_1.wav",
+   "root": 69,
+   "keys": [
+    69,
+    70
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 1.7,
+   "tune": -0.1,
+   "start": 0,
+   "end": 428309,
+   "endFade": 2646,
+   "loop": [
+    335146,
+    388962
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Bassoon/sus/PSBassoon_A3_v2_1.wav",
+   "root": 69,
+   "keys": [
+    69,
+    70
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 1.7,
+   "tune": 0.3,
+   "start": 0,
+   "end": 427834,
+   "endFade": 2646,
+   "loop": [
+    337431,
+    393372
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Bassoon/sus/PSBassoon_C4_v1_1.wav",
+   "root": 72,
+   "keys": [
+    71,
+    73
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 1.7,
+   "tune": -0.9,
+   "start": 0,
+   "end": 492358,
+   "endFade": 2646,
+   "loop": [
+    278454,
+    452466
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Bassoon/sus/PSBassoon_C4_v2_1.wav",
+   "root": 72,
+   "keys": [
+    71,
+    73
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 1.7,
+   "tune": -0.7,
+   "start": 0,
+   "end": 434281,
+   "endFade": 2646,
+   "loop": [
+    322582,
+    395136
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Woodwinds/Bassoon/sus/PSBassoon_D#4_v2_1.wav",
+   "root": 75,
+   "keys": [
+    74,
+    127
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 1.7,
+   "tune": -0.5,
+   "start": 0,
+   "end": 326217,
+   "endFade": 2646,
+   "loop": [
+    190373,
+    289296
+   ],
+   "loopCrossfade": 3528
+  }
+ ],
+ "settings": {
+  "velocity-db": 12,
+  "velocity-crossfade": 1,
+  "loop": 1
+ }
+}

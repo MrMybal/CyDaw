@@ -1,0 +1,5 @@
+Dear ImGui 1.93.0 WIP, docking branch
+Source: local copy of ocornut/imgui (commit 64944b4520b30772de8dbf0b37d0311746477a32, 2026-09-25,
+"Merge remote-tracking branch 'origin/master' into docking").
+Files kept: core sources, the Win32, DX11 and OpenGL3 backends, Roboto-Medium.ttf and Cousine-Regular.ttf (Apache License 2.0).
+License: MIT (LICENSE.txt).

@@ -1,0 +1,452 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Cello section pizzicato",
+ "zones": [
+  {
+   "file": "bank:vsco/Strings/Cello Section/pizzT/pizzT_C1_v1_RR1.wav",
+   "root": 36,
+   "keys": [
+    0,
+    38
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 6.0,
+   "tune": -3.3,
+   "start": 0,
+   "end": 128772,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/pizzT/pizzT_C1_v2_RR1.wav",
+   "root": 36,
+   "keys": [
+    0,
+    38
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 6.0,
+   "tune": 0.8,
+   "start": 0,
+   "end": 163522,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/pizzT/pizzT_E1_v1_RR1.wav",
+   "root": 40,
+   "keys": [
+    39,
+    41
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 6.0,
+   "tune": -21.6,
+   "start": 0,
+   "end": 140446,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/pizzT/pizzT_E1_v2_RR1.wav",
+   "root": 40,
+   "keys": [
+    39,
+    41
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 6.0,
+   "tune": -9.2,
+   "start": 0,
+   "end": 137681,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/pizzT/pizzT_G1_v1_RR1.wav",
+   "root": 43,
+   "keys": [
+    42,
+    45
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 6.0,
+   "tune": 7.1,
+   "start": 0,
+   "end": 141994,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/pizzT/pizzT_G1_v2_RR1.wav",
+   "root": 43,
+   "keys": [
+    42,
+    45
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 6.0,
+   "tune": -1.7,
+   "start": 0,
+   "end": 147356,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/pizzT/pizzT_B1_v1_RR1.wav",
+   "root": 47,
+   "keys": [
+    46,
+    48
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 6.0,
+   "tune": 13.0,
+   "start": 0,
+   "end": 148387,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/pizzT/pizzT_B1_v2_RR1.wav",
+   "root": 47,
+   "keys": [
+    46,
+    48
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 6.0,
+   "tune": 13.0,
+   "start": 0,
+   "end": 176350,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/pizzT/pizzT_D2_v1_RR1.wav",
+   "root": 50,
+   "keys": [
+    49,
+    51
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 6.0,
+   "tune": 1.1,
+   "start": 0,
+   "end": 120495,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/pizzT/pizzT_D2_v2_RR1.wav",
+   "root": 50,
+   "keys": [
+    49,
+    51
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 6.0,
+   "tune": 4.1,
+   "start": 0,
+   "end": 120834,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/pizzT/pizzT_F2_v1_RR1.wav",
+   "root": 53,
+   "keys": [
+    52,
+    55
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 6.0,
+   "tune": -7.7,
+   "start": 0,
+   "end": 91728,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/pizzT/pizzT_F2_v2_RR1.wav",
+   "root": 53,
+   "keys": [
+    52,
+    55
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 6.0,
+   "tune": 0.8,
+   "start": 0,
+   "end": 79878,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/pizzT/pizzT_A2_v1_RR1.wav",
+   "root": 57,
+   "keys": [
+    56,
+    58
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 6.0,
+   "tune": -0.2,
+   "start": 0,
+   "end": 127229,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/pizzT/pizzT_A2_v2_RR1.wav",
+   "root": 57,
+   "keys": [
+    56,
+    58
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 6.0,
+   "tune": 0.5,
+   "start": 0,
+   "end": 119952,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/pizzT/pizzT_C3_v1_RR1.wav",
+   "root": 60,
+   "keys": [
+    59,
+    62
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 6.0,
+   "tune": -1.8,
+   "start": 0,
+   "end": 85554,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/pizzT/pizzT_C3_v2_RR1.wav",
+   "root": 60,
+   "keys": [
+    59,
+    62
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 6.0,
+   "tune": -5.1,
+   "start": 0,
+   "end": 86436,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/pizzT/pizzT_E3_v1_RR1.wav",
+   "root": 64,
+   "keys": [
+    63,
+    65
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 6.0,
+   "tune": 42.6,
+   "start": 0,
+   "end": 75852,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/pizzT/pizzT_E3_v2_RR1.wav",
+   "root": 64,
+   "keys": [
+    63,
+    65
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 6.0,
+   "tune": 12.7,
+   "start": 0,
+   "end": 67914,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/pizzT/pizzT_G3_v1_RR1.wav",
+   "root": 67,
+   "keys": [
+    66,
+    69
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 6.0,
+   "tune": 5.8,
+   "start": 0,
+   "end": 118188,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/pizzT/pizzT_G3_v2_RR1.wav",
+   "root": 67,
+   "keys": [
+    66,
+    69
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 6.0,
+   "tune": 14.0,
+   "start": 0,
+   "end": 111132,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/pizzT/pizzT_B3_v1_RR1.wav",
+   "root": 71,
+   "keys": [
+    70,
+    72
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 6.0,
+   "tune": 2.0,
+   "start": 0,
+   "end": 88200,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/pizzT/pizzT_B3_v2_RR1.wav",
+   "root": 71,
+   "keys": [
+    70,
+    72
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 6.0,
+   "tune": 0.3,
+   "start": 0,
+   "end": 55566,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/pizzT/pizzT_D4_v1_RR1.wav",
+   "root": 74,
+   "keys": [
+    73,
+    75
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 6.0,
+   "tune": 0.8,
+   "start": 0,
+   "end": 41127,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/pizzT/pizzT_D4_v2_RR1.wav",
+   "root": 74,
+   "keys": [
+    73,
+    75
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 6.0,
+   "tune": -21.4,
+   "start": 0,
+   "end": 46746,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/pizzT/pizzT_F4_v1_RR1.wav",
+   "root": 77,
+   "keys": [
+    76,
+    127
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 6.0,
+   "tune": 0.8,
+   "start": 0,
+   "end": 34398,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/pizzT/pizzT_F4_v2_RR1.wav",
+   "root": 77,
+   "keys": [
+    76,
+    127
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 6.0,
+   "tune": 2.2,
+   "start": 0,
+   "end": 41454,
+   "endFade": 2646
+  }
+ ],
+ "settings": {
+  "velocity-db": 16
+ }
+}

@@ -1,0 +1,277 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "909 drum machine",
+ "settings": {
+  "one-shot": 1,
+  "velocity-db": 10
+ },
+ "zones": [
+  {
+   "file": "bank:cydaw-electro/Kicks/House Classic.wav",
+   "root": 35,
+   "keys": [
+    35,
+    35
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 0.0
+  },
+  {
+   "file": "bank:cydaw-electro/Kicks/909 Punch.wav",
+   "root": 36,
+   "keys": [
+    36,
+    36
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 0.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/909 Rim.wav",
+   "root": 37,
+   "keys": [
+    37,
+    37
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/Snares/909 Snare.wav",
+   "root": 38,
+   "keys": [
+    38,
+    38
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -2.0
+  },
+  {
+   "file": "bank:cydaw-electro/Claps/909 Clap.wav",
+   "root": 39,
+   "keys": [
+    39,
+    39
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -3.0
+  },
+  {
+   "file": "bank:cydaw-electro/Snares/Tight Snare.wav",
+   "root": 40,
+   "keys": [
+    40,
+    40
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -2.0
+  },
+  {
+   "file": "bank:cydaw-electro/Toms/909 Low Tom.wav",
+   "root": 41,
+   "keys": [
+    41,
+    41
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -4.0
+  },
+  {
+   "file": "bank:cydaw-electro/Hats/909 Closed Hat.wav",
+   "root": 42,
+   "keys": [
+    42,
+    42
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -9.0,
+   "group": 1,
+   "offBy": 1
+  },
+  {
+   "file": "bank:cydaw-electro/Toms/909 Low Tom.wav",
+   "root": 43,
+   "keys": [
+    43,
+    43
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -4.0
+  },
+  {
+   "file": "bank:cydaw-electro/Hats/808 Pedal Hat.wav",
+   "root": 44,
+   "keys": [
+    44,
+    44
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -9.0,
+   "group": 1,
+   "offBy": 1
+  },
+  {
+   "file": "bank:cydaw-electro/Toms/909 Mid Tom.wav",
+   "root": 45,
+   "keys": [
+    45,
+    45
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -4.0
+  },
+  {
+   "file": "bank:cydaw-electro/Hats/909 Open Hat.wav",
+   "root": 46,
+   "keys": [
+    46,
+    46
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -8.0,
+   "group": 1,
+   "offBy": 1
+  },
+  {
+   "file": "bank:cydaw-electro/Toms/909 Mid Tom.wav",
+   "root": 47,
+   "keys": [
+    47,
+    47
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -4.0
+  },
+  {
+   "file": "bank:cydaw-electro/Toms/909 High Tom.wav",
+   "root": 48,
+   "keys": [
+    48,
+    48
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -4.0
+  },
+  {
+   "file": "bank:cydaw-electro/Cymbals/Crash.wav",
+   "root": 49,
+   "keys": [
+    49,
+    49
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -11.0
+  },
+  {
+   "file": "bank:cydaw-electro/Toms/909 High Tom.wav",
+   "root": 50,
+   "keys": [
+    50,
+    50
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -4.0
+  },
+  {
+   "file": "bank:cydaw-electro/Cymbals/Ride.wav",
+   "root": 51,
+   "keys": [
+    51,
+    51
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -11.0
+  },
+  {
+   "file": "bank:cydaw-electro/Cymbals/Ride Bell.wav",
+   "root": 53,
+   "keys": [
+    53,
+    53
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -11.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/Tambourine.wav",
+   "root": 54,
+   "keys": [
+    54,
+    54
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/Cowbell Short.wav",
+   "root": 56,
+   "keys": [
+    56,
+    56
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  }
+ ]
+}

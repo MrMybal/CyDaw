@@ -1,0 +1,40 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "kick-synth",
+ "name": "Sub Kick",
+ "state": {
+  "type": "kick-synth",
+  "parameters": {
+   "kick.bodyShape": 0.0,
+   "kick.bodyPhase": 0.0,
+   "kick.pitchStart": 90.0,
+   "kick.pitchEnd": 40.0,
+   "kick.pitchTime": 80.0,
+   "kick.pitchCurve": 2.0,
+   "kick.bodyLevel": 0.0,
+   "kick.attack": 0.400000005960464,
+   "kick.hold": 30.0,
+   "kick.decay": 900.0,
+   "kick.decayCurve": 1.299999952316284,
+   "kick.length": 1500.0,
+   "kick.clickType": 0.0,
+   "kick.clickLevel": -10.0,
+   "kick.clickDecay": 6.0,
+   "kick.clickTone": 4500.0,
+   "kick.subLevel": -6.0,
+   "kick.subDecay": 900.0,
+   "kick.subOctave": 0.0,
+   "kick.driveType": 0.0,
+   "kick.drive": 0.0,
+   "kick.driveTone": 20000.0,
+   "kick.lowCut": 20.0,
+   "kick.highCut": 20000.0,
+   "kick.lowBoost": 0.0,
+   "kick.keyTrack": 1.0,
+   "kick.velocity": 0.5,
+   "kick.output": -3.569999933242798
+  }
+ }
+}

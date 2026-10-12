@@ -1,0 +1,792 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Knight upright piano",
+ "zones": [
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl1_rr1_A-1.wav",
+   "root": 21,
+   "keys": [
+    0,
+    23
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 749917,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl2_rr1_A-1.wav",
+   "root": 21,
+   "keys": [
+    0,
+    23
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 1152986,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl1_rr1_C#0.wav",
+   "root": 25,
+   "keys": [
+    24,
+    27
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 1012253,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl2_rr1_C#0.wav",
+   "root": 25,
+   "keys": [
+    24,
+    27
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 1076961,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl1_rr1_F0.wav",
+   "root": 29,
+   "keys": [
+    28,
+    31
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 937387,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl2_rr1_F0.wav",
+   "root": 29,
+   "keys": [
+    28,
+    31
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 41,
+   "end": 1025895,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl1_rr1_A0.wav",
+   "root": 33,
+   "keys": [
+    32,
+    35
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 822665,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl2_rr1_A0.wav",
+   "root": 33,
+   "keys": [
+    32,
+    35
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 34,
+   "end": 1034996,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl1_rr1_C#1.wav",
+   "root": 37,
+   "keys": [
+    36,
+    39
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 1143596,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl2_rr1_C#1.wav",
+   "root": 37,
+   "keys": [
+    36,
+    39
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 1177069,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl1_rr1_F1.wav",
+   "root": 41,
+   "keys": [
+    40,
+    43
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 1262028,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl2_rr1_F1.wav",
+   "root": 41,
+   "keys": [
+    40,
+    43
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 19,
+   "end": 1157661,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl1_rr1_A1.wav",
+   "root": 45,
+   "keys": [
+    44,
+    47
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 1050895,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl2_rr1_A1.wav",
+   "root": 45,
+   "keys": [
+    44,
+    47
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 1025414,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl1_rr1_C#2.wav",
+   "root": 49,
+   "keys": [
+    48,
+    51
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 1029982,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl2_rr1_C#2.wav",
+   "root": 49,
+   "keys": [
+    48,
+    51
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 838335,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl1_rr1_F2.wav",
+   "root": 53,
+   "keys": [
+    52,
+    55
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 773746,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl2_rr1_F2.wav",
+   "root": 53,
+   "keys": [
+    52,
+    55
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 25,
+   "end": 959754,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl1_rr1_A2.wav",
+   "root": 57,
+   "keys": [
+    56,
+    59
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 957911,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl2_rr1_A2.wav",
+   "root": 57,
+   "keys": [
+    56,
+    59
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 29,
+   "end": 934602,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl1_rr1_C#3.wav",
+   "root": 61,
+   "keys": [
+    60,
+    63
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 724352,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl2_rr1_C#3.wav",
+   "root": 61,
+   "keys": [
+    60,
+    63
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 868706,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl1_rr1_F3.wav",
+   "root": 65,
+   "keys": [
+    64,
+    67
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 745969,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl2_rr1_F3.wav",
+   "root": 65,
+   "keys": [
+    64,
+    67
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 816365,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl1_rr1_A3.wav",
+   "root": 69,
+   "keys": [
+    68,
+    71
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 534034,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl2_rr1_A3.wav",
+   "root": 69,
+   "keys": [
+    68,
+    71
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 786730,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl1_rr1_C#4.wav",
+   "root": 73,
+   "keys": [
+    72,
+    75
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 442689,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl2_rr1_C#4.wav",
+   "root": 73,
+   "keys": [
+    72,
+    75
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 641487,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl1_rr1_F4.wav",
+   "root": 77,
+   "keys": [
+    76,
+    79
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 501355,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl2_rr1_F4.wav",
+   "root": 77,
+   "keys": [
+    76,
+    79
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 475559,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl1_rr1_A4.wav",
+   "root": 81,
+   "keys": [
+    80,
+    83
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 523938,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl2_rr1_A4.wav",
+   "root": 81,
+   "keys": [
+    80,
+    83
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 55,
+   "end": 623019,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl1_rr1_C#5.wav",
+   "root": 85,
+   "keys": [
+    84,
+    87
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 481306,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl2_rr1_C#5.wav",
+   "root": 85,
+   "keys": [
+    84,
+    87
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 561985,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl1_rr1_F5.wav",
+   "root": 89,
+   "keys": [
+    88,
+    91
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 434112,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl2_rr1_F5.wav",
+   "root": 89,
+   "keys": [
+    88,
+    91
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 467918,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl1_rr1_A5.wav",
+   "root": 93,
+   "keys": [
+    92,
+    95
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 375699,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl2_rr1_A5.wav",
+   "root": 93,
+   "keys": [
+    92,
+    95
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 247779,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl1_rr1_C#6.wav",
+   "root": 97,
+   "keys": [
+    96,
+    99
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 237439,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl2_rr1_C#6.wav",
+   "root": 97,
+   "keys": [
+    96,
+    99
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 154496,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl1_rr1_F6.wav",
+   "root": 101,
+   "keys": [
+    100,
+    103
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 111202,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl2_rr1_F6.wav",
+   "root": 101,
+   "keys": [
+    100,
+    103
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 120853,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl1_rr1_A6.wav",
+   "root": 105,
+   "keys": [
+    104,
+    106
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 105383,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl2_rr1_A6.wav",
+   "root": 105,
+   "keys": [
+    104,
+    106
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 78562,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl1_rr1_C7.wav",
+   "root": 108,
+   "keys": [
+    107,
+    127
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 96738,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Chordophones/Zithers/Upright Piano, Knight/Sustains/Player_vl2_rr1_C7.wav",
+   "root": 108,
+   "keys": [
+    107,
+    127
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.6,
+   "tune": -6.8,
+   "start": 0,
+   "end": 102393,
+   "endFade": 2646
+  }
+ ],
+ "settings": {
+  "velocity-db": 18
+ }
+}

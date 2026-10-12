@@ -1,0 +1,3951 @@
+{
+ "format": "cydaw-factory-catalogue",
+ "version": 1,
+ "categories": {
+  "pianos": {
+   "fr": "Pianos",
+   "en": "Pianos"
+  },
+  "electric-pianos": {
+   "fr": "Pianos électriques",
+   "en": "Electric pianos"
+  },
+  "harpsichords": {
+   "fr": "Clavecins",
+   "en": "Harpsichords"
+  },
+  "harps": {
+   "fr": "Harpes",
+   "en": "Harps"
+  },
+  "strings": {
+   "fr": "Cordes frottées et pincées",
+   "en": "Bowed and plucked strings"
+  },
+  "string-sections": {
+   "fr": "Cordes d'orchestre",
+   "en": "Orchestral strings"
+  },
+  "brass": {
+   "fr": "Cuivres",
+   "en": "Brass"
+  },
+  "woodwinds": {
+   "fr": "Bois",
+   "en": "Woodwinds"
+  },
+  "organs": {
+   "fr": "Orgues",
+   "en": "Organs"
+  },
+  "mallets": {
+   "fr": "Percussions mélodiques",
+   "en": "Tuned percussion"
+  },
+  "folk": {
+   "fr": "Instruments traditionnels",
+   "en": "Folk instruments"
+  },
+  "guitars": {
+   "fr": "Guitares",
+   "en": "Guitars"
+  },
+  "basses": {
+   "fr": "Basses",
+   "en": "Basses"
+  },
+  "drums": {
+   "fr": "Batteries et percussions",
+   "en": "Drums and percussion"
+  },
+  "electro-drums": {
+   "fr": "Batteries électroniques",
+   "en": "Electronic drums"
+  },
+  "synths": {
+   "fr": "Synthés échantillonnés",
+   "en": "Sampled synths"
+  },
+  "voices": {
+   "fr": "Voix",
+   "en": "Voices"
+  }
+ },
+ "instruments": [
+  {
+   "key": "grand-steinway",
+   "names": {
+    "fr": "Piano à queue Steinway B",
+    "en": "Steinway B grand piano"
+   },
+   "category": "pianos",
+   "map": "Instruments/Steinway B Grand/Steinway B Grand.cysampler",
+   "settings": {
+    "velocity-db": 30
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 900
+   },
+   "source": "VCSL",
+   "bank": "vcsl",
+   "licence": "CC0-1.0",
+   "range": [
+    "A#0",
+    "F#7"
+   ],
+   "gainDb": -3.2,
+   "report": {
+    "key": "grand-steinway",
+    "notes": 21,
+    "zones": 63,
+    "octaveShift": 0,
+    "meanDeviationCents": 5.2,
+    "largestDeviationCents": 24.7,
+    "loops": 0,
+    "gainDb": -3.2,
+    "megabytes": 395.0
+   },
+   "model": "Sound Models/Steinway B Grand.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.35
+   }
+  },
+  {
+   "key": "grand-kawai",
+   "names": {
+    "fr": "Piano à queue Kawai",
+    "en": "Kawai grand piano"
+   },
+   "category": "pianos",
+   "map": "Instruments/Kawai Grand/Kawai Grand.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 900
+   },
+   "source": "VCSL",
+   "bank": "vcsl",
+   "licence": "CC0-1.0",
+   "range": [
+    "A#0",
+    "C8"
+   ],
+   "gainDb": 3.6,
+   "report": {
+    "key": "grand-kawai",
+    "notes": 26,
+    "zones": 99,
+    "octaveShift": 12,
+    "meanDeviationCents": 1.1,
+    "largestDeviationCents": 8593.3,
+    "loops": 0,
+    "gainDb": 3.6,
+    "megabytes": 299.6
+   },
+   "model": "Sound Models/Kawai Grand.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.35
+   }
+  },
+  {
+   "key": "felt-piano",
+   "names": {
+    "fr": "Piano feutré",
+    "en": "Felt piano"
+   },
+   "category": "pianos",
+   "map": "Instruments/Felt Piano/Felt Piano.cysampler",
+   "settings": {
+    "velocity-db": 14
+   },
+   "envelope": {
+    "attack": 3,
+    "release": 700
+   },
+   "source": "VCSL",
+   "bank": "vcsl",
+   "licence": "CC0-1.0",
+   "range": [
+    "A#0",
+    "C8"
+   ],
+   "derivedFrom": "grand-kawai",
+   "report": {
+    "key": "felt-piano",
+    "zones": 52,
+    "derivedFrom": "grand-kawai"
+   },
+   "filter": 2600.0
+  },
+  {
+   "key": "upright-yamaha",
+   "names": {
+    "fr": "Piano droit Yamaha",
+    "en": "Yamaha upright piano"
+   },
+   "category": "pianos",
+   "map": "Instruments/Yamaha Upright/Yamaha Upright.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 700
+   },
+   "source": "VCSL",
+   "bank": "vcsl",
+   "licence": "CC0-1.0",
+   "range": [
+    "C1",
+    "C7"
+   ],
+   "gainDb": -1.1,
+   "report": {
+    "key": "upright-yamaha",
+    "notes": 13,
+    "zones": 38,
+    "octaveShift": 12,
+    "meanDeviationCents": 2.8,
+    "largestDeviationCents": 1203.7,
+    "loops": 0,
+    "gainDb": -1.1,
+    "megabytes": 126.8
+   },
+   "model": "Sound Models/Yamaha Upright.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.3
+   }
+  },
+  {
+   "key": "upright-honky-tonk",
+   "names": {
+    "fr": "Piano droit honky-tonk",
+    "en": "Honky-tonk upright piano"
+   },
+   "category": "pianos",
+   "map": "Instruments/Honky-Tonk Upright/Honky-Tonk Upright.cysampler",
+   "settings": {
+    "velocity-db": 18,
+    "width": 1.2
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 380
+   },
+   "source": "VCSL",
+   "bank": "vcsl",
+   "licence": "CC0-1.0",
+   "range": [
+    "C1",
+    "C7"
+   ],
+   "derivedFrom": "upright-yamaha",
+   "report": {
+    "key": "upright-honky-tonk",
+    "zones": 76,
+    "derivedFrom": "upright-yamaha"
+   }
+  },
+  {
+   "key": "upright-knight",
+   "names": {
+    "fr": "Piano droit Knight",
+    "en": "Knight upright piano"
+   },
+   "category": "pianos",
+   "map": "Instruments/Knight Upright/Knight Upright.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 700
+   },
+   "source": "VCSL",
+   "bank": "vcsl",
+   "licence": "CC0-1.0",
+   "range": [
+    "A0",
+    "C8"
+   ],
+   "gainDb": 5.6,
+   "report": {
+    "key": "upright-knight",
+    "notes": 23,
+    "zones": 46,
+    "octaveShift": 12,
+    "meanDeviationCents": 6.8,
+    "largestDeviationCents": 82.1,
+    "loops": 0,
+    "gainDb": 5.6,
+    "megabytes": 188.3
+   },
+   "model": "Sound Models/Knight Upright.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.3
+   }
+  },
+  {
+   "key": "fm-piano",
+   "names": {
+    "fr": "Piano FM (TX81Z)",
+    "en": "FM piano (TX81Z)"
+   },
+   "category": "electric-pianos",
+   "map": "Instruments/FM Piano/FM Piano.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 300
+   },
+   "source": "VCSL",
+   "bank": "vcsl",
+   "licence": "CC0-1.0",
+   "range": [
+    "C0",
+    "G#6"
+   ],
+   "gainDb": 8.7,
+   "report": {
+    "key": "fm-piano",
+    "notes": 11,
+    "zones": 33,
+    "octaveShift": 0,
+    "meanDeviationCents": 1.0,
+    "largestDeviationCents": 3.1,
+    "loops": 0,
+    "gainDb": 8.7,
+    "megabytes": 34.5
+   },
+   "model": "Sound Models/FM Piano.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.25
+   }
+  },
+  {
+   "key": "harpsichord-flemish-1",
+   "names": {
+    "fr": "Clavecin flamand I",
+    "en": "Flemish harpsichord I"
+   },
+   "category": "harpsichords",
+   "map": "Instruments/Flemish Harpsichord I/Flemish Harpsichord I.cysampler",
+   "settings": {
+    "velocity-db": 4
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 260
+   },
+   "source": "VCSL",
+   "bank": "vcsl",
+   "licence": "CC0-1.0",
+   "range": [
+    "F#1",
+    "C6"
+   ],
+   "gainDb": 8.2,
+   "report": {
+    "key": "harpsichord-flemish-1",
+    "notes": 14,
+    "zones": 14,
+    "octaveShift": 12,
+    "meanDeviationCents": 4.0,
+    "largestDeviationCents": 6.5,
+    "loops": 0,
+    "gainDb": 8.2,
+    "megabytes": 32.9
+   },
+   "model": "Sound Models/Flemish Harpsichord I.cysound",
+   "modelSettings": {
+    "velocity-db": 3,
+    "release": 0.25,
+    "velocity-brightness": 0
+   }
+  },
+  {
+   "key": "harpsichord-flemish-2",
+   "names": {
+    "fr": "Clavecin flamand II",
+    "en": "Flemish harpsichord II"
+   },
+   "category": "harpsichords",
+   "map": "Instruments/Flemish Harpsichord II/Flemish Harpsichord II.cysampler",
+   "settings": {
+    "velocity-db": 4
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 260
+   },
+   "source": "VCSL",
+   "bank": "vcsl",
+   "licence": "CC0-1.0",
+   "range": [
+    "F#2",
+    "C7"
+   ],
+   "gainDb": 8.5,
+   "report": {
+    "key": "harpsichord-flemish-2",
+    "notes": 13,
+    "zones": 13,
+    "octaveShift": 12,
+    "meanDeviationCents": 3.4,
+    "largestDeviationCents": 16.6,
+    "loops": 0,
+    "gainDb": 8.5,
+    "megabytes": 23.5
+   },
+   "model": "Sound Models/Flemish Harpsichord II.cysound",
+   "modelSettings": {
+    "velocity-db": 3,
+    "release": 0.25,
+    "velocity-brightness": 0
+   }
+  },
+  {
+   "key": "harpsichord-french",
+   "names": {
+    "fr": "Clavecin français",
+    "en": "French harpsichord"
+   },
+   "category": "harpsichords",
+   "map": "Instruments/French Harpsichord/French Harpsichord.cysampler",
+   "settings": {
+    "velocity-db": 4
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 260
+   },
+   "source": "VCSL",
+   "bank": "vcsl",
+   "licence": "CC0-1.0",
+   "range": [
+    "D1",
+    "C6"
+   ],
+   "gainDb": 9.3,
+   "report": {
+    "key": "harpsichord-french",
+    "notes": 15,
+    "zones": 15,
+    "octaveShift": 12,
+    "meanDeviationCents": 4.4,
+    "largestDeviationCents": 6.2,
+    "loops": 0,
+    "gainDb": 9.3,
+    "megabytes": 43.8
+   },
+   "model": "Sound Models/French Harpsichord.cysound",
+   "modelSettings": {
+    "velocity-db": 3,
+    "release": 0.25,
+    "velocity-brightness": 0
+   }
+  },
+  {
+   "key": "harpsichord-italian",
+   "names": {
+    "fr": "Clavecin italien",
+    "en": "Italian harpsichord"
+   },
+   "category": "harpsichords",
+   "map": "Instruments/Italian Harpsichord/Italian Harpsichord.cysampler",
+   "settings": {
+    "velocity-db": 4
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 260
+   },
+   "source": "VCSL",
+   "bank": "vcsl",
+   "licence": "CC0-1.0",
+   "range": [
+    "F#1",
+    "A#5"
+   ],
+   "gainDb": 5.6,
+   "report": {
+    "key": "harpsichord-italian",
+    "notes": 16,
+    "zones": 16,
+    "octaveShift": 12,
+    "meanDeviationCents": 7.1,
+    "largestDeviationCents": 16.1,
+    "loops": 0,
+    "gainDb": 5.6,
+    "megabytes": 32.5
+   },
+   "model": "Sound Models/Italian Harpsichord.cysound",
+   "modelSettings": {
+    "velocity-db": 3,
+    "release": 0.25,
+    "velocity-brightness": 0
+   }
+  },
+  {
+   "key": "harpsichord-english",
+   "names": {
+    "fr": "Clavecin anglais",
+    "en": "English harpsichord"
+   },
+   "category": "harpsichords",
+   "map": "Instruments/English Harpsichord/English Harpsichord.cysampler",
+   "settings": {
+    "velocity-db": 4
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 260
+   },
+   "source": "VCSL",
+   "bank": "vcsl",
+   "licence": "CC0-1.0",
+   "range": [
+    "A#1",
+    "D6"
+   ],
+   "gainDb": 6.1,
+   "report": {
+    "key": "harpsichord-english",
+    "notes": 14,
+    "zones": 14,
+    "octaveShift": 12,
+    "meanDeviationCents": 4.4,
+    "largestDeviationCents": 14.4,
+    "loops": 0,
+    "gainDb": 6.1,
+    "megabytes": 28.7
+   },
+   "model": "Sound Models/English Harpsichord.cysound",
+   "modelSettings": {
+    "velocity-db": 3,
+    "release": 0.25,
+    "velocity-brightness": 0
+   }
+  },
+  {
+   "key": "harpsichord-english-lute",
+   "names": {
+    "fr": "Clavecin anglais, jeu de luth",
+    "en": "English harpsichord, lute stop"
+   },
+   "category": "harpsichords",
+   "map": "Instruments/English Harpsichord Lute/English Harpsichord Lute.cysampler",
+   "settings": {
+    "velocity-db": 4
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 200
+   },
+   "source": "VCSL",
+   "bank": "vcsl",
+   "licence": "CC0-1.0",
+   "range": [
+    "A#1",
+    "D6"
+   ],
+   "gainDb": 7.9,
+   "report": {
+    "key": "harpsichord-english-lute",
+    "notes": 14,
+    "zones": 14,
+    "octaveShift": 12,
+    "meanDeviationCents": 0.8,
+    "largestDeviationCents": 19.3,
+    "loops": 0,
+    "gainDb": 7.9,
+    "megabytes": 13.9
+   },
+   "model": "Sound Models/English Harpsichord Lute.cysound",
+   "modelSettings": {
+    "velocity-db": 3,
+    "release": 0.25,
+    "velocity-brightness": 0
+   }
+  },
+  {
+   "key": "harp-concert",
+   "names": {
+    "fr": "Harpe de concert",
+    "en": "Concert harp"
+   },
+   "category": "harps",
+   "map": "Instruments/Concert Harp/Concert Harp.cysampler",
+   "settings": {
+    "velocity-db": 16
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 2500
+   },
+   "source": "VCSL",
+   "bank": "vcsl",
+   "licence": "CC0-1.0",
+   "range": [
+    "E1",
+    "F7"
+   ],
+   "gainDb": 11.0,
+   "report": {
+    "key": "harp-concert",
+    "notes": 22,
+    "zones": 43,
+    "octaveShift": 0,
+    "meanDeviationCents": -7.6,
+    "largestDeviationCents": 24.8,
+    "loops": 0,
+    "gainDb": 11.0,
+    "megabytes": 72.0
+   },
+   "model": "Sound Models/Concert Harp.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 2.0
+   }
+  },
+  {
+   "key": "harp-folk",
+   "names": {
+    "fr": "Harpe celtique",
+    "en": "Folk harp"
+   },
+   "category": "harps",
+   "map": "Instruments/Folk Harp/Folk Harp.cysampler",
+   "settings": {
+    "velocity-db": 16
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 2200
+   },
+   "source": "VCSL",
+   "bank": "vcsl",
+   "licence": "CC0-1.0",
+   "range": [
+    "C2",
+    "G#6"
+   ],
+   "gainDb": 5.2,
+   "report": {
+    "key": "harp-folk",
+    "notes": 29,
+    "zones": 58,
+    "octaveShift": 12,
+    "meanDeviationCents": 4.0,
+    "largestDeviationCents": 1203.1,
+    "loops": 0,
+    "gainDb": 5.2,
+    "megabytes": 83.2
+   },
+   "model": "Sound Models/Folk Harp.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 1.8
+   }
+  },
+  {
+   "key": "violin-arco",
+   "names": {
+    "fr": "Violon (archet, vibrato)",
+    "en": "Violin (bowed, vibrato)"
+   },
+   "category": "strings",
+   "map": "Instruments/Violin Arco/Violin Arco.cysampler",
+   "settings": {
+    "velocity-db": 12,
+    "velocity-crossfade": 1,
+    "loop": 1
+   },
+   "envelope": {
+    "attack": 4,
+    "release": 320
+   },
+   "source": "VSCO 2 CE",
+   "bank": "vsco",
+   "licence": "CC0-1.0",
+   "range": [
+    "G3",
+    "C7"
+   ],
+   "gainDb": 5.7,
+   "report": {
+    "key": "violin-arco",
+    "notes": 15,
+    "zones": 30,
+    "octaveShift": 0,
+    "meanDeviationCents": 3.8,
+    "largestDeviationCents": 1891.8,
+    "loops": 30,
+    "gainDb": 5.7,
+    "megabytes": 74.4
+   },
+   "model": "Sound Models/Violin Arco.cysound",
+   "modelSettings": {
+    "velocity-db": 10
+   },
+   "voicing": {
+    "mode": "legato",
+    "glide": 35
+   }
+  },
+  {
+   "key": "violin-pizz",
+   "names": {
+    "fr": "Violon pizzicato",
+    "en": "Violin pizzicato"
+   },
+   "category": "strings",
+   "map": "Instruments/Violin Pizzicato/Violin Pizzicato.cysampler",
+   "settings": {
+    "velocity-db": 16
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 400
+   },
+   "source": "VSCO 2 CE",
+   "bank": "vsco",
+   "licence": "CC0-1.0",
+   "range": [
+    "G3",
+    "A6"
+   ],
+   "gainDb": 7.3,
+   "report": {
+    "key": "violin-pizz",
+    "notes": 12,
+    "zones": 22,
+    "octaveShift": 0,
+    "meanDeviationCents": -13.1,
+    "largestDeviationCents": 1902.3,
+    "loops": 0,
+    "gainDb": 7.3,
+    "megabytes": 7.0
+   },
+   "model": "Sound Models/Violin Pizzicato.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.4
+   }
+  },
+  {
+   "key": "violin-section",
+   "names": {
+    "fr": "Violons (section)",
+    "en": "Violin section"
+   },
+   "category": "string-sections",
+   "map": "Instruments/Violin Section/Violin Section.cysampler",
+   "settings": {
+    "velocity-db": 12,
+    "velocity-crossfade": 1,
+    "loop": 1
+   },
+   "envelope": {
+    "attack": 10,
+    "release": 360
+   },
+   "source": "VSCO 2 CE",
+   "bank": "vsco",
+   "licence": "CC0-1.0",
+   "range": [
+    "G3",
+    "D6"
+   ],
+   "gainDb": 9.4,
+   "report": {
+    "key": "violin-section",
+    "notes": 11,
+    "zones": 22,
+    "octaveShift": 12,
+    "meanDeviationCents": 0.2,
+    "largestDeviationCents": 1.1,
+    "loops": 22,
+    "gainDb": 9.4,
+    "megabytes": 46.0
+   },
+   "model": "Sound Models/Violin Section.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.36
+   }
+  },
+  {
+   "key": "viola-section",
+   "names": {
+    "fr": "Altos (section)",
+    "en": "Viola section"
+   },
+   "category": "string-sections",
+   "map": "Instruments/Viola Section/Viola Section.cysampler",
+   "settings": {
+    "velocity-db": 12,
+    "velocity-crossfade": 1,
+    "loop": 1
+   },
+   "envelope": {
+    "attack": 10,
+    "release": 360
+   },
+   "source": "VSCO 2 CE",
+   "bank": "vsco",
+   "licence": "CC0-1.0",
+   "range": [
+    "C3",
+    "D6"
+   ],
+   "gainDb": 3.0,
+   "report": {
+    "key": "viola-section",
+    "notes": 13,
+    "zones": 26,
+    "octaveShift": 12,
+    "meanDeviationCents": -0.1,
+    "largestDeviationCents": 3.6,
+    "loops": 26,
+    "gainDb": 3.0,
+    "megabytes": 71.7
+   },
+   "model": "Sound Models/Viola Section.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.36
+   }
+  },
+  {
+   "key": "cello-section",
+   "names": {
+    "fr": "Violoncelles (section)",
+    "en": "Cello section"
+   },
+   "category": "string-sections",
+   "map": "Instruments/Cello Section/Cello Section.cysampler",
+   "settings": {
+    "velocity-db": 12,
+    "velocity-crossfade": 1,
+    "loop": 1
+   },
+   "envelope": {
+    "attack": 10,
+    "release": 380
+   },
+   "source": "VSCO 2 CE",
+   "bank": "vsco",
+   "licence": "CC0-1.0",
+   "range": [
+    "C2",
+    "F5"
+   ],
+   "gainDb": -0.8,
+   "report": {
+    "key": "cello-section",
+    "notes": 13,
+    "zones": 26,
+    "octaveShift": 12,
+    "meanDeviationCents": 0.0,
+    "largestDeviationCents": 5.0,
+    "loops": 26,
+    "gainDb": -0.8,
+    "megabytes": 70.1
+   },
+   "model": "Sound Models/Cello Section.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.38
+   }
+  },
+  {
+   "key": "contrabass-arco",
+   "names": {
+    "fr": "Contrebasse (archet)",
+    "en": "Double bass (bowed)"
+   },
+   "category": "strings",
+   "map": "Instruments/Double Bass Arco/Double Bass Arco.cysampler",
+   "settings": {
+    "velocity-db": 12,
+    "velocity-crossfade": 1,
+    "loop": 1
+   },
+   "envelope": {
+    "attack": 10,
+    "release": 380
+   },
+   "source": "VSCO 2 CE",
+   "bank": "vsco",
+   "licence": "CC0-1.0",
+   "range": [
+    "F#1",
+    "B3"
+   ],
+   "gainDb": 12.7,
+   "report": {
+    "key": "contrabass-arco",
+    "notes": 13,
+    "zones": 26,
+    "octaveShift": 12,
+    "meanDeviationCents": 0.1,
+    "largestDeviationCents": 2.1,
+    "loops": 26,
+    "gainDb": 12.7,
+    "megabytes": 48.0
+   },
+   "model": "Sound Models/Double Bass Arco.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.38
+   },
+   "voicing": {
+    "mode": "legato",
+    "glide": 45
+   }
+  },
+  {
+   "key": "violin-section-pizz",
+   "names": {
+    "fr": "Violons pizzicato (section)",
+    "en": "Violin section pizzicato"
+   },
+   "category": "string-sections",
+   "map": "Instruments/Violin Section Pizzicato/Violin Section Pizzicato.cysampler",
+   "settings": {
+    "velocity-db": 16
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 400
+   },
+   "source": "VSCO 2 CE",
+   "bank": "vsco",
+   "licence": "CC0-1.0",
+   "range": [
+    "G3",
+    "D6"
+   ],
+   "gainDb": 3.9,
+   "report": {
+    "key": "violin-section-pizz",
+    "notes": 11,
+    "zones": 22,
+    "octaveShift": 12,
+    "meanDeviationCents": -5.1,
+    "largestDeviationCents": 1897.4,
+    "loops": 0,
+    "gainDb": 3.9,
+    "megabytes": 4.3
+   },
+   "model": "Sound Models/Violin Section Pizzicato.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.4
+   }
+  },
+  {
+   "key": "cello-section-pizz",
+   "names": {
+    "fr": "Violoncelles pizzicato (section)",
+    "en": "Cello section pizzicato"
+   },
+   "category": "string-sections",
+   "map": "Instruments/Cello Section Pizzicato/Cello Section Pizzicato.cysampler",
+   "settings": {
+    "velocity-db": 16
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 500
+   },
+   "source": "VSCO 2 CE",
+   "bank": "vsco",
+   "licence": "CC0-1.0",
+   "range": [
+    "C2",
+    "F5"
+   ],
+   "gainDb": 6.0,
+   "report": {
+    "key": "cello-section-pizz",
+    "notes": 13,
+    "zones": 26,
+    "octaveShift": 12,
+    "meanDeviationCents": -0.8,
+    "largestDeviationCents": 3622.1,
+    "loops": 0,
+    "gainDb": 6.0,
+    "megabytes": 17.6
+   },
+   "model": "Sound Models/Cello Section Pizzicato.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.5
+   }
+  },
+  {
+   "key": "contrabass-pizz",
+   "names": {
+    "fr": "Contrebasse pizzicato",
+    "en": "Double bass pizzicato"
+   },
+   "category": "strings",
+   "map": "Instruments/Double Bass Pizzicato/Double Bass Pizzicato.cysampler",
+   "settings": {
+    "velocity-db": 16
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 600
+   },
+   "source": "VSCO 2 CE",
+   "bank": "vsco",
+   "licence": "CC0-1.0",
+   "range": [
+    "E1",
+    "B3"
+   ],
+   "gainDb": 17.7,
+   "report": {
+    "key": "contrabass-pizz",
+    "notes": 14,
+    "zones": 20,
+    "octaveShift": 12,
+    "meanDeviationCents": -0.5,
+    "largestDeviationCents": 2398.7,
+    "loops": 0,
+    "gainDb": 17.7,
+    "megabytes": 10.2
+   },
+   "model": "Sound Models/Double Bass Pizzicato.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.6
+   }
+  },
+  {
+   "key": "horn",
+   "names": {
+    "fr": "Cor en fa",
+    "en": "French horn"
+   },
+   "category": "brass",
+   "map": "Instruments/French Horn/French Horn.cysampler",
+   "settings": {
+    "velocity-db": 12,
+    "velocity-crossfade": 1,
+    "loop": 1
+   },
+   "envelope": {
+    "attack": 12,
+    "release": 300
+   },
+   "source": "VSCO 2 CE",
+   "bank": "vsco",
+   "licence": "CC0-1.0",
+   "range": [
+    "A1",
+    "F5"
+   ],
+   "gainDb": 6.4,
+   "report": {
+    "key": "horn",
+    "notes": 11,
+    "zones": 29,
+    "octaveShift": 12,
+    "meanDeviationCents": -0.1,
+    "largestDeviationCents": 1198.1,
+    "loops": 29,
+    "gainDb": 6.4,
+    "megabytes": 50.6
+   },
+   "model": "Sound Models/French Horn.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.3
+   },
+   "voicing": {
+    "mode": "legato",
+    "glide": 40
+   }
+  },
+  {
+   "key": "trumpet",
+   "names": {
+    "fr": "Trompette",
+    "en": "Trumpet"
+   },
+   "category": "brass",
+   "map": "Instruments/Trumpet/Trumpet.cysampler",
+   "settings": {
+    "velocity-db": 12,
+    "velocity-crossfade": 1,
+    "loop": 1
+   },
+   "envelope": {
+    "attack": 6,
+    "release": 250
+   },
+   "source": "VSCO 2 CE",
+   "bank": "vsco",
+   "licence": "CC0-1.0",
+   "range": [
+    "F3",
+    "C6"
+   ],
+   "gainDb": 0.3,
+   "report": {
+    "key": "trumpet",
+    "notes": 10,
+    "zones": 20,
+    "octaveShift": 12,
+    "meanDeviationCents": -0.4,
+    "largestDeviationCents": 7.1,
+    "loops": 20,
+    "gainDb": 0.3,
+    "megabytes": 40.5
+   },
+   "model": "Sound Models/Trumpet.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.25
+   },
+   "voicing": {
+    "mode": "legato",
+    "glide": 30
+   }
+  },
+  {
+   "key": "trombone",
+   "names": {
+    "fr": "Trombone ténor",
+    "en": "Tenor trombone"
+   },
+   "category": "brass",
+   "map": "Instruments/Tenor Trombone/Tenor Trombone.cysampler",
+   "settings": {
+    "velocity-db": 12,
+    "velocity-crossfade": 1,
+    "loop": 1
+   },
+   "envelope": {
+    "attack": 8,
+    "release": 280
+   },
+   "source": "VSCO 2 CE",
+   "bank": "vsco",
+   "licence": "CC0-1.0",
+   "range": [
+    "A#1",
+    "F4"
+   ],
+   "gainDb": 15.8,
+   "report": {
+    "key": "trombone",
+    "notes": 11,
+    "zones": 31,
+    "octaveShift": 12,
+    "meanDeviationCents": 0.1,
+    "largestDeviationCents": 0.4,
+    "loops": 31,
+    "gainDb": 15.8,
+    "megabytes": 60.1
+   },
+   "model": "Sound Models/Tenor Trombone.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.28
+   },
+   "voicing": {
+    "mode": "legato",
+    "glide": 60
+   }
+  },
+  {
+   "key": "tuba",
+   "names": {
+    "fr": "Tuba",
+    "en": "Tuba"
+   },
+   "category": "brass",
+   "map": "Instruments/Tuba/Tuba.cysampler",
+   "settings": {
+    "velocity-db": 12,
+    "velocity-crossfade": 1,
+    "loop": 1
+   },
+   "envelope": {
+    "attack": 10,
+    "release": 300
+   },
+   "source": "VSCO 2 CE",
+   "bank": "vsco",
+   "licence": "CC0-1.0",
+   "range": [
+    "F1",
+    "D4"
+   ],
+   "gainDb": 4.7,
+   "report": {
+    "key": "tuba",
+    "notes": 9,
+    "zones": 23,
+    "octaveShift": 12,
+    "meanDeviationCents": -0.4,
+    "largestDeviationCents": 1218.9,
+    "loops": 20,
+    "gainDb": 4.7,
+    "megabytes": 31.2
+   },
+   "model": "Sound Models/Tuba.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.3
+   },
+   "voicing": {
+    "mode": "legato",
+    "glide": 45
+   }
+  },
+  {
+   "key": "flute",
+   "names": {
+    "fr": "Flûte",
+    "en": "Flute"
+   },
+   "category": "woodwinds",
+   "map": "Instruments/Flute/Flute.cysampler",
+   "settings": {
+    "velocity-db": 12,
+    "velocity-crossfade": 1,
+    "loop": 1
+   },
+   "envelope": {
+    "attack": 8,
+    "release": 260
+   },
+   "source": "VSCO 2 CE",
+   "bank": "vsco",
+   "licence": "CC0-1.0",
+   "range": [
+    "C4",
+    "C7"
+   ],
+   "gainDb": 7.7,
+   "report": {
+    "key": "flute",
+    "notes": 10,
+    "zones": 19,
+    "octaveShift": 12,
+    "meanDeviationCents": 0.3,
+    "largestDeviationCents": 4.1,
+    "loops": 19,
+    "gainDb": 7.7,
+    "megabytes": 49.0
+   },
+   "model": "Sound Models/Flute.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.26
+   },
+   "voicing": {
+    "mode": "legato",
+    "glide": 30
+   }
+  },
+  {
+   "key": "oboe",
+   "names": {
+    "fr": "Hautbois",
+    "en": "Oboe"
+   },
+   "category": "woodwinds",
+   "map": "Instruments/Oboe/Oboe.cysampler",
+   "settings": {
+    "velocity-db": 12,
+    "velocity-crossfade": 1,
+    "loop": 1
+   },
+   "envelope": {
+    "attack": 6,
+    "release": 240
+   },
+   "source": "VSCO 2 CE",
+   "bank": "vsco",
+   "licence": "CC0-1.0",
+   "range": [
+    "A#3",
+    "F6"
+   ],
+   "gainDb": 12.9,
+   "report": {
+    "key": "oboe",
+    "notes": 9,
+    "zones": 18,
+    "octaveShift": 12,
+    "meanDeviationCents": -0.3,
+    "largestDeviationCents": 1200.0,
+    "loops": 18,
+    "gainDb": 12.9,
+    "megabytes": 34.9
+   },
+   "model": "Sound Models/Oboe.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.24
+   },
+   "voicing": {
+    "mode": "legato",
+    "glide": 30
+   }
+  },
+  {
+   "key": "clarinet",
+   "names": {
+    "fr": "Clarinette",
+    "en": "Clarinet"
+   },
+   "category": "woodwinds",
+   "map": "Instruments/Clarinet/Clarinet.cysampler",
+   "settings": {
+    "velocity-db": 12,
+    "velocity-crossfade": 1,
+    "loop": 1
+   },
+   "envelope": {
+    "attack": 6,
+    "release": 240
+   },
+   "source": "VSCO 2 CE",
+   "bank": "vsco",
+   "licence": "CC0-1.0",
+   "range": [
+    "D3",
+    "F#6"
+   ],
+   "gainDb": 6.0,
+   "report": {
+    "key": "clarinet",
+    "notes": 11,
+    "zones": 33,
+    "octaveShift": 12,
+    "meanDeviationCents": 0.9,
+    "largestDeviationCents": 100.0,
+    "loops": 33,
+    "gainDb": 6.0,
+    "megabytes": 59.3
+   },
+   "model": "Sound Models/Clarinet.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.24
+   },
+   "voicing": {
+    "mode": "legato",
+    "glide": 30
+   }
+  },
+  {
+   "key": "bassoon",
+   "names": {
+    "fr": "Basson",
+    "en": "Bassoon"
+   },
+   "category": "woodwinds",
+   "map": "Instruments/Bassoon/Bassoon.cysampler",
+   "settings": {
+    "velocity-db": 12,
+    "velocity-crossfade": 1,
+    "loop": 1
+   },
+   "envelope": {
+    "attack": 8,
+    "release": 260
+   },
+   "source": "VSCO 2 CE",
+   "bank": "vsco",
+   "licence": "CC0-1.0",
+   "range": [
+    "A#1",
+    "D#5"
+   ],
+   "gainDb": 1.7,
+   "report": {
+    "key": "bassoon",
+    "notes": 13,
+    "zones": 25,
+    "octaveShift": 12,
+    "meanDeviationCents": 0.1,
+    "largestDeviationCents": 1203.4,
+    "loops": 25,
+    "gainDb": 1.7,
+    "megabytes": 35.2
+   },
+   "model": "Sound Models/Bassoon.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.26
+   },
+   "voicing": {
+    "mode": "legato",
+    "glide": 35
+   }
+  },
+  {
+   "key": "pipe-organ",
+   "names": {
+    "fr": "Orgue à tuyaux (grand jeu)",
+    "en": "Pipe organ (full)"
+   },
+   "category": "organs",
+   "map": "Instruments/Pipe Organ Full/Pipe Organ Full.cysampler",
+   "settings": {
+    "velocity-db": 0,
+    "velocity-crossfade": 1,
+    "loop": 1
+   },
+   "envelope": {
+    "attack": 6,
+    "release": 260
+   },
+   "source": "VCSL",
+   "bank": "vcsl",
+   "licence": "CC0-1.0",
+   "range": [
+    "C2",
+    "C7"
+   ],
+   "gainDb": 15.6,
+   "report": {
+    "key": "pipe-organ",
+    "notes": 21,
+    "zones": 21,
+    "octaveShift": 12,
+    "meanDeviationCents": -0.1,
+    "largestDeviationCents": 1202.3,
+    "loops": 21,
+    "gainDb": 15.6,
+    "megabytes": 45.5
+   },
+   "model": "Sound Models/Pipe Organ Full.cysound",
+   "modelSettings": {
+    "velocity-db": 0,
+    "release": 0.26
+   }
+  },
+  {
+   "key": "pipe-organ-quiet",
+   "names": {
+    "fr": "Orgue à tuyaux (jeu doux)",
+    "en": "Pipe organ (soft)"
+   },
+   "category": "organs",
+   "map": "Instruments/Pipe Organ Soft/Pipe Organ Soft.cysampler",
+   "settings": {
+    "velocity-db": 0,
+    "velocity-crossfade": 1,
+    "loop": 1
+   },
+   "envelope": {
+    "attack": 6,
+    "release": 260
+   },
+   "source": "VCSL",
+   "bank": "vcsl",
+   "licence": "CC0-1.0",
+   "range": [
+    "C2",
+    "C7"
+   ],
+   "gainDb": 19.6,
+   "report": {
+    "key": "pipe-organ-quiet",
+    "notes": 21,
+    "zones": 21,
+    "octaveShift": 12,
+    "meanDeviationCents": 0.1,
+    "largestDeviationCents": 1905.5,
+    "loops": 20,
+    "gainDb": 19.6,
+    "megabytes": 44.9
+   },
+   "model": "Sound Models/Pipe Organ Soft.cysound",
+   "modelSettings": {
+    "velocity-db": 0,
+    "release": 0.26
+   }
+  },
+  {
+   "key": "renaissance-organ",
+   "names": {
+    "fr": "Orgue Renaissance (8 pieds)",
+    "en": "Renaissance organ (8 foot)"
+   },
+   "category": "organs",
+   "map": "Instruments/Renaissance Organ/Renaissance Organ.cysampler",
+   "settings": {
+    "velocity-db": 0,
+    "velocity-crossfade": 1,
+    "loop": 1
+   },
+   "envelope": {
+    "attack": 4,
+    "release": 200
+   },
+   "source": "VCSL",
+   "bank": "vcsl",
+   "licence": "CC0-1.0",
+   "range": [
+    "C2",
+    "E6"
+   ],
+   "gainDb": 17.2,
+   "report": {
+    "key": "renaissance-organ",
+    "notes": 27,
+    "zones": 27,
+    "octaveShift": 12,
+    "meanDeviationCents": -0.3,
+    "largestDeviationCents": 4.0,
+    "loops": 27,
+    "gainDb": 17.2,
+    "megabytes": 56.7
+   },
+   "model": "Sound Models/Renaissance Organ.cysound",
+   "modelSettings": {
+    "velocity-db": 0,
+    "release": 0.2
+   }
+  },
+  {
+   "key": "recorder-alto",
+   "names": {
+    "fr": "Flûte à bec alto",
+    "en": "Alto recorder"
+   },
+   "category": "woodwinds",
+   "map": "Instruments/Alto Recorder/Alto Recorder.cysampler",
+   "settings": {
+    "velocity-db": 12,
+    "velocity-crossfade": 1,
+    "loop": 1
+   },
+   "envelope": {
+    "attack": 6,
+    "release": 200
+   },
+   "source": "VCSL",
+   "bank": "vcsl",
+   "licence": "CC0-1.0",
+   "range": [
+    "F4",
+    "E6"
+   ],
+   "gainDb": 18.0,
+   "report": {
+    "key": "recorder-alto",
+    "notes": 12,
+    "zones": 12,
+    "octaveShift": 12,
+    "meanDeviationCents": 0.3,
+    "largestDeviationCents": 5.9,
+    "loops": 12,
+    "gainDb": 18.0,
+    "megabytes": 29.4
+   },
+   "model": "Sound Models/Alto Recorder.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.2
+   },
+   "voicing": {
+    "mode": "legato",
+    "glide": 25
+   }
+  },
+  {
+   "key": "recorder-tenor",
+   "names": {
+    "fr": "Flûte à bec ténor",
+    "en": "Tenor recorder"
+   },
+   "category": "woodwinds",
+   "map": "Instruments/Tenor Recorder/Tenor Recorder.cysampler",
+   "settings": {
+    "velocity-db": 12,
+    "velocity-crossfade": 1,
+    "loop": 1
+   },
+   "envelope": {
+    "attack": 6,
+    "release": 200
+   },
+   "source": "VCSL",
+   "bank": "vcsl",
+   "licence": "CC0-1.0",
+   "range": [
+    "C4",
+    "C6"
+   ],
+   "gainDb": 17.9,
+   "report": {
+    "key": "recorder-tenor",
+    "notes": 13,
+    "zones": 13,
+    "octaveShift": 12,
+    "meanDeviationCents": 1.5,
+    "largestDeviationCents": 6.4,
+    "loops": 13,
+    "gainDb": 17.9,
+    "megabytes": 20.7
+   },
+   "model": "Sound Models/Tenor Recorder.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.2
+   },
+   "voicing": {
+    "mode": "legato",
+    "glide": 25
+   }
+  },
+  {
+   "key": "ocarina",
+   "names": {
+    "fr": "Ocarina",
+    "en": "Ocarina"
+   },
+   "category": "woodwinds",
+   "map": "Instruments/Ocarina/Ocarina.cysampler",
+   "settings": {
+    "velocity-db": 12,
+    "velocity-crossfade": 1,
+    "loop": 1
+   },
+   "envelope": {
+    "attack": 6,
+    "release": 200
+   },
+   "source": "VCSL",
+   "bank": "vcsl",
+   "licence": "CC0-1.0",
+   "range": [
+    "A4",
+    "C#6"
+   ],
+   "gainDb": 5.7,
+   "report": {
+    "key": "ocarina",
+    "notes": 11,
+    "zones": 11,
+    "octaveShift": 12,
+    "meanDeviationCents": 3.8,
+    "largestDeviationCents": 9.8,
+    "loops": 11,
+    "gainDb": 5.7,
+    "megabytes": 18.8
+   },
+   "model": "Sound Models/Ocarina.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.2
+   },
+   "voicing": {
+    "mode": "legato",
+    "glide": 25
+   }
+  },
+  {
+   "key": "tenor-sax",
+   "names": {
+    "fr": "Saxophone ténor",
+    "en": "Tenor saxophone"
+   },
+   "category": "woodwinds",
+   "map": "Instruments/Tenor Saxophone/Tenor Saxophone.cysampler",
+   "settings": {
+    "velocity-db": 12,
+    "velocity-crossfade": 1,
+    "loop": 1
+   },
+   "envelope": {
+    "attack": 6,
+    "release": 240
+   },
+   "source": "VCSL",
+   "bank": "vcsl",
+   "licence": "CC0-1.0",
+   "range": [
+    "G#2",
+    "E6"
+   ],
+   "gainDb": 9.5,
+   "report": {
+    "key": "tenor-sax",
+    "notes": 23,
+    "zones": 46,
+    "octaveShift": 12,
+    "meanDeviationCents": 0.1,
+    "largestDeviationCents": 1203.7,
+    "loops": 46,
+    "gainDb": 9.5,
+    "megabytes": 100.1
+   },
+   "model": "Sound Models/Tenor Saxophone.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.24
+   },
+   "voicing": {
+    "mode": "legato",
+    "glide": 35
+   }
+  },
+  {
+   "key": "harmonica",
+   "names": {
+    "fr": "Harmonica chromatique",
+    "en": "Chromatic harmonica"
+   },
+   "category": "folk",
+   "map": "Instruments/Chromatic Harmonica/Chromatic Harmonica.cysampler",
+   "settings": {
+    "velocity-db": 12,
+    "velocity-crossfade": 1,
+    "loop": 1
+   },
+   "envelope": {
+    "attack": 6,
+    "release": 200
+   },
+   "source": "VCSL",
+   "bank": "vcsl",
+   "licence": "CC0-1.0",
+   "range": [
+    "C3",
+    "C7"
+   ],
+   "gainDb": 0.5,
+   "report": {
+    "key": "harmonica",
+    "notes": 13,
+    "zones": 13,
+    "octaveShift": 12,
+    "meanDeviationCents": 0.5,
+    "largestDeviationCents": 2789.8,
+    "loops": 13,
+    "gainDb": 0.5,
+    "megabytes": 8.5
+   },
+   "model": "Sound Models/Chromatic Harmonica.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.2
+   }
+  },
+  {
+   "key": "bowed-psaltery",
+   "names": {
+    "fr": "Psaltérion à archet",
+    "en": "Bowed psaltery"
+   },
+   "category": "folk",
+   "map": "Instruments/Bowed Psaltery/Bowed Psaltery.cysampler",
+   "settings": {
+    "velocity-db": 12,
+    "velocity-crossfade": 1,
+    "loop": 1
+   },
+   "envelope": {
+    "attack": 20,
+    "release": 600
+   },
+   "source": "VCSL",
+   "bank": "vcsl",
+   "licence": "CC0-1.0",
+   "range": [
+    "A#4",
+    "F#6"
+   ],
+   "gainDb": 14.9,
+   "report": {
+    "key": "bowed-psaltery",
+    "notes": 11,
+    "zones": 11,
+    "octaveShift": 12,
+    "meanDeviationCents": 1.6,
+    "largestDeviationCents": 3.9,
+    "loops": 3,
+    "gainDb": 14.9,
+    "megabytes": 19.2
+   },
+   "model": "Sound Models/Bowed Psaltery.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.6
+   }
+  },
+  {
+   "key": "dan-tranh",
+   "names": {
+    "fr": "Đàn tranh (cithare vietnamienne)",
+    "en": "Đàn tranh (Vietnamese zither)"
+   },
+   "category": "folk",
+   "map": "Instruments/Dan Tranh/Dan Tranh.cysampler",
+   "settings": {
+    "velocity-db": 16
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 1500
+   },
+   "source": "VCSL",
+   "bank": "vcsl",
+   "licence": "CC0-1.0",
+   "range": [
+    "B2",
+    "B5"
+   ],
+   "gainDb": 4.0,
+   "report": {
+    "key": "dan-tranh",
+    "notes": 16,
+    "zones": 47,
+    "octaveShift": 12,
+    "meanDeviationCents": 7.1,
+    "largestDeviationCents": 1223.6,
+    "loops": 0,
+    "gainDb": 4.0,
+    "megabytes": 34.6
+   },
+   "model": "Sound Models/Dan Tranh.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 1.5
+   }
+  },
+  {
+   "key": "marimba",
+   "names": {
+    "fr": "Marimba",
+    "en": "Marimba"
+   },
+   "category": "mallets",
+   "map": "Instruments/Marimba/Marimba.cysampler",
+   "settings": {
+    "velocity-db": 16
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 900
+   },
+   "source": "VCSL",
+   "bank": "vcsl",
+   "licence": "CC0-1.0",
+   "range": [
+    "F2",
+    "C7"
+   ],
+   "gainDb": 14.5,
+   "report": {
+    "key": "marimba",
+    "notes": 10,
+    "zones": 30,
+    "octaveShift": 12,
+    "meanDeviationCents": 0.8,
+    "largestDeviationCents": 7504.2,
+    "loops": 0,
+    "gainDb": 14.5,
+    "megabytes": 32.0
+   },
+   "model": "Sound Models/Marimba.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.9
+   }
+  },
+  {
+   "key": "vibraphone",
+   "names": {
+    "fr": "Vibraphone",
+    "en": "Vibraphone"
+   },
+   "category": "mallets",
+   "map": "Instruments/Vibraphone/Vibraphone.cysampler",
+   "settings": {
+    "velocity-db": 16
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 2500
+   },
+   "source": "VCSL",
+   "bank": "vcsl",
+   "licence": "CC0-1.0",
+   "range": [
+    "F3",
+    "E6"
+   ],
+   "gainDb": 9.3,
+   "report": {
+    "key": "vibraphone",
+    "notes": 11,
+    "zones": 20,
+    "octaveShift": 12,
+    "meanDeviationCents": 0.1,
+    "largestDeviationCents": 4145.3,
+    "loops": 0,
+    "gainDb": 9.3,
+    "megabytes": 38.2
+   },
+   "model": "Sound Models/Vibraphone.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 2.5
+   }
+  },
+  {
+   "key": "xylophone",
+   "names": {
+    "fr": "Xylophone",
+    "en": "Xylophone"
+   },
+   "category": "mallets",
+   "map": "Instruments/Xylophone/Xylophone.cysampler",
+   "settings": {
+    "velocity-db": 16
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 500
+   },
+   "source": "VCSL",
+   "bank": "vcsl",
+   "licence": "CC0-1.0",
+   "range": [
+    "G4",
+    "C8"
+   ],
+   "gainDb": 0.4,
+   "report": {
+    "key": "xylophone",
+    "notes": 8,
+    "zones": 16,
+    "octaveShift": 12,
+    "meanDeviationCents": 16.1,
+    "largestDeviationCents": 54.9,
+    "loops": 0,
+    "gainDb": 0.4,
+    "megabytes": 8.3
+   },
+   "model": "Sound Models/Xylophone.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.5
+   }
+  },
+  {
+   "key": "glockenspiel",
+   "names": {
+    "fr": "Glockenspiel",
+    "en": "Glockenspiel"
+   },
+   "category": "mallets",
+   "map": "Instruments/Glockenspiel/Glockenspiel.cysampler",
+   "settings": {
+    "velocity-db": 16
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 2500
+   },
+   "source": "VCSL",
+   "bank": "vcsl",
+   "licence": "CC0-1.0",
+   "range": [
+    "G5",
+    "C8"
+   ],
+   "gainDb": 17.8,
+   "report": {
+    "key": "glockenspiel",
+    "notes": 7,
+    "zones": 16,
+    "octaveShift": 12,
+    "meanDeviationCents": -7.1,
+    "largestDeviationCents": 2371.9,
+    "loops": 0,
+    "gainDb": 17.8,
+    "megabytes": 15.8
+   },
+   "model": "Sound Models/Glockenspiel.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 2.5
+   }
+  },
+  {
+   "key": "tubular-bells",
+   "names": {
+    "fr": "Cloches tubulaires",
+    "en": "Tubular bells"
+   },
+   "category": "mallets",
+   "map": "Instruments/Tubular Bells/Tubular Bells.cysampler",
+   "settings": {
+    "velocity-db": 16
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 4000
+   },
+   "source": "VCSL",
+   "bank": "vcsl",
+   "licence": "CC0-1.0",
+   "range": [
+    "C4",
+    "F5"
+   ],
+   "gainDb": 0.8,
+   "report": {
+    "key": "tubular-bells",
+    "notes": 11,
+    "zones": 17,
+    "octaveShift": 0,
+    "meanDeviationCents": 3.4,
+    "largestDeviationCents": 3391.8,
+    "loops": 0,
+    "gainDb": 0.8,
+    "megabytes": 59.9
+   },
+   "model": "Sound Models/Tubular Bells.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 4.0
+   }
+  },
+  {
+   "key": "hand-chimes",
+   "names": {
+    "fr": "Carillon à main",
+    "en": "Hand chimes"
+   },
+   "category": "mallets",
+   "map": "Instruments/Hand Chimes/Hand Chimes.cysampler",
+   "settings": {
+    "velocity-db": 16
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 3000
+   },
+   "source": "VCSL",
+   "bank": "vcsl",
+   "licence": "CC0-1.0",
+   "range": [
+    "C4",
+    "C7"
+   ],
+   "gainDb": 9.0,
+   "report": {
+    "key": "hand-chimes",
+    "notes": 19,
+    "zones": 19,
+    "octaveShift": 12,
+    "meanDeviationCents": 3.3,
+    "largestDeviationCents": 13.5,
+    "loops": 0,
+    "gainDb": 9.0,
+    "megabytes": 42.9
+   },
+   "model": "Sound Models/Hand Chimes.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 3.0
+   }
+  },
+  {
+   "key": "clavisynth",
+   "names": {
+    "fr": "Clavisynth FM (TX81Z)",
+    "en": "FM clavisynth (TX81Z)"
+   },
+   "category": "electric-pianos",
+   "map": "Instruments/FM Clavisynth/FM Clavisynth.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 300
+   },
+   "source": "VCSL",
+   "bank": "vcsl",
+   "licence": "CC0-1.0",
+   "range": [
+    "C2",
+    "C8"
+   ],
+   "gainDb": 8.5,
+   "report": {
+    "key": "clavisynth",
+    "notes": 19,
+    "zones": 57,
+    "octaveShift": 24,
+    "meanDeviationCents": 3.1,
+    "largestDeviationCents": 1199.7,
+    "loops": 0,
+    "gainDb": 8.5,
+    "megabytes": 30.8
+   },
+   "model": "Sound Models/FM Clavisynth.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.3
+   }
+  },
+  {
+   "key": "electro-808",
+   "names": {
+    "fr": "Boîte à rythmes 808",
+    "en": "808 drum machine"
+   },
+   "category": "electro-drums",
+   "map": "Instruments/Electro/Electro 808/Electro 808.cysampler",
+   "settings": {
+    "one-shot": 1,
+    "velocity-db": 10
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 300
+   },
+   "source": "cydaw-electro",
+   "bank": "cydaw-electro",
+   "melodic": false,
+   "licence": "CC0-1.0",
+   "range": [
+    "B1",
+    "D#5"
+   ],
+   "report": {
+    "key": "electro-808",
+    "zones": 23,
+    "files": 20,
+    "megabytes": 1.0,
+    "description": "23 zones · B1–D#5 · generated"
+   }
+  },
+  {
+   "key": "electro-909",
+   "names": {
+    "fr": "Boîte à rythmes 909",
+    "en": "909 drum machine"
+   },
+   "category": "electro-drums",
+   "map": "Instruments/Electro/Electro 909/Electro 909.cysampler",
+   "settings": {
+    "one-shot": 1,
+    "velocity-db": 10
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 300
+   },
+   "source": "cydaw-electro",
+   "bank": "cydaw-electro",
+   "melodic": false,
+   "licence": "CC0-1.0",
+   "range": [
+    "B1",
+    "G#3"
+   ],
+   "report": {
+    "key": "electro-909",
+    "zones": 20,
+    "files": 17,
+    "megabytes": 0.8,
+    "description": "20 zones · B1–G#3 · generated"
+   }
+  },
+  {
+   "key": "electro-techno",
+   "names": {
+    "fr": "Kit techno",
+    "en": "Techno kit"
+   },
+   "category": "electro-drums",
+   "map": "Instruments/Electro/Electro Techno/Electro Techno.cysampler",
+   "settings": {
+    "one-shot": 1,
+    "velocity-db": 10
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 300
+   },
+   "source": "cydaw-electro",
+   "bank": "cydaw-electro",
+   "melodic": false,
+   "licence": "CC0-1.0",
+   "range": [
+    "B1",
+    "F#6"
+   ],
+   "report": {
+    "key": "electro-techno",
+    "zones": 23,
+    "files": 23,
+    "megabytes": 1.8,
+    "description": "23 zones · B1–F#6 · generated"
+   }
+  },
+  {
+   "key": "electro-house",
+   "names": {
+    "fr": "Kit house",
+    "en": "House kit"
+   },
+   "category": "electro-drums",
+   "map": "Instruments/Electro/Electro House/Electro House.cysampler",
+   "settings": {
+    "one-shot": 1,
+    "velocity-db": 10
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 300
+   },
+   "source": "cydaw-electro",
+   "bank": "cydaw-electro",
+   "melodic": false,
+   "licence": "CC0-1.0",
+   "range": [
+    "B1",
+    "D#5"
+   ],
+   "report": {
+    "key": "electro-house",
+    "zones": 20,
+    "files": 20,
+    "megabytes": 0.8,
+    "description": "20 zones · B1–D#5 · generated"
+   }
+  },
+  {
+   "key": "electro-trap",
+   "names": {
+    "fr": "Kit trap",
+    "en": "Trap kit"
+   },
+   "category": "electro-drums",
+   "map": "Instruments/Electro/Electro Trap/Electro Trap.cysampler",
+   "settings": {
+    "one-shot": 1,
+    "velocity-db": 10
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 300
+   },
+   "source": "cydaw-electro",
+   "bank": "cydaw-electro",
+   "melodic": false,
+   "licence": "CC0-1.0",
+   "range": [
+    "B1",
+    "E6"
+   ],
+   "report": {
+    "key": "electro-trap",
+    "zones": 23,
+    "files": 20,
+    "megabytes": 1.7,
+    "description": "23 zones · B1–E6 · generated"
+   }
+  },
+  {
+   "key": "electro-lofi",
+   "names": {
+    "fr": "Kit lo-fi",
+    "en": "Lo-fi kit"
+   },
+   "category": "electro-drums",
+   "map": "Instruments/Electro/Electro Lo-Fi/Electro Lo-Fi.cysampler",
+   "settings": {
+    "one-shot": 1,
+    "velocity-db": 10
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 300
+   },
+   "source": "cydaw-electro",
+   "bank": "cydaw-electro",
+   "melodic": false,
+   "licence": "CC0-1.0",
+   "range": [
+    "B1",
+    "D#5"
+   ],
+   "report": {
+    "key": "electro-lofi",
+    "zones": 13,
+    "files": 13,
+    "megabytes": 0.4,
+    "description": "13 zones · B1–D#5 · generated"
+   }
+  },
+  {
+   "key": "electro-hard",
+   "names": {
+    "fr": "Kit hard dance",
+    "en": "Hard dance kit"
+   },
+   "category": "electro-drums",
+   "map": "Instruments/Electro/Electro Hard Dance/Electro Hard Dance.cysampler",
+   "settings": {
+    "one-shot": 1,
+    "velocity-db": 10
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 300
+   },
+   "source": "cydaw-electro",
+   "bank": "cydaw-electro",
+   "melodic": false,
+   "licence": "CC0-1.0",
+   "range": [
+    "B1",
+    "D#6"
+   ],
+   "report": {
+    "key": "electro-hard",
+    "zones": 14,
+    "files": 14,
+    "megabytes": 1.3,
+    "description": "14 zones · B1–D#6 · generated"
+   }
+  },
+  {
+   "key": "electro-dnb",
+   "names": {
+    "fr": "Kit drum and bass",
+    "en": "Drum and bass kit"
+   },
+   "category": "electro-drums",
+   "map": "Instruments/Electro/Electro Drum and Bass/Electro Drum and Bass.cysampler",
+   "settings": {
+    "one-shot": 1,
+    "velocity-db": 10
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 300
+   },
+   "source": "cydaw-electro",
+   "bank": "cydaw-electro",
+   "melodic": false,
+   "licence": "CC0-1.0",
+   "range": [
+    "B1",
+    "A#4"
+   ],
+   "report": {
+    "key": "electro-dnb",
+    "zones": 19,
+    "files": 16,
+    "megabytes": 0.6,
+    "description": "19 zones · B1–A#4 · generated"
+   }
+  },
+  {
+   "key": "electro-kicks",
+   "names": {
+    "fr": "Collection de kicks",
+    "en": "Kick collection"
+   },
+   "category": "electro-drums",
+   "map": "Instruments/Electro/Electro Kicks/Electro Kicks.cysampler",
+   "settings": {
+    "one-shot": 1,
+    "velocity-db": 10
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 300
+   },
+   "source": "cydaw-electro",
+   "bank": "cydaw-electro",
+   "melodic": false,
+   "licence": "CC0-1.0",
+   "range": [
+    "C2",
+    "A3"
+   ],
+   "report": {
+    "key": "electro-kicks",
+    "zones": 22,
+    "files": 22,
+    "megabytes": 1.3,
+    "description": "22 zones · C2–A3 · generated"
+   }
+  },
+  {
+   "key": "electro-perc-fx",
+   "names": {
+    "fr": "Percussions et effets électro",
+    "en": "Electro percussion and FX"
+   },
+   "category": "electro-drums",
+   "map": "Instruments/Electro/Electro Percussion and FX/Electro Percussion and FX.cysampler",
+   "settings": {
+    "one-shot": 1,
+    "velocity-db": 10
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 300
+   },
+   "source": "cydaw-electro",
+   "bank": "cydaw-electro",
+   "melodic": false,
+   "licence": "CC0-1.0",
+   "range": [
+    "C3",
+    "A#6"
+   ],
+   "report": {
+    "key": "electro-perc-fx",
+    "zones": 42,
+    "files": 42,
+    "megabytes": 2.9,
+    "description": "42 zones · C3–A#6 · generated"
+   }
+  },
+  {
+   "key": "guitar-epiphone",
+   "names": {
+    "fr": "Guitare électrique Epiphone",
+    "en": "Epiphone electric guitar"
+   },
+   "category": "guitars",
+   "map": "Instruments/Epiphone Guitar/Epiphone Guitar.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 400
+   },
+   "source": "emilyguitar",
+   "bank": "emilyguitar",
+   "sfz": "emilyguitar/emily_basic.sfz",
+   "melodic": true,
+   "licence": "CC0-1.0",
+   "range": [
+    "C#2",
+    "D6"
+   ],
+   "report": {
+    "key": "guitar-epiphone",
+    "zones": 323,
+    "files": 323,
+    "megabytes": 125.0,
+    "description": "emily_basic · 323 zones · C#2–C7 · 5 layers"
+   },
+   "model": "Sound Models/Epiphone Guitar.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.4
+   }
+  },
+  {
+   "key": "guitar-archtop",
+   "names": {
+    "fr": "Guitare archtop (électrique)",
+    "en": "Archtop guitar (electric)"
+   },
+   "category": "guitars",
+   "map": "Instruments/Archtop Guitar/Archtop Guitar.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 400
+   },
+   "source": "shinyguitar",
+   "bank": "shinyguitar",
+   "sfz": "shinyguitar/Programs/main.sfz",
+   "melodic": true,
+   "licence": "CC0-1.0",
+   "range": [
+    "C#2",
+    "C6"
+   ],
+   "report": {
+    "key": "guitar-archtop",
+    "zones": 6798,
+    "files": 846,
+    "megabytes": 459.3,
+    "description": "main · 6798 zones · C0–C6 · 5 layers"
+   },
+   "model": "Sound Models/Archtop Guitar.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.4
+   }
+  },
+  {
+   "key": "guitar-archtop-acoustic",
+   "names": {
+    "fr": "Guitare archtop (acoustique)",
+    "en": "Archtop guitar (acoustic)"
+   },
+   "category": "guitars",
+   "map": "Instruments/Archtop Guitar Acoustic/Archtop Guitar Acoustic.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 400
+   },
+   "source": "shinyguitar",
+   "bank": "shinyguitar",
+   "sfz": "shinyguitar/Programs/main.sfz",
+   "melodic": true,
+   "licence": "CC0-1.0",
+   "range": [
+    "C#2",
+    "C6"
+   ],
+   "report": {
+    "key": "guitar-archtop-acoustic",
+    "zones": 6798,
+    "files": 846,
+    "megabytes": 459.3,
+    "description": "main · 6798 zones · C0–C6 · 5 layers"
+   },
+   "model": "Sound Models/Archtop Guitar Acoustic.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.4
+   }
+  },
+  {
+   "key": "guitar-gretsch",
+   "names": {
+    "fr": "Guitare Gretsch Anniversary",
+    "en": "Gretsch Anniversary guitar"
+   },
+   "category": "guitars",
+   "map": "Instruments/Gretsch Guitar/Gretsch Guitar.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 400
+   },
+   "source": "black-and-green-guitars",
+   "bank": "black-and-green-guitars",
+   "sfz": "black-and-green-guitars/Programs/04-green_twang.sfz",
+   "melodic": true,
+   "licence": "CC0-1.0",
+   "range": [
+    "F2",
+    "D6"
+   ],
+   "report": {
+    "key": "guitar-gretsch",
+    "zones": 3366,
+    "files": 620,
+    "megabytes": 293.5,
+    "description": "04-green_twang · 3366 zones · E2–D6 · 4 layers"
+   },
+   "model": "Sound Models/Gretsch Guitar.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.4
+   }
+  },
+  {
+   "key": "guitar-hofner",
+   "names": {
+    "fr": "Guitare Hofner Club",
+    "en": "Hofner Club guitar"
+   },
+   "category": "guitars",
+   "map": "Instruments/Hofner Guitar/Hofner Guitar.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 400
+   },
+   "source": "black-and-green-guitars",
+   "bank": "black-and-green-guitars",
+   "sfz": "black-and-green-guitars/Programs/07-black_twang.sfz",
+   "melodic": true,
+   "licence": "CC0-1.0",
+   "range": [
+    "F2",
+    "D6"
+   ],
+   "report": {
+    "key": "guitar-hofner",
+    "zones": 3366,
+    "files": 620,
+    "megabytes": 192.5,
+    "description": "07-black_twang · 3366 zones · E2–D6 · 4 layers"
+   },
+   "model": "Sound Models/Hofner Guitar.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.4
+   }
+  },
+  {
+   "key": "banjo",
+   "names": {
+    "fr": "Banjo six cordes",
+    "en": "Six-string banjo"
+   },
+   "category": "guitars",
+   "map": "Instruments/Six-String Banjo/Six-String Banjo.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 500
+   },
+   "source": "ganjo",
+   "bank": "ganjo",
+   "sfz": "ganjo/ganjo.sfz",
+   "melodic": true,
+   "licence": "CC0-1.0",
+   "range": [
+    "D#2",
+    "B4"
+   ],
+   "report": {
+    "key": "banjo",
+    "zones": 58,
+    "files": 58,
+    "megabytes": 22.7,
+    "description": "ganjo · 58 zones · D#2–B4 · 1 layer"
+   },
+   "model": "Sound Models/Six-String Banjo.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.5
+   }
+  },
+  {
+   "key": "bass-jazz",
+   "names": {
+    "fr": "Basse Jazz Bass",
+    "en": "Jazz bass"
+   },
+   "category": "basses",
+   "map": "Instruments/Jazz Bass/Jazz Bass.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 250
+   },
+   "source": "growlybass",
+   "bank": "growlybass",
+   "sfz": "growlybass/growlybass_clean.sfz",
+   "melodic": true,
+   "licence": "CC0-1.0",
+   "range": [
+    "C#2",
+    "D#5"
+   ],
+   "report": {
+    "key": "bass-jazz",
+    "zones": 240,
+    "files": 240,
+    "megabytes": 183.6,
+    "description": "growlybass_clean · 240 zones · C#2–C6 · 4 layers"
+   },
+   "model": "Sound Models/Jazz Bass.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.25
+   }
+  },
+  {
+   "key": "bass-dark-black",
+   "names": {
+    "fr": "Basse électrique « Dark Black »",
+    "en": "\"Dark Black\" electric bass"
+   },
+   "category": "basses",
+   "map": "Instruments/Dark Black Bass/Dark Black Bass.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 250
+   },
+   "source": "black-and-blue-basses",
+   "bank": "black-and-blue-basses",
+   "sfz": "black-and-blue-basses/Programs/05-darkblack_pluck.sfz",
+   "melodic": true,
+   "licence": "CC0-1.0",
+   "range": [
+    "C2",
+    "E5"
+   ],
+   "report": {
+    "key": "bass-dark-black",
+    "zones": 4200,
+    "files": 840,
+    "megabytes": 470.6,
+    "description": "05-darkblack_pluck · 4200 zones · B1–E5 · 5 layers"
+   },
+   "model": "Sound Models/Dark Black Bass.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.25
+   }
+  },
+  {
+   "key": "bass-baby-blue",
+   "names": {
+    "fr": "Basse électrique « Baby Blue »",
+    "en": "\"Baby Blue\" electric bass"
+   },
+   "category": "basses",
+   "map": "Instruments/Baby Blue Bass/Baby Blue Bass.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 250
+   },
+   "source": "black-and-blue-basses",
+   "bank": "black-and-blue-basses",
+   "sfz": "black-and-blue-basses/Programs/04-babyblue_warm.sfz",
+   "melodic": true,
+   "licence": "CC0-1.0",
+   "range": [
+    "E1",
+    "D#5"
+   ],
+   "report": {
+    "key": "bass-baby-blue",
+    "zones": 2544,
+    "files": 220,
+    "megabytes": 145.5,
+    "description": "04-babyblue_warm · 2544 zones · E1–D#5 · 1 layer"
+   },
+   "model": "Sound Models/Baby Blue Bass.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.25
+   }
+  },
+  {
+   "key": "bass-fashion",
+   "names": {
+    "fr": "Basse Killer KB-Simmony",
+    "en": "Killer KB-Simmony bass"
+   },
+   "category": "basses",
+   "map": "Instruments/Fashionbass/Fashionbass.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 250
+   },
+   "source": "fashionbass",
+   "bank": "fashionbass",
+   "sfz": "fashionbass/fashionbass_clean.sfz",
+   "melodic": true,
+   "licence": "CC0-1.0",
+   "range": [
+    "F#0",
+    "A4"
+   ],
+   "report": {
+    "key": "bass-fashion",
+    "zones": 350,
+    "files": 350,
+    "megabytes": 339.5,
+    "description": "fashionbass_clean · 350 zones · F#0–C7 · 5 layers"
+   },
+   "model": "Sound Models/Fashionbass.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.25
+   }
+  },
+  {
+   "key": "bass-swag",
+   "names": {
+    "fr": "Basse Swagbass",
+    "en": "Swagbass"
+   },
+   "category": "basses",
+   "map": "Instruments/Swagbass/Swagbass.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 250
+   },
+   "source": "swagbass",
+   "bank": "swagbass",
+   "sfz": "swagbass/swagbass_clean.sfz",
+   "melodic": true,
+   "licence": "CC0-1.0",
+   "range": [
+    "A0",
+    "A4"
+   ],
+   "report": {
+    "key": "bass-swag",
+    "zones": 254,
+    "files": 254,
+    "megabytes": 145.5,
+    "description": "swagbass_clean · 254 zones · A0–C6 · 3 layers"
+   },
+   "model": "Sound Models/Swagbass.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.25
+   }
+  },
+  {
+   "key": "bass-six",
+   "names": {
+    "fr": "Basse six cordes (Bass VI)",
+    "en": "Bass VI"
+   },
+   "category": "basses",
+   "map": "Instruments/Bass VI/Bass VI.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 250
+   },
+   "source": "pastabass",
+   "bank": "pastabass",
+   "sfz": "pastabass/fetuccine.sfz",
+   "melodic": true,
+   "licence": "CC0-1.0",
+   "range": [
+    "E2",
+    "C#6"
+   ],
+   "report": {
+    "key": "bass-six",
+    "zones": 256,
+    "files": 256,
+    "megabytes": 137.2,
+    "description": "fetuccine · 256 zones · E2–C#6 · 4 layers"
+   },
+   "model": "Sound Models/Bass VI.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.25
+   }
+  },
+  {
+   "key": "bass-big-little",
+   "names": {
+    "fr": "Basse acoustique Big Little",
+    "en": "Big Little acoustic bass"
+   },
+   "category": "basses",
+   "map": "Instruments/Big Little Bass/Big Little Bass.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 300
+   },
+   "source": "big-little-bass",
+   "bank": "big-little-bass",
+   "sfz": "big-little-bass/Programs/01-big_little_pluck.sfz",
+   "melodic": true,
+   "licence": "CC0-1.0",
+   "range": [
+    "C2",
+    "F#5"
+   ],
+   "report": {
+    "key": "bass-big-little",
+    "zones": 2288,
+    "files": 440,
+    "megabytes": 313.8,
+    "description": "01-big_little_pluck · 2288 zones · B1–F#5 · 2 layers"
+   },
+   "model": "Sound Models/Big Little Bass.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.3
+   }
+  },
+  {
+   "key": "upright-bass-jazz",
+   "names": {
+    "fr": "Contrebasse jazz (pizzicato)",
+    "en": "Jazz double bass (pizzicato)"
+   },
+   "category": "basses",
+   "map": "Instruments/Jazz Double Bass/Jazz Double Bass.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 350
+   },
+   "source": "meatbass",
+   "bank": "meatbass",
+   "sfz": "meatbass/Programs/04_pizz.sfz",
+   "melodic": true,
+   "licence": "CC0-1.0",
+   "range": [
+    "A0",
+    "C4"
+   ],
+   "report": {
+    "key": "upright-bass-jazz",
+    "zones": 5032,
+    "files": 264,
+    "megabytes": 127.1,
+    "description": "04_pizz · 5032 zones · A0–G5 · 4 layers"
+   },
+   "model": "Sound Models/Jazz Double Bass.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.35
+   }
+  },
+  {
+   "key": "upright-bass-hushed",
+   "names": {
+    "fr": "Contrebasse feutrée",
+    "en": "Hushed double bass"
+   },
+   "category": "basses",
+   "map": "Instruments/Hushed Double Bass/Hushed Double Bass.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 350
+   },
+   "source": "sneakybass",
+   "bank": "sneakybass",
+   "sfz": "sneakybass/Programs/02-sneakybass_pluck.sfz",
+   "melodic": true,
+   "licence": "CC0-1.0",
+   "range": [
+    "C2",
+    "C5"
+   ],
+   "report": {
+    "key": "upright-bass-hushed",
+    "zones": 1040,
+    "files": 368,
+    "megabytes": 266.6,
+    "description": "02-sneakybass_pluck · 1040 zones · C2–C5 · 1 layer"
+   },
+   "model": "Sound Models/Hushed Double Bass.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.35
+   }
+  },
+  {
+   "key": "upright-bass-electric",
+   "names": {
+    "fr": "Contrebasse électrique Ergo",
+    "en": "Ergo electric upright bass"
+   },
+   "category": "basses",
+   "map": "Instruments/Ergo Electric Upright Bass/Ergo Electric Upright Bass.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 300
+   },
+   "source": "ergo",
+   "bank": "ergo",
+   "sfz": "ergo/ergo_pizz.sfz",
+   "melodic": true,
+   "licence": "CC0-1.0",
+   "range": [
+    "E0",
+    "F#3"
+   ],
+   "report": {
+    "key": "upright-bass-electric",
+    "zones": 161,
+    "files": 161,
+    "megabytes": 127.3,
+    "description": "ergo_pizz · 161 zones · E0–F#3 · 3 layers"
+   },
+   "model": "Sound Models/Ergo Electric Upright Bass.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.3
+   }
+  },
+  {
+   "key": "cello-solo",
+   "names": {
+    "fr": "Violoncelle solo (archet)",
+    "en": "Solo cello (bowed)"
+   },
+   "category": "strings",
+   "map": "Instruments/Solo Cello/Solo Cello.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 400
+   },
+   "source": "bigcat-cello",
+   "bank": "bigcat-cello",
+   "sfz": "bigcat-cello/Programs/01- Bowed (velocity layer).sfz",
+   "melodic": true,
+   "licence": "CC0-1.0",
+   "range": [
+    "C1",
+    "C5"
+   ],
+   "report": {
+    "key": "cello-solo",
+    "zones": 2446,
+    "files": 410,
+    "megabytes": 123.5,
+    "description": "01- Bowed (velocity layer) · 2446 zones · C1–A7 · 5 layers"
+   },
+   "model": "Sound Models/Solo Cello.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.4
+   },
+   "voicing": {
+    "mode": "legato",
+    "glide": 40
+   }
+  },
+  {
+   "key": "cello-solo-pizz",
+   "names": {
+    "fr": "Violoncelle solo pizzicato",
+    "en": "Solo cello pizzicato"
+   },
+   "category": "strings",
+   "map": "Instruments/Solo Cello Pizzicato/Solo Cello Pizzicato.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 450
+   },
+   "source": "bigcat-cello",
+   "bank": "bigcat-cello",
+   "sfz": "bigcat-cello/Programs/03- Plucked.sfz",
+   "melodic": true,
+   "licence": "CC0-1.0",
+   "range": [
+    "C1",
+    "C4"
+   ],
+   "report": {
+    "key": "cello-solo-pizz",
+    "zones": 617,
+    "files": 69,
+    "megabytes": 17.9,
+    "description": "03- Plucked · 617 zones · C1–B5 · 1 layer"
+   },
+   "model": "Sound Models/Solo Cello Pizzicato.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.45
+   }
+  },
+  {
+   "key": "double-bass-rubner",
+   "names": {
+    "fr": "Contrebasse Otto Rubner (archet)",
+    "en": "Otto Rubner double bass (bowed)"
+   },
+   "category": "strings",
+   "map": "Instruments/Rubner Double Bass/Rubner Double Bass.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 400
+   },
+   "source": "meatbass",
+   "bank": "meatbass",
+   "sfz": "meatbass/Programs/03_arco_5vel.sfz",
+   "melodic": true,
+   "licence": "CC0-1.0",
+   "range": [
+    "C1",
+    "F#4"
+   ],
+   "report": {
+    "key": "double-bass-rubner",
+    "zones": 3840,
+    "files": 170,
+    "megabytes": 103.9,
+    "description": "03_arco_5vel · 3840 zones · A0–A4 · 5 layers"
+   },
+   "model": "Sound Models/Rubner Double Bass.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.4
+   }
+  },
+  {
+   "key": "baritone-sax",
+   "names": {
+    "fr": "Saxophone baryton",
+    "en": "Baritone saxophone"
+   },
+   "category": "woodwinds",
+   "map": "Instruments/Baritone Saxophone/Baritone Saxophone.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 250
+   },
+   "source": "bear-sax",
+   "bank": "bear-sax",
+   "sfz": "bear-sax/Programs/2-solo-poly.sfz",
+   "melodic": true,
+   "licence": "CC0-1.0",
+   "range": [
+    "C#2",
+    "G#4"
+   ],
+   "report": {
+    "key": "baritone-sax",
+    "zones": 1433,
+    "files": 721,
+    "megabytes": 132.8,
+    "description": "2-solo-poly · 1433 zones · C2–G#4 · 5 layers"
+   },
+   "model": "Sound Models/Baritone Saxophone.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.25
+   },
+   "voicing": {
+    "mode": "legato",
+    "glide": 40
+   }
+  },
+  {
+   "key": "alto-sax",
+   "names": {
+    "fr": "Saxophone alto",
+    "en": "Alto saxophone"
+   },
+   "category": "woodwinds",
+   "map": "Instruments/Alto Saxophone/Alto Saxophone.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 250
+   },
+   "source": "weresax",
+   "bank": "weresax",
+   "sfz": "weresax/Programs/Sax.sfz",
+   "melodic": true,
+   "licence": "CC0-1.0",
+   "range": [
+    "C#3",
+    "G#5"
+   ],
+   "report": {
+    "key": "alto-sax",
+    "zones": 256,
+    "files": 256,
+    "megabytes": 202.4,
+    "description": "Sax · 256 zones · C#3–G#5 · 2 layers"
+   },
+   "model": "Sound Models/Alto Saxophone.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.25
+   },
+   "voicing": {
+    "mode": "legato",
+    "glide": 35
+   }
+  },
+  {
+   "key": "tuba-war",
+   "names": {
+    "fr": "Tuba (War Tuba)",
+    "en": "Tuba (War Tuba)"
+   },
+   "category": "brass",
+   "map": "Instruments/War Tuba/War Tuba.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 300
+   },
+   "source": "war-tuba",
+   "bank": "war-tuba",
+   "sfz": "war-tuba/Programs/2-solo-poly.sfz",
+   "melodic": true,
+   "licence": "CC0-1.0",
+   "range": [
+    "F1",
+    "G3"
+   ],
+   "report": {
+    "key": "tuba-war",
+    "zones": 1416,
+    "files": 1389,
+    "megabytes": 118.9,
+    "description": "2-solo-poly · 1416 zones · F1–E4 · 8 layers"
+   },
+   "model": "Sound Models/War Tuba.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.3
+   },
+   "voicing": {
+    "mode": "legato",
+    "glide": 45
+   }
+  },
+  {
+   "key": "piano-osiris",
+   "names": {
+    "fr": "Piano Osiris (una corda)",
+    "en": "Osiris piano (una corda)"
+   },
+   "category": "pianos",
+   "map": "Instruments/Osiris Piano/Osiris Piano.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 400
+   },
+   "source": "osiris-piano",
+   "bank": "osiris-piano",
+   "sfz": "osiris-piano/Programs/01-natural.sfz",
+   "melodic": true,
+   "licence": "CC0-1.0",
+   "range": [
+    "A0",
+    "C8"
+   ],
+   "report": {
+    "key": "piano-osiris",
+    "zones": 3160,
+    "files": 1242,
+    "megabytes": 483.2,
+    "description": "01-natural · 3160 zones · A0–C8 · 3 layers"
+   },
+   "model": "Sound Models/Osiris Piano.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.4
+   }
+  },
+  {
+   "key": "piano-scary",
+   "names": {
+    "fr": "Piano hanté (Scarypiano)",
+    "en": "Haunted piano (Scarypiano)"
+   },
+   "category": "pianos",
+   "map": "Instruments/Scarypiano/Scarypiano.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 500
+   },
+   "source": "scarypiano",
+   "bank": "scarypiano",
+   "sfz": "scarypiano/Programs/Scarypiano.sfz",
+   "melodic": true,
+   "licence": "CC0-1.0",
+   "range": [
+    "A#0",
+    "C8"
+   ],
+   "report": {
+    "key": "piano-scary",
+    "zones": 429,
+    "files": 429,
+    "megabytes": 585.4,
+    "description": "Scarypiano · 429 zones · A0–C8 · 4 layers"
+   },
+   "model": "Sound Models/Scarypiano.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.5
+   }
+  },
+  {
+   "key": "erhu",
+   "names": {
+    "fr": "Erhu (vièle chinoise)",
+    "en": "Erhu (Chinese fiddle)"
+   },
+   "category": "folk",
+   "map": "Instruments/Erhu/Erhu.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 300
+   },
+   "source": "erhu",
+   "bank": "erhu",
+   "sfz": "erhu/Programs/02-erhu_long.sfz",
+   "melodic": true,
+   "licence": "CC0-1.0",
+   "range": [
+    "D#3",
+    "A4"
+   ],
+   "report": {
+    "key": "erhu",
+    "zones": 360,
+    "files": 40,
+    "megabytes": 28.3,
+    "description": "02-erhu_long · 360 zones · D3–A4 · 1 layer"
+   },
+   "model": "Sound Models/Erhu.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.3
+   },
+   "voicing": {
+    "mode": "legato",
+    "glide": 60
+   }
+  },
+  {
+   "key": "cithara",
+   "names": {
+    "fr": "Cithara barbarica (lyre médiévale)",
+    "en": "Cithara barbarica (medieval lyre)"
+   },
+   "category": "folk",
+   "map": "Instruments/Cithara Barbarica/Cithara Barbarica.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 1500
+   },
+   "source": "cithara-barbarica",
+   "bank": "cithara-barbarica",
+   "sfz": "cithara-barbarica/Programs/02-cithara_barbarica_finger.sfz",
+   "melodic": true,
+   "licence": "CC0-1.0",
+   "range": [
+    "E3",
+    "A4"
+   ],
+   "report": {
+    "key": "cithara",
+    "zones": 80,
+    "files": 40,
+    "megabytes": 76.6,
+    "description": "02-cithara_barbarica_finger · 80 zones · E3–A4 · 2 layers"
+   },
+   "model": "Sound Models/Cithara Barbarica.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 1.5
+   }
+  },
+  {
+   "key": "zither-hungarian",
+   "names": {
+    "fr": "Cithare hongroise",
+    "en": "Hungarian zither"
+   },
+   "category": "folk",
+   "map": "Instruments/Hungarian Zither/Hungarian Zither.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 1500
+   },
+   "source": "hungarian-zither",
+   "bank": "hungarian-zither",
+   "sfz": "hungarian-zither/Programs/hungarian_zither_mel_strings_poly.sfz",
+   "melodic": true,
+   "licence": "CC0-1.0",
+   "range": [
+    "G2",
+    "C5"
+   ],
+   "report": {
+    "key": "zither-hungarian",
+    "zones": 90,
+    "files": 90,
+    "megabytes": 48.7,
+    "description": "hungarian_zither_mel_strings_poly · 90 zones · G2–C5 · 1 layer"
+   },
+   "model": "Sound Models/Hungarian Zither.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 1.5
+   }
+  },
+  {
+   "key": "tagelharpa",
+   "names": {
+    "fr": "Talharpa basse (pincée)",
+    "en": "Bass tagelharpa (plucked)"
+   },
+   "category": "folk",
+   "map": "Instruments/Bass Tagelharpa/Bass Tagelharpa.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 800
+   },
+   "source": "horse-pulse",
+   "bank": "horse-pulse",
+   "sfz": "horse-pulse/Programs/03-pluck.sfz",
+   "melodic": true,
+   "licence": "CC0-1.0",
+   "range": [
+    "D2",
+    "B4"
+   ],
+   "report": {
+    "key": "tagelharpa",
+    "zones": 782,
+    "files": 223,
+    "megabytes": 84.7,
+    "description": "03-pluck · 782 zones · D2–G#5 · 2 layers"
+   },
+   "model": "Sound Models/Bass Tagelharpa.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.8
+   }
+  },
+  {
+   "key": "steel-drum",
+   "names": {
+    "fr": "Steel drum",
+    "en": "Steel drum"
+   },
+   "category": "mallets",
+   "map": "Instruments/Steel Drum/Steel Drum.cysampler",
+   "settings": {
+    "one-shot": 1,
+    "velocity-db": 12
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 1200
+   },
+   "source": "steel-drum",
+   "bank": "steel-drum",
+   "sfz": "steel-drum/jSteelDrum-noxfade.sfz",
+   "melodic": true,
+   "licence": "Unlicense",
+   "range": [
+    "C4",
+    "B5"
+   ],
+   "report": {
+    "key": "steel-drum",
+    "zones": 402,
+    "files": 368,
+    "megabytes": 38.5,
+    "description": "jSteelDrum-noxfade · 402 zones · C4–B5 · 5 layers"
+   },
+   "model": "Sound Models/Steel Drum.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 1.2
+   }
+  },
+  {
+   "key": "drums-jazz",
+   "names": {
+    "fr": "Batterie jazz (Virtuosity)",
+    "en": "Jazz kit (Virtuosity)"
+   },
+   "category": "drums",
+   "map": "Instruments/Jazz Kit/Jazz Kit.cysampler",
+   "settings": {
+    "one-shot": 1,
+    "velocity-db": 10
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 300
+   },
+   "source": "virtuosity-drums",
+   "bank": "virtuosity-drums",
+   "sfz": "virtuosity-drums/Programs/01-basic-kit.sfz",
+   "melodic": false,
+   "licence": "CC0-1.0",
+   "range": [
+    "B1",
+    "C6"
+   ],
+   "report": {
+    "key": "drums-jazz",
+    "zones": 1667,
+    "files": 1659,
+    "megabytes": 442.4,
+    "description": "01-basic-kit · 1667 zones · B1–C6 · 36 layers"
+   }
+  },
+  {
+   "key": "drums-rusty",
+   "names": {
+    "fr": "Batterie Big Rusty",
+    "en": "Big Rusty kit"
+   },
+   "category": "drums",
+   "map": "Instruments/Big Rusty Kit/Big Rusty Kit.cysampler",
+   "settings": {
+    "one-shot": 1,
+    "velocity-db": 10
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 300
+   },
+   "source": "big-rusty-drums",
+   "bank": "big-rusty-drums",
+   "sfz": "big-rusty-drums/Programs/02-basic.sfz",
+   "melodic": false,
+   "licence": "CC0-1.0",
+   "range": [
+    "A#1",
+    "A#3"
+   ],
+   "report": {
+    "key": "drums-rusty",
+    "zones": 2056,
+    "files": 1452,
+    "megabytes": 193.1,
+    "description": "02-basic · 2056 zones · A#1–A#3 · 15 layers"
+   }
+  },
+  {
+   "key": "drums-swirly",
+   "names": {
+    "fr": "Batterie Swirly",
+    "en": "Swirly kit"
+   },
+   "category": "drums",
+   "map": "Instruments/Swirly Kit/Swirly Kit.cysampler",
+   "settings": {
+    "one-shot": 1,
+    "velocity-db": 10
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 300
+   },
+   "source": "swirly-drums",
+   "bank": "swirly-drums",
+   "sfz": "swirly-drums/Programs/Basic_kit.sfz",
+   "melodic": false,
+   "licence": "CC0-1.0",
+   "range": [
+    "C2",
+    "E4"
+   ],
+   "report": {
+    "key": "drums-swirly",
+    "zones": 3436,
+    "files": 2980,
+    "megabytes": 1202.1,
+    "description": "Basic_kit · 3436 zones · C2–E4 · 55 layers"
+   }
+  },
+  {
+   "key": "drums-unruly-sticks",
+   "names": {
+    "fr": "Batterie Unruly (baguettes)",
+    "en": "Unruly kit (sticks)"
+   },
+   "category": "drums",
+   "map": "Instruments/Unruly Kit Sticks/Unruly Kit Sticks.cysampler",
+   "settings": {
+    "one-shot": 1,
+    "velocity-db": 10
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 300
+   },
+   "source": "unruly-drums",
+   "bank": "unruly-drums",
+   "sfz": "unruly-drums/Programs/01-kit-sticks.sfz",
+   "melodic": false,
+   "licence": "CC0-1.0",
+   "range": [
+    "C#1",
+    "B5"
+   ],
+   "report": {
+    "key": "drums-unruly-sticks",
+    "zones": 6267,
+    "files": 4003,
+    "megabytes": 393.0,
+    "description": "01-kit-sticks · 6267 zones · C#1–B5 · 15 layers"
+   }
+  },
+  {
+   "key": "drums-unruly-brushes",
+   "names": {
+    "fr": "Batterie Unruly (balais)",
+    "en": "Unruly kit (brushes)"
+   },
+   "category": "drums",
+   "map": "Instruments/Unruly Kit Brushes/Unruly Kit Brushes.cysampler",
+   "settings": {
+    "one-shot": 1,
+    "velocity-db": 10
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 300
+   },
+   "source": "unruly-drums",
+   "bank": "unruly-drums",
+   "sfz": "unruly-drums/Programs/02-kit-brushes.sfz",
+   "melodic": false,
+   "licence": "CC0-1.0",
+   "range": [
+    "C#1",
+    "B5"
+   ],
+   "report": {
+    "key": "drums-unruly-brushes",
+    "zones": 7163,
+    "files": 3615,
+    "megabytes": 413.0,
+    "description": "02-kit-brushes · 7163 zones · C#1–B5 · 11 layers"
+   }
+  },
+  {
+   "key": "drums-seventies",
+   "names": {
+    "fr": "Batterie seventies (Gogodze Phu)",
+    "en": "Seventies kit (Gogodze Phu)"
+   },
+   "category": "drums",
+   "map": "Instruments/Seventies Kit/Seventies Kit.cysampler",
+   "settings": {
+    "one-shot": 1,
+    "velocity-db": 10
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 300
+   },
+   "source": "gogodze-phu-2",
+   "bank": "gogodze-phu-2",
+   "sfz": "gogodze-phu-2/Programs/Kit_b.sfz",
+   "melodic": false,
+   "licence": "CC0-1.0",
+   "range": [
+    "C2",
+    "A#2"
+   ],
+   "report": {
+    "key": "drums-seventies",
+    "zones": 729,
+    "files": 729,
+    "megabytes": 207.3,
+    "description": "Kit_b · 729 zones · C4–C4 · 18 layers"
+   }
+  },
+  {
+   "key": "bobobo",
+   "names": {
+    "fr": "Tambours bobobo (Ghana)",
+    "en": "Bobobo drums (Ghana)"
+   },
+   "category": "drums",
+   "map": "Instruments/Bobobo Drums/Bobobo Drums.cysampler",
+   "settings": {
+    "one-shot": 1,
+    "velocity-db": 10
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 300
+   },
+   "source": "gogodze-phu-1",
+   "bank": "gogodze-phu-1",
+   "sfz": "gogodze-phu-1/Programs/Bobobo.sfz",
+   "melodic": false,
+   "licence": "CC0-1.0",
+   "range": [
+    "C2",
+    "A#2"
+   ],
+   "report": {
+    "key": "bobobo",
+    "zones": 144,
+    "files": 144,
+    "megabytes": 23.2,
+    "description": "Bobobo · 144 zones · C2–A#2 · 4 layers"
+   }
+  },
+  {
+   "key": "body-percussion",
+   "names": {
+    "fr": "Percussions corporelles",
+    "en": "Body percussion"
+   },
+   "category": "drums",
+   "map": "Instruments/Body Percussion/Body Percussion.cysampler",
+   "settings": {
+    "one-shot": 1,
+    "velocity-db": 10
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 300
+   },
+   "source": "body-percussion",
+   "bank": "body-percussion",
+   "sfz": "body-percussion/Programs/body.sfz",
+   "melodic": false,
+   "licence": "CC0-1.0",
+   "range": [
+    "C2",
+    "C#4"
+   ],
+   "report": {
+    "key": "body-percussion",
+    "zones": 356,
+    "files": 202,
+    "megabytes": 61.7,
+    "description": "body · 356 zones · C2–C#4 · 2 layers"
+   }
+  },
+  {
+   "key": "caveman-cosmonaut",
+   "names": {
+    "fr": "Caveman Cosmonaut (orgue-synthé)",
+    "en": "Caveman Cosmonaut (organ synth)"
+   },
+   "category": "synths",
+   "map": "Instruments/Caveman Cosmonaut/Caveman Cosmonaut.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 300
+   },
+   "source": "caveman-cosmonaut",
+   "bank": "caveman-cosmonaut",
+   "sfz": "caveman-cosmonaut/Programs/main.sfz",
+   "melodic": true,
+   "licence": "CC0-1.0",
+   "range": [
+    "G2",
+    "B5"
+   ],
+   "report": {
+    "key": "caveman-cosmonaut",
+    "zones": 11973,
+    "files": 370,
+    "megabytes": 106.3,
+    "description": "main · 11973 zones · C2–C6 · 1 layer"
+   },
+   "model": "Sound Models/Caveman Cosmonaut.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.3
+   }
+  },
+  {
+   "key": "cowsynth",
+   "names": {
+    "fr": "Cowsynth (cornemuse-synthé)",
+    "en": "Cowsynth (bagpipe synth)"
+   },
+   "category": "synths",
+   "map": "Instruments/Cowsynth/Cowsynth.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 600
+   },
+   "source": "cowsynth",
+   "bank": "cowsynth",
+   "sfz": "cowsynth/cowsynth_lonely_pad.sfz",
+   "melodic": true,
+   "licence": "CC0-1.0",
+   "range": [
+    "G2",
+    "E4"
+   ],
+   "report": {
+    "key": "cowsynth",
+    "zones": 8,
+    "files": 8,
+    "megabytes": 6.6,
+    "description": "cowsynth_lonely_pad · 8 zones · G2–E4 · 1 layer"
+   },
+   "model": "Sound Models/Cowsynth.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.6
+   }
+  },
+  {
+   "key": "string-cyborgs",
+   "names": {
+    "fr": "String Cyborgs (cordes-synthé)",
+    "en": "String Cyborgs (string synth)"
+   },
+   "category": "synths",
+   "map": "Instruments/String Cyborgs/String Cyborgs.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 500
+   },
+   "source": "string-cyborgs",
+   "bank": "string-cyborgs",
+   "sfz": "string-cyborgs/Programs/zinc_one_voice.sfz",
+   "melodic": true,
+   "licence": "CC0-1.0",
+   "range": [
+    "A1",
+    "A5"
+   ],
+   "report": {
+    "key": "string-cyborgs",
+    "zones": 49,
+    "files": 49,
+    "megabytes": 13.7,
+    "description": "zinc_one_voice · 49 zones · A1–A5 · 1 layer"
+   },
+   "model": "Sound Models/String Cyborgs.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.5
+   }
+  },
+  {
+   "key": "voice-a",
+   "names": {
+    "fr": "Voix chantée « a »",
+    "en": "Sung voice \"a\""
+   },
+   "category": "voices",
+   "map": "Instruments/Voice A/Voice A.cysampler",
+   "settings": {
+    "velocity-db": 18
+   },
+   "envelope": {
+    "attack": 1,
+    "release": 300
+   },
+   "source": "legato-vocal",
+   "bank": "legato-vocal",
+   "sfz": "legato-vocal/Programs/01-no_legato_polyphonic_only_no_vibrato_a.sfz",
+   "melodic": true,
+   "licence": "CC0-1.0",
+   "range": [
+    "C3",
+    "A#4"
+   ],
+   "report": {
+    "key": "voice-a",
+    "zones": 23,
+    "files": 23,
+    "megabytes": 38.0,
+    "description": "01-no_legato_polyphonic_only_no_vibrato_a · 23 zones · C3–A#4 · 1 layer"
+   },
+   "model": "Sound Models/Voice A.cysound",
+   "modelSettings": {
+    "velocity-db": 12,
+    "release": 0.3
+   },
+   "voicing": {
+    "mode": "legato",
+    "glide": 50
+   }
+  }
+ ]
+}

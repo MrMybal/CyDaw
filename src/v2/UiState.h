@@ -1,0 +1,225 @@
+#pragma once
+
+#include "Studio.h"
+
+#include <juce_audio_utils/juce_audio_utils.h>
+
+#include <map>
+#include <memory>
+#include <optional>
+#include <algorithm>
+#include <vector>
+
+// What the panels share: the selection, the views' zoom and scroll, the
+// clip shown in the editor, the waveforms already read.
+
+namespace cydaw::v2 {
+
+struct ClipRef {
+    TrackRef track;
+    std::uint64_t clipId {};
+
+    [[nodiscard]] bool operator==(const ClipRef& other) const noexcept
+    {
+        return track == other.track && clipId == other.clipId;
+    }
+};
+
+// Drag-and-drop payload carrying a file path between panels.
+inline constexpr const char* kFilePayload = "CYDAW_FILE";
+
+enum class Panel { none, arrangement, launcher, devices, graph, mixer, editor, browser, inspector, workshop, routing };
+
+// What the device workshop is asked to open (a track's device, a file of My
+// devices, a new device). It asks first when the device it holds is not
+// saved.
+struct WorkshopRequest {
+    enum class Kind { trackDevice, file, newEffect, newInstrument };
+    Kind kind { Kind::trackDevice };
+    TrackRef track;
+    std::uint64_t nodeId {}; // 0 with a MIDI track: its instrument
+    juce::File file;
+    int inputChannels { 2 };  // a new effect's widths
+    int outputChannels { 2 };
+};
+
+// A device's display shown large in a window of its own: the track, the
+// card, which of its displays.
+struct ExpandedPane {
+    TrackRef track;
+    std::uint64_t nodeId {};
+    int pane {};
+    // Asked once: out of the studio's window, a window of its own on the
+    // desktop (as a plug-in's).
+    bool detach {};
+    // Asked once: to the front.
+    bool focus { true };
+};
+
+// A device's window, as a plugin's: the card of a graph (0: the track's
+// whole graph, an instrument's).
+struct PluginWindow {
+    TrackRef track;
+    std::uint64_t nodeId {};
+    [[nodiscard]] bool operator==(const PluginWindow& other) const noexcept
+    {
+        return track == other.track && nodeId == other.nodeId;
+    }
+};
+
+// A right click asking for a menu: a track's, or a launcher slot's.
+struct ContextRequest {
+    // outputs: a track's outputs and sends, to edit.
+    enum class Kind { track, launcherSlot, outputs };
+    Kind kind { Kind::track };
+    TrackRef track;
+    int scene { -1 };
+};
+
+// A slot of the launcher: a track's cell in a scene (a clip or empty).
+struct SlotRef {
+    TrackRef track;
+    int scene {};
+    [[nodiscard]] bool operator==(const SlotRef& other) const noexcept
+    {
+        return track == other.track && scene == other.scene;
+    }
+};
+
+struct UiState {
+    std::optional<TrackRef> selectedTrack;
+    std::vector<ClipRef> selectedClips;
+    // The launcher's slots picked (a click; Ctrl or Shift adds): what its
+    // menu and Ctrl+E act on.
+    std::vector<SlotRef> selectedSlots;
+    [[nodiscard]] bool isSlotSelected(const SlotRef& slot) const
+    {
+        return std::find(selectedSlots.begin(), selectedSlots.end(), slot) != selectedSlots.end();
+    }
+    std::optional<ClipRef> editedClip;
+    // The audio editor's face asked for (0 sample, 1 takes, 2 stretch; -1
+    // none): taken by the editor at its next frame.
+    int audioEditorFace { -1 };
+    Panel focused { Panel::arrangement };
+    std::optional<WorkshopRequest> workshopRequest;
+    std::optional<ContextRequest> contextRequest;
+    // The VST workshop mode: the whole window builds devices (graph, its
+    // tools, the plugin export); no tracks, no arrangement.
+    bool workshopMode {};
+    // Asks a panel to come to the front (set by one panel, honoured by the
+    // frame).
+    Panel bringToFront { Panel::none };
+    // The audio settings asked open on the card's inputs and outputs, or
+    // closed (a bus's effects picked from them, to edit in the panels).
+    bool openSoundCard {};
+    bool closeAudioSettings {};
+    // The sound banks' window shown; the locations asked open.
+    bool showBanks {};
+    bool openLocations {};
+    // The semantic sound search's window (its models, licences, index).
+    bool showSemantic {};
+    // The library's big window: shown, its tab (0 sounds, 1 instruments, 2
+    // effects and devices), the track a pick goes to (the device strip's
+    // "+", which also closes it once something is added), brought to the
+    // front, taken out of the studio's window.
+    bool showLibrary {};
+    // The graph editor shows the selected track's modulation graph, not its
+    // sound's.
+    bool graphShowsModulation {};
+    int libraryTab {};
+    std::optional<TrackRef> libraryTarget;
+    bool libraryPick {};
+    bool libraryFocus {};
+    bool libraryDetach {};
+    // The devices' displays open large, each in a window of its own: several
+    // at once, as plug-ins' windows.
+    std::vector<ExpandedPane> expandedPanes;
+    // Opens one (or brings it to the front, on that display).
+    void openExpandedPane(const ExpandedPane& wanted)
+    {
+        for (auto& open : expandedPanes)
+            if (open.track == wanted.track && open.nodeId == wanted.nodeId) {
+                open.pane = wanted.pane;
+                open.focus = true;
+                open.detach = open.detach || wanted.detach;
+                return;
+            }
+        expandedPanes.push_back(wanted);
+    }
+    [[nodiscard]] bool expandedPaneOpen(const TrackRef& track, const std::uint64_t nodeId) const
+    {
+        return std::any_of(expandedPanes.begin(), expandedPanes.end(),
+                           [&](const ExpandedPane& open) { return open.track == track && open.nodeId == nodeId; });
+    }
+    void closeExpandedPane(const TrackRef& track, const std::uint64_t nodeId)
+    {
+        std::erase_if(expandedPanes, [&](const ExpandedPane& open) { return open.track == track && open.nodeId == nodeId; });
+    }
+    // The sampler pane drawn last: files dropped from the system on it are
+    // added to its card.
+    struct SamplerDrop {
+        TrackRef track;
+        std::uint64_t nodeId {};
+        float x0 {};
+        float y0 {};
+        float x1 {};
+        float y1 {};
+    };
+    std::optional<SamplerDrop> samplerDrop;
+
+    // Arrangement.
+    double pixelsPerSecond { 48.0 };
+    // The arrangement's vertical zoom: every track's height times this.
+    float laneZoom { 1.0f };
+    double scrollSeconds {};
+    float scrollY {};
+    double snapBeats { 1.0 };   // 0: off
+    bool followPlayhead { true };
+
+    // Status line: the last thing the interface has to say.
+    juce::String status;
+    bool statusIsError {};
+    double statusTime {};
+
+    [[nodiscard]] bool isSelected(const ClipRef& clip) const
+    {
+        return std::find(selectedClips.begin(), selectedClips.end(), clip) != selectedClips.end();
+    }
+    void selectTrack(const TrackRef& track)
+    {
+        selectedTrack = track;
+    }
+    // The device panel's catalogue asked open (the control port).
+    bool openDeviceCatalogue {};
+    // The devices' windows open (PluginWindows draws them).
+    std::vector<PluginWindow> pluginWindows;
+    void togglePluginWindow(const PluginWindow& window)
+    {
+        if (const auto found = std::find(pluginWindows.begin(), pluginWindows.end(), window); found != pluginWindows.end())
+            pluginWindows.erase(found);
+        else
+            pluginWindows.push_back(window);
+    }
+    [[nodiscard]] bool pluginWindowOpen(const PluginWindow& window) const
+    {
+        return std::find(pluginWindows.begin(), pluginWindows.end(), window) != pluginWindows.end();
+    }
+};
+
+// Peaks of audio files, read in the background and drawn per pixel.
+class WaveformCache final {
+public:
+    explicit WaveformCache(juce::AudioFormatManager& formats);
+    ~WaveformCache();
+
+    [[nodiscard]] juce::AudioThumbnail* get(const juce::File& file);
+    [[nodiscard]] bool anyLoading() const;
+    void clear();
+
+private:
+    juce::AudioFormatManager& formats_;
+    juce::AudioThumbnailCache cache_ { 256 };
+    std::map<juce::String, std::unique_ptr<juce::AudioThumbnail>> thumbnails_;
+};
+
+} // namespace cydaw::v2

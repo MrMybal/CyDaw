@@ -1,0 +1,282 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Xylophone",
+ "zones": [
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Xylophone/Medium Mallets/Xylo_Medium_G3_pp_01_far.wav",
+   "root": 67,
+   "keys": [
+    0,
+    69
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 0.4,
+   "tune": 3.2,
+   "start": 0,
+   "end": 67914,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Xylophone/Medium Mallets/Xylo_Medium_G3_ff_01_far.wav",
+   "root": 67,
+   "keys": [
+    0,
+    69
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 0.4,
+   "tune": 2.0,
+   "start": 0,
+   "end": 109368,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Xylophone/Medium Mallets/Xylo_Medium_C4_pp_01_far.wav",
+   "root": 72,
+   "keys": [
+    70,
+    75
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 0.4,
+   "tune": -9.0,
+   "start": 0,
+   "end": 83790,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Xylophone/Medium Mallets/Xylo_Medium_C4_ff_01_far.wav",
+   "root": 72,
+   "keys": [
+    70,
+    75
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 0.4,
+   "tune": -5.9,
+   "start": 0,
+   "end": 102312,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Xylophone/Medium Mallets/Xylo_Medium_G4_pp_01_far.wav",
+   "root": 79,
+   "keys": [
+    76,
+    81
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 0.4,
+   "tune": -16.4,
+   "start": 0,
+   "end": 71442,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Xylophone/Medium Mallets/Xylo_Medium_G4_ff_01_far.wav",
+   "root": 79,
+   "keys": [
+    76,
+    81
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 0.4,
+   "tune": -19.9,
+   "start": 0,
+   "end": 81144,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Xylophone/Medium Mallets/Xylo_Medium_C5_pp_01_far.wav",
+   "root": 84,
+   "keys": [
+    82,
+    87
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 0.4,
+   "tune": -15.7,
+   "start": 0,
+   "end": 71442,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Xylophone/Medium Mallets/Xylo_Medium_C5_ff_01_far.wav",
+   "root": 84,
+   "keys": [
+    82,
+    87
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 0.4,
+   "tune": -14.9,
+   "start": 0,
+   "end": 60858,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Xylophone/Medium Mallets/Xylo_Medium_G5_pp_01_far.wav",
+   "root": 91,
+   "keys": [
+    88,
+    93
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 0.4,
+   "tune": -13.8,
+   "start": 0,
+   "end": 39690,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Xylophone/Medium Mallets/Xylo_Medium_G5_ff_01_far.wav",
+   "root": 91,
+   "keys": [
+    88,
+    93
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 0.4,
+   "tune": 54.9,
+   "start": 0,
+   "end": 41454,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Xylophone/Medium Mallets/Xylo_Medium_C6_pp_01_far.wav",
+   "root": 96,
+   "keys": [
+    94,
+    99
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 0.4,
+   "tune": -18.4,
+   "start": 0,
+   "end": 31752,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Xylophone/Medium Mallets/Xylo_Medium_C6_ff_01_far.wav",
+   "root": 96,
+   "keys": [
+    94,
+    99
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 0.4,
+   "tune": -18.1,
+   "start": 0,
+   "end": 33516,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Xylophone/Medium Mallets/Xylo_Medium_G6_pp_01_far.wav",
+   "root": 103,
+   "keys": [
+    100,
+    105
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 0.4,
+   "tune": -22.1,
+   "start": 0,
+   "end": 27342,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Xylophone/Medium Mallets/Xylo_Medium_G6_ff_01_far.wav",
+   "root": 103,
+   "keys": [
+    100,
+    105
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 0.4,
+   "tune": -20.7,
+   "start": 0,
+   "end": 30870,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Xylophone/Medium Mallets/Xylo_Medium_C7_pp_01_far.wav",
+   "root": 108,
+   "keys": [
+    106,
+    127
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 0.4,
+   "tune": -21.6,
+   "start": 0,
+   "end": 26460,
+   "endFade": 2646
+  },
+  {
+   "file": "bank:vcsl/Idiophones/Struck Idiophones/Xylophone/Medium Mallets/Xylo_Medium_C7_ff_01_far.wav",
+   "root": 108,
+   "keys": [
+    106,
+    127
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 0.4,
+   "tune": -21.4,
+   "start": 0,
+   "end": 26460,
+   "endFade": 2646
+  }
+ ],
+ "settings": {
+  "velocity-db": 16
+ }
+}

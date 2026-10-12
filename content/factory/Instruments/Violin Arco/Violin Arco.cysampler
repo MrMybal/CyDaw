@@ -1,0 +1,672 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Violin (bowed, vibrato)",
+ "zones": [
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Arco Vib/LLVln_ArcoVib_G3_p.wav",
+   "root": 55,
+   "keys": [
+    0,
+    56
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.7,
+   "tune": -3.8,
+   "start": 0,
+   "end": 697194,
+   "endFade": 2646,
+   "loop": [
+    557450,
+    625338
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Arco Vib/LLVln_ArcoVib_G3_f.wav",
+   "root": 55,
+   "keys": [
+    0,
+    56
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.7,
+   "tune": 0.3,
+   "start": 0,
+   "end": 734211,
+   "endFade": 2646,
+   "loop": [
+    297639,
+    637686
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Arco Vib/LLVln_ArcoVib_A3_p.wav",
+   "root": 57,
+   "keys": [
+    57,
+    58
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.7,
+   "tune": 2.7,
+   "start": 0,
+   "end": 727771,
+   "endFade": 2646,
+   "loop": [
+    300247,
+    636804
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Arco Vib/LLVln_ArcoVib_A3_f.wav",
+   "root": 57,
+   "keys": [
+    57,
+    58
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.7,
+   "tune": 0.4,
+   "start": 0,
+   "end": 716109,
+   "endFade": 2646,
+   "loop": [
+    292044,
+    637686
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Arco Vib/LLVln_ArcoVib_C4_p.wav",
+   "root": 60,
+   "keys": [
+    59,
+    62
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.7,
+   "tune": -18.6,
+   "start": 0,
+   "end": 774151,
+   "endFade": 2646,
+   "loop": [
+    624110,
+    717948
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Arco Vib/LLVln_ArcoVib_C4_f.wav",
+   "root": 60,
+   "keys": [
+    59,
+    62
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.7,
+   "tune": -4.2,
+   "start": 0,
+   "end": 583531,
+   "endFade": 2646,
+   "loop": [
+    478271,
+    532728
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Arco Vib/LLVln_ArcoVib_E4_p.wav",
+   "root": 64,
+   "keys": [
+    63,
+    65
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.7,
+   "tune": -5.2,
+   "start": 0,
+   "end": 650032,
+   "endFade": 2646,
+   "loop": [
+    329262,
+    601524
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Arco Vib/LLVln_ArcoVib_E4_f.wav",
+   "root": 64,
+   "keys": [
+    63,
+    65
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.7,
+   "tune": 4.2,
+   "start": 0,
+   "end": 604130,
+   "endFade": 2646,
+   "loop": [
+    268714,
+    537138
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Arco Vib/LLVln_ArcoVib_G4_p.wav",
+   "root": 67,
+   "keys": [
+    66,
+    68
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.7,
+   "tune": -3.3,
+   "start": 0,
+   "end": 648505,
+   "endFade": 2646,
+   "loop": [
+    516262,
+    592704
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Arco Vib/LLVln_ArcoVib_G4_f.wav",
+   "root": 67,
+   "keys": [
+    66,
+    68
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.7,
+   "tune": -5.6,
+   "start": 0,
+   "end": 591501,
+   "endFade": 2646,
+   "loop": [
+    264271,
+    544194
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Arco Vib/LLVln_ArcoVib_A4_p.wav",
+   "root": 69,
+   "keys": [
+    69,
+    70
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.7,
+   "tune": 1.6,
+   "start": 0,
+   "end": 653019,
+   "endFade": 2646,
+   "loop": [
+    265563,
+    568890
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Arco Vib/LLVln_ArcoVib_A4_f.wav",
+   "root": 69,
+   "keys": [
+    69,
+    70
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.7,
+   "tune": -16.9,
+   "start": 0,
+   "end": 622120,
+   "endFade": 2646,
+   "loop": [
+    260636,
+    541548
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Arco Vib/LLVln_ArcoVib_C5_p.wav",
+   "root": 72,
+   "keys": [
+    71,
+    74
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.7,
+   "tune": 1.4,
+   "start": 0,
+   "end": 624686,
+   "endFade": 2646,
+   "loop": [
+    504244,
+    584766
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Arco Vib/LLVln_ArcoVib_C5_f.wav",
+   "root": 72,
+   "keys": [
+    71,
+    74
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.7,
+   "tune": -15.3,
+   "start": 0,
+   "end": 624486,
+   "endFade": 2646,
+   "loop": [
+    294327,
+    590058
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Arco Vib/LLVln_ArcoVib_E5_p.wav",
+   "root": 76,
+   "keys": [
+    75,
+    77
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.7,
+   "tune": -0.5,
+   "start": 0,
+   "end": 629262,
+   "endFade": 2646,
+   "loop": [
+    304154,
+    580356
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Arco Vib/LLVln_ArcoVib_E5_f.wav",
+   "root": 76,
+   "keys": [
+    75,
+    77
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.7,
+   "tune": -10.9,
+   "start": 0,
+   "end": 591282,
+   "endFade": 2646,
+   "loop": [
+    260338,
+    542430
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Arco Vib/LLVln_ArcoVib_G5_p.wav",
+   "root": 79,
+   "keys": [
+    78,
+    80
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.7,
+   "tune": -4.8,
+   "start": 0,
+   "end": 649167,
+   "endFade": 2646,
+   "loop": [
+    265115,
+    603288
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Arco Vib/LLVln_ArcoVib_G5_f.wav",
+   "root": 79,
+   "keys": [
+    78,
+    80
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.7,
+   "tune": -1.6,
+   "start": 0,
+   "end": 555515,
+   "endFade": 2646,
+   "loop": [
+    430186,
+    523026
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Arco Vib/LLVln_ArcoVib_A5_p.wav",
+   "root": 81,
+   "keys": [
+    81,
+    82
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.7,
+   "tune": 1.6,
+   "start": 0,
+   "end": 640519,
+   "endFade": 2646,
+   "loop": [
+    182904,
+    530964
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Arco Vib/LLVln_ArcoVib_A5_f.wav",
+   "root": 81,
+   "keys": [
+    81,
+    82
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.7,
+   "tune": -2.0,
+   "start": 0,
+   "end": 496697,
+   "endFade": 2646,
+   "loop": [
+    337198,
+    430416
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Arco Vib/LLVln_ArcoVib_C6_p.wav",
+   "root": 84,
+   "keys": [
+    83,
+    86
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.7,
+   "tune": 5.2,
+   "start": 0,
+   "end": 589715,
+   "endFade": 2646,
+   "loop": [
+    447105,
+    546840
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Arco Vib/LLVln_ArcoVib_C6_f.wav",
+   "root": 84,
+   "keys": [
+    83,
+    86
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.7,
+   "tune": 6.9,
+   "start": 0,
+   "end": 540682,
+   "endFade": 2646,
+   "loop": [
+    239577,
+    507150
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Arco Vib/LLVln_ArcoVib_E6_p.wav",
+   "root": 88,
+   "keys": [
+    87,
+    89
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.7,
+   "tune": -6.9,
+   "start": 0,
+   "end": 628664,
+   "endFade": 2646,
+   "loop": [
+    247304,
+    553896
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Arco Vib/LLVln_ArcoVib_E6_f.wav",
+   "root": 88,
+   "keys": [
+    87,
+    89
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.7,
+   "tune": -12.9,
+   "start": 0,
+   "end": 590877,
+   "endFade": 2646,
+   "loop": [
+    500263,
+    557424
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Arco Vib/LLVln_ArcoVib_G6_p.wav",
+   "root": 91,
+   "keys": [
+    90,
+    92
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.7,
+   "tune": -12.4,
+   "start": 0,
+   "end": 604294,
+   "endFade": 2646,
+   "loop": [
+    452579,
+    548604
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Arco Vib/LLVln_ArcoVib_G6_f.wav",
+   "root": 91,
+   "keys": [
+    90,
+    92
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.7,
+   "tune": -13.8,
+   "start": 0,
+   "end": 540995,
+   "endFade": 2646,
+   "loop": [
+    413152,
+    508032
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Arco Vib/LLVln_ArcoVib_A6_p.wav",
+   "root": 93,
+   "keys": [
+    93,
+    94
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.7,
+   "tune": -3.8,
+   "start": 0,
+   "end": 653516,
+   "endFade": 2646,
+   "loop": [
+    304960,
+    594468
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Arco Vib/LLVln_ArcoVib_A6_f.wav",
+   "root": 93,
+   "keys": [
+    93,
+    94
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.7,
+   "tune": -9.6,
+   "start": 0,
+   "end": 513052,
+   "endFade": 2646,
+   "loop": [
+    250754,
+    470106
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Arco Vib/LLVln_ArcoVib_C7_p.wav",
+   "root": 96,
+   "keys": [
+    95,
+    127
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": 5.7,
+   "tune": 1.0,
+   "start": 0,
+   "end": 568665,
+   "endFade": 2646,
+   "loop": [
+    200259,
+    529200
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Solo Violin/Arco Vib/LLVln_ArcoVib_C7_f.wav",
+   "root": 96,
+   "keys": [
+    95,
+    127
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": 5.7,
+   "tune": -7.8,
+   "start": 0,
+   "end": 544110,
+   "endFade": 2646,
+   "loop": [
+    452227,
+    515088
+   ],
+   "loopCrossfade": 3528
+  }
+ ],
+ "settings": {
+  "velocity-db": 12,
+  "velocity-crossfade": 1,
+  "loop": 1
+ }
+}

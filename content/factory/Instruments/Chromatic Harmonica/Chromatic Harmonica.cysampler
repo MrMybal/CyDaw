@@ -1,0 +1,298 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Chromatic harmonica",
+ "zones": [
+  {
+   "file": "bank:vcsl/Aerophones/Free Aerophones/Harmonica-Hohner-Super64/Sustains/Normal/Hohner-Super64_Normal _C2.wav",
+   "root": 48,
+   "keys": [
+    0,
+    50
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 0.5,
+   "tune": -4.4,
+   "start": 0,
+   "end": 179699,
+   "endFade": 2646,
+   "loop": [
+    63355,
+    147294
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Free Aerophones/Harmonica-Hohner-Super64/Sustains/Normal/Hohner-Super64_Normal _E2.wav",
+   "root": 52,
+   "keys": [
+    51,
+    53
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 0.5,
+   "tune": -0.2,
+   "start": 0,
+   "end": 214910,
+   "endFade": 2646,
+   "loop": [
+    130450,
+    183456
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Free Aerophones/Harmonica-Hohner-Super64/Sustains/Normal/Hohner-Super64_Normal _G2.wav",
+   "root": 55,
+   "keys": [
+    54,
+    57
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 0.5,
+   "tune": 7.6,
+   "start": 0,
+   "end": 213422,
+   "endFade": 2646,
+   "loop": [
+    53864,
+    177282
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Free Aerophones/Harmonica-Hohner-Super64/Sustains/Normal/Hohner-Super64_Normal _C3.wav",
+   "root": 60,
+   "keys": [
+    58,
+    62
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 0.5,
+   "tune": 2.5,
+   "start": 0,
+   "end": 211595,
+   "endFade": 2646,
+   "loop": [
+    124117,
+    178164
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Free Aerophones/Harmonica-Hohner-Super64/Sustains/Normal/Hohner-Super64_Normal _E3.wav",
+   "root": 64,
+   "keys": [
+    63,
+    65
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 0.5,
+   "tune": -0.5,
+   "start": 0,
+   "end": 236357,
+   "endFade": 2646,
+   "loop": [
+    139943,
+    205506
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Free Aerophones/Harmonica-Hohner-Super64/Sustains/Normal/Hohner-Super64_Normal _G3.wav",
+   "root": 67,
+   "keys": [
+    66,
+    69
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 0.5,
+   "tune": 0.7,
+   "start": 0,
+   "end": 241597,
+   "endFade": 2646,
+   "loop": [
+    158123,
+    211680
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Free Aerophones/Harmonica-Hohner-Super64/Sustains/Normal/Hohner-Super64_Normal _C4.wav",
+   "root": 72,
+   "keys": [
+    70,
+    74
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 0.5,
+   "tune": -0.8,
+   "start": 0,
+   "end": 213444,
+   "endFade": 2646,
+   "loop": [
+    26668,
+    187866
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Free Aerophones/Harmonica-Hohner-Super64/Sustains/Normal/Hohner-Super64_Normal _E4.wav",
+   "root": 76,
+   "keys": [
+    75,
+    77
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 0.5,
+   "tune": 0.9,
+   "start": 0,
+   "end": 242550,
+   "endFade": 2646,
+   "loop": [
+    95393,
+    215208
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Free Aerophones/Harmonica-Hohner-Super64/Sustains/Normal/Hohner-Super64_Normal _G4.wav",
+   "root": 79,
+   "keys": [
+    78,
+    81
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 0.5,
+   "tune": -1.4,
+   "start": 0,
+   "end": 197568,
+   "endFade": 2646,
+   "loop": [
+    28994,
+    171108
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Free Aerophones/Harmonica-Hohner-Super64/Sustains/Normal/Hohner-Super64_Normal _C5.wav",
+   "root": 84,
+   "keys": [
+    82,
+    86
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 0.5,
+   "tune": -0.9,
+   "start": 0,
+   "end": 211800,
+   "endFade": 2646,
+   "loop": [
+    65637,
+    183456
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Free Aerophones/Harmonica-Hohner-Super64/Sustains/Normal/Hohner-Super64_Normal _E5.wav",
+   "root": 88,
+   "keys": [
+    87,
+    89
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 0.5,
+   "tune": -0.5,
+   "start": 0,
+   "end": 236273,
+   "endFade": 2646,
+   "loop": [
+    154462,
+    209034
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Free Aerophones/Harmonica-Hohner-Super64/Sustains/Normal/Hohner-Super64_Normal _G5.wav",
+   "root": 91,
+   "keys": [
+    90,
+    93
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 0.5,
+   "tune": -0.5,
+   "start": 0,
+   "end": 229753,
+   "endFade": 2646,
+   "loop": [
+    75358,
+    195804
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vcsl/Aerophones/Free Aerophones/Harmonica-Hohner-Super64/Sustains/Normal/Hohner-Super64_Normal _C6.wav",
+   "root": 96,
+   "keys": [
+    94,
+    127
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": 0.5,
+   "tune": -2.1,
+   "start": 0,
+   "end": 197568,
+   "endFade": 2646,
+   "loop": [
+    51806,
+    172872
+   ],
+   "loopCrossfade": 3528
+  }
+ ],
+ "settings": {
+  "velocity-db": 12,
+  "velocity-crossfade": 1,
+  "loop": 1
+ }
+}

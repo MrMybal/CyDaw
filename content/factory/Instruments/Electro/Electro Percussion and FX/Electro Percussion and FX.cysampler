@@ -1,0 +1,557 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Electro percussion and FX",
+ "settings": {
+  "one-shot": 1,
+  "velocity-db": 10
+ },
+ "zones": [
+  {
+   "file": "bank:cydaw-electro/Toms/808 Low Tom.wav",
+   "root": 48,
+   "keys": [
+    48,
+    48
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -4.0
+  },
+  {
+   "file": "bank:cydaw-electro/Toms/808 Mid Tom.wav",
+   "root": 49,
+   "keys": [
+    49,
+    49
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -4.0
+  },
+  {
+   "file": "bank:cydaw-electro/Toms/808 High Tom.wav",
+   "root": 50,
+   "keys": [
+    50,
+    50
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -4.0
+  },
+  {
+   "file": "bank:cydaw-electro/Toms/909 Low Tom.wav",
+   "root": 51,
+   "keys": [
+    51,
+    51
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -4.0
+  },
+  {
+   "file": "bank:cydaw-electro/Toms/909 Mid Tom.wav",
+   "root": 52,
+   "keys": [
+    52,
+    52
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -4.0
+  },
+  {
+   "file": "bank:cydaw-electro/Toms/909 High Tom.wav",
+   "root": 53,
+   "keys": [
+    53,
+    53
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -4.0
+  },
+  {
+   "file": "bank:cydaw-electro/Toms/Electro Tom.wav",
+   "root": 54,
+   "keys": [
+    54,
+    54
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -4.0
+  },
+  {
+   "file": "bank:cydaw-electro/Toms/Syn Tom Drop.wav",
+   "root": 55,
+   "keys": [
+    55,
+    55
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -4.0
+  },
+  {
+   "file": "bank:cydaw-electro/Cymbals/808 Cymbal.wav",
+   "root": 56,
+   "keys": [
+    56,
+    56
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -11.0
+  },
+  {
+   "file": "bank:cydaw-electro/Cymbals/Crash.wav",
+   "root": 57,
+   "keys": [
+    57,
+    57
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -11.0
+  },
+  {
+   "file": "bank:cydaw-electro/Cymbals/Ride.wav",
+   "root": 58,
+   "keys": [
+    58,
+    58
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -11.0
+  },
+  {
+   "file": "bank:cydaw-electro/Cymbals/Ride Bell.wav",
+   "root": 59,
+   "keys": [
+    59,
+    59
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -11.0
+  },
+  {
+   "file": "bank:cydaw-electro/Cymbals/Splash.wav",
+   "root": 60,
+   "keys": [
+    60,
+    60
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -11.0
+  },
+  {
+   "file": "bank:cydaw-electro/Cymbals/China.wav",
+   "root": 61,
+   "keys": [
+    61,
+    61
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -11.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/808 Rim.wav",
+   "root": 62,
+   "keys": [
+    62,
+    62
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/909 Rim.wav",
+   "root": 63,
+   "keys": [
+    63,
+    63
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/Claves.wav",
+   "root": 64,
+   "keys": [
+    64,
+    64
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/Wood Block.wav",
+   "root": 65,
+   "keys": [
+    65,
+    65
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/808 Cowbell.wav",
+   "root": 66,
+   "keys": [
+    66,
+    66
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/Cowbell Short.wav",
+   "root": 67,
+   "keys": [
+    67,
+    67
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/808 Conga High.wav",
+   "root": 68,
+   "keys": [
+    68,
+    68
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/808 Conga Mid.wav",
+   "root": 69,
+   "keys": [
+    69,
+    69
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/808 Conga Low.wav",
+   "root": 70,
+   "keys": [
+    70,
+    70
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/Bongo.wav",
+   "root": 71,
+   "keys": [
+    71,
+    71
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/Shaker.wav",
+   "root": 72,
+   "keys": [
+    72,
+    72
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/Shaker Long.wav",
+   "root": 73,
+   "keys": [
+    73,
+    73
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/Maracas.wav",
+   "root": 74,
+   "keys": [
+    74,
+    74
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/Tambourine.wav",
+   "root": 75,
+   "keys": [
+    75,
+    75
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/Tambourine Short.wav",
+   "root": 76,
+   "keys": [
+    76,
+    76
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/Perc Blip.wav",
+   "root": 77,
+   "keys": [
+    77,
+    77
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/Percussion/Perc Metal.wav",
+   "root": 78,
+   "keys": [
+    78,
+    78
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/FX/Zap Down.wav",
+   "root": 84,
+   "keys": [
+    84,
+    84
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/FX/Zap Fast.wav",
+   "root": 85,
+   "keys": [
+    85,
+    85
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/FX/Laser.wav",
+   "root": 86,
+   "keys": [
+    86,
+    86
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/FX/Pew.wav",
+   "root": 87,
+   "keys": [
+    87,
+    87
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/FX/Riser 2s.wav",
+   "root": 88,
+   "keys": [
+    88,
+    88
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/FX/Riser 4s.wav",
+   "root": 89,
+   "keys": [
+    89,
+    89
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/FX/Downlifter.wav",
+   "root": 90,
+   "keys": [
+    90,
+    90
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/FX/Impact.wav",
+   "root": 91,
+   "keys": [
+    91,
+    91
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/FX/Impact Short.wav",
+   "root": 92,
+   "keys": [
+    92,
+    92
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/FX/Sub Drop.wav",
+   "root": 93,
+   "keys": [
+    93,
+    93
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  },
+  {
+   "file": "bank:cydaw-electro/FX/Noise Hit.wav",
+   "root": 94,
+   "keys": [
+    94,
+    94
+   ],
+   "velocities": [
+    1,
+    127
+   ],
+   "gain": -6.0
+  }
+ ]
+}

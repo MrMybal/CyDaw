@@ -1,0 +1,582 @@
+{
+ "format": "cydaw-sampler",
+ "version": 1,
+ "name": "Cello section",
+ "zones": [
+  {
+   "file": "bank:vsco/Strings/Cello Section/susvib/susvib_C1_v1_1.wav",
+   "root": 36,
+   "keys": [
+    0,
+    38
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": -0.8,
+   "tune": 0.5,
+   "start": 1132,
+   "end": 382788,
+   "endFade": 2646,
+   "loop": [
+    92586,
+    299880
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/susvib/susvib_C1_v3_1.wav",
+   "root": 36,
+   "keys": [
+    0,
+    38
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": -0.8,
+   "tune": 0.3,
+   "start": 0,
+   "end": 538020,
+   "endFade": 2646,
+   "loop": [
+    178990,
+    448056
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/susvib/susvib_E1_v1_1.wav",
+   "root": 40,
+   "keys": [
+    39,
+    41
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": -0.8,
+   "tune": 4.0,
+   "start": 553,
+   "end": 411384,
+   "endFade": 2646,
+   "loop": [
+    76171,
+    351918
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/susvib/susvib_E1_v3_1.wav",
+   "root": 40,
+   "keys": [
+    39,
+    41
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": -0.8,
+   "tune": 5.0,
+   "start": 0,
+   "end": 513397,
+   "endFade": 2646,
+   "loop": [
+    282119,
+    457758
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/susvib/susvib_G1_v1_1.wav",
+   "root": 43,
+   "keys": [
+    42,
+    45
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": -0.8,
+   "start": 0,
+   "end": 360276,
+   "endFade": 2646,
+   "loop": [
+    160526,
+    291942
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/susvib/susvib_G1_v3_1.wav",
+   "root": 43,
+   "keys": [
+    42,
+    45
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": -0.8,
+   "tune": 3.0,
+   "start": 0,
+   "end": 547722,
+   "endFade": 2646,
+   "loop": [
+    349183,
+    468342
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/susvib/susvib_B1_v1_1.wav",
+   "root": 47,
+   "keys": [
+    46,
+    48
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": -0.8,
+   "tune": -0.1,
+   "start": 680,
+   "end": 395408,
+   "endFade": 2646,
+   "loop": [
+    207154,
+    343098
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/susvib/susvib_B1_v3_1.wav",
+   "root": 47,
+   "keys": [
+    46,
+    48
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": -0.8,
+   "start": 0,
+   "end": 562153,
+   "endFade": 2646,
+   "loop": [
+    404834,
+    493038
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/susvib/susvib_D2_v1_1.wav",
+   "root": 50,
+   "keys": [
+    49,
+    51
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": -0.8,
+   "tune": -0.4,
+   "start": 226,
+   "end": 425152,
+   "endFade": 2646,
+   "loop": [
+    62597,
+    330750
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/susvib/susvib_D2_v3_1.wav",
+   "root": 50,
+   "keys": [
+    49,
+    51
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": -0.8,
+   "tune": 1.9,
+   "start": 0,
+   "end": 548554,
+   "endFade": 2646,
+   "loop": [
+    65901,
+    460404
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/susvib/susvib_F2_v1_1.wav",
+   "root": 53,
+   "keys": [
+    52,
+    55
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": -0.8,
+   "tune": -0.1,
+   "start": 0,
+   "end": 361620,
+   "endFade": 2646,
+   "loop": [
+    138131,
+    299880
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/susvib/susvib_F2_v3_1.wav",
+   "root": 53,
+   "keys": [
+    52,
+    55
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": -0.8,
+   "tune": -0.8,
+   "start": 0,
+   "end": 510442,
+   "endFade": 2646,
+   "loop": [
+    351656,
+    425124
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/susvib/susvib_A2_v1_1.wav",
+   "root": 57,
+   "keys": [
+    56,
+    58
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": -0.8,
+   "tune": 0.3,
+   "start": 60,
+   "end": 389449,
+   "endFade": 2646,
+   "loop": [
+    114116,
+    328986
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/susvib/susvib_A2_v3_1.wav",
+   "root": 57,
+   "keys": [
+    56,
+    58
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": -0.8,
+   "tune": 1.7,
+   "start": 0,
+   "end": 513772,
+   "endFade": 2646,
+   "loop": [
+    322963,
+    449820
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/susvib/susvib_C3_v1_1.wav",
+   "root": 60,
+   "keys": [
+    59,
+    62
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": -0.8,
+   "tune": -0.3,
+   "start": 0,
+   "end": 406602,
+   "endFade": 2646,
+   "loop": [
+    188947,
+    361620
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/susvib/susvib_C3_v3_1.wav",
+   "root": 60,
+   "keys": [
+    59,
+    62
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": -0.8,
+   "tune": 1.8,
+   "start": 0,
+   "end": 486864,
+   "endFade": 2646,
+   "loop": [
+    372043,
+    433062
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/susvib/susvib_E3_v1_1.wav",
+   "root": 64,
+   "keys": [
+    63,
+    65
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": -0.8,
+   "tune": 0.2,
+   "start": 44,
+   "end": 396018,
+   "endFade": 2646,
+   "loop": [
+    202345,
+    349272
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/susvib/susvib_E3_v3_1.wav",
+   "root": 64,
+   "keys": [
+    63,
+    65
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": -0.8,
+   "tune": 1.1,
+   "start": 0,
+   "end": 546371,
+   "endFade": 2646,
+   "loop": [
+    354437,
+    428652
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/susvib/susvib_G3_v1_1.wav",
+   "root": 67,
+   "keys": [
+    66,
+    69
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": -0.8,
+   "tune": -1.0,
+   "start": 0,
+   "end": 399546,
+   "endFade": 2646,
+   "loop": [
+    229467,
+    342216
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/susvib/susvib_G3_v3_1.wav",
+   "root": 67,
+   "keys": [
+    66,
+    69
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": -0.8,
+   "tune": -1.9,
+   "start": 0,
+   "end": 555954,
+   "endFade": 2646,
+   "loop": [
+    37598,
+    416304
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/susvib/susvib_B3_v1_1.wav",
+   "root": 71,
+   "keys": [
+    70,
+    72
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": -0.8,
+   "tune": -1.0,
+   "start": 0,
+   "end": 276948,
+   "endFade": 2646,
+   "loop": [
+    45839,
+    239022
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/susvib/susvib_B3_v3_1.wav",
+   "root": 71,
+   "keys": [
+    70,
+    72
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": -0.8,
+   "tune": -1.1,
+   "start": 0,
+   "end": 477507,
+   "endFade": 2646,
+   "loop": [
+    285602,
+    406602
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/susvib/susvib_D4_v1_1.wav",
+   "root": 74,
+   "keys": [
+    73,
+    75
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": -0.8,
+   "tune": -0.5,
+   "start": 2528,
+   "end": 351918,
+   "endFade": 2646,
+   "loop": [
+    182287,
+    293706
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/susvib/susvib_D4_v3_1.wav",
+   "root": 74,
+   "keys": [
+    73,
+    75
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": -0.8,
+   "tune": -1.2,
+   "start": 0,
+   "end": 466861,
+   "endFade": 2646,
+   "loop": [
+    138683,
+    373086
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/susvib/susvib_F4_v1_1.wav",
+   "root": 77,
+   "keys": [
+    76,
+    127
+   ],
+   "velocities": [
+    1,
+    63
+   ],
+   "gain": -0.8,
+   "tune": -2.4,
+   "start": 243,
+   "end": 315756,
+   "endFade": 2646,
+   "loop": [
+    198960,
+    264600
+   ],
+   "loopCrossfade": 3528
+  },
+  {
+   "file": "bank:vsco/Strings/Cello Section/susvib/susvib_F4_v3_1.wav",
+   "root": 77,
+   "keys": [
+    76,
+    127
+   ],
+   "velocities": [
+    64,
+    127
+   ],
+   "gain": -0.8,
+   "tune": 0.3,
+   "start": 0,
+   "end": 454383,
+   "endFade": 2646,
+   "loop": [
+    230820,
+    400428
+   ],
+   "loopCrossfade": 3528
+  }
+ ],
+ "settings": {
+  "velocity-db": 12,
+  "velocity-crossfade": 1,
+  "loop": 1
+ }
+}
