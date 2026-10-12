@@ -1,13 +1,13 @@
-# CyDAW 2 — nouvelle interface (Dear ImGui)
+# L'interface de CyDAW (référence)
 
-CyDAW 2 est une nouvelle interface, compacte et rapide, posée sur le même moteur que CyDAW 1.
-La v1 reste compilable et intacte.
+L'interface de CyDAW, en Dear ImGui sur Direct3D 11 : ce document en décrit chaque panneau et les
+commandes du port de contrôle, pour qui développe ou pilote le logiciel.
 
-- Exécutable : `build/agent-graph/CyDAW2_artefacts/Release/CyDAW 2.exe` (cible CMake `CyDAW2`).
-- Projets : les mêmes fichiers `.cydaw` que la v1, dans les deux sens (testé : un projet enregistré
-  par la v2 s'ouvre dans la v1 et inversement, contenu identique).
-- Réglages : la carte son est partagée avec la v1 (`%APPDATA%\CyDAW\CyDAW.layout.settings`) ; la
-  disposition des panneaux de la v2 est dans `%APPDATA%\CyDAW\CyDAW2.layout.ini`.
+- Exécutable : `CyDAW2_artefacts/Release/CyDAW 2.exe` dans le dossier de compilation (cible CMake
+  `CyDAW2`).
+- Projets : fichiers `.cydaw`.
+- Réglages : la carte son dans `%APPDATA%\CyDAW\CyDAW.layout.settings`, la disposition des panneaux
+  dans `%APPDATA%\CyDAW\CyDAW2.layout.ini`.
 
 ## Disposition
 
