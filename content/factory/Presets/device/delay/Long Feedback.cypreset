@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "delay",
+ "name": "Long Feedback",
+ "state": {
+  "type": "delay",
+  "parameters": {
+   "delay.time": 750.0,
+   "delay.feedback": 0.75,
+   "delay.mix": 0.3
+  }
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "reverb-rack",
+ "name": "Large Hall",
+ "state": {
+  "type": "reverb-rack",
+  "parameters": {
+   "node.11002.reverb.roomSize": 0.88,
+   "node.11002.reverb.mix": 0.38
+  }
+ }
+}

@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "echo-notes",
+ "name": "Free Slapback",
+ "state": {
+  "type": "echo-notes",
+  "parameters": {
+   "echonotes.time": 90.0,
+   "echonotes.decay": 0.4,
+   "echonotes.pitch": 0.0,
+   "echonotes.sync": 0.0,
+   "echonotes.repeats": 1.0
+  }
+ }
+}

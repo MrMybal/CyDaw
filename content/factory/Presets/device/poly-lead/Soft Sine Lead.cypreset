@@ -1,0 +1,27 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "poly-lead",
+ "name": "Soft Sine Lead",
+ "state": {
+  "type": "poly-lead",
+  "parameters": {
+   "node.36002.voice.mode": 1.0,
+   "node.36002.voice.glide": 80.0,
+   "node.36003.polyOscillator.waveform": 0.0,
+   "node.36003.polyOscillator.level": 0.18,
+   "node.36004.envelope.attack": 30.0,
+   "node.36004.envelope.decay": 400.0,
+   "node.36004.envelope.sustain": 0.8,
+   "node.36004.envelope.release": 500.0,
+   "node.36005.gain.db": 0.0,
+   "node.36006.voiceFilter.cutoff": 6000.0,
+   "node.36006.voiceFilter.resonance": 0.8,
+   "node.36007.drive.db": 2.0,
+   "node.36008.delay.time": 420.0,
+   "node.36008.delay.feedback": 0.3,
+   "node.36008.delay.mix": 0.25
+  }
+ }
+}

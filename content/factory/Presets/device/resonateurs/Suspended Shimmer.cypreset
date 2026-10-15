@@ -1,0 +1,29 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "resonateurs",
+ "name": "Suspended Shimmer",
+ "state": {
+  "type": "resonateurs",
+  "parameters": {
+   "resonateurs.note": 57.0,
+   "resonateurs.decay": 1.0,
+   "resonateurs.colour": 0.8,
+   "resonateurs.width": 1.0,
+   "resonateurs.mix": 0.35,
+   "resonateurs.output": 0.0,
+   "resonateurs.tone": 0.5,
+   "resonateurs.mode": 0.0,
+   "resonateurs.interval2": 5.0,
+   "resonateurs.interval3": 7.0,
+   "resonateurs.interval4": 12.0,
+   "resonateurs.interval5": 17.0,
+   "resonateurs.gain1": 1.0,
+   "resonateurs.gain2": 0.800000011920929,
+   "resonateurs.gain3": 0.699999988079071,
+   "resonateurs.gain4": 0.600000023841858,
+   "resonateurs.gain5": 0.5
+  }
+ }
+}

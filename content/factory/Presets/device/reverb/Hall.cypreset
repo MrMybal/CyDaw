@@ -1,0 +1,14 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "reverb",
+ "name": "Hall",
+ "state": {
+  "type": "reverb",
+  "parameters": {
+   "reverb.roomSize": 0.8,
+   "reverb.mix": 0.3
+  }
+ }
+}

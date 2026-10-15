@@ -93,13 +93,17 @@ Layout ambre()
         },
     };
     layout.pages = { std::move(page) };
-    layout.panePicture = Picture::filter;
-    layout.paneKey = "filter";
-    layout.paneChoice = "filter.model";
-    layout.pane = { { "filter.cutoff", "FRÉQ.", "CUTOFF" },  { "filter.resonance", "RÉSO.", "RESO" },
-                    { "filter.env", "ENV", "ENV" },          { "filter.drive", "SATUR.", "DRIVE" },
-                    { "amp.attack", "ATTAQUE", "ATTACK" },   { "amp.decay", "DÉCLIN", "DECAY" },
-                    { "amp.release", "RELÂCHE", "RELEASE" }, { "voice.master", "VOLUME", "VOLUME" } };
+    // The card in Devices: the sound's main settings; the window has them all.
+    layout.card = {
+        { "oscCard", "OSCILLATEURS", "OSCILLATORS", 1, 1.0f, Picture::wave, nullptr, nullptr,
+          { { "osc1.level", "OSC 1", "OSC 1" }, { "osc2.level", "OSC 2", "OSC 2" }, { "osc3.level", "OSC 3", "OSC 3" }, { "noise.level", "BRUIT", "NOISE" }, { "unison.voices", "UNISSON", "UNISON" }, { "drift", "DÉRIVE", "DRIFT" } } },
+        { "filterCard", "FILTRE", "FILTER", 2, 1.0f, Picture::filter, "filter", nullptr,
+          { { "filter.model" }, { "filter.cutoff", "FRÉQ.", "CUTOFF" }, { "filter.resonance", "RÉSO.", "RESO" }, { "filter.env", "ENV", "ENV" }, { "filter.drive", "SATUR.", "DRIVE" } } },
+        { "ampCard", "ENVELOPPE", "ENVELOPE", 3, 1.0f, Picture::envelope, "amp", nullptr,
+          { { "amp.attack", "ATTAQUE", "ATTACK" }, { "amp.decay", "DÉCLIN", "DECAY" }, { "amp.sustain", "MAINTIEN", "SUSTAIN" }, { "amp.release", "RELÂCHE", "RELEASE" } } },
+        { "outCard", "LFO · VOIX", "LFO · VOICE", 4, 1.0f, Picture::lfo, "lfo1", nullptr,
+          { { "lfo1.rate", "VITESSE", "RATE" }, { "lfo1.pitch", "→ HAUTEUR", "→ PITCH" }, { "voice.glide", "GLISSÉ", "GLIDE" }, { "voice.master", "VOLUME", "VOLUME" } } },
+    };
     return layout;
 }
 
@@ -226,13 +230,17 @@ Layout colosse()
         },
     };
     layout.pages = { std::move(synthPage), std::move(modulationPage) };
-    layout.panePicture = Picture::wave;
-    layout.paneKey = "osc1";
-    layout.paneChoice = "osc1.table";
-    layout.pane = { { "osc1.position", "POS. 1", "POS 1" }, { "osc1.warp", "DÉF. 1", "WARP 1" },
-                    { "osc2.position", "POS. 2", "POS 2" }, { "f1.cutoff", "FRÉQ.", "CUTOFF" },
-                    { "f1.resonance", "RÉSO.", "RESO" },    { "drive.amount", "SATUR.", "DRIVE" },
-                    { "amp.release", "RELÂCHE", "RELEASE" }, { "voice.master", "VOLUME", "VOLUME" } };
+    // The card in Devices: the sound's main settings; the window has them all.
+    layout.card = {
+        { "osc1Card", "OSC 1", "OSC 1", 1, 1.0f, Picture::wave, "osc1", nullptr,
+          { { "osc1.table" }, { "osc1.position", "POSITION", "POSITION" }, { "osc1.warp", "DÉFORM.", "WARP" }, { "osc1.level", "NIVEAU", "LEVEL" } } },
+        { "osc2Card", "OSC 2", "OSC 2", 1, 1.0f, Picture::wave, "osc2", nullptr,
+          { { "osc2.table" }, { "osc2.position", "POSITION", "POSITION" }, { "osc2.warp", "DÉFORM.", "WARP" }, { "osc2.level", "NIVEAU", "LEVEL" } } },
+        { "filterCard", "FILTRES", "FILTERS", 2, 1.0f, Picture::filter, "f1", "f2",
+          { { "f1.type" }, { "f1.cutoff", "FRÉQ. 1", "CUTOFF 1" }, { "f1.resonance", "RÉSO. 1", "RESO 1" }, { "f2.cutoff", "FRÉQ. 2", "CUTOFF 2" }, { "drive.amount", "SATUR.", "DRIVE" } } },
+        { "ampCard", "ENVELOPPE", "ENVELOPE", 3, 1.0f, Picture::envelope, "amp", nullptr,
+          { { "amp.attack", "ATTAQUE", "ATTACK" }, { "amp.decay", "DÉCLIN", "DECAY" }, { "amp.sustain", "MAINTIEN", "SUSTAIN" }, { "amp.release", "RELÂCHE", "RELEASE" }, { "voice.master", "VOLUME", "VOLUME" } } },
+    };
     return layout;
 }
 
@@ -381,12 +389,17 @@ Layout mosaique()
         },
     };
     layout.pages = { std::move(engines), std::move(modulation) };
-    layout.panePicture = Picture::wave;
-    layout.paneKey = "a";
-    layout.paneChoice = "a.type";
-    layout.pane = { { "macro1", "MACRO 1", "MACRO 1" }, { "macro2", "MACRO 2", "MACRO 2" }, { "macro3", "MACRO 3", "MACRO 3" },
-                    { "macro4", "MACRO 4", "MACRO 4" }, { "f1.cutoff", "FRÉQ.", "CUTOFF" },  { "f1.resonance", "RÉSO.", "RESO" },
-                    { "amp.release", "RELÂCHE", "RELEASE" }, { "voice.master", "VOLUME", "VOLUME" } };
+    // The card in Devices: the sound's main settings; the window has them all.
+    layout.card = {
+        { "enginesCard", "MOTEURS", "ENGINES", 1, 1.0f, Picture::wave, "a", nullptr,
+          { { "a.type" }, { "b.type" }, { "a.level", "NIV. A", "LEVEL A" }, { "b.level", "NIV. B", "LEVEL B" } } },
+        { "filterCard", "FILTRES", "FILTERS", 4, 1.0f, Picture::filter, "f1", "f2",
+          { { "f1.type" }, { "f1.cutoff", "FRÉQ. 1", "CUTOFF 1" }, { "f1.resonance", "RÉSO. 1", "RESO 1" }, { "drive.amount", "SATUR.", "DRIVE" } } },
+        { "macrosCard", "MACROS", "MACROS", 9, 1.0f, Picture::none, nullptr, nullptr,
+          { { "macro1", "MACRO 1", "MACRO 1" }, { "macro2", "MACRO 2", "MACRO 2" }, { "macro3", "MACRO 3", "MACRO 3" }, { "macro4", "MACRO 4", "MACRO 4" } } },
+        { "ampCard", "ENVELOPPE", "ENVELOPE", 5, 1.0f, Picture::envelope, "amp", nullptr,
+          { { "amp.attack", "ATTAQUE", "ATTACK" }, { "amp.decay", "DÉCLIN", "DECAY" }, { "amp.sustain", "MAINTIEN", "SUSTAIN" }, { "amp.release", "RELÂCHE", "RELEASE" }, { "voice.master", "VOLUME", "VOLUME" } } },
+    };
     return layout;
 }
 
@@ -501,14 +514,39 @@ Layout nebuleuse()
         },
     };
     layout.pages = { std::move(layers), std::move(modulation) };
-    layout.panePicture = Picture::orb;
-    layout.paneKey = "orb";
-    layout.paneChoice = "a.texture";
-    layout.pane = { { "orb.x", "ORBE X", "ORB X" },     { "orb.y", "ORBE Y", "ORB Y" },      { "orb.motion", "MOUV.", "MOTION" },
-                    { "a.scan", "LECTURE", "SCAN" },    { "a.grain", "GRAIN", "GRAIN" },     { "f.cutoff", "FRÉQ.", "CUTOFF" },
-                    { "amp.release", "RELÂCHE", "RELEASE" }, { "voice.master", "VOLUME", "VOLUME" } };
+    // The card in Devices: the sound's main settings; the window has them all.
+    layout.card = {
+        { "orbCard", "ORBE", "ORB", 6, 1.0f, Picture::orb, "orb", nullptr,
+          { { "orb.motion", "MOUV.", "MOTION" }, { "orb.rate", "VITESSE", "RATE" } } },
+        { "layersCard", "COUCHES", "LAYERS", 1, 1.0f, Picture::none, nullptr, nullptr,
+          { { "a.texture" }, { "a.scan", "LECTURE", "SCAN" }, { "a.grain", "GRAIN", "GRAIN" }, { "a.level", "NIV. A", "LEVEL A" }, { "b.level", "NIV. B", "LEVEL B" } } },
+        { "filterCard", "FILTRE", "FILTER", 3, 1.0f, Picture::filter, "f", nullptr,
+          { { "f.type" }, { "f.cutoff", "FRÉQ.", "CUTOFF" }, { "f.resonance", "RÉSO.", "RESO" } } },
+        { "ampCard", "ENVELOPPE", "ENVELOPE", 4, 1.0f, Picture::envelope, "amp", nullptr,
+          { { "amp.attack", "ATTAQUE", "ATTACK" }, { "amp.decay", "DÉCLIN", "DECAY" }, { "amp.sustain", "MAINTIEN", "SUSTAIN" }, { "amp.release", "RELÂCHE", "RELEASE" }, { "voice.master", "VOLUME", "VOLUME" } } },
+    };
     return layout;
 }
+
+#include "synth_layouts/opale.inc"
+
+#include "synth_layouts/onyx.inc"
+
+#include "synth_layouts/tirette.inc"
+
+#include "synth_layouts/alliage.inc"
+
+#include "synth_layouts/quartz.inc"
+
+#include "synth_layouts/argile.inc"
+
+#include "synth_layouts/saphir.inc"
+
+#include "synth_layouts/derive.inc"
+
+#include "synth_layouts/bronze.inc"
+#include "synth_layouts/silex.inc"
+#include "synth_layouts/jade.inc"
 
 } // namespace
 
@@ -519,11 +557,33 @@ const Layout& layoutFor(const Model model)
     static const Layout colosseLayout = colosse();
     static const Layout mosaiqueLayout = mosaique();
     static const Layout nebuleuseLayout = nebuleuse();
+    static const Layout bronzeLayout = bronze();
+    static const Layout silexLayout = silex();
+    static const Layout jadeLayout = jade();
+    static const Layout deriveLayout = derive();
+    static const Layout saphirLayout = saphir();
+    static const Layout argileLayout = argile();
+    static const Layout quartzLayout = quartz();
+    static const Layout alliageLayout = alliage();
+    static const Layout tiretteLayout = tirette();
+    static const Layout onyxLayout = onyx();
+    static const Layout opaleLayout = opale();
     switch (model) {
     case Model::ambre: return ambreLayout;
     case Model::colosse: return colosseLayout;
     case Model::mosaique: return mosaiqueLayout;
     case Model::nebuleuse: return nebuleuseLayout;
+    case Model::bronze: return bronzeLayout;
+    case Model::silex: return silexLayout;
+    case Model::jade: return jadeLayout;
+    case Model::derive: return deriveLayout;
+    case Model::saphir: return saphirLayout;
+    case Model::argile: return argileLayout;
+    case Model::quartz: return quartzLayout;
+    case Model::alliage: return alliageLayout;
+    case Model::tirette: return tiretteLayout;
+    case Model::onyx: return onyxLayout;
+    case Model::opale: return opaleLayout;
     default: return none;
     }
 }

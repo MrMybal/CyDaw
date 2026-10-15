@@ -1,4 +1,6 @@
 #include <cydaw/engine/GraphInstrumentCompiler.h>
+#include <cydaw/engine/EffectCatalogue.h>
+#include <cydaw/engine/MidiEffects.h>
 #include <cydaw/graph/SoundSources.h>
 
 #include <cydaw/graph/PrimitiveRegistry.h>
@@ -264,6 +266,28 @@ bool reaches(const std::vector<FlatConnection>& connections,
     return false;
 }
 
+// How many cables from the nearest of `sources` to `destination` (a large
+// number when none leads there).
+int distanceFrom(const std::vector<FlatConnection>& connections, const std::vector<Endpoint>& sources,
+                 const std::uint64_t destination)
+{
+    std::vector<std::pair<std::uint64_t, int>> pending;
+    for (const auto& source : sources)
+        pending.emplace_back(source.nodeId, 0);
+    std::set<std::uint64_t> visited;
+    for (std::size_t at = 0; at < pending.size(); ++at) {
+        const auto [current, steps] = pending[at];
+        if (current == destination)
+            return steps;
+        if (!visited.insert(current).second)
+            continue;
+        for (const auto& connection : connections)
+            if (connection.source.nodeId == current)
+                pending.emplace_back(connection.destination.nodeId, steps + 1);
+    }
+    return 1'000'000;
+}
+
 bool anyReach(const std::vector<FlatConnection>& connections,
               const std::vector<Endpoint>& sources,
               const std::uint64_t destination)
@@ -443,6 +467,9 @@ GraphInstrumentCompileResult compileGraphInstrument(
             result.plan.synthValues[static_cast<std::size_t>(index)]
                 = synth::clampValue(model, index, static_cast<float>(value(*oscillator, setting.key, setting.defaultValue)));
         }
+    } else if (oscillator->processorKey == "core.drum-rack") {
+        // A rack: its pads play (the track's engine), its voices nothing.
+        result.plan.waveform = PolyOscillatorWaveform::rack;
     } else if (oscillator == stringVoice && stringVoice != nullptr) {
         result.plan.waveform = PolyOscillatorWaveform::string;
         result.plan.stringDamping = static_cast<float>(std::clamp(
@@ -488,6 +515,41 @@ GraphInstrumentCompileResult compileGraphInstrument(
         } else if (node.processorKey == "core.midi-velocity")
             result.plan.velocityScale *= static_cast<float>(
                 value(node, "scale", 1.0));
+    }
+    // The MIDI effects on the way, in the order the notes meet them.
+    {
+        std::vector<std::pair<int, const FlatNode*>> chain;
+        for (const auto& node : flattener.nodes) {
+            const auto* effect = effectForProcessor(node.processorKey);
+            const auto legacy = node.processorKey == "core.midi-arpeggiator";
+            if ((effect == nullptr || !effect->midi) && !legacy)
+                continue;
+            if (!anyReach(flattener.connections, midiInputs, node.id) || !reaches(flattener.connections, node.id, allocator->id))
+                continue;
+            chain.emplace_back(distanceFrom(flattener.connections, midiInputs, node.id), &node);
+        }
+        std::ranges::stable_sort(chain, {}, &std::pair<int, const FlatNode*>::first);
+        if (!chain.empty()) {
+            auto effects = std::make_shared<MidiEffectsPlan>();
+            for (const auto& [distance, node] : chain) {
+                if (effects->count >= midiEffectMost)
+                    break;
+                const auto* effect = effectForProcessor(node->processorKey);
+                if (effect == nullptr) {
+                    effects->effects[effects->count++] = legacyArpeggiatorSettings(value(*node, "rate", 0.25), value(*node, "octaves", 1.0));
+                    continue;
+                }
+                MidiEffectSettings settings;
+                settings.kind = effect->kind;
+                for (std::size_t index = 0; index < effect->parameters.size() && index < settings.values.size(); ++index) {
+                    const auto& parameter = effect->parameters[index];
+                    settings.values[index] = std::clamp(static_cast<float>(value(*node, parameter.key, parameter.defaultValue)),
+                                                        parameter.minimum, parameter.maximum);
+                }
+                effects->effects[effects->count++] = settings;
+            }
+            result.plan.midiEffects = std::move(effects);
+        }
     }
     result.plan.transposeSemitones = std::clamp(
         result.plan.transposeSemitones, -96, 96);

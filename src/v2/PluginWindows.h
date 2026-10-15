@@ -1,6 +1,7 @@
 #pragma once
 
 #include "PresetMenu.h"
+#include "Studio.h"
 #include "UiState.h"
 
 #include <memory>

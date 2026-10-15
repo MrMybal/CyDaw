@@ -6,6 +6,7 @@
 #include "Theme.h"
 #include "Widgets.h"
 
+#include <imgui_internal.h>
 #include <juce_audio_formats/juce_audio_formats.h>
 
 #include <algorithm>
@@ -96,18 +97,15 @@ void SamplerView::commit(const Target& target, const juce::var& json, const bool
 void SamplerView::openEditor(const TrackRef& track, const std::uint64_t nodeId, const bool detached, const bool controls,
                              const bool here)
 {
-    placeHere_ = here && !detached;
+    const auto id = windows_.open(track, nodeId, state_.manyInstrumentWindows);
+    placeHere_ = here && !detached ? id : std::string();
     if (detached)
-        ui::setDetached(editorWindowId, true);
+        ui::setDetached(id.c_str(), true);
     else if (here)
-        ui::setDetached(editorWindowId, false);
-    showControls_ = controls;
-    focusEditor_ = true;
-    editor_ = Target { track, nodeId };
-    selected_ = 0;
-    editing_ = false;
-    working_ = juce::var();
-    peaks_ = {};
+        ui::setDetached(id.c_str(), false);
+    auto& kept = windowStates_[id];
+    kept = {};
+    kept.showControls = controls;
 }
 
 void SamplerView::addFiles(const TrackRef& track, const std::uint64_t nodeId, const juce::StringArray& paths)
@@ -129,6 +127,17 @@ void SamplerView::addFiles(const TrackRef& track, const std::uint64_t nodeId, co
     if (audio.isEmpty())
         return;
     const Target target { track, nodeId };
+    // The simple sampler holds one sample, over the whole keyboard around
+    // its note (its name's, its pitch's; middle C for a sound without one),
+    // played at every key's pitch: a sample dropped replaces it.
+    const auto* slot = studio_.graphFor(track);
+    if (const auto controls = slot != nullptr ? slot->graph().editorSamplerControls(nodeId) : std::nullopt;
+        controls && controls->simple) {
+        pane_ = {};
+        commit(target, app::simpleSamplerMap(audio[0]));
+        report(audio[0].getFileName());
+        return;
+    }
     const auto current = currentMap(target);
     const auto zones = zonesOf(current);
     const auto json = zones != nullptr && !zones->isEmpty()
@@ -265,6 +274,12 @@ int SamplerView::drawMap(const juce::var& json, const ImVec2 at, const ImVec2 si
 void SamplerView::drawPane(const TrackRef& track, app::NodeGraphComponent& graph, const std::uint64_t nodeId, const ImVec2 at,
                            const ImVec2 size, const ImU32 colour)
 {
+    // Inside a module: English, whatever the language.
+    const ui::ModuleText english;
+    if (const auto controls = graph.editorSamplerControls(nodeId); controls && controls->simple) {
+        drawSimplePane(track, graph, nodeId, at, size);
+        return;
+    }
     const auto& p = theme::palette();
     auto* list = ImGui::GetWindowDrawList();
     const ImVec2 end(at.x + size.x, at.y + size.y);
@@ -331,9 +346,11 @@ void SamplerView::drawPane(const TrackRef& track, app::NodeGraphComponent& graph
             description << "\n" << missing << ui::Ls(" fichier(s) introuvable(s)", " file(s) missing");
     }
     ImGui::SetCursorScreenPos(ImVec2(at.x + dp(4.0f), end.y - textHeight + dp(1.0f)));
-    ImGui::PushTextWrapPos(end.x - dp(62.0f));
+    list->PushClipRect(at, ImVec2(end.x - dp(60.0f), end.y), true);
+    ui::pushTextWrapAt(end.x - dp(62.0f));
     ImGui::TextColored(theme::vec(p.textDim), "%s", description.toRawUTF8());
     ImGui::PopTextWrapPos();
+    list->PopClipRect();
     ImGui::SetCursorScreenPos(ImVec2(end.x - dp(58.0f), end.y - textHeight + dp(1.0f)));
     if (ImGui::SmallButton(L("Zones…", "Zones…")))
         openEditor(track, nodeId);
@@ -345,6 +362,164 @@ void SamplerView::drawPane(const TrackRef& track, app::NodeGraphComponent& graph
                   "Add samples (WAV, FLAC, AIFF…): their note comes from their name or their pitch."));
     ImGui::PopFont();
     ImGui::PopID();
+}
+
+void SamplerView::drawSimplePane(const TrackRef& track, app::NodeGraphComponent& graph, const std::uint64_t nodeId, const ImVec2 at,
+                                 const ImVec2 size)
+{
+    // Inside a module: English, whatever the language.
+    const ui::ModuleText english;
+    const auto& p = theme::palette();
+    auto* list = ImGui::GetWindowDrawList();
+    const ImVec2 end(at.x + size.x, at.y + size.y);
+    list->AddRectFilled(at, end, p.bg1, dp(4.0f));
+    const Target target { track, nodeId };
+    const auto mine = pane_.target.has_value() && pane_.target->track == track && pane_.target->nodeId == nodeId;
+    auto json = mine && pane_.editing ? pane_.working : copyOf(graph.nodeSamplerJson(nodeId));
+    auto* zones = zonesOf(json);
+    const auto empty = zones == nullptr || zones->isEmpty();
+    ImGui::PushID("simplePane");
+    ImGui::PushFont(nullptr, ui::currentFontBase() * 0.78f);
+    const auto row = ImGui::GetFrameHeight() + dp(3.0f);
+    // Granular (Nuée): its grains' settings, a row of knobs under the sound.
+    std::vector<app::NodeGraphComponent::EditorParameter> grainSettings;
+    auto granular = false;
+    for (const auto& node : graph.editorNodes())
+        if (node.id == nodeId)
+            for (const auto& parameter : node.parameters) {
+                if (parameter.binding.endsWith(".sampler.grains"))
+                    granular = parameter.value >= 0.5;
+                else if (parameter.binding.contains(".sampler.grain"))
+                    grainSettings.push_back(parameter);
+            }
+    const auto knobRow = granular ? dp(22.0f) + ImGui::GetFontSize() * 2.2f : 0.0f;
+    const ImVec2 waveAt(at.x + dp(4.0f), at.y + dp(4.0f));
+    const ImVec2 waveSize(size.x - dp(8.0f), std::max(dp(30.0f), size.y - row * 3.0f - dp(8.0f) - knobRow));
+    if (empty) {
+        const ImVec2 waveEnd(waveAt.x + waveSize.x, waveAt.y + waveSize.y);
+        list->AddRectFilled(waveAt, waveEnd, p.bg0, dp(3.0f));
+        ui::centredText(list, waveAt, waveEnd, p.textFaint, L("Déposez un échantillon ici", "Drop a sample here"));
+        ImGui::SetCursorScreenPos(waveAt);
+        ImGui::InvisibleButton("##simpleEmpty", waveSize);
+        if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+            chooseFiles(target);
+        ui::tooltip(L("Un échantillon joué sur tout le clavier. Glissez-en un ici (du navigateur ou de l'explorateur), "
+                      "ou double-cliquez pour le choisir.",
+                      "One sample played over the whole keyboard. Drag one here (from the browser or the file explorer), "
+                      "or double click to choose it."));
+    } else {
+        // Its waveform and markers, the loop and its length.
+        ImGui::SetCursorScreenPos(waveAt);
+        drawWaveform(target, json, 0, waveSize, pane_.peaks, pane_.working, pane_.editing, true);
+        if (pane_.editing)
+            pane_.target = target;
+        if (granular) {
+            // Where the grains are taken (and how far around), over the sound.
+            const auto valueOf = [&grainSettings](const char* suffix, const double fallback) {
+                for (const auto& parameter : grainSettings)
+                    if (parameter.binding.endsWith(suffix))
+                        return parameter.value;
+                return fallback;
+            };
+            const auto position = std::clamp(valueOf(".grainPosition", 0.3), 0.0, 1.0);
+            const auto spray = std::clamp(valueOf(".grainSpray", 0.05), 0.0, 1.0);
+            const auto scan = valueOf(".grainScan", 0.0);
+            const auto x = waveAt.x + static_cast<float>(position) * waveSize.x;
+            const auto half = static_cast<float>(spray * 0.5) * waveSize.x;
+            const auto tint = IM_COL32(150, 210, 255, 255);
+            list->AddRectFilled(ImVec2(std::max(waveAt.x, x - half), waveAt.y), ImVec2(std::min(waveAt.x + waveSize.x, x + half), waveAt.y + waveSize.y),
+                                theme::alpha(tint, 0.18f));
+            list->AddLine(ImVec2(x, waveAt.y), ImVec2(x, waveAt.y + waveSize.y), tint, dp(2.0f));
+            if (std::abs(scan) > 0.005) {
+                const auto direction = scan > 0.0 ? 1.0f : -1.0f;
+                const ImVec2 tip(x + direction * dp(14.0f), waveAt.y + dp(8.0f));
+                list->AddLine(ImVec2(x, tip.y), tip, tint, dp(1.5f));
+                list->AddTriangleFilled(tip, ImVec2(tip.x - direction * dp(5.0f), tip.y - dp(4.0f)),
+                                        ImVec2(tip.x - direction * dp(5.0f), tip.y + dp(4.0f)), tint);
+            }
+            // Dragging along the sound sets where the grains are taken.
+            ImGui::SetCursorScreenPos(ImVec2(waveAt.x, waveAt.y + waveSize.y * 0.5f));
+            ImGui::InvisibleButton("##grainPlace", ImVec2(waveSize.x, waveSize.y * 0.5f));
+            if (ImGui::IsItemActive()) {
+                const auto place = std::clamp((ImGui::GetIO().MousePos.x - waveAt.x) / std::max(1.0f, waveSize.x), 0.0f, 1.0f);
+                for (const auto& parameter : grainSettings)
+                    if (parameter.binding.endsWith(".grainPosition"))
+                        (void) graph.editorSetParameter(parameter.binding, place);
+            }
+            ui::tooltip(L("Glisser ici : l'endroit où les grains sont pris.", "Drag here: where the grains are taken."));
+        }
+        // Its note: where it plays at its own pitch.
+        auto& zone = zones->getReference(0);
+        auto root = static_cast<int>(zone.getProperty("root", 60));
+        ImGui::SetCursorScreenPos(ImVec2(waveAt.x, ImGui::GetCursorScreenPos().y));
+        ImGui::SetNextItemWidth(dp(96.0f));
+        const auto format = juce::String::fromUTF8(L("Racine ", "Root ")) + noteName(root);
+        if (ImGui::DragInt("##root", &root, 0.15f, 0, 127, format.toRawUTF8())) {
+            setValue(zone, "root", root);
+            pane_.editing = true;
+            pane_.working = json;
+            pane_.target = target;
+        }
+        ui::tooltip(L("La note où l'échantillon joue à sa hauteur enregistrée (glisser, ou Ctrl+clic pour la taper).",
+                      "The key that plays the sample at its recorded pitch (drag, or Ctrl+click to type it)."));
+        ImGui::SameLine();
+        const auto file = juce::File(app::resolveSamplePath(zone.getProperty("file", {}).toString())).getFileNameWithoutExtension();
+        ImGui::PushClipRect(ImGui::GetCursorScreenPos(), ImVec2(end.x - dp(4.0f), end.y), true);
+        ImGui::TextColored(theme::vec(p.textDim), "%s", file.toRawUTF8());
+        ImGui::PopClipRect();
+    }
+    // The grains' knobs.
+    if (granular && !grainSettings.empty()) {
+        const auto top = end.y - row - knobRow - dp(2.0f);
+        const auto cell = (size.x - dp(8.0f)) / static_cast<float>(grainSettings.size());
+        for (std::size_t index = 0; index < grainSettings.size(); ++index) {
+            const auto& parameter = grainSettings[index];
+            auto value = static_cast<float>(parameter.value);
+            ui::KnobStyle style;
+            style.diameter = 22.0f;
+            const auto label = parameter.label.toStdString();
+            style.label = label.c_str();
+            style.colour = IM_COL32(150, 210, 255, 255);
+            const auto unit = parameter.unit.toStdString();
+            style.unit = unit.c_str();
+            style.format = parameter.maximum - parameter.minimum >= 100.0 ? "%.0f" : "%.2f";
+            if (parameter.unit == "ms" || parameter.unit == "Hz")
+                style.flags |= ui::knobLogarithmic;
+            if (parameter.minimum < 0.0)
+                style.flags |= ui::knobBipolar;
+            ImGui::SetCursorScreenPos(ImVec2(at.x + dp(4.0f) + cell * static_cast<float>(index) + (cell - dp(34.0f)) * 0.5f, top));
+            ImGui::PushID(static_cast<int>(index));
+            if (ui::knob("##grain", &value, static_cast<float>(parameter.minimum), static_cast<float>(parameter.maximum),
+                         static_cast<float>(parameter.defaultValue), style))
+                (void) graph.editorSetParameter(parameter.binding, value);
+            ImGui::PopID();
+        }
+    }
+    ImGui::SetCursorScreenPos(ImVec2(at.x + dp(4.0f), end.y - row));
+    if (ImGui::SmallButton(empty ? L("Charger…", "Load…") : L("Remplacer…", "Replace…")))
+        chooseFiles(target);
+    ui::tooltip(L("Choisir l'échantillon (WAV, FLAC, AIFF…).", "Choose the sample (WAV, FLAC, AIFF…)."));
+    ImGui::SameLine();
+    if (ImGui::SmallButton(L("Éditer…", "Edit…")))
+        openEditor(track, nodeId);
+    ui::tooltip(L("La zone en détail : touches, vélocités, accord, niveau.", "The zone in detail: keys, velocities, tuning, level."));
+    // A sample dropped anywhere on it (the browser's), or from the system
+    // (the drop handler asks where this pane was).
+    if (ImGui::BeginDragDropTargetCustom(ImRect(at, end), ImGui::GetID("##simpleDrop"))) {
+        if (const auto* payload = ImGui::AcceptDragDropPayload(kFilePayload); payload != nullptr && payload->DataSize > 1)
+            addFiles(track, nodeId, juce::StringArray { juce::String::fromUTF8(static_cast<const char*>(payload->Data)) });
+        ImGui::EndDragDropTarget();
+    }
+    state_.samplerDrop = UiState::SamplerDrop { track, nodeId, at.x, at.y, end.x, end.y };
+    ImGui::PopFont();
+    ImGui::PopID();
+    // A marker or the root let go: the edit becomes the card's (one undo step).
+    if (pane_.editing && pane_.target.has_value() && pane_.target->track == track && pane_.target->nodeId == nodeId
+        && !ImGui::IsAnyItemActive()) {
+        pane_.editing = false;
+        commit(target, pane_.working);
+        pane_.working = juce::var();
+    }
 }
 
 void SamplerView::drawZoneFields(const Target& target, juce::var& json, const int zone)
@@ -433,7 +608,8 @@ void SamplerView::drawZoneFields(const Target& target, juce::var& json, const in
                   "The root and tuning from the pitch heard in the sample."));
 }
 
-void SamplerView::drawWaveform(const Target& target, juce::var& json, const int zone, const ImVec2 size)
+void SamplerView::drawWaveform(const Target& target, juce::var& json, const int zone, const ImVec2 size, Peaks& peaks,
+                               juce::var& working, bool& editing, const bool compact)
 {
     const auto& p = theme::palette();
     auto* list = ImGui::GetWindowDrawList();
@@ -458,11 +634,11 @@ void SamplerView::drawWaveform(const Target& target, juce::var& json, const int 
     }
     // Its peaks, per column, read once.
     const auto columns = std::max(16, static_cast<int>(size.x));
-    if (peaks_.sample != data.get() || peaks_.columns != columns) {
-        peaks_.sample = data.get();
-        peaks_.columns = columns;
-        peaks_.low.assign(static_cast<std::size_t>(columns), 0.0f);
-        peaks_.high.assign(static_cast<std::size_t>(columns), 0.0f);
+    if (peaks.sample != data.get() || peaks.columns != columns) {
+        peaks.sample = data.get();
+        peaks.columns = columns;
+        peaks.low.assign(static_cast<std::size_t>(columns), 0.0f);
+        peaks.high.assign(static_cast<std::size_t>(columns), 0.0f);
         // A long recording has only its head in memory: its peaks read from
         // the file, once.
         std::unique_ptr<juce::AudioFormatReader> reader;
@@ -476,8 +652,8 @@ void SamplerView::drawWaveform(const Target& target, juce::var& json, const int 
             const auto to = std::max(from + 1, data->frames * (column + 1) / columns);
             juce::Range<float> levels[2];
             reader->readMaxLevels(from, to - from, levels, 1);
-            peaks_.low[static_cast<std::size_t>(column)] = levels[0].getStart();
-            peaks_.high[static_cast<std::size_t>(column)] = levels[0].getEnd();
+            peaks.low[static_cast<std::size_t>(column)] = levels[0].getStart();
+            peaks.high[static_cast<std::size_t>(column)] = levels[0].getEnd();
         }
         for (int column = 0; column < columns && !data->streamed; ++column) {
             const auto from = data->frames * column / columns;
@@ -490,16 +666,16 @@ void SamplerView::drawWaveform(const Target& target, juce::var& json, const int 
                 low = std::min(low, value);
                 high = std::max(high, value);
             }
-            peaks_.low[static_cast<std::size_t>(column)] = static_cast<float>(low) / 32'767.0f;
-            peaks_.high[static_cast<std::size_t>(column)] = static_cast<float>(high) / 32'767.0f;
+            peaks.low[static_cast<std::size_t>(column)] = static_cast<float>(low) / 32'767.0f;
+            peaks.high[static_cast<std::size_t>(column)] = static_cast<float>(high) / 32'767.0f;
         }
     }
     const auto middle = (at.y + end.y) * 0.5f;
     const auto half = size.y * 0.46f;
     for (int column = 0; column < columns; ++column) {
         const auto x = at.x + size.x * static_cast<float>(column) / static_cast<float>(columns);
-        list->AddLine(ImVec2(x, middle - peaks_.high[static_cast<std::size_t>(column)] * half),
-                      ImVec2(x, middle - peaks_.low[static_cast<std::size_t>(column)] * half + 1.0f), p.audio);
+        list->AddLine(ImVec2(x, middle - peaks.high[static_cast<std::size_t>(column)] * half),
+                      ImVec2(x, middle - peaks.low[static_cast<std::size_t>(column)] * half + 1.0f), p.audio);
     }
     // The markers: start, end, loop start and end.
     auto& item = zones->getReference(zone);
@@ -540,11 +716,12 @@ void SamplerView::drawWaveform(const Target& target, juce::var& json, const int 
         case 3: setPair(item, "loop", static_cast<juce::int64>(loopStart), std::max<juce::int64>(frame, static_cast<juce::int64>(loopStart) + 2)); break;
         default: break;
         }
-        editing_ = true;
-        working_ = json;
+        editing = true;
+        working = json;
     }
     ui::tooltip(L("Glissez les repères : début (vert), fin (rouge), boucle.", "Drag the markers: start (green), end (red), loop."));
-    // The loop on or off, and its crossfade.
+    // The loop on or off, and its crossfade, under the waveform.
+    ImGui::SetCursorScreenPos(ImVec2(at.x, ImGui::GetCursorScreenPos().y + (compact ? dp(2.0f) : 0.0f)));
     auto looped = hasLoop;
     if (ImGui::Checkbox(L("Boucle", "Loop"), &looped)) {
         auto edited = copyOf(json);
@@ -559,50 +736,76 @@ void SamplerView::drawWaveform(const Target& target, juce::var& json, const int 
         }
         commit(target, edited);
     }
-    if (hasLoop) {
+    if (hasLoop && !compact) {
         ImGui::SameLine();
         auto crossfade = static_cast<float>(static_cast<int>(item.getProperty("loopCrossfade", 0)) * 1'000.0 / data->sampleRate);
         ImGui::SetNextItemWidth(dp(120.0f));
         if (ImGui::DragFloat(ui::labelId(L("Fondu", "Crossfade"), "crossfade").c_str(), &crossfade, 0.5f, 0.0f, 500.0f, "%.0f ms")) {
             setValue(item, "loopCrossfade", static_cast<int>(crossfade * 0.001 * data->sampleRate));
-            editing_ = true;
-            working_ = json;
+            editing = true;
+            working = json;
         }
     }
     ImGui::SameLine();
-    ImGui::TextColored(theme::vec(p.textDim), "%.2f s, %d Hz, %s", frames / data->sampleRate, static_cast<int>(data->sampleRate),
-                       data->channels > 1 ? L("stéréo", "stereo") : L("mono", "mono"));
+    if (compact)
+        ImGui::TextColored(theme::vec(p.textDim), "%.2f s %s", frames / data->sampleRate,
+                           data->channels > 1 ? L("stéréo", "stereo") : L("mono", "mono"));
+    else
+        ImGui::TextColored(theme::vec(p.textDim), "%.2f s, %d Hz, %s", frames / data->sampleRate, static_cast<int>(data->sampleRate),
+                           data->channels > 1 ? L("stéréo", "stereo") : L("mono", "mono"));
 }
 
 void SamplerView::drawEditor()
 {
-    if (!editor_)
-        return;
+    // Inside a module: English, whatever the language.
+    const ui::ModuleText english;
+    windows_.each([this](const TrackRef& track, const std::uint64_t nodeId, const bool focus) {
+        editor_ = Target { track, nodeId };
+        windowId_ = windows_.idOf(track, nodeId);
+        // This window's own: its zone in hand, its edit, its waveform.
+        auto& kept = windowStates_[windowId_];
+        selected_ = kept.selected;
+        editing_ = kept.editing;
+        working_ = kept.working;
+        peaks_ = std::move(kept.peaks);
+        showControls_ = kept.showControls;
+        const auto open = drawEditorWindow(focus);
+        kept = { selected_, editing_, working_, std::move(peaks_), showControls_ };
+        if (!open)
+            windowStates_.erase(windowId_);
+        editor_.reset();
+        return open;
+    });
+}
+
+bool SamplerView::drawEditorWindow(const bool focus)
+{
     const auto target = *editor_;
     auto* slot = studio_.graphFor(target.track);
     if (slot == nullptr || (!studio_.isValid(target.track) && !target.track.master)) {
-        editor_.reset();
-        return;
+        return false;
     }
     auto json = editing_ ? working_ : copyOf(currentMap(target));
     const auto& p = theme::palette();
-    ui::beforeDetachable(editorWindowId);
-    if (std::exchange(placeHere_, false)) {
+    ui::beforeDetachable(windowId_.c_str());
+    windows_.placeFirst(target.track, target.nodeId);
+    if (!placeHere_.empty() && placeHere_ == windowId_) {
+        placeHere_.clear();
         const auto* main = ImGui::GetMainViewport();
         ImGui::SetNextWindowPos(ImVec2(main->Pos.x + dp(60.0f), main->Pos.y + dp(70.0f)), ImGuiCond_Always);
         ImGui::SetNextWindowViewport(main->ID);
     }
     ImGui::SetNextWindowSize(ImVec2(dp(920.0f), dp(640.0f)), ImGuiCond_FirstUseEver);
-    if (std::exchange(focusEditor_, false))
+    if (focus)
         ImGui::SetNextWindowFocus();
     auto open = true;
-    const auto title = ui::Ls("Sampler — ", "Sampler — ") + studio_.trackName(target.track) + "###samplerEditor";
+    const auto title = ui::Ls("Sampler — ", "Sampler — ") + studio_.trackName(target.track) + juce::String(windowId_);
     if (ImGui::Begin(title.toRawUTF8(), &open, ImGuiWindowFlags_NoCollapse)) {
         // Out of the studio's window, as a plug-in's (another screen), and back.
         {
             const auto headerY = ImGui::GetCursorPosY();
             ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - dp(24.0f));
-            (void) ui::detachButton(editorWindowId, ImVec2(dp(24.0f), dp(22.0f)));
+            (void) ui::detachButton(windowId_.c_str(), ImVec2(dp(24.0f), dp(22.0f)));
             ImGui::SetCursorPosY(headerY);
         }
 
@@ -702,7 +905,8 @@ void SamplerView::drawEditor()
                                            .toRawUTF8());
                     drawZoneFields(target, json, selected_);
                     ImGui::Spacing();
-                    drawWaveform(target, json, selected_, ImVec2(ImGui::GetContentRegionAvail().x, dp(130.0f)));
+                    drawWaveform(target, json, selected_, ImVec2(ImGui::GetContentRegionAvail().x, dp(130.0f)), peaks_, working_,
+                                 editing_, false);
                 } else {
                     ImGui::TextDisabled("%s", L("Choisissez une zone.", "Choose a zone."));
                 }
@@ -731,8 +935,7 @@ void SamplerView::drawEditor()
         commit(target, working_);
         working_ = juce::var();
     }
-    if (!open)
-        editor_.reset();
+    return open;
 }
 
 } // namespace cydaw::v2

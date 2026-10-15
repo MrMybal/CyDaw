@@ -584,4 +584,60 @@ void TimeStretcher::render(StretchSource& source, const std::int64_t position, c
     expected_ = position + count;
 }
 
+namespace {
+
+// The loop read over and over: every frame taken modulo its length.
+struct LoopSource final : StretchSource {
+    const std::vector<std::vector<float>>& channels;
+    std::int64_t length {};
+    LoopSource(const std::vector<std::vector<float>>& source, const std::int64_t frames) : channels(source), length(frames) {}
+    void read(const std::int64_t start, const int count, float* const* out, const int channelCount) override
+    {
+        for (int channel = 0; channel < channelCount; ++channel) {
+            const auto& from = channels[static_cast<std::size_t>(std::min(channel, static_cast<int>(channels.size()) - 1))];
+            for (int i = 0; i < count; ++i) {
+                const auto frame = ((start + i) % length + length) % length;
+                out[channel][i] = frame < static_cast<std::int64_t>(from.size()) ? from[static_cast<std::size_t>(frame)] : 0.0f;
+            }
+        }
+    }
+};
+
+} // namespace
+
+std::vector<std::vector<float>> renderStretchedLoop(const std::vector<std::vector<float>>& channels, const double sourceRate,
+                                                    const double sourceBpm, const int beats, const double tempo,
+                                                    const double outputRate, const StretchAlgorithm algorithm)
+{
+    if (channels.empty() || sourceRate <= 0.0 || sourceBpm <= 0.0 || beats <= 0 || tempo <= 0.0 || outputRate <= 0.0)
+        return {};
+    const auto loopSeconds = static_cast<double>(beats) * 60.0 / sourceBpm;
+    const auto sourceFrames = std::max<std::int64_t>(1, static_cast<std::int64_t>(std::llround(loopSeconds * sourceRate)));
+    const auto outputFrames = std::max<std::int64_t>(1, static_cast<std::int64_t>(std::llround(static_cast<double>(beats) * 60.0 / tempo * outputRate)));
+    LoopSource source(channels, sourceFrames);
+    StretchSettings settings;
+    settings.algorithm = algorithm;
+    settings.sourceRate = sourceRate;
+    settings.outputRate = outputRate;
+    settings.channels = static_cast<int>(channels.size());
+    // Exactly the loop's frames in exactly its output length.
+    settings.speed = static_cast<double>(sourceFrames) / sourceRate / (static_cast<double>(outputFrames) / outputRate);
+    TimeStretcher stretcher;
+    stretcher.prepare(settings);
+    // Twice round, the second kept: by then the stretcher has heard the end
+    // of the loop going into its start, so the seam is as the rest.
+    std::vector<std::vector<float>> rendered(channels.size(), std::vector<float>(static_cast<std::size_t>(outputFrames) * 2));
+    constexpr int block = 4'096;
+    std::vector<float*> pointers(channels.size());
+    for (std::int64_t at = 0; at < outputFrames * 2; at += block) {
+        const auto count = static_cast<int>(std::min<std::int64_t>(block, outputFrames * 2 - at));
+        for (std::size_t channel = 0; channel < channels.size(); ++channel)
+            pointers[channel] = rendered[channel].data() + at;
+        stretcher.render(source, at, count, pointers.data());
+    }
+    for (auto& channel : rendered)
+        channel.erase(channel.begin(), channel.begin() + outputFrames);
+    return rendered;
+}
+
 } // namespace cydaw::engine

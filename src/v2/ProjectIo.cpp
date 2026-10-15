@@ -83,6 +83,7 @@ const juce::Identifier launcherActions("launcherActions");
 const juce::Identifier launcherClips("launcherClips");
 const juce::Identifier lengthBeats("lengthBeats");
 const juce::Identifier loop("loop");
+const juce::Identifier launcherScene("launcherScene");
 const juce::Identifier loopEnd("loopEnd");
 const juce::Identifier loopEndBeats("loopEndBeats");
 const juce::Identifier loopRangeExplicit("loopRangeExplicit");
@@ -1375,7 +1376,9 @@ void restoreMidiClip(Engine& engine, const std::uint64_t trackId, const juce::Dy
     const auto length = std::max(0.25, number(clip, keys::lengthBeats));
     const auto looping = static_cast<bool>(clip.getProperty(keys::loop));
     const auto clipId = engine.addMidiClip(trackId, clip.getProperty(keys::name).toString(),
-                                           number(clip, keys::startBeats), length, looping, colourOf(clip));
+                                           number(clip, keys::startBeats), length, looping, colourOf(clip),
+                                           clip.hasProperty(keys::launcherScene) ? static_cast<int>(clip.getProperty(keys::launcherScene))
+                                                                                 : -1);
     if (clipId == 0)
         return;
     const auto playStart = numberOr(clip, keys::playStartBeats, 0.0);
@@ -1442,6 +1445,8 @@ std::uint64_t restoreMidiTrack(Studio& studio, const juce::DynamicObject& saved,
         state.laneHeight = juce::jlimit(40, 420, static_cast<int>(saved.getProperty(keys::laneHeight)));
     state.automationVisible = static_cast<bool>(saved.getProperty(keys::automationVisible));
     readParameterLanes(saved, state.parameterLanes);
+    if (const auto pads = saved.getProperty("rackPads"); pads.isArray())
+        studio.restoreRackPads(TrackRef { true, 0, trackId }, pads);
     // Every armed track armed again (CyDAW 2 arms several).
     if (static_cast<bool>(saved.getProperty(keys::armed))) {
         (void) studio.engine().setMidiTrackArmed(trackId, true);
@@ -1575,7 +1580,7 @@ juce::var buildDocument(Studio& studio, const juce::File& projectFile, const boo
         if (state != nullptr && state->bus)
             track->setProperty("bus", true);
         track->setProperty("outputs", outputsToVar(studio, TrackRef { false, index, 0 }));
-        if (state != nullptr && state->launcherStopOff != 0)
+        if (state != nullptr && state->launcherStopOff.any())
             track->setProperty("launcherStopOff", stopsOffToVar(studio, TrackRef { false, index, 0 }));
         track->setProperty(keys::laneHeight, state != nullptr ? state->laneHeight : 88);
         track->setProperty(keys::automationVisible, state != nullptr && state->automationVisible);
@@ -1634,7 +1639,7 @@ juce::var buildDocument(Studio& studio, const juce::File& projectFile, const boo
         const auto* state = found != studio.midiStates().end() ? &found->second : nullptr;
         auto track = makeObject();
         track->setProperty("outputs", outputsToVar(studio, TrackRef { true, 0, info.id }));
-        if (state != nullptr && state->launcherStopOff != 0)
+        if (state != nullptr && state->launcherStopOff.any())
             track->setProperty("launcherStopOff", stopsOffToVar(studio, TrackRef { true, 0, info.id }));
         track->setProperty(keys::name, info.name);
         track->setProperty(keys::gainDb, info.gainDb);
@@ -1651,6 +1656,8 @@ juce::var buildDocument(Studio& studio, const juce::File& projectFile, const boo
         track->setProperty(keys::nodeGraph,
                            Studio::withoutSharedModules(graphOr(midiGraphs, info.id, studio.factoryMidiGraph())));
         track->setProperty(keys::gainAutomation, automationPointsToVar(engine.midiAutomationPoints(info.id)));
+        if (studio.rackPadCount(TrackRef { true, 0, info.id }) > 0)
+            track->setProperty("rackPads", studio.rackPadsState(TrackRef { true, 0, info.id }));
         if (state != nullptr) {
             track->setProperty(keys::parameterAutomation, parameterLanesToVar(state->parameterLanes));
             track->setProperty(keys::shownAutomation, state->parameterLanes.shown);
@@ -1667,6 +1674,8 @@ juce::var buildDocument(Studio& studio, const juce::File& projectFile, const boo
             clip->setProperty(keys::loopStartBeats, clipInfo.loopStartBeats);
             clip->setProperty(keys::loopEndBeats, clipInfo.loopEndBeats);
             clip->setProperty(keys::colour, static_cast<juce::int64>(clipInfo.colour));
+            if (clipInfo.launcherScene >= 0)
+                clip->setProperty(keys::launcherScene, clipInfo.launcherScene);
             clip->setProperty(keys::notes, midiNotesToVar(clipInfo.notes));
             clip->setProperty(keys::gainAutomation, automationPointsToVar(clipInfo.automation));
             clips.add(juce::var(clip.get()));
@@ -1690,6 +1699,36 @@ juce::var buildDocument(Studio& studio, const juce::File& projectFile, const boo
                           static_cast<int>(interfaceValue(studio, keys::arrangementSnapType, 1)));
     document->setProperty(keys::arrangementTool, static_cast<int>(interfaceValue(studio, keys::arrangementTool, 1)));
     document->setProperty(keys::launchQuantization, static_cast<int>(engine.launchQuantization()));
+    // The master's launcher clips: by scene, their lanes' points in beats.
+    {
+        juce::Array<juce::var> masterClips;
+        for (const auto& [scene, clip] : studio.masterClips()) {
+            auto* entry = new juce::DynamicObject();
+            entry->setProperty("scene", scene);
+            entry->setProperty("name", clip.name);
+            entry->setProperty("colour", static_cast<juce::int64>(clip.colour));
+            entry->setProperty("lengthBeats", clip.lengthBeats);
+            entry->setProperty("looping", clip.looping);
+            juce::Array<juce::var> lanes;
+            for (const auto& [binding, points] : clip.lanes) {
+                juce::Array<juce::var> list;
+                for (const auto& point : points) {
+                    juce::Array<juce::var> pair;
+                    pair.add(point.beats);
+                    pair.add(static_cast<double>(point.value));
+                    list.add(pair);
+                }
+                auto* lane = new juce::DynamicObject();
+                lane->setProperty("binding", binding);
+                lane->setProperty("points", list);
+                lanes.add(juce::var(lane));
+            }
+            entry->setProperty("lanes", lanes);
+            masterClips.add(juce::var(entry));
+        }
+        if (!masterClips.isEmpty())
+            document->setProperty("masterClips", masterClips);
+    }
     document->setProperty(keys::arrangementPlayback, engine.arrangementPlaybackEnabled());
     document->setProperty(keys::launcherActionReplay,
                           static_cast<bool>(interfaceValue(studio, keys::launcherActionReplay, false)));
@@ -1883,6 +1922,35 @@ bool DocumentLoad::next()
                 ? static_cast<Engine::LaunchQuantization>(
                       juce::jlimit(0, 4, static_cast<int>(root.getProperty(keys::launchQuantization))))
                 : Engine::LaunchQuantization::oneBar);
+        // The master's launcher clips.
+        {
+            std::map<int, MasterClip> masterClips;
+            if (const auto* list = root.getProperty("masterClips").getArray())
+                for (const auto& entry : *list) {
+                    const auto scene = static_cast<int>(entry.getProperty("scene", -1));
+                    if (scene < 0 || scene >= Engine::maximumLauncherScenes)
+                        continue;
+                    MasterClip clip;
+                    clip.name = entry.getProperty("name", juce::String()).toString();
+                    clip.colour = static_cast<juce::uint32>(static_cast<juce::int64>(entry.getProperty("colour", static_cast<juce::int64>(0xffffb84d))));
+                    clip.lengthBeats = std::clamp(static_cast<double>(entry.getProperty("lengthBeats", 16.0)), 0.25, 4'096.0);
+                    clip.looping = static_cast<bool>(entry.getProperty("looping", true));
+                    if (const auto* lanes = entry.getProperty("lanes", juce::var()).getArray())
+                        for (const auto& lane : *lanes) {
+                            const auto binding = lane.getProperty("binding", juce::String()).toString();
+                            std::vector<MasterClip::Point> points;
+                            if (const auto* values = lane.getProperty("points", juce::var()).getArray())
+                                for (const auto& value : *values)
+                                    if (const auto* pair = value.getArray(); pair != nullptr && pair->size() >= 2)
+                                        points.push_back({ static_cast<double>((*pair)[0]), static_cast<float>(static_cast<double>((*pair)[1])) });
+                            std::sort(points.begin(), points.end(), [](const auto& a, const auto& b) { return a.beats < b.beats; });
+                            if (binding.isNotEmpty() && !points.empty())
+                                clip.lanes[binding] = std::move(points);
+                        }
+                    masterClips[scene] = std::move(clip);
+                }
+            studio.setMasterClips(std::move(masterClips));
+        }
         // The virtual inputs and outputs are the software's: the project's are
         // only names to find them by.
         s.busIds = mapProjectBuses(studio, root);

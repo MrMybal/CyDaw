@@ -80,7 +80,7 @@ inline constexpr std::array<NoteDivision, 12> noteDivisions { {
 }
 
 // Where an effect sits in the primitive registry.
-enum class EffectGroup : std::uint8_t { modulation, delay, filter, dynamics, channels, analysis };
+enum class EffectGroup : std::uint8_t { modulation, delay, filter, dynamics, channels, analysis, midi };
 
 // The sidechain input of an effect that has one ("sidechain-in"). Far above the value ports
 // (3, 4… one per parameter) so adding it moved none of them: saved cables
@@ -106,6 +106,9 @@ struct EffectDescriptor {
     // A second audio input its detector listens to instead of its own sound
     // (a kick ducking the bass): the port effectSidechainPortId.
     bool sidechain {};
+    // A MIDI effect (MidiEffects.h): notes in, notes out, before the
+    // instrument; no sound of its own.
+    bool midi {};
 
     [[nodiscard]] constexpr std::size_t parameterCount() const noexcept { return parameters.size(); }
     [[nodiscard]] constexpr bool convertsChannels() const noexcept { return inputChannels != outputChannels; }
@@ -120,6 +123,28 @@ enum class EqProValue : int { enabled, type, frequency, gain, q, slope };
 {
     return band * eqProValuesPerBand + static_cast<int>(value);
 }
+// After the output and the band heard alone, each band's dynamics: whether
+// its gain moves with the sound, how far it may go from its gain (dB), from
+// what level, how fast, and what its detector hears (0 its own band of the
+// sound, 1 the same band of the sidechain). Kept in the slots after the
+// bands' values, in that order.
+inline constexpr int eqProDynamicValuesPerBand = 6;
+enum class EqProDynamic : int { on, range, threshold, attack, release, detector };
+[[nodiscard]] constexpr int eqProDynamicSlot(const int band, const EqProDynamic value) noexcept
+{
+    return eqProBands * eqProValuesPerBand + band * eqProDynamicValuesPerBand + static_cast<int>(value);
+}
+// Its place among the entry's parameters: after the output and the listen.
+[[nodiscard]] constexpr int eqProDynamicIndex(const int band, const EqProDynamic value) noexcept
+{
+    return eqProDynamicSlot(band, value) + 2;
+}
+static_assert(eqProDynamicSlot(eqProBands - 1, EqProDynamic::detector) < static_cast<int>(std::tuple_size_v<decltype(NativeDspNodeParameters::eqBands)>));
+// What the equaliser's processor shows of its work (AudioProcessor::
+// readings): each band's gain moved by its dynamics now (dB, 0 for a
+// static band), then the level each band's detector hears (dB, -120 for a
+// static band).
+inline constexpr int eqProReadingCount = eqProBands * 2;
 
 namespace effect_detail {
 using P = NativeDspNodeParameters;
@@ -236,6 +261,21 @@ inline constexpr EffectParameter pingPong[] {
       static_cast<std::int16_t>(((n) - 1) * 6 + 5), static_cast<std::int8_t>((n) - 1) }
 
 // A value kept in a slot (no socket), `band` none.
+// A band's dynamics, in the slots after the eight bands' values.
+#define CYDAW_EQ_DYNAMIC(n)                                                                                                     \
+    { "b" #n "-dynamic", "eqpro.b" #n "Dynamic", "effect.parameter.dynamicsOn", "", 0.0f, 1.0f, 0.0f, nullptr,             \
+      static_cast<std::int16_t>(48 + ((n) - 1) * 6 + 0), static_cast<std::int8_t>((n) - 1) },                              \
+    { "b" #n "-range", "eqpro.b" #n "Range", "effect.parameter.dynamicRange", "dB", -30.0f, 30.0f, -6.0f, nullptr,           \
+      static_cast<std::int16_t>(48 + ((n) - 1) * 6 + 1), static_cast<std::int8_t>((n) - 1) },                              \
+    { "b" #n "-threshold", "eqpro.b" #n "Threshold", "effect.parameter.threshold", "dB", -60.0f, 0.0f, -24.0f, nullptr,     \
+      static_cast<std::int16_t>(48 + ((n) - 1) * 6 + 2), static_cast<std::int8_t>((n) - 1) },                              \
+    { "b" #n "-attack", "eqpro.b" #n "Attack", "effect.parameter.attack", "ms", 0.5f, 200.0f, 10.0f, nullptr,               \
+      static_cast<std::int16_t>(48 + ((n) - 1) * 6 + 3), static_cast<std::int8_t>((n) - 1) },                              \
+    { "b" #n "-release", "eqpro.b" #n "Release", "effect.parameter.release", "ms", 10.0f, 2'000.0f, 120.0f, nullptr,        \
+      static_cast<std::int16_t>(48 + ((n) - 1) * 6 + 4), static_cast<std::int8_t>((n) - 1) },                              \
+    { "b" #n "-detector", "eqpro.b" #n "Detector", "effect.parameter.detector", "", 0.0f, 1.0f, 0.0f, nullptr,              \
+      static_cast<std::int16_t>(48 + ((n) - 1) * 6 + 5), static_cast<std::int8_t>((n) - 1) }
+
 #define CYDAW_SLOT(key, suffix, label, unit, minimum, maximum, defaultValue, slot)                                             \
     EffectParameter                                                                                                            \
     {                                                                                                                          \
@@ -757,12 +797,425 @@ inline constexpr EffectParameter eqPro[] {
     CYDAW_EQ_BAND(1, 40.0f),    CYDAW_EQ_BAND(2, 120.0f),   CYDAW_EQ_BAND(3, 350.0f),    CYDAW_EQ_BAND(4, 900.0f),
     CYDAW_EQ_BAND(5, 2'200.0f), CYDAW_EQ_BAND(6, 5'000.0f), CYDAW_EQ_BAND(7, 10'000.0f), CYDAW_EQ_BAND(8, 16'000.0f),
     { "output", "eqpro.output", "effect.parameter.output", "dB", -24.0f, 24.0f, 0.0f, &P::effect1 },
+    // The band heard alone while a band's listen is held: 0 none, n band n.
+    { "listen", "eqpro.listen", "effect.parameter.soloBand", "", 0.0f, 8.0f, 0.0f, &P::effect2 },
+    CYDAW_EQ_DYNAMIC(1), CYDAW_EQ_DYNAMIC(2), CYDAW_EQ_DYNAMIC(3), CYDAW_EQ_DYNAMIC(4),
+    CYDAW_EQ_DYNAMIC(5), CYDAW_EQ_DYNAMIC(6), CYDAW_EQ_DYNAMIC(7), CYDAW_EQ_DYNAMIC(8),
 };
+// ---- The effects added on 2026-10-14 (their design headers say what each
+// value does; the enums there follow these arrays' order) ----
+
+inline constexpr EffectParameter vocoderParameters[] {
+    { "mix", "vocoder.mix", "effect.parameter.mix", "", 0.0f, 1.0f, 1.0f, &P::effect1 },
+    { "formant", "vocoder.formant", "effect.parameter.formant", "", -12.0f, 12.0f, 0.0f, &P::effect2 },
+    { "attack", "vocoder.attack", "effect.parameter.attack", "ms", 0.5f, 100.0f, 4.0f, &P::effect3 },
+    { "release", "vocoder.release", "effect.parameter.release", "ms", 5.0f, 1'000.0f, 60.0f, &P::effect4 },
+    { "pitch", "vocoder.pitch", "effect.parameter.carrierPitch", "", 24.0f, 96.0f, 48.0f, &P::effect5 },
+    { "unvoiced", "vocoder.unvoiced", "effect.parameter.unvoiced", "", 0.0f, 1.0f, 0.3f, &P::effect6 },
+    { "tone", "vocoder.tone", "effect.parameter.tone", "", -1.0f, 1.0f, 0.0f, &P::effect7 },
+    { "output", "vocoder.output", "effect.parameter.output", "dB", -24.0f, 24.0f, 0.0f, &P::effect8 },
+    { "carrier-source", "vocoder.carrier", "effect.parameter.carrier", "", 0.0f, 3.0f, 2.0f, nullptr, 0, -1 },
+    { "bands", "vocoder.bands", "effect.parameter.bands", "", 4.0f, 40.0f, 20.0f, nullptr, 1, -1 },
+    { "low-band", "vocoder.lowBand", "effect.parameter.lowBand", "Hz", 50.0f, 1'000.0f, 100.0f, nullptr, 2, -1 },
+    { "high-band", "vocoder.highBand", "effect.parameter.highBand", "Hz", 2'000.0f, 18'000.0f, 10'000.0f, nullptr, 3, -1 },
+    { "bandwidth", "vocoder.bandwidth", "effect.parameter.bandwidth", "", 0.25f, 2.0f, 1.0f, nullptr, 4, -1 },
+    { "band-gate", "vocoder.gate", "effect.parameter.bandGate", "dB", -90.0f, -20.0f, -70.0f, nullptr, 5, -1 },
+    { "stereo", "vocoder.stereo", "effect.parameter.stereo", "", 0.0f, 1.0f, 0.5f, nullptr, 6, -1 },
+    { "detune", "vocoder.detune", "effect.parameter.detune", "", 0.0f, 1.0f, 0.2f, nullptr, 7, -1 },
+};
+inline constexpr EffectParameter deEsserParameters[] {
+    { "threshold", "deesser.threshold", "effect.parameter.threshold", "dB", -60.0f, 0.0f, -28.0f, &P::effect1 },
+    { "frequency", "deesser.frequency", "effect.parameter.frequency", "Hz", 2'000.0f, 12'000.0f, 6'000.0f, &P::effect2 },
+    { "range", "deesser.range", "effect.parameter.range", "dB", 0.0f, 24.0f, 10.0f, &P::effect3 },
+    { "release", "deesser.release", "effect.parameter.release", "ms", 10.0f, 300.0f, 60.0f, &P::effect4 },
+    { "output", "deesser.output", "effect.parameter.output", "dB", -24.0f, 24.0f, 0.0f, &P::effect5 },
+    { "mode", "deesser.mode", "effect.parameter.mode", "", 0.0f, 1.0f, 0.0f, nullptr, 0, -1 },
+    { "detector-type", "deesser.detectorType", "effect.parameter.detectorType", "", 0.0f, 1.0f, 0.0f, nullptr, 1, -1 },
+    { "listen", "deesser.listen", "effect.parameter.audition", "", 0.0f, 1.0f, 0.0f, nullptr, 2, -1 },
+    { "bandwidth", "deesser.bandwidth", "effect.parameter.bandwidth", "", 0.3f, 3.0f, 1.0f, nullptr, 3, -1 },
+    { "attack", "deesser.attack", "effect.parameter.attack", "ms", 0.1f, 20.0f, 1.0f, nullptr, 4, -1 },
+    { "link", "deesser.link", "effect.parameter.link", "", 0.0f, 1.0f, 1.0f, nullptr, 5, -1 },
+};
+inline constexpr EffectParameter tunerParameters[] {
+    { "reference", "tuner.reference", "effect.parameter.reference", "Hz", 415.0f, 466.0f, 440.0f, &P::effect1 },
+    { "mute", "tuner.mute", "effect.parameter.mute", "", 0.0f, 1.0f, 0.0f, nullptr, 0, -1 },
+    { "display-mode", "tuner.displayMode", "effect.parameter.displayMode", "", 0.0f, 1.0f, 0.0f, nullptr, 1, -1 },
+};
+inline constexpr EffectParameter harmonieParameters[] {
+    { "shift-a", "harmonie.shiftA", "effect.parameter.shiftA", "", -24.0f, 24.0f, 12.0f, &P::effect1 },
+    { "fine-a", "harmonie.fineA", "effect.parameter.fineA", "", -100.0f, 100.0f, 0.0f, &P::effect2 },
+    { "level-a", "harmonie.levelA", "effect.parameter.levelA", "", 0.0f, 1.0f, 1.0f, &P::effect3 },
+    { "shift-b", "harmonie.shiftB", "effect.parameter.shiftB", "", -24.0f, 24.0f, 7.0f, &P::effect4 },
+    { "level-b", "harmonie.levelB", "effect.parameter.levelB", "", 0.0f, 1.0f, 0.0f, &P::effect5 },
+    { "dry", "harmonie.dry", "effect.parameter.dry", "", 0.0f, 1.0f, 0.0f, &P::effect6 },
+    { "delay", "harmonie.delay", "effect.parameter.delay", "ms", 0.0f, 500.0f, 0.0f, &P::effect7 },
+    { "output", "harmonie.output", "effect.parameter.output", "dB", -24.0f, 24.0f, 0.0f, &P::effect8 },
+    { "window", "harmonie.window", "effect.parameter.window", "ms", 10.0f, 120.0f, 40.0f, nullptr, 0, -1 },
+    { "mode", "harmonie.mode", "effect.parameter.mode", "", 0.0f, 2.0f, 1.0f, nullptr, 1, -1 },
+    { "fine-b", "harmonie.fineB", "effect.parameter.fineB", "", -100.0f, 100.0f, 0.0f, nullptr, 2, -1 },
+    { "pan-a", "harmonie.panA", "effect.parameter.panA", "", -1.0f, 1.0f, 0.0f, nullptr, 3, -1 },
+    { "pan-b", "harmonie.panB", "effect.parameter.panB", "", -1.0f, 1.0f, 0.0f, nullptr, 4, -1 },
+    { "feedback", "harmonie.feedback", "effect.parameter.feedback", "", 0.0f, 0.9f, 0.0f, nullptr, 5, -1 },
+};
+inline constexpr EffectParameter justesseParameters[] {
+    { "speed", "justesse.speed", "effect.parameter.retuneSpeed", "ms", 0.0f, 400.0f, 20.0f, &P::effect1 },
+    { "amount", "justesse.amount", "effect.parameter.amount", "", 0.0f, 1.0f, 1.0f, &P::effect2 },
+    { "humanize", "justesse.humanize", "effect.parameter.humanize", "", 0.0f, 1.0f, 0.0f, &P::effect3 },
+    { "transpose", "justesse.transpose", "effect.parameter.transpose", "", -12.0f, 12.0f, 0.0f, &P::effect4 },
+    { "mix", "justesse.mix", "effect.parameter.mix", "", 0.0f, 1.0f, 1.0f, &P::effect5 },
+    { "output", "justesse.output", "effect.parameter.output", "dB", -24.0f, 24.0f, 0.0f, &P::effect6 },
+    { "key", "justesse.key", "effect.parameter.key", "", 0.0f, 11.0f, 0.0f, nullptr, 0, -1 },
+    { "scale", "justesse.scale", "effect.parameter.scale", "", 0.0f, 11.0f, 0.0f, nullptr, 1, -1 },
+    { "low-pitch", "justesse.lowPitch", "effect.parameter.lowPitch", "Hz", 50.0f, 400.0f, 70.0f, nullptr, 2, -1 },
+    { "high-pitch", "justesse.highPitch", "effect.parameter.highPitch", "Hz", 300.0f, 1'600.0f, 1'000.0f, nullptr, 3, -1 },
+    { "sensitivity", "justesse.sensitivity", "effect.parameter.sensitivity", "", 0.0f, 1.0f, 0.5f, nullptr, 4, -1 },
+};
+inline constexpr EffectParameter empreinteParameters[] {
+    { "mix", "empreinte.mix", "effect.parameter.mix", "", 0.0f, 1.0f, 0.3f, &P::effect1 },
+    { "predelay", "empreinte.predelay", "effect.parameter.predelay", "ms", 0.0f, 250.0f, 0.0f, &P::effect2 },
+    { "low-cut", "empreinte.lowCut", "effect.parameter.lowCut", "Hz", 10.0f, 1'000.0f, 10.0f, &P::effect3 },
+    { "high-cut", "empreinte.highCut", "effect.parameter.highCut", "Hz", 1'000.0f, 20'000.0f, 20'000.0f, &P::effect4 },
+    { "width", "empreinte.width", "effect.parameter.width", "", 0.0f, 1.0f, 1.0f, &P::effect5 },
+    { "early", "empreinte.early", "effect.parameter.earlyLevel", "dB", -24.0f, 6.0f, 0.0f, &P::effect6 },
+    { "tail", "empreinte.tail", "effect.parameter.tailLevel", "dB", -24.0f, 6.0f, 0.0f, &P::effect7 },
+    { "output", "empreinte.output", "effect.parameter.output", "dB", -24.0f, 24.0f, 0.0f, &P::effect8 },
+    { "space-type", "empreinte.space", "effect.parameter.builtinSpace", "", 0.0f, 9.0f, 2.0f, nullptr, 0, -1 },
+    { "ir-length", "empreinte.length", "effect.parameter.irLength", "", 0.1f, 1.0f, 1.0f, nullptr, 1, -1 },
+    { "reverse", "empreinte.reverse", "effect.parameter.reverse", "", 0.0f, 1.0f, 0.0f, nullptr, 2, -1 },
+};
+inline constexpr EffectParameter givreParameters[] {
+    { "blur", "givre.blur", "effect.parameter.blur", "", 0.0f, 1.0f, 0.4f, &P::effect1 },
+    { "smear", "givre.smear", "effect.parameter.spectralSmear", "", 0.0f, 1.0f, 0.0f, &P::effect2 },
+    { "shift", "givre.shift", "effect.parameter.spectralShift", "", -12.0f, 12.0f, 0.0f, &P::effect3 },
+    { "tone", "givre.tone", "effect.parameter.tone", "", -1.0f, 1.0f, 0.0f, &P::effect4 },
+    { "scatter", "givre.scatter", "effect.parameter.scatter", "", 0.0f, 1.0f, 0.2f, &P::effect5 },
+    { "mix", "givre.mix", "effect.parameter.mix", "", 0.0f, 1.0f, 0.5f, &P::effect6 },
+    { "output", "givre.output", "effect.parameter.output", "dB", -24.0f, 24.0f, 0.0f, &P::effect7 },
+    { "freeze", "givre.freeze", "effect.parameter.freeze", "", 0.0f, 1.0f, 0.0f, nullptr, 0, -1 },
+    { "sync", "givre.sync", "effect.parameter.sync", "", 0.0f, 12.0f, 0.0f, nullptr, 1, -1 },
+};
+inline constexpr EffectParameter grainsParameters[] {
+    { "time", "grains.time", "effect.parameter.time", "ms", 1.0f, 2'000.0f, 250.0f, &P::effect1 },
+    { "feedback", "grains.feedback", "effect.parameter.feedback", "", 0.0f, 0.95f, 0.35f, &P::effect2 },
+    { "pitch", "grains.pitch", "effect.parameter.pitch", "", -24.0f, 24.0f, 0.0f, &P::effect3 },
+    { "spray", "grains.spray", "effect.parameter.spray", "ms", 0.0f, 500.0f, 20.0f, &P::effect4 },
+    { "density", "grains.density", "effect.parameter.density", "Hz", 1.0f, 100.0f, 25.0f, &P::effect5 },
+    { "pitch-random", "grains.pitchRandom", "effect.parameter.pitchRandom", "", 0.0f, 12.0f, 0.0f, &P::effect6 },
+    { "mix", "grains.mix", "effect.parameter.mix", "", 0.0f, 1.0f, 0.4f, &P::effect7 },
+    { "output", "grains.output", "effect.parameter.output", "dB", -24.0f, 24.0f, 0.0f, &P::effect8 },
+    { "sync", "grains.sync", "effect.parameter.sync", "", 0.0f, 12.0f, 0.0f, nullptr, 0, -1 },
+    { "grain-size", "grains.size", "effect.parameter.grainSize", "ms", 10.0f, 500.0f, 90.0f, nullptr, 1, -1 },
+    { "stereo", "grains.stereo", "effect.parameter.stereo", "", 0.0f, 1.0f, 0.6f, nullptr, 2, -1 },
+    { "reverse-chance", "grains.reverseChance", "effect.parameter.reverseChance", "", 0.0f, 1.0f, 0.0f, nullptr, 3, -1 },
+    { "freeze", "grains.freeze", "effect.parameter.freeze", "", 0.0f, 1.0f, 0.0f, nullptr, 4, -1 },
+    { "high-cut", "grains.highCut", "effect.parameter.highCut", "Hz", 1'000.0f, 20'000.0f, 14'000.0f, nullptr, 5, -1 },
+};
+inline constexpr EffectParameter saccadeParameters[] {
+    { "chance", "saccade.chance", "effect.parameter.chance", "", 0.0f, 1.0f, 1.0f, &P::effect1 },
+    { "variation", "saccade.variation", "effect.parameter.variation", "", 0.0f, 1.0f, 0.0f, &P::effect2 },
+    { "decay", "saccade.decay", "effect.parameter.decay", "", 0.0f, 1.0f, 0.0f, &P::effect3 },
+    { "pitch-decay", "saccade.pitchDecay", "effect.parameter.pitchDecay", "", 0.0f, 1.0f, 0.0f, &P::effect4 },
+    { "filter", "saccade.filter", "effect.parameter.cutoff", "Hz", 200.0f, 20'000.0f, 20'000.0f, &P::effect5 },
+    { "mix", "saccade.mix", "effect.parameter.mix", "", 0.0f, 1.0f, 1.0f, &P::effect6 },
+    { "output", "saccade.output", "effect.parameter.output", "dB", -24.0f, 24.0f, 0.0f, &P::effect7 },
+    { "interval-sync", "saccade.interval", "effect.parameter.interval", "", 1.0f, 12.0f, 12.0f, nullptr, 0, -1 },
+    { "offset", "saccade.offset", "effect.parameter.offset", "", 0.0f, 15.0f, 8.0f, nullptr, 1, -1 },
+    { "gate-length", "saccade.gate", "effect.parameter.repeatLength", "", 1.0f, 16.0f, 4.0f, nullptr, 2, -1 },
+    { "grid-sync", "saccade.grid", "effect.parameter.grid", "", 1.0f, 12.0f, 3.0f, nullptr, 3, -1 },
+    { "mode", "saccade.mode", "effect.parameter.mode", "", 0.0f, 2.0f, 1.0f, nullptr, 4, -1 },
+    { "reverse-chance", "saccade.reverseChance", "effect.parameter.reverseChance", "", 0.0f, 1.0f, 0.0f, nullptr, 5, -1 },
+    { "repeat", "saccade.repeat", "effect.parameter.repeatNow", "", 0.0f, 1.0f, 0.0f, nullptr, 6, -1 },
+};
+inline constexpr EffectParameter boucleurParameters[] {
+    { "feedback", "boucleur.feedback", "effect.parameter.overdub", "", 0.0f, 1.0f, 1.0f, &P::effect1 },
+    { "level", "boucleur.level", "effect.parameter.loopLevel", "", 0.0f, 1.0f, 1.0f, &P::effect2 },
+    { "dry", "boucleur.dry", "effect.parameter.dry", "", 0.0f, 1.0f, 1.0f, &P::effect3 },
+    { "output", "boucleur.output", "effect.parameter.output", "dB", -24.0f, 24.0f, 0.0f, &P::effect4 },
+    { "state", "boucleur.state", "effect.parameter.loopState", "", 0.0f, 3.0f, 0.0f, nullptr, 0, -1 },
+    { "bars", "boucleur.bars", "effect.parameter.loopBars", "", 0.0f, 5.0f, 0.0f, nullptr, 1, -1 },
+    { "quantize", "boucleur.quantize", "effect.parameter.quantizeStart", "", 0.0f, 1.0f, 1.0f, nullptr, 2, -1 },
+    { "speed-mode", "boucleur.speed", "effect.parameter.loopSpeed", "", 0.0f, 2.0f, 1.0f, nullptr, 3, -1 },
+    { "reverse", "boucleur.reverse", "effect.parameter.reverse", "", 0.0f, 1.0f, 0.0f, nullptr, 4, -1 },
+    { "clear", "boucleur.clear", "effect.parameter.clearLoop", "", 0.0f, 100.0f, 0.0f, nullptr, 5, -1 },
+};
+inline constexpr EffectParameter pompeParameters[] {
+    { "depth", "pompe.depth", "effect.parameter.depth", "", 0.0f, 1.0f, 0.8f, &P::effect1 },
+    { "rate", "pompe.rate", "effect.parameter.rate", "Hz", 0.1f, 20.0f, 2.0f, &P::effect2 },
+    { "curve", "pompe.curve", "effect.parameter.curve", "", -1.0f, 1.0f, 0.4f, &P::effect3 },
+    { "hold", "pompe.hold", "effect.parameter.holdLow", "", 0.0f, 0.5f, 0.05f, &P::effect4 },
+    { "phase", "pompe.phase", "effect.parameter.phase", "", 0.0f, 1.0f, 0.0f, &P::effect5 },
+    { "stereo-offset", "pompe.stereoOffset", "effect.parameter.stereoOffset", "", 0.0f, 0.5f, 0.0f, &P::effect6 },
+    { "mix", "pompe.mix", "effect.parameter.mix", "", 0.0f, 1.0f, 1.0f, &P::effect7 },
+    { "output", "pompe.output", "effect.parameter.output", "dB", -24.0f, 24.0f, 0.0f, &P::effect8 },
+    { "shape", "pompe.shape", "effect.parameter.shape", "", 0.0f, 7.0f, 0.0f, nullptr, 0, -1 },
+    { "sync", "pompe.sync", "effect.parameter.sync", "", 0.0f, 12.0f, 9.0f, nullptr, 1, -1 },
+    { "trigger-source", "pompe.trigger", "effect.parameter.trigger", "", 0.0f, 1.0f, 0.0f, nullptr, 2, -1 },
+    { "threshold", "pompe.threshold", "effect.parameter.threshold", "dB", -60.0f, 0.0f, -24.0f, nullptr, 3, -1 },
+    { "smoothing", "pompe.smoothing", "effect.parameter.smoothing", "ms", 0.0f, 20.0f, 1.5f, nullptr, 4, -1 },
+    { "point-1", "pompe.point1", "effect.parameter.level", "", 0.0f, 1.0f, 0.0f, nullptr, 5, 0 },
+    { "point-2", "pompe.point2", "effect.parameter.level", "", 0.0f, 1.0f, 0.22f, nullptr, 6, 1 },
+    { "point-3", "pompe.point3", "effect.parameter.level", "", 0.0f, 1.0f, 0.42f, nullptr, 7, 2 },
+    { "point-4", "pompe.point4", "effect.parameter.level", "", 0.0f, 1.0f, 0.58f, nullptr, 8, 3 },
+    { "point-5", "pompe.point5", "effect.parameter.level", "", 0.0f, 1.0f, 0.7f, nullptr, 9, 4 },
+    { "point-6", "pompe.point6", "effect.parameter.level", "", 0.0f, 1.0f, 0.79f, nullptr, 10, 5 },
+    { "point-7", "pompe.point7", "effect.parameter.level", "", 0.0f, 1.0f, 0.86f, nullptr, 11, 6 },
+    { "point-8", "pompe.point8", "effect.parameter.level", "", 0.0f, 1.0f, 0.91f, nullptr, 12, 7 },
+    { "point-9", "pompe.point9", "effect.parameter.level", "", 0.0f, 1.0f, 0.94f, nullptr, 13, 8 },
+    { "point-10", "pompe.point10", "effect.parameter.level", "", 0.0f, 1.0f, 0.965f, nullptr, 14, 9 },
+    { "point-11", "pompe.point11", "effect.parameter.level", "", 0.0f, 1.0f, 0.98f, nullptr, 15, 10 },
+    { "point-12", "pompe.point12", "effect.parameter.level", "", 0.0f, 1.0f, 0.99f, nullptr, 16, 11 },
+    { "point-13", "pompe.point13", "effect.parameter.level", "", 0.0f, 1.0f, 1.0f, nullptr, 17, 12 },
+    { "point-14", "pompe.point14", "effect.parameter.level", "", 0.0f, 1.0f, 1.0f, nullptr, 18, 13 },
+    { "point-15", "pompe.point15", "effect.parameter.level", "", 0.0f, 1.0f, 1.0f, nullptr, 19, 14 },
+    { "point-16", "pompe.point16", "effect.parameter.level", "", 0.0f, 1.0f, 1.0f, nullptr, 20, 15 },
+};
+inline constexpr EffectParameter decaleurParameters[] {
+    { "shift", "decaleur.shift", "effect.parameter.shiftHz", "Hz", -2'000.0f, 2'000.0f, 100.0f, &P::effect1 },
+    { "fine", "decaleur.fine", "effect.parameter.fine", "Hz", -50.0f, 50.0f, 0.0f, &P::effect2 },
+    { "spread", "decaleur.spread", "effect.parameter.spread", "Hz", 0.0f, 200.0f, 0.0f, &P::effect3 },
+    { "feedback", "decaleur.feedback", "effect.parameter.feedback", "", 0.0f, 0.95f, 0.0f, &P::effect4 },
+    { "lfo-rate", "decaleur.lfoRate", "effect.parameter.lfoRate", "Hz", 0.01f, 10.0f, 0.5f, &P::effect5 },
+    { "lfo-depth", "decaleur.lfoDepth", "effect.parameter.lfoDepth", "Hz", 0.0f, 1'000.0f, 0.0f, &P::effect6 },
+    { "mix", "decaleur.mix", "effect.parameter.mix", "", 0.0f, 1.0f, 1.0f, &P::effect7 },
+    { "output", "decaleur.output", "effect.parameter.output", "dB", -24.0f, 24.0f, 0.0f, &P::effect8 },
+    { "mode", "decaleur.mode", "effect.parameter.mode", "", 0.0f, 2.0f, 0.0f, nullptr, 0, -1 },
+    { "sync", "decaleur.sync", "effect.parameter.sync", "", 0.0f, 12.0f, 0.0f, nullptr, 1, -1 },
+    { "lfo-shape", "decaleur.lfoShape", "effect.parameter.lfoShape", "", 0.0f, 3.0f, 0.0f, nullptr, 2, -1 },
+    { "delay", "decaleur.delay", "effect.parameter.delay", "ms", 0.0f, 1'000.0f, 0.0f, nullptr, 3, -1 },
+};
+inline constexpr EffectParameter anneauParameters[] {
+    { "frequency", "anneau.frequency", "effect.parameter.frequency", "Hz", 1.0f, 5'000.0f, 220.0f, &P::effect1 },
+    { "drive", "anneau.drive", "effect.parameter.drive", "dB", 0.0f, 24.0f, 0.0f, &P::effect2 },
+    { "lfo-rate", "anneau.lfoRate", "effect.parameter.lfoRate", "Hz", 0.01f, 10.0f, 0.5f, &P::effect3 },
+    { "lfo-depth", "anneau.lfoDepth", "effect.parameter.lfoDepth", "", 0.0f, 2.0f, 0.0f, &P::effect4 },
+    { "mix", "anneau.mix", "effect.parameter.mix", "", 0.0f, 1.0f, 0.5f, &P::effect5 },
+    { "output", "anneau.output", "effect.parameter.output", "dB", -24.0f, 24.0f, 0.0f, &P::effect6 },
+    { "stereo", "anneau.stereo", "effect.parameter.stereoPhase", "", 0.0f, 1.0f, 0.0f, &P::effect7 },
+    { "shape", "anneau.shape", "effect.parameter.shape", "", 0.0f, 3.0f, 0.0f, nullptr, 0, -1 },
+    { "mode", "anneau.mode", "effect.parameter.mode", "", 0.0f, 1.0f, 0.0f, nullptr, 1, -1 },
+    { "sync", "anneau.sync", "effect.parameter.sync", "", 0.0f, 12.0f, 0.0f, nullptr, 2, -1 },
+    { "low-cut", "anneau.lowCut", "effect.parameter.lowCut", "Hz", 20.0f, 2'000.0f, 20.0f, nullptr, 3, -1 },
+    { "lfo-shape", "anneau.lfoShape", "effect.parameter.lfoShape", "", 0.0f, 3.0f, 0.0f, nullptr, 4, -1 },
+};
+inline constexpr EffectParameter rotorParameters[] {
+    { "slow", "rotor.slow", "effect.parameter.slowSpeed", "Hz", 0.3f, 2.0f, 0.8f, &P::effect1 },
+    { "fast", "rotor.fast", "effect.parameter.fastSpeed", "Hz", 4.0f, 9.0f, 6.8f, &P::effect2 },
+    { "acceleration", "rotor.acceleration", "effect.parameter.acceleration", "s", 0.2f, 5.0f, 1.2f, &P::effect3 },
+    { "balance", "rotor.balance", "effect.parameter.hornDrum", "", -1.0f, 1.0f, 0.0f, &P::effect4 },
+    { "doppler", "rotor.doppler", "effect.parameter.doppler", "", 0.0f, 1.0f, 0.5f, &P::effect5 },
+    { "drive", "rotor.drive", "effect.parameter.drive", "dB", 0.0f, 24.0f, 3.0f, &P::effect6 },
+    { "mix", "rotor.mix", "effect.parameter.mix", "", 0.0f, 1.0f, 1.0f, &P::effect7 },
+    { "output", "rotor.output", "effect.parameter.output", "dB", -24.0f, 24.0f, 0.0f, &P::effect8 },
+    { "speed-mode", "rotor.speed", "effect.parameter.rotorSpeed", "", 0.0f, 2.0f, 1.0f, nullptr, 0, -1 },
+    { "crossover", "rotor.crossover", "effect.parameter.crossover", "Hz", 400.0f, 1'500.0f, 800.0f, nullptr, 1, -1 },
+    { "width", "rotor.width", "effect.parameter.width", "", 0.0f, 1.0f, 0.8f, nullptr, 2, -1 },
+    { "room", "rotor.room", "effect.parameter.room", "", 0.0f, 1.0f, 0.25f, nullptr, 3, -1 },
+};
+inline constexpr EffectParameter resonateursParameters[] {
+    { "note", "resonateurs.note", "effect.parameter.rootNote", "", 24.0f, 96.0f, 48.0f, &P::effect1 },
+    { "decay", "resonateurs.decay", "effect.parameter.decay", "", 0.0f, 1.0f, 0.7f, &P::effect2 },
+    { "colour", "resonateurs.colour", "effect.parameter.colour", "", 0.0f, 1.0f, 0.5f, &P::effect3 },
+    { "width", "resonateurs.width", "effect.parameter.width", "", 0.0f, 1.0f, 0.6f, &P::effect4 },
+    { "mix", "resonateurs.mix", "effect.parameter.mix", "", 0.0f, 1.0f, 0.5f, &P::effect5 },
+    { "output", "resonateurs.output", "effect.parameter.output", "dB", -24.0f, 24.0f, 0.0f, &P::effect6 },
+    { "tone", "resonateurs.tone", "effect.parameter.tone", "", -1.0f, 1.0f, 0.0f, &P::effect7 },
+    { "mode", "resonateurs.mode", "effect.parameter.mode", "", 0.0f, 2.0f, 0.0f, nullptr, 0, -1 },
+    { "interval-2", "resonateurs.interval2", "effect.parameter.interval", "", -24.0f, 24.0f, 7.0f, nullptr, 1, 1 },
+    { "interval-3", "resonateurs.interval3", "effect.parameter.interval", "", -24.0f, 24.0f, 12.0f, nullptr, 2, 2 },
+    { "interval-4", "resonateurs.interval4", "effect.parameter.interval", "", -24.0f, 24.0f, 16.0f, nullptr, 3, 3 },
+    { "interval-5", "resonateurs.interval5", "effect.parameter.interval", "", -24.0f, 24.0f, 19.0f, nullptr, 4, 4 },
+    { "gain-1", "resonateurs.gain1", "effect.parameter.gain", "", 0.0f, 1.0f, 1.0f, nullptr, 5, 0 },
+    { "gain-2", "resonateurs.gain2", "effect.parameter.gain", "", 0.0f, 1.0f, 0.8f, nullptr, 6, 1 },
+    { "gain-3", "resonateurs.gain3", "effect.parameter.gain", "", 0.0f, 1.0f, 0.7f, nullptr, 7, 2 },
+    { "gain-4", "resonateurs.gain4", "effect.parameter.gain", "", 0.0f, 1.0f, 0.6f, nullptr, 8, 3 },
+    { "gain-5", "resonateurs.gain5", "effect.parameter.gain", "", 0.0f, 1.0f, 0.5f, nullptr, 9, 4 },
+};
+inline constexpr EffectParameter corpsParameters[] {
+    { "tune", "corps.tune", "effect.parameter.tune", "Hz", 40.0f, 2'000.0f, 220.0f, &P::effect1 },
+    { "decay", "corps.decay", "effect.parameter.decay", "", 0.0f, 1.0f, 0.5f, &P::effect2 },
+    { "material", "corps.material", "effect.parameter.material", "", 0.0f, 1.0f, 0.5f, &P::effect3 },
+    { "inharmonic", "corps.inharmonic", "effect.parameter.inharmonicity", "", -1.0f, 1.0f, 0.0f, &P::effect4 },
+    { "position", "corps.position", "effect.parameter.hitPosition", "", 0.0f, 1.0f, 0.3f, &P::effect5 },
+    { "mix", "corps.mix", "effect.parameter.mix", "", 0.0f, 1.0f, 0.5f, &P::effect6 },
+    { "output", "corps.output", "effect.parameter.output", "dB", -24.0f, 24.0f, 0.0f, &P::effect7 },
+    { "width", "corps.width", "effect.parameter.width", "", 0.0f, 1.0f, 0.5f, &P::effect8 },
+    { "body-type", "corps.type", "effect.parameter.bodyType", "", 0.0f, 6.0f, 0.0f, nullptr, 0, -1 },
+    { "low-cut", "corps.lowCut", "effect.parameter.lowCut", "Hz", 20.0f, 2'000.0f, 80.0f, nullptr, 1, -1 },
+};
+inline constexpr EffectParameter peigneParameters[] {
+    { "frequency", "peigne.frequency", "effect.parameter.frequency", "Hz", 20.0f, 5'000.0f, 200.0f, &P::effect1 },
+    { "feedback", "peigne.feedback", "effect.parameter.feedback", "", -0.98f, 0.98f, 0.75f, &P::effect2 },
+    { "damping", "peigne.damping", "effect.parameter.damping", "Hz", 500.0f, 20'000.0f, 9'000.0f, &P::effect3 },
+    { "spread", "peigne.spread", "effect.parameter.spread", "", 0.0f, 1.0f, 0.0f, &P::effect4 },
+    { "lfo-depth", "peigne.lfoDepth", "effect.parameter.lfoDepth", "", 0.0f, 1.0f, 0.0f, &P::effect5 },
+    { "lfo-rate", "peigne.lfoRate", "effect.parameter.lfoRate", "Hz", 0.01f, 10.0f, 0.3f, &P::effect6 },
+    { "mix", "peigne.mix", "effect.parameter.mix", "", 0.0f, 1.0f, 0.5f, &P::effect7 },
+    { "output", "peigne.output", "effect.parameter.output", "dB", -24.0f, 24.0f, 0.0f, &P::effect8 },
+    { "mode", "peigne.mode", "effect.parameter.mode", "", 0.0f, 1.0f, 0.0f, nullptr, 0, -1 },
+    { "sync", "peigne.sync", "effect.parameter.sync", "", 0.0f, 12.0f, 0.0f, nullptr, 1, -1 },
+};
+inline constexpr EffectParameter utilitaireParameters[] {
+    { "gain", "utilitaire.gain", "effect.parameter.gain", "dB", -36.0f, 36.0f, 0.0f, &P::effect1 },
+    { "pan", "utilitaire.pan", "effect.parameter.pan", "", -1.0f, 1.0f, 0.0f, &P::effect2 },
+    { "width", "utilitaire.width", "effect.parameter.width", "", 0.0f, 2.0f, 1.0f, &P::effect3 },
+    { "mono-bass", "utilitaire.monoBass", "effect.parameter.monoBass", "Hz", 20.0f, 500.0f, 20.0f, &P::effect4 },
+    { "invert-left", "utilitaire.invertLeft", "effect.parameter.invertLeft", "", 0.0f, 1.0f, 0.0f, nullptr, 0, -1 },
+    { "invert-right", "utilitaire.invertRight", "effect.parameter.invertRight", "", 0.0f, 1.0f, 0.0f, nullptr, 1, -1 },
+    { "channel-mode", "utilitaire.channelMode", "effect.parameter.channelMode", "", 0.0f, 4.0f, 0.0f, nullptr, 2, -1 },
+    { "dc-filter", "utilitaire.dcFilter", "effect.parameter.dcFilter", "", 0.0f, 1.0f, 0.0f, nullptr, 3, -1 },
+    { "mute", "utilitaire.mute", "effect.parameter.mute", "", 0.0f, 1.0f, 0.0f, nullptr, 4, -1 },
+    { "delay", "utilitaire.delay", "effect.parameter.delay", "ms", 0.0f, 20.0f, 0.0f, nullptr, 5, -1 },
+};
+inline constexpr EffectParameter stereoscopeParameters[] {
+    { "zoom", "stereoscope.zoom", "effect.parameter.zoom", "", 0.5f, 4.0f, 1.0f, &P::effect1 },
+    { "persistence", "stereoscope.persistence", "effect.parameter.persistence", "", 0.0f, 1.0f, 0.5f, &P::effect2 },
+    { "history", "stereoscope.history", "effect.parameter.historyLength", "s", 1.0f, 30.0f, 10.0f, &P::effect3 },
+    { "display-mode", "stereoscope.displayMode", "effect.parameter.displayMode", "", 0.0f, 1.0f, 0.0f, nullptr, 0, -1 },
+};
+
+// ---- The MIDI effects (MidiEffects.h computes what each value does; the
+// enums there follow these arrays' order) ----
+
+inline constexpr EffectParameter arpegeParameters[] {
+    { "gate", "arpege.gate", "effect.parameter.gateLength", "", 0.05f, 2.0f, 0.6f, &P::effect1 },
+    { "swing", "arpege.swing", "effect.parameter.swing", "", 0.0f, 0.75f, 0.0f, &P::effect2 },
+    { "velocity", "arpege.velocity", "effect.parameter.fixedVelocity", "", 1.0f, 127.0f, 100.0f, &P::effect3 },
+    { "rate-sync", "arpege.rate", "effect.parameter.stepRate", "", 1.0f, 12.0f, 3.0f, nullptr, 0, -1 },
+    { "mode", "arpege.mode", "effect.parameter.mode", "", 0.0f, 8.0f, 0.0f, nullptr, 1, -1 },
+    { "octaves", "arpege.octaves", "effect.parameter.octaves", "", 1.0f, 4.0f, 1.0f, nullptr, 2, -1 },
+    { "velocity-mode", "arpege.velocityMode", "effect.parameter.velocityMode", "", 0.0f, 2.0f, 0.0f, nullptr, 3, -1 },
+    { "latch", "arpege.latch", "effect.parameter.latch", "", 0.0f, 1.0f, 0.0f, nullptr, 4, -1 },
+    { "retrigger", "arpege.retrigger", "effect.parameter.retrigger", "", 0.0f, 1.0f, 1.0f, nullptr, 5, -1 },
+};
+inline constexpr EffectParameter accordsParameters[] {
+    { "velocity", "accords.velocity", "effect.parameter.addedVelocity", "", 0.0f, 1.0f, 0.85f, &P::effect1 },
+    { "strum", "accords.strum", "effect.parameter.strum", "ms", 0.0f, 200.0f, 0.0f, &P::effect2 },
+    { "chord-type", "accords.chord", "effect.parameter.chordType", "", 0.0f, 11.0f, 0.0f, nullptr, 0, -1 },
+    { "interval-1", "accords.interval1", "effect.parameter.interval", "", -24.0f, 24.0f, 4.0f, nullptr, 1, 0 },
+    { "interval-2", "accords.interval2", "effect.parameter.interval", "", -24.0f, 24.0f, 7.0f, nullptr, 2, 1 },
+    { "interval-3", "accords.interval3", "effect.parameter.interval", "", -24.0f, 24.0f, 0.0f, nullptr, 3, 2 },
+    { "interval-4", "accords.interval4", "effect.parameter.interval", "", -24.0f, 24.0f, 0.0f, nullptr, 4, 3 },
+    { "interval-5", "accords.interval5", "effect.parameter.interval", "", -24.0f, 24.0f, 0.0f, nullptr, 5, 4 },
+    { "interval-6", "accords.interval6", "effect.parameter.interval", "", -24.0f, 24.0f, 0.0f, nullptr, 6, 5 },
+    { "inversion", "accords.inversion", "effect.parameter.inversion", "", -3.0f, 3.0f, 0.0f, nullptr, 7, -1 },
+    { "spread", "accords.spread", "effect.parameter.openVoicing", "", 0.0f, 1.0f, 0.0f, nullptr, 8, -1 },
+    { "strum-mode", "accords.strumMode", "effect.parameter.strumDirection", "", 0.0f, 2.0f, 0.0f, nullptr, 9, -1 },
+    { "key", "accords.key", "effect.parameter.key", "", 0.0f, 11.0f, 0.0f, nullptr, 10, -1 },
+    { "scale", "accords.scale", "effect.parameter.scale", "", 0.0f, 11.0f, 0.0f, nullptr, 11, -1 },
+};
+inline constexpr EffectParameter gammeParameters[] {
+    { "transpose", "gamme.transpose", "effect.parameter.transpose", "", -24.0f, 24.0f, 0.0f, &P::effect1 },
+    { "degrees", "gamme.degrees", "effect.parameter.degreeShift", "", -7.0f, 7.0f, 0.0f, &P::effect2 },
+    { "key", "gamme.key", "effect.parameter.key", "", 0.0f, 11.0f, 0.0f, nullptr, 0, -1 },
+    { "scale", "gamme.scale", "effect.parameter.scale", "", 0.0f, 11.0f, 1.0f, nullptr, 1, -1 },
+    { "mode", "gamme.mode", "effect.parameter.mode", "", 0.0f, 3.0f, 0.0f, nullptr, 2, -1 },
+};
+inline constexpr EffectParameter echoNotesParameters[] {
+    { "time", "echonotes.time", "effect.parameter.time", "ms", 10.0f, 2'000.0f, 250.0f, &P::effect1 },
+    { "decay", "echonotes.decay", "effect.parameter.velocityDecay", "", 0.0f, 1.0f, 0.3f, &P::effect2 },
+    { "pitch", "echonotes.pitch", "effect.parameter.pitchStep", "", -12.0f, 12.0f, 0.0f, &P::effect3 },
+    { "sync", "echonotes.sync", "effect.parameter.sync", "", 0.0f, 12.0f, 6.0f, nullptr, 0, -1 },
+    { "repeats", "echonotes.repeats", "effect.parameter.repeats", "", 1.0f, 16.0f, 3.0f, nullptr, 1, -1 },
+};
+inline constexpr EffectParameter aleaParameters[] {
+    { "timing", "alea.timing", "effect.parameter.timingRandom", "ms", 0.0f, 50.0f, 0.0f, &P::effect1 },
+    { "velocity", "alea.velocity", "effect.parameter.velocityRandom", "", 0.0f, 1.0f, 0.15f, &P::effect2 },
+    { "chance", "alea.chance", "effect.parameter.playChance", "", 0.0f, 1.0f, 1.0f, &P::effect3 },
+    { "pitch-chance", "alea.pitchChance", "effect.parameter.pitchChance", "", 0.0f, 1.0f, 0.0f, &P::effect4 },
+    { "pitch-range", "alea.pitchRange", "effect.parameter.pitchRange", "", 0.0f, 12.0f, 0.0f, &P::effect5 },
+};
+inline constexpr EffectParameter dureeParameters[] {
+    { "length", "duree.length", "effect.parameter.noteLength", "ms", 10.0f, 4'000.0f, 250.0f, &P::effect1 },
+    { "factor", "duree.factor", "effect.parameter.stretch", "", 1.0f, 4.0f, 1.5f, &P::effect2 },
+    { "mode", "duree.mode", "effect.parameter.mode", "", 0.0f, 3.0f, 0.0f, nullptr, 0, -1 },
+    { "length-sync", "duree.sync", "effect.parameter.sync", "", 1.0f, 12.0f, 6.0f, nullptr, 1, -1 },
+};
+inline constexpr EffectParameter sequenceurParameters[] {
+    { "swing", "sequenceur.swing", "effect.parameter.swing", "", 0.0f, 0.75f, 0.0f, &P::effect1 },
+    { "gate", "sequenceur.gate", "effect.parameter.gateLength", "", 0.05f, 1.0f, 0.75f, &P::effect2 },
+    { "mode", "sequenceur.mode", "effect.parameter.mode", "", 0.0f, 1.0f, 0.0f, nullptr, 0, -1 },
+    { "steps", "sequenceur.steps", "effect.parameter.stepCount", "", 1.0f, 16.0f, 16.0f, nullptr, 1, -1 },
+    { "rate-sync", "sequenceur.rate", "effect.parameter.stepRate", "", 1.0f, 12.0f, 3.0f, nullptr, 2, -1 },
+    { "direction-mode", "sequenceur.direction", "effect.parameter.direction", "", 0.0f, 3.0f, 0.0f, nullptr, 3, -1 },
+    { "root", "sequenceur.root", "effect.parameter.rootNote", "", 24.0f, 96.0f, 60.0f, nullptr, 4, -1 },
+    { "step-1-on", "sequenceur.step1On", "effect.parameter.stepOn", "", 0.0f, 1.0f, 1.0f, nullptr, 5, 0 },
+    { "step-1-note", "sequenceur.step1Note", "effect.parameter.stepNote", "", -24.0f, 24.0f, 0.0f, nullptr, 6, 0 },
+    { "step-1-velocity", "sequenceur.step1Velocity", "effect.parameter.stepVelocity", "", 1.0f, 127.0f, 120.0f, nullptr, 7, 0 },
+    { "step-1-length", "sequenceur.step1Length", "effect.parameter.stepLength", "", 0.1f, 1.0f, 1.0f, nullptr, 8, 0 },
+    { "step-2-on", "sequenceur.step2On", "effect.parameter.stepOn", "", 0.0f, 1.0f, 1.0f, nullptr, 9, 1 },
+    { "step-2-note", "sequenceur.step2Note", "effect.parameter.stepNote", "", -24.0f, 24.0f, 0.0f, nullptr, 10, 1 },
+    { "step-2-velocity", "sequenceur.step2Velocity", "effect.parameter.stepVelocity", "", 1.0f, 127.0f, 96.0f, nullptr, 11, 1 },
+    { "step-2-length", "sequenceur.step2Length", "effect.parameter.stepLength", "", 0.1f, 1.0f, 1.0f, nullptr, 12, 1 },
+    { "step-3-on", "sequenceur.step3On", "effect.parameter.stepOn", "", 0.0f, 1.0f, 1.0f, nullptr, 13, 2 },
+    { "step-3-note", "sequenceur.step3Note", "effect.parameter.stepNote", "", -24.0f, 24.0f, 12.0f, nullptr, 14, 2 },
+    { "step-3-velocity", "sequenceur.step3Velocity", "effect.parameter.stepVelocity", "", 1.0f, 127.0f, 96.0f, nullptr, 15, 2 },
+    { "step-3-length", "sequenceur.step3Length", "effect.parameter.stepLength", "", 0.1f, 1.0f, 1.0f, nullptr, 16, 2 },
+    { "step-4-on", "sequenceur.step4On", "effect.parameter.stepOn", "", 0.0f, 1.0f, 1.0f, nullptr, 17, 3 },
+    { "step-4-note", "sequenceur.step4Note", "effect.parameter.stepNote", "", -24.0f, 24.0f, 0.0f, nullptr, 18, 3 },
+    { "step-4-velocity", "sequenceur.step4Velocity", "effect.parameter.stepVelocity", "", 1.0f, 127.0f, 96.0f, nullptr, 19, 3 },
+    { "step-4-length", "sequenceur.step4Length", "effect.parameter.stepLength", "", 0.1f, 1.0f, 1.0f, nullptr, 20, 3 },
+    { "step-5-on", "sequenceur.step5On", "effect.parameter.stepOn", "", 0.0f, 1.0f, 1.0f, nullptr, 21, 4 },
+    { "step-5-note", "sequenceur.step5Note", "effect.parameter.stepNote", "", -24.0f, 24.0f, 7.0f, nullptr, 22, 4 },
+    { "step-5-velocity", "sequenceur.step5Velocity", "effect.parameter.stepVelocity", "", 1.0f, 127.0f, 120.0f, nullptr, 23, 4 },
+    { "step-5-length", "sequenceur.step5Length", "effect.parameter.stepLength", "", 0.1f, 1.0f, 1.0f, nullptr, 24, 4 },
+    { "step-6-on", "sequenceur.step6On", "effect.parameter.stepOn", "", 0.0f, 1.0f, 1.0f, nullptr, 25, 5 },
+    { "step-6-note", "sequenceur.step6Note", "effect.parameter.stepNote", "", -24.0f, 24.0f, 0.0f, nullptr, 26, 5 },
+    { "step-6-velocity", "sequenceur.step6Velocity", "effect.parameter.stepVelocity", "", 1.0f, 127.0f, 96.0f, nullptr, 27, 5 },
+    { "step-6-length", "sequenceur.step6Length", "effect.parameter.stepLength", "", 0.1f, 1.0f, 1.0f, nullptr, 28, 5 },
+    { "step-7-on", "sequenceur.step7On", "effect.parameter.stepOn", "", 0.0f, 1.0f, 1.0f, nullptr, 29, 6 },
+    { "step-7-note", "sequenceur.step7Note", "effect.parameter.stepNote", "", -24.0f, 24.0f, 12.0f, nullptr, 30, 6 },
+    { "step-7-velocity", "sequenceur.step7Velocity", "effect.parameter.stepVelocity", "", 1.0f, 127.0f, 96.0f, nullptr, 31, 6 },
+    { "step-7-length", "sequenceur.step7Length", "effect.parameter.stepLength", "", 0.1f, 1.0f, 1.0f, nullptr, 32, 6 },
+    { "step-8-on", "sequenceur.step8On", "effect.parameter.stepOn", "", 0.0f, 1.0f, 1.0f, nullptr, 33, 7 },
+    { "step-8-note", "sequenceur.step8Note", "effect.parameter.stepNote", "", -24.0f, 24.0f, 3.0f, nullptr, 34, 7 },
+    { "step-8-velocity", "sequenceur.step8Velocity", "effect.parameter.stepVelocity", "", 1.0f, 127.0f, 96.0f, nullptr, 35, 7 },
+    { "step-8-length", "sequenceur.step8Length", "effect.parameter.stepLength", "", 0.1f, 1.0f, 1.0f, nullptr, 36, 7 },
+    { "step-9-on", "sequenceur.step9On", "effect.parameter.stepOn", "", 0.0f, 1.0f, 1.0f, nullptr, 37, 8 },
+    { "step-9-note", "sequenceur.step9Note", "effect.parameter.stepNote", "", -24.0f, 24.0f, 0.0f, nullptr, 38, 8 },
+    { "step-9-velocity", "sequenceur.step9Velocity", "effect.parameter.stepVelocity", "", 1.0f, 127.0f, 120.0f, nullptr, 39, 8 },
+    { "step-9-length", "sequenceur.step9Length", "effect.parameter.stepLength", "", 0.1f, 1.0f, 1.0f, nullptr, 40, 8 },
+    { "step-10-on", "sequenceur.step10On", "effect.parameter.stepOn", "", 0.0f, 1.0f, 1.0f, nullptr, 41, 9 },
+    { "step-10-note", "sequenceur.step10Note", "effect.parameter.stepNote", "", -24.0f, 24.0f, 0.0f, nullptr, 42, 9 },
+    { "step-10-velocity", "sequenceur.step10Velocity", "effect.parameter.stepVelocity", "", 1.0f, 127.0f, 96.0f, nullptr, 43, 9 },
+    { "step-10-length", "sequenceur.step10Length", "effect.parameter.stepLength", "", 0.1f, 1.0f, 1.0f, nullptr, 44, 9 },
+    { "step-11-on", "sequenceur.step11On", "effect.parameter.stepOn", "", 0.0f, 1.0f, 1.0f, nullptr, 45, 10 },
+    { "step-11-note", "sequenceur.step11Note", "effect.parameter.stepNote", "", -24.0f, 24.0f, 12.0f, nullptr, 46, 10 },
+    { "step-11-velocity", "sequenceur.step11Velocity", "effect.parameter.stepVelocity", "", 1.0f, 127.0f, 96.0f, nullptr, 47, 10 },
+    { "step-11-length", "sequenceur.step11Length", "effect.parameter.stepLength", "", 0.1f, 1.0f, 1.0f, nullptr, 48, 10 },
+    { "step-12-on", "sequenceur.step12On", "effect.parameter.stepOn", "", 0.0f, 1.0f, 1.0f, nullptr, 49, 11 },
+    { "step-12-note", "sequenceur.step12Note", "effect.parameter.stepNote", "", -24.0f, 24.0f, 0.0f, nullptr, 50, 11 },
+    { "step-12-velocity", "sequenceur.step12Velocity", "effect.parameter.stepVelocity", "", 1.0f, 127.0f, 96.0f, nullptr, 51, 11 },
+    { "step-12-length", "sequenceur.step12Length", "effect.parameter.stepLength", "", 0.1f, 1.0f, 1.0f, nullptr, 52, 11 },
+    { "step-13-on", "sequenceur.step13On", "effect.parameter.stepOn", "", 0.0f, 1.0f, 1.0f, nullptr, 53, 12 },
+    { "step-13-note", "sequenceur.step13Note", "effect.parameter.stepNote", "", -24.0f, 24.0f, 10.0f, nullptr, 54, 12 },
+    { "step-13-velocity", "sequenceur.step13Velocity", "effect.parameter.stepVelocity", "", 1.0f, 127.0f, 120.0f, nullptr, 55, 12 },
+    { "step-13-length", "sequenceur.step13Length", "effect.parameter.stepLength", "", 0.1f, 1.0f, 1.0f, nullptr, 56, 12 },
+    { "step-14-on", "sequenceur.step14On", "effect.parameter.stepOn", "", 0.0f, 1.0f, 1.0f, nullptr, 57, 13 },
+    { "step-14-note", "sequenceur.step14Note", "effect.parameter.stepNote", "", -24.0f, 24.0f, 7.0f, nullptr, 58, 13 },
+    { "step-14-velocity", "sequenceur.step14Velocity", "effect.parameter.stepVelocity", "", 1.0f, 127.0f, 96.0f, nullptr, 59, 13 },
+    { "step-14-length", "sequenceur.step14Length", "effect.parameter.stepLength", "", 0.1f, 1.0f, 1.0f, nullptr, 60, 13 },
+    { "step-15-on", "sequenceur.step15On", "effect.parameter.stepOn", "", 0.0f, 1.0f, 1.0f, nullptr, 61, 14 },
+    { "step-15-note", "sequenceur.step15Note", "effect.parameter.stepNote", "", -24.0f, 24.0f, 12.0f, nullptr, 62, 14 },
+    { "step-15-velocity", "sequenceur.step15Velocity", "effect.parameter.stepVelocity", "", 1.0f, 127.0f, 96.0f, nullptr, 63, 14 },
+    { "step-15-length", "sequenceur.step15Length", "effect.parameter.stepLength", "", 0.1f, 1.0f, 1.0f, nullptr, 64, 14 },
+    { "step-16-on", "sequenceur.step16On", "effect.parameter.stepOn", "", 0.0f, 1.0f, 1.0f, nullptr, 65, 15 },
+    { "step-16-note", "sequenceur.step16Note", "effect.parameter.stepNote", "", -24.0f, 24.0f, 5.0f, nullptr, 66, 15 },
+    { "step-16-velocity", "sequenceur.step16Velocity", "effect.parameter.stepVelocity", "", 1.0f, 127.0f, 96.0f, nullptr, 67, 15 },
+    { "step-16-length", "sequenceur.step16Length", "effect.parameter.stepLength", "", 0.1f, 1.0f, 1.0f, nullptr, 68, 15 },
+};
+inline constexpr EffectParameter roulementParameters[] {
+    { "rate", "roulement.rate", "effect.parameter.rate", "Hz", 1.0f, 40.0f, 8.0f, &P::effect1 },
+    { "gate", "roulement.gate", "effect.parameter.gateLength", "", 0.1f, 1.0f, 0.5f, &P::effect2 },
+    { "ramp", "roulement.ramp", "effect.parameter.velocityRamp", "", -1.0f, 1.0f, 0.0f, &P::effect3 },
+    { "sync", "roulement.sync", "effect.parameter.sync", "", 0.0f, 12.0f, 3.0f, nullptr, 0, -1 },
+};
+
+#undef CYDAW_EQ_DYNAMIC
 #undef CYDAW_EQ_BAND
 #undef CYDAW_SLOT
 } // namespace effect_detail
 
-inline constexpr std::array<EffectDescriptor, 33> effectCatalogue { {
+inline constexpr std::array<EffectDescriptor, 60> effectCatalogue { {
     { "chorus", "core.chorus", effect_detail::K::chorus, "node.chorus", "node.chorus.description", "Chorus",
       effect_detail::effects, EffectGroup::modulation, 0xff5fd0c4u, effect_detail::chorus },
     { "flanger", "core.flanger", effect_detail::K::flanger, "node.flanger", "node.flanger.description", "Flanger",
@@ -781,7 +1234,7 @@ inline constexpr std::array<EffectDescriptor, 33> effectCatalogue { {
     { "eq-three", "core.eq-three", effect_detail::K::threeBandEq, "node.eqThree", "node.eqThree.description", "EQ Three",
       effect_detail::filters, EffectGroup::filter, 0xff5fc9d8u, effect_detail::eqThree },
     { "eq-pro", "core.eq-pro", effect_detail::K::parametricEq, "node.eqPro", "node.eqPro.description", "Parametric EQ",
-      effect_detail::filters, EffectGroup::filter, 0xff4fd6e8u, effect_detail::eqPro },
+      effect_detail::filters, EffectGroup::filter, 0xff4fd6e8u, effect_detail::eqPro, 2, 2, true },
     { "comp-pro", "core.comp-pro", effect_detail::K::compressorPro, "node.compPro", "node.compPro.description",
       "Pro Compressor", effect_detail::dynamics, EffectGroup::dynamics, 0xffff9a3cu, effect_detail::compressorPro, 2, 2,
       true },
@@ -835,6 +1288,35 @@ inline constexpr std::array<EffectDescriptor, 33> effectCatalogue { {
       effect_detail::effects, EffectGroup::dynamics, 0xffffc46bu, effect_detail::finition },
     { "halo", "core.halo", effect_detail::K::halo, "node.halo", "node.halo.description", "Halo Reverb", effect_detail::effects,
       EffectGroup::delay, 0xffb08cffu, effect_detail::halo },
+    // Added on 2026-10-14.
+    { "vocoder", "core.vocoder", effect_detail::K::vocoder, "node.vocoder", "node.vocoder.description", "Vocoder", effect_detail::effects, EffectGroup::modulation, 0xff9fd36bu, effect_detail::vocoderParameters, 2, 2, true },
+    { "de-esser", "core.de-esser", effect_detail::K::deEsser, "node.deEsser", "node.deEsser.description", "De-esser", effect_detail::dynamics, EffectGroup::dynamics, 0xffffb36bu, effect_detail::deEsserParameters },
+    { "tuner", "core.tuner", effect_detail::K::tuner, "node.tuner", "node.tuner.description", "Tuner", effect_detail::analyzers, EffectGroup::analysis, 0xff7fe0c0u, effect_detail::tunerParameters },
+    { "harmonie", "core.harmonie", effect_detail::K::harmonie, "node.harmonie", "node.harmonie.description", "Harmonie Pitch Shifter", effect_detail::effects, EffectGroup::modulation, 0xffd08cffu, effect_detail::harmonieParameters },
+    { "justesse", "core.justesse", effect_detail::K::justesse, "node.justesse", "node.justesse.description", "Justesse Pitch Correction", effect_detail::effects, EffectGroup::modulation, 0xffff8fc7u, effect_detail::justesseParameters },
+    { "empreinte", "core.empreinte", effect_detail::K::empreinte, "node.empreinte", "node.empreinte.description", "Empreinte Convolution Reverb", effect_detail::effects, EffectGroup::delay, 0xff8fb0ffu, effect_detail::empreinteParameters },
+    { "givre", "core.givre", effect_detail::K::givre, "node.givre", "node.givre.description", "Givre Spectral Freeze", effect_detail::effects, EffectGroup::delay, 0xffa8e6ffu, effect_detail::givreParameters },
+    { "grains", "core.grains", effect_detail::K::grains, "node.grains", "node.grains.description", "Grains Delay", effect_detail::effects, EffectGroup::delay, 0xffe8c56au, effect_detail::grainsParameters },
+    { "saccade", "core.saccade", effect_detail::K::saccade, "node.saccade", "node.saccade.description", "Saccade Repeat", effect_detail::effects, EffectGroup::delay, 0xffff7f9fu, effect_detail::saccadeParameters },
+    { "boucleur", "core.boucleur", effect_detail::K::boucleur, "node.boucleur", "node.boucleur.description", "Boucleur Looper", effect_detail::effects, EffectGroup::delay, 0xff6be0a0u, effect_detail::boucleurParameters },
+    { "pompe", "core.pompe", effect_detail::K::pompe, "node.pompe", "node.pompe.description", "Pompe Volume Shaper", effect_detail::dynamics, EffectGroup::dynamics, 0xffff6b6bu, effect_detail::pompeParameters, 2, 2, true },
+    { "decaleur", "core.decaleur", effect_detail::K::decaleur, "node.decaleur", "node.decaleur.description", "Decaleur Frequency Shifter", effect_detail::effects, EffectGroup::modulation, 0xff6bd0ffu, effect_detail::decaleurParameters },
+    { "anneau", "core.anneau", effect_detail::K::anneau, "node.anneau", "node.anneau.description", "Anneau Ring Modulator", effect_detail::effects, EffectGroup::modulation, 0xfff0a0ffu, effect_detail::anneauParameters },
+    { "rotor", "core.rotor", effect_detail::K::rotor, "node.rotor", "node.rotor.description", "Rotor Rotary Speaker", effect_detail::effects, EffectGroup::modulation, 0xffd6a46bu, effect_detail::rotorParameters },
+    { "resonateurs", "core.resonateurs", effect_detail::K::resonateurs, "node.resonateurs", "node.resonateurs.description", "Resonateurs", effect_detail::effects, EffectGroup::filter, 0xffc0a0ffu, effect_detail::resonateursParameters },
+    { "corps", "core.corps", effect_detail::K::corps, "node.corps", "node.corps.description", "Corps Resonant Body", effect_detail::effects, EffectGroup::filter, 0xffd09060u, effect_detail::corpsParameters },
+    { "peigne", "core.peigne", effect_detail::K::peigne, "node.peigne", "node.peigne.description", "Peigne Comb Filter", effect_detail::effects, EffectGroup::filter, 0xff70e0d0u, effect_detail::peigneParameters },
+    { "utilitaire", "core.utilitaire", effect_detail::K::utilitaire, "node.utilitaire", "node.utilitaire.description", "Utilitaire", effect_detail::utilities, EffectGroup::channels, 0xff9aa8b8u, effect_detail::utilitaireParameters },
+    { "stereoscope", "core.stereoscope", effect_detail::K::stereoscope, "node.stereoscope", "node.stereoscope.description", "Stereoscope", effect_detail::analyzers, EffectGroup::analysis, 0xff63c6ffu, effect_detail::stereoscopeParameters },
+    // The MIDI effects.
+    { "arpege", "core.arpege", effect_detail::K::arpege, "node.arpege", "node.arpege.description", "Arpeggiator", "nodes.category.midi", EffectGroup::midi, 0xffd47be8u, effect_detail::arpegeParameters, 2, 2, false, true },
+    { "accords", "core.accords", effect_detail::K::accords, "node.accords", "node.accords.description", "Chords", "nodes.category.midi", EffectGroup::midi, 0xffcf78ddu, effect_detail::accordsParameters, 2, 2, false, true },
+    { "gamme", "core.gamme", effect_detail::K::gamme, "node.gamme", "node.gamme.description", "Scale", "nodes.category.midi", EffectGroup::midi, 0xffcf78ddu, effect_detail::gammeParameters, 2, 2, false, true },
+    { "echo-notes", "core.echo-notes", effect_detail::K::echoNotes, "node.echoNotes", "node.echoNotes.description", "Note Echo", "nodes.category.midi", EffectGroup::midi, 0xffcf78ddu, effect_detail::echoNotesParameters, 2, 2, false, true },
+    { "alea", "core.alea", effect_detail::K::alea, "node.alea", "node.alea.description", "Random", "nodes.category.midi", EffectGroup::midi, 0xffcf78ddu, effect_detail::aleaParameters, 2, 2, false, true },
+    { "duree", "core.duree", effect_detail::K::duree, "node.duree", "node.duree.description", "Note Length", "nodes.category.midi", EffectGroup::midi, 0xffcf78ddu, effect_detail::dureeParameters, 2, 2, false, true },
+    { "sequenceur", "core.sequenceur", effect_detail::K::sequenceur, "node.sequenceur", "node.sequenceur.description", "Step Sequencer", "nodes.category.midi", EffectGroup::midi, 0xffd47be8u, effect_detail::sequenceurParameters, 2, 2, false, true },
+    { "roulement", "core.roulement", effect_detail::K::roulement, "node.roulement", "node.roulement.description", "Note Repeat", "nodes.category.midi", EffectGroup::midi, 0xffcf78ddu, effect_detail::roulementParameters, 2, 2, false, true },
 } };
 
 [[nodiscard]] constexpr const EffectDescriptor* effectForKind(const NativeDspNodeKind kind) noexcept

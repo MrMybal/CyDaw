@@ -1,0 +1,16 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "multimode-filter",
+ "name": "Clean High-Pass",
+ "state": {
+  "type": "multimode-filter",
+  "parameters": {
+   "filter.mode": 1.0,
+   "filter.cutoff": 200.0,
+   "filter.resonance": 0.7,
+   "filter.drive": 0.0
+  }
+ }
+}

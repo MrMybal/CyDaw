@@ -1,0 +1,16 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "bitcrusher",
+ "name": "8-bit Console",
+ "state": {
+  "type": "bitcrusher",
+  "parameters": {
+   "crusher.bits": 8.0,
+   "crusher.downsample": 4.0,
+   "crusher.drive": 0.0,
+   "crusher.mix": 1.0
+  }
+ }
+}

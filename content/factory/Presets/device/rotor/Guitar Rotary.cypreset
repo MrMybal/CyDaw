@@ -1,0 +1,24 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "rotor",
+ "name": "Guitar Rotary",
+ "state": {
+  "type": "rotor",
+  "parameters": {
+   "rotor.slow": 1.0,
+   "rotor.fast": 6.8,
+   "rotor.acceleration": 1.2,
+   "rotor.balance": 0.3,
+   "rotor.doppler": 0.6,
+   "rotor.drive": 5.0,
+   "rotor.mix": 1.0,
+   "rotor.output": 0.0,
+   "rotor.speed": 1.0,
+   "rotor.crossover": 1000.0,
+   "rotor.width": 0.8,
+   "rotor.room": 0.25
+  }
+ }
+}

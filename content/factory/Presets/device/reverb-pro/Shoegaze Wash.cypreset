@@ -1,0 +1,35 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "reverb-pro",
+ "name": "Shoegaze Wash",
+ "state": {
+  "type": "reverb-pro",
+  "parameters": {
+   "revpro.space": 1.0,
+   "revpro.decay": 9.0,
+   "revpro.predelay": 10.0,
+   "revpro.distance": 0.75,
+   "revpro.brightness": 0.2,
+   "revpro.character": 0.85,
+   "revpro.width": 1.7,
+   "revpro.mix": 0.5,
+   "revpro.lowDecay": 0.8,
+   "revpro.lowFrequency": 200.0,
+   "revpro.midDecay": 1.2,
+   "revpro.midFrequency": 1500.0,
+   "revpro.highDecay": 0.9,
+   "revpro.highFrequency": 6000.0,
+   "revpro.lowCut": 200.0,
+   "revpro.highCut": 11000.0,
+   "revpro.ducking": 0.0,
+   "revpro.duckRelease": 300.0,
+   "revpro.freeze": 0.0,
+   "revpro.sync": 0.0,
+   "revpro.diffusion": 1.0,
+   "revpro.output": 0.0,
+   "revpro.early": -18.0
+  }
+ }
+}

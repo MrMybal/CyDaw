@@ -18,6 +18,12 @@ sons intégrée.
 **Ses instruments**
 - **Prisme** (tables d'ondes), **Ambre** (analogique), **Colosse** (tables d'ondes modernes),
   **Mosaïque** (hybride), **Nébuleuse** (couches et grains), **Kick** (grosse caisse synthétique).
+- **Opale** (polyphonique de tous les jours), **Quartz** et **Saphir** (FM), **Tirette** (orgue),
+  **Onyx** (distorsion de phase), **Alliage** (modules), **Argile** et **Dérive** (analogiques),
+  **Bronze** (objets résonants), **Jade** (piano électrique modélisé), **Silex** (boîte à rythmes
+  synthétisée).
+- **Rack de pads** (sur chaque pad, un instrument et ses effets) et **Nuée** (granulaire sur ses
+  propres sons).
 - **Batterie** : six kits acoustiques, mixage élément par élément, réglages des micros, motifs
   rythmiques posés en clips MIDI.
 - **Sampler** : zones, couches de vélocité, round robin, import SFZ (contrôleurs, articulations,
@@ -33,6 +39,12 @@ sons intégrée.
   Multibande Pro, Velours (résonances), Patine (usure analogique), Halo (réverbe), Tranche (tranche de
   console), Finition (mastering) et Sonomètre (loudness).
 - Amplis, baffles et micros pour guitares, basses et voix.
+- Créatifs : vocodeur, changeur de hauteur et harmoniseur, correction de justesse, dé-esseur, réverbe à
+  convolution, gel et flou spectraux, écho granulaire, répétitions en rythme, boucleur, décaleur de
+  fréquence, modulation en anneau, cabine tournante, résonateurs, filtre en peigne, volume en rythme.
+- MIDI : arpégiateur, accords, gamme, écho de notes, humanisation, durée des notes, séquenceur pas à
+  pas, roulement.
+- Utilitaires : accordeur, stéréoscope (goniomètre, corrélation de phase), polarité et graves en mono.
 
 **Mixer et router**
 - Mixeur avec bus, envois, side-chain, compensation de latence.
@@ -85,7 +97,7 @@ Les tests se lancent avec `ctest -C Release` dans le dossier de compilation.
 - [Sampler et instruments d'usine](docs/SAMPLER.md) · [Synthés](docs/SYNTHES.md) ·
   [Prisme](docs/PRISME.md) · [Batterie](docs/BATTERIE.md) · [Kick](docs/KICK_ET_ELECTRO.md)
 - [Effets de studio](docs/EFFETS_STUDIO.md) · [Effets de mixage](docs/EFFETS_MIXAGE.md) ·
-  [Amplis et micros](docs/AMPLIS_ET_MICROS.md)
+  [Effets créatifs et MIDI](docs/EFFETS_CREATIFS.md) · [Amplis et micros](docs/AMPLIS_ET_MICROS.md)
 - [Bibliothèque de sons](docs/BANQUE_DE_SONS.md) · [Modèles de son](docs/SOUND_MATCHING.md)
 - [Édition audio](docs/EDITION_AUDIO.md) · [Architecture](docs/ARCHITECTURE.md)
 - [Serveur MCP](tools/mcp/README.md)

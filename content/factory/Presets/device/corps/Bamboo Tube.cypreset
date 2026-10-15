@@ -1,0 +1,22 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "corps",
+ "name": "Bamboo Tube",
+ "state": {
+  "type": "corps",
+  "parameters": {
+   "corps.tune": 330.0,
+   "corps.decay": 0.35,
+   "corps.material": 0.1,
+   "corps.inharmonic": 0.0,
+   "corps.position": 0.1,
+   "corps.mix": 0.4,
+   "corps.output": 0.0,
+   "corps.width": 0.5,
+   "corps.type": 6.0,
+   "corps.lowCut": 80.0
+  }
+ }
+}

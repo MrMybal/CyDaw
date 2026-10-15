@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Studio.h"
+#include "DeviceHost.h"
 #include "StudioEffectsView.h"
 #include "UiState.h"
 
@@ -12,7 +12,7 @@ namespace cydaw::v2 {
 
 class CardFileScope final {
 public:
-    CardFileScope(Studio& studio, UiState& state, const TrackRef& track, app::NodeGraphComponent& graph, std::uint64_t nodeId,
+    CardFileScope(DeviceHost& studio, UiState& state, const TrackRef& track, app::NodeGraphComponent& graph, std::uint64_t nodeId,
                   const juce::String& typeKey);
     ~CardFileScope();
     CardFileScope(const CardFileScope&) = delete;

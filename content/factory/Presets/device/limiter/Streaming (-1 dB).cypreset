@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "limiter",
+ "name": "Streaming (-1 dB)",
+ "state": {
+  "type": "limiter",
+  "parameters": {
+   "limiter.gain": 3.0,
+   "limiter.ceiling": -1.0,
+   "limiter.release": 80.0
+  }
+ }
+}

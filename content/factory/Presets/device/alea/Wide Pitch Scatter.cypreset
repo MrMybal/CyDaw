@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "alea",
+ "name": "Wide Pitch Scatter",
+ "state": {
+  "type": "alea",
+  "parameters": {
+   "alea.timing": 0.0,
+   "alea.velocity": 0.15,
+   "alea.chance": 1.0,
+   "alea.pitchChance": 0.5,
+   "alea.pitchRange": 12.0
+  }
+ }
+}

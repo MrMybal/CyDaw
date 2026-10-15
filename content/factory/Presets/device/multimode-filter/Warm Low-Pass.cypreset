@@ -1,0 +1,16 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "multimode-filter",
+ "name": "Warm Low-Pass",
+ "state": {
+  "type": "multimode-filter",
+  "parameters": {
+   "filter.mode": 0.0,
+   "filter.cutoff": 3000.0,
+   "filter.resonance": 0.9,
+   "filter.drive": 2.0
+  }
+ }
+}

@@ -3,7 +3,9 @@
 #include <cydaw/engine/AudioGraph.h>
 #include <cydaw/engine/AudioProcessor.h>
 
+#include <atomic>
 #include <memory>
+#include <span>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -22,6 +24,16 @@ enum class RenderPlanError : std::uint8_t {
 };
 
 class AudioRenderPlan;
+
+// A node switched off (its card bypassed): it gives out what `from` received
+// at its main input, a sidechain left out; `from` 0 gives silence (an
+// instrument switched off).
+struct BypassedNode {
+    NodeId node {};
+    NodeId from {};
+
+    [[nodiscard]] bool operator==(const BypassedNode&) const = default;
+};
 
 struct RenderPlanResult {
     RenderPlanError error { RenderPlanError::none };
@@ -99,11 +111,45 @@ public:
     [[nodiscard]] std::uint32_t latencySamples() const noexcept;
     // The longest wait a path can be given, set when the plan is compiled.
     [[nodiscard]] std::uint32_t maximumLatencySamples() const noexcept { return maximumLatency_; }
+    // The nodes switched off, every other one on. Any thread: the shape does
+    // not change. A switched-off node goes on processing (it comes back
+    // warm) and reporting its latency, its input held back as long, so the
+    // mix's alignment never moves; the change is crossfaded.
+    void setBypasses(std::span<const BypassedNode> nodes) noexcept;
+    // The loudest each of these nodes gave out since it was last asked
+    // (its first two channels; the second as the first for a mono one), for
+    // an interface's meters; 0 for a node the plan has not. Any thread.
+    void takePeaks(const NodeId* nodes, std::size_t count, float* left, float* right) noexcept;
+    // What a node's processor shows of its work now (AudioProcessor::
+    // readings): up to `count` values, how many; none for a node the plan
+    // has not. Any thread.
+    [[nodiscard]] std::size_t readings(NodeId node, float* into, std::size_t count) const noexcept;
 
 private:
     friend class AudioRenderPlanBuilder;
+    // A node's switch: what the control side wants, then the audio thread's
+    // fade toward it.
+    struct Bypass {
+        // -1 on; -2 silence; else the index of the node whose input passes.
+        std::atomic<std::int32_t> wanted { -1 };
+        float mix {};
+        std::int32_t from { -1 };
+        // For a node with a latency: its own input, held back as long.
+        AudioBuffer ring;
+        std::uint32_t write {};
+    };
+    void bypass(std::size_t index, std::uint32_t frames) noexcept;
+    // What a node received at its main input (a sidechain left out).
+    void mainInput(std::size_t index, AudioBlockView into) noexcept;
+
     ProcessSpec spec_;
     std::vector<RuntimeNode> nodes_;
+    std::unique_ptr<Bypass[]> bypasses_;
+    AudioBuffer bypassScratch_;
+    // Two a node: its channels' loudest since takePeaks().
+    std::unique_ptr<std::atomic<float>[]> peaks_;
+    // Whether any node may be switched off: nothing to look at otherwise.
+    std::atomic<bool> anyBypass_ {};
     std::size_t outputNodeIndex_ {};
     std::vector<DelayLine> delayLines_;
     // Each node's output latency this block (the audio thread's).

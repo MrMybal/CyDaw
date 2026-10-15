@@ -1,0 +1,35 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "reverb-pro",
+ "name": "Pop Vocal Tempo Hall (Ducked)",
+ "state": {
+  "type": "reverb-pro",
+  "parameters": {
+   "revpro.space": 0.6,
+   "revpro.decay": 2.0,
+   "revpro.predelay": 12.0,
+   "revpro.distance": 0.4,
+   "revpro.brightness": 0.2,
+   "revpro.character": 0.35,
+   "revpro.width": 1.3,
+   "revpro.mix": 0.3,
+   "revpro.lowDecay": 0.75,
+   "revpro.lowFrequency": 280.0,
+   "revpro.midDecay": 1.0,
+   "revpro.midFrequency": 1800.0,
+   "revpro.highDecay": 0.8,
+   "revpro.highFrequency": 7000.0,
+   "revpro.lowCut": 250.0,
+   "revpro.highCut": 13000.0,
+   "revpro.ducking": 12.0,
+   "revpro.duckRelease": 600.0,
+   "revpro.freeze": 0.0,
+   "revpro.sync": 5.0,
+   "revpro.diffusion": 0.9,
+   "revpro.output": 0.0,
+   "revpro.early": -9.0
+  }
+ }
+}

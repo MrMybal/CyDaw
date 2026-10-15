@@ -34,7 +34,19 @@ namespace cydaw::graph {
            || processorKey == "core.ambre-synth"
            || processorKey == "core.colosse-synth"
            || processorKey == "core.mosaique-synth"
-           || processorKey == "core.nebuleuse-synth";
+           || processorKey == "core.nebuleuse-synth"
+           || processorKey == "core.opale-synth"
+           || processorKey == "core.onyx-synth"
+           || processorKey == "core.tirette-synth"
+           || processorKey == "core.alliage-synth"
+           || processorKey == "core.quartz-synth"
+           || processorKey == "core.argile-synth"
+           || processorKey == "core.saphir-synth"
+           || processorKey == "core.derive-synth"
+           || processorKey == "core.bronze-synth"
+           || processorKey == "core.silex-synth"
+           || processorKey == "core.jade-synth"
+           || processorKey == "core.drum-rack";
 }
 
 // Of those, the ones a voice allocator can drive per note: the allocator
@@ -53,7 +65,19 @@ namespace cydaw::graph {
            || processorKey == "core.ambre-synth"
            || processorKey == "core.colosse-synth"
            || processorKey == "core.mosaique-synth"
-           || processorKey == "core.nebuleuse-synth";
+           || processorKey == "core.nebuleuse-synth"
+           || processorKey == "core.opale-synth"
+           || processorKey == "core.onyx-synth"
+           || processorKey == "core.tirette-synth"
+           || processorKey == "core.alliage-synth"
+           || processorKey == "core.quartz-synth"
+           || processorKey == "core.argile-synth"
+           || processorKey == "core.saphir-synth"
+           || processorKey == "core.derive-synth"
+           || processorKey == "core.bronze-synth"
+           || processorKey == "core.silex-synth"
+           || processorKey == "core.jade-synth"
+           || processorKey == "core.drum-rack";
 }
 
 // Narrower still: a node whose presence on its own says the graph is meant to

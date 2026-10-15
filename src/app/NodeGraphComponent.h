@@ -333,6 +333,7 @@ public:
 
     void refreshTranslations();
     [[nodiscard]] juce::var serialise() const;
+    // The graph the engine plays: its cards switched off listed in it.
     [[nodiscard]] cydaw::engine::NativeDspGraph nativeDspGraph() const;
     // The same graph with the cache set aside, and how many times the export
     // has been rebuilt from scratch. The suite compares the two graphs and
@@ -432,6 +433,13 @@ public:
     bool removeCommentForRemote(std::uint64_t id);
     [[nodiscard]] juce::Result insertFactoryDevice(
         const juce::String& deviceKey);
+    // An instrument preset in place of the instrument this graph plays: its
+    // voice section (allocator, source, envelope, gain, voice filter) taken
+    // out and the preset's put in, wired where the old one was — what fed
+    // its notes, the effects after it, the cables other cards plugged into
+    // it — so the chain after it, its automation and its modulators stay.
+    // With no voice section to replace, the preset is the whole graph.
+    [[nodiscard]] juce::Result replaceInstrument(const juce::String& presetKey);
     [[nodiscard]] juce::Result insertNode(const juce::String& nodeTypeKey);
     [[nodiscard]] juce::Result replaceNode(
         const juce::String& currentNodeTypeKey,
@@ -439,6 +447,10 @@ public:
     // Splices a card into the cable that feeds the output, whatever feeds
     // it. The suite cannot know a loaded preset's topology.
     [[nodiscard]] juce::Result insertNodeBeforeOutput(
+        const juce::String& insertedNodeTypeKey);
+    // Splices a MIDI card (an arpeggiator, chords…) into the notes' cable
+    // that reaches the instrument: after the MIDI cards already there.
+    [[nodiscard]] juce::Result insertNodeBeforeInstrument(
         const juce::String& insertedNodeTypeKey);
     [[nodiscard]] juce::Result insertNodeOnConnection(
         const juce::String& sourceNodeTypeKey,
@@ -561,6 +573,7 @@ public:
         juce::Colour colour;
         juce::Point<float> position; // canvas fractions, as stored
         bool collapsed {};
+        bool bypassed {};
         bool protectedNode {};
         bool composite {};
         // It has a designed interface: a window to open, as a plugin's.
@@ -742,6 +755,13 @@ public:
     // A device taken out of a chain, as the device panel does: what fed it
     // is wired to what it fed, so the sound still flows. One undo step.
     bool editorRemoveFromChain(std::uint64_t id);
+    // A device moved along its chain, as the device panel's drag does: taken
+    // out (what fed it wired to what it fed), then put back just before
+    // `before` (0: last, before the chain's output). Its sidechain input and
+    // the control cables on its knobs stay. False when it cannot move (an
+    // instrument's voice, a card without an audio input and output). One
+    // undo step.
+    bool editorMoveInChain(std::uint64_t id, std::uint64_t before);
     // While dragging, positions change without history; `commit` ends the
     // gesture and records one step.
     void editorMoveNodes(const std::vector<std::pair<std::uint64_t, juce::Point<float>>>& positions,
@@ -767,10 +787,17 @@ public:
     struct SamplerCardControls {
         cydaw::engine::SamplerControllers controllers {};
         float articulation { -1.0f };
+        // The simple sampler's card: one sample over the keys.
+        bool simple {};
     };
     [[nodiscard]] std::optional<SamplerCardControls> editorSamplerControls(std::uint64_t nodeId) const;
     bool editorSetAlias(std::uint64_t id, const juce::String& alias);
+    // A card's own description (what a missing plug-in was: its maker, its
+    // format), kept with the graph.
+    bool editorSetDescription(std::uint64_t id, const juce::String& description);
     bool editorSetCollapsed(std::uint64_t id, bool collapsed);
+    // A card switched off or on (heard at once, an undo step).
+    bool editorSetBypassed(std::uint64_t id, bool bypassed);
     std::vector<std::uint64_t> editorDuplicate(const std::vector<std::uint64_t>& ids);
     bool editorUndo();
     bool editorRedo();
@@ -792,6 +819,9 @@ public:
         bool instrument {};
     };
     [[nodiscard]] std::map<std::uint64_t, EditorNativeSpan> editorNativeSpans() const;
+    [[nodiscard]] std::map<std::uint64_t, EditorNativeSpan> nativeSpansOf(const cydaw::engine::NativeDspGraph& native) const;
+    // The export as the cache holds it, its cards switched off not listed.
+    [[nodiscard]] cydaw::engine::NativeDspGraph exportedNativeGraph() const;
     // The control cables that reach the instrument's voices — an LFO on the
     // voice filter's cutoff — by the control node they leave and what they
     // move. Their sources run in the effect chain, which keeps their ids.
@@ -930,6 +960,10 @@ private:
         // Editor-only compact presentation. Ports remain available while the
         // control surface is hidden; this never affects DSP compilation.
         bool collapsed {};
+        // Switched off: what reaches it goes through untouched (an
+        // instrument falls silent). The engine keeps it running, so it comes
+        // back without a gap; the graph's shape does not change.
+        bool bypassed {};
         // The table this card was shaped with, in harmonics. Null means the
         // built-in bank. The rendered form of the same table lives in
         // parameters.wavetable, and setNodeWavetable writes both at once so

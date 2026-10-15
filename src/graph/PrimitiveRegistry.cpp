@@ -436,6 +436,13 @@ PrimitiveRegistry createFactoryPrimitiveRegistry()
               port(2, "frequency", Type::value, Direction::input, Rate::control),
               port(3, "level", Type::value, Direction::input, Rate::control) },
             std::move(samplerParameters), true, true, false, true));
+        // A rack of pads: each pad an instrument and its effects of its own
+        // (the track's engine plays them); its own voices are silent.
+        add(primitive("core.drum-rack", "Pad Rack", Category::generator,
+            { port(1, "audio-out", Type::audio, Direction::output, Rate::audio, 2),
+              port(2, "frequency", Type::value, Direction::input, Rate::control),
+              port(3, "level", Type::value, Direction::input, Rate::control) },
+            {}, true, true, false, true));
         add(primitive("core.batterie", "Batterie", Category::generator,
             { port(1, "audio-out", Type::audio, Direction::output, Rate::audio, 2),
               port(2, "frequency", Type::value, Direction::input, Rate::control),
@@ -683,6 +690,18 @@ PrimitiveRegistry createFactoryPrimitiveRegistry()
     // The effect catalogue: an audio input and output, then one value input
     // per parameter a cable can drive, in the catalogue's order.
     for (const auto& effect : engine::effectCatalogue) {
+        // A MIDI effect: notes in, notes out, its values knobs only.
+        if (effect.midi) {
+            std::vector<NodeParameter> values;
+            for (const auto& item : effect.parameters)
+                if (!item.key.empty())
+                    values.push_back(parameter(std::string(item.key), item.minimum, item.maximum, item.defaultValue));
+            add(primitive(std::string(effect.processorKey), std::string(effect.displayName), Category::midi,
+                          { port(1, "midi-in", Type::midi, Direction::input, Rate::event),
+                            port(2, "midi-out", Type::midi, Direction::output, Rate::event) },
+                          std::move(values), true));
+            continue;
+        }
         std::vector<GraphPort> ports {
             port(1, "audio-in", Type::audio, Direction::input, Rate::audio, effect.inputChannels),
             port(2, "audio-out", Type::audio, Direction::output, Rate::audio, effect.outputChannels)

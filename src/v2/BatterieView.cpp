@@ -159,7 +159,11 @@ bool BatterieView::knob(const int index, const char* label, const float diameter
     list->AddText(ImVec2(origin.x + (width - size.x) * 0.5f, y), hovered || active ? p.text : p.textDim, text.toRawUTF8());
     list->PopClipRect();
     ImGui::PopFont();
-    ImGui::Dummy(ImVec2(width, textHeight + dp(2.0f)));
+    // Its name, or its number: a click on it types the value in.
+    auto typed = static_cast<double>(value(index));
+    if (ui::valueEntryButton("##number", ImVec2(width, textHeight + dp(2.0f)), typed, parameter.minimum, parameter.maximum,
+                             parameter.unit == "%" ? 100.0 : 1.0, parameter.unit.c_str()))
+        set(index, static_cast<float>(typed));
     ImGui::EndGroup();
     ImGui::PopID();
     return changed;
@@ -478,15 +482,15 @@ void BatterieView::drawGroovesTab()
 void BatterieView::drawPane(const TrackRef& track, app::NodeGraphComponent& graph, const std::uint64_t nodeId, const ImVec2 origin,
                             const ImVec2 size, const ImU32 colour)
 {
+    // Inside a module: English, whatever the language.
+    const ui::ModuleText english;
     if (!bind(track, graph, nodeId))
         return;
     (void) colour;
     ImGui::PushID(static_cast<int>(nodeId) + 43'000);
     ImGui::SetCursorScreenPos(origin);
     ImGui::BeginGroup();
-    if (ui::primaryButton(L("Ouvrir Batterie", "Open Batterie"), ImVec2(dp(120.0f), 0.0f)))
-        openEditor(track, nodeId);
-    ImGui::SameLine();
+    // Its window opens from the card's header.
     const auto kit = std::clamp(static_cast<int>(std::lround(value(drum::globalBase + drum::globalKit))), 0, static_cast<int>(drum::kits.size()) - 1);
     ImGui::TextDisabled("%s", L(drum::kits[static_cast<std::size_t>(kit)].french, drum::kits[static_cast<std::size_t>(kit)].english));
     const auto knobsHeight = dp(26.0f) + ui::currentFontBase() * 0.78f + dp(3.0f);
@@ -515,32 +519,40 @@ void BatterieView::drawPane(const TrackRef& track, app::NodeGraphComponent& grap
 
 void BatterieView::openEditor(const TrackRef& track, const std::uint64_t nodeId, const bool detached, const bool mics)
 {
-    editor_ = Target { track, nodeId };
-    focusEditor_ = true;
+    const auto id = windows_.open(track, nodeId, state_.manyInstrumentWindows);
     showMics_ = mics;
     if (detached)
-        ui::setDetached(editorWindowId, true);
+        ui::setDetached(id.c_str(), true);
 }
 
 void BatterieView::drawEditor()
 {
-    if (!editor_)
-        return;
+    // Inside a module: English, whatever the language.
+    const ui::ModuleText english;
+    windows_.each([this](const TrackRef& track, const std::uint64_t nodeId, const bool focus) {
+        editor_ = Target { track, nodeId };
+        windowId_ = windows_.idOf(track, nodeId);
+        const auto open = drawEditorWindow(focus);
+        editor_.reset();
+        return open;
+    });
+}
+
+bool BatterieView::drawEditorWindow(const bool focus)
+{
     const auto target = *editor_;
     auto* slot = studio_.graphFor(target.track);
     if (slot == nullptr || !studio_.isValid(target.track) || !bind(target.track, slot->graph(), target.nodeId)) {
-        editor_.reset();
-        return;
+        return false;
     }
     const auto& p = theme::palette();
-    ui::beforeDetachable(editorWindowId);
+    ui::beforeDetachable(windowId_.c_str());
+    windows_.placeFirst(target.track, target.nodeId);
     ImGui::SetNextWindowSize(ImVec2(dp(1'180.0f), dp(760.0f)), ImGuiCond_FirstUseEver);
-    if (focusEditor_) {
+    if (focus)
         ImGui::SetNextWindowFocus();
-        focusEditor_ = false;
-    }
     auto open = true;
-    const auto title = juce::String::fromUTF8("Batterie \xe2\x80\x94 ") + studio_.trackName(target.track) + editorWindowId;
+    const auto title = juce::String::fromUTF8("Batterie \xe2\x80\x94 ") + studio_.trackName(target.track) + juce::String(windowId_);
     ImGui::PushStyleColor(ImGuiCol_TitleBgActive, theme::mix(batterieGold, p.bg2 | 0xff000000u, 0.65f));
     const auto visible = ImGui::Begin(title.toRawUTF8(), &open, ImGuiWindowFlags_NoCollapse);
     ImGui::PopStyleColor();
@@ -548,7 +560,7 @@ void BatterieView::drawEditor()
         {
             const auto headerY = ImGui::GetCursorPosY();
             ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - dp(24.0f));
-            (void) ui::detachButton(editorWindowId, ImVec2(dp(24.0f), dp(22.0f)));
+            (void) ui::detachButton(windowId_.c_str(), ImVec2(dp(24.0f), dp(22.0f)));
             ImGui::SetCursorPosY(headerY);
         }
         ImGui::PushFont(theme::boldFont(), ImGui::GetStyle().FontSizeBase * 1.3f);
@@ -622,8 +634,7 @@ void BatterieView::drawEditor()
         }
     }
     ImGui::End();
-    if (!open)
-        editor_.reset();
+    return open;
 }
 
 } // namespace cydaw::v2

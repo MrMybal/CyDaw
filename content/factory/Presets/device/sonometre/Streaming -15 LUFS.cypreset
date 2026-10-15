@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "sonometre",
+ "name": "Streaming -15 LUFS",
+ "state": {
+  "type": "sonometre",
+  "parameters": {
+   "sonometre.target": 2.0,
+   "sonometre.history": 120.0,
+   "sonometre.truePeak": -1.0
+  }
+ }
+}

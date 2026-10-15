@@ -1,0 +1,16 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "lfo",
+ "name": "Triangle Sweep",
+ "state": {
+  "type": "lfo",
+  "parameters": {
+   "node.9001.lfo.rate": 0.5,
+   "node.9001.lfo.depth": 1.0,
+   "node.9001.lfo.offset": 0.0,
+   "node.9001.lfo.shape": 1.0
+  }
+ }
+}

@@ -1,0 +1,30 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "comp-pro",
+ "name": "Natural Acoustic Guitar",
+ "state": {
+  "type": "comp-pro",
+  "parameters": {
+   "comppro.threshold": -22.0,
+   "comppro.ratio": 2.5,
+   "comppro.knee": 12.0,
+   "comppro.attack": 25.0,
+   "comppro.release": 220.0,
+   "comppro.makeup": 3.0,
+   "comppro.mix": 1.0,
+   "comppro.sidechain": 100.0,
+   "comppro.style": 2.0,
+   "comppro.range": 8.0,
+   "comppro.hold": 0.0,
+   "comppro.lookahead": 0.0,
+   "comppro.autoRelease": 1.0,
+   "comppro.autoGain": 0.0,
+   "comppro.sidechainLow": 12000.0,
+   "comppro.link": 1.0,
+   "comppro.channels": 0.0,
+   "comppro.audition": 0.0
+  }
+ }
+}

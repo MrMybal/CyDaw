@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "saccade",
+ "name": "Random Glitch",
+ "state": {
+  "type": "saccade",
+  "parameters": {
+   "saccade.chance": 0.25,
+   "saccade.variation": 0.6,
+   "saccade.decay": 0.0,
+   "saccade.pitchDecay": 0.0,
+   "saccade.filter": 20000.0,
+   "saccade.mix": 1.0,
+   "saccade.output": 0.0,
+   "saccade.interval": 9.0,
+   "saccade.offset": 2.0,
+   "saccade.gate": 2.0,
+   "saccade.grid": 1.0,
+   "saccade.mode": 1.0,
+   "saccade.reverseChance": 0.3,
+   "saccade.repeat": 0.0
+  }
+ }
+}

@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "tuner",
+ "name": "Strobe 440",
+ "state": {
+  "type": "tuner",
+  "parameters": {
+   "tuner.reference": 440.0,
+   "tuner.mute": 0.0,
+   "tuner.displayMode": 1.0
+  }
+ }
+}

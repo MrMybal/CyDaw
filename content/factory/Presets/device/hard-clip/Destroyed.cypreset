@@ -1,0 +1,13 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "hard-clip",
+ "name": "Destroyed",
+ "state": {
+  "type": "hard-clip",
+  "parameters": {
+   "clip.threshold": 0.2
+  }
+ }
+}

@@ -1,0 +1,25 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "echo-bande",
+ "name": "Blues Guitar Driven Slap",
+ "state": {
+  "type": "echo-bande",
+  "parameters": {
+   "echoband.time": 140.0,
+   "echoband.intensity": 0.25,
+   "echoband.echo": 0.75,
+   "echoband.reverb": 0.0,
+   "echoband.bass": -2.0,
+   "echoband.treble": -3.0,
+   "echoband.wow": 0.25,
+   "echoband.mix": 0.45,
+   "echoband.mode": 0.0,
+   "echoband.sync": 0.0,
+   "echoband.drive": 14.0,
+   "echoband.age": 0.6,
+   "echoband.width": 0.5
+  }
+ }
+}

@@ -1,0 +1,16 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "roulement",
+ "name": "Thirty-Second Roll",
+ "state": {
+  "type": "roulement",
+  "parameters": {
+   "roulement.rate": 8.0,
+   "roulement.gate": 0.5,
+   "roulement.ramp": 0.0,
+   "roulement.sync": 1.0
+  }
+ }
+}

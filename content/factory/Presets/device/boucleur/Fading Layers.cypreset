@@ -1,0 +1,22 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "boucleur",
+ "name": "Fading Layers",
+ "state": {
+  "type": "boucleur",
+  "parameters": {
+   "boucleur.feedback": 0.7,
+   "boucleur.level": 1.0,
+   "boucleur.dry": 1.0,
+   "boucleur.output": 0.0,
+   "boucleur.state": 0.0,
+   "boucleur.bars": 3.0,
+   "boucleur.quantize": 1.0,
+   "boucleur.speed": 1.0,
+   "boucleur.reverse": 0.0,
+   "boucleur.clear": 0.0
+  }
+ }
+}

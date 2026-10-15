@@ -1,0 +1,18 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "wide-echo",
+ "name": "Bright Ping",
+ "state": {
+  "type": "wide-echo",
+  "parameters": {
+   "node.26002.delay.time": 250.0,
+   "node.26002.delay.feedback": 0.35,
+   "node.26002.delay.mix": 0.28,
+   "node.26003.stereo.width": 1.6,
+   "node.26004.lowpass.cutoff": 14000.0,
+   "node.26004.lowpass.resonance": 0.7
+  }
+ }
+}

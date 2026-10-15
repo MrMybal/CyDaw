@@ -131,6 +131,16 @@ std::vector<juce::String> pathOf(const Type& type)
             return { audio, effects, Ls("Amplis et micros", "Amps and microphones") };
         if (among(key, { "patine" }))
             return { audio, effects, Ls("Couleur et usure", "Colour and wear") };
+        if (among(key, { "vocoder", "harmonie", "justesse" }))
+            return { audio, effects, Ls("Voix et hauteur", "Voice and pitch") };
+        if (among(key, { "empreinte", "grains", "givre" }))
+            return { audio, effects, Ls("Échos et réverbération", "Echoes and reverb") };
+        if (among(key, { "saccade", "boucleur" }))
+            return { audio, effects, Ls("Rythme et boucles", "Rhythm and loops") };
+        if (among(key, { "decaleur", "anneau", "rotor" }))
+            return { audio, effects, Ls("Modulation", "Modulation") };
+        if (among(key, { "resonateurs", "corps", "peigne" }))
+            return { audio, effects, Ls("Résonateurs", "Resonators") };
         if (among(key, { "tranche", "finition" }))
             return { audio, effects, Ls("Suites de mixage et de mastering", "Mixing and mastering suites") };
         return { audio, effects };
@@ -145,7 +155,7 @@ std::vector<juce::String> pathOf(const Type& type)
         return { audio, Ls("Dynamique", "Dynamics") };
     if (category == "nodes.category.utilities") {
         const auto utilities = Ls("Utilitaires", "Utilities");
-        if (among(key, { "stereo-width", "mono-to-stereo", "stereo-to-mono" }))
+        if (among(key, { "stereo-width", "mono-to-stereo", "stereo-to-mono", "utilitaire" }))
             return { audio, utilities, Ls("Canaux et stéréo", "Channels and stereo") };
         return { audio, utilities, Ls("Gain et mixage", "Gain and mixing") };
     }

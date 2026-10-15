@@ -1,0 +1,21 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "givre",
+ "name": "Slight Detune Haze",
+ "state": {
+  "type": "givre",
+  "parameters": {
+   "givre.blur": 0.3,
+   "givre.smear": 0.0,
+   "givre.shift": 0.15,
+   "givre.tone": 0.0,
+   "givre.scatter": 0.25,
+   "givre.mix": 0.4,
+   "givre.output": 0.0,
+   "givre.freeze": 0.0,
+   "givre.sync": 0.0
+  }
+ }
+}

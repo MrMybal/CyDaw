@@ -172,9 +172,9 @@ def main() -> int:
         # ---- Factory presets ----
         listed = need({"cmd": "presets", "track": track, "nodeId": node}, "presets")
         factory = [item["name"] for item in listed.get("presets", []) if item.get("factory")]
-        check(len(factory) >= 20 and "Basse acide" in factory, f"Ambre's factory presets ({len(factory)})")
-        if "Basse acide" in factory:
-            need({"cmd": "presets", "track": track, "nodeId": node, "action": "load", "name": "Basse acide"}, "load")
+        check(len(factory) >= 20 and "Acid Bass" in factory, f"Ambre's factory presets ({len(factory)})")
+        if "Acid Bass" in factory:
+            need({"cmd": "presets", "track": track, "nodeId": node, "action": "load", "name": "Acid Bass"}, "load")
             acid = synth()["values"]
             check(acid["voice.mode"] == 2 and acid["filter.resonance"] > 0.7, "a factory preset loads its settings")
         synth(init=True)
@@ -228,9 +228,9 @@ def main() -> int:
         colosse_node = first["nodeId"]
         listed = need({"cmd": "presets", "track": colosse, "nodeId": colosse_node}, "Colosse presets")
         factory = [item["name"] for item in listed.get("presets", []) if item.get("factory")]
-        check(len(factory) >= 20 and "Grondement" in factory, f"Colosse's factory presets ({len(factory)})")
-        if "Grondement" in factory:
-            need({"cmd": "presets", "track": colosse, "nodeId": colosse_node, "action": "load", "name": "Grondement"}, "load")
+        check(len(factory) >= 20 and "Rumble" in factory, f"Colosse's factory presets ({len(factory)})")
+        if "Rumble" in factory:
+            need({"cmd": "presets", "track": colosse, "nodeId": colosse_node, "action": "load", "name": "Rumble"}, "load")
             growl = colosse_synth()["values"]
             check(growl["voice.mode"] == 1 and growl["f1.type"] == 5 and growl["mod1.source"] == 3,
                   "a Colosse preset loads its settings")
@@ -315,6 +315,22 @@ def main() -> int:
               f"an exported plug-in plays Nébuleuse (rms {exported.get('rms', 0.0):.3f})")
         need({"cmd": "show_dialog", "name": "nebuleuse"}, "Nébuleuse window")
         nebuleuse_synth(set={"a.texture": "Rain", "orb.x": -0.5, "mod7.dest": "Harmonia"})
+
+        # ---- The models after it: each an instrument, its sounds, a preset ----
+        for model in ("opale", "onyx", "tirette", "alliage", "quartz", "argile", "saphir", "derive", "bronze", "jade"):
+            later = need({"cmd": "add_midi_track", "name": model.capitalize(), "instrument": f"{model}-instrument"}, model)["name"]
+            heard = need({"cmd": "synth", "track": later, "note": 60, "seconds": 1.0, "tail": 3.0}, f"{model} synth")
+            check(heard.get("model") == model and heard["rmsDb"] > -45.0 and heard["endDb"] < -60.0,
+                  f"{model} sounds and ends ({heard['rmsDb']:.0f} dB, end {heard['endDb']:.0f} dB)")
+            listed = need({"cmd": "presets", "track": later, "nodeId": heard["nodeId"]}, f"{model} presets")
+            factory = [item["name"] for item in listed.get("presets", []) if item.get("factory")]
+            check(len(factory) >= 20 and "Init" in factory, f"{model}'s factory presets ({len(factory)})")
+            chosen = next((name for name in factory if name != "Init"), None)
+            if chosen:
+                need({"cmd": "presets", "track": later, "nodeId": heard["nodeId"], "action": "load", "name": chosen}, "load")
+                loaded = need({"cmd": "synth", "track": later, "note": 48, "seconds": 1.0, "tail": 3.0}, f"{model} preset")
+                check(loaded["values"] != heard["values"] and loaded["rmsDb"] > -50.0,
+                      f"a {model} preset ({chosen}) loads and sounds ({loaded['rmsDb']:.0f} dB)")
 
         # ---- Its window, a project saved and opened ----
         need({"cmd": "get_track_graph", "track": track}, "select Ambre")

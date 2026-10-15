@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "auto-filter",
+ "name": "Gentle Breathing",
+ "state": {
+  "type": "auto-filter",
+  "parameters": {
+   "autofilter.cutoff": 2000.0,
+   "autofilter.resonance": 1.2,
+   "autofilter.rate": 0.3,
+   "autofilter.depth": 0.4,
+   "autofilter.sync": 0.0
+  }
+ }
+}

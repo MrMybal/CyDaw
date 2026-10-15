@@ -1,6 +1,7 @@
 #pragma once
 
 #include "PresetMenu.h"
+#include "Studio.h"
 #include "UiState.h"
 
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -30,6 +31,7 @@ class PrismView;
 class KickView;
 class SynthView;
 class BatterieView;
+class RackView;
 class InterfaceEditor;
 
 class DevicesView final {
@@ -43,6 +45,7 @@ public:
     void setKickView(KickView* kick) noexcept { kick_ = kick; }
     void setSynthView(SynthView* synth) noexcept { synth_ = synth; }
     void setBatterieView(BatterieView* batterie) noexcept { batterie_ = batterie; }
+    void setRackView(RackView* rack) noexcept { rack_ = rack; }
 
 private:
     void drawCatalogue(const TrackRef& track);
@@ -93,6 +96,10 @@ private:
     juce::String menuBinding_;
     juce::String menuLabel_;
     std::map<juce::String, PluginParameters> pluginParameters_;
+    // The plug-ins' output levels (left, right), falling as a meter's.
+    std::vector<std::pair<float, float>> pluginLevels_;
+    std::size_t pluginLevelsTrack_ { static_cast<std::size_t>(-1) };
+    double pluginLevelsTaken_ {};
     std::size_t pluginPopupTrack_ {};
     std::size_t pluginPopupIndex_ {};
     juce::File pluginPopupFile_;
@@ -110,6 +117,7 @@ private:
     KickView* kick_ {};
     SynthView* synth_ {};
     BatterieView* batterie_ {};
+    RackView* rack_ {};
     // A device's designed interface (the workshop's), played in its card.
     std::unique_ptr<InterfaceEditor> designed_;
     void drawSoundModelPane(const TrackRef& track, app::NodeGraphComponent& graph, std::uint64_t nodeId, ImVec2 at,

@@ -1,0 +1,16 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "lfo-core",
+ "name": "Square Steps",
+ "state": {
+  "type": "lfo-core",
+  "parameters": {
+   "lfo.rate": 2.0,
+   "lfo.depth": 1.0,
+   "lfo.offset": 0.0,
+   "lfo.shape": 3.0
+  }
+ }
+}

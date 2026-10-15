@@ -1,0 +1,16 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "lfo-core",
+ "name": "Vibrato",
+ "state": {
+  "type": "lfo-core",
+  "parameters": {
+   "lfo.rate": 6.0,
+   "lfo.depth": 0.2,
+   "lfo.offset": 0.0,
+   "lfo.shape": 0.0
+  }
+ }
+}

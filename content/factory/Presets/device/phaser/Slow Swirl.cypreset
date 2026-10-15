@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "phaser",
+ "name": "Slow Swirl",
+ "state": {
+  "type": "phaser",
+  "parameters": {
+   "phaser.rate": 0.1,
+   "phaser.depth": 1.0,
+   "phaser.frequency": 500.0,
+   "phaser.feedback": 0.6,
+   "phaser.mix": 0.5
+  }
+ }
+}

@@ -1,0 +1,13 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "drive",
+ "name": "Crunch",
+ "state": {
+  "type": "drive",
+  "parameters": {
+   "drive.db": 12.0
+  }
+ }
+}

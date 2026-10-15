@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "grains",
+ "name": "Pitch Spray",
+ "state": {
+  "type": "grains",
+  "parameters": {
+   "grains.time": 250.0,
+   "grains.feedback": 0.3,
+   "grains.pitch": 0.0,
+   "grains.spray": 200.0,
+   "grains.density": 35.0,
+   "grains.pitchRandom": 7.0,
+   "grains.mix": 0.4,
+   "grains.output": 0.0,
+   "grains.sync": 0.0,
+   "grains.size": 100.0,
+   "grains.stereo": 0.9,
+   "grains.reverseChance": 0.0,
+   "grains.freeze": 0.0,
+   "grains.highCut": 14000.0
+  }
+ }
+}

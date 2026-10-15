@@ -1,0 +1,24 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "decaleur",
+ "name": "Tempo Siren",
+ "state": {
+  "type": "decaleur",
+  "parameters": {
+   "decaleur.shift": 200.0,
+   "decaleur.fine": 0.0,
+   "decaleur.spread": 0.0,
+   "decaleur.feedback": 0.0,
+   "decaleur.lfoRate": 0.5,
+   "decaleur.lfoDepth": 400.0,
+   "decaleur.mix": 0.7,
+   "decaleur.output": 0.0,
+   "decaleur.mode": 0.0,
+   "decaleur.sync": 11.0,
+   "decaleur.lfoShape": 1.0,
+   "decaleur.delay": 0.0
+  }
+ }
+}

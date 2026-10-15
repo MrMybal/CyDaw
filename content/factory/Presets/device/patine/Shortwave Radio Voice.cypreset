@@ -1,0 +1,28 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "patine",
+ "name": "Shortwave Radio Voice",
+ "state": {
+  "type": "patine",
+  "parameters": {
+   "patine.noise": 0.55,
+   "patine.wobble": 0.3,
+   "patine.distort": 0.5,
+   "patine.digital": 0.35,
+   "patine.space": 0.0,
+   "patine.magnetic": 0.5,
+   "patine.magnitude": 1.0,
+   "patine.mix": 1.0,
+   "patine.noiseType": 1.0,
+   "patine.wobbleRate": 0.9,
+   "patine.distortType": 2.0,
+   "patine.spaceSize": 0.3,
+   "patine.tone": 0.6,
+   "patine.width": 0.0,
+   "patine.output": -2.0,
+   "patine.noiseFollow": 0.0
+  }
+ }
+}

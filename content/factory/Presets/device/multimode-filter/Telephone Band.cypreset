@@ -1,0 +1,16 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "multimode-filter",
+ "name": "Telephone Band",
+ "state": {
+  "type": "multimode-filter",
+  "parameters": {
+   "filter.mode": 2.0,
+   "filter.cutoff": 1500.0,
+   "filter.resonance": 1.5,
+   "filter.drive": 4.0
+  }
+ }
+}

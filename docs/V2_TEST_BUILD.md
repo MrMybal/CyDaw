@@ -26,8 +26,10 @@ demande un emplacement et ne modifie jamais l'exemple. Espace lance et arrête l
 | 17-neons | Piano seul, pièce originale sombre : octaves pulsées sous une ligne lente qui monte jusqu'aux accords pleins | La pulsation régulière et la montée des nuances |
 | 18-cycles-lents | Piano seul, pièce originale minimaliste en trois mouvements (figure brisée et chant ; triolets contre croches ; choral) | Jeu égal, nuances en paliers, pédale changée à chaque accord |
 | 22-amplis-et-micros | Un morceau rock (la mineur, 110 BPM) joué par des instruments d'usine passés dans les **simulateurs d'ampli, de baffle et de micro** : guitare clean, rythmique crunch, solo, basse dans son ampli, voix à la radio puis au téléphone | Sélectionnez une guitare : sur ses cartes Ampli et Baffle et micro, le bouton ⤢ ouvre leur fenêtre ; glissez les micros sur le haut-parleur |
-| 21-kick-et-batteries-electro | Un morceau techno (la mineur, 126 BPM) : **Kick** accordé sur A1, le kit **909** et les percussions et effets de **CyDAW Electro**, basse roulante et nappe de Prisme ; groove, basse, break avec riser, drop | Sur la carte Kick, « Ouvrir Kick » : glissez les points jaunes et bleus. Les sons des kits se génèrent à l'ouverture (Options › Banques de sons, ligne CyDAW Electro) |
-| 13-prisme | **Prisme**, le synthé à tables d'ondes : nappe, pluck, basse Reese, lead supersaw, cloches, puis basse growl et batterie, chacun un son d'usine | Sélectionnez une piste : sur sa carte, « Ouvrir Prisme » ; essayez les préréglages, glissez un LFO sur un potard |
+| 23-instruments-et-effets-natifs | Un morceau original (ré mineur, 100 BPM) joué par les **instruments de CyDAW** et passé dans ses **effets** : nappe Nébuleuse usée par Patine, cloches Mosaïque dans Écho Bande et Halo, Batterie pressée par Pression et Fournaise, basse Colosse, accords Ambre dans Tranche et Velours, lead Prisme, Kick sous la batterie ; sur le master, Multibande Pro, Finition et Sonomètre | Sélectionnez une piste : ses instruments et effets sont dans Périphériques (le bouton « Ouvrir » ouvre la grande fenêtre d'un synthé) ; le master montre la chaîne de finition |
+| 24-catalogue-instruments-et-effets | **Tout CyDAW sans clips** : chaque instrument sur sa piste (les quinze synthés dont Silex et Jade, Prisme, Kick, Batterie, le rack de pads, l'échantillonneur simple, Nuée, le sampler, un modèle de son, Poly Keys), chacun avec un son d'usine et un ou deux effets ; entre eux, tous les effets (Réverbe Pro, Écho Bande, Égaliseur Pro, Fournaise, Halo, Filtre Pro, Compresseur Pro, amplis et baffles, Velours, Limiteur Pro, Pression, Multibande Pro, Tranche, Finition, Patine, les effets créatifs du Vocodeur au Peigne, l'Utilitaire, l'Accordeur, et les huit effets MIDI avant leurs instruments) ; sur le master, le spectromètre, le sonomètre et le stéréoscope | Cliquez une piste : son instrument et ses effets sont dans Périphériques ; jouez-la au clavier de l'ordinateur (Ctrl+K) |
+| 21-kick-et-batteries-electro | Un morceau techno (la mineur, 126 BPM) : **Kick** accordé sur A1, le kit **909** et les percussions et effets de **CyDAW Electro**, basse roulante et nappe de Prisme ; groove, basse, break avec riser, drop | Ouvrez la fenêtre du Kick (bouton de l'en-tête de sa carte) : glissez les points jaunes et bleus. Les sons des kits se génèrent à l'ouverture (Options › Banques de sons, ligne CyDAW Electro) |
+| 13-prisme | **Prisme**, le synthé à tables d'ondes : nappe, pluck, basse Reese, lead supersaw, cloches, puis basse growl et batterie, chacun un son d'usine | Sélectionnez une piste : ouvrez Prisme par le bouton de l'en-tête de sa carte ; essayez les préréglages, glissez un LFO sur un potard |
 | 04-ambiance | Un LFO branché sur le filtre de chaque voix du synthé | Le point violet sur le potard modulé, la courbe du filtre qui bouge |
 | 01 à 06 | Les modèles d'origine (synthé et filtre, basse et nappes, arpège, ambiance, rythmique, glitch) | Base pour vos essais |
 
@@ -72,7 +74,13 @@ un effet ou un instrument avec un graphe, puis à l'exporter en VST3.
   Maj pour le réglage fin ; molette sur une poignée : Q ;
 - clic droit sur une poignée : forme et pente (12 à 48 dB/oct) ; dans le vide : ajouter une bande
   d'une forme donnée ;
-- sous l'affichage, les champs de la bande choisie (forme, fréquence, gain ou pente, Q, sortie).
+- sous l'affichage, les champs de la bande choisie (forme, fréquence, gain ou pente, Q, sortie) ;
+- écouter une bande seule : maintenir le casque au-dessus d'elle (ou Alt + clic maintenu) ; pendant
+  l'écoute, glisser la déplace et la molette la resserre ;
+- bande dynamique : clic droit sur une cloche › « Bande dynamique » ; un losange sous la poignée règle
+  la plage, et en lecture la courbe bouge avec le son. En grand : seuil, attaque, relâchement,
+  « Sa bande » ou « Sidechain », « Seuil auto ». Essayez le préréglage « Softened Sibilance
+  (De-esser) » sur une voix.
 
 **Compresseur Pro** (« + », tapez « compresseur ») : seuil, ratio, genou, attaque, relâchement,
 compensation, mélange (compression parallèle) et filtre du détecteur.

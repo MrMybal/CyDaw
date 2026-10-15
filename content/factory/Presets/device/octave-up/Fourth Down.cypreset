@@ -1,0 +1,13 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "octave-up",
+ "name": "Fourth Down",
+ "state": {
+  "type": "octave-up",
+  "parameters": {
+   "node.33002.midi.transpose": -5.0
+  }
+ }
+}

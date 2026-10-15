@@ -1,0 +1,28 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "vocoder",
+ "name": "Monotone Announcer",
+ "state": {
+  "type": "vocoder",
+  "parameters": {
+   "vocoder.mix": 1.0,
+   "vocoder.formant": 0.0,
+   "vocoder.attack": 4.0,
+   "vocoder.release": 60.0,
+   "vocoder.pitch": 52.0,
+   "vocoder.unvoiced": 0.300000011920929,
+   "vocoder.tone": -0.3,
+   "vocoder.output": 0.0,
+   "vocoder.carrier": 1.0,
+   "vocoder.bands": 12.0,
+   "vocoder.lowBand": 100.0,
+   "vocoder.highBand": 6000.0,
+   "vocoder.bandwidth": 1.0,
+   "vocoder.gate": -70.0,
+   "vocoder.stereo": 0.0,
+   "vocoder.detune": 0.1
+  }
+ }
+}

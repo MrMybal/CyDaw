@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "eq-three",
+ "name": "Warm Mix",
+ "state": {
+  "type": "eq-three",
+  "parameters": {
+   "eq3.low": 2.0,
+   "eq3.mid": 0.0,
+   "eq3.high": -2.0,
+   "eq3.lowFrequency": 150.0,
+   "eq3.highFrequency": 6000.0
+  }
+ }
+}

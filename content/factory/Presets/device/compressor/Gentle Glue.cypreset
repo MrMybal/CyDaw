@@ -1,0 +1,14 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "compressor",
+ "name": "Gentle Glue",
+ "state": {
+  "type": "compressor",
+  "parameters": {
+   "compressor.threshold": -12.0,
+   "compressor.ratio": 2.0
+  }
+ }
+}

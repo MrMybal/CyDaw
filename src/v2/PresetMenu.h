@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Presets.h"
+#include "DeviceHost.h"
 #include "UiState.h"
 
 #include <imgui.h>
@@ -28,23 +29,23 @@ public:
         std::function<bool(int, juce::String&)> select;
     };
 
-    PresetMenu(Studio& studio, UiState& state);
+    PresetMenu(DeviceHost& studio, UiState& state);
     // An icon button opening the presets of `holder`.
-    void button(const char* id, const Studio::PresetHolder& holder, const Capture& capture, const Apply& apply,
+    void button(const char* id, const PresetHolder& holder, const Capture& capture, const Apply& apply,
                 ImVec2 size, const Programs* programs = nullptr);
     // A bar: previous, the current name (opening the list), next, save.
-    void bar(const char* id, const Studio::PresetHolder& holder, const Capture& capture, const Apply& apply, float width,
+    void bar(const char* id, const PresetHolder& holder, const Capture& capture, const Apply& apply, float width,
              const Programs* programs = nullptr);
 
 private:
-    void popup(const char* id, const Studio::PresetHolder& holder, const Capture& capture, const Apply& apply,
+    void popup(const char* id, const PresetHolder& holder, const Capture& capture, const Apply& apply,
                const Programs* programs);
-    void open(const char* id, const Studio::PresetHolder& holder, const Programs* programs);
-    bool load(const presets::Entry& entry, const Studio::PresetHolder& holder, const Apply& apply);
-    void step(int direction, const Studio::PresetHolder& holder, const Apply& apply);
+    void open(const char* id, const PresetHolder& holder, const Programs* programs);
+    bool load(const presets::Entry& entry, const PresetHolder& holder, const Apply& apply);
+    void step(int direction, const PresetHolder& holder, const Apply& apply);
     void report(const juce::String& text, bool error);
 
-    Studio& studio_;
+    DeviceHost& studio_;
     UiState& state_;
     char name_[128] {};
     char newName_[128] {};

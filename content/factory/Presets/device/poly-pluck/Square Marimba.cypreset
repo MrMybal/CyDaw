@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "poly-pluck",
+ "name": "Square Marimba",
+ "state": {
+  "type": "poly-pluck",
+  "parameters": {
+   "node.35002.voice.mode": 0.0,
+   "node.35002.voice.glide": 0.0,
+   "node.35003.polyOscillator.waveform": 3.0,
+   "node.35003.polyOscillator.level": 0.1,
+   "node.35004.envelope.attack": 1.0,
+   "node.35004.envelope.decay": 300.0,
+   "node.35004.envelope.sustain": 0.0,
+   "node.35004.envelope.release": 200.0,
+   "node.35005.gain.db": 0.0,
+   "node.35006.voiceFilter.cutoff": 3000.0,
+   "node.35006.voiceFilter.resonance": 1.5,
+   "node.35007.delay.time": 240.0,
+   "node.35007.delay.feedback": 0.15,
+   "node.35007.delay.mix": 0.1
+  }
+ }
+}

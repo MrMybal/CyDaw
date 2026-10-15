@@ -1,0 +1,29 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "resonateurs",
+ "name": "Sympathetic Strings",
+ "state": {
+  "type": "resonateurs",
+  "parameters": {
+   "resonateurs.note": 50.0,
+   "resonateurs.decay": 0.9,
+   "resonateurs.colour": 0.85,
+   "resonateurs.width": 0.600000023841858,
+   "resonateurs.mix": 0.3,
+   "resonateurs.output": 0.0,
+   "resonateurs.tone": 0.4,
+   "resonateurs.mode": 0.0,
+   "resonateurs.interval2": 7.0,
+   "resonateurs.interval3": 12.0,
+   "resonateurs.interval4": 14.0,
+   "resonateurs.interval5": 19.0,
+   "resonateurs.gain1": 1.0,
+   "resonateurs.gain2": 0.800000011920929,
+   "resonateurs.gain3": 0.699999988079071,
+   "resonateurs.gain4": 0.600000023841858,
+   "resonateurs.gain5": 0.5
+  }
+ }
+}

@@ -86,6 +86,9 @@ SoundBanks::SoundBanks() = default;
 
 SoundBanks::~SoundBanks()
 {
+    stopPreload_ = true;
+    if (preloader_.joinable())
+        preloader_.join();
     ++generation_;
     for (auto& worker : workers_)
         worker->signalThreadShouldExit();
@@ -170,24 +173,50 @@ const std::vector<SoundBanks::BankFile>& SoundBanks::filesOf(const juce::String&
     auto& files = lists_[id];
     auto& index = indexes_[id];
     if (const auto* bank = find(id)) {
-        const auto json = juce::JSON::parse(bank->list.loadFileAsString());
-        if (const auto* list = json.getProperty("files", {}).getArray())
-            for (const auto& item : *list)
-                if (const auto* fields = item.getArray(); fields != nullptr && fields->size() >= 2) {
-                    BankFile file;
-                    file.path = (*fields)[0].toString();
-                    file.size = static_cast<juce::int64>((*fields)[1]);
-                    file.lfs = fields->size() > 2 && static_cast<int>((*fields)[2]) != 0;
-                    if (fields->size() > 3)
-                        file.recipe = (*fields)[3];
-                    // Inside the bank only.
-                    if (file.path.isEmpty() || file.path.contains("..") || juce::File::isAbsolutePath(file.path))
-                        continue;
-                    index[file.path] = files.size();
-                    files.push_back(std::move(file));
+        // Read ahead on the preloading thread (waited for when it is on it),
+        // else here.
+        std::optional<PreloadedList> read;
+        for (;;) {
+            {
+                const std::scoped_lock lock(preloadLock_);
+                if (const auto found = preloadedLists_.find(id); found != preloadedLists_.end()) {
+                    read = std::move(found->second);
+                    preloadedLists_.erase(found);
+                    break;
                 }
+                if (!listsWaiting_.contains(id))
+                    break;
+            }
+            juce::Thread::sleep(2);
+        }
+        if (!read)
+            read = readList(bank->list);
+        files = std::move(read->files);
+        index = std::move(read->index);
     }
     return files;
+}
+
+SoundBanks::PreloadedList SoundBanks::readList(const juce::File& listFile)
+{
+    PreloadedList read;
+    const auto json = juce::JSON::parse(listFile.loadFileAsString());
+    if (const auto* list = json.getProperty("files", {}).getArray())
+        for (const auto& item : *list)
+            if (const auto* fields = item.getArray(); fields != nullptr && fields->size() >= 2) {
+                BankFile file;
+                file.path = (*fields)[0].toString();
+                file.size = static_cast<juce::int64>((*fields)[1]);
+                file.lfs = fields->size() > 2 && static_cast<int>((*fields)[2]) != 0;
+                if (fields->size() > 3)
+                    file.recipe = (*fields)[3];
+                // Inside the bank only.
+                if (file.path.isEmpty() || file.path.contains("..") || juce::File::isAbsolutePath(file.path))
+                    continue;
+                read.index[file.path] = read.files.size();
+                read.files.push_back(std::move(file));
+            }
+    return read;
 }
 
 juce::File SoundBanks::folderOf(const juce::String& id) const
@@ -238,7 +267,57 @@ std::optional<SoundBanks::OnDisk> SoundBanks::onDisk(const juce::String& id)
 
 // ---- What is missing ------------------------------------------------------------------------
 
+void SoundBanks::preloadMaps(std::vector<juce::File> maps)
+{
+    if (preloader_.joinable())
+        return;
+    // The banks' lists first (each map's count needs them), then the maps.
+    std::vector<std::pair<juce::String, juce::File>> lists;
+    for (const auto& bank : banks_)
+        if (!lists_.contains(bank.id) && bank.list.existsAsFile())
+            lists.emplace_back(bank.id, bank.list);
+    {
+        const std::scoped_lock lock(preloadLock_);
+        for (const auto& map : maps)
+            preloadWaiting_.insert(map.getFullPathName());
+        for (const auto& [id, file] : lists)
+            listsWaiting_.insert(id);
+    }
+    preloader_ = std::thread([this, maps = std::move(maps), lists = std::move(lists)] {
+        juce::Thread::setCurrentThreadName("CyDAW maps");
+        for (const auto& [id, file] : lists) {
+            if (stopPreload_)
+                break;
+            auto read = readList(file);
+            const std::scoped_lock lock(preloadLock_);
+            preloadedLists_[id] = std::move(read);
+            listsWaiting_.erase(id);
+        }
+        {
+            // Stopped early: nothing is left waiting for it.
+            const std::scoped_lock lock(preloadLock_);
+            listsWaiting_.clear();
+        }
+        for (const auto& map : maps) {
+            if (stopPreload_)
+                return;
+            Preloaded entry;
+            entry.stamp = map.getLastModificationTime().toMilliseconds();
+            juce::String error;
+            entry.paths = pathsOfMap(app::loadSamplerMapFile(map, error));
+            const std::scoped_lock lock(preloadLock_);
+            preloaded_[map.getFullPathName()] = std::move(entry);
+            preloadWaiting_.erase(map.getFullPathName());
+        }
+    });
+}
+
 std::vector<juce::String> SoundBanks::bankPathsOf(const juce::var& mapJson) const
+{
+    return pathsOfMap(mapJson);
+}
+
+std::vector<juce::String> SoundBanks::pathsOfMap(const juce::var& mapJson)
 {
     std::vector<juce::String> paths;
     if (const auto* zones = mapJson.getProperty("zones", {}).getArray())
@@ -299,9 +378,25 @@ SoundBanks::Missing SoundBanks::missingForFile(const juce::File& mapFile, const 
     const auto stamp = mapFile.getLastModificationTime().toMilliseconds();
     auto& entry = maps_[mapFile.getFullPathName()];
     if (entry.stamp != stamp || entry.generation == -1) {
-        juce::String error;
+        // Read ahead on the preloading thread, or still to be: not here.
+        auto read = false;
+        {
+            const std::scoped_lock lock(preloadLock_);
+            if (const auto found = preloaded_.find(mapFile.getFullPathName()); found != preloaded_.end() && found->second.stamp == stamp) {
+                entry.paths = std::move(found->second.paths);
+                preloaded_.erase(found);
+                read = true;
+            } else if (!exact && preloadWaiting_.contains(mapFile.getFullPathName())) {
+                Missing waiting;
+                waiting.pending = true;
+                return waiting;
+            }
+        }
+        if (!read) {
+            juce::String error;
+            entry.paths = bankPathsOf(app::loadSamplerMapFile(mapFile, error));
+        }
         entry.stamp = stamp;
-        entry.paths = bankPathsOf(app::loadSamplerMapFile(mapFile, error));
         entry.generation = -1;
     }
     if (exact || entry.generation != diskGeneration_) {

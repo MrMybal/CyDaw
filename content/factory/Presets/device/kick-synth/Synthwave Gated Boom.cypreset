@@ -1,0 +1,40 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "kick-synth",
+ "name": "Synthwave Gated Boom",
+ "state": {
+  "type": "kick-synth",
+  "parameters": {
+   "kick.bodyShape": 1.0,
+   "kick.bodyPhase": 0.0,
+   "kick.pitchStart": 260.0,
+   "kick.pitchEnd": 55.0,
+   "kick.pitchTime": 78.0,
+   "kick.pitchCurve": 3.0,
+   "kick.bodyLevel": 0.0,
+   "kick.attack": 0.5,
+   "kick.hold": 120.0,
+   "kick.decay": 260.0,
+   "kick.decayCurve": 0.400000005960464,
+   "kick.length": 380.0,
+   "kick.clickType": 1.0,
+   "kick.clickLevel": -11.0,
+   "kick.clickDecay": 14.0,
+   "kick.clickTone": 3500.0,
+   "kick.subLevel": -14.0,
+   "kick.subDecay": 380.0,
+   "kick.subOctave": 0.0,
+   "kick.driveType": 3.0,
+   "kick.drive": 4.0,
+   "kick.driveTone": 9000.0,
+   "kick.lowCut": 30.0,
+   "kick.highCut": 9000.0,
+   "kick.lowBoost": 2.0,
+   "kick.keyTrack": 1.0,
+   "kick.velocity": 0.5,
+   "kick.output": -5.099999904632568
+  }
+ }
+}

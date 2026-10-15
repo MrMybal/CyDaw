@@ -1,0 +1,25 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "echo-bande",
+ "name": "Reggae Skank Echo",
+ "state": {
+  "type": "echo-bande",
+  "parameters": {
+   "echoband.time": 120.0,
+   "echoband.intensity": 0.55,
+   "echoband.echo": 0.65,
+   "echoband.reverb": 0.3,
+   "echoband.bass": -6.0,
+   "echoband.treble": -2.0,
+   "echoband.wow": 0.25,
+   "echoband.mix": 0.4,
+   "echoband.mode": 5.0,
+   "echoband.sync": 3.0,
+   "echoband.drive": 3.0,
+   "echoband.age": 0.45,
+   "echoband.width": 0.5
+  }
+ }
+}

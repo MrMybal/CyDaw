@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cydaw/engine/KickSynth.h>
+#include <cydaw/engine/MidiEffects.h>
 #include <cydaw/engine/PrismSynth.h>
 #include <cydaw/engine/Sampler.h>
 #include <cydaw/engine/SoundModel.h>
@@ -37,7 +38,10 @@ enum class PolyOscillatorWaveform : std::uint8_t {
     kick,
     // A synth of the family (SynthFamily.h): Ambre and the others, a whole
     // synthesiser per voice, in stereo.
-    family
+    family,
+    // A rack of pads: its voices are silent, each pad an instrument of its
+    // own that the track's engine plays (the "drum-rack" card).
+    rack
 };
 
 // The sources that play a recording at its own level (a sound model, a
@@ -105,6 +109,10 @@ struct PolySynthGraphPlan final {
     // A sampler playing a drum kit (Batterie): its mix, piece by piece.
     bool drumKit {};
     drum::Values drumValues { drum::neutralValues() };
+    // The MIDI effects the notes go through before the voices (an
+    // arpeggiator, chords…), in order; null for none. A pointer: the plan is
+    // copied once per voice per block.
+    MidiEffectsRef midiEffects;
 
     [[nodiscard]] bool operator==(const PolySynthGraphPlan&) const = default;
 };

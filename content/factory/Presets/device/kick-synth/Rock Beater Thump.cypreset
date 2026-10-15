@@ -1,0 +1,40 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "kick-synth",
+ "name": "Rock Beater Thump",
+ "state": {
+  "type": "kick-synth",
+  "parameters": {
+   "kick.bodyShape": 2.0,
+   "kick.bodyPhase": 0.0,
+   "kick.pitchStart": 180.0,
+   "kick.pitchEnd": 61.70000076293945,
+   "kick.pitchTime": 30.0,
+   "kick.pitchCurve": 2.0,
+   "kick.bodyLevel": 0.0,
+   "kick.attack": 0.0,
+   "kick.hold": 5.0,
+   "kick.decay": 220.0,
+   "kick.decayCurve": 1.799999952316284,
+   "kick.length": 500.0,
+   "kick.clickType": 1.0,
+   "kick.clickLevel": -6.0,
+   "kick.clickDecay": 6.0,
+   "kick.clickTone": 3800.0,
+   "kick.subLevel": -60.0,
+   "kick.subDecay": 600.0,
+   "kick.subOctave": 0.0,
+   "kick.driveType": 0.0,
+   "kick.drive": 2.0,
+   "kick.driveTone": 10000.0,
+   "kick.lowCut": 35.0,
+   "kick.highCut": 10000.0,
+   "kick.lowBoost": 2.0,
+   "kick.keyTrack": 1.0,
+   "kick.velocity": 0.800000011920929,
+   "kick.output": -5.440000057220459
+  }
+ }
+}

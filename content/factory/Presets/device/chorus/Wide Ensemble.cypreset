@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "chorus",
+ "name": "Wide Ensemble",
+ "state": {
+  "type": "chorus",
+  "parameters": {
+   "chorus.rate": 0.9,
+   "chorus.depth": 0.6,
+   "chorus.delay": 18.0,
+   "chorus.width": 1.0,
+   "chorus.mix": 0.6
+  }
+ }
+}

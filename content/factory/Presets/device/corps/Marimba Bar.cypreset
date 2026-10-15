@@ -1,0 +1,22 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "corps",
+ "name": "Marimba Bar",
+ "state": {
+  "type": "corps",
+  "parameters": {
+   "corps.tune": 262.0,
+   "corps.decay": 0.45,
+   "corps.material": 0.15,
+   "corps.inharmonic": 0.0,
+   "corps.position": 0.1,
+   "corps.mix": 0.5,
+   "corps.output": 0.0,
+   "corps.width": 0.5,
+   "corps.type": 1.0,
+   "corps.lowCut": 80.0
+  }
+ }
+}

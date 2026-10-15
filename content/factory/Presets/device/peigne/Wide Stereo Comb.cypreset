@@ -1,0 +1,22 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "peigne",
+ "name": "Wide Stereo Comb",
+ "state": {
+  "type": "peigne",
+  "parameters": {
+   "peigne.frequency": 330.0,
+   "peigne.feedback": 0.75,
+   "peigne.damping": 9000.0,
+   "peigne.spread": 1.0,
+   "peigne.lfoDepth": 0.0,
+   "peigne.lfoRate": 0.300000011920929,
+   "peigne.mix": 0.5,
+   "peigne.output": 0.0,
+   "peigne.mode": 0.0,
+   "peigne.sync": 0.0
+  }
+ }
+}

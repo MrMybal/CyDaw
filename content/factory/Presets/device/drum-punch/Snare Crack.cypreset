@@ -1,0 +1,18 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "drum-punch",
+ "name": "Snare Crack",
+ "state": {
+  "type": "drum-punch",
+  "parameters": {
+   "node.25002.highpass.cutoff": 90.0,
+   "node.25003.compressor.threshold": -22.0,
+   "node.25003.compressor.ratio": 6.0,
+   "node.25004.drive.db": 5.0,
+   "node.25005.clip.threshold": 0.9,
+   "node.25006.gain.db": -2.0
+  }
+ }
+}

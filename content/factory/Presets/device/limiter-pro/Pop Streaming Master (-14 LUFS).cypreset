@@ -1,0 +1,27 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "limiter-pro",
+ "name": "Pop Streaming Master (-14 LUFS)",
+ "state": {
+  "type": "limiter-pro",
+  "parameters": {
+   "limpro.gain": 6.0,
+   "limpro.output": -1.0,
+   "limpro.lookahead": 2.0,
+   "limpro.attack": 8.0,
+   "limpro.release": 80.0,
+   "limpro.style": 5.0,
+   "limpro.linkTransients": 0.6,
+   "limpro.linkRelease": 0.9,
+   "limpro.truePeak": 1.0,
+   "limpro.oversampling": 2.0,
+   "limpro.dither": 1.0,
+   "limpro.shaping": 1.0,
+   "limpro.dcFilter": 1.0,
+   "limpro.unity": 0.0,
+   "limpro.target": -14.0
+  }
+ }
+}

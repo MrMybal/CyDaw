@@ -1,0 +1,42 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "pression",
+ "name": "Kick (Sub and Click)",
+ "state": {
+  "type": "pression",
+  "parameters": {
+   "pression.depth": 0.5,
+   "pression.time": 0.25,
+   "pression.upward": 0.8,
+   "pression.downward": 1.0,
+   "pression.lowGain": 1.0,
+   "pression.midGain": -2.0,
+   "pression.highGain": 1.5,
+   "pression.output": 0.0,
+   "pression.input": 0.0,
+   "pression.crossLow": 90.0,
+   "pression.crossHigh": 3000.0,
+   "pression.lowDownThreshold": -24.0,
+   "pression.lowDownRatio": 8.0,
+   "pression.lowUpThreshold": -45.0,
+   "pression.lowUpRatio": 3.0,
+   "pression.lowAttack": 30.0,
+   "pression.lowRelease": 150.0,
+   "pression.midDownThreshold": -30.0,
+   "pression.midDownRatio": 20.0,
+   "pression.midUpThreshold": -80.0,
+   "pression.midUpRatio": 1.0,
+   "pression.midAttack": 15.0,
+   "pression.midRelease": 150.0,
+   "pression.highDownThreshold": -34.0,
+   "pression.highDownRatio": 10.0,
+   "pression.highUpThreshold": -40.0,
+   "pression.highUpRatio": 4.0,
+   "pression.highAttack": 5.0,
+   "pression.highRelease": 60.0,
+   "pression.solo": 0.0
+  }
+ }
+}

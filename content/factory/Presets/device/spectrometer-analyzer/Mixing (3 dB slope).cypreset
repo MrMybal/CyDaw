@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "spectrometer-analyzer",
+ "name": "Mixing (3 dB slope)",
+ "state": {
+  "type": "spectrometer-analyzer",
+  "parameters": {
+   "node.48002.spectrometer.floor": -90.0,
+   "node.48002.spectrometer.tilt": 3.0,
+   "node.48002.spectrometer.smoothing": 0.5,
+   "node.48002.spectrometer.hold": 2.0,
+   "node.48002.spectrometer.history": 8.0
+  }
+ }
+}

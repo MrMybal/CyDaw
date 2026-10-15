@@ -1,0 +1,13 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "noise",
+ "name": "Whisper",
+ "state": {
+  "type": "noise",
+  "parameters": {
+   "noise.level": 0.02
+  }
+ }
+}

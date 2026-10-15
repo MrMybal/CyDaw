@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "limiter",
+ "name": "Loud Master",
+ "state": {
+  "type": "limiter",
+  "parameters": {
+   "limiter.gain": 6.0,
+   "limiter.ceiling": -0.3,
+   "limiter.release": 60.0
+  }
+ }
+}

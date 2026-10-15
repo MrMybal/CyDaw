@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "spectrometer-analyzer",
+ "name": "Long History",
+ "state": {
+  "type": "spectrometer-analyzer",
+  "parameters": {
+   "node.48002.spectrometer.floor": -90.0,
+   "node.48002.spectrometer.tilt": 3.0,
+   "node.48002.spectrometer.smoothing": 0.6,
+   "node.48002.spectrometer.hold": 6.0,
+   "node.48002.spectrometer.history": 30.0
+  }
+ }
+}

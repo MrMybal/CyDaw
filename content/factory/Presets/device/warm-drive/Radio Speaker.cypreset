@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "warm-drive",
+ "name": "Radio Speaker",
+ "state": {
+  "type": "warm-drive",
+  "parameters": {
+   "node.14002.drive.db": 18.0,
+   "node.14003.lowpass.cutoff": 2600.0,
+   "node.14003.lowpass.resonance": 2.5,
+   "node.14004.clip.threshold": 0.7,
+   "node.14005.gain.db": -6.0
+  }
+ }
+}

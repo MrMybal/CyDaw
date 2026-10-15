@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "poly-keys",
+ "name": "Dull Felt Keys",
+ "state": {
+  "type": "poly-keys",
+  "parameters": {
+   "node.37002.voice.mode": 0.0,
+   "node.37002.voice.glide": 0.0,
+   "node.37003.polyOscillator.waveform": 0.0,
+   "node.37003.polyOscillator.level": 0.17,
+   "node.37004.envelope.attack": 6.0,
+   "node.37004.envelope.decay": 800.0,
+   "node.37004.envelope.sustain": 0.3,
+   "node.37004.envelope.release": 450.0,
+   "node.37005.gain.db": 0.0,
+   "node.37006.voiceFilter.cutoff": 1600.0,
+   "node.37006.voiceFilter.resonance": 0.7,
+   "node.37007.compressor.threshold": -12.0,
+   "node.37007.compressor.ratio": 1.8,
+   "node.37008.stereo.width": 1.1
+  }
+ }
+}

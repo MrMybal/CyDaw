@@ -1,0 +1,18 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "drum-punch",
+ "name": "Loud Breakbeat",
+ "state": {
+  "type": "drum-punch",
+  "parameters": {
+   "node.25002.highpass.cutoff": 50.0,
+   "node.25003.compressor.threshold": -26.0,
+   "node.25003.compressor.ratio": 8.0,
+   "node.25004.drive.db": 7.0,
+   "node.25005.clip.threshold": 0.85,
+   "node.25006.gain.db": -4.0
+  }
+ }
+}

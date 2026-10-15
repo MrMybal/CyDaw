@@ -195,11 +195,43 @@ piste, supprimer) ; sur une case du lanceur : lancer, arrêter, ouvrir, renommer
 dans la scène suivante, supprimer, ou un nouveau clip MIDI, et sur une case vide son stop
 (`ContextMenus.*`).
 
-**Lanceur** (`LauncherView.*`, `Studio::launchScene`…) : un clic sélectionne une case (`UiState::selectedSlots`,
+**Lanceur** (`LauncherView.*`, `Studio::launchScene`…) : comme dans Bitwig, la **colonne des scènes est à
+gauche** (un bouton par rangée, « Tout » sous elles arrête tous les clips) et la **colonne Master à droite
+a ses propres cases** : des **clips d'automation du master**, un par scène (`MasterClip`, `Studio::masterClips`).
+Double-clic sur une case vide du Master : un clip (« Master n »), ouvert dans l'Éditeur ; il a un nom, une
+longueur en temps, une boucle, et des courbes : le **volume du master** (`master.gain`, en dB) ou n'importe
+quel réglage des effets du master (choisi dans la liste « Courbe », avec une recherche ; ● : la courbe a des
+points). Dans l'éditeur : clic ajoute un point (et le tire), glisser le déplace entre ses voisins (aimanté à
+la grille, Alt pour libérer), clic droit le retire. Le clip part avec sa scène, à la quantification du
+lanceur, sur une horloge du master qui tourne pendant la lecture (`MasterOutputAudioSource::clock`) ; ses
+courbes d'effets sont des couloirs d'automation « de clip » (`AutomationLane::clipStartSeconds`,
+`clipLengthSeconds`, `clipLooping`) que le moteur lit à chaque bloc, sa courbe de volume fait bouger le
+fader du master (remis où il était quand le clip s'arrête). Une scène lancée sans clip Master arrête celui
+qui joue ; Stop puis lecture le relance depuis son début, comme les clips des pistes. Menu de la case :
+lancer, éditer, dupliquer vers la scène suivante, supprimer. Enregistrés dans le projet (`masterClips`).
+Port de contrôle : `master_clip {scene, action, name, lengthBeats, looping, lane, points}` (action `lanes` :
+ce qu'une courbe peut automatiser), `launch_scene` répond aussi `masterScene`.
+Un clic sélectionne une case (`UiState::selectedSlots`,
 Ctrl/Maj pour plusieurs), le triangle d'un clip le lance (son carré l'arrête pendant qu'il joue), une rangée
 de stops par piste sous les clips. Une case vide a un stop (actif par défaut) : une scène lancée arrête
 les pistes dont la case est vide, sauf si ce stop est retiré (Ctrl+E, menu ; enregistré par piste dans le
 projet, `launcherStopOff`). Lancer un clip audio ou une scène n'arrête plus les clips MIDI des autres pistes.
+**Stop puis lecture** : les clips qui jouaient quand le transport s'arrête attendent (leur case s'encadre)
+et repartent **depuis leur début** à la lecture suivante, tous ensemble ; lancer un clip ou une scène
+pendant l'arrêt les fait partir avec lui ; « Tout arrêter » ou l'arrêt d'une piste les oublie
+(`Studio::clipsAtStop_`, `AudioTrackController::restartLauncherClips`).
+**Scènes** : jusqu'à 256 (`maximumLauncherScenes`) ; la grille montre celles qui servent et deux de plus
+(huit au moins), les autres défilent (molette, barre). **Un clip MIDI du lanceur a sa case à lui**
+(`MidiClip::launcherScene` ; -1 : clip de l'arrangement) : l'arrangement ne le joue ni ne le montre, et un
+clip de l'arrangement n'apparaît plus dans le lanceur (comme dans Bitwig ; avant, la scène se déduisait
+de la position, une scène tous les 16 temps). Enregistré dans le projet (`launcherScene` du clip). Port
+de contrôle : `add_midi_clip {scene}` crée le clip dans la case, `set_midi_clip {scene}` l'y range (-1 :
+le rend à l'arrangement). Un projet importé (Bitwig, Ableton, DAWproject) garde toutes ses lignes : un
+projet Bitwig de 215 scènes arrive entier (431 clips, 143 836 notes), là où il en perdait la quasi-totalité.
+Bitwig : les pistes **hybrides** (type 2 : notes et audio) sont lues comme des pistes d'instrument (une piste
+« (audio) » à côté si elles ont aussi de l'audio), le Master est celui que nomme le groupe racine
+(`master_track`), les pistes d'effets sont lues aussi ; une piste sans nom prend celui que Bitwig montre
+(son instrument, sinon « Audio 14 », « Inst 1 »…). Les pistes audio restent avant les pistes MIDI.
 Armement : choisir une piste n'arme plus rien (`setArmFollowsMidiInput(false)` ; CyDAW 1 garde l'ancien
 comportement), plusieurs pistes MIDI s'arment ensemble ; le clavier joue la piste choisie, ou une piste
 armée (la choisie si elle l'est) ; changer de piste ne lâche plus que les notes tenues au clavier (les notes
@@ -264,9 +296,9 @@ pistes ni arrangement dans ce mode ; le transport reste, pour écouter.
   palette ou faits d'un réglage publié ; déplacés et dimensionnés sur une grille aimantée ; liés aux
   réglages publiés à droite ; « Disposition automatique » ; mode Jouer pour tourner les potards. Taille
   de la fenêtre en pixels et grille réglables. L'état est l'interface du graphe racine
-  (`NodeGraphComponent::editorSetInterface`, `windowWidth`/`windowHeight` dans « presentation ») ; un
-  VST3 exporté ouvre exactement cette disposition à cette taille (mode `setPerformanceMode` de
-  `ModuleInterfaceEditorComponent`, sans onglet Graphe).
+  (`NodeGraphComponent::editorSetInterface`, `windowWidth`/`windowHeight` dans « presentation ») ; une
+  interface modifiée ici est marquée dessinée (`designed`) et un VST3 exporté ouvre exactement cette
+  disposition à cette taille (jouée par `InterfaceEditor::drawPlayed`).
 - **Entrée et sortie audio** (onglet Infos) : mono, stéréo ou jusqu'à 8 canaux ; mono → stéréo et
   stéréo → mono passent par un convertisseur (nœuds `mono-to-stereo` avec panoramique, `stereo-to-mono`
   avec balance) posé avant la sortie. Un câble entre une prise mono et une stéréo en pose un tout seul ;
@@ -301,6 +333,17 @@ pistes ni arrangement dans ce mode ; le transport reste, pour écouter.
   l'exécutable, ou à indiquer). Chaque nouveau périphérique reçoit son propre code plugin ; le nom du
   plugin suit celui du périphérique tant qu'on ne lui en donne pas un autre.
 - Quitter avec un périphérique ni enregistré ni sur une piste demande d'abord quoi en faire.
+- **La fenêtre du VST3 exporté** : la même interface que dans CyDAW (Dear ImGui), jamais le graphe.
+  Prisme, les synthés de la famille et Kick ouvrent leur propre fenêtre en entier (leurs onglets, leurs
+  préréglages, leurs effets après eux) ; des effets montrent chacun leur grande vue (un sélecteur en haut
+  quand il y en a plusieurs) ; un périphérique dont l'interface a été dessinée dans l'onglet Interface
+  ouvre sur elle. Les affichages suivent le son du plug-in (les taps de son processeur) ; le tempo est
+  celui de l'hôte (effets et effets MIDI synchronisés). La fenêtre se redimensionne ; elle dessine à la
+  cadence de l'écran quand un son passe, au ralenti sinon. Code : `src/plugin_ui/PluginInterface.*`
+  (sur `ImGuiHost`, `DeviceBody`, `DeviceHost`, `DeviceSignals`), `GraphRuntimeEditor` dans
+  `src/graph_plugin/GraphRuntimePlugin.cpp` ; les vues des périphériques passent par `DeviceHost`
+  (le studio dans CyDAW, le graphe du plug-in une fois exporté). Test : `cydaw2_plugin_window_check`
+  (`cydaw_graph_runtime_host … editor <image>` ouvre la fenêtre hors de l'écran et en écrit une image).
 
 Code : `src/v2/WorkshopView.*` (le mode), `src/v2/Vst3Build.*` (la compilation),
 `Studio::workshop*` (le document : graphe propre, lien à une piste, niveaux ouverts, bibliothèque),
@@ -423,6 +466,22 @@ Huit effets et deux suites natives inspirés d'outils de mixage connus :
 Tout est dans docs/EFFETS_MIXAGE.md (`src/v2/MixEffectsPanes.inc`, moteurs `MixDesign.h` et
 `MixEffects.cpp`).
 
+## Effets créatifs, effets MIDI et utilitaires
+
+Dix-neuf effets audio : **Vocodeur**, **Harmonie** (changeur de hauteur et harmoniseur), **Justesse**
+(correction de justesse), **Dé-esseur**, **Pompe** (volume en rythme), **Empreinte** (réverbe à
+convolution), **Givre** (gel et flou spectraux), **Grains** (écho granulaire), **Saccade** (répétitions
+en rythme), **Boucleur**, **Décaleur** (décalage de fréquence), **Anneau** (modulation en anneau),
+**Rotor** (cabine tournante), **Résonateurs**, **Corps**, **Peigne**, **Utilitaire** (polarité, mono,
+largeur…), **Accordeur** et **Stéréoscope** (goniomètre, corrélation de phase). Huit effets MIDI, posés
+avant l'instrument dans l'ordre où on les ajoute : **Arpège**, **Accords**, **Gamme**, **Écho de notes**,
+**Aléa**, **Durée**, **Séquenceur** (seize pas) et **Roulement** (note repeat). Chacun a sa carte et sa
+grande fenêtre ; tout est dans docs/EFFETS_CREATIFS.md (panneaux `src/v2/*Panes.inc`, moteurs
+`src/engine/*Effects.cpp`, effets MIDI `MidiEffects.cpp` joués avant les voix par `MidiEffectsHost`).
+
+Une étiquette trop longue pour la case de son bouton est écrite un peu plus petite (jusqu'aux deux tiers),
+centrée sous le bouton sur toute la largeur de la case (`KnobStyle::labelWidth`).
+
 ## Kick et batteries électroniques
 
 **Kick** (Piste › Nouveau Kick) est un instrument qui ne fait que des grosses caisses : un corps dont la
@@ -436,6 +495,17 @@ effets). Tout est dans docs/KICK_ET_ELECTRO.md (`src/v2/KickView.*`, moteurs `Ki
 ## Préréglages
 
 Tout ce qui a des réglages a ses préréglages, et un bouton pour eux (l'icône de liste) :
+
+**Préréglages d'usine des périphériques de base** : chacun des modules d'usine (Poly Keys, Poly Pad, Poly
+Bass, Poly Pluck, Poly Lead, Poly Sine, Ambient Glass, Electric Organ, Percussive Bell, Stereo Finisher,
+Warm Drive, Echo Space, Reverb Rack, Vocal Strip, Parallel Drive, Drum Punch, Wide Echo, Dark Room, Mono
+Focus, Master Guard, Tremolo, Auto-Pan, Dynamic Filter, Arp Motion, Note Shaper, Octave Up, Bass Zone,
+LFO…) et chacune des cartes simples (Compresseur, Limiteur, Porte, Transitoires, Drive, Écrêtage,
+Bitcrusher, Délai, Réverbe, Ping-pong, Chorus, Flanger, Phaser, Trémolo, Passe-bas, Passe-haut, EQ, Bande
+d'EQ, Filtre multimode, Filtre auto, EQ 3 bandes, Largeur stéréo, Table d'ondes, Corde, Bruit, LFO, Échelle
+de vélocité, Transposition) a de 3 à 8 préréglages en anglais (`tools/factory_content/studio_presets/basics.py`,
+écrits par `build_studio_presets.py` ; un module les range par les cartes de son intérieur,
+« node.16002.eq.tone »).
 
 - **une carte** de la chaîne d'une piste (dans son en-tête, Périphériques) : ses potards, et ce qui n'est
   pas un nombre — la carte d'un sampler, le modèle d'une carte Modèle de son, la table d'une wavetable.
@@ -463,6 +533,150 @@ Code : `src/v2/Presets.*` (les fichiers), `src/v2/PresetMenu.*` (le bouton, la b
 VST3 exporté), `IsolatedPluginHost::getPrograms / setProgram` (ceux d'un plug-in hébergé). Port de
 contrôle : `presets` et `workshop` › `programs` ; MCP : `presets`. Vérifié par `cydaw2_presets_check`.
 
+## Clavier de l'ordinateur et entrées MIDI
+
+Comme dans Bitwig, **le clavier de l'ordinateur joue des notes** (activé par défaut ; Ctrl+K, bouton ⌨ de
+la barre de transport, Options › Clavier de l'ordinateur) : la rangée du milieu donne les touches blanches,
+celle du dessus les noires, **selon la place des touches** (AZERTY : Q S D F G H J K L M ù = Do…Fa ; QWERTY :
+A S D F…), lue de la disposition Windows (`MapVirtualKeyEx`) ; les deux premières touches de la rangée du
+bas changent d'octave (AZERTY W / X), les deux suivantes la vélocité (C / V). Il joue la piste instrument
+choisie (ou les pistes armées), par l'état du clavier du moteur. Ses touches passent avant les raccourcis
+d'une lettre (S, L…) tant qu'une piste instrument est choisie ; Ctrl et Alt gardent les leurs ; une saisie
+de texte, le graphe et l'atelier le coupent (`ComputerKeyboard.*`). **Options › Entrées MIDI…** (ou clic
+droit sur ⌨) : l'onglet « Entrées MIDI » des réglages audio, avec les claviers et contrôleurs MIDI branchés
+(une case par appareil ; un appareil vu pour la première fois est allumé), le clavier de l'ordinateur (octave,
+vélocité) et le dessin de ses touches. Port de contrôle : `computer_keyboard {enabled, octave, velocity}`
+(`held` : les notes tenues), `midi_inputs {device, enabled}`.
+
+## Thèmes
+
+**Options › Thème** : *Gris moyen* (par défaut, proche de Bitwig), *Gris clair* (proche d'Ableton Live),
+*Sombre (d'origine)*, et les thèmes à soi. **Thèmes et couleurs…** : la liste, et pour un thème à soi ses
+29 couleurs par groupes (fonds, traits et grille, texte, accent et sélection, signaux et transport,
+vu-mètres), qui changent l'interface pendant qu'on les règle ; « Créer à partir de celui-ci » copie
+n'importe quel thème. Un thème à soi est un fichier JSON `.cytheme` (`"format": "CyDAW Theme"`, couleurs
+`"#RRGGBB"` ou `"#RRGGBBAA"`) dans le dossier Thèmes des préréglages. Seules les couleurs changent
+(`theme::setPalette`, `ThemesView.*`). Port de contrôle : `theme {key|name, create, from, colours}`.
+
+## Importer un projet d'une autre application
+
+Fichier › Importer, ou un .bwproject, .als, .dawproject, .song **glissé dans la fenêtre** : le projet ouvert
+est d'abord proposé à l'enregistrement (comme pour en ouvrir un autre), puis l'import se fait **par étapes,
+avec la barre de progression** de l'ouverture (« Importation de … » : lecture du projet sur un fil à part,
+puis les pistes, puis leurs instruments et effets, quelques-unes par image ; `Studio::startImportingProject`,
+`importStep`). Le rapport de ce qui n'a pas pu passer s'affiche à la fin. Port de contrôle :
+`import_project {file, background: true}`.
+
+**Plugins du projet importé** : chaque piste garde sa chaîne telle qu'elle était (`ImportedTrack::chain` :
+nom, éditeur, format, plug-in ou périphérique de l'application, instrument, effet de notes, et les réglages
+lisibles — ceux d'un périphérique Bitwig par leur identifiant, « F1FREQ », ceux d'un périphérique Live par leur
+chemin XML). Un **plug-in** (VST, CLAP…) n'est plus remplacé par un instrument : sa place est gardée par une
+carte **« Plugin manquant »** (ou « Instrument manquant ») comme dans Bitwig — un triangle d'avertissement, son
+nom, son éditeur et son format (types `missing-plugin`, `missing-instrument` ; le son passe à travers un effet
+manquant, un instrument manquant est muet). Choisir un instrument pour la piste (+, bibliothèque) prend la
+place de l'instrument manquant, ses effets restent (`replaceInstrument`). `Studio::addMissingPlugin`.
+
+**Instruments de l'application d'origine** : un instrument propre à Bitwig ou à Live devient celui de CyDAW
+qui lui ressemble (`src/v2/ImportedInstruments.cpp`, `imported::equivalentOf`) :
+
+| D'origine | Dans CyDAW |
+|---|---|
+| Bitwig Polysynth | Opale, **avec ses réglages** (oscillateurs, sub, synchro, unisson, mélange, filtre, enveloppes) |
+| Bitwig FM-4 | Quartz |
+| Bitwig Organ | Tirette |
+| Bitwig Phase-4 | Onyx |
+| Bitwig Polymer | Alliage |
+| Bitwig E-Kick | Kick |
+| Live Operator | Saphir |
+| Live Analog | Argile |
+| Live Drift | Dérive |
+| Live Collision, Tension | Bronze |
+| Live Wavetable | Prisme |
+| Live Meld | Alliage |
+| Simpler, Sampler (Bitwig) | l'échantillonneur simple |
+| Sampler (Live) | le sampler |
+| Drum Rack, Drum Machine, Impulse | Batterie |
+| tout autre instrument natif | Opale |
+
+Les réglages de Polysynth passent un à un (`Studio::setSynthSettings`) : octave en pieds, forme continue
+(triangle → dent de scie → carré), sub et sa forme, synchro en demi-tons, voix et écart d'unisson, balance et
+mode du mélange, saturation avant le filtre, fréquence du filtre (une note MIDI chez Bitwig), résonance,
+profondeur d'enveloppe en demi-tons, suivi du clavier, les deux enveloppes en secondes. Pour les autres, seul
+l'instrument est choisi pour l'instant (leurs réglages n'ont pas encore été relevés sur de vrais projets).
+
+Une **nouvelle piste instrument** (menu Piste, bouton de l'arrangement) et les pistes d'un **fichier MIDI importé**
+reçoivent aussi Opale (au lieu des Poly Keys, qui restent dans le catalogue et dans les modèles).
+
+## Ajouter une piste
+
+Le **+** après la dernière piste du lanceur, après la dernière tranche du mixeur, et en tête de la barre de
+l'arrangement (« + Piste ») ouvre le menu des pistes (`src/v2/AddTrackMenu.cpp`) : piste instrument (Opale),
+piste audio, piste bus, et « Piste instrument avec… » : chacun des treize synthés, Prisme, Kick, Batterie,
+l'échantillonneur simple, le sampler. La piste faite est choisie. Le menu Piste garde aussi tout cela.
+
+## Plusieurs fenêtres d'instrument
+
+Options › **Plusieurs fenêtres d'instrument** (coché par défaut, gardé dans les réglages) : la fenêtre d'un
+instrument (un synthé, Prisme, Kick, Batterie, le sampler) s'ouvre à côté de celles déjà ouvertes, une par
+instrument, chacune un peu plus bas et à droite de la précédente, chacune avec sa place, sa taille et son
+bouton pour sortir de la fenêtre du studio ; décoché, elle remplace la dernière. Chaque fenêtre du sampler
+garde sa zone en main et son édition en cours. `EditorWindows.h` (une liste de fenêtres par sorte
+d'instrument, un identifiant par instrument), `UiState::manyInstrumentWindows`.
+
+## L'échantillonneur simple
+
+Instruments › **Échantillonneur simple** (`simple-sampler-instrument`) : un seul son joué sur **tout le
+clavier**, autour de sa note (celle de son nom, ou sa hauteur entendue ; do 4 pour un son sans hauteur, qui
+est alors joué à toutes les hauteurs comme un échantillon). Sa carte montre **la forme d'onde** avec ses repères
+à glisser (début en vert, fin en rouge, boucle), la case Boucle, la durée, la **racine** à glisser ou taper et
+le nom du fichier ; « Remplacer… » ou un son glissé dessus (navigateur, explorateur) **remplace** le son (au
+lieu d'ajouter une zone) ; « Éditer… » ouvre la fenêtre du sampler. Ses boutons sont ceux du sampler
+(transposition, accord fin, début, vélocité, boucle, suivi du clavier, à l'envers, jusqu'au bout, largeur),
+suivis de son enveloppe et de son filtre de voix. C'est une carte sampler avec le réglage caché `sampler.simple`
+(`SamplerSetting::simple`) ; `app::simpleSamplerMap`, `SamplerView::drawSimplePane`. Port de contrôle :
+`load_sampler {track, file: un son}` sur une piste qui en a un.
+
+**Nuée** (Piste › Nouvelle piste › Nuée, `nuee-instrument`) est l'échantillonneur simple en mode
+granulaire, suivi de Halo : le son chargé n'est plus joué d'un bout à l'autre mais lu en grains, à la
+hauteur de la touche. Sa carte ajoute les réglages des grains : position dans le son, balayage (vitesse et
+sens de la lecture, 0 : figé), taille (10 ms à 1 s), densité (1 à 120 grains par seconde), dispersion
+autour de la position, hauteur aléatoire, largeur stéréo, chance à l'envers et forme des grains
+(`SamplerSetting::grains` et suivants).
+
+## Rack de pads
+
+Piste › Nouvelle piste › **Rack de pads** (`rack-instrument`) : seize pads, quatre par quatre, le plus grave
+(do 2, note 36) en bas à gauche. Chaque pad joue **n'importe quel instrument avec ses propres effets** quand
+sa touche arrive ; le rack neuf contient un kit (grosse caisse Kick, caisse claire et clap Silex,
+charlestons fermé et ouvert Silex dans le même groupe de coupure).
+
+- Un clic choisit un pad : à droite, son nom, sa touche, « Ouvrir sa chaîne », son volume, son
+  panoramique, muet, solo, son groupe de coupure (les pads d'un même groupe se coupent) et la note que son
+  instrument reçoit (sa touche, ou une autre : do 4 pour un instrument accordé).
+- Un double-clic (ou « Ouvrir sa chaîne ») montre dans Périphériques **la chaîne du pad** : son instrument
+  et ses effets, qu'on modifie comme ceux d'une piste ; la flèche ◀ en haut de la colonne revient au rack.
+- Clic droit : son instrument (Kick, Silex, les deux échantillonneurs, Nuée, Prisme ou l'un des synthés),
+  charger un son, muet, solo, retirer. Un son
+  glissé sur un pad (navigateur, explorateur) en fait un pad d'échantillonneur simple.
+- Le pad s'allume quand il sonne. Les pads se jouent après les voix de la piste et avant ses effets ;
+  chacun a ses douze voix et son propre graphe (`MidiSynthEngine::RackPad`).
+- Projet : les pads sont enregistrés avec la piste (`rackPads`). Port de contrôle : `rack {track, action:
+  list|add|instrument|mix|sample|remove|open|close, note, pad, …}` (`src/v2/RackView.*`, `Studio::addRackPad`
+  et suivants).
+
+## Changer d'instrument
+
+Un instrument choisi pour une piste instrument **remplace son instrument** au lieu de créer une piste :
+depuis le + de la chaîne (la bibliothèque s'ouvre pour cette piste), la bibliothèque (F9) ou le Navigateur
+quand une piste instrument est choisie (« Nouvelle piste » reste au menu et dans le volet de la
+bibliothèque). Seule la section de voix est échangée (allocateur, source, enveloppe, gain, filtre de voix,
+et ce que le préréglage met après son filtre, comme le halo de Nébuleuse) : **les effets après lui, leur
+automation et les câbles de modulation restent** (`NodeGraphComponent::replaceInstrument`,
+`Studio::replaceInstrument`). Une piste qui portait le nom de son instrument prend celui du nouveau. Port de
+contrôle : `insert_device` d'un instrument sur une piste instrument le remplace ; `add_factory_instrument
+{key, track}` le met sur cette piste. La liste des instruments d'usine se lit en arrière-plan au démarrage
+(26 Mo de cartes, `SoundBanks::preloadMaps`) : l'onglet Instruments s'ouvre sans attendre.
+
 ## Affichages des périphériques
 
 Chaque périphérique montre ce qu'il fait, à partir des paramètres qu'il publie (donc aussi pour un
@@ -483,12 +697,30 @@ l'Inspecteur pour le LFO de piste :
 | Compresseur Pro | Niveaux d'entrée et de sortie et réduction de gain sur cinq secondes, vumètre de réduction, courbe de transfert avec le genou | Historique : glisser le seuil, molette pour le ratio ; courbe : seuil (côté), ratio (haut/bas), molette pour le genou |
 | Autre périphérique | Spectres avant et après | — |
 
+**Carte d'un périphérique sans vue à lui** (effets, dynamique, filtres, analyseurs, modules faits d'un
+graphe : `DevicesView` `cardFace`) : chaque affichage en petit (toujours manipulable, ⤢ l'ouvre en grand),
+avec **ses vrais boutons dessous** (un bouton avec son nom et sa valeur, un interrupteur, une liste :
+`visual::compactControl`) — ses réglages principaux (`visual::cardSlots` : la bande en main d'un égaliseur,
+les réglages principaux d'un effet studio) —, puis ses autres réglages en colonnes ; chaque partie aussi
+étroite que ses boutons le permettent à la hauteur du volet. Le spectre du son est laissé à la fenêtre
+quand la carte montre autre chose. L'oscilloscope dessine l'onde du son, le vumètre ses niveaux.
+
+**Grande fenêtre d'un périphérique** (boutons œil et ⧉ de sa carte, ⤢ d'un affichage) : un périphérique
+à **un seul** affichage l'ouvre directement en grand avec **tous ses réglages** en grands boutons (styles,
+options, potards ; `visual::drawLargePane`). Pour un périphérique à plusieurs affichages (Poly Keys, Stereo
+Finisher, Warm Drive…), l'onglet **TOUT** (par défaut) montre ses affichages en grand, sur autant de rangées
+qu'il faut, avec leurs niveaux, et dessous **tous ses réglages en grands boutons**, groupés par affichage
+puis « Autres réglages » (`visual::controlGroups`) ; un onglet par affichage le montre seul, en grand
+(`visual::drawOverview`). Un module qui a une interface dessinée dans l'atelier la garde dans un
+onglet **INTERFACE** de la même fenêtre (avant, l'œil ouvrait cette seule interface, générée et bien plus
+pauvre que la carte) ; un module sans aucun affichage reconnu ouvre toujours la fenêtre de son interface.
+
 Dans Périphériques, la molette fait défiler la chaîne de côté quand rien sous le pointeur ne la prend
 (afficheurs et potards gardent la leur) ; ✕ retire un périphérique en reliant ce qui l'alimentait à ce
 qu'il alimentait, de sorte que le son continue (une seule étape d'annulation).
 
-Sous chaque affichage, des champs de valeur (glisser, Maj pour le réglage fin, double-clic pour la
-valeur par défaut). Le bouton ⤢ après le titre d'un affichage (dans Périphériques comme sur les cartes
+Sous chaque affichage, ses boutons (glisser, Maj pour le réglage fin, double-clic pour la valeur par
+défaut, clic sur la valeur pour la taper, clic droit pour l'automatiser). Le bouton ⤢ après le titre d'un affichage (dans Périphériques comme sur les cartes
 du graphe) l'ouvre en grand dans une fenêtre « Périphérique » à lui. On peut en ouvrir plusieurs à la
 fois, comme des fenêtres de VST. Elle s'ancre ou flotte comme les panneaux, et montre un onglet par
 affichage quand le périphérique en a plusieurs.
@@ -517,6 +749,53 @@ directement la fenêtre du périphérique hors du studio. Par le port de contrô
 sélectionnée. Le signal vient de prises que le moteur garde à l'entrée et à la sortie de chaque
 périphérique affiché (`NativeDspRuntime::setTaps`, sans verrou ni allocation dans le thread audio).
 
+## Allumer, éteindre, tourner sans claquer
+
+**Changer l'ordre** : on prend un effet par son nom (en tête de sa carte) et on le lâche sur une autre
+carte : sur sa moitié gauche, il passe avant ; sur sa moitié droite, après (sur le « + », en dernier).
+Une ligne montre où il va. La chaîne est recâblée (ce qui l'alimentait alimente ce qui le suivait, puis
+il s'insère à sa nouvelle place ; son entrée sidechain et les câbles de contrôle sur ses boutons
+restent) et les cartes se rangent dans l'ordre du signal. L'instrument reste en tête. Un pas
+d'annulation. Moteur : `NodeGraphComponent::editorMoveInChain` ; port de contrôle : `move_device`
+(`track`, `nodeId`, `before` : la carte devant laquelle il va, 0 pour la fin).
+
+**Vumètre de sortie** : chaque carte de Périphériques (instrument, effet, plug-in VST3, même repliée) a
+un vumètre le long de son bord droit : ce qui sort de ce périphérique, gauche et droite, pour voir d'un
+coup d'œil où le son s'arrête dans la chaîne. Un instrument montre ce que ses voix donnent. Moteur :
+chaque nœud du plan garde sa crête depuis la dernière lecture (`AudioRenderPlan::takePeaks`), les
+plug-ins la leur (`GainPanAudioSource::takePluginPeaks`) ; `DeviceSignals::outputLevel` la fait
+retomber comme un vumètre (24 dB par seconde). La fenêtre d'un instrument s'ouvre par le bouton de
+l'en-tête de sa carte (le bouton « Ouvrir … » de la carte faisait doublon).
+
+**Bouton marche/arrêt** : chaque périphérique qui fait ou transporte du son a, en tête de sa carte
+(Périphériques, même repliée), à gauche de son nom, un bouton allumé ou éteint. Éteint (bypass), un effet laisse passer
+ce qui lui arrive, comme s'il n'était pas là, et sa carte se grise ; un instrument éteint se tait.
+Le moteur le fait tourner quand même : rallumé, il repart sans trou (une réverbe a déjà sa queue). Le
+passage se fait en fondu de 10 ms, et un effet qui a une latence (une anticipation, un
+suréchantillonnage) la garde quand il est éteint : ce qui passe arrive au même moment, la
+compensation du mix ne bouge pas. L'état est enregistré avec le projet et a son pas d'annulation.
+Un plug-in VST3 qui a son propre interrupteur « Bypass » a le même bouton, qui le commande (le plug-in
+passe le son lui-même, latence et réglages gardés). Moteur : `NativeDspGraph::bypasses` (la carte
+éteinte : le nœud dont la sortie est remplacée, celui dont l'entrée passe ; 0 : le silence),
+`AudioRenderPlan::setBypasses` (sans recompiler), `NodeGraphComponent::editorSetBypassed`.
+
+**Tourner un bouton** : pendant qu'on le tourne, le pointeur disparaît et reste où on a cliqué (il ne
+bute jamais sur un bord d'écran) ; il réapparaît au même endroit quand on lâche. Un réglage à crans
+(nombre de voix, octave) cumule les petits mouvements jusqu'au cran suivant ; la molette avance d'un
+cran. Un bouton grisé dit dans sa bulle ce qui le ferait agir (« agit quand Unisson vaut 2 ou plus »).
+`ui::heldMovement`, `KnobStyle::steps` ; le pointeur piloté par le port de contrôle (tests) garde
+l'ancien comportement.
+
+**Boutons tournés sans claquer** : un réglage d'effet ou d'instrument change à chaque image quand on
+tourne un bouton ; le moteur fait glisser ce qu'il entend vers la nouvelle valeur en quelques
+millisecondes, au lieu d'un saut au début du bloc suivant. Pendant ce glissement, un effet traite son
+bloc par morceaux de 32 échantillons (`AudioProcessor::valuesGliding` / `glideValues`, que
+`EffectProcessor` fait pour tout le catalogue) ; un choix (type, mode, pente, synchro…), un
+interrupteur, une anticipation ou un suréchantillonnage, eux, changent d'un coup. Un instrument fait
+de même avec les valeurs de ses voix (`PlanGlide` dans `AudioTrackController.cpp`), et son volume et
+son maintien suivent à l'échantillon près. Une modulation de piste n'est plus réinitialisée un instant
+quand on touche un bouton de la même piste.
+
 ## Effets
 
 Quatorze effets s'ajoutent au catalogue (Périphériques « + », recherche du graphe), chacun avec son
@@ -532,7 +811,7 @@ affichage (et un analyseur, le spectromètre, plus bas) :
 | Filtre multimode | mode (passe-bas, passe-haut, passe-bande, réjecteur), coupure, résonance, saturation |
 | Filtre auto | coupure, résonance, vitesse et profondeur du LFO (jusqu'à ±4 octaves), synchro |
 | EQ 3 bandes | graves, médiums, aigus, fréquences de séparation basse et haute |
-| Égaliseur Pro | 8 bandes (forme, fréquence, gain, Q, pente, active) et sortie |
+| Égaliseur Pro | 8 bandes (forme, fréquence, gain, Q, pente, active ; dynamique, plage, seuil, attaque, relâchement, détection) et sortie |
 | Compresseur Pro | seuil, ratio, genou, attaque, relâchement, compensation, mélange, filtre du détecteur |
 | Limiteur | gain, plafond, relâchement |
 | Gate | seuil, attaque, relâchement, plage |
@@ -556,12 +835,43 @@ passe-bande ou inclinaison. Sur la courbe : double-clic dans le vide ajoute une 
 une coupe ou un réjecteur, la hauteur règle le Q), Maj pour le réglage fin, molette sur une poignée
 pour le Q, double-clic sur une poignée la retire, clic droit pour la forme et la pente (ou, dans le
 vide, ajouter une bande d'une forme donnée). L'info-bulle donne la note la plus proche (« A4 +12 ct »).
+**Écouter une bande seule** : un casque s'affiche au-dessus de la bande choisie ; tant qu'on maintient le
+clic dessus, on n'entend que ce que cette bande travaille (un passe-bande à sa fréquence et à son Q,
+en fondu) ; Alt + clic maintenu sur une poignée fait de même, et la fenêtre en grand a un bouton casque
+à côté d'« Active » (`eqpro.listen` : 0 aucune, n la bande n). **Pendant l'écoute**, glisser à gauche
+ou à droite déplace la bande (on cherche la fréquence à l'oreille, Maj pour le fin) et la molette la
+resserre ou l'élargit (son Q) ; l'info-bulle suit la fréquence, la note et le Q. Le double-clic suit le
+réglage de Windows (sa durée et sa distance), plus tolérant que celui d'ImGui.
+
+**Bandes dynamiques** (comme Pro-Q 3) : une cloche, un plateau ou une inclinaison peut devenir
+dynamique (clic droit sur sa poignée › « Bande dynamique », ou le bouton « Dynamique » de la fenêtre en
+grand). Son gain bouge alors avec le son : un détecteur écoute **sa bande** (un passe-bande à sa
+fréquence et à son Q pour une cloche, un passe-bas sous un plateau bas, un passe-haut au-dessus d'un
+plateau haut, tout le son pour une inclinaison) ou, au choix, la même bande du **sidechain** (choisi dans
+l'en-tête de la carte, comme pour le Compresseur Pro ; sans sidechain, la bande elle-même). Au-dessus
+du **seuil**, le gain part vers sa **plage** (trois quarts de dB par dB dépassé, genou doux de 6 dB) sans
+jamais la dépasser : une plage négative creuse la bande quand elle est trop forte (sifflantes, boue,
+résonances), une plage positive la fait ressortir quand elle frappe (le clic d'un kick). **Attaque** et
+**relâchement** règlent la vitesse. Sur la courbe : la zone que la plage peut balayer est ombrée, un
+**losange** marque où elle mène (glisser : la plage ; double-clic : la bande redevient statique), et
+pendant la lecture la courbe et un trait épais montrent où le gain est **maintenant** (ce que le moteur
+fait vraiment, lu sur le processeur). La fenêtre en grand a une seconde rangée : Dynamique, « Sa bande »
+/ « Sidechain », Plage, Seuil, Attaque, Relâchement, un vumètre de ce que le détecteur entend avec le
+trait du seuil, et **Seuil auto** (pendant la lecture : le seuil se place 6 dB sous les crêtes que la bande a
+eues ces dernières secondes). Sur la carte, une bande dynamique choisie ajoute ses champs Plage et
+Seuil. Valeurs : `eqpro.b<n>Dynamic`, `Range` (−30 à +30 dB), `Threshold`, `Attack`, `Release`,
+`Detector` (0 sa bande, 1 sidechain), rangées après la sortie et l'écoute ; moteur `ParametricEq`
+(`EffectProcessors.cpp`), lecture de ce qu'il fait : `AudioProcessor::readings` →
+`AudioRenderPlan::readings` → `NativeDspRuntime::nodeReadings` → `DeviceSignals` (`Live::readings`).
+31 préréglages d'usine, en anglais (« Softened Sibilance (De-esser) », « Bass Making Room for the Kick
+(Sidechain) », « Backing Vocals Behind the Lead (Sidechain) », « Kick Click Forward »…).
 En grand : pastilles des huit bandes (clic choisit, double-clic active ou coupe), formes dessinées,
 pentes, potards fréquence / gain / Q avec leur valeur, sortie, échelle ±3 / ±6 / ±12 / ±30 dB,
 lecture de la fréquence, de la note et du niveau sous le pointeur. Courbes et son viennent du même
 calcul (`include/cydaw/engine/BiquadDesign.h`) : `--effects-test` vérifie que des sinus ressortent au
-gain que la courbe dessine (écart mesuré : 0,003 dB, tolérance du test : 0,35 dB). Les valeurs des bandes vivent dans `eqBands` (48 valeurs)
-du nœud ; un déplacement de fréquence, gain ou Q glisse en quelques millisecondes pour ne pas claquer.
+gain que la courbe dessine (écart mesuré : 0,003 dB, tolérance du test : 0,35 dB). Les valeurs des bandes vivent dans `eqBands` (48 valeurs
+pour les bandes, puis 48 pour leur dynamique ; le tableau en a 96) du nœud ; un déplacement de
+fréquence, gain ou Q glisse en quelques millisecondes pour ne pas claquer.
 La modulation de piste ne propose que la fréquence, le gain et le Q des bandes actives.
 
 Le **Compresseur Pro** calcule son gain à la manière des compresseurs de studio (genou progressif,
@@ -652,7 +962,14 @@ transparent, la gate se ferme…).
 - **Modulation** (Inspecteur, pistes audio) : un LFO (vitesse, profondeur, décalage, forme) déplace les
   paramètres publiés du graphe de la piste ; cocher un paramètre l'active, la glissière règle la
   quantité. Un potard modulé montre sa position réelle par un point violet dans Périphériques.
-- **Piano roll** : double-clic ajoute ou supprime une note, glisser déplace (temps et hauteur),
+- **Piano roll** : la hauteur se lit d'un coup d'œil — chaque touche blanche porte son nom quand il y a la
+  place (chaque Do en gras), une ligne marquée et le nom de l'octave à chaque Do au bord gauche des notes, la
+  rangée sous le pointeur éclairée (et sa touche nommée, noire comprise), les touches des notes
+  sélectionnées marquées, le nom dans chaque note, et celui de la note qu'on déplace à côté du pointeur. La
+  molette fait défiler les notes même pendant une sélection au rectangle ou un déplacement, et tirer vers
+  un bord fait défiler la vue (le rectangle garde son point de départ). La tête de lecture suit le clip là où il joue — dans le lanceur, depuis son début (un
+  stop puis une lecture le font repartir du début, la tête aussi), dans l'arrangement, à la position du
+  morceau. Double-clic ajoute ou supprime une note, glisser déplace (temps et hauteur),
   bord droit pour la durée, clic droit efface ce qu'il survole, flèches déplacent (Maj : octave),
   Q quantifie, Ctrl+D duplique, couloir de vélocité en bas, clavier cliquable qui joue
   l'instrument. Ctrl+molette zoom horizontal, Alt+molette hauteur des lignes. Comme partout où il y a
@@ -662,8 +979,13 @@ transparent, la gate se ferme…).
   Modes Hauteur / Volume : voir « Expressions par note ».
 - **Clip audio** : la source entière d'abord, puis la même bande à saisir au-dessus de ses secondes
   (Ctrl+molette zoome au pointeur, molette déplace).
-- **Potards** : glisser verticalement, Maj pour le réglage fin, molette, double-clic pour la valeur
-  par défaut ; la valeur s'affiche au survol.
+- **Potards, faders, champs** : glisser verticalement à trois vitesses — normale, **Ctrl lente**
+  (réglage fin), **Maj rapide** (`ui::valueSpeed`) — molette, double-clic pour la valeur par défaut.
+  **Un clic sur le nombre** écrit sous un potard, un fader, un champ (sans glisser) ouvre une saisie au
+  clavier : Entrée la prend (« 1,5k » = 1500, la virgule vaut un point, une fraction se tape en %),
+  Échap ou un clic ailleurs l'abandonne (`ui::valueEntry`, `visual::typedValue`) — dans Périphériques,
+  les grandes fenêtres, les effets de studio, l'Égaliseur Pro, les contrôleurs du sampler, le mixeur
+  (niveau, panoramique « C », « L 30 »).
 
 ## Architecture
 
@@ -705,7 +1027,9 @@ aucun, jeton facultatif `CYDAW_CONTROL_TOKEN`) avec les mêmes 94 commandes, plu
 (`src/v2/RemoteCommands.*`) : le serveur MCP `tools/mcp/cydaw_mcp_server.py` pilote donc la v2, qui
 est maintenant son exécutable par défaut (`.mcp.json` pointe sur `CyDAW 2.exe`). Les sondes n'ouvrent
 pas le port. Une session automatisée (`CYDAW_NO_RECOVERY=1`, posé par `cydaw_mcp_check.py`) ne laisse
-ni copie de récupération ni disposition modifiée.
+ni copie de récupération ni disposition modifiée. Avec `CYDAW_SINGLE_VIEWPORT=1`, les fenêtres (éditeurs
+de périphériques compris) restent dans la fenêtre principale, pour qu'un `snapshot` et `ui_input` les
+atteignent (tests).
 
 Fermer la fenêtre, Ctrl+Q, Nouveau, Ouvrir, un modèle ou un import demandent d'abord s'il faut
 enregistrer les modifications (Enregistrer, Ne pas enregistrer, Annuler).
@@ -752,6 +1076,13 @@ Atelier : `workshop` `status` donne aussi `tabs`, `activeTab` et `simulator` (r�
 `levelDb` avant le master) ; `tab` / `close_tab` (`id`), `simulate` (`play`, `source`
 none/sine/chords/noise/pink/drums/clicks/sample, `level`, `tone`, `sample`, `pattern`
 none/held/chords/arpeggio/bass/scale, `root`, `velocity`, `output`), `note` (`note`, `on`).
+
+Marche/arrêt : `set_node` avec `bypassed` (vrai : la carte est éteinte) ; `describe_node` le dit, et
+`get_track_graph` donne `bypasses`, ce que le moteur reçoit (paires nœud remplacé, nœud dont l'entrée
+passe ; 0 : le silence). `voice_live` (`track`) : ce que joue la voix la plus récente d'une piste
+(Prisme, synthés de la famille) : `modulated` (les réglages que ses modulations déplacent, par clé),
+`lfos`, `lfoPhases`, `envelopes` ; `playing` faux quand aucune ne joue. `launch_scene` avec
+`query: true` lit seulement ce qui joue, et où (`position`, en secondes dans chaque clip).
 
 Câbles : `connect` prend `mode` (`set` ou `modulate`) et `amount` (-1..1) pour un câble de contrôle
 sur un bouton ; `get_track_graph` donne les ports et le mode de chaque câble. `describe_node` liste les

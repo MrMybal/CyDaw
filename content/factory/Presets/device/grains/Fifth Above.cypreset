@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "grains",
+ "name": "Fifth Above",
+ "state": {
+  "type": "grains",
+  "parameters": {
+   "grains.time": 280.0,
+   "grains.feedback": 0.5,
+   "grains.pitch": 7.0,
+   "grains.spray": 60.0,
+   "grains.density": 40.0,
+   "grains.pitchRandom": 0.0,
+   "grains.mix": 0.35,
+   "grains.output": 0.0,
+   "grains.sync": 0.0,
+   "grains.size": 150.0,
+   "grains.stereo": 0.8,
+   "grains.reverseChance": 0.0,
+   "grains.freeze": 0.0,
+   "grains.highCut": 14000.0
+  }
+ }
+}

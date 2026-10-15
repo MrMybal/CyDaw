@@ -1,0 +1,14 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "compressor",
+ "name": "Acoustic Guitar",
+ "state": {
+  "type": "compressor",
+  "parameters": {
+   "compressor.threshold": -16.0,
+   "compressor.ratio": 3.0
+  }
+ }
+}

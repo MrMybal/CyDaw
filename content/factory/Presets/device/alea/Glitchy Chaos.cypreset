@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "alea",
+ "name": "Glitchy Chaos",
+ "state": {
+  "type": "alea",
+  "parameters": {
+   "alea.timing": 40.0,
+   "alea.velocity": 0.4,
+   "alea.chance": 0.5,
+   "alea.pitchChance": 0.5,
+   "alea.pitchRange": 7.0
+  }
+ }
+}

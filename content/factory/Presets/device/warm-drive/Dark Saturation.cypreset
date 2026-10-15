@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "warm-drive",
+ "name": "Dark Saturation",
+ "state": {
+  "type": "warm-drive",
+  "parameters": {
+   "node.14002.drive.db": 10.0,
+   "node.14003.lowpass.cutoff": 3500.0,
+   "node.14003.lowpass.resonance": 0.8,
+   "node.14004.clip.threshold": 0.9,
+   "node.14005.gain.db": -3.0
+  }
+ }
+}

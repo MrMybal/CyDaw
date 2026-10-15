@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "gamme",
+ "name": "D Dorian",
+ "state": {
+  "type": "gamme",
+  "parameters": {
+   "gamme.transpose": 0.0,
+   "gamme.degrees": 0.0,
+   "gamme.key": 2.0,
+   "gamme.scale": 8.0,
+   "gamme.mode": 0.0
+  }
+ }
+}

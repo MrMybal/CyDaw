@@ -1,0 +1,40 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "kick-synth",
+ "name": "Raw Hard Dance Screamer",
+ "state": {
+  "type": "kick-synth",
+  "parameters": {
+   "kick.bodyShape": 3.0,
+   "kick.bodyPhase": 0.0,
+   "kick.pitchStart": 1800.0,
+   "kick.pitchEnd": 48.0,
+   "kick.pitchTime": 140.39999389648438,
+   "kick.pitchCurve": 5.0,
+   "kick.bodyLevel": 0.0,
+   "kick.attack": 0.0,
+   "kick.hold": 140.0,
+   "kick.decay": 520.0,
+   "kick.decayCurve": 1.200000047683716,
+   "kick.length": 900.0,
+   "kick.clickType": 1.0,
+   "kick.clickLevel": -4.0,
+   "kick.clickDecay": 12.0,
+   "kick.clickTone": 3000.0,
+   "kick.subLevel": -16.0,
+   "kick.subDecay": 450.0,
+   "kick.subOctave": 0.0,
+   "kick.driveType": 1.0,
+   "kick.drive": 28.0,
+   "kick.driveTone": 3500.0,
+   "kick.lowCut": 40.0,
+   "kick.highCut": 10000.0,
+   "kick.lowBoost": 4.0,
+   "kick.keyTrack": 1.0,
+   "kick.velocity": 0.100000001490116,
+   "kick.output": -9.460000038146973
+  }
+ }
+}

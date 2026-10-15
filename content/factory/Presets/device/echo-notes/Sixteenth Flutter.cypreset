@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "echo-notes",
+ "name": "Sixteenth Flutter",
+ "state": {
+  "type": "echo-notes",
+  "parameters": {
+   "echonotes.time": 250.0,
+   "echonotes.decay": 0.12,
+   "echonotes.pitch": 0.0,
+   "echonotes.sync": 3.0,
+   "echonotes.repeats": 8.0
+  }
+ }
+}

@@ -18,8 +18,12 @@ namespace cydaw::engine {
 class EffectProcessor : public AudioProcessor {
 public:
     explicit EffectProcessor(const EffectDescriptor& descriptor) noexcept;
-    // Realtime-safe: the values are atomics.
+    // Realtime-safe: the values are atomics. What the processor reads glides
+    // there (a few milliseconds) unless it is a choice, which jumps; the
+    // first values it is given hold at once.
     void setParameters(const NativeDspNodeParameters& parameters) noexcept;
+    [[nodiscard]] bool valuesGliding() noexcept override;
+    void glideValues(std::uint32_t frames, double sampleRate) noexcept override;
     [[nodiscard]] const EffectDescriptor& descriptor() const noexcept { return descriptor_; }
     // The response a convolving effect plays (the cabinet's), given before
     // prepare(), off the audio thread. Others ignore it.
@@ -27,15 +31,25 @@ public:
     [[nodiscard]] virtual const ImpulseResponse* impulse() const noexcept { return nullptr; }
 
 protected:
-    // The n-th parameter of the catalogue entry.
+    // The n-th parameter of the catalogue entry, as heard now.
     [[nodiscard]] float value(std::size_t index) const noexcept
     {
-        return values_[index].load(std::memory_order_relaxed);
+        return heard_[index].load(std::memory_order_relaxed);
     }
 
 private:
     const EffectDescriptor& descriptor_;
-    std::array<std::atomic<float>, 64> values_ {};
+    // As set, and as heard (written by the audio thread only, read by any:
+    // a latency may follow a value).
+    std::array<std::atomic<float>, 128> values_ {};
+    std::array<std::atomic<float>, 128> heard_ {};
+    // A choice, a switch, a look-ahead: what jumps rather than glides.
+    std::array<bool, 128> jumps_ {};
+    std::atomic<std::uint32_t> setCount_ {};
+    std::uint32_t seenCount_ {};
+    // Until the first block, what is set is heard at once.
+    std::atomic<bool> primed_ {};
+    bool gliding_ {};
 };
 
 // The processor for one of the catalogue's kinds, its values set; empty for

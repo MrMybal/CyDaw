@@ -1,3 +1,4 @@
+#include "MidiEffectsHost.h"
 #include "AudioTrackController.h"
 #include "PlanSynthesiser.h"
 #include "Localization.h"
@@ -1001,6 +1002,16 @@ void GainPanAudioSource::getNextAudioBlock(const juce::AudioSourceChannelInfo& b
                     (void) pluginHosts_[index]->processBlock(*bufferToFill.buffer,
                                                              bufferToFill.startSample,
                                                              bufferToFill.numSamples);
+                    // How loud it came out, for its meter.
+                    for (int channel = 0; channel < std::min(2, bufferToFill.buffer->getNumChannels()); ++channel) {
+                        const auto loudest = bufferToFill.buffer->getMagnitude(channel, bufferToFill.startSample, bufferToFill.numSamples);
+                        auto& kept = pluginPeaks_[index * 2 + static_cast<std::size_t>(channel)];
+                        if (loudest > kept.load(std::memory_order_relaxed))
+                            kept.store(loudest, std::memory_order_relaxed);
+                    }
+                    if (bufferToFill.buffer->getNumChannels() == 1)
+                        pluginPeaks_[index * 2 + 1].store(pluginPeaks_[index * 2].load(std::memory_order_relaxed),
+                                                          std::memory_order_relaxed);
                 }
             }
         }
@@ -1848,9 +1859,17 @@ void MasterOutputAudioSource::getNextAudioBlock(
     const juce::AudioSourceChannelInfo& bufferToFill)
 {
     input_.getNextAudioBlock(bufferToFill);
+    // Where this block starts on the master's clock (none while stopped:
+    // its clip's automation then rests), the clock moved on.
+    auto blockStart = std::numeric_limits<double>::quiet_NaN();
+    if (const auto rate = sampleRate_.load(std::memory_order_relaxed);
+        clockRunning_.load(std::memory_order_acquire) && rate > 0.0 && bufferToFill.numSamples > 0) {
+        blockStart = clock_.load(std::memory_order_relaxed);
+        clock_.store(blockStart + static_cast<double>(bufferToFill.numSamples) / rate, std::memory_order_relaxed);
+    }
     // The master track's devices, then its fader.
     if (bufferToFill.buffer != nullptr && bufferToFill.numSamples > 0 && chainActive_.load(std::memory_order_acquire))
-        (void) chain_.process(*bufferToFill.buffer, bufferToFill.startSample, bufferToFill.numSamples);
+        (void) chain_.process(*bufferToFill.buffer, bufferToFill.startSample, bufferToFill.numSamples, blockStart);
     if (bufferToFill.buffer != nullptr && bufferToFill.numSamples > 0)
         bufferToFill.buffer->applyGain(
             bufferToFill.startSample, bufferToFill.numSamples,
@@ -3596,6 +3615,257 @@ struct VoiceModulationState {
     std::array<float, capacity> depths {};
 };
 
+namespace {
+
+// Which of an instrument's settings jump when they are set rather than
+// glide: its choices, switches and whole numbers. Built once, off the audio
+// thread (the engine asks when it is made).
+struct GlideKinds {
+    std::array<bool, cydaw::engine::prism::parameterCount> prism {};
+    std::array<bool, cydaw::engine::kick::parameterCount> kick {};
+    std::array<std::array<bool, cydaw::engine::synth::valueCapacity>, 5> synth {};
+    std::array<bool, cydaw::engine::drum::valueCount> drum {};
+    std::array<bool, 16> sampler {};
+};
+
+const GlideKinds& glideKinds()
+{
+    static const GlideKinds kinds = [] {
+        namespace engine = cydaw::engine;
+        GlideKinds made;
+        for (int index = 0; index < engine::prism::parameterCount; ++index)
+            made.prism[static_cast<std::size_t>(index)] = engine::prism::parameter(index).kind != engine::prism::Kind::continuous;
+        for (int index = 0; index < engine::kick::parameterCount; ++index)
+            made.kick[static_cast<std::size_t>(index)] = !engine::kick::parameter(index).choices.empty();
+        for (auto& jumps : made.synth)
+            jumps.fill(true);
+        for (int model = 1; model < 5; ++model) {
+            const auto which = static_cast<engine::synth::Model>(model);
+            auto& jumps = made.synth[static_cast<std::size_t>(model)];
+            const auto count = std::min(engine::synth::parameterCount(which), engine::synth::valueCapacity);
+            for (int index = 0; index < count; ++index)
+                jumps[static_cast<std::size_t>(index)] = engine::synth::parameter(which, index).kind != engine::synth::Kind::continuous;
+        }
+        made.drum.fill(true);
+        const auto& drums = engine::drum::parameters();
+        for (std::size_t index = 0; index < drums.size() && index < made.drum.size(); ++index)
+            made.drum[index] = drums[index].kind != engine::drum::Kind::continuous;
+        made.sampler.fill(true);
+        for (const auto setting : { engine::SamplerSetting::transpose, engine::SamplerSetting::fine, engine::SamplerSetting::velocityDb,
+                                    engine::SamplerSetting::velocityCrossfade, engine::SamplerSetting::width })
+            made.sampler[static_cast<std::size_t>(setting)] = false;
+        return made;
+    }();
+    return kinds;
+}
+
+// What a track's newest voice plays, from the audio thread to the
+// interface: a sequence lock over atomics (the writer never waits, a reader
+// tries again while a write is under way).
+class VoiceLiveFeed final {
+public:
+    void write(const cydaw::engine::VoiceLive* live) noexcept
+    {
+        sequence_.fetch_add(1, std::memory_order_acq_rel);
+        playing_.store(live != nullptr, std::memory_order_relaxed);
+        if (live != nullptr) {
+            for (std::size_t index = 0; index < live->values.size(); ++index)
+                values_[index].store(live->values[index], std::memory_order_relaxed);
+            for (std::size_t index = 0; index < live->lfos.size(); ++index) {
+                lfos_[index].store(live->lfos[index], std::memory_order_relaxed);
+                phases_[index].store(live->lfoPhases[index], std::memory_order_relaxed);
+            }
+            for (std::size_t index = 0; index < live->envelopes.size(); ++index)
+                envelopes_[index].store(live->envelopes[index], std::memory_order_relaxed);
+        }
+        sequence_.fetch_add(1, std::memory_order_release);
+    }
+    // False when no voice plays.
+    bool read(cydaw::engine::VoiceLive& out) const noexcept
+    {
+        for (int attempt = 0; attempt < 8; ++attempt) {
+            const auto before = sequence_.load(std::memory_order_acquire);
+            if ((before & 1u) != 0)
+                continue;
+            const auto playing = playing_.load(std::memory_order_relaxed);
+            if (playing) {
+                for (std::size_t index = 0; index < out.values.size(); ++index)
+                    out.values[index] = values_[index].load(std::memory_order_relaxed);
+                for (std::size_t index = 0; index < out.lfos.size(); ++index) {
+                    out.lfos[index] = lfos_[index].load(std::memory_order_relaxed);
+                    out.lfoPhases[index] = phases_[index].load(std::memory_order_relaxed);
+                }
+                for (std::size_t index = 0; index < out.envelopes.size(); ++index)
+                    out.envelopes[index] = envelopes_[index].load(std::memory_order_relaxed);
+            }
+            std::atomic_thread_fence(std::memory_order_acquire);
+            if (sequence_.load(std::memory_order_relaxed) == before)
+                return playing;
+        }
+        return false;
+    }
+
+private:
+    std::atomic<std::uint32_t> sequence_ {};
+    std::atomic<bool> playing_ {};
+    std::array<std::atomic<float>, cydaw::engine::VoiceLive::valueCount> values_ {};
+    std::array<std::atomic<float>, cydaw::engine::VoiceLive::lfoCount> lfos_ {};
+    std::array<std::atomic<float>, cydaw::engine::VoiceLive::lfoCount> phases_ {};
+    std::array<std::atomic<float>, cydaw::engine::VoiceLive::envelopeCount> envelopes_ {};
+};
+
+// An instrument's settings as heard: a knob turned glides there in a few
+// milliseconds instead of jumping at the next block (a click on a level, a
+// cutoff, a sustain). The engine renders its voices in short pieces while
+// it glides. Audio thread only. Choices, switches, and a plan that plays
+// something else (another model, other tables) are taken at once.
+class PlanGlide final {
+public:
+    // At the start of a block, under its borrow of `plan`: whether the
+    // values still move toward it.
+    [[nodiscard]] bool begin(const cydaw::engine::PolySynthGraphPlan& plan) noexcept
+    {
+        const Identity identity { plan.enabled, plan.waveform, plan.synthModel, plan.drumKit,
+                                  plan.wavetable.get(), plan.soundModel.get(), plan.sampler.get(), plan.prismTables.get() };
+        if (!primed_ || !(identity == identity_)) {
+            primed_ = true;
+            identity_ = identity;
+            take(plan);
+            return false;
+        }
+        const auto& kinds = glideKinds();
+        const auto differs = [](const auto& heard, const auto& wanted, const auto& jumps) {
+            for (std::size_t index = 0; index < heard.size() && index < wanted.size(); ++index)
+                if (!jumps[index] && heard[index] != wanted[index])
+                    return true;
+            return false;
+        };
+        const auto model = static_cast<std::size_t>(plan.synthModel);
+        return heard_.oscillatorLevel != plan.oscillatorLevel || heard_.filterCutoffHz != plan.filterCutoffHz
+               || heard_.filterResonance != plan.filterResonance || heard_.sustainLevel != plan.sustainLevel
+               || heard_.wavetablePosition != plan.wavetablePosition || heard_.wavetableDetuneCents != plan.wavetableDetuneCents
+               || heard_.stringDamping != plan.stringDamping || heard_.velocityScale != plan.velocityScale
+               || differs(heard_.prismValues, plan.prismValues, kinds.prism) || differs(heard_.kickValues, plan.kickValues, kinds.kick)
+               || (model < kinds.synth.size() && differs(heard_.synthValues, plan.synthValues, kinds.synth[model]))
+               || differs(heard_.drumValues, plan.drumValues, kinds.drum)
+               || differs(heard_.samplerValues, plan.samplerValues, kinds.sampler);
+    }
+
+    // `frames` further toward `plan`: what the voices play for them. It
+    // shares the plan's tables, so it lives only within the block's borrow.
+    [[nodiscard]] const cydaw::engine::PolySynthGraphPlan& step(const cydaw::engine::PolySynthGraphPlan& plan, const int frames,
+                                                               const double sampleRate) noexcept
+    {
+        const auto amount = static_cast<float>(1.0 - std::exp(-static_cast<double>(frames) / (0.006 * std::max(1.0, sampleRate))));
+        const auto& kinds = glideKinds();
+        const auto move = [amount](float& heard, const float wanted, const float tolerance) {
+            heard += (wanted - heard) * amount;
+            if (std::abs(wanted - heard) <= tolerance)
+                heard = wanted;
+        };
+        const auto moveAll = [&move](auto& heard, const auto& wanted, const auto& jumps) {
+            for (std::size_t index = 0; index < heard.size() && index < wanted.size(); ++index) {
+                if (jumps[index])
+                    heard[index] = wanted[index];
+                else
+                    move(heard[index], wanted[index], 1.0e-5f * std::max(1.0f, std::abs(wanted[index])));
+            }
+        };
+        move(heard_.oscillatorLevel, plan.oscillatorLevel, 1.0e-6f);
+        move(heard_.filterCutoffHz, plan.filterCutoffHz, 0.01f);
+        move(heard_.filterResonance, plan.filterResonance, 1.0e-5f);
+        move(heard_.sustainLevel, plan.sustainLevel, 1.0e-6f);
+        move(heard_.wavetablePosition, plan.wavetablePosition, 1.0e-6f);
+        move(heard_.wavetableDetuneCents, plan.wavetableDetuneCents, 1.0e-4f);
+        move(heard_.stringDamping, plan.stringDamping, 1.0e-6f);
+        move(heard_.velocityScale, plan.velocityScale, 1.0e-6f);
+        moveAll(heard_.prismValues, plan.prismValues, kinds.prism);
+        moveAll(heard_.kickValues, plan.kickValues, kinds.kick);
+        if (const auto model = static_cast<std::size_t>(plan.synthModel); model < kinds.synth.size())
+            moveAll(heard_.synthValues, plan.synthValues, kinds.synth[model]);
+        moveAll(heard_.drumValues, plan.drumValues, kinds.drum);
+        moveAll(heard_.samplerValues, plan.samplerValues, kinds.sampler);
+        playing_ = plan;
+        playing_.oscillatorLevel = heard_.oscillatorLevel;
+        playing_.filterCutoffHz = heard_.filterCutoffHz;
+        playing_.filterResonance = heard_.filterResonance;
+        playing_.sustainLevel = heard_.sustainLevel;
+        playing_.wavetablePosition = heard_.wavetablePosition;
+        playing_.wavetableDetuneCents = heard_.wavetableDetuneCents;
+        playing_.stringDamping = heard_.stringDamping;
+        playing_.velocityScale = heard_.velocityScale;
+        playing_.prismValues = heard_.prismValues;
+        playing_.kickValues = heard_.kickValues;
+        playing_.synthValues = heard_.synthValues;
+        playing_.drumValues = heard_.drumValues;
+        playing_.samplerValues = heard_.samplerValues;
+        return playing_;
+    }
+
+    // At the end of the block, still under its borrow: the plan's shared
+    // parts let go of while the plan itself still holds them (so they are
+    // never freed here).
+    void end() noexcept
+    {
+        playing_.wavetable = {};
+        playing_.soundModel = {};
+        playing_.sampler = {};
+        playing_.prismTables = {};
+    }
+
+private:
+    struct Identity {
+        bool enabled {};
+        cydaw::engine::PolyOscillatorWaveform waveform {};
+        cydaw::engine::synth::Model model {};
+        bool drumKit {};
+        const void* wavetable {};
+        const void* soundModel {};
+        const void* sampler {};
+        const void* tables {};
+        [[nodiscard]] bool operator==(const Identity&) const = default;
+    };
+    struct Heard {
+        float oscillatorLevel {};
+        float filterCutoffHz {};
+        float filterResonance {};
+        float sustainLevel {};
+        float wavetablePosition {};
+        float wavetableDetuneCents {};
+        float stringDamping {};
+        float velocityScale {};
+        cydaw::engine::prism::PrismValues prismValues {};
+        cydaw::engine::kick::KickValues kickValues {};
+        cydaw::engine::synth::Values synthValues {};
+        cydaw::engine::drum::Values drumValues {};
+        cydaw::engine::SamplerValues samplerValues {};
+    };
+
+    void take(const cydaw::engine::PolySynthGraphPlan& plan) noexcept
+    {
+        heard_.oscillatorLevel = plan.oscillatorLevel;
+        heard_.filterCutoffHz = plan.filterCutoffHz;
+        heard_.filterResonance = plan.filterResonance;
+        heard_.sustainLevel = plan.sustainLevel;
+        heard_.wavetablePosition = plan.wavetablePosition;
+        heard_.wavetableDetuneCents = plan.wavetableDetuneCents;
+        heard_.stringDamping = plan.stringDamping;
+        heard_.velocityScale = plan.velocityScale;
+        heard_.prismValues = plan.prismValues;
+        heard_.kickValues = plan.kickValues;
+        heard_.synthValues = plan.synthValues;
+        heard_.drumValues = plan.drumValues;
+        heard_.samplerValues = plan.samplerValues;
+    }
+
+    bool primed_ {};
+    Identity identity_ {};
+    Heard heard_ {};
+    cydaw::engine::PolySynthGraphPlan playing_ {};
+};
+
+} // namespace
+
 class GraphSynthVoice final : public juce::SynthesiserVoice, public PlanVoice {
 public:
     GraphSynthVoice(const cydaw::realtime::RtPublisher<cydaw::engine::PolySynthGraphPlan>& graph,
@@ -3605,9 +3875,16 @@ public:
         voice_.setPrismContext(context);
     }
 
+    // The plan the engine points its voices at this block (null: they
+    // borrow the publisher's themselves).
+    void hearFrom(const cydaw::engine::PolySynthGraphPlan* const* heard) noexcept { heard_ = heard; }
+
     [[nodiscard]] double voicePitch() const noexcept override { return voice_.currentPitch(); }
+    bool live(cydaw::engine::VoiceLive& out) const noexcept { return isVoiceActive() && voice_.live(out); }
     [[nodiscard]] int chokedBy() const noexcept override
     {
+        if (heard_ != nullptr && *heard_ != nullptr)
+            return voice_.chokedBy(**heard_);
         const auto graph = graph_.read();
         return graph != nullptr ? voice_.chokedBy(*graph) : 0;
     }
@@ -3622,13 +3899,14 @@ public:
                    juce::SynthesiserSound*,
                    const int pitchWheel) override
     {
-        const auto graph = graph_.read();
         // A note starts from the automated values too (what an envelope or
         // a unison reads once, at its start).
-        const auto started = withModulation(graph != nullptr ? *graph : silentPlan(), [&](const auto& plan) {
-            return legato ? voice_.retarget(plan, midiNoteNumber, velocity, std::max(1.0, getSampleRate()))
-                          : voice_.startNote(plan, midiNoteNumber, velocity, std::max(1.0, getSampleRate()), glideFrom,
-                                             softAttack);
+        const auto started = withPlan([&](const auto& current) {
+            return withModulation(current, [&](const auto& plan) {
+                return legato ? voice_.retarget(plan, midiNoteNumber, velocity, std::max(1.0, getSampleRate()))
+                              : voice_.startNote(plan, midiNoteNumber, velocity, std::max(1.0, getSampleRate()), glideFrom,
+                                                 softAttack);
+            });
         });
         legato = false;
         glideFrom = -1.0;
@@ -3696,16 +3974,28 @@ public:
     {
         if (!voice_.isActive())
             return;
-        const auto graph = graph_.read();
-        const auto rendered = withModulation(graph != nullptr ? *graph : silentPlan(), [&](const auto& plan) {
-            return voice_.render(plan, output.getArrayOfWritePointers(), output.getNumChannels(), startSample, numSamples,
-                                 std::max(1.0, getSampleRate()));
+        const auto rendered = withPlan([&](const auto& current) {
+            return withModulation(current, [&](const auto& plan) {
+                return voice_.render(plan, output.getArrayOfWritePointers(), output.getNumChannels(), startSample, numSamples,
+                                     std::max(1.0, getSampleRate()));
+            });
         });
         if (!rendered)
             clearCurrentNote();
     }
 
 private:
+    // The plan this block: the engine's when it gives one, else the
+    // publisher's, borrowed for the call.
+    template <typename Use>
+    auto withPlan(Use&& use)
+    {
+        if (heard_ != nullptr && *heard_ != nullptr)
+            return use(**heard_);
+        const auto graph = graph_.read();
+        return use(graph != nullptr ? *graph : silentPlan());
+    }
+
     // The plan as the lanes and the cables leave it this block, handed to
     // `use`; the plan itself when nothing moves it.
     template <typename Use>
@@ -3737,6 +4027,7 @@ private:
     // All voices share one publisher and borrow it in turn on the audio
     // thread, so an instrument edit never frees a plan mid-voice.
     const cydaw::realtime::RtPublisher<cydaw::engine::PolySynthGraphPlan>& graph_;
+    const cydaw::engine::PolySynthGraphPlan* const* heard_ {};
     const VoiceModulationState& modulation_;
     cydaw::engine::PolyVoice voice_;
     bool expressive_ {};
@@ -3805,16 +4096,24 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
         voiceModulations.store(std::make_shared<const std::vector<cydaw::engine::PolyVoiceModulation>>());
         // As many as the exported plug-in has: a piano held by its pedal
         // rings on many keys at once.
-        for (int voice = 0; voice < 32; ++voice)
-            synthesiser.addVoice(new GraphSynthVoice(instrumentGraph, voiceModulation, &synthesiser.context));
+        (void) glideKinds();
+        for (int voice = 0; voice < 32; ++voice) {
+            auto* made = new GraphSynthVoice(instrumentGraph, voiceModulation, &synthesiser.context);
+            made->hearFrom(&heardPlan);
+            synthesiser.addVoice(made);
+        }
         synthesiser.addSound(new GraphSynthSound());
         // Prisme's voicing (mono, legato, glide, its voice limit), read off
         // the plan the voices play.
         synthesiser.voicing = [this] {
+            if (heardPlan != nullptr)
+                return PlanSynthesiser::voicingOf(*heardPlan);
             const auto plan = instrumentGraph.read();
             return plan != nullptr ? PlanSynthesiser::voicingOf(*plan) : PlanSynthesiser::Voicing {};
         };
         synthesiser.noteInfo = [this](const int note, const float velocity) {
+            if (heardPlan != nullptr)
+                return PlanSynthesiser::noteInfoOf(*heardPlan, note, velocity, synthesiser.context.sampler);
             const auto plan = instrumentGraph.read();
             return plan != nullptr ? PlanSynthesiser::noteInfoOf(*plan, note, velocity, synthesiser.context.sampler)
                                    : PlanSynthesiser::NoteInfo {};
@@ -3831,6 +4130,10 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
         sampleRateHz.store(sampleRate, std::memory_order_release);
         effects.prepare(sampleRate, std::max(1, samplesPerBlockExpected), 2);
         voicesDelay.prepare(LatencyCompensatingAudioSource::maximumDelaySamples);
+        midiEffects.prepare(sampleRate);
+        for (auto& pad : padStore)
+            if (pad != nullptr)
+                pad->prepare(sampleRate, samplesPerBlockExpected);
         if (liveInput.load(std::memory_order_acquire))
             collector.reset(sampleRate);
     }
@@ -4057,8 +4360,26 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
         readVoiceModulations(automationSeconds);
         synthesiser.advance(static_cast<double>(output.numSamples) / std::max(1.0, synthesiser.getSampleRate()),
                             NativeDspRuntime::sessionTempo());
-        followSamplerCard();
-        synthesiser.renderNextBlock(*output.buffer, midi, output.startSample, output.numSamples);
+        {
+            // The block's one borrow of the plan: the voices, the voicing
+            // and the sampler's card read it through heardPlan.
+            const auto published = instrumentGraph.read();
+            followSamplerCard(published.get());
+            // The MIDI effects between the notes and the voices, on the
+            // transport's beat while it plays.
+            {
+                cydaw::engine::MidiEffectClock clock;
+                clock.sampleRate = std::max(1.0, synthesiser.getSampleRate());
+                clock.beatsPerMinute = NativeDspRuntime::sessionTempo();
+                clock.playing = playing.load(std::memory_order_relaxed) && NativeDspRuntime::sessionPlaying();
+                clock.quarterNotes = std::max(0.0, automationSeconds) * clock.beatsPerMinute / 60.0;
+                midiEffects.apply(midi, 0, output.numSamples, published != nullptr ? published->midiEffects.get() : nullptr, clock);
+            }
+            renderVoices(published.get(), *output.buffer, midi, output.startSample, output.numSamples);
+            // A rack's pads: each its instrument and its effects.
+            renderPads(midi, output, automationSeconds);
+        }
+        publishVoiceLive(output.numSamples);
         voicesDelay.process(*output.buffer, output.startSample, output.numSamples);
         if (const auto* main = routedInputs[0]; main != nullptr) {
             const auto count = std::min(output.numSamples, routedSamples);
@@ -4177,9 +4498,8 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
     // the voices apply them in order.
     // A sampler's controllers and articulation follow its card, as the lanes
     // leave them this block.
-    void followSamplerCard() noexcept
+    void followSamplerCard(const cydaw::engine::PolySynthGraphPlan* plan) noexcept
     {
-        const auto plan = instrumentGraph.read();
         if (plan == nullptr || plan->waveform != cydaw::engine::PolyOscillatorWaveform::sampler)
             return;
         auto card = plan->samplerControllers;
@@ -4196,6 +4516,44 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
                 articulation = value;
         }
         synthesiser.context.sampler.follow(plan->sampler.get(), card, articulation);
+    }
+
+    // What the newest voice plays (a Prisme's, a synth's of the family), for
+    // the interface: about fifty times a second, the audio thread's to write.
+    void publishVoiceLive(const int frames) noexcept
+    {
+        liveCountdown -= frames;
+        if (liveCountdown > 0)
+            return;
+        liveCountdown = std::max(256, static_cast<int>(synthesiser.getSampleRate() / 50.0));
+        const GraphSynthVoice* newest {};
+        for (int index = 0; index < synthesiser.getNumVoices(); ++index) {
+            const auto* voice = dynamic_cast<const GraphSynthVoice*>(synthesiser.getVoice(index));
+            if (voice != nullptr && voice->isVoiceActive() && (newest == nullptr || newest->wasStartedBefore(*voice)))
+                newest = voice;
+        }
+        const auto playing = newest != nullptr && newest->live(liveScratch);
+        live.write(playing ? &liveScratch : nullptr);
+    }
+
+    // The voices, rendered from `plan`: in pieces of 32 frames while its
+    // values glide toward it (a knob turned), whole otherwise.
+    void renderVoices(const cydaw::engine::PolySynthGraphPlan* plan, juce::AudioBuffer<float>& buffer, const juce::MidiBuffer& midi,
+                      const int start, const int count) noexcept
+    {
+        if (plan == nullptr || !glide.begin(*plan)) {
+            heardPlan = plan;
+            synthesiser.renderNextBlock(buffer, midi, start, count);
+        } else {
+            const auto rate = std::max(1.0, synthesiser.getSampleRate());
+            for (int done = 0; done < count; done += 32) {
+                const auto frames = std::min(32, count - done);
+                heardPlan = &glide.step(*plan, frames, rate);
+                synthesiser.renderNextBlock(buffer, midi, start + done, frames);
+            }
+            glide.end();
+        }
+        heardPlan = nullptr;
     }
 
     void readVoiceModulations(const double seconds) noexcept
@@ -4229,10 +4587,156 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
     }
 
     cydaw::realtime::RtPublisher<cydaw::engine::PolySynthGraphPlan> instrumentGraph;
+    // What the voices play this block, while it renders (audio thread).
+    const cydaw::engine::PolySynthGraphPlan* heardPlan {};
+    PlanGlide glide;
+    // What the newest voice plays, published for the interface.
+    VoiceLiveFeed live;
+    cydaw::engine::VoiceLive liveScratch {};
+    int liveCountdown {};
     cydaw::realtime::RtPublisher<std::vector<cydaw::engine::PolyVoiceModulation>> voiceModulations;
     cydaw::realtime::RtPublisher<std::vector<AudioTrackController::VoiceAutomationLane>> voiceAutomation;
     VoiceModulationState voiceModulation;
     NativeDspRuntime effects;
+    MidiEffectsHost midiEffects;
+
+    // ---- A rack of pads (the "drum-rack" card) ----
+    // A pad: an instrument and its effects of their own, played by the
+    // track's notes of its key (as another note when it says so), summed
+    // with the others before the track's effects. Made on the message
+    // thread; never freed while the engine lives (the audio thread may hold
+    // it), only emptied.
+    struct RackPad {
+        RackPad()
+        {
+            plan.store(std::make_shared<const cydaw::engine::PolySynthGraphPlan>());
+            for (int voice = 0; voice < 12; ++voice)
+                synthesiser.addVoice(new GraphSynthVoice(plan, modulation, &synthesiser.context));
+            synthesiser.addSound(new GraphSynthSound());
+            synthesiser.voicing = [this] {
+                const auto current = plan.read();
+                return current != nullptr ? PlanSynthesiser::voicingOf(*current) : PlanSynthesiser::Voicing {};
+            };
+            synthesiser.noteInfo = [this](const int note, const float velocity) {
+                const auto current = plan.read();
+                return current != nullptr ? PlanSynthesiser::noteInfoOf(*current, note, velocity, synthesiser.context.sampler)
+                                          : PlanSynthesiser::NoteInfo {};
+            };
+            notes.ensureSize(2'048);
+        }
+        void prepare(const double rate, const int block)
+        {
+            synthesiser.setCurrentPlaybackSampleRate(std::max(1.0, rate));
+            effects.prepare(std::max(1.0, rate), std::max(1, block), 2);
+            buffer.setSize(2, std::max(8'192, block), false, true, true);
+        }
+        cydaw::realtime::RtPublisher<cydaw::engine::PolySynthGraphPlan> plan;
+        VoiceModulationState modulation;
+        PlanSynthesiser synthesiser;
+        NativeDspRuntime effects;
+        juce::AudioBuffer<float> buffer;
+        juce::MidiBuffer notes;
+        std::atomic<int> note { -1 };   // the key that plays it; -1: none
+        std::atomic<int> playAs { -1 }; // the note it plays; -1: the key's own
+        std::atomic<float> gain { 1.0f };
+        std::atomic<float> pan {};
+        std::atomic<bool> muted {};
+        std::atomic<bool> solo {};
+        std::atomic<int> choke {};      // pads of one group cut each other; 0: none
+        std::atomic<float> peak {};     // for its meter
+    };
+    static constexpr std::size_t maximumPads = 16;
+    std::array<std::atomic<RackPad*>, maximumPads> pads {};
+    std::array<std::unique_ptr<RackPad>, maximumPads> padStore;
+
+    // The pad at `index`, made (and prepared) the first time it is asked for.
+    RackPad* padAt(const std::size_t index)
+    {
+        if (index >= maximumPads)
+            return nullptr;
+        if (padStore[index] == nullptr) {
+            auto made = std::make_unique<RackPad>();
+            made->prepare(sampleRateHz.load(std::memory_order_acquire), blockSize.load(std::memory_order_acquire));
+            padStore[index] = std::move(made);
+            pads[index].store(padStore[index].get(), std::memory_order_release);
+        }
+        return padStore[index].get();
+    }
+
+    // The pads' sound, added into the block (before the track's effects).
+    void renderPads(const juce::MidiBuffer& midi, const juce::AudioSourceChannelInfo& output, const double timelineSeconds) noexcept
+    {
+        std::array<RackPad*, maximumPads> playing {};
+        std::size_t count = 0;
+        auto soloed = false;
+        for (auto& slot : pads)
+            if (auto* pad = slot.load(std::memory_order_acquire); pad != nullptr && pad->note.load(std::memory_order_relaxed) >= 0) {
+                playing[count++] = pad;
+                soloed = soloed || pad->solo.load(std::memory_order_relaxed);
+            }
+        if (count == 0)
+            return;
+        const auto frames = output.numSamples;
+        for (std::size_t index = 0; index < count; ++index)
+            playing[index]->notes.clear();
+        // Each pad its key's notes (as its own note, or the one it plays),
+        // the controllers to all; a pad's note cuts the others of its group.
+        for (const auto metadata : midi) {
+            const auto* data = metadata.data;
+            const auto size = metadata.numBytes;
+            if (size < 1)
+                continue;
+            const auto type = data[0] & 0xF0;
+            const auto isNote = (type == 0x90 || type == 0x80) && size >= 3;
+            for (std::size_t index = 0; index < count; ++index) {
+                auto* pad = playing[index];
+                if (!isNote) {
+                    pad->notes.addEvent(data, size, metadata.samplePosition);
+                    continue;
+                }
+                if (data[1] != pad->note.load(std::memory_order_relaxed))
+                    continue;
+                const auto as = pad->playAs.load(std::memory_order_relaxed);
+                const std::uint8_t raw[3] { data[0], static_cast<std::uint8_t>(as >= 0 ? std::min(as, 127) : data[1]), data[2] };
+                pad->notes.addEvent(raw, 3, metadata.samplePosition);
+                const auto group = pad->choke.load(std::memory_order_relaxed);
+                if (type == 0x90 && data[2] > 0 && group > 0)
+                    for (std::size_t other = 0; other < count; ++other)
+                        if (other != index && playing[other]->choke.load(std::memory_order_relaxed) == group)
+                            playing[other]->notes.addEvent(juce::MidiMessage::allNotesOff((data[0] & 0x0F) + 1), metadata.samplePosition);
+            }
+        }
+        const auto rate = std::max(1.0, synthesiser.getSampleRate());
+        for (std::size_t index = 0; index < count; ++index) {
+            auto* pad = playing[index];
+            if (frames > pad->buffer.getNumSamples())
+                continue;
+            const auto plan = pad->plan.read();
+            pad->synthesiser.advance(static_cast<double>(frames) / rate, NativeDspRuntime::sessionTempo(), plan.get());
+            pad->buffer.clear(0, frames);
+            pad->synthesiser.renderNextBlock(pad->buffer, pad->notes, 0, frames);
+            (void) pad->effects.process(pad->buffer, 0, frames, timelineSeconds);
+            const auto audible = !pad->muted.load(std::memory_order_relaxed)
+                                 && (!soloed || pad->solo.load(std::memory_order_relaxed));
+            const auto gain = audible ? pad->gain.load(std::memory_order_relaxed) : 0.0f;
+            const auto pan = std::clamp(pad->pan.load(std::memory_order_relaxed), -1.0f, 1.0f);
+            const auto left = gain * std::min(1.0f, 1.0f - pan);
+            const auto right = gain * std::min(1.0f, 1.0f + pan);
+            auto peak = 0.0f;
+            const auto channels = output.buffer->getNumChannels();
+            if (channels > 0) {
+                output.buffer->addFrom(0, output.startSample, pad->buffer, 0, 0, frames, left);
+                peak = std::max(peak, pad->buffer.getMagnitude(0, 0, frames) * left);
+            }
+            if (channels > 1) {
+                output.buffer->addFrom(1, output.startSample, pad->buffer, 1, 0, frames, right);
+                peak = std::max(peak, pad->buffer.getMagnitude(1, 0, frames) * right);
+            }
+            const auto falling = pad->peak.load(std::memory_order_relaxed) * std::pow(0.5f, static_cast<float>(frames) / static_cast<float>(rate * 0.15));
+            pad->peak.store(std::max(peak, falling), std::memory_order_relaxed);
+        }
+    }
+
     std::atomic<int> blockSize { 512 };
     std::atomic<double> sampleRateHz { 48'000.0 };
     PlanSynthesiser synthesiser;
@@ -5222,6 +5726,73 @@ struct AudioTrackController::PlaybackTrack final {
     std::vector<std::vector<AudioClip>> arrangementEditRedoStates;
 };
 
+// ---- A loop auditioned at the tempo --------------------------------------------------------
+
+bool LoopAuditionSource::clock(std::int64_t& frames, const std::function<void()>& readWithIt) const
+{
+    for (int tries = 0; tries < 200; ++tries) {
+        const auto before = sequence_.load(std::memory_order_acquire);
+        if ((before & 1u) != 0u) {
+            juce::Thread::sleep(1);
+            continue;
+        }
+        frames = frames_.load(std::memory_order_acquire);
+        readWithIt();
+        if (sequence_.load(std::memory_order_acquire) == before)
+            return true;
+    }
+    return false;
+}
+
+void LoopAuditionSource::getNextAudioBlock(const juce::AudioSourceChannelInfo& info)
+{
+    const auto blockStart = frames_.load(std::memory_order_relaxed);
+    {
+        const auto loop = loop_.read();
+        if (loop == nullptr || loop->frames <= 0 || loop->channels == nullptr || loop->channels->empty()) {
+            info.clearActiveBufferRegion();
+            playing_.store(false, std::memory_order_release);
+        } else {
+            const auto frames = loop->frames;
+            if (loop->generation != generation_) {
+                // Where it comes in: on the transport's beat (as heard,
+                // after the mix's latency), else where it was asked to.
+                generation_ = loop->generation;
+                if (loop->sync) {
+                    const auto elapsed = static_cast<double>(blockStart - loop->clockFrames) / loop->rate;
+                    const auto beats = (loop->positionSeconds + elapsed - loop->latencySeconds) * loop->tempo / 60.0;
+                    auto inLoop = std::fmod(beats, static_cast<double>(loop->beats));
+                    if (inLoop < 0.0)
+                        inLoop += static_cast<double>(loop->beats);
+                    phase_ = static_cast<std::int64_t>(std::llround(inLoop / static_cast<double>(loop->beats)
+                                                                    * static_cast<double>(frames)))
+                             % frames;
+                } else {
+                    phase_ = ((loop->startFrame % frames) + frames) % frames;
+                }
+            }
+            const auto gain = juce::Decibels::decibelsToGain(gainDb_.load(std::memory_order_relaxed));
+            const auto& rendered = *loop->channels;
+            const auto channels = static_cast<int>(rendered.size());
+            for (int channel = 0; channel < info.buffer->getNumChannels(); ++channel) {
+                const auto& from = rendered[static_cast<std::size_t>(std::min(channel, channels - 1))];
+                auto* out = info.buffer->getWritePointer(channel, info.startSample);
+                auto at = phase_;
+                for (int i = 0; i < info.numSamples; ++i) {
+                    out[i] = from[static_cast<std::size_t>(at)] * gain;
+                    if (++at >= frames)
+                        at = 0;
+                }
+            }
+            phase_ = (phase_ + info.numSamples) % frames;
+            fraction_.store(static_cast<double>(phase_) / static_cast<double>(frames), std::memory_order_relaxed);
+            playing_.store(true, std::memory_order_release);
+        }
+    }
+    frames_.fetch_add(info.numSamples, std::memory_order_acq_rel);
+    sequence_.fetch_add(1, std::memory_order_acq_rel);
+}
+
 AudioTrackController::AudioTrackController()
 {
     formatManager_.registerBasicFormats();
@@ -5229,8 +5800,12 @@ AudioTrackController::AudioTrackController()
     (void) addMidiTrack("Instrument 1");
     simulation_ = std::make_unique<Simulation>(*this);
     mixerSource_.addInputSource(simulation_.get(), false);
+    // The clock around the mix: it starts before it, ends with the loop
+    // auditioned after it.
+    auditionMixer_.addInputSource(&loopAudition_.clockStart(), false);
     auditionMixer_.addInputSource(&masterOutput_, false);
     auditionMixer_.addInputSource(&samplePreviewTransport_, false);
+    auditionMixer_.addInputSource(&loopAudition_, false);
     virtualBusRouter_.setDirectOutputs(&mixerSource_);
     recorder_.setRouter(&virtualBusRouter_);
     sourcePlayer_.setSource(&virtualBusRouter_);
@@ -5249,8 +5824,10 @@ AudioTrackController::~AudioTrackController()
     virtualBusRouter_.setDirectOutputs(nullptr);
     stopAudioClipPreview();
     stopSamplePreview();
+    auditionMixer_.removeInputSource(&loopAudition_);
     auditionMixer_.removeInputSource(&samplePreviewTransport_);
     auditionMixer_.removeInputSource(&masterOutput_);
+    auditionMixer_.removeInputSource(&loopAudition_.clockStart());
     mixerSource_.removeInputSource(simulation_.get());
     clearTracks();
     clearMidiTracks();
@@ -5358,8 +5935,11 @@ juce::Result AudioTrackController::addEmptyAudioTrack(
 }
 
 juce::Result AudioTrackController::startSamplePreview(
-    const juce::File& file, const double startSeconds)
+    const juce::File& file, const double startSeconds, const SamplePreviewTempo& tempo)
 {
+    if (tempo.sourceBpm > 0.0)
+        if (startTempoPreview(file, startSeconds, tempo).wasOk())
+            return juce::Result::ok();
     auto reader = std::unique_ptr<juce::AudioFormatReader>(
         formatManager_.createReaderFor(file));
     if (reader == nullptr || reader->sampleRate <= 0.0
@@ -5384,20 +5964,132 @@ juce::Result AudioTrackController::startSamplePreview(
     return juce::Result::ok();
 }
 
+juce::Result AudioTrackController::startTempoPreview(const juce::File& file, const double startSeconds,
+                                                     const SamplePreviewTempo& tempo)
+{
+    std::unique_ptr<juce::AudioFormatReader> reader(formatManager_.createReaderFor(file));
+    if (reader == nullptr || reader->sampleRate <= 0.0 || reader->lengthInSamples <= 0)
+        return juce::Result::fail(tr("error.openAudio", "file", file.getFileName()));
+    // A loop of whole beats: the file's length in beats, rounded.
+    const auto seconds = static_cast<double>(reader->lengthInSamples) / reader->sampleRate;
+    const auto beats = static_cast<int>(std::lround(seconds * tempo.sourceBpm / 60.0));
+    if (beats < 1 || seconds > 32.0)
+        return juce::Result::fail("not a loop");
+    const auto loopSeconds = static_cast<double>(beats) * 60.0 / tempo.sourceBpm;
+    const auto frames = std::min<juce::int64>(reader->lengthInSamples,
+                                              static_cast<juce::int64>(std::ceil(loopSeconds * reader->sampleRate)));
+    const auto channels = std::clamp(static_cast<int>(reader->numChannels), 1, 2);
+    juce::AudioBuffer<float> decoded(channels, static_cast<int>(frames));
+    if (!reader->read(&decoded, 0, static_cast<int>(frames), 0, true, channels > 1))
+        return juce::Result::fail(tr("error.openAudio", "file", file.getFileName()));
+    std::vector<std::vector<float>> source(static_cast<std::size_t>(channels));
+    for (int channel = 0; channel < channels; ++channel)
+        source[static_cast<std::size_t>(channel)].assign(decoded.getReadPointer(channel),
+                                                         decoded.getReadPointer(channel) + frames);
+    const auto rate = loopAudition_.sampleRate();
+    auto loop = std::make_shared<LoopAuditionSource::Loop>();
+    auto rendered = std::make_shared<std::vector<std::vector<float>>>(cydaw::engine::renderStretchedLoop(
+        source, reader->sampleRate, tempo.sourceBpm, beats, tempoBpm_, rate,
+        static_cast<cydaw::engine::StretchAlgorithm>(std::clamp(tempo.algorithm, 0, 3))));
+    if (rendered->empty() || rendered->front().empty())
+        return juce::Result::fail("could not stretch " + file.getFileName());
+    loop->frames = static_cast<std::int64_t>(rendered->front().size());
+    loop->channels = std::move(rendered);
+    loop->beats = beats;
+    loop->tempo = tempoBpm_;
+    loop->rate = rate;
+    loop->generation = ++tempoPreview_.generation;
+    // In step with the transport while it plays; else from where it was
+    // asked (in the file's seconds).
+    loop->sync = isPlaying();
+    if (loop->sync) {
+        std::int64_t clockFrames {};
+        double position {};
+        if (loopAudition_.clock(clockFrames, [this, &position] { position = this->position(); })) {
+            loop->clockFrames = clockFrames;
+            loop->positionSeconds = position;
+            loop->latencySeconds = static_cast<double>(mixLatencySamples()) / rate;
+        } else {
+            loop->sync = false;
+        }
+    }
+    loop->startFrame = static_cast<std::int64_t>(std::clamp(startSeconds / loopSeconds, 0.0, 1.0)
+                                                 * static_cast<double>(loop->frames));
+    samplePreviewTransport_.stop();
+    samplePreviewTransport_.setSource(nullptr);
+    samplePreviewReader_.reset();
+    tempoPreview_.file = file;
+    tempoPreview_.tempo = tempo;
+    tempoPreview_.beats = beats;
+    tempoPreview_.sourceSeconds = loopSeconds;
+    tempoPreview_.loop = loop;
+    loopAudition_.play(std::move(loop));
+    return juce::Result::ok();
+}
+
+void AudioTrackController::followTempoPreview()
+{
+    const auto current = tempoPreview_.loop;
+    if (tempoPreview_.file == juce::File() || current == nullptr || !isPlaying() || !loopAudition_.playing())
+        return;
+    // Five times a second is enough.
+    const auto now = juce::Time::getMillisecondCounter();
+    if (now - tempoPreview_.checked < 200)
+        return;
+    tempoPreview_.checked = now;
+    // Where it is and where the transport is, at the end of the same block.
+    std::int64_t clockFrames {};
+    double position {};
+    double fraction {};
+    if (!loopAudition_.clock(clockFrames, [this, &position, &fraction] {
+            position = this->position();
+            fraction = loopAudition_.fraction();
+        }))
+        return;
+    const auto latency = static_cast<double>(mixLatencySamples()) / current->rate;
+    const auto beats = static_cast<double>(current->beats);
+    auto expected = std::fmod((position - latency) * current->tempo / 60.0, beats) / beats;
+    if (expected < 0.0)
+        expected += 1.0;
+    auto error = fraction - expected;
+    error -= std::round(error);
+    // Within a few milliseconds: in step.
+    if (current->sync && std::abs(error) * beats * 60.0 / current->tempo < 0.004)
+        return;
+    auto again = std::make_shared<LoopAuditionSource::Loop>(*current);
+    again->generation = ++tempoPreview_.generation;
+    again->sync = true;
+    again->clockFrames = clockFrames;
+    again->positionSeconds = position;
+    again->latencySeconds = latency;
+    tempoPreview_.loop = again;
+    loopAudition_.play(std::move(again));
+}
+
+int AudioTrackController::samplePreviewLoopBeats() const noexcept
+{
+    return tempoPreview_.file != juce::File() ? tempoPreview_.beats : 0;
+}
+
 void AudioTrackController::stopSamplePreview()
 {
     samplePreviewTransport_.stop();
     samplePreviewTransport_.setSource(nullptr);
     samplePreviewReader_.reset();
+    loopAudition_.stop();
+    tempoPreview_.file = juce::File();
+    tempoPreview_.loop.reset();
 }
 
 bool AudioTrackController::isSamplePreviewing() const noexcept
 {
-    return samplePreviewTransport_.isPlaying();
+    return samplePreviewTransport_.isPlaying() || tempoPreview_.file != juce::File();
 }
 
 double AudioTrackController::samplePreviewPositionSeconds() const noexcept
 {
+    if (tempoPreview_.file != juce::File())
+        return loopAudition_.fraction() * tempoPreview_.sourceSeconds;
     return samplePreviewTransport_.getCurrentPosition();
 }
 
@@ -6895,6 +7587,69 @@ juce::Result AudioTrackController::setMasterNativeDspGraph(const cydaw::engine::
 juce::Result AudioTrackController::updateMasterNativeDspParameters(const cydaw::engine::NativeDspGraph& graph)
 {
     return masterOutput_.updateChainParameters(graph);
+}
+
+void AudioTrackController::masterNodePeaks(const std::vector<std::uint64_t>& nodes, std::vector<float>& left,
+                                           std::vector<float>& right) const
+{
+    left.assign(nodes.size(), 0.0f);
+    right.assign(nodes.size(), 0.0f);
+    masterOutput_.chain().takeNodePeaks(nodes.data(), nodes.size(), left.data(), right.data());
+}
+
+void AudioTrackController::trackNodePeaks(const std::size_t trackIndex, const std::vector<std::uint64_t>& nodes,
+                                          std::vector<float>& left, std::vector<float>& right) const
+{
+    left.assign(nodes.size(), 0.0f);
+    right.assign(nodes.size(), 0.0f);
+    if (const auto* track = findTrack(trackIndex))
+        track->gainPanSource.takeNodePeaks(nodes.data(), nodes.size(), left.data(), right.data());
+}
+
+void AudioTrackController::trackPluginPeaks(const std::size_t trackIndex, std::vector<float>& left, std::vector<float>& right)
+{
+    left.clear();
+    right.clear();
+    if (auto* track = findTrack(trackIndex))
+        track->gainPanSource.takePluginPeaks(left, right);
+}
+
+void AudioTrackController::midiTrackNodePeaks(const std::uint64_t trackId, const std::vector<std::uint64_t>& nodes,
+                                              std::vector<float>& left, std::vector<float>& right) const
+{
+    left.assign(nodes.size(), 0.0f);
+    right.assign(nodes.size(), 0.0f);
+    if (const auto* track = findMidiTrack(trackId))
+        track->synth.effects.takeNodePeaks(nodes.data(), nodes.size(), left.data(), right.data());
+}
+
+namespace {
+constexpr std::size_t kMostReadings = 1'024;
+}
+
+void AudioTrackController::masterNodeReadings(const std::uint64_t node, std::vector<float>& into) const
+{
+    into.resize(kMostReadings);
+    into.resize(masterOutput_.chain().nodeReadings(node, into.data(), into.size()));
+}
+
+void AudioTrackController::trackNodeReadings(const std::size_t trackIndex, const std::uint64_t node, std::vector<float>& into) const
+{
+    into.resize(kMostReadings);
+    const auto* track = findTrack(trackIndex);
+    into.resize(track != nullptr ? track->gainPanSource.nodeReadings(node, into.data(), into.size()) : 0);
+}
+
+void AudioTrackController::midiTrackNodeReadings(const std::uint64_t trackId, const std::uint64_t node, std::vector<float>& into) const
+{
+    into.resize(kMostReadings);
+    const auto* track = findMidiTrack(trackId);
+    into.resize(track != nullptr ? track->synth.effects.nodeReadings(node, into.data(), into.size()) : 0);
+}
+
+void AudioTrackController::setMasterNativeAutomation(std::vector<NativeDspRuntime::AutomationLane> lanes)
+{
+    masterOutput_.chain().setAutomation(std::move(lanes));
 }
 
 std::vector<std::pair<std::uint64_t, float>> AudioTrackController::masterControlValues() const
@@ -11349,18 +12104,40 @@ std::uint64_t AudioTrackController::addMidiClip(
     const double startBeats,
     const double lengthBeats,
     const bool looping,
-    const std::uint32_t colour)
+    const std::uint32_t colour,
+    const int launcherScene)
 {
     auto* track = findMidiTrack(trackId);
-    if (track == nullptr)
+    if (track == nullptr || launcherScene >= maximumLauncherScenes)
         return 0;
     const auto id = nextMidiClipId_++;
     if (name.isEmpty())
         name = "Clip " + juce::String(static_cast<int>(track->clips.size() + 1));
-    track->clips.push_back({ id, std::move(name), std::max(0.0, startBeats),
-                             std::max(0.25, lengthBeats), looping, colour, {} });
+    MidiClip clip;
+    clip.id = id;
+    clip.name = std::move(name);
+    clip.startBeats = launcherScene >= 0 ? 0.0 : std::max(0.0, startBeats);
+    clip.lengthBeats = std::max(0.25, lengthBeats);
+    clip.looping = looping;
+    clip.colour = colour;
+    clip.launcherScene = std::max(-1, launcherScene);
+    track->clips.push_back(std::move(clip));
     publishMidiSequence(*track);
     return id;
+}
+
+bool AudioTrackController::setMidiClipLauncherScene(const std::uint64_t trackId, const std::uint64_t clipId,
+                                                    const int launcherScene)
+{
+    auto* track = findMidiTrack(trackId);
+    auto* clip = track != nullptr ? findMidiClip(*track, clipId) : nullptr;
+    if (clip == nullptr || launcherScene >= maximumLauncherScenes)
+        return false;
+    clip->launcherScene = std::max(-1, launcherScene);
+    if (clip->launcherScene >= 0)
+        clip->startBeats = 0.0;
+    publishMidiSequence(*track);
+    return true;
 }
 
 bool AudioTrackController::setMidiTrackName(const std::uint64_t trackId,
@@ -12486,6 +13263,59 @@ AudioTrackController::midiTrackControlValues(const std::uint64_t trackId) const
     return {};
 }
 
+juce::Result AudioTrackController::setMidiTrackRackPad(const std::uint64_t trackId, const std::size_t pad,
+                                                      const cydaw::engine::PolySynthGraphPlan& plan,
+                                                      const cydaw::engine::NativeDspGraph& effects)
+{
+    auto* track = findMidiTrack(trackId);
+    if (track == nullptr)
+        return juce::Result::fail("MIDI instrument track not found.");
+    auto* slot = track->synth.padAt(pad);
+    if (slot == nullptr)
+        return juce::Result::fail("No such pad.");
+    auto voices = plan;
+    voices.voiceCount = 12;
+    voices.oscillatorLevel = juce::jlimit(0.0f, cydaw::engine::playsRecordingLevel(voices.waveform) ? 1.0f : 0.5f, voices.oscillatorLevel);
+    voices.attackSeconds = juce::jlimit(0.0001f, 5.0f, voices.attackSeconds);
+    voices.decaySeconds = juce::jlimit(0.0001f, 5.0f, voices.decaySeconds);
+    voices.sustainLevel = juce::jlimit(0.0f, 1.0f, voices.sustainLevel);
+    voices.releaseSeconds = juce::jlimit(0.0001f, 10.0f, voices.releaseSeconds);
+    voices.filterCutoffHz = juce::jlimit(20.0f, 20'000.0f, voices.filterCutoffHz);
+    // A pad's notes reach it already through the track's MIDI effects.
+    voices.midiEffects.reset();
+    slot->plan.store(std::make_shared<const cydaw::engine::PolySynthGraphPlan>(voices));
+    if (slot->effects.updateParameters(effects).wasOk())
+        return juce::Result::ok();
+    slot->effects.prepare(track->synth.sampleRateHz.load(std::memory_order_acquire), track->synth.blockSize.load(std::memory_order_acquire), 2);
+    return slot->effects.setGraph(effects);
+}
+
+void AudioTrackController::setMidiTrackRackPadMix(const std::uint64_t trackId, const std::size_t pad, const int note, const int playAs,
+                                                  const float gainDb, const float pan, const bool muted, const bool solo, const int choke)
+{
+    auto* track = findMidiTrack(trackId);
+    if (track == nullptr)
+        return;
+    auto* slot = note >= 0 ? track->synth.padAt(pad) : (pad < MidiSynthEngine::maximumPads ? track->synth.padStore[pad].get() : nullptr);
+    if (slot == nullptr)
+        return;
+    slot->playAs.store(playAs, std::memory_order_relaxed);
+    slot->gain.store(juce::Decibels::decibelsToGain(gainDb, -96.0f), std::memory_order_relaxed);
+    slot->pan.store(juce::jlimit(-1.0f, 1.0f, pan), std::memory_order_relaxed);
+    slot->muted.store(muted, std::memory_order_relaxed);
+    slot->solo.store(solo, std::memory_order_relaxed);
+    slot->choke.store(choke, std::memory_order_relaxed);
+    slot->note.store(note >= 0 && note < 128 ? note : -1, std::memory_order_release);
+}
+
+float AudioTrackController::midiTrackRackPadPeak(const std::uint64_t trackId, const std::size_t pad) const
+{
+    if (const auto* track = findMidiTrack(trackId))
+        if (pad < MidiSynthEngine::maximumPads && track->synth.padStore[pad] != nullptr)
+            return track->synth.padStore[pad]->peak.load(std::memory_order_relaxed);
+    return 0.0f;
+}
+
 void AudioTrackController::setMidiTrackVoiceModulations(
     const std::uint64_t trackId,
     std::vector<cydaw::engine::PolyVoiceModulation> modulations)
@@ -12754,6 +13584,12 @@ double AudioTrackController::midiLauncherClipPositionSeconds(
                        std::memory_order_acquire));
 }
 
+bool AudioTrackController::midiTrackVoiceLive(const std::uint64_t trackId, cydaw::engine::VoiceLive& out) const noexcept
+{
+    const auto* track = findMidiTrack(trackId);
+    return track != nullptr && track->synth.live.read(out);
+}
+
 float AudioTrackController::midiLauncherClipProgress(
     const std::uint64_t trackId) const noexcept
 {
@@ -12875,8 +13711,12 @@ void AudioTrackController::setTimeSignature(const int numerator, const int denom
 
 void AudioTrackController::setTempo(const double beatsPerMinute)
 {
+    const auto before = tempoBpm_;
     tempoBpm_ = juce::jlimit(20.0, 400.0, beatsPerMinute);
     NativeDspRuntime::setSessionTempo(tempoBpm_);
+    // A loop auditioned at the tempo follows it.
+    if (tempoPreview_.file != juce::File() && before != tempoBpm_)
+        (void) startTempoPreview(tempoPreview_.file, samplePreviewPositionSeconds(), tempoPreview_.tempo);
     publishAllMidiSequences();
     if (simulation_ != nullptr && !simulationPattern_.empty())
         publishSimulationPattern();
@@ -14077,6 +14917,34 @@ bool AudioTrackController::launchScene(const int sceneIndex)
     return launched;
 }
 
+bool AudioTrackController::restartLauncherClips(const std::vector<ClipToRestart>& clips)
+{
+    if (clips.empty())
+        return false;
+    setArrangementPlaybackEnabled(false);
+    if (!isPlaying())
+        play();
+    // The arrangement's MIDI stays silent: only the clips play.
+    for (auto& midiTrack : midiTracks_) {
+        const auto restarts = std::any_of(clips.begin(), clips.end(), [&midiTrack](const auto& clip) {
+            return clip.midi && clip.midiTrackId == midiTrack->id;
+        });
+        if (!restarts && midiTrack->activeLauncherScene.load(std::memory_order_acquire) < 0)
+            midiTrack->synth.setPlaying(false);
+    }
+    auto restarted = false;
+    for (const auto& clip : clips) {
+        if (clip.midi) {
+            restarted = startMidiClipPreview(clip.midiTrackId, clip.midiClipId, clip.sceneIndex) || restarted;
+        } else if (const auto launched = launcherClip(clip.trackIndex, clip.sceneIndex)) {
+            restarted = scheduleLauncherClip(clip.trackIndex, clip.sceneIndex, 0.0,
+                                             launched->playStartSeconds)
+                        || restarted;
+        }
+    }
+    return restarted;
+}
+
 bool AudioTrackController::stopLauncherTrack(
     const std::size_t trackIndex, const bool quantized)
 {
@@ -14333,11 +15201,16 @@ void AudioTrackController::play()
         track->synth.setPosition(sessionPosition);
         track->synth.setPlaying(true);
     }
+    masterOutput_.setClock(sessionPosition);
+    masterOutput_.setClockRunning(true);
+    NativeDspRuntime::setSessionPlaying(true);
     resetLatencyCompensation();
 }
 
 void AudioTrackController::stop()
 {
+    masterOutput_.setClockRunning(false);
+    NativeDspRuntime::setSessionPlaying(false);
     stopTransportsTogether([](PlaybackTrack&) { return true; });
     for (auto& track : tracks_)
         track->clipSource->clearLauncherClip();
@@ -14365,6 +15238,7 @@ void AudioTrackController::setPosition(const double seconds)
                                         transportHorizonSeconds);
     const auto safePosition = juce::jlimit(
         0.0, std::max(0.0, sessionLength), seconds);
+    masterOutput_.setClock(safePosition);
     stopTransportsTogether([](PlaybackTrack& track) {
         return track.clipSource->activeLauncherScene() >= 0
                || track.clipSource->pendingLauncherScene() >= 0;
@@ -15099,14 +15973,19 @@ void AudioTrackController::publishMidiSequence(MidiPlaybackTrack& track)
         }
         track.activeEditorClipId.store(0, std::memory_order_release);
     }
+    // The arrangement plays its own clips; the launcher's wait to be
+    // launched.
     auto scheduled = std::make_shared<std::vector<MidiSynthEngine::ScheduledNote>>();
     auto noteCount = std::size_t {};
     for (const auto& clip : track.clips)
-        noteCount += clip.notes.size();
+        if (clip.launcherScene < 0)
+            noteCount += clip.notes.size();
     scheduled->reserve(noteCount);
     const auto secondsPerBeat = 60.0 / tempoBpm_;
     double lengthSeconds = 0.0;
     for (const auto& clip : track.clips) {
+        if (clip.launcherScene >= 0)
+            continue;
         for (const auto& note : clip.notes) {
             const auto clippedStartBeats = juce::jlimit(
                 0.0, clip.lengthBeats, note.startBeats);

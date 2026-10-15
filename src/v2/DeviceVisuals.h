@@ -54,6 +54,11 @@ struct Live {
     float control {};
     // What cables put on the device's parameters now, by binding.
     const std::map<juce::String, float>* modulated {};
+    // What the device's processor shows of its work now (an equaliser's
+    // dynamic bands: engine::eqProReadingCount values); meaningful while
+    // `running`.
+    const float* readings {};
+    int readingCount {};
     double tempo { 120.0 };
 };
 
@@ -71,6 +76,8 @@ enum class PaneKind {
     width,
     level,
     lfo,
+    // The sound's last samples, as a wave (the oscilloscope).
+    scope,
     // The effect catalogue's.
     multiFilter,
     autoFilter,
@@ -110,8 +117,43 @@ enum class PaneKind {
     tranche,
     finition,
     // Halo (HaloDesign.h).
-    halo
+    halo,
+    // The effects added on 2026-10-14 (their <Group>Panes.inc).
+    vocoder,
+    deEsser,
+    tuner,
+    harmonie,
+    justesse,
+    empreinte,
+    givre,
+    grains,
+    saccade,
+    boucleur,
+    pompe,
+    decaleur,
+    anneau,
+    rotor,
+    resonateurs,
+    corps,
+    peigne,
+    utilitaire,
+    stereoscope,
+    // The MIDI effects (MidiPanes.inc).
+    arpege,
+    accords,
+    gamme,
+    echoNotes,
+    alea,
+    duree,
+    sequenceur,
+    roulement
 };
+
+// One of the effects added on 2026-10-14.
+[[nodiscard]] inline bool isAddedPane(const PaneKind kind) noexcept
+{
+    return kind >= PaneKind::vocoder && kind <= PaneKind::roulement;
+}
 
 // A studio effect's pane: StudioEffectsView draws it, card and window.
 [[nodiscard]] inline bool isStudioPane(const PaneKind kind) noexcept
@@ -119,7 +161,8 @@ enum class PaneKind {
     return kind == PaneKind::reverbPro || kind == PaneKind::limiterPro || kind == PaneKind::filterPro || kind == PaneKind::ampSim
            || kind == PaneKind::cabSim || kind == PaneKind::micSim || kind == PaneKind::pression || kind == PaneKind::fournaise
            || kind == PaneKind::echoBande || kind == PaneKind::multibandPro || kind == PaneKind::velours || kind == PaneKind::patine
-           || kind == PaneKind::sonometre || kind == PaneKind::tranche || kind == PaneKind::finition || kind == PaneKind::halo;
+           || kind == PaneKind::sonometre || kind == PaneKind::tranche || kind == PaneKind::finition || kind == PaneKind::halo
+           || isAddedPane(kind);
 }
 
 struct Pane {
@@ -139,11 +182,19 @@ struct Surface {
 };
 
 // Reads what a device publishes and decides what to draw. `hasSignal`: the
-// device's sound can be tapped; `instrument`: only what leaves it can.
-[[nodiscard]] Surface inferSurface(const std::vector<Param>& parameters, bool hasSignal, bool instrument);
+// device's sound can be tapped; `instrument`: only what leaves it can;
+// `typeKey`: what it is (an analyser shows what it is for).
+[[nodiscard]] Surface inferSurface(const std::vector<Param>& parameters, bool hasSignal, bool instrument,
+                                   const juce::String& typeKey = {});
 
 // The width a pane takes at a height.
 [[nodiscard]] float paneWidth(const Pane& pane, float height);
+
+// What a pane edits under it (its slots, into pane.parameters): the
+// equaliser's band in hand, the parametric one's band chosen and output, a
+// studio effect's main settings, else all of them. `id`: the pane's, as
+// drawPane takes it.
+[[nodiscard]] std::vector<int> cardSlots(const char* id, const Pane& pane, std::vector<Param>& parameters);
 
 // Draws a pane with its value fields; true when a parameter changed. With
 // `expand`, a corner button sets it when clicked (open the pane large).
@@ -157,6 +208,16 @@ bool drawPane(const char* id, const Pane& pane, std::vector<Param>& parameters, 
 // `extras`, the parameters no display takes) large under it.
 bool drawLargePane(const char* id, const Pane& pane, std::vector<Param>& parameters, ImVec2 position, ImVec2 size,
                    ImU32 colour, const Live& live, const Setter& set, const std::vector<int>* extras = nullptr);
+// Every pane of a device at once, as its card has them but as large as the
+// size lets them (on as many rows as they need), its levels beside them and
+// the settings no display takes (`extras`) large under them. `expand` gets
+// the pane whose corner button was clicked.
+bool drawOverview(const char* id, const std::vector<Pane>& panes, std::vector<Param>& parameters, ImVec2 position, ImVec2 size,
+                  ImU32 colour, const Live& live, const Setter& set, const std::vector<int>& extras, int* expand);
+
+// The value written under a control: a click on it types a number in
+// (a fraction in percent). `min`, `size`: where the text is.
+bool typedValue(const char* id, Param& parameter, ImVec2 min, ImVec2 size, const Setter& set);
 
 // "FILTRE", "ÉGALISEUR PRO"…
 [[nodiscard]] const char* paneTitle(const Pane& pane);

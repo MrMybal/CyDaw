@@ -1,5 +1,6 @@
 #pragma once
 
+#include "DeviceHost.h"
 #include "UiState.h"
 
 #include <imgui.h>
@@ -25,7 +26,7 @@ namespace cydaw::v2 {
 
 class InterfaceEditor final {
 public:
-    InterfaceEditor(Studio& studio, UiState& state);
+    InterfaceEditor(DeviceHost& studio, UiState& state);
 
     // The window, edited (or played), filling the space given.
     void drawCanvas(GraphSlot& slot);
@@ -63,7 +64,7 @@ private:
     [[nodiscard]] ImVec2 windowSize() const;
     void report(const juce::String& message);
 
-    Studio& studio_;
+    DeviceHost& studio_;
     UiState& state_;
     app::ModuleInterfaceState interface_;
     const void* slot_ {};

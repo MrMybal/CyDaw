@@ -1,0 +1,40 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "kick-synth",
+ "name": "Folded Glitch Zap",
+ "state": {
+  "type": "kick-synth",
+  "parameters": {
+   "kick.bodyShape": 3.0,
+   "kick.bodyPhase": 90.0,
+   "kick.pitchStart": 4000.0,
+   "kick.pitchEnd": 65.0,
+   "kick.pitchTime": 25.0,
+   "kick.pitchCurve": 1.5,
+   "kick.bodyLevel": 0.0,
+   "kick.attack": 0.0,
+   "kick.hold": 10.0,
+   "kick.decay": 160.0,
+   "kick.decayCurve": 2.0,
+   "kick.length": 300.0,
+   "kick.clickType": 3.0,
+   "kick.clickLevel": -6.0,
+   "kick.clickDecay": 10.0,
+   "kick.clickTone": 6000.0,
+   "kick.subLevel": -60.0,
+   "kick.subDecay": 600.0,
+   "kick.subOctave": 0.0,
+   "kick.driveType": 2.0,
+   "kick.drive": 12.0,
+   "kick.driveTone": 9000.0,
+   "kick.lowCut": 50.0,
+   "kick.highCut": 16000.0,
+   "kick.lowBoost": 0.0,
+   "kick.keyTrack": 1.0,
+   "kick.velocity": 0.699999988079071,
+   "kick.output": -7.0
+  }
+ }
+}

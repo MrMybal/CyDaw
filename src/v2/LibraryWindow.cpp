@@ -897,7 +897,7 @@ void LibraryWindow::drawSamples()
         selectedPath_ = data_->items[static_cast<std::size_t>(rows[static_cast<std::size_t>(selectedRow_)])].path;
         scrollToSelected_ = true;
         if (autoPreview_)
-            (void) studio_.engine().startSamplePreview(juce::File(selectedPath_));
+            (void) studio_.auditionSample(selectedPath_, 0.0, state_.auditionAtTempo);
     }
     if (ImGui::BeginTable("##librarySamples", SampleCatalog::columnCount, flags, tableSize)) {
         using C = SampleCatalog::Column;
@@ -942,7 +942,6 @@ void LibraryWindow::drawSamples()
         clipper.Begin(static_cast<int>(rows.size()));
         if (scrollToSelected_ && selectedRow_ >= 0)
             clipper.IncludeItemByIndex(selectedRow_);
-        auto& engine = studio_.engine();
         while (clipper.Step()) {
             for (auto row = clipper.DisplayStart; row < clipper.DisplayEnd; ++row) {
                 const auto index = rows[static_cast<std::size_t>(row)];
@@ -971,7 +970,7 @@ void LibraryWindow::drawSamples()
                     if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
                         addSampleToTrack(item.path);
                     else if (autoPreview_)
-                        (void) engine.startSamplePreview(juce::File(item.path));
+                        (void) studio_.auditionSample(item.path, 0.0, state_.auditionAtTempo);
                 }
                 if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
                     const auto path = item.path.toStdString();
@@ -1065,6 +1064,22 @@ void LibraryWindow::drawSamples()
     }
 }
 
+void LibraryWindow::tempoSwitch(const juce::String& path)
+{
+    const auto& p = theme::palette();
+    if (ImGui::Checkbox(L("Au tempo", "At tempo"), &state_.auditionAtTempo) && path.isNotEmpty()
+        && studio_.engine().isSamplePreviewing())
+        (void) studio_.auditionSample(path, 0.0, state_.auditionAtTempo);
+    ui::tooltip(L("Les boucles (celles dont le tempo est connu) jouées au tempo du projet, étirées sans changer de hauteur, "
+                  "calées sur la mesure quand le transport tourne.",
+                  "Loops (those whose tempo is known) played at the project's tempo, stretched without changing pitch, "
+                  "in step with the bar while the transport runs."));
+    if (const auto from = path.isNotEmpty() ? studio_.auditionTempoOf(path) : 0.0; from > 0.0) {
+        ImGui::SameLine();
+        ImGui::TextColored(theme::vec(p.accent), "%.0f \xe2\x86\x92 %.0f BPM", from, studio_.engine().tempo());
+    }
+}
+
 void LibraryWindow::drawSamplePreview(const SampleCatalog::Item* item, const float width)
 {
     const auto& p = theme::palette();
@@ -1081,6 +1096,8 @@ void LibraryWindow::drawSamplePreview(const SampleCatalog::Item* item, const flo
                              "track; drag: wherever you like."));
         ImGui::PopTextWrapPos();
         ImGui::Checkbox(L("Écoute au clic", "Preview on click"), &autoPreview_);
+        ImGui::SameLine();
+        tempoSwitch({});
         ImGui::EndChild();
         return;
     }
@@ -1111,7 +1128,7 @@ void LibraryWindow::drawSamplePreview(const SampleCatalog::Item* item, const flo
     ImGui::InvisibleButton("##previewShape", size);
     if (ImGui::IsItemClicked() && record != nullptr && record->length > 0.0) {
         const auto t = (ImGui::GetIO().MousePos.x - origin.x) / size.x * record->length;
-        (void) engine.startSamplePreview(record->file(), std::max(0.0, t));
+        (void) studio_.auditionSample(item->path, std::max(0.0, t), state_.auditionAtTempo);
     }
     if (ImGui::BeginDragDropSource()) {
         const auto path = item->path.toStdString();
@@ -1126,10 +1143,12 @@ void LibraryWindow::drawSamplePreview(const SampleCatalog::Item* item, const flo
         if (engine.isSamplePreviewing())
             engine.stopSamplePreview();
         else
-            (void) engine.startSamplePreview(juce::File(item->path));
+            (void) studio_.auditionSample(item->path, 0.0, state_.auditionAtTempo);
     }
     ImGui::SameLine();
     ImGui::Checkbox(L("Écoute au clic", "Preview on click"), &autoPreview_);
+    ImGui::SameLine();
+    tempoSwitch(item->path);
     // What it is.
     const auto row = [&p](const char* label, const juce::String& value) {
         if (value.isEmpty())
@@ -1280,16 +1299,29 @@ void LibraryWindow::drawInstruments()
     }
     const auto previewWidth = dp(330.0f);
     const ImVec2 tableSize(ImGui::GetContentRegionAvail().x - previewWidth - dp(8.0f), ImGui::GetContentRegionAvail().y);
-    const auto add = [this](const InstrumentRow& row, const bool model) {
+    // The instrument track it was opened for (its "+"), or the one picked:
+    // what is chosen takes the place of its instrument, its effects kept.
+    // Without one, or asked, a new track.
+    std::optional<TrackRef> onto;
+    if (const auto track = target(); track && track->midi && !track->master && !track->isBus() && studio_.isValid(*track))
+        onto = track;
+    const auto add = [this](const InstrumentRow& row, const bool model, const std::optional<TrackRef> on) {
         juce::String error;
         std::optional<TrackRef> track;
         if (row.kind == InstrumentRow::factory) {
             if (row.missing && !studio_.banks().busy())
                 (void) studio_.downloadFactoryInstrument(row.key, error);
-            track = studio_.addFactoryInstrument(row.key, error, model);
+            track = studio_.addFactoryInstrument(row.key, error, model, on);
         } else if (row.kind == InstrumentRow::native) {
-            track = studio_.addMidiTrack({}, row.key);
-        } else if ((track = studio_.addMidiTrack(row.name))) {
+            if (on) {
+                if (const auto replaced = studio_.replaceInstrument(*on, row.key, row.name); replaced.wasOk())
+                    track = on;
+                else
+                    error = replaced.getErrorMessage();
+            } else {
+                track = studio_.addMidiTrack({}, row.key);
+            }
+        } else if ((track = on ? on : studio_.addMidiTrack(row.name))) {
             if (const auto inserted = studio_.insertLibraryDevice(*track, row.file); inserted.failed())
                 error = inserted.getErrorMessage();
         }
@@ -1340,7 +1372,7 @@ void LibraryWindow::drawInstruments()
                                       ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowDoubleClick)) {
                     selectedInstrument_ = index;
                     if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-                        add(row, false);
+                        add(row, false, onto);
                 }
                 ImGui::TableSetColumnIndex(1);
                 ImGui::TextColored(theme::vec(p.textDim), "%s", row.category.toRawUTF8());
@@ -1378,15 +1410,30 @@ void LibraryWindow::drawInstruments()
             ImGui::TextColored(theme::vec(p.accent), "%s",
                                (row.state + " : " + ui::sizeText(row.missingBytes) + " (" + row.banks.joinIntoString(", ") + ")").toRawUTF8());
         ImGui::Spacing();
+        if (onto) {
+            // In place of the track's instrument (the double click's way).
+            const auto label = ui::Ls("Remplacer l'instrument de « ", "Replace the instrument of \"") + studio_.trackName(*onto)
+                               + ui::Ls(" »", "\"");
+            if (ui::primaryButton(label.toRawUTF8(), ImVec2(-1.0f, 0.0f)))
+                add(row, false, onto);
+            ui::tooltip(L("Ses effets, leur automation et ses modulateurs restent", "Its effects, their automation and its modulators stay"));
+            if (row.model && ImGui::Button(L("Remplacer (modèle de son)", "Replace (sound model)"), ImVec2(-1.0f, 0.0f)))
+                add(row, true, onto);
+        }
         if (ImGui::Button(L("Nouvelle piste", "New track"), ImVec2(-1.0f, 0.0f)))
-            add(row, false);
+            add(row, false, std::nullopt);
         if (row.model && ImGui::Button(L("Nouvelle piste (modèle de son)", "New track (sound model)"), ImVec2(-1.0f, 0.0f)))
-            add(row, true);
+            add(row, true, std::nullopt);
     } else {
         ImGui::PushTextWrapPos(0.0f);
         ImGui::TextColored(theme::vec(p.textFaint), "%s",
-                           L("Double-clic : une nouvelle piste qui le joue (ses échantillons téléchargés ou générés s'il le faut).",
-                             "Double click: a new track playing it (its samples downloaded or generated if need be)."));
+                           onto ? (ui::Ls("Double-clic : il remplace l'instrument de « ", "Double click: it replaces the instrument of \"")
+                                   + studio_.trackName(*onto)
+                                   + ui::Ls(" » (ses effets restent ; ses échantillons téléchargés ou générés s'il le faut).",
+                                            "\" (its effects stay; its samples downloaded or generated if need be)."))
+                                      .toRawUTF8()
+                                : L("Double-clic : une nouvelle piste qui le joue (ses échantillons téléchargés ou générés s'il le faut).",
+                                    "Double click: a new track playing it (its samples downloaded or generated if need be)."));
         ImGui::PopTextWrapPos();
     }
     ImGui::EndChild();

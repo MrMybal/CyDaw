@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "tuner",
+ "name": "Orchestra 443",
+ "state": {
+  "type": "tuner",
+  "parameters": {
+   "tuner.reference": 443.0,
+   "tuner.mute": 0.0,
+   "tuner.displayMode": 0.0
+  }
+ }
+}

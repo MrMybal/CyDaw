@@ -1,0 +1,14 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "parallel-drive",
+ "name": "Gentle Harmonics",
+ "state": {
+  "type": "parallel-drive",
+  "parameters": {
+   "node.17002.drive.db": 6.0,
+   "node.17003.gain.db": -18.0
+  }
+ }
+}

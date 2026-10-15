@@ -1,0 +1,18 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "wide-echo",
+ "name": "Wide Quarter",
+ "state": {
+  "type": "wide-echo",
+  "parameters": {
+   "node.26002.delay.time": 500.0,
+   "node.26002.delay.feedback": 0.4,
+   "node.26002.delay.mix": 0.3,
+   "node.26003.stereo.width": 1.5,
+   "node.26004.lowpass.cutoff": 8000.0,
+   "node.26004.lowpass.resonance": 0.7
+  }
+ }
+}

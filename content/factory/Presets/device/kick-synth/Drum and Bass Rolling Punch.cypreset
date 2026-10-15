@@ -1,0 +1,40 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "kick-synth",
+ "name": "Drum and Bass Rolling Punch",
+ "state": {
+  "type": "kick-synth",
+  "parameters": {
+   "kick.bodyShape": 0.0,
+   "kick.bodyPhase": 20.0,
+   "kick.pitchStart": 520.0,
+   "kick.pitchEnd": 58.29999923706055,
+   "kick.pitchTime": 28.700000762939453,
+   "kick.pitchCurve": 3.5,
+   "kick.bodyLevel": 0.0,
+   "kick.attack": 0.0,
+   "kick.hold": 12.0,
+   "kick.decay": 200.0,
+   "kick.decayCurve": 2.200000047683716,
+   "kick.length": 450.0,
+   "kick.clickType": 2.0,
+   "kick.clickLevel": -7.0,
+   "kick.clickDecay": 2.0,
+   "kick.clickTone": 7000.0,
+   "kick.subLevel": -14.0,
+   "kick.subDecay": 220.0,
+   "kick.subOctave": 0.0,
+   "kick.driveType": 3.0,
+   "kick.drive": 6.0,
+   "kick.driveTone": 10000.0,
+   "kick.lowCut": 30.0,
+   "kick.highCut": 17000.0,
+   "kick.lowBoost": 1.0,
+   "kick.keyTrack": 1.0,
+   "kick.velocity": 0.349999994039536,
+   "kick.output": -5.690000057220459
+  }
+ }
+}

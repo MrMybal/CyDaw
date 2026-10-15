@@ -2,6 +2,7 @@
 
 #include "PresetMenu.h"
 #include "Studio.h"
+#include "EditorWindows.h"
 #include "UiState.h"
 
 #include <cydaw/engine/DrumKit.h>
@@ -28,11 +29,12 @@ public:
     // `detached`: in a window of its own out of the studio's, as a plug-in's;
     // `mics`: on its kit's controls.
     void openEditor(const TrackRef& track, std::uint64_t nodeId, bool detached = false, bool mics = false);
-    [[nodiscard]] bool showsEditor(const TrackRef& track, std::uint64_t nodeId) const
+    [[nodiscard]] bool showsEditor(const TrackRef& track, std::uint64_t nodeId) const { return windows_.shows(track, nodeId); }
+    // That instrument's window's id (each has its own window).
+    [[nodiscard]] std::string editorWindowId(const TrackRef& track, std::uint64_t nodeId) const
     {
-        return editor_ && editor_->track == track && editor_->nodeId == nodeId;
+        return windows_.idOf(track, nodeId);
     }
-    static constexpr const char* editorWindowId = "###batterieEditor";
     void drawEditor();
 
 private:
@@ -64,8 +66,13 @@ private:
         TrackRef track;
         std::uint64_t nodeId {};
     };
+    // Its windows (one for each instrument opened), and the one being drawn:
+    // its instrument, its id.
+    EditorWindows windows_ { "###batterieEditor" };
     std::optional<Target> editor_;
-    bool focusEditor_ {};
+    std::string windowId_;
+    // One window; false once it is closed.
+    bool drawEditorWindow(bool focus);
     bool showMics_ {};
     engine::drum::Piece selected_ { engine::drum::Piece::snare };
     // The grooves tab: the one chosen, how many bars, the fill to end on.

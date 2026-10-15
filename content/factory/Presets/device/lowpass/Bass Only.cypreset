@@ -1,0 +1,14 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "lowpass",
+ "name": "Bass Only",
+ "state": {
+  "type": "lowpass",
+  "parameters": {
+   "lowpass.cutoff": 250.0,
+   "lowpass.resonance": 0.7
+  }
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "compressor",
+ "name": "Drum Smash",
+ "state": {
+  "type": "compressor",
+  "parameters": {
+   "compressor.threshold": -32.0,
+   "compressor.ratio": 10.0
+  }
+ }
+}

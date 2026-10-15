@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "ping-pong",
+ "name": "Dotted Eighth",
+ "state": {
+  "type": "ping-pong",
+  "parameters": {
+   "pingpong.time": 375.0,
+   "pingpong.feedback": 0.5,
+   "pingpong.mix": 0.3,
+   "pingpong.width": 1.0,
+   "pingpong.sync": 8.0
+  }
+ }
+}

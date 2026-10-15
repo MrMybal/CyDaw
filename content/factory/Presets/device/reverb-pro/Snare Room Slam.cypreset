@@ -1,0 +1,35 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "reverb-pro",
+ "name": "Snare Room Slam",
+ "state": {
+  "type": "reverb-pro",
+  "parameters": {
+   "revpro.space": 0.3,
+   "revpro.decay": 0.9,
+   "revpro.predelay": 5.0,
+   "revpro.distance": 0.15,
+   "revpro.brightness": 0.3,
+   "revpro.character": 0.2,
+   "revpro.width": 1.3,
+   "revpro.mix": 0.3,
+   "revpro.lowDecay": 0.6,
+   "revpro.lowFrequency": 300.0,
+   "revpro.midDecay": 1.1,
+   "revpro.midFrequency": 2000.0,
+   "revpro.highDecay": 0.6,
+   "revpro.highFrequency": 7000.0,
+   "revpro.lowCut": 180.0,
+   "revpro.highCut": 14000.0,
+   "revpro.ducking": 0.0,
+   "revpro.duckRelease": 300.0,
+   "revpro.freeze": 0.0,
+   "revpro.sync": 0.0,
+   "revpro.diffusion": 0.85,
+   "revpro.output": 0.0,
+   "revpro.early": 2.0
+  }
+ }
+}

@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "ping-pong",
+ "name": "Eighth Ping-Pong",
+ "state": {
+  "type": "ping-pong",
+  "parameters": {
+   "pingpong.time": 250.0,
+   "pingpong.feedback": 0.45,
+   "pingpong.mix": 0.3,
+   "pingpong.width": 1.0,
+   "pingpong.sync": 6.0
+  }
+ }
+}

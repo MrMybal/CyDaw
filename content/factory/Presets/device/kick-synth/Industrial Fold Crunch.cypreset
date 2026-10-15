@@ -1,0 +1,40 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "kick-synth",
+ "name": "Industrial Fold Crunch",
+ "state": {
+  "type": "kick-synth",
+  "parameters": {
+   "kick.bodyShape": 1.0,
+   "kick.bodyPhase": 60.0,
+   "kick.pitchStart": 650.0,
+   "kick.pitchEnd": 46.0,
+   "kick.pitchTime": 108.0,
+   "kick.pitchCurve": 4.5,
+   "kick.bodyLevel": 0.0,
+   "kick.attack": 0.0,
+   "kick.hold": 90.0,
+   "kick.decay": 520.0,
+   "kick.decayCurve": 1.299999952316284,
+   "kick.length": 1000.0,
+   "kick.clickType": 1.0,
+   "kick.clickLevel": -5.0,
+   "kick.clickDecay": 14.0,
+   "kick.clickTone": 2600.0,
+   "kick.subLevel": -14.0,
+   "kick.subDecay": 500.0,
+   "kick.subOctave": 0.0,
+   "kick.driveType": 2.0,
+   "kick.drive": 17.0,
+   "kick.driveTone": 4200.0,
+   "kick.lowCut": 32.0,
+   "kick.highCut": 11000.0,
+   "kick.lowBoost": 3.0,
+   "kick.keyTrack": 1.0,
+   "kick.velocity": 0.25,
+   "kick.output": -4.190000057220459
+  }
+ }
+}

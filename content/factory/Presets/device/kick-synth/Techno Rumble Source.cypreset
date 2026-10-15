@@ -1,0 +1,40 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "kick-synth",
+ "name": "Techno Rumble Source",
+ "state": {
+  "type": "kick-synth",
+  "parameters": {
+   "kick.bodyShape": 0.0,
+   "kick.bodyPhase": 0.0,
+   "kick.pitchStart": 420.0,
+   "kick.pitchEnd": 49.0,
+   "kick.pitchTime": 55.0,
+   "kick.pitchCurve": 5.0,
+   "kick.bodyLevel": 0.0,
+   "kick.attack": 0.200000002980232,
+   "kick.hold": 35.0,
+   "kick.decay": 260.0,
+   "kick.decayCurve": 2.400000095367432,
+   "kick.length": 600.0,
+   "kick.clickType": 2.0,
+   "kick.clickLevel": -9.0,
+   "kick.clickDecay": 2.5,
+   "kick.clickTone": 4200.0,
+   "kick.subLevel": -60.0,
+   "kick.subDecay": 600.0,
+   "kick.subOctave": 0.0,
+   "kick.driveType": 3.0,
+   "kick.drive": 6.0,
+   "kick.driveTone": 7000.0,
+   "kick.lowCut": 28.0,
+   "kick.highCut": 14000.0,
+   "kick.lowBoost": 1.5,
+   "kick.keyTrack": 1.0,
+   "kick.velocity": 0.300000011920929,
+   "kick.output": -5.880000114440918
+  }
+ }
+}

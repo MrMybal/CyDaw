@@ -1,0 +1,28 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "patine",
+ "name": "Faded Memory Ambient",
+ "state": {
+  "type": "patine",
+  "parameters": {
+   "patine.noise": 0.4,
+   "patine.wobble": 0.7,
+   "patine.distort": 0.1,
+   "patine.digital": 0.2,
+   "patine.space": 0.5,
+   "patine.magnetic": 0.6,
+   "patine.magnitude": 0.8,
+   "patine.mix": 1.0,
+   "patine.noiseType": 1.0,
+   "patine.wobbleRate": 0.1,
+   "patine.distortType": 0.0,
+   "patine.spaceSize": 0.9,
+   "patine.tone": -0.45,
+   "patine.width": 1.2,
+   "patine.output": 0.0,
+   "patine.noiseFollow": 0.0
+  }
+ }
+}

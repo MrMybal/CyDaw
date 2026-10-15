@@ -1,0 +1,40 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "kick-synth",
+ "name": "Hardstyle Long Tuned Tail",
+ "state": {
+  "type": "kick-synth",
+  "parameters": {
+   "kick.bodyShape": 1.0,
+   "kick.bodyPhase": 90.0,
+   "kick.pitchStart": 3000.0,
+   "kick.pitchEnd": 52.0,
+   "kick.pitchTime": 181.0,
+   "kick.pitchCurve": 7.0,
+   "kick.bodyLevel": 0.0,
+   "kick.attack": 0.0,
+   "kick.hold": 160.0,
+   "kick.decay": 650.0,
+   "kick.decayCurve": 0.899999976158142,
+   "kick.length": 1000.0,
+   "kick.clickType": 2.0,
+   "kick.clickLevel": -3.0,
+   "kick.clickDecay": 3.0,
+   "kick.clickTone": 7000.0,
+   "kick.subLevel": -12.0,
+   "kick.subDecay": 500.0,
+   "kick.subOctave": 0.0,
+   "kick.driveType": 2.0,
+   "kick.drive": 16.0,
+   "kick.driveTone": 7000.0,
+   "kick.lowCut": 35.0,
+   "kick.highCut": 15000.0,
+   "kick.lowBoost": 3.0,
+   "kick.keyTrack": 1.0,
+   "kick.velocity": 0.100000001490116,
+   "kick.output": -4.119999885559082
+  }
+ }
+}

@@ -1,0 +1,21 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "givre",
+ "name": "Bright Frost",
+ "state": {
+  "type": "givre",
+  "parameters": {
+   "givre.blur": 0.5,
+   "givre.smear": 0.0,
+   "givre.shift": 0.0,
+   "givre.tone": 0.6,
+   "givre.scatter": 0.6,
+   "givre.mix": 0.45,
+   "givre.output": 0.0,
+   "givre.freeze": 0.0,
+   "givre.sync": 0.0
+  }
+ }
+}

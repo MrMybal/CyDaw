@@ -22,6 +22,9 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM,
 #endif
 
 #include <algorithm>
+#include <cstdio>
+#include <cstdint>
+#include <string>
 #include <map>
 #include <vector>
 
@@ -200,7 +203,22 @@ struct NativeAccess {
 
 namespace {
 
-constexpr const wchar_t* kWindowClass = L"CyDAW2ImGuiSurface";
+// The module the surface's code is in (the application, or a plug-in's DLL):
+// its window class is its own, so two plug-ins of CyDAW in one host each
+// draw through their own code, and one unloaded leaves the other's alone.
+HMODULE thisModule()
+{
+    HMODULE module {};
+    GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                       reinterpret_cast<LPCWSTR>(&thisModule), &module);
+    return module != nullptr ? module : GetModuleHandleW(nullptr);
+}
+
+const std::wstring& windowClassName()
+{
+    static const std::wstring name = L"CyDAW2ImGuiSurface-" + std::to_wstring(reinterpret_cast<std::uintptr_t>(thisModule()));
+    return name;
+}
 
 LRESULT CALLBACK surfaceProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -289,9 +307,9 @@ void registerWindowClass()
     windowClass.cbSize = sizeof(windowClass);
     windowClass.style = CS_DBLCLKS;
     windowClass.lpfnWndProc = surfaceProc;
-    windowClass.hInstance = GetModuleHandleW(nullptr);
+    windowClass.hInstance = thisModule();
     windowClass.hCursor = LoadCursorW(nullptr, MAKEINTRESOURCEW(32512));
-    windowClass.lpszClassName = kWindowClass;
+    windowClass.lpszClassName = windowClassName().c_str();
     RegisterClassExW(&windowClass);
     registered = true;
 }
@@ -300,15 +318,27 @@ void registerWindowClass()
 
 ImGuiHost::ImGuiHost()
     : native_(std::make_unique<Native>()),
-      vblank_(this, [this](const double timestamp) { vblank(timestamp); })
+      vblank_(this, [this](const double timestamp) {
+          lastVBlankMs_ = juce::Time::getMillisecondCounterHiRes();
+          vblank(timestamp);
+      })
 {
     setOpaque(true);
     setWantsKeyboardFocus(true);
     addAndMakeVisible(embed_);
+    fallback_.startTimerHz(30);
+}
+
+void ImGuiHost::Fallback::timerCallback()
+{
+    const auto now = juce::Time::getMillisecondCounterHiRes();
+    if (now - host.lastVBlankMs_ > 200.0)
+        host.vblank(now * 0.001);
 }
 
 ImGuiHost::~ImGuiHost()
 {
+    fallback_.stopTimer();
     if (native_->backendsReady) {
         ImGui::SetCurrentContext(native_->imgui);
         ImGui_ImplDX11_Shutdown();
@@ -331,9 +361,9 @@ void ImGuiHost::createNativeWindow()
     if (native_->hwnd != nullptr || getPeer() == nullptr)
         return;
     registerWindowClass();
-    native_->hwnd = CreateWindowExW(0, kWindowClass, L"CyDAW", WS_POPUP | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
+    native_->hwnd = CreateWindowExW(0, windowClassName().c_str(), L"CyDAW", WS_POPUP | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
                                     0, 0, std::max(1, getWidth()), std::max(1, getHeight()),
-                                    nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
+                                    nullptr, nullptr, thisModule(), nullptr);
     if (native_->hwnd == nullptr)
         return;
     SetWindowLongPtrW(native_->hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
@@ -351,10 +381,15 @@ void ImGuiHost::createNativeWindow()
     native_->imgui = ImGui::CreateContext();
     ImGui::SetCurrentContext(native_->imgui);
     auto& io = ImGui::GetIO();
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_DockingEnable;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    if (ownWindows)
+        io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     // A panel dragged out of the window becomes a window of its own, on any
-    // screen; dragged back over the main window, it docks again.
-    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+    // screen; dragged back over the main window, it docks again. Kept inside
+    // the main window when CYDAW_SINGLE_VIEWPORT is set, so a snapshot shows
+    // the device windows too (tests).
+    if (ownWindows && juce::SystemStats::getEnvironmentVariable("CYDAW_SINGLE_VIEWPORT", {}).isEmpty())
+        io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
     io.ConfigViewportsNoTaskBarIcon = true;
     io.ConfigViewportsNoDefaultParent = false;
     io.ConfigWindowsMoveFromTitleBarOnly = true;
@@ -362,6 +397,11 @@ void ImGuiHost::createNativeWindow()
     io.ConfigDragClickToInputText = true;
     // The layout is saved by the application, in its settings folder.
     io.IniFilename = nullptr;
+    // A double click as Windows counts it (half a second by default, and
+    // the person's own setting), not ImGui's stricter 0.3 s: a calm double
+    // click otherwise reads as two clicks.
+    io.MouseDoubleClickTime = std::clamp(static_cast<float>(GetDoubleClickTime()) / 1000.0f, 0.2f, 0.9f);
+    io.MouseDoubleClickMaxDist = std::max(6.0f, static_cast<float>(GetSystemMetrics(SM_CXDOUBLECLK)));
 
     native_->dpi = ImGui_ImplWin32_GetDpiScaleForHwnd(native_->hwnd);
     theme::loadFonts();
@@ -521,6 +561,10 @@ void ImGuiHost::frame()
         n.dpi = dpi;
         theme::apply(dpi);
     }
+
+    // Its own scale, should another context (another plug-in's window)
+    // have drawn at another.
+    theme::useDpi(n.dpi);
 
     n.applyResize();
     if (n.target == nullptr || n.width == 0 || n.height == 0)

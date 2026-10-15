@@ -1,0 +1,24 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "velours",
+ "name": "Synth Pad (Softness)",
+ "state": {
+  "type": "velours",
+  "parameters": {
+   "velours.depth": 5.0,
+   "velours.sharpness": 0.35,
+   "velours.selectivity": 0.4,
+   "velours.attack": 20.0,
+   "velours.release": 300.0,
+   "velours.focusLow": 300.0,
+   "velours.focusHigh": 14000.0,
+   "velours.mix": 0.8,
+   "velours.mode": 0.0,
+   "velours.delta": 0.0,
+   "velours.output": 0.5,
+   "velours.link": 0.7
+  }
+ }
+}

@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "string",
+ "name": "Muted String",
+ "state": {
+  "type": "string",
+  "parameters": {
+   "string.frequency": 220.0,
+   "string.damping": 0.8,
+   "string.decay": 0.6
+  }
+ }
+}

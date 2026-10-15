@@ -1,0 +1,29 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "ambient-glass",
+ "name": "Crystal Rain",
+ "state": {
+  "type": "ambient-glass",
+  "parameters": {
+   "node.38002.voice.mode": 0.0,
+   "node.38002.voice.glide": 0.0,
+   "node.38003.polyOscillator.waveform": 2.0,
+   "node.38003.polyOscillator.level": 0.08,
+   "node.38004.envelope.attack": 1.0,
+   "node.38004.envelope.decay": 400.0,
+   "node.38004.envelope.sustain": 0.0,
+   "node.38004.envelope.release": 1500.0,
+   "node.38005.gain.db": 0.0,
+   "node.38006.voiceFilter.cutoff": 6400.0,
+   "node.38006.voiceFilter.resonance": 4.0,
+   "node.38007.delay.time": 230.0,
+   "node.38007.delay.feedback": 0.62,
+   "node.38007.delay.mix": 0.4,
+   "node.38008.reverb.roomSize": 0.85,
+   "node.38008.reverb.mix": 0.4,
+   "node.38009.stereo.width": 1.9
+  }
+ }
+}

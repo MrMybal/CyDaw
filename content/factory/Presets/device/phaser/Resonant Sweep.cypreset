@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "phaser",
+ "name": "Resonant Sweep",
+ "state": {
+  "type": "phaser",
+  "parameters": {
+   "phaser.rate": 0.25,
+   "phaser.depth": 0.9,
+   "phaser.frequency": 900.0,
+   "phaser.feedback": 0.85,
+   "phaser.mix": 0.55
+  }
+ }
+}

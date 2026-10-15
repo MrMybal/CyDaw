@@ -48,6 +48,23 @@ bool compressorStudioPanel(const Pane& pane, std::vector<Param>& parameters, ImV
 float nativeControls(std::vector<Param>& parameters, const std::vector<int>& main, const std::vector<int>& others, const char* mainTitle,
                      ImVec2 origin, float width, ImU32 colour, const Live& live, const Setter& set, bool draw, bool* changed);
 
+// A control small, on a device's card: a switch, a list under its name, or
+// a knob with its name and its value (a click on it types one in). Its size
+// at that knob size; drawn at `origin`, `width` wide.
+[[nodiscard]] ImVec2 compactControlSize(const Param& parameter, float diameter);
+bool compactControl(Param& parameter, ImVec2 origin, float width, ImU32 colour, const Live& live, const Setter& set,
+                    float diameter);
+
+// Sections of controls large (a device's window), side by side as they fit,
+// onto more rows when they do not: each its title, its choices, its knobs.
+// Returns the height; drawn only when `draw`.
+struct ControlGroup {
+    juce::String title;
+    std::vector<int> indices;
+};
+float controlGroups(std::vector<Param>& parameters, const std::vector<ControlGroup>& groups, ImVec2 origin, float width,
+                    ImU32 colour, const Live& live, const Setter& set, bool draw, bool* changed);
+
 // Which of a studio pane's parameters its card shows as fields (the amp's:
 // those of the channel chosen).
 [[nodiscard]] std::vector<int> studioCardFields(const Pane& pane, std::vector<Param>& parameters);
@@ -58,5 +75,8 @@ float nativeControls(std::vector<Param>& parameters, const std::vector<int>& mai
 
 // A parameter of theirs that takes whole steps (a style, a type, a switch).
 [[nodiscard]] bool studioStepped(const Param& parameter);
+
+// How wide an added effect's display is for its height.
+[[nodiscard]] float addedPaneFactor(PaneKind kind);
 
 } // namespace cydaw::v2::visual

@@ -1,4 +1,5 @@
 #include <cydaw/engine/HaloReverb.h>
+#include <cydaw/engine/AddedEffects.h>
 
 #include <cydaw/engine/AudioBuffer.h>
 #include <cydaw/engine/EffectCatalogue.h>
@@ -301,7 +302,8 @@ std::unique_ptr<EffectProcessor> makeHaloEffect(const EffectDescriptor& descript
 {
     if (descriptor.kind == NativeDspNodeKind::halo)
         return std::make_unique<HaloReverb>(descriptor);
-    return {};
+    // The effects added after it (AddedEffects.cpp).
+    return makeAddedEffect(descriptor);
 }
 
 } // namespace cydaw::engine

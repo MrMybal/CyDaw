@@ -1,0 +1,13 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "midi-transpose",
+ "name": "Octave Up",
+ "state": {
+  "type": "midi-transpose",
+  "parameters": {
+   "midi.transpose": 12.0
+  }
+ }
+}

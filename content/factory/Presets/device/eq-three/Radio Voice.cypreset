@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "eq-three",
+ "name": "Radio Voice",
+ "state": {
+  "type": "eq-three",
+  "parameters": {
+   "eq3.low": -12.0,
+   "eq3.mid": 4.0,
+   "eq3.high": -8.0,
+   "eq3.lowFrequency": 400.0,
+   "eq3.highFrequency": 2500.0
+  }
+ }
+}

@@ -1,0 +1,29 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "ambient-glass",
+ "name": "Slow Dawn",
+ "state": {
+  "type": "ambient-glass",
+  "parameters": {
+   "node.38002.voice.mode": 0.0,
+   "node.38002.voice.glide": 0.0,
+   "node.38003.polyOscillator.waveform": 0.0,
+   "node.38003.polyOscillator.level": 0.12,
+   "node.38004.envelope.attack": 2500.0,
+   "node.38004.envelope.decay": 3000.0,
+   "node.38004.envelope.sustain": 0.8,
+   "node.38004.envelope.release": 7000.0,
+   "node.38005.gain.db": 0.0,
+   "node.38006.voiceFilter.cutoff": 5000.0,
+   "node.38006.voiceFilter.resonance": 1.2,
+   "node.38007.delay.time": 900.0,
+   "node.38007.delay.feedback": 0.45,
+   "node.38007.delay.mix": 0.28,
+   "node.38008.reverb.roomSize": 0.94,
+   "node.38008.reverb.mix": 0.52,
+   "node.38009.stereo.width": 1.65
+  }
+ }
+}

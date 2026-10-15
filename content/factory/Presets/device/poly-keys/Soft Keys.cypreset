@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "poly-keys",
+ "name": "Soft Keys",
+ "state": {
+  "type": "poly-keys",
+  "parameters": {
+   "node.37002.voice.mode": 0.0,
+   "node.37002.voice.glide": 0.0,
+   "node.37003.polyOscillator.waveform": 0.0,
+   "node.37003.polyOscillator.level": 0.16,
+   "node.37004.envelope.attack": 10.0,
+   "node.37004.envelope.decay": 1200.0,
+   "node.37004.envelope.sustain": 0.45,
+   "node.37004.envelope.release": 700.0,
+   "node.37005.gain.db": 0.0,
+   "node.37006.voiceFilter.cutoff": 3800.0,
+   "node.37006.voiceFilter.resonance": 0.8,
+   "node.37007.compressor.threshold": -14.0,
+   "node.37007.compressor.ratio": 2.0,
+   "node.37008.stereo.width": 1.15
+  }
+ }
+}

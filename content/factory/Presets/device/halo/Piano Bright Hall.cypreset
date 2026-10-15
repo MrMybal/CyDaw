@@ -1,0 +1,30 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "halo",
+ "name": "Piano Bright Hall",
+ "state": {
+  "type": "halo",
+  "parameters": {
+   "halo.mix": 0.25,
+   "halo.decay": 2.3,
+   "halo.predelay": 18.0,
+   "halo.size": 0.7,
+   "halo.highCut": 15000.0,
+   "halo.lowCut": 70.0,
+   "halo.modDepth": 0.25,
+   "halo.modRate": 0.5,
+   "halo.mode": 1.0,
+   "halo.colour": 2.0,
+   "halo.attack": 0.5,
+   "halo.earlyDiffusion": 0.7,
+   "halo.lateDiffusion": 0.75,
+   "halo.bassMultiplier": 1.1,
+   "halo.bassCrossover": 250.0,
+   "halo.damping": 11000.0,
+   "halo.sync": 0.0,
+   "halo.width": 1.0
+  }
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "lowpass",
+ "name": "Telephone Top",
+ "state": {
+  "type": "lowpass",
+  "parameters": {
+   "lowpass.cutoff": 3400.0,
+   "lowpass.resonance": 1.2
+  }
+ }
+}

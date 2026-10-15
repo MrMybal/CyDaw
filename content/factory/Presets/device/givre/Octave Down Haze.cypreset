@@ -1,0 +1,21 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "givre",
+ "name": "Octave Down Haze",
+ "state": {
+  "type": "givre",
+  "parameters": {
+   "givre.blur": 0.5,
+   "givre.smear": 0.0,
+   "givre.shift": -12.0,
+   "givre.tone": -0.4,
+   "givre.scatter": 0.200000002980232,
+   "givre.mix": 0.4,
+   "givre.output": 0.0,
+   "givre.freeze": 0.0,
+   "givre.sync": 0.0
+  }
+ }
+}

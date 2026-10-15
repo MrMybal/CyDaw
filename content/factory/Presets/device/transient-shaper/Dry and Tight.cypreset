@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "transient-shaper",
+ "name": "Dry and Tight",
+ "state": {
+  "type": "transient-shaper",
+  "parameters": {
+   "transient.attack": 0.3,
+   "transient.sustain": -0.8,
+   "transient.output": 1.0
+  }
+ }
+}

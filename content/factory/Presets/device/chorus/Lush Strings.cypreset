@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "chorus",
+ "name": "Lush Strings",
+ "state": {
+  "type": "chorus",
+  "parameters": {
+   "chorus.rate": 0.4,
+   "chorus.depth": 0.7,
+   "chorus.delay": 22.0,
+   "chorus.width": 1.0,
+   "chorus.mix": 0.55
+  }
+ }
+}

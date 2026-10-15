@@ -1,0 +1,24 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "fournaise",
+ "name": "Industrial Punished Drums",
+ "state": {
+  "type": "fournaise",
+  "parameters": {
+   "fournaise.drive": 9.0,
+   "fournaise.tone": 0.3,
+   "fournaise.lowCut": 80.0,
+   "fournaise.highCut": 8000.0,
+   "fournaise.mix": 0.6,
+   "fournaise.output": 0.0,
+   "fournaise.style": 4.0,
+   "fournaise.punish": 1.0,
+   "fournaise.auto": 1.0,
+   "fournaise.thump": 1.0,
+   "fournaise.steep": 0.0,
+   "fournaise.oversampling": 2.0
+  }
+ }
+}

@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "mic-sim",
+ "name": "Laptop Video Call",
+ "state": {
+  "type": "mic-sim",
+  "parameters": {
+   "micsim.distance": 60.0,
+   "micsim.angle": 30.0,
+   "micsim.drive": 0.0,
+   "micsim.lowCut": 200.0,
+   "micsim.highCut": 7000.0,
+   "micsim.room": 0.5,
+   "micsim.output": 0.0,
+   "micsim.mix": 1.0,
+   "micsim.model": 4.0,
+   "micsim.pattern": 1.0,
+   "micsim.preamp": 0.0,
+   "micsim.noise": -60.0,
+   "micsim.roomSize": 0.2,
+   "micsim.roomTone": 4500.0
+  }
+ }
+}

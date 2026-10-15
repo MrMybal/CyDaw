@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "echo-notes",
+ "name": "Octave Cascade",
+ "state": {
+  "type": "echo-notes",
+  "parameters": {
+   "echonotes.time": 250.0,
+   "echonotes.decay": 0.25,
+   "echonotes.pitch": 12.0,
+   "echonotes.sync": 9.0,
+   "echonotes.repeats": 3.0
+  }
+ }
+}

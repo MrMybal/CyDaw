@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "auto-pan",
+ "name": "Hard Left-Right",
+ "state": {
+  "type": "auto-pan",
+  "parameters": {
+   "node.31002.lfo.rate": 2.0,
+   "node.31002.lfo.depth": 1.0,
+   "node.31002.lfo.offset": 0.0,
+   "node.31002.lfo.shape": 3.0,
+   "node.31003.pan.value": 0.0
+  }
+ }
+}

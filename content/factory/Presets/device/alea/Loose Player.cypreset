@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "alea",
+ "name": "Loose Player",
+ "state": {
+  "type": "alea",
+  "parameters": {
+   "alea.timing": 15.0,
+   "alea.velocity": 0.18,
+   "alea.chance": 1.0,
+   "alea.pitchChance": 0.0,
+   "alea.pitchRange": 0.0
+  }
+ }
+}

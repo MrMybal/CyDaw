@@ -1,0 +1,28 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "patine",
+ "name": "Old Phonograph Vocal",
+ "state": {
+  "type": "patine",
+  "parameters": {
+   "patine.noise": 0.7,
+   "patine.wobble": 0.25,
+   "patine.distort": 0.3,
+   "patine.digital": 0.0,
+   "patine.space": 0.05,
+   "patine.magnetic": 0.3,
+   "patine.magnitude": 1.0,
+   "patine.mix": 1.0,
+   "patine.noiseType": 0.0,
+   "patine.wobbleRate": 0.35,
+   "patine.distortType": 0.0,
+   "patine.spaceSize": 0.2,
+   "patine.tone": -0.6,
+   "patine.width": 0.0,
+   "patine.output": 1.0,
+   "patine.noiseFollow": 0.0
+  }
+ }
+}

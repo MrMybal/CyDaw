@@ -2,8 +2,10 @@
 
 #include "DeviceSignals.h"
 #include "PresetMenu.h"
+#include "Studio.h"
 #include "UiState.h"
 
+#include <memory>
 #include <string>
 
 // Devices' displays in windows of their own, as large as each window is
@@ -16,9 +18,12 @@
 
 namespace cydaw::v2 {
 
+class InterfaceEditor;
+
 class DeviceEditorView final {
 public:
     DeviceEditorView(Studio& studio, UiState& state, DeviceSignals& signals);
+    ~DeviceEditorView();
     void draw();
 
     // A device's window id, the same from frame to frame ("###device-a0-3").
@@ -32,6 +37,9 @@ private:
     UiState& state_;
     DeviceSignals& signals_;
     PresetMenu presets_;
+    // A device made of a graph: the interface drawn for it in the workshop,
+    // played (its INTERFACE tab).
+    std::unique_ptr<InterfaceEditor> designed_;
 };
 
 } // namespace cydaw::v2

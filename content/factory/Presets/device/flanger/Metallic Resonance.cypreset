@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "flanger",
+ "name": "Metallic Resonance",
+ "state": {
+  "type": "flanger",
+  "parameters": {
+   "flanger.rate": 0.4,
+   "flanger.depth": 0.6,
+   "flanger.delay": 0.8,
+   "flanger.feedback": 0.9,
+   "flanger.mix": 0.5
+  }
+ }
+}

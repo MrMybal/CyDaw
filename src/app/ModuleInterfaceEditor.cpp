@@ -27,6 +27,7 @@ static const juce::Identifier gridColumns("gridColumns");
 static const juce::Identifier gridRows("gridRows");
 static const juce::Identifier windowWidth("windowWidth");
 static const juce::Identifier windowHeight("windowHeight");
+static const juce::Identifier designed("designed");
 static const juce::Identifier height("height");
 static const juce::Identifier hostParameterId("hostParameterId");
 static const juce::Identifier id("id");
@@ -1487,6 +1488,8 @@ juce::var serialiseModuleInterface(const ModuleInterfaceState& state)
         root->setProperty(jsonKeys::windowWidth, static_cast<int>(state.windowWidth));
         root->setProperty(jsonKeys::windowHeight, static_cast<int>(state.windowHeight));
     }
+    if (state.designed)
+        root->setProperty(jsonKeys::designed, true);
 
     juce::Array<juce::var> parameters;
     for (const auto& parameter : state.parameters) {
@@ -1656,6 +1659,7 @@ ModuleInterfaceState restoreModuleInterface(const juce::var& value)
         state.windowHeight = static_cast<std::uint16_t>(juce::jlimit(
             160, 2'160, static_cast<int>(root->getProperty(jsonKeys::windowHeight))));
     }
+    state.designed = static_cast<bool>(root->getProperty(jsonKeys::designed));
     std::set<juce::String> parameterKeys;
     if (const auto* parameters = root->getProperty(jsonKeys::parameters).getArray()) {
         for (const auto& parameterValue : *parameters) {

@@ -1,0 +1,22 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "corps",
+ "name": "Tom Skin",
+ "state": {
+  "type": "corps",
+  "parameters": {
+   "corps.tune": 120.0,
+   "corps.decay": 0.4,
+   "corps.material": 0.3,
+   "corps.inharmonic": 0.0,
+   "corps.position": 0.35,
+   "corps.mix": 0.4,
+   "corps.output": 0.0,
+   "corps.width": 0.5,
+   "corps.type": 3.0,
+   "corps.lowCut": 80.0
+  }
+ }
+}

@@ -10,6 +10,15 @@
 #include <cydaw/engine/MixDesign.h>
 #include <cydaw/engine/ProEffectsDesign.h>
 #include <cydaw/engine/SuiteDesign.h>
+#include <cydaw/engine/VoiceDesign.h>
+#include <cydaw/engine/PitchDesign.h>
+#include <cydaw/engine/SpaceDesign.h>
+#include <cydaw/engine/RhythmDesign.h>
+#include <cydaw/engine/MotionDesign.h>
+#include <cydaw/engine/ResonanceDesign.h>
+#include <cydaw/engine/UtilityDesign.h>
+#include <cydaw/engine/MidiEffects.h>
+#include <cydaw/engine/MidiEffectsDesign.h>
 
 #include <algorithm>
 #include <array>
@@ -166,6 +175,7 @@ bool knobCell(const ImVec2 origin, const float width, Param* parameter, const ch
     ui::KnobStyle style;
     style.diameter = diameter;
     style.label = label;
+    style.labelWidth = width;
     style.colour = colour;
     style.format = parameter->maximum - parameter->minimum >= 100.0 ? "%.0f" : parameter->maximum - parameter->minimum >= 10.0 ? "%.1f" : "%.2f";
     style.unit = unit.c_str();
@@ -188,8 +198,12 @@ bool knobCell(const ImVec2 origin, const float width, Param* parameter, const ch
     ImGui::PopID();
     const auto shown = formatValue(*parameter, parameter->value);
     const auto size = textSize(shown.toRawUTF8(), 0.7f);
-    text(list, ImVec2(origin.x + (width - size.x) * 0.5f, origin.y + dp(diameter) + ImGui::GetFontSize() * 0.88f), p.text,
-         shown.toRawUTF8(), 0.7f);
+    const auto valueTop = origin.y + dp(diameter) + ImGui::GetFontSize() * 0.88f;
+    text(list, ImVec2(origin.x + (width - size.x) * 0.5f, valueTop), p.text, shown.toRawUTF8(), 0.7f);
+    // A click on the value types it in.
+    ImGui::PushID(parameter->binding.toRawUTF8());
+    changed |= typedValue("##typed", *parameter, ImVec2(origin.x + dp(2.0f), valueTop), ImVec2(width - dp(4.0f), size.y), set);
+    ImGui::PopID();
     return changed;
 }
 
@@ -1690,15 +1704,20 @@ bool chooser(const char* id, Param* parameter, const int count, juce::String (*n
         return false;
     auto* list = ImGui::GetWindowDrawList();
     const auto current = whole(static_cast<float>(parameter->value - parameter->minimum), count);
-    const auto label = name(current) + juce::String::fromUTF8(" \xe2\x96\xbe");
+    // Its name and a small arrow, drawn (not every font has the glyph).
+    const auto label = name(current);
     const auto size = textSize(label.toRawUTF8(), scale);
+    const auto arrow = size.y * 0.5f;
+    const ImVec2 box(size.x + arrow + dp(12.0f), size.y + dp(4.0f));
     ImGui::PushID(id);
     ImGui::SetCursorScreenPos(at);
-    const auto clicked = ImGui::InvisibleButton("##chooser", ImVec2(size.x + dp(8.0f), size.y + dp(4.0f)));
+    const auto clicked = ImGui::InvisibleButton("##chooser", box);
     const auto hovered = ImGui::IsItemHovered();
-    list->AddRectFilled(at, ImVec2(at.x + size.x + dp(8.0f), at.y + size.y + dp(4.0f)), theme::alpha(colour, hovered ? 0.35f : 0.18f),
-                        dp(3.0f));
+    list->AddRectFilled(at, ImVec2(at.x + box.x, at.y + box.y), theme::alpha(colour, hovered ? 0.35f : 0.18f), dp(3.0f));
     text(list, ImVec2(at.x + dp(4.0f), at.y + dp(2.0f)), theme::palette().text, label.toRawUTF8(), scale);
+    const ImVec2 tip(at.x + size.x + dp(8.0f) + arrow * 0.5f, at.y + box.y * 0.5f + arrow * 0.3f);
+    list->AddTriangleFilled(ImVec2(tip.x - arrow * 0.5f, tip.y - arrow * 0.55f), ImVec2(tip.x + arrow * 0.5f, tip.y - arrow * 0.55f), tip,
+                            theme::palette().textDim);
     if (hovered)
         ImGui::SetTooltip("%s", (hint(current) + "\n" + ui::Ls("Clic : changer", "Click: change")).toRawUTF8());
     if (clicked)
@@ -2375,6 +2394,150 @@ bool micLarge(const Pane& pane, std::vector<Param>& parameters, const ImVec2 pos
 
 #include "HaloPanes.inc"
 
+// ---- The effects added on 2026-10-14 ---
+
+// The window most of them share: the display large on top (a title in its
+// corner), its controls under it in sections (controlGroups) — each
+// section's values as pane indices.
+struct AddedSection {
+    const char* title;
+    std::vector<int> indices;
+};
+bool addedLarge(const Pane& pane, std::vector<Param>& parameters, const ImVec2 position, const ImVec2 size, const ImU32 colour,
+                const Live& live, const Setter& set, const char* heading, const std::vector<AddedSection>& sections,
+                const std::function<bool(const Box&)>& display, const float smallestDisplay = 190.0f)
+{
+    auto* list = ImGui::GetWindowDrawList();
+    std::vector<ControlGroup> groups;
+    for (const auto& item : sections) {
+        ControlGroup group { juce::String::fromUTF8(item.title), {} };
+        for (const auto index : item.indices)
+            if (index >= 0 && static_cast<std::size_t>(index) < pane.parameters.size() && pane.parameters[static_cast<std::size_t>(index)] >= 0)
+                group.indices.push_back(pane.parameters[static_cast<std::size_t>(index)]);
+        if (!group.indices.empty())
+            groups.push_back(std::move(group));
+    }
+    const auto controls = controlGroups(parameters, groups, ImVec2(position.x, 0.0f), size.x, colour, live, set, false, nullptr);
+    const auto displayHeight = std::max(dp(smallestDisplay), size.y - controls - dp(10.0f));
+    const Box outer { position, ImVec2(position.x + size.x, position.y + displayHeight) };
+    const auto inner = frame(list, outer);
+    auto changed = false;
+    list->PushClipRect(inner.min, inner.max, true);
+    if (display)
+        changed |= display(inner);
+    title(list, inner, heading);
+    list->PopClipRect();
+    controlGroups(parameters, groups, ImVec2(position.x, outer.max.y + dp(8.0f)), size.x, colour, live, set, true, &changed);
+    return changed;
+}
+
+// The values of a pane as an array (missing ones at their defaults).
+template <std::size_t N>
+std::array<float, N> addedValues(std::vector<Param>& parameters, const Pane& pane, const char* typeKey)
+{
+    return studioValues<N>(parameters, pane, typeKey);
+}
+
+#include "VoicePanes.inc"
+#include "PitchPanes.inc"
+#include "SpacePanes.inc"
+#include "RhythmPanes.inc"
+#include "MotionPanes.inc"
+#include "ResonancePanes.inc"
+#include "UtilityPanes.inc"
+#include "MidiPanes.inc"
+
+bool addedDisplay(const PaneKind kind, std::vector<Param>& parameters, const Pane& pane, const Box& box, const ImU32 colour,
+                  const Live& live, const Setter& set, const bool large)
+{
+    if (kind == PaneKind::vocoder || kind == PaneKind::deEsser || kind == PaneKind::tuner)
+        return voiceDisplay(kind, parameters, pane, box, colour, live, set, large);
+    if (kind == PaneKind::harmonie || kind == PaneKind::justesse)
+        return pitchDisplay(kind, parameters, pane, box, colour, live, set, large);
+    if (kind == PaneKind::empreinte || kind == PaneKind::givre)
+        return spacefxDisplay(kind, parameters, pane, box, colour, live, set, large);
+    if (kind == PaneKind::grains || kind == PaneKind::saccade || kind == PaneKind::boucleur)
+        return rhythmDisplay(kind, parameters, pane, box, colour, live, set, large);
+    if (kind == PaneKind::pompe || kind == PaneKind::decaleur || kind == PaneKind::anneau || kind == PaneKind::rotor)
+        return motionDisplay(kind, parameters, pane, box, colour, live, set, large);
+    if (kind == PaneKind::resonateurs || kind == PaneKind::corps || kind == PaneKind::peigne)
+        return resonanceDisplay(kind, parameters, pane, box, colour, live, set, large);
+    if (kind == PaneKind::utilitaire || kind == PaneKind::stereoscope)
+        return utilityDisplay(kind, parameters, pane, box, colour, live, set, large);
+    if (kind == PaneKind::arpege || kind == PaneKind::accords || kind == PaneKind::gamme || kind == PaneKind::echoNotes || kind == PaneKind::alea || kind == PaneKind::duree || kind == PaneKind::sequenceur || kind == PaneKind::roulement)
+        return midifxDisplay(kind, parameters, pane, box, colour, live, set, large);
+    return false;
+}
+
+bool addedLargePane(const PaneKind kind, const Pane& pane, std::vector<Param>& parameters, const ImVec2 position, const ImVec2 size,
+                    const ImU32 colour, const Live& live, const Setter& set)
+{
+    if (kind == PaneKind::vocoder || kind == PaneKind::deEsser || kind == PaneKind::tuner)
+        return voiceLarge(kind, pane, parameters, position, size, colour, live, set);
+    if (kind == PaneKind::harmonie || kind == PaneKind::justesse)
+        return pitchLarge(kind, pane, parameters, position, size, colour, live, set);
+    if (kind == PaneKind::empreinte || kind == PaneKind::givre)
+        return spacefxLarge(kind, pane, parameters, position, size, colour, live, set);
+    if (kind == PaneKind::grains || kind == PaneKind::saccade || kind == PaneKind::boucleur)
+        return rhythmLarge(kind, pane, parameters, position, size, colour, live, set);
+    if (kind == PaneKind::pompe || kind == PaneKind::decaleur || kind == PaneKind::anneau || kind == PaneKind::rotor)
+        return motionLarge(kind, pane, parameters, position, size, colour, live, set);
+    if (kind == PaneKind::resonateurs || kind == PaneKind::corps || kind == PaneKind::peigne)
+        return resonanceLarge(kind, pane, parameters, position, size, colour, live, set);
+    if (kind == PaneKind::utilitaire || kind == PaneKind::stereoscope)
+        return utilityLarge(kind, pane, parameters, position, size, colour, live, set);
+    if (kind == PaneKind::arpege || kind == PaneKind::accords || kind == PaneKind::gamme || kind == PaneKind::echoNotes || kind == PaneKind::alea || kind == PaneKind::duree || kind == PaneKind::sequenceur || kind == PaneKind::roulement)
+        return midifxLarge(kind, pane, parameters, position, size, colour, live, set);
+    return false;
+}
+
+std::vector<int> addedCardFields(const PaneKind kind, std::vector<Param>& parameters, const Pane& pane)
+{
+    if (kind == PaneKind::vocoder || kind == PaneKind::deEsser || kind == PaneKind::tuner)
+        return voiceCardFields(kind, parameters, pane);
+    if (kind == PaneKind::harmonie || kind == PaneKind::justesse)
+        return pitchCardFields(kind, parameters, pane);
+    if (kind == PaneKind::empreinte || kind == PaneKind::givre)
+        return spacefxCardFields(kind, parameters, pane);
+    if (kind == PaneKind::grains || kind == PaneKind::saccade || kind == PaneKind::boucleur)
+        return rhythmCardFields(kind, parameters, pane);
+    if (kind == PaneKind::pompe || kind == PaneKind::decaleur || kind == PaneKind::anneau || kind == PaneKind::rotor)
+        return motionCardFields(kind, parameters, pane);
+    if (kind == PaneKind::resonateurs || kind == PaneKind::corps || kind == PaneKind::peigne)
+        return resonanceCardFields(kind, parameters, pane);
+    if (kind == PaneKind::utilitaire || kind == PaneKind::stereoscope)
+        return utilityCardFields(kind, parameters, pane);
+    if (kind == PaneKind::arpege || kind == PaneKind::accords || kind == PaneKind::gamme || kind == PaneKind::echoNotes || kind == PaneKind::alea || kind == PaneKind::duree || kind == PaneKind::sequenceur || kind == PaneKind::roulement)
+        return midifxCardFields(kind, parameters, pane);
+    return {};
+}
+
+juce::String addedFormat(const juce::String& binding, const double value)
+{
+    if (auto shown = voiceFormat(binding, value); shown.isNotEmpty())
+        return shown;
+    if (auto shown = pitchFormat(binding, value); shown.isNotEmpty())
+        return shown;
+    if (auto shown = spacefxFormat(binding, value); shown.isNotEmpty())
+        return shown;
+    if (auto shown = rhythmFormat(binding, value); shown.isNotEmpty())
+        return shown;
+    if (auto shown = motionFormat(binding, value); shown.isNotEmpty())
+        return shown;
+    if (auto shown = resonanceFormat(binding, value); shown.isNotEmpty())
+        return shown;
+    if (auto shown = utilityFormat(binding, value); shown.isNotEmpty())
+        return shown;
+    if (auto shown = midifxFormat(binding, value); shown.isNotEmpty())
+        return shown;
+    return {};
+}
+
+bool addedStepped(const juce::String& binding)
+{
+    return midifxStepped(binding) || voiceStepped(binding) || pitchStepped(binding) || spacefxStepped(binding) || rhythmStepped(binding) || motionStepped(binding) || resonanceStepped(binding) || utilityStepped(binding);
+}
+
 // ---- The controls of the other devices, in their windows -------------------------------------------
 
 enum class ControlKind { knob, toggle, buttons, list };
@@ -2588,7 +2751,140 @@ float nativeControls(std::vector<Param>& parameters, const std::vector<int>& mai
 
 namespace {
 
+// A setting's name on its own: after its group's ("Sortie · niveau"), its
+// first letter up.
+juce::String ownLabel(const Param& parameter)
+{
+    const auto label = parameter.label.fromLastOccurrenceOf(juce::String::fromUTF8("\xc2\xb7 "), false, false);
+    return label.substring(0, 1).toUpperCase() + label.substring(1);
+}
+
 } // namespace
+
+ImVec2 compactControlSize(const Param& parameter, const float diameter)
+{
+    const auto label = ownLabel(parameter);
+    switch (controlKindOf(parameter)) {
+    case ControlKind::toggle: return ImVec2(std::clamp(textSize(label.toRawUTF8(), 0.8f).x + dp(26.0f), dp(56.0f), dp(120.0f)), dp(22.0f));
+    case ControlKind::buttons:
+    case ControlKind::list: {
+        auto widest = textSize(label.toRawUTF8(), 0.64f).x;
+        for (const auto& name : choiceNames(parameter))
+            widest = std::max(widest, textSize(name.toRawUTF8(), 0.8f).x + dp(28.0f));
+        return ImVec2(std::clamp(widest, dp(72.0f), dp(130.0f)), ImGui::GetFontSize() * 0.8f + dp(24.0f));
+    }
+    default:
+        return ImVec2(std::clamp(textSize(label.toRawUTF8(), 0.86f).x + dp(8.0f), dp(diameter + 20.0f), dp(90.0f)), knobHeight(diameter));
+    }
+}
+
+bool compactControl(Param& parameter, const ImVec2 origin, const float width, const ImU32 colour, const Live& live, const Setter& set,
+                    const float diameter)
+{
+    const auto label = ownLabel(parameter).toStdString();
+    switch (controlKindOf(parameter)) {
+    case ControlKind::toggle: return switchCell(label.c_str(), &parameter, origin, ImVec2(width, dp(22.0f)), colour, set);
+    case ControlKind::buttons:
+    case ControlKind::list: {
+        text(ImGui::GetWindowDrawList(), origin, theme::palette().textDim, label.c_str(), 0.64f);
+        ImGui::PushID(parameter.binding.toRawUTF8());
+        const auto changed = comboCell("##list", &parameter, choiceNames(parameter), ImVec2(origin.x, origin.y + ImGui::GetFontSize() * 0.8f),
+                                       width, set);
+        ImGui::PopID();
+        return changed;
+    }
+    default: return knobCell(origin, width, &parameter, label.c_str(), colour, live, set, diameter);
+    }
+}
+
+float controlGroups(std::vector<Param>& parameters, const std::vector<ControlGroup>& groups, const ImVec2 origin, const float width,
+                    const ImU32 colour, const Live& live, const Setter& set, const bool draw, bool* changed)
+{
+    const auto& p = theme::palette();
+    std::vector<std::string> titles;
+    std::vector<ControlSection> sections;
+    for (const auto& group : groups)
+        if (!group.indices.empty())
+            titles.push_back(group.title.toStdString());
+    for (std::size_t at = 0, title = 0; at < groups.size(); ++at)
+        if (!groups[at].indices.empty())
+            sections.push_back({ titles[title++].c_str(), groups[at].indices });
+    if (sections.empty())
+        return 0.0f;
+    auto knobCount = std::size_t {};
+    for (const auto& part : sections)
+        knobCount += part.indices.size();
+    const auto diameter = knobCount <= 8 ? 50.0f : knobCount <= 16 ? 42.0f : 36.0f;
+    const auto inner = width - dp(24.0f);
+    const auto gap = dp(28.0f);
+    // What a section needs on one row: its choices, its knobs.
+    const auto natural = [&](const ControlSection& part) {
+        auto choices = 0.0f;
+        auto knobs = 0;
+        for (const auto index : part.indices) {
+            const auto& parameter = parameters[static_cast<std::size_t>(index)];
+            const auto kind = controlKindOf(parameter);
+            if (kind == ControlKind::knob)
+                ++knobs;
+            else
+                choices += choiceWidth(parameter, kind) + dp(12.0f);
+        }
+        return std::clamp(std::max(choices, static_cast<float>(knobs) * dp(diameter + 60.0f)), dp(150.0f), inner);
+    };
+    // The sections in rows, each as wide as it needs; a row's room shared out.
+    std::vector<std::vector<std::pair<std::size_t, float>>> rows(1);
+    auto used = 0.0f;
+    for (std::size_t at = 0; at < sections.size(); ++at) {
+        const auto need = natural(sections[at]);
+        if (!rows.back().empty() && used + gap + need > inner) {
+            rows.emplace_back();
+            used = 0.0f;
+        }
+        used += (rows.back().empty() ? 0.0f : gap) + need;
+        rows.back().push_back({ at, need });
+    }
+    for (auto& row : rows) {
+        auto total = 0.0f;
+        for (const auto& [at, need] : row)
+            total += need;
+        const auto room = inner - gap * static_cast<float>(row.size() - 1);
+        for (auto& [at, need] : row)
+            need = need * room / std::max(1.0f, total);
+    }
+    std::vector<float> heights;
+    auto height = dp(12.0f);
+    for (const auto& row : rows) {
+        auto tallest = 0.0f;
+        for (const auto& [at, need] : row)
+            tallest = std::max(tallest, nativeSectionHeight(parameters, sections[at], need, diameter));
+        heights.push_back(tallest);
+        height += tallest + dp(8.0f);
+    }
+    if (!draw)
+        return height;
+    auto* list = ImGui::GetWindowDrawList();
+    list->AddRectFilled(origin, ImVec2(origin.x + width, origin.y + height), theme::mix(colour, p.bg1, 0.88f), dp(6.0f));
+    list->AddRect(origin, ImVec2(origin.x + width, origin.y + height), theme::alpha(colour, 0.45f), dp(6.0f));
+    auto moved = false;
+    auto y = origin.y + dp(10.0f);
+    for (std::size_t line = 0; line < rows.size(); ++line) {
+        auto x = origin.x + dp(12.0f);
+        for (std::size_t at = 0; at < rows[line].size(); ++at) {
+            const auto& [index, need] = rows[line][at];
+            if (at > 0) {
+                list->AddLine(ImVec2(x - gap * 0.5f, y), ImVec2(x - gap * 0.5f, y + heights[line]), theme::alpha(colour, 0.3f));
+            }
+            ImGui::PushID(static_cast<int>(index));
+            moved |= nativeSection(parameters, sections[index], ImVec2(x, y), need, diameter, colour, live, set);
+            ImGui::PopID();
+            x += need + gap;
+        }
+        y += heights[line] + dp(8.0f);
+    }
+    if (changed != nullptr)
+        *changed = moved;
+    return height;
+}
 
 // ---- Entry points --------------------------------------------------------------------------------
 
@@ -2628,7 +2924,7 @@ bool studioPane(const Pane& pane, std::vector<Param>& parameters, const ImVec2 m
     case PaneKind::tranche: return trancheDisplay(parameters, pane, box, colour, live, set, false);
     case PaneKind::finition: return finitionDisplay(parameters, pane, box, colour, live, set, false);
     case PaneKind::halo: return haloDisplay(parameters, pane, box, colour, live, set, false);
-    default: return false;
+    default: return addedDisplay(pane.kind, parameters, pane, box, colour, live, set, false);
     }
 }
 
@@ -2654,7 +2950,7 @@ bool studioLargePane(const Pane& pane, std::vector<Param>& parameters, const ImV
     case PaneKind::tranche: changed = trancheLarge(pane, parameters, position, size, colour, live, set); break;
     case PaneKind::finition: changed = finitionLarge(pane, parameters, position, size, colour, live, set); break;
     case PaneKind::halo: changed = haloLarge(pane, parameters, position, size, colour, live, set); break;
-    default: break;
+    default: changed = addedLargePane(pane.kind, pane, parameters, position, size, colour, live, set); break;
     }
     ImGui::PopID();
     return changed;
@@ -2758,7 +3054,7 @@ std::vector<int> studioCardFields(const Pane& pane, std::vector<Param>& paramete
     case PaneKind::finition:
         return { engine::suite::finitionGain, engine::suite::finitionCeiling, engine::suite::finitionDynamics, engine::suite::finitionWidth };
     case PaneKind::halo: return { engine::halo::haloMix, engine::halo::haloDecay, engine::halo::haloPredelay, engine::halo::haloSize };
-    default: return {};
+    default: return addedCardFields(pane.kind, parameters, pane);
     }
 }
 
@@ -2786,6 +3082,8 @@ juce::String onOff(const double value)
 juce::String studioFormat(const Param& parameter, const double value)
 {
     const auto& binding = parameter.binding;
+    if (auto shown = addedFormat(binding, value); shown.isNotEmpty())
+        return shown;
     const auto knob = [](const double v) { return juce::String(v, 1); };
     const auto off = [](const char* french, const char* english) { return ui::Ls(french, english); };
     const auto degrees = [](const double v) { return juce::String(juce::roundToInt(v)) + juce::String::fromUTF8("\xc2\xb0"); };
@@ -3126,6 +3424,8 @@ bool studioStepped(const Param& parameter)
     for (const auto* suffix : stepped)
         if (parameter.binding.endsWith(suffix))
             return true;
+    if (addedStepped(parameter.binding))
+        return true;
     if (parameter.binding.contains("multiband.band")
         && (parameter.binding.endsWith("Mode") || parameter.binding.endsWith("On") || parameter.binding.endsWith("Solo")))
         return true;
@@ -3134,6 +3434,40 @@ bool studioStepped(const Param& parameter)
     const auto suffix = parameter.binding.fromLastOccurrenceOf("filtpro.", false, false);
     return suffix.endsWith("On") || suffix.endsWith("Type") || suffix.endsWith("Slope") || suffix.endsWith("Shape")
            || suffix.endsWith("Sync") || suffix.endsWith("Source") || suffix.endsWith("Destination");
+}
+
+float addedPaneFactor(const PaneKind kind)
+{
+    switch (kind) {
+    case PaneKind::vocoder: return 2.3f;
+    case PaneKind::deEsser: return 2.3f;
+    case PaneKind::tuner: return 2.3f;
+    case PaneKind::harmonie: return 2.3f;
+    case PaneKind::justesse: return 2.3f;
+    case PaneKind::empreinte: return 2.3f;
+    case PaneKind::givre: return 2.3f;
+    case PaneKind::grains: return 2.3f;
+    case PaneKind::saccade: return 2.3f;
+    case PaneKind::boucleur: return 2.3f;
+    case PaneKind::pompe: return 2.3f;
+    case PaneKind::decaleur: return 2.3f;
+    case PaneKind::anneau: return 2.3f;
+    case PaneKind::rotor: return 2.3f;
+    case PaneKind::resonateurs: return 2.3f;
+    case PaneKind::corps: return 2.3f;
+    case PaneKind::peigne: return 2.3f;
+    case PaneKind::utilitaire: return 2.3f;
+    case PaneKind::stereoscope: return 2.3f;
+    case PaneKind::arpege: return 2.3f;
+    case PaneKind::accords: return 2.3f;
+    case PaneKind::gamme: return 2.3f;
+    case PaneKind::echoNotes: return 2.3f;
+    case PaneKind::alea: return 2.3f;
+    case PaneKind::duree: return 2.3f;
+    case PaneKind::sequenceur: return 2.3f;
+    case PaneKind::roulement: return 2.3f;
+    default: return 2.0f;
+    }
 }
 
 } // namespace cydaw::v2::visual

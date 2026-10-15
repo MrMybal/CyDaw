@@ -1,0 +1,28 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "patine",
+ "name": "Video Tape Pad",
+ "state": {
+  "type": "patine",
+  "parameters": {
+   "patine.noise": 0.35,
+   "patine.wobble": 0.55,
+   "patine.distort": 0.1,
+   "patine.digital": 0.0,
+   "patine.space": 0.1,
+   "patine.magnetic": 0.65,
+   "patine.magnitude": 1.0,
+   "patine.mix": 1.0,
+   "patine.noiseType": 1.0,
+   "patine.wobbleRate": 0.15,
+   "patine.distortType": 1.0,
+   "patine.spaceSize": 0.5,
+   "patine.tone": -0.3,
+   "patine.width": 0.9,
+   "patine.output": 0.0,
+   "patine.noiseFollow": 0.0
+  }
+ }
+}

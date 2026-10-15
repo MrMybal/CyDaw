@@ -1,0 +1,40 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "kick-synth",
+ "name": "House Punchy Thump",
+ "state": {
+  "type": "kick-synth",
+  "parameters": {
+   "kick.bodyShape": 0.0,
+   "kick.bodyPhase": 45.0,
+   "kick.pitchStart": 330.0,
+   "kick.pitchEnd": 55.0,
+   "kick.pitchTime": 57.5,
+   "kick.pitchCurve": 4.5,
+   "kick.bodyLevel": 0.0,
+   "kick.attack": 0.300000011920929,
+   "kick.hold": 22.0,
+   "kick.decay": 300.0,
+   "kick.decayCurve": 1.899999976158142,
+   "kick.length": 700.0,
+   "kick.clickType": 1.0,
+   "kick.clickLevel": -10.0,
+   "kick.clickDecay": 4.0,
+   "kick.clickTone": 4500.0,
+   "kick.subLevel": -16.0,
+   "kick.subDecay": 280.0,
+   "kick.subOctave": 0.0,
+   "kick.driveType": 0.0,
+   "kick.drive": 5.0,
+   "kick.driveTone": 12000.0,
+   "kick.lowCut": 25.0,
+   "kick.highCut": 16000.0,
+   "kick.lowBoost": 2.0,
+   "kick.keyTrack": 1.0,
+   "kick.velocity": 0.400000005960464,
+   "kick.output": -3.910000085830688
+  }
+ }
+}

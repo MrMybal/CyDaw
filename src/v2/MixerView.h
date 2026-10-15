@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Studio.h"
 #include "UiState.h"
 
 // The mixer: one narrow strip per track — colour, name, the devices it

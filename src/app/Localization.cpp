@@ -4,10 +4,16 @@
 
 namespace cydaw::app {
 
+JUCE_IMPLEMENT_SINGLETON(Localization)
+
 Localization& Localization::instance()
 {
-    static Localization localization;
-    return localization;
+    return *getInstance();
+}
+
+Localization::~Localization()
+{
+    clearSingletonInstance();
 }
 
 Localization::Localization()
@@ -26,7 +32,6 @@ Localization::Localization()
         languageCode_ = "en";
         current_ = english_;
     }
-    nodeNamesInEnglish_ = properties_.getUserSettings()->getBoolValue("nodeNamesEnglish", true);
 }
 
 namespace {
@@ -39,32 +44,22 @@ bool isNodeName(const juce::String& key)
         return true;
     return key.indexOfChar(5, '.') < 0;
 }
+
+// What is inside a module, in English whatever the language: its name, its
+// settings' names, its interface's controls (a module reads the same in a
+// tutorial from anywhere; CyDAW's own interface is what gets translated).
+bool isModuleText(const juce::String& key)
+{
+    return isNodeName(key) || key.startsWith("effect.parameter.") || key.startsWith("node.parameter.")
+           || key.startsWith("sampler.parameter.") || key.startsWith("model.parameter.") || key.startsWith("module.ui.");
+}
 } // namespace
-
-bool Localization::nodeNamesInEnglish() const
-{
-    const juce::ScopedReadLock lock(mappingsLock_);
-    return nodeNamesInEnglish_;
-}
-
-void Localization::setNodeNamesInEnglish(const bool english)
-{
-    {
-        const juce::ScopedWriteLock lock(mappingsLock_);
-        if (nodeNamesInEnglish_ == english)
-            return;
-        nodeNamesInEnglish_ = english;
-    }
-    properties_.getUserSettings()->setValue("nodeNamesEnglish", english);
-    properties_.saveIfNeeded();
-    sendChangeMessage();
-}
 
 juce::String Localization::text(const juce::StringRef key) const
 {
     const juce::String keyText(key.text);
     const juce::ScopedReadLock lock(mappingsLock_);
-    if (nodeNamesInEnglish_ && languageCode_ != "en" && isNodeName(keyText))
+    if (languageCode_ != "en" && isModuleText(keyText))
         if (const auto english = english_.find(keyText); english != english_.end() && english->second.isNotEmpty())
             return english->second;
     if (const auto translated = current_.find(keyText);

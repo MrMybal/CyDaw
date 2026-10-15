@@ -1,7 +1,8 @@
 #pragma once
 
 #include "PresetMenu.h"
-#include "Studio.h"
+#include "DeviceHost.h"
+#include "EditorWindows.h"
 #include "UiState.h"
 
 #include <cydaw/engine/PrismSynth.h>
@@ -22,7 +23,7 @@ namespace cydaw::v2 {
 
 class PrismView final {
 public:
-    PrismView(Studio& studio, UiState& state);
+    PrismView(DeviceHost& studio, UiState& state);
 
     // The card's pane: as wide as this.
     [[nodiscard]] static float paneWidth();
@@ -32,11 +33,12 @@ public:
     // `here`: inside the studio's window, wherever it was last left (on a
     // screen of its own, or one unplugged since).
     void openEditor(const TrackRef& track, std::uint64_t nodeId, bool detached = false, bool here = false);
-    [[nodiscard]] bool showsEditor(const TrackRef& track, std::uint64_t nodeId) const
+    [[nodiscard]] bool showsEditor(const TrackRef& track, std::uint64_t nodeId) const { return windows_.shows(track, nodeId); }
+    // That instrument's window's id (each has its own window).
+    [[nodiscard]] std::string editorWindowId(const TrackRef& track, std::uint64_t nodeId) const
     {
-        return editor_ && editor_->track == track && editor_->nodeId == nodeId;
+        return windows_.idOf(track, nodeId);
     }
-    static constexpr const char* editorWindowId = "###prismEditor";
     void drawEditor();
 
 private:
@@ -48,7 +50,18 @@ private:
         engine::prism::PrismValues values {};
         // The oscillators' own tables (imported waves), when it has any.
         engine::prism::TablesRef own;
+        // What its newest voice plays now, when one plays.
+        bool live {};
+        engine::VoiceLive heard {};
+        // Its settings as they play now: the knobs, the automation lanes at
+        // the playhead over them, the voice's own modulations over those.
+        engine::prism::PrismValues played {};
     };
+    // Where a setting plays now when the automation or its voice's
+    // modulations move it away from its knob.
+    [[nodiscard]] std::optional<float> heard(int index) const;
+    // The filter's curve drawn again where the modulations put it.
+    bool drawingHeard_ {};
     // The table an oscillator plays: its own, else the factory one named.
     [[nodiscard]] engine::prism::WavetableRef tableOf(int osc) const;
     void chooseTableFile(int osc);
@@ -84,7 +97,7 @@ private:
     // for shapes ready made.
     void editDrawnLfo(int lfo, ImVec2 origin, ImVec2 size);
 
-    Studio& studio_;
+    DeviceHost& studio_;
     UiState& state_;
     PresetMenu presets_;
     Card card_;
@@ -92,16 +105,22 @@ private:
         TrackRef track;
         std::uint64_t nodeId {};
     };
+    // Its windows (one for each instrument opened), and the one being drawn:
+    // its instrument, its id.
+    EditorWindows windows_ { "###prismEditor" };
     std::optional<Target> editor_;
+    std::string windowId_;
+    // One window; false once it is closed.
+    bool drawEditorWindow(bool focus);
     // Which envelope (0..3) or LFO (4..7) the modulation section shows.
     int modulator_ { 1 };
     // Which of B and C shows when the three do not fit side by side.
     int secondOscillator_ { 1 };
     // The point last drawn while the mouse is down (-1: none yet).
     int drawnLast_ { -1 };
-    bool placeHere_ {};
+    // The window to put back in the studio's window on its next frame.
+    std::string placeHere_;
     float drawnLastValue_ {};
-    bool focusEditor_ {};
     std::unique_ptr<juce::FileChooser> chooser_;
 };
 

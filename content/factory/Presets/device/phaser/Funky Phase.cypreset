@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "phaser",
+ "name": "Funky Phase",
+ "state": {
+  "type": "phaser",
+  "parameters": {
+   "phaser.rate": 1.5,
+   "phaser.depth": 0.7,
+   "phaser.frequency": 1200.0,
+   "phaser.feedback": 0.4,
+   "phaser.mix": 0.5
+  }
+ }
+}

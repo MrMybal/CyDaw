@@ -38,6 +38,7 @@ namespace cydaw::app::detail {
     if (key == "sound-model") return "core.sound-model";
     if (key == "sampler") return "core.sampler";
     if (key == "batterie") return "core.batterie";
+    if (key == "drum-rack") return "core.drum-rack";
     if (key == "prism-synth") return "core.prism-synth";
     if (key == "kick-synth") return "core.kick-synth";
     if (const auto model = cydaw::engine::synth::modelForType(key.toStdString()); model != cydaw::engine::synth::Model::none)

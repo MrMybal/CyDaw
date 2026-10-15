@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "poly-pluck",
+ "name": "Resonant Zap",
+ "state": {
+  "type": "poly-pluck",
+  "parameters": {
+   "node.35002.voice.mode": 0.0,
+   "node.35002.voice.glide": 0.0,
+   "node.35003.polyOscillator.waveform": 2.0,
+   "node.35003.polyOscillator.level": 0.13,
+   "node.35004.envelope.attack": 1.0,
+   "node.35004.envelope.decay": 120.0,
+   "node.35004.envelope.sustain": 0.0,
+   "node.35004.envelope.release": 90.0,
+   "node.35005.gain.db": 0.0,
+   "node.35006.voiceFilter.cutoff": 2400.0,
+   "node.35006.voiceFilter.resonance": 12.0,
+   "node.35007.delay.time": 180.0,
+   "node.35007.delay.feedback": 0.3,
+   "node.35007.delay.mix": 0.2
+  }
+ }
+}

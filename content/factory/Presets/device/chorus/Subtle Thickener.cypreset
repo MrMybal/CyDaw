@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "chorus",
+ "name": "Subtle Thickener",
+ "state": {
+  "type": "chorus",
+  "parameters": {
+   "chorus.rate": 0.3,
+   "chorus.depth": 0.25,
+   "chorus.delay": 10.0,
+   "chorus.width": 0.6,
+   "chorus.mix": 0.3
+  }
+ }
+}

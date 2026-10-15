@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "stereo-finisher",
+ "name": "Bright Pop",
+ "state": {
+  "type": "stereo-finisher",
+  "parameters": {
+   "node.16002.eq.tone": 0.25,
+   "node.16003.stereo.width": 1.25,
+   "node.16004.compressor.threshold": -14.0,
+   "node.16004.compressor.ratio": 2.5,
+   "node.16005.clip.threshold": 0.93
+  }
+ }
+}

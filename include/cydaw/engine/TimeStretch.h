@@ -136,4 +136,15 @@ private:
     std::vector<float> kernel_;
 };
 
+// A loop (`beats` long at `sourceBpm`) played at `tempo`: exactly `beats`
+// beats of it at the output's rate, stretched (its pitch kept, but with
+// repitch), seamless when played over and over. `channels` holds the
+// file's channels, `sourceRate` frames a second; the loop is the file's
+// first `beats` beats (shorter, silence after it). Allocates: off the
+// audio callback.
+[[nodiscard]] std::vector<std::vector<float>> renderStretchedLoop(const std::vector<std::vector<float>>& channels,
+                                                                  double sourceRate, double sourceBpm, int beats,
+                                                                  double tempo, double outputRate,
+                                                                  StretchAlgorithm algorithm);
+
 } // namespace cydaw::engine

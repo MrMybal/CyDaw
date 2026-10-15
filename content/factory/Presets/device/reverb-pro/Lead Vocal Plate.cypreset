@@ -1,0 +1,35 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "reverb-pro",
+ "name": "Lead Vocal Plate",
+ "state": {
+  "type": "reverb-pro",
+  "parameters": {
+   "revpro.space": 0.45,
+   "revpro.decay": 1.6,
+   "revpro.predelay": 35.0,
+   "revpro.distance": 0.3,
+   "revpro.brightness": 0.25,
+   "revpro.character": 0.35,
+   "revpro.width": 1.1,
+   "revpro.mix": 0.22,
+   "revpro.lowDecay": 0.7,
+   "revpro.lowFrequency": 250.0,
+   "revpro.midDecay": 1.0,
+   "revpro.midFrequency": 1500.0,
+   "revpro.highDecay": 0.75,
+   "revpro.highFrequency": 6000.0,
+   "revpro.lowCut": 220.0,
+   "revpro.highCut": 12000.0,
+   "revpro.ducking": 4.0,
+   "revpro.duckRelease": 300.0,
+   "revpro.freeze": 0.0,
+   "revpro.sync": 0.0,
+   "revpro.diffusion": 0.95,
+   "revpro.output": 0.0,
+   "revpro.early": -12.0
+  }
+ }
+}

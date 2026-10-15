@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "transient-shaper",
+ "name": "Softer Hits",
+ "state": {
+  "type": "transient-shaper",
+  "parameters": {
+   "transient.attack": -0.6,
+   "transient.sustain": 0.0,
+   "transient.output": 1.0
+  }
+ }
+}

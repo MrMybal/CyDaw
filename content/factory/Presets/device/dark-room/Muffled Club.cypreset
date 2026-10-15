@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "dark-room",
+ "name": "Muffled Club",
+ "state": {
+  "type": "dark-room",
+  "parameters": {
+   "node.27002.lowpass.cutoff": 900.0,
+   "node.27002.lowpass.resonance": 1.4,
+   "node.27003.reverb.roomSize": 0.6,
+   "node.27003.reverb.mix": 0.3,
+   "node.27004.eq.tone": -0.3
+  }
+ }
+}

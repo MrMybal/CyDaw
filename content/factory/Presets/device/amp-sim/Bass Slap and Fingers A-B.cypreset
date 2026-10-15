@@ -1,0 +1,41 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "amp-sim",
+ "name": "Bass Slap and Fingers A-B",
+ "state": {
+  "type": "amp-sim",
+  "parameters": {
+   "amp.gain": 2.5,
+   "amp.bass": 7.0,
+   "amp.middle": 2.5,
+   "amp.treble": 7.5,
+   "amp.presence": 7.0,
+   "amp.master": 5.0,
+   "amp.output": 0.0,
+   "amp.mix": 1.0,
+   "amp.model": 7.0,
+   "amp.bright": 1.0,
+   "amp.depth": 6.5,
+   "amp.sag": 0.1,
+   "amp.tight": 20.0,
+   "amp.gate": -85.0,
+   "amp.pedal": 1.0,
+   "amp.pedalDrive": 0.1,
+   "amp.pedalTone": 0.7,
+   "amp.pedalLevel": 0.0,
+   "amp.oversampling": 2.0,
+   "amp.channel": 0.0,
+   "amp.modelB": 7.0,
+   "amp.gainB": 3.0,
+   "amp.bassB": 6.0,
+   "amp.middleB": 5.0,
+   "amp.trebleB": 5.5,
+   "amp.presenceB": 5.0,
+   "amp.masterB": 5.0,
+   "amp.brightB": 0.0,
+   "amp.depthB": 5.5
+  }
+ }
+}

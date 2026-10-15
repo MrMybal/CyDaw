@@ -1,0 +1,25 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "echo-bande",
+ "name": "Psychedelic Wobbly Tape",
+ "state": {
+  "type": "echo-bande",
+  "parameters": {
+   "echoband.time": 240.0,
+   "echoband.intensity": 0.65,
+   "echoband.echo": 0.7,
+   "echoband.reverb": 0.35,
+   "echoband.bass": 0.0,
+   "echoband.treble": -3.0,
+   "echoband.wow": 0.9,
+   "echoband.mix": 0.45,
+   "echoband.mode": 7.0,
+   "echoband.sync": 0.0,
+   "echoband.drive": 6.0,
+   "echoband.age": 0.7,
+   "echoband.width": 0.8
+  }
+ }
+}

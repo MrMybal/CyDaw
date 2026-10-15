@@ -1,6 +1,7 @@
 #pragma once
 
 #include "SampleCatalog.h"
+#include "Studio.h"
 #include "UiState.h"
 
 #include <imgui.h>
@@ -75,6 +76,8 @@ private:
     void drawHeader();
     void drawSamples();
     void drawSamplePreview(const SampleCatalog::Item* item, float width);
+    // The "at tempo" switch, and the tempos of the loop heard.
+    void tempoSwitch(const juce::String& path);
     void drawInstruments();
     void drawEffects();
     void requery();

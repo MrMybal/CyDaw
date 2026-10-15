@@ -1,0 +1,30 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "comp-pro",
+ "name": "Rap Vocal Upfront (Fast Attack)",
+ "state": {
+  "type": "comp-pro",
+  "parameters": {
+   "comppro.threshold": -26.0,
+   "comppro.ratio": 6.0,
+   "comppro.knee": 3.0,
+   "comppro.attack": 1.0,
+   "comppro.release": 50.0,
+   "comppro.makeup": 7.0,
+   "comppro.mix": 1.0,
+   "comppro.sidechain": 120.0,
+   "comppro.style": 1.0,
+   "comppro.range": 15.0,
+   "comppro.hold": 5.0,
+   "comppro.lookahead": 0.0,
+   "comppro.autoRelease": 0.0,
+   "comppro.autoGain": 0.0,
+   "comppro.sidechainLow": 9000.0,
+   "comppro.link": 1.0,
+   "comppro.channels": 0.0,
+   "comppro.audition": 0.0
+  }
+ }
+}

@@ -1,0 +1,23 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "empreinte",
+ "name": "Grand Hall Vocals",
+ "state": {
+  "type": "empreinte",
+  "parameters": {
+   "empreinte.mix": 0.25,
+   "empreinte.predelay": 35.0,
+   "empreinte.lowCut": 180.0,
+   "empreinte.highCut": 9000.0,
+   "empreinte.width": 1.0,
+   "empreinte.early": -3.0,
+   "empreinte.tail": 0.0,
+   "empreinte.output": 0.0,
+   "empreinte.space": 3.0,
+   "empreinte.length": 1.0,
+   "empreinte.reverse": 0.0
+  }
+ }
+}

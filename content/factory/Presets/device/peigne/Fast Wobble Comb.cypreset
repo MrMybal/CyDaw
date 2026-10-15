@@ -1,0 +1,22 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "peigne",
+ "name": "Fast Wobble Comb",
+ "state": {
+  "type": "peigne",
+  "parameters": {
+   "peigne.frequency": 600.0,
+   "peigne.feedback": 0.85,
+   "peigne.damping": 9000.0,
+   "peigne.spread": 0.0,
+   "peigne.lfoDepth": 0.25,
+   "peigne.lfoRate": 6.0,
+   "peigne.mix": 0.6,
+   "peigne.output": 0.0,
+   "peigne.mode": 0.0,
+   "peigne.sync": 0.0
+  }
+ }
+}

@@ -1,0 +1,23 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "poly-sine",
+ "name": "Sub Bass",
+ "state": {
+  "type": "poly-sine",
+  "parameters": {
+   "node.10002.voice.mode": 1.0,
+   "node.10002.voice.glide": 40.0,
+   "node.10003.polyOscillator.waveform": 0.0,
+   "node.10003.polyOscillator.level": 0.22,
+   "node.10004.envelope.attack": 3.0,
+   "node.10004.envelope.decay": 200.0,
+   "node.10004.envelope.sustain": 0.9,
+   "node.10004.envelope.release": 120.0,
+   "node.10007.gain.db": 0.0,
+   "node.10005.voiceFilter.cutoff": 1200.0,
+   "node.10005.voiceFilter.resonance": 0.7
+  }
+ }
+}

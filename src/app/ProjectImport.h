@@ -47,6 +47,21 @@ struct ImportedAudioClip {
     int launcherScene { -1 };
 };
 
+// One device of a track's chain, as the other application had it: a plug-in
+// (its name, its maker, its format) or one of its own devices (its type),
+// an instrument or an effect. Its settings, when they could be read, by the
+// other application's own names.
+struct ImportedDevice {
+    juce::String name;
+    juce::String vendor;
+    juce::String format;      // "VST3", "VST2", "CLAP", "AU" for a plug-in
+    juce::String type;        // the other application's own device ("Polysynth", "Operator")
+    bool plugin {};
+    bool instrument {};
+    bool noteEffect {};
+    std::vector<std::pair<juce::String, double>> settings;
+};
+
 struct ImportedTrack {
     juce::String name;
     bool midi {};
@@ -58,6 +73,8 @@ struct ImportedTrack {
     // The devices and plugins the track carried, by name: not translated,
     // reported.
     juce::StringArray devices;
+    // The same in order, with what each one is.
+    std::vector<ImportedDevice> chain;
     bool hadInstrument {};
     std::vector<ImportedAudioClip> audioClips;
     std::vector<ImportedMidiClip> midiClips;

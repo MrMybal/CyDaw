@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "tremolo-pan",
+ "name": "Vintage Amp Tremolo",
+ "state": {
+  "type": "tremolo-pan",
+  "parameters": {
+   "tremolo.rate": 5.5,
+   "tremolo.depth": 0.5,
+   "tremolo.shape": 1.0,
+   "tremolo.spread": 0.0,
+   "tremolo.sync": 0.0
+  }
+ }
+}

@@ -1,0 +1,42 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "pression",
+ "name": "Podcast (Even Voice)",
+ "state": {
+  "type": "pression",
+  "parameters": {
+   "pression.depth": 0.3,
+   "pression.time": 0.7,
+   "pression.upward": 0.8,
+   "pression.downward": 0.7,
+   "pression.lowGain": -1.5,
+   "pression.midGain": 0.0,
+   "pression.highGain": 0.5,
+   "pression.output": 0.0,
+   "pression.input": 0.0,
+   "pression.crossLow": 120.0,
+   "pression.crossHigh": 4500.0,
+   "pression.lowDownThreshold": -30.0,
+   "pression.lowDownRatio": 6.0,
+   "pression.lowUpThreshold": -50.0,
+   "pression.lowUpRatio": 2.0,
+   "pression.lowAttack": 40.0,
+   "pression.lowRelease": 300.0,
+   "pression.midDownThreshold": -24.0,
+   "pression.midDownRatio": 4.0,
+   "pression.midUpThreshold": -46.0,
+   "pression.midUpRatio": 2.5,
+   "pression.midAttack": 20.0,
+   "pression.midRelease": 250.0,
+   "pression.highDownThreshold": -30.0,
+   "pression.highDownRatio": 8.0,
+   "pression.highUpThreshold": -50.0,
+   "pression.highUpRatio": 2.0,
+   "pression.highAttack": 5.0,
+   "pression.highRelease": 120.0,
+   "pression.solo": 0.0
+  }
+ }
+}

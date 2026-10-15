@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "stereo-finisher",
+ "name": "Lo-Fi Master",
+ "state": {
+  "type": "stereo-finisher",
+  "parameters": {
+   "node.16002.eq.tone": -0.3,
+   "node.16003.stereo.width": 0.9,
+   "node.16004.compressor.threshold": -20.0,
+   "node.16004.compressor.ratio": 5.0,
+   "node.16005.clip.threshold": 0.85
+  }
+ }
+}

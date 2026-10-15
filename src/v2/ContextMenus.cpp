@@ -22,7 +22,7 @@ const app::AudioTrackController::MidiClip* midiClipForScene(const app::AudioTrac
 {
     if (const auto* clips = engine.midiClipsView(trackId))
         for (const auto& clip : *clips)
-            if (juce::roundToInt(clip.startBeats / 16.0) == scene)
+            if (clip.launcherScene == scene)
                 return &clip;
     return nullptr;
 }
@@ -222,7 +222,7 @@ void ContextMenus::slotMenu(const TrackRef& track, const int scene)
         const auto* clip = midiClipForScene(engine, track.midiId, scene);
         if (clip == nullptr) {
             if (ImGui::MenuItem(L("Nouveau clip MIDI", "New MIDI clip"), L("Double-clic", "Double click"))) {
-                const auto id = engine.addMidiClip(track.midiId, {}, scene * 16.0, 4.0, true, studio_.trackColour(track));
+                const auto id = engine.addMidiClip(track.midiId, {}, 0.0, 4.0, true, studio_.trackColour(track), scene);
                 if (id != 0) {
                     state_.editedClip = ClipRef { track, id };
                     state_.bringToFront = Panel::editor;
@@ -235,7 +235,7 @@ void ContextMenus::slotMenu(const TrackRef& track, const int scene)
             return;
         }
         const auto clipId = clip->id;
-        if (ImGui::MenuItem(L("Lancer", "Launch"), "â¶"))
+        if (ImGui::MenuItem(L("Lancer", "Launch"), "\xe2\x96\xb6"))
             (void) studio_.launchSlot(track, scene);
         if (ImGui::MenuItem(L("Arrêter la piste", "Stop the track")))
             stopTrack();
@@ -257,7 +257,7 @@ void ContextMenus::slotMenu(const TrackRef& track, const int scene)
         const auto nextFree = midiClipForScene(engine, track.midiId, scene + 1) == nullptr;
         if (ImGui::MenuItem(L("Dupliquer dans la scène suivante", "Duplicate into the next scene"), nullptr, false, nextFree)) {
             const auto copy = *clip;
-            const auto id = engine.addMidiClip(track.midiId, copy.name, (scene + 1) * 16.0, copy.lengthBeats, copy.looping, copy.colour);
+            const auto id = engine.addMidiClip(track.midiId, copy.name, 0.0, copy.lengthBeats, copy.looping, copy.colour, scene + 1);
             if (id != 0) {
                 (void) engine.setMidiClipTimelineBounds(track.midiId, id, copy.lengthBeats, copy.playStartBeats, copy.playEndBeats,
                                                         copy.loopStartBeats, copy.loopEndBeats, copy.looping);
@@ -286,7 +286,7 @@ void ContextMenus::slotMenu(const TrackRef& track, const int scene)
         ImGui::TextDisabled("%s", L("Glissez un sample du Navigateur ici.", "Drag a sample from the Browser here."));
         return;
     }
-    if (ImGui::MenuItem(L("Lancer", "Launch"), "â¶"))
+    if (ImGui::MenuItem(L("Lancer", "Launch"), "\xe2\x96\xb6"))
         (void) studio_.launchSlot(track, scene);
     if (ImGui::MenuItem(L("Arrêter la piste", "Stop the track")))
         stopTrack();

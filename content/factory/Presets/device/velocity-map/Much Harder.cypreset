@@ -1,0 +1,13 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "velocity-map",
+ "name": "Much Harder",
+ "state": {
+  "type": "velocity-map",
+  "parameters": {
+   "midi.velocity": 1.7
+  }
+ }
+}

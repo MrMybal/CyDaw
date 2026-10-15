@@ -1,0 +1,16 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "gate",
+ "name": "Soft Reduction",
+ "state": {
+  "type": "gate",
+  "parameters": {
+   "gate.threshold": -40.0,
+   "gate.attack": 5.0,
+   "gate.release": 400.0,
+   "gate.range": -8.0
+  }
+ }
+}

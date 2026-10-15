@@ -1,4 +1,5 @@
 #include "LauncherView.h"
+#include "AddTrackMenu.h"
 #include "MixerView.h"
 
 #include "Icons.h"
@@ -22,7 +23,7 @@ const app::AudioTrackController::MidiClip* midiClipForScene(const app::AudioTrac
 {
     if (const auto* clips = engine.midiClipsView(trackId))
         for (const auto& clip : *clips)
-            if (juce::roundToInt(clip.startBeats / 16.0) == scene)
+            if (clip.launcherScene == scene)
                 return &clip;
     return nullptr;
 }
@@ -36,7 +37,9 @@ void LauncherView::draw()
     const auto& p = theme::palette();
     auto& engine = studio_.engine();
     const auto tracks = studio_.tracks();
-    constexpr auto scenes = app::AudioTrackController::maximumLauncherScenes;
+    // The scenes in use and two more (eight at least): a large project's
+    // hundreds scroll.
+    const auto scenes = studio_.launcherSceneCount();
 
     // Toolbar: mode, quantisation, stop all.
     const auto arrangementMode = engine.arrangementPlaybackEnabled();
@@ -71,21 +74,22 @@ void LauncherView::draw()
                   "ajouter). Le triangle d'un clip le lance ; pendant qu'il joue, son carré l'arrête. Double-clic : ouvrir le "
                   "clip, ou en créer un dans une case MIDI vide. Le carré d'une case vide arrête la piste, et une scène lancée "
                   "arrête les pistes dont la case est vide ; Ctrl+E (ou le clic droit) retire ou remet ce stop sur les cases "
-                  "vides sélectionnées. La rangée ■ sous les clips arrête chaque piste. La colonne Master lance les scènes.",
+                  "vides sélectionnées. La rangée ■ sous les clips arrête chaque piste. La colonne de gauche lance les scènes.",
                   "Click a track's name: pick it. Click a clip or a slot: select it (Ctrl, Shift: add). A clip's triangle "
                   "launches it; while it plays, its square stops it. Double click: open the clip, or make one in an empty MIDI "
                   "slot. An empty slot's square stops the track, and a scene launched stops the tracks whose slot is empty; "
                   "Ctrl+E (or the right click) takes that stop off the selected empty slots, or puts it back. The ■ row under "
-                  "the clips stops each track. The Master column launches the scenes."));
+                  "the clips stops each track. The column on the left launches the scenes."));
     // Ctrl+E: the selected empty slots' stop taken off, or put back.
     if (state_.focused == Panel::launcher && ImGui::IsKeyChordPressed(ImGuiMod_Ctrl | ImGuiKey_E))
         toggleSelectedStops();
 
-    // As in Bitwig: the tracks' columns, each with its mixer strip under its
-    // clips, and the master's column on the right, whose slots launch the
-    // scenes. The names stay on top and the stops and strips at the bottom;
-    // only the scenes between them scroll up and down (their bar beside the
-    // master's column), everything sideways together.
+    // As in Bitwig: the scenes' column on the left (each row launched from
+    // there), the tracks' columns, each with its mixer strip under its clips,
+    // and the master's column on the right, with its own slots. The names
+    // stay on top and the stops and strips at the bottom; only the scenes
+    // between them scroll up and down (their bar beside the master's
+    // column), the tracks sideways.
     const auto available = ImGui::GetContentRegionAvail();
     const auto gap = dp(3.0f);
     const auto cellWidth = dp(100.0f);
@@ -94,6 +98,7 @@ void LauncherView::draw()
     const auto scrollbar = ImGui::GetStyle().ScrollbarSize;
     const auto barWidth = dp(10.0f);
     const auto masterWidth = cellWidth;
+    const auto scenesWidth = dp(92.0f);
     const auto slotsTop = headerHeight + gap;
     // From the bottom: the sideways bar, the strips, the stop row; the scenes
     // have what is left (one row at least).
@@ -122,7 +127,54 @@ void LauncherView::draw()
         return true;
     };
 
-    const auto gridWidth = std::max(dp(60.0f), available.x - masterWidth - barWidth - gap * 3.0f);
+    // The scenes' column: each row launched from its button, every clip
+    // stopped from the stop row's end.
+    ImGui::BeginChild("##scenes", ImVec2(scenesWidth, available.y), ImGuiChildFlags_None,
+                      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+    {
+        auto* sceneList = ImGui::GetWindowDrawList();
+        const auto top = ImGui::GetCursorScreenPos();
+        const ImVec2 max(top.x + scenesWidth, top.y + headerHeight);
+        sceneList->AddRectFilled(top, max, p.bg2, dp(3.0f));
+        ImGui::PushFont(theme::boldFont(), ui::currentFontBase() * 0.88f);
+        sceneList->AddText(ImVec2(top.x + dp(6.0f), top.y + dp(6.0f)), p.text, L("Scènes", "Scenes"));
+        ImGui::PopFont();
+        ImGui::SetCursorScreenPos(ImVec2(max.x - dp(22.0f), top.y + dp(3.0f)));
+        ImGui::PushFont(nullptr, ui::currentFontBase() * 0.8f);
+        if (ui::iconButton(icon::stop, L("Tout arrêter", "Stop all"), false, 0, ImVec2(dp(20.0f), dp(20.0f))))
+            stopAll();
+        ImGui::PopFont();
+        const auto scenesTop = top.y + slotsTop;
+        ImGui::PushClipRect(ImVec2(top.x, scenesTop), ImVec2(top.x + scenesWidth, scenesTop + viewport), true);
+        for (auto scene = 0; scene < scenes; ++scene) {
+            const ImVec2 min(top.x, scenesTop + scene * rowStep - sceneScroll_);
+            if (min.y + cellHeight < scenesTop || min.y > scenesTop + viewport)
+                continue;
+            ImGui::PushID(scene + 1'000);
+            ImGui::SetCursorScreenPos(min);
+            char label[32];
+            std::snprintf(label, sizeof(label), "%s  %s %d", icon::play, L("Scène", "Scene"), scene + 1);
+            ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.0f, 0.5f));
+            if (ImGui::Button(label, ImVec2(scenesWidth, cellHeight)))
+                launchScene(scene);
+            ImGui::PopStyleVar();
+            ui::tooltip(L("Lancer la scène : les clips de cette rangée", "Launch the scene: the clips of this row"));
+            ImGui::PopID();
+        }
+        ImGui::PopClipRect();
+        if (ImGui::IsWindowHovered() && io.MousePos.y >= scenesTop && io.MousePos.y < scenesTop + viewport)
+            (void) sceneWheel(io.MouseWheel);
+        ImGui::SetCursorScreenPos(ImVec2(top.x, top.y + stopRowTop));
+        char label[48];
+        std::snprintf(label, sizeof(label), "%s  %s", icon::stop, L("Tout", "All"));
+        if (ImGui::Button(label, ImVec2(scenesWidth, stopHeight)))
+            stopAll();
+        ui::tooltip(L("Arrêter tous les clips", "Stop every clip"));
+    }
+    ImGui::EndChild();
+    ImGui::SameLine(0.0f, gap);
+
+    const auto gridWidth = std::max(dp(60.0f), available.x - scenesWidth - masterWidth - barWidth - gap * 4.0f);
     ImGui::BeginChild("##grid", ImVec2(gridWidth, available.y), ImGuiChildFlags_None,
                       ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
     auto* list = ImGui::GetWindowDrawList();
@@ -168,6 +220,10 @@ void LauncherView::draw()
         ImGui::PopFont();
         ImGui::PopID();
     }
+    // After the last track: a "+" that adds one.
+    const auto addWidth = std::max(headerHeight, dp(34.0f));
+    ImGui::SetCursorScreenPos(ImVec2(origin.x + static_cast<float>(tracks.size()) * (cellWidth + gap), origin.y));
+    add_track::button(studio_, state_, "launcherAdd", ImVec2(addWidth, headerHeight));
 
     // The slots, in the scrolled band between the names and the stops. A
     // clip: its triangle launches it (its square, while it plays, stops it),
@@ -215,7 +271,7 @@ void LauncherView::draw()
                 return stops && std::abs(point.x - centre.x) <= stopSize && std::abs(point.y - centre.y) <= stopSize;
             };
 
-            ImGui::PushID(static_cast<int>(column) * 64 + scene);
+            ImGui::PushID(static_cast<int>(column) * 1'024 + scene);
             ImGui::SetCursorScreenPos(min);
             ImGui::InvisibleButton("##cell", ImVec2(cellWidth, cellHeight), ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
             const auto hovered = ImGui::IsItemHovered();
@@ -258,7 +314,7 @@ void LauncherView::draw()
             }
             if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && track.midi && !exists && !overStop) {
                 // A new MIDI clip in this scene.
-                const auto id = engine.addMidiClip(track.midiId, {}, scene * 16.0, 4.0, true, studio_.trackColour(track));
+                const auto id = engine.addMidiClip(track.midiId, {}, 0.0, 4.0, true, studio_.trackColour(track), scene);
                 if (id != 0) {
                     state_.editedClip = ClipRef { track, id };
                     state_.bringToFront = Panel::editor;
@@ -333,7 +389,7 @@ void LauncherView::draw()
         mixer_strip::track(studio_, state_, tracks[column], static_cast<int>(column), cellWidth, stripHeight);
     }
     ImGui::SetCursorScreenPos(origin);
-    ImGui::Dummy(ImVec2(tracks.size() * (cellWidth + gap), bottom));
+    ImGui::Dummy(ImVec2(static_cast<float>(tracks.size()) * (cellWidth + gap) + addWidth + gap, bottom));
     // The wheel: over the scenes, up and down when they do not all fit;
     // elsewhere (and with Shift), sideways. A knob or a fader under the
     // pointer keeps it.
@@ -402,10 +458,11 @@ void LauncherView::draw()
         ImGui::PopFont();
         ImGui::SetCursorScreenPos(ImVec2(max.x - dp(22.0f), top.y + dp(3.0f)));
         ImGui::PushFont(nullptr, ui::currentFontBase() * 0.8f);
-        if (ui::iconButton(icon::stop, L("Tout arrêter", "Stop all"), false, 0, ImVec2(dp(20.0f), dp(20.0f))))
-            stopAll();
+        if (ui::iconButton(icon::stop, L("Arrêter le clip du master", "Stop the master's clip"), false, 0, ImVec2(dp(20.0f), dp(20.0f))))
+            studio_.stopMasterClip();
         ImGui::PopFont();
-        // Its scenes, scrolled with the grid's.
+        // Its slots, scrolled with the grid's: its automation clips, one a
+        // scene (masterSlot draws and plays them).
         const auto masterViewTop = top.y + slotsTop;
         ImGui::PushClipRect(ImVec2(top.x, masterViewTop), ImVec2(top.x + masterWidth, masterViewTop + viewport), true);
         for (auto scene = 0; scene < scenes; ++scene) {
@@ -413,30 +470,138 @@ void LauncherView::draw()
             if (min.y + cellHeight < masterViewTop || min.y > masterViewTop + viewport)
                 continue;
             ImGui::PushID(scene + 1'000);
-            ImGui::SetCursorScreenPos(min);
-            char label[32];
-            std::snprintf(label, sizeof(label), "%s  %s %d", icon::play, L("Scène", "Scene"), scene + 1);
-            if (ImGui::Button(label, ImVec2(masterWidth, cellHeight)))
-                launchScene(scene);
-            ui::tooltip(L("Lancer la scène : les clips de cette rangée", "Launch the scene: the clips of this row"));
+            masterSlot(scene, min, ImVec2(min.x + masterWidth, min.y + cellHeight));
             ImGui::PopID();
         }
         ImGui::PopClipRect();
         if (ImGui::IsWindowHovered() && io.MousePos.y >= masterViewTop && io.MousePos.y < masterViewTop + viewport)
             (void) sceneWheel(io.MouseWheel);
-        // The stop row's end: every track stopped.
+        // The stop row's end: the master's clip stopped.
         ImGui::SetCursorScreenPos(ImVec2(top.x, top.y + stopRowTop));
         {
             char label[48];
-            std::snprintf(label, sizeof(label), "%s  %s", icon::stop, L("Tout", "All"));
+            std::snprintf(label, sizeof(label), "%s", icon::stop);
             if (ImGui::Button(label, ImVec2(masterWidth, stopHeight)))
-                stopAll();
-            ui::tooltip(L("Arrêter tous les clips", "Stop every clip"));
+                studio_.stopMasterClip();
+            ui::tooltip(L("Arrêter le clip du master", "Stop the master's clip"));
         }
         ImGui::SetCursorScreenPos(ImVec2(top.x, top.y + mixerTop));
         mixer_strip::master(studio_, state_, masterWidth, stripHeight);
     }
     ImGui::EndChild();
+}
+
+void LauncherView::masterSlot(const int scene, const ImVec2 min, const ImVec2 max)
+{
+    const auto& p = theme::palette();
+    const auto& io = ImGui::GetIO();
+    auto* list = ImGui::GetWindowDrawList();
+    const auto width = max.x - min.x;
+    const auto height = max.y - min.y;
+    const auto playWidth = dp(20.0f);
+    const auto open = [&] {
+        state_.editedMasterScene = scene;
+        state_.editedClip.reset();
+        state_.bringToFront = Panel::editor;
+    };
+    const auto* clip = studio_.masterClip(scene);
+    const auto playing = clip != nullptr && studio_.playingMasterScene() == scene;
+    const auto pending = clip != nullptr && studio_.pendingMasterScene() == scene;
+    ImGui::SetCursorScreenPos(min);
+    ImGui::InvisibleButton("##masterCell", ImVec2(width, height), ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
+    const auto hovered = ImGui::IsItemHovered();
+    const auto overPlay = hovered && clip != nullptr && io.MousePos.x < min.x + playWidth;
+    if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
+        state_.focused = Panel::launcher;
+        if (clip != nullptr && io.MouseClickedPos[0].x < min.x + playWidth) {
+            // Its button: launch it, or stop it while it plays.
+            if (playing || pending)
+                studio_.stopMasterClip();
+            else
+                (void) studio_.launchMasterClip(scene);
+        } else if (clip != nullptr) {
+            // A click shows it in the editor (without bringing it forward).
+            state_.editedMasterScene = scene;
+            state_.editedClip.reset();
+        }
+    }
+    if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && !overPlay) {
+        if (clip == nullptr)
+            (void) studio_.createMasterClip(scene);
+        open();
+    }
+    if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+        ImGui::OpenPopup("##masterSlotMenu");
+    if (ImGui::BeginPopup("##masterSlotMenu")) {
+        if (clip == nullptr) {
+            if (ImGui::MenuItem(L("Créer un clip d'automation", "Create an automation clip"))) {
+                (void) studio_.createMasterClip(scene);
+                open();
+            }
+        } else {
+            if (ImGui::MenuItem(playing || pending ? L("Arrêter", "Stop") : L("Lancer", "Launch"))) {
+                if (playing || pending)
+                    studio_.stopMasterClip();
+                else
+                    (void) studio_.launchMasterClip(scene);
+            }
+            if (ImGui::MenuItem(L("Éditer", "Edit")))
+                open();
+            if (ImGui::MenuItem(L("Dupliquer vers la scène suivante", "Duplicate to the next scene"), nullptr, false,
+                                studio_.masterClip(scene + 1) == nullptr)) {
+                auto copy = *clip;
+                copy.name = clip->name + " 2";
+                studio_.setMasterClip(scene + 1, std::move(copy));
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem(L("Supprimer", "Delete"))) {
+                if (state_.editedMasterScene && *state_.editedMasterScene == scene)
+                    state_.editedMasterScene.reset();
+                studio_.removeMasterClip(scene);
+            }
+        }
+        ImGui::EndPopup();
+    }
+    // What a menu did: the clip as it is now.
+    clip = studio_.masterClip(scene);
+    if (overPlay)
+        ui::tooltip(playing || pending ? L("Arrêter le clip du master", "Stop the master's clip")
+                                       : L("Lancer le clip du master", "Launch the master's clip"));
+    else if (hovered && clip == nullptr)
+        ui::tooltip(L("Double-clic : un clip d'automation du master (volume, ses effets) joué avec cette scène",
+                      "Double click: an automation clip of the master (level, its effects) played with this scene"));
+    else if (hovered)
+        ui::tooltip(L("Clic : l'éditer. Double-clic : l'ouvrir. Clic droit : son menu.",
+                      "Click: edit it. Double click: open it. Right click: its menu."));
+
+    const ImVec2 centre((min.x + max.x) * 0.5f, (min.y + max.y) * 0.5f);
+    if (clip != nullptr) {
+        const auto fill = theme::fromArgb(clip->colour != 0 ? clip->colour : 0xffffb84du);
+        list->AddRectFilled(min, max, theme::mix(fill, p.bg0 | 0xff000000u, hovered ? 0.4f : 0.5f), dp(3.0f));
+        if (playing)
+            list->AddRectFilled(ImVec2(min.x, max.y - dp(3.0f)),
+                                ImVec2(min.x + width * std::clamp(studio_.masterClipProgress(), 0.0f, 1.0f), max.y), p.play);
+        const ImVec2 marker(min.x + playWidth * 0.5f, centre.y);
+        if (overPlay)
+            list->AddRectFilled(ImVec2(min.x + dp(2.0f), min.y + dp(2.0f)), ImVec2(min.x + playWidth, max.y - dp(2.0f)),
+                                (p.text & 0x00ffffffu) | 0x22000000u, dp(2.0f));
+        if (playing || pending)
+            list->AddRectFilled(ImVec2(marker.x - dp(4.0f), marker.y - dp(4.0f)), ImVec2(marker.x + dp(4.0f), marker.y + dp(4.0f)),
+                                playing ? p.play : p.accent);
+        else
+            list->AddTriangle(ImVec2(marker.x - dp(4.0f), marker.y - dp(5.0f)), ImVec2(marker.x - dp(4.0f), marker.y + dp(5.0f)),
+                              ImVec2(marker.x + dp(5.0f), marker.y), overPlay ? p.play : p.text, 1.4f);
+        ui::clippedText(list, ImVec2(min.x + playWidth + dp(2.0f), min.y + (height - ImGui::GetFontSize()) * 0.5f),
+                        width - playWidth - dp(6.0f), p.text, clip->name.toRawUTF8());
+        if (pending)
+            list->AddRect(min, max, p.accent, dp(3.0f), 1.5f);
+    } else {
+        list->AddRectFilled(min, max, hovered ? p.bg3 : p.bg1, dp(3.0f));
+        if (hovered)
+            ui::centredText(list, min, max, p.textFaint, "+");
+    }
+    if (clip != nullptr && state_.editedMasterScene && *state_.editedMasterScene == scene)
+        list->AddRect(ImVec2(min.x + 0.5f, min.y + 0.5f), ImVec2(max.x - 0.5f, max.y - 0.5f), p.text, dp(3.0f), 1.5f);
 }
 
 void LauncherView::launchScene(const int scene)

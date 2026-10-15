@@ -16,6 +16,10 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_extra/juce_gui_extra.h>
 
+#if JUCE_WINDOWS
+ #include "PluginInterface.h"
+#endif
+
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -78,7 +82,7 @@ enum class NativeParameterField : std::uint8_t {
     // An effect's values kept in slots (the equaliser's bands, the studio
     // effects' styles and options), by slot.
     effectSlotFirst,
-    effectSlotLast = effectSlotFirst + 47
+    effectSlotLast = effectSlotFirst + 95
 };
 static_assert(static_cast<int>(NativeParameterField::effectSlotLast) <= 255);
 
@@ -103,7 +107,7 @@ enum class InstrumentParameterField : std::uint16_t {
     // A sampler's level, then its settings (SamplerSetting order).
     samplerLevel,
     samplerSettingFirst,
-    samplerSettingLast = samplerSettingFirst + 15,
+    samplerSettingLast = samplerSettingFirst + 31,
     // Prisme's settings (prism::parameter order).
     prismFirst,
     prismLast = prismFirst + cydaw::engine::prism::parameterCount - 1,
@@ -333,7 +337,8 @@ std::optional<NativeParameterField> fieldForBinding(
             for (std::size_t index = 0; index < std::size(fields); ++index)
                 if (fields[index] == effect->field)
                     return static_cast<NativeParameterField>(static_cast<int>(NativeParameterField::effect1) + static_cast<int>(index));
-            if (effect->field == nullptr && effect->slot >= 0 && effect->slot < 48)
+            if (effect->field == nullptr && effect->slot >= 0
+                && effect->slot <= static_cast<int>(NativeParameterField::effectSlotLast) - static_cast<int>(NativeParameterField::effectSlotFirst))
                 return static_cast<NativeParameterField>(static_cast<int>(NativeParameterField::effectSlotFirst) + effect->slot);
         }
     return {};
@@ -670,6 +675,54 @@ void applyInstrumentParameter(
     }
 }
 
+// What an instrument's plan holds in a field (the inverse of
+// applyInstrumentParameter); none for a field it has no value for.
+std::optional<float> instrumentParameterValue(
+    const cydaw::engine::PolySynthGraphPlan& plan,
+    const InstrumentParameterField field) noexcept
+{
+    switch (field) {
+    case InstrumentParameterField::none: return std::nullopt;
+    case InstrumentParameterField::waveform: return static_cast<float>(static_cast<int>(plan.waveform));
+    case InstrumentParameterField::oscillatorLevel:
+    case InstrumentParameterField::modelLevel:
+    case InstrumentParameterField::samplerLevel: return plan.oscillatorLevel;
+    case InstrumentParameterField::attackMilliseconds: return plan.attackSeconds * 1'000.0f;
+    case InstrumentParameterField::decayMilliseconds: return plan.decaySeconds * 1'000.0f;
+    case InstrumentParameterField::sustainLevel: return plan.sustainLevel;
+    case InstrumentParameterField::releaseMilliseconds: return plan.releaseSeconds * 1'000.0f;
+    case InstrumentParameterField::filterCutoff: return plan.filterCutoffHz;
+    case InstrumentParameterField::filterResonance: return plan.filterResonance;
+    case InstrumentParameterField::transpose: return static_cast<float>(plan.transposeSemitones);
+    case InstrumentParameterField::minimumNote: return static_cast<float>(plan.minimumMidiNote);
+    case InstrumentParameterField::maximumNote: return static_cast<float>(plan.maximumMidiNote);
+    case InstrumentParameterField::velocityScale: return plan.velocityScale;
+    case InstrumentParameterField::voiceMode: return static_cast<float>(plan.voiceMode);
+    case InstrumentParameterField::glide: return plan.glideSeconds * 1'000.0f;
+    default: break;
+    }
+    const auto at = [field](const InstrumentParameterField first) {
+        return static_cast<std::size_t>(static_cast<int>(field) - static_cast<int>(first));
+    };
+    if (field >= InstrumentParameterField::modelSettingFirst && field <= InstrumentParameterField::modelSettingLast
+        && at(InstrumentParameterField::modelSettingFirst) < cydaw::engine::soundModelSettingCount)
+        return plan.soundModelValues[at(InstrumentParameterField::modelSettingFirst)];
+    if (field >= InstrumentParameterField::samplerSettingFirst && field <= InstrumentParameterField::samplerSettingLast
+        && at(InstrumentParameterField::samplerSettingFirst) < cydaw::engine::samplerSettingCount)
+        return plan.samplerValues[at(InstrumentParameterField::samplerSettingFirst)];
+    if (field >= InstrumentParameterField::prismFirst && field <= InstrumentParameterField::prismLast)
+        return plan.prismValues[at(InstrumentParameterField::prismFirst)];
+    if (field >= InstrumentParameterField::kickFirst && field <= InstrumentParameterField::kickLast)
+        return plan.kickValues[at(InstrumentParameterField::kickFirst)];
+    if (field >= InstrumentParameterField::drumFirst && field <= InstrumentParameterField::drumLast)
+        return plan.drumValues[at(InstrumentParameterField::drumFirst)];
+    if (field >= InstrumentParameterField::synthFirst && field <= InstrumentParameterField::synthLast
+        && plan.synthModel != cydaw::engine::synth::Model::none
+        && static_cast<int>(at(InstrumentParameterField::synthFirst)) < cydaw::engine::synth::parameterCount(plan.synthModel))
+        return plan.synthValues[at(InstrumentParameterField::synthFirst)];
+    return std::nullopt;
+}
+
 struct HostSlotTarget {
     int nodeIndex { -1 };
     NativeParameterField field { NativeParameterField::mix };
@@ -689,6 +742,26 @@ struct HostParameterMap {
 
 class GraphRuntimeProcessor;
 
+#if JUCE_WINDOWS
+// The plug-in's window: CyDAW's own interface of its device (Prisme's,
+// a synth's, the effects' large views, or the interface drawn in the
+// workshop), over the graph its state holds. Never the graph itself.
+class GraphRuntimeEditor final : public juce::AudioProcessorEditor,
+                                 private juce::Timer {
+public:
+    explicit GraphRuntimeEditor(GraphRuntimeProcessor& processor);
+    ~GraphRuntimeEditor() override;
+    void paint(juce::Graphics& graphics) override;
+    void resized() override;
+
+private:
+    void publish(bool topologyChanged);
+    void timerCallback() override;
+
+    GraphRuntimeProcessor& processor_;
+    std::unique_ptr<cydaw::plugin_ui::PluginInterface> interface_;
+};
+#else
 class GraphRuntimeEditor final : public juce::AudioProcessorEditor,
                                  private juce::Timer {
 public:
@@ -711,6 +784,7 @@ private:
     juce::TooltipWindow tooltips_ { this, 650 };
     bool graphEditorVisible_ {};
 };
+#endif
 
 class GraphRuntimeProcessor final : public juce::AudioProcessor {
 public:
@@ -784,6 +858,14 @@ public:
                       juce::MidiBuffer& midi) override
     {
         juce::ScopedNoDenormals noDenormals;
+        // The host's tempo: the effects and the MIDI effects synced to a
+        // note value follow it.
+        if (auto* head = getPlayHead())
+            if (const auto position = head->getPosition())
+                if (const auto bpm = position->getBpm(); bpm.hasValue() && *bpm > 1.0) {
+                    hostTempo_.store(*bpm, std::memory_order_relaxed);
+                    cydaw::app::NativeDspRuntime::setSessionTempo(*bpm);
+                }
         // A host rendering offline: a sampler's lane waits for frames still
         // on the disk instead of missing them.
         const juce::ScopedValueSetter<bool> mayWait(cydaw::engine::samplerMayWait, isNonRealtime());
@@ -915,7 +997,7 @@ public:
         instrumentRenderer_.setPlan(instrumentPlan);
         const auto preserveHostValues = preserveHostParametersOnce_.exchange(
             false, std::memory_order_acq_rel);
-        configureHostParameters(graph, publishedParameters,
+        configureHostParameters(graph, instrumentPlan, publishedParameters,
                                 !preserveHostValues);
         const juce::ScopedLock lock(stateLock_);
         editorState_ = editorState;
@@ -959,8 +1041,37 @@ public:
         return analysisFrames_.tryPop(frame);
     }
 
+    // What the window's displays read of the sound (message thread): the
+    // devices' taps, what they show of their work, their levels, the tempo.
+    void setTaps(const std::vector<cydaw::app::NativeDspRuntime::TapRequest>& taps) noexcept
+    {
+        runtime_.setTaps(taps);
+    }
+    bool readTap(const std::uint64_t nodeId, const bool input,
+                 cydaw::engine::AudioAnalysisFrame& frame) const noexcept
+    {
+        return runtime_.readTap(nodeId, input, frame);
+    }
+    void nodeReadings(const std::uint64_t nodeId, std::vector<float>& into) const
+    {
+        into.resize(1'024);
+        into.resize(runtime_.nodeReadings(nodeId, into.data(), into.size()));
+    }
+    void nodePeaks(const std::vector<std::uint64_t>& nodes, std::vector<float>& left,
+                   std::vector<float>& right) const
+    {
+        left.assign(nodes.size(), 0.0f);
+        right.assign(nodes.size(), 0.0f);
+        runtime_.takeNodePeaks(nodes.data(), nodes.size(), left.data(), right.data());
+    }
+    [[nodiscard]] double hostTempo() const noexcept
+    {
+        return hostTempo_.load(std::memory_order_relaxed);
+    }
+
     void configureHostParameters(
         const cydaw::engine::NativeDspGraph& graph,
+        const cydaw::engine::PolySynthGraphPlan& instrumentPlan,
         const std::vector<cydaw::graph::PublishedParameter>& parameters,
         const bool notifyHostValues)
     {
@@ -1049,6 +1160,11 @@ public:
                     -1, NativeParameterField::mix, instrumentField,
                     metadata.minimum, metadata.maximum
                 };
+                // Its value as the instrument plays it now (the window may
+                // just have moved it): the host follows, and never puts an
+                // older one back.
+                if (const auto value = instrumentParameterValue(instrumentPlan, instrumentField); value && extent > 0.0f)
+                    currentNormalised = juce::jlimit(0.0f, 1.0f, (*value - metadata.minimum) / extent);
             }
             if (notifyHostValues
                 && std::abs(hostParameters_[slot]->getValue()
@@ -1241,7 +1357,7 @@ public:
                         && parameter.minimum <= parameter.maximum)
                         published.push_back(std::move(parameter));
                 }
-        configureHostParameters(*native, published, false);
+        configureHostParameters(*native, instrumentPlan, published, false);
         if (schema >= 2)
             if (const auto* values = root->getProperty("hostValues").getArray())
                 for (auto slot = std::size_t {};
@@ -1356,6 +1472,7 @@ private:
     // previous map.
     cydaw::realtime::RtPublisher<HostParameterMap> hostParameterMap_;
     std::atomic<bool> preserveHostParametersOnce_ {};
+    std::atomic<double> hostTempo_ { 120.0 };
     cydaw::realtime::SpscRing<cydaw::engine::AudioAnalysisFrame, 8>
         analysisFrames_;
     double analysisSampleRate_ { 48'000.0 };
@@ -1364,6 +1481,78 @@ private:
     cydaw::engine::AnalysisWaveformRing analysisRing_;
 };
 
+#if JUCE_WINDOWS
+GraphRuntimeEditor::GraphRuntimeEditor(GraphRuntimeProcessor& processor)
+    : AudioProcessorEditor(processor), processor_(processor)
+{
+    cydaw::plugin_ui::PluginSound sound;
+    auto* owner = &processor_;
+    sound.setTaps = [owner](const std::vector<cydaw::app::NativeDspRuntime::TapRequest>& taps) { owner->setTaps(taps); };
+    sound.readTap = [owner](const std::uint64_t nodeId, const bool input, cydaw::engine::AudioAnalysisFrame& frame) {
+        return owner->readTap(nodeId, input, frame);
+    };
+    sound.readings = [owner](const std::uint64_t nodeId, std::vector<float>& into) { owner->nodeReadings(nodeId, into); };
+    sound.peaks = [owner](const std::vector<std::uint64_t>& nodes, std::vector<float>& left, std::vector<float>& right) {
+        owner->nodePeaks(nodes, left, right);
+    };
+    sound.tempo = [owner] { return owner->hostTempo(); };
+    interface_ = std::make_unique<cydaw::plugin_ui::PluginInterface>(
+        processor.getName(), processor.acceptsMidi(), std::move(sound),
+        [this](const bool structural) { publish(structural); });
+    if (const auto state = processor_.editorState(); !state.isVoid())
+        interface_->restore(state);
+    addAndMakeVisible(*interface_);
+    const auto size = interface_->preferredSize();
+    const auto least = cydaw::plugin_ui::PluginInterface::smallestSize();
+    setResizable(true, true);
+    setResizeLimits(least.x, least.y, 4'096, 2'160);
+    setSize(size.x, size.y);
+    startTimerHz(30);
+    publish(true);
+}
+
+GraphRuntimeEditor::~GraphRuntimeEditor()
+{
+    stopTimer();
+    processor_.setTaps({});
+    interface_.reset();
+}
+
+void GraphRuntimeEditor::paint(juce::Graphics& graphics)
+{
+    graphics.fillAll(juce::Colour(0xff2b2d31));
+}
+
+void GraphRuntimeEditor::resized()
+{
+    if (interface_ != nullptr)
+        interface_->setBounds(getLocalBounds());
+}
+
+void GraphRuntimeEditor::timerCallback()
+{
+    // The host's automation, shown on the knobs.
+    if (interface_ == nullptr)
+        return;
+    for (const auto& [key, value] :
+         processor_.currentPublishedParameterValues())
+        (void) interface_->graph().setGraphInterfaceParameter(key, value);
+}
+
+void GraphRuntimeEditor::publish(const bool topologyChanged)
+{
+    if (interface_ == nullptr)
+        return;
+    auto& graph = interface_->graph();
+    const auto runtimeExport = graph.runtimeGraphExport();
+    if (runtimeExport.compilationResult.failed())
+        return;
+    (void) processor_.applyEditorGraph(
+        graph.serialise(), runtimeExport.nativeGraph,
+        runtimeExport.publishedParameters, runtimeExport.instrumentPlan,
+        topologyChanged);
+}
+#else
 GraphRuntimeEditor::GraphRuntimeEditor(GraphRuntimeProcessor& processor)
     : AudioProcessorEditor(processor), processor_(processor)
 {
@@ -1512,6 +1701,8 @@ void GraphRuntimeEditor::publish(const bool topologyChanged)
     graph_.setDspCompilationStatus(result,
                                    runtimeExport.nativeGraph.nodes.size());
 }
+
+#endif
 
 } // namespace cydaw::graph_plugin
 

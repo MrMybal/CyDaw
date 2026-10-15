@@ -1,6 +1,7 @@
 #pragma once
 
 #include "SampleCatalog.h"
+#include "Studio.h"
 #include "UiState.h"
 
 #include <imgui.h>

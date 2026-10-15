@@ -1,0 +1,23 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "poly-sine",
+ "name": "Warm Triangle Pad",
+ "state": {
+  "type": "poly-sine",
+  "parameters": {
+   "node.10002.voice.mode": 0.0,
+   "node.10002.voice.glide": 0.0,
+   "node.10003.polyOscillator.waveform": 1.0,
+   "node.10003.polyOscillator.level": 0.13,
+   "node.10004.envelope.attack": 700.0,
+   "node.10004.envelope.decay": 1500.0,
+   "node.10004.envelope.sustain": 0.7,
+   "node.10004.envelope.release": 2600.0,
+   "node.10007.gain.db": 0.0,
+   "node.10005.voiceFilter.cutoff": 4200.0,
+   "node.10005.voiceFilter.resonance": 0.9
+  }
+ }
+}

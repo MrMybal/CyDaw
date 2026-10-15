@@ -1,0 +1,14 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "arp-motion",
+ "name": "Octave Up",
+ "state": {
+  "type": "arp-motion",
+  "parameters": {
+   "node.20003.midi.transpose": 12.0,
+   "node.20004.midi.velocity": 0.86
+  }
+ }
+}

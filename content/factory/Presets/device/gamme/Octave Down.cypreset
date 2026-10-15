@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "gamme",
+ "name": "Octave Down",
+ "state": {
+  "type": "gamme",
+  "parameters": {
+   "gamme.transpose": -12.0,
+   "gamme.degrees": 0.0,
+   "gamme.key": 0.0,
+   "gamme.scale": 0.0,
+   "gamme.mode": 0.0
+  }
+ }
+}

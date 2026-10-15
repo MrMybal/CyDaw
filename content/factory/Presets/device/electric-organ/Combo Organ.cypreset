@@ -1,0 +1,27 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "electric-organ",
+ "name": "Combo Organ",
+ "state": {
+  "type": "electric-organ",
+  "parameters": {
+   "node.39002.voice.mode": 0.0,
+   "node.39002.voice.glide": 0.0,
+   "node.39003.polyOscillator.waveform": 1.0,
+   "node.39003.polyOscillator.level": 0.12,
+   "node.39004.envelope.attack": 4.0,
+   "node.39004.envelope.decay": 60.0,
+   "node.39004.envelope.sustain": 0.9,
+   "node.39004.envelope.release": 140.0,
+   "node.39005.gain.db": 0.0,
+   "node.39006.voiceFilter.cutoff": 8200.0,
+   "node.39006.voiceFilter.resonance": 1.4,
+   "node.39007.drive.db": 8.0,
+   "node.39008.compressor.threshold": -18.0,
+   "node.39008.compressor.ratio": 3.0,
+   "node.39009.stereo.width": 1.0
+  }
+ }
+}

@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "chorus",
+ "name": "Classic Chorus",
+ "state": {
+  "type": "chorus",
+  "parameters": {
+   "chorus.rate": 0.6,
+   "chorus.depth": 0.5,
+   "chorus.delay": 14.0,
+   "chorus.width": 0.8,
+   "chorus.mix": 0.5
+  }
+ }
+}

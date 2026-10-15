@@ -1,7 +1,8 @@
 #pragma once
 
 #include "PresetMenu.h"
-#include "Studio.h"
+#include "DeviceHost.h"
+#include "EditorWindows.h"
 #include "UiState.h"
 
 #include <cydaw/engine/KickSynth.h>
@@ -21,7 +22,7 @@ namespace cydaw::v2 {
 
 class KickView final {
 public:
-    KickView(Studio& studio, UiState& state);
+    KickView(DeviceHost& studio, UiState& state);
 
     // The card's pane: as wide as this.
     [[nodiscard]] static float paneWidth();
@@ -29,11 +30,12 @@ public:
                   ImU32 colour);
     // `detached`: in a window of its own out of the studio's, as a plug-in's.
     void openEditor(const TrackRef& track, std::uint64_t nodeId, bool detached = false);
-    [[nodiscard]] bool showsEditor(const TrackRef& track, std::uint64_t nodeId) const
+    [[nodiscard]] bool showsEditor(const TrackRef& track, std::uint64_t nodeId) const { return windows_.shows(track, nodeId); }
+    // That instrument's window's id (each has its own window).
+    [[nodiscard]] std::string editorWindowId(const TrackRef& track, std::uint64_t nodeId) const
     {
-        return editor_ && editor_->track == track && editor_->nodeId == nodeId;
+        return windows_.idOf(track, nodeId);
     }
-    static constexpr const char* editorWindowId = "###kickEditor";
     void drawEditor();
 
 private:
@@ -66,7 +68,7 @@ private:
     // The KICK tab: the picture, then the sections.
     void drawKickTab();
 
-    Studio& studio_;
+    DeviceHost& studio_;
     UiState& state_;
     PresetMenu presets_;
     Card card_;
@@ -74,8 +76,13 @@ private:
         TrackRef track;
         std::uint64_t nodeId {};
     };
+    // Its windows (one for each instrument opened), and the one being drawn:
+    // its instrument, its id.
+    EditorWindows windows_ { "###kickEditor" };
     std::optional<Target> editor_;
-    bool focusEditor_ {};
+    std::string windowId_;
+    // One window; false once it is closed.
+    bool drawEditorWindow(bool focus);
     // The pictures' samples and the settings they were made with: a few,
     // for a card and a window of two tracks drawn in the same frame.
     struct Picture {

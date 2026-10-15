@@ -3,6 +3,7 @@
 #include <imgui.h>
 
 #include <algorithm>
+#include <cmath>
 
 namespace cydaw::v2 {
 
@@ -22,33 +23,24 @@ void DeviceSignals::updateTarget(const Target& target, const GraphSlot& slot)
     if (updatedFrame_ == ImGui::GetFrameCount() && tapped_ && *tapped_ == target && spansSlot_ == &slot)
         return;
     updatedFrame_ = ImGui::GetFrameCount();
-    auto& engine = studio_.engine();
     // Where each device runs in the engine, again only when the graph changed.
     if (spansSlot_ != &slot || spansRevision_ != slot.revision()) {
         spans_ = slot.graph().editorNativeSpans();
         spansSlot_ = &slot;
         spansRevision_ = slot.revision();
     }
-    const auto setTaps = [&engine](const Target& where, const std::vector<app::NativeDspRuntime::TapRequest>& taps) {
-        if (where.simulation)
-            engine.setSimulationTaps(taps);
-        else if (where.track.isBus())
-            engine.setVirtualBusTaps(where.track.bus, taps);
-        else if (where.track.master)
-            engine.setMasterNodeTaps(taps);
-        else if (where.track.midi)
-            engine.setMidiTrackNodeTaps(where.track.midiId, taps);
-        else
-            engine.setTrackNodeTaps(where.track.audioIndex, taps);
+    const auto setTaps = [this](const Target& where, const std::vector<app::NativeDspRuntime::TapRequest>& taps) {
+        if (source_.setTaps)
+            source_.setTaps(where.simulation, where.track, taps);
     };
     if (tapped_ && !(*tapped_ == target)) {
-        if (tapped_->simulation || tapped_->track.isMaster() || studio_.isValid(tapped_->track)
-            || (tapped_->track.isBus() && studio_.hardwareBus(tapped_->track.bus)))
+        if (tapped_->simulation || (source_.stillThere && source_.stillThere(tapped_->track)))
             setTaps(*tapped_, {});
         taps_.clear();
         cards_.clear();
     }
     tapped_ = target;
+    takeLevels(target);
 
     // The cards in signal order, as far as the engine keeps taps.
     auto nodes = slot.graph().editorNodes();
@@ -78,15 +70,8 @@ void DeviceSignals::updateTarget(const Target& target, const GraphSlot& slot)
     }
 
     const auto now = ImGui::GetTime();
-    const auto read = [&engine, &target](const std::uint64_t nodeId, const bool input, engine::AudioAnalysisFrame& frame) {
-        if (target.simulation)
-            return engine.readSimulationTap(nodeId, input, frame);
-        if (target.track.isBus())
-            return engine.readVirtualBusTap(target.track.bus, nodeId, input, frame);
-        if (target.track.master)
-            return engine.readMasterNodeTap(nodeId, input, frame);
-        return target.track.midi ? engine.readMidiTrackNodeTap(target.track.midiId, nodeId, input, frame)
-                                 : engine.readTrackNodeTap(target.track.audioIndex, nodeId, input, frame);
+    const auto read = [this, &target](const std::uint64_t nodeId, const bool input, engine::AudioAnalysisFrame& frame) {
+        return source_.readTap && source_.readTap(target.simulation, target.track, nodeId, input, frame);
     };
     for (const auto id : shown) {
         const auto& span = spans_.at(id);
@@ -118,6 +103,11 @@ void DeviceSignals::updateTarget(const Target& target, const GraphSlot& slot)
             card.after.update(nullptr, now);
             card.inputDb = card.outputDb = -120.0f;
         }
+        // What its processor shows of its work: a track's chain only.
+        if (target.simulation || target.track.isBus() || !source_.readings)
+            card.readings.clear();
+        else
+            source_.readings(target.track, span.exits.front(), card.readings);
         // Levels sixty times a second, for the dynamics' history.
         if (now - card.lastHistory >= 1.0 / 60.0 && now - card.lastFresh < 0.3) {
             card.lastHistory = now;
@@ -130,6 +120,53 @@ void DeviceSignals::updateTarget(const Target& target, const GraphSlot& slot)
     }
 }
 
+void DeviceSignals::takeLevels(const Target& target)
+{
+    // A track's chain: the loudest each card's last nodes gave out since the
+    // last frame, then a meter's fall (about 24 dB a second).
+    if (target.simulation || target.track.isBus() || !source_.peaks) {
+        levels_.clear();
+        return;
+    }
+    std::vector<std::uint64_t> nodes;
+    for (const auto& [card, span] : spans_)
+        nodes.insert(nodes.end(), span.exits.begin(), span.exits.end());
+    std::vector<float> left;
+    std::vector<float> right;
+    source_.peaks(target.track, nodes, left, right);
+    const auto now = ImGui::GetTime();
+    const auto fall = static_cast<float>(std::pow(10.0, -24.0 / 20.0 * std::clamp(now - levelsTaken_, 0.0, 0.5)));
+    levelsTaken_ = now;
+    std::map<std::uint64_t, Level> next;
+    auto at = std::size_t {};
+    for (const auto& [card, span] : spans_) {
+        Level heard;
+        for (std::size_t exit = 0; exit < span.exits.size() && at < left.size(); ++exit, ++at) {
+            heard.left = std::max(heard.left, left[at]);
+            heard.right = std::max(heard.right, right[at]);
+        }
+        auto shown = Level {};
+        if (const auto before = levels_.find(card); before != levels_.end())
+            shown = { before->second.left * fall, before->second.right * fall };
+        next[card] = { std::max(shown.left, heard.left), std::max(shown.right, heard.right) };
+    }
+    levels_ = std::move(next);
+}
+
+std::optional<DeviceSignals::Level> DeviceSignals::outputLevel(const std::uint64_t cardId) const
+{
+    const auto found = levels_.find(cardId);
+    return found != levels_.end() ? std::optional<Level>(found->second) : std::nullopt;
+}
+
+std::optional<DeviceSignals::Level> DeviceSignals::instrumentLevel() const
+{
+    for (const auto& [card, span] : spans_)
+        if (span.instrument)
+            return outputLevel(card);
+    return std::nullopt;
+}
+
 const app::NodeGraphComponent::EditorNativeSpan* DeviceSignals::span(const std::uint64_t cardId) const
 {
     const auto found = spans_.find(cardId);
@@ -139,7 +176,7 @@ const app::NodeGraphComponent::EditorNativeSpan* DeviceSignals::span(const std::
 visual::Live DeviceSignals::live(const std::uint64_t cardId, Histories& histories) const
 {
     visual::Live live;
-    live.tempo = studio_.engine().tempo();
+    live.tempo = source_.tempo ? source_.tempo() : 120.0;
     const auto found = cards_.find(cardId);
     if (found == cards_.end())
         return live;
@@ -161,6 +198,8 @@ visual::Live DeviceSignals::live(const std::uint64_t cardId, Histories& historie
     live.outputHistory = histories.outputs.data();
     live.reductionHistory = histories.differences.data();
     live.historyCount = historyLength;
+    live.readings = card.readings.empty() ? nullptr : card.readings.data();
+    live.readingCount = static_cast<int>(card.readings.size());
     return live;
 }
 

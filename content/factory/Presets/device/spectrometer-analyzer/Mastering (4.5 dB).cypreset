@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "spectrometer-analyzer",
+ "name": "Mastering (4.5 dB)",
+ "state": {
+  "type": "spectrometer-analyzer",
+  "parameters": {
+   "node.48002.spectrometer.floor": -80.0,
+   "node.48002.spectrometer.tilt": 4.5,
+   "node.48002.spectrometer.smoothing": 0.7,
+   "node.48002.spectrometer.hold": 4.0,
+   "node.48002.spectrometer.history": 16.0
+  }
+ }
+}

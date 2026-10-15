@@ -178,9 +178,9 @@ def main() -> int:
         # ---- Presets ----
         listed = need({"cmd": "presets", "track": track, "nodeId": node}, "presets")
         factory = [item["name"] for item in listed.get("presets", []) if item.get("factory")]
-        check(len(factory) >= 10 and "Balais intimes" in factory, f"Batterie's factory presets ({len(factory)})")
-        if "Balais intimes" in factory:
-            need({"cmd": "presets", "track": track, "nodeId": node, "action": "load", "name": "Balais intimes"}, "load")
+        check(len(factory) >= 10 and "Intimate Brushes" in factory, f"Batterie's factory presets ({len(factory)})")
+        if "Intimate Brushes" in factory:
+            need({"cmd": "presets", "track": track, "nodeId": node, "action": "load", "name": "Intimate Brushes"}, "load")
             loaded = batterie()
             check(loaded.get("kitInstrument") == "drums-unruly-brushes" and abs(loaded["values"]["kick.level"] + 3.0) < 1e-4,
                   f"a preset of another kit loads that kit and its mix ({loaded.get('kit')})")

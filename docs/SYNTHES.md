@@ -1,10 +1,14 @@
 # La famille de synthés
 
 Les synthés natifs de CyDAW qui partagent un même cadre : **Ambre** (synthé analogique polyphonique),
-**Colosse** (grand synthé moderne à tables d'ondes), **Mosaïque** (synthé hybride) et **Nébuleuse** (synthé
-d'atmosphères, granulaire). Chacun a sa carte dans
-Périphériques (une image, une rangée de boutons, « Ouvrir ») et sa grande fenêtre (ses panneaux, ses
-préréglages, ses effets). Prisme (tables d'ondes) et Kick restent à part.
+**Colosse** (grand synthé moderne à tables d'ondes), **Mosaïque** (synthé hybride), **Nébuleuse** (synthé
+d'atmosphères, granulaire), puis **Opale** (le synthé polyphonique de tous les jours), **Quartz** et **Saphir**
+(deux FM à quatre opérateurs), **Tirette** (orgue à tirettes), **Onyx** (distorsion de phase), **Alliage**
+(synthé à modules), **Argile** (analogique tout en double), **Dérive** (analogique simple et vivant), **Bronze**
+(objets résonants : maillet, bruit, deux résonateurs), **Silex** (boîte à rythmes synthétisée) et **Jade**
+(piano électrique modélisé). Chacun a sa carte dans
+Périphériques (courte : trois ou quatre petits panneaux de ses réglages principaux, comme un module de
+Bitwig) et sa grande fenêtre (tous ses panneaux et tous ses réglages, ses préréglages, ses effets). Prisme (tables d'ondes) et Kick restent à part.
 
 | Synthé | Où le trouver | Ce qu'il est |
 |---|---|---|
@@ -12,6 +16,17 @@ préréglages, ses effets). Prisme (tables d'ondes) et Kick restent à part.
 | **Colosse** (`colosse-synth`, instrument `colosse-instrument`) | Piste › Nouveau Colosse ; Instruments | deux oscillateurs à tables d'ondes déformables, deux filtres de sept sortes, une séquence, six modulations libres |
 | **Mosaïque** (`mosaique-synth`, instrument `mosaique-instrument`) | Piste › Nouveau Mosaïque ; Instruments | deux moteurs hybrides (analogique, tables, harmonique, modal), deux filtres, fonction dessinée, aléatoire Turing, quatre macros, huit modulations |
 | **Nébuleuse** (`nebuleuse-synth`, instrument `nebuleuse-instrument`) | Piste › Nouveau Nébuleuse ; Instruments | deux couches (synthèse ou grains de sept textures), harmonia, l'orbe, huit modulations ; Halo derrière |
+| **Opale** (`opale-synth`, `opale-instrument`) | Instruments | deux oscillateurs profonds (forme continue, sub, synchro, unisson), un mélangeur à six modes, un filtre de sept sortes |
+| **Quartz** (`quartz-synth`, `quartz-instrument`) | Instruments | FM à quatre opérateurs en matrice libre (chacun module les autres et lui-même), du bruit, une enveloppe par opérateur, un filtre |
+| **Saphir** (`saphir-synth`, `saphir-instrument`) | Instruments | FM à quatre opérateurs : onze algorithmes, douze formes d'onde, enveloppes qui bouclent, enveloppe de hauteur |
+| **Tirette** (`tirette-synth`, `tirette-instrument`) | Instruments | orgue à neuf tirettes (roues phoniques, transistors, tuyaux), percussion, vibrato et chorus, saturation, cabine tournante |
+| **Onyx** (`onyx-synth`, `onyx-instrument`) | Instruments | distorsion de phase : quatre oscillateurs aux phases pliées (huit formes, trois résonantes) qui se modulent, un filtre |
+| **Alliage** (`alliage-synth`, `alliage-instrument`) | Instruments | un oscillateur parmi huit (essaim, table, impulsion, FM, synchro, additif, bande de bruit…), un filtre parmi sept |
+| **Argile** (`argile-synth`, `argile-instrument`) | Instruments | tout en double : deux oscillateurs et leur sub, deux filtres de huit types en parallèle ou en série, deux amplis, deux LFO |
+| **Dérive** (`derive-synth`, `derive-instrument`) | Instruments | deux oscillateurs, une dérive vivante par voix, une enveloppe qui peut boucler, trois modulations |
+| **Bronze** (`bronze-synth`, `bronze-instrument`) | Instruments | un maillet et un bruit qui excitent deux résonateurs (poutre, marimba, membrane, plaque, corde, tuyau, tube), en série ou côte à côte |
+| **Silex** (`silex-synth`, `silex-instrument`) | Instruments | une boîte à rythmes dont chaque son est synthétisé (grosse caisse, caisse claire, clap, charlestons, toms, cymbales, percussions), chacun ses réglages ; trois caractères (analogique, numérique, lo-fi) ; le charleston fermé coupe l'ouvert |
+| **Jade** (`jade-synth`, `jade-instrument`) | Instruments | un piano électrique modélisé : lames et barres de ton, anches ou cordes frappées, lues par leur micro (cloche, aboiement, grognement), préampli, trémolo panoramique et chorus |
 
 ## Le cadre commun
 
@@ -23,8 +38,14 @@ Un modèle, c'est trois choses :
   `voice.glideAlways`, `voice.bend`, `voice.master` ;
 - **son moteur** : ce que joue une voix (`synth::Voice` le choisit d'après le modèle) ;
 - **sa mise en page** (`src/v2/SynthLayouts.cpp`) : ses panneaux en rangées, l'image de chacun (onde,
-  courbe du filtre, enveloppe, LFO), ses boutons et leurs noms courts ; la carte : son image et sa
-  rangée de boutons.
+  courbe du filtre, enveloppe, LFO), ses boutons et leurs noms courts ; sa carte (`Layout::card`) :
+  trois ou quatre petits panneaux (une image — onde, filtre et enveloppe qu'on tire comme dans la fenêtre,
+  LFO — et quatre à neuf boutons), chacun aussi étroit que la hauteur du volet le permet, la carte entière
+  autour de 550 px ; un double-clic sur le titre d'un panneau ouvre la fenêtre.
+
+Un bouton qui n'agit pas (« si UNISSON ≥ 2 ») est grisé : sous un bouton seul, son nom laisse la place à ce
+qu'il attend ; des boutons voisins qui attendent la même chose ont **une seule** étiquette sur eux ; une
+liste ou un interrupteur le dit à l'intérieur de lui-même. Rien ne déborde sur le bouton d'à côté.
 
 Les tables d'ondes (Colosse, Mosaïque, Nébuleuse) et les textures (Nébuleuse) sont fabriquées à la
 première carte qui en a besoin, hors du fil audio (`synth::warmUp`), pas au démarrage.
@@ -57,7 +78,7 @@ Un synthé analogique à l'ancienne :
   premier vers la hauteur (vibrato, avec un retard et la molette) et la largeur d'impulsion, le second
   vers le filtre et le volume.
 
-La fenêtre (Ouvrir Ambre, ou le bouton ⤢ de la carte pour une fenêtre séparée) :
+La fenêtre (le bouton de l'en-tête de la carte, une fenêtre séparée) :
 
 - **VOIX**, **OSC 1**, **OSC 2**, **OSC 3** ;
 - **MÉLANGE** : l'onde des trois oscillateurs dessinée (avec la synchro et la FM), le bruit, la dérive,
@@ -74,9 +95,7 @@ pour le Ladder et la Cascade qui sont des passe-bas, la vitesse d'un LFO calé s
 sur un bouton : valeur de départ, automation dans l'arrangement. L'onglet **EFFETS** ajoute après Ambre
 les effets de CyDAW (chorus, Fournaise, Patine, Écho Bande, Halo…).
 
-**Préréglages d'usine** (22) : Init, Basse Moog, Basse acide, Basse ronde, Basse pulsée, Sub sinus,
-Lead mono, Lead synchro, Lead mordant, Nappe chaude, Nappe cordes, Nappe balayée, Cuivres, Pincé, Arpège
-résonant, Clavier poly, Orgue analogique, Cloche FM, Vent, Unisson large, Wobble, Dérive vintage. Ils
+**Préréglages d'usine** : 48 (noms en anglais), par exemple Squelching Acid Bass, Night Drive Synthwave Bass, Singing Glide Lead, Tremolo Electric Piano, Silky PWM Pad. Ils
 sont faits par `tools/factory_content/build_synth_presets.py` : chaque son réglé par le port de
 contrôle, mesuré hors ligne, son volume ajusté pour qu'un do 4 tenu ait la même sonie.
 
@@ -114,10 +133,7 @@ table et leur position ; les sources ; les deux filtres et leur courbe, deux poi
 glisser ; la saturation ; les trois enveloppes) et **MODULATION** (la séquence à dessiner, les LFO, les
 six modulations).
 
-**Préréglages d'usine** (22) : Init, Basse colosse, Basse réducteur, Grondement, Wobble numérique,
-Lead tranchant, Lead métal, Supersaw colosse, Nappe mouvante, Nappe voyelles, Pincé harmonique, Cloche
-de phase, Séquence filtrée, Arpège à pas, Corde peigne, Hurlement, Sub profond, Cuivres modernes,
-Texture numérique, Chœur formant, Redressé, Basse pliée.
+**Préréglages d'usine** : 46 (noms en anglais), par exemple Massive Rolling Reese, Epic Trance Supersaw, Cascading Fifths Arp, Colossal Evolving Pad, Giant Drop Riser.
 
 ## Mosaïque
 
@@ -155,10 +171,7 @@ La fenêtre a deux pages : **MOTEURS** (les deux moteurs, dessinés tels qu'ils 
 sources, les filtres et leur courbe selon les envois ; le volume ; les macros) et **MODULATION** (les
 enveloppes 2 et 3, les LFO, la fonction, l'aléatoire, les huit modulations).
 
-**Préréglages d'usine** (22) : Init, Marimba, Vibraphone, Cloches de verre, Corde frappée, Tambour de
-peau, Archet de verre, Violoncelle d'archet, Orgue harmonique, Nappe additive, Spectre étiré,
-Analogique gras, Synchro hurlante, Tables mouvantes, Turing arpège, Aléatoire mélodique, Fonction
-pulsée, Fonction filtrée, Pincé hybride, Basse hybride, Voix du vent, Macros en morphose.
+**Préréglages d'usine** : 44 (noms en anglais), par exemple Struck Wooden Bass, Glass Harp, Island Steel Drum, Singing Bowl, Polyrhythmic Sequence.
 
 ## Nébuleuse
 
@@ -197,10 +210,62 @@ la lecture et la longueur d'un grain ; les réglages de la source choisie seulem
 filtre et sa courbe ; l'orbe ; le volume) et **MODULATION** (l'enveloppe 2, les LFO, les huit
 modulations). La carte montre l'orbe.
 
-**Préréglages d'usine** (22) : Init, Chœur céleste, Nappe de verre, Vent du nord, Cordes lointaines,
-Carillon, Pluie d'été, Drone sombre, Drone lumineux, Grains inversés, Nuage d'accords, Basse nébuleuse,
-Pad orbital, Texture balayée, Souffle vocal, Cristaux, Mer de cloches, Lead aérien, Ombre, Aube,
-Granulaire pur, Fantôme.
+**Préréglages d'usine** : 45 (noms en anglais), par exemple Cathedral Choir, Floating Ninth Chords, Time-Stretched Strings, Distant Storm, Misty Bell Piano.
+
+## Les neuf synthés suivants
+
+Ils reprennent le cadre commun (voix d'abord, carte courte de quelques panneaux, grande fenêtre en
+panneaux, préréglages d'usine en anglais) ; chacun sa couleur.
+
+- **Opale** — le synthé polyphonique « de tous les jours ». Par oscillateur : octave (32' à 2'), hauteur,
+  fin, **forme continue** (sinus → triangle → dent de scie → carré → impulsion étroite), niveau, **sub** et
+  sa forme, **synchro** (0 à 36 demi-tons), **unisson** (1 à 7, désaccord, largeur), phase redémarrée. Le
+  **mélangeur** a six modes (mélange, AM, négatif, signe, volet, max), une balance, du bruit et sa couleur,
+  une saturation, une réinjection, une dérive, l'enveloppe du filtre vers la hauteur. Filtre des sept sortes
+  de la famille, deux enveloppes, un LFO, la molette. 26 préréglages (Warm Keys, Electric Piano, Sync Lead…).
+- **Quartz** — FM à quatre opérateurs en **matrice libre** : chaque opérateur (rapport ou fréquence fixe,
+  fin, niveau, profondeur, sa propre enveloppe) module les trois autres et lui-même ; du bruit qui module
+  aussi ; rapports arrondis aux entiers au choix ; suréchantillonné ×2. 24 préréglages (Electric Piano,
+  Tubular Bells, Slap Bass…).
+- **Saphir** — FM à quatre opérateurs à **onze algorithmes**, douze formes d'onde, des enveloppes d'opérateur
+  qui peuvent **boucler**, une enveloppe de hauteur, un filtre et son enveloppe, un LFO. Ses tables sont
+  faites une fois (préchauffage). 24 préréglages (Classic E-Piano, Deep FM Bass, Steel Drum…).
+- **Tirette** — orgue à **neuf tirettes** (16', 5⅓', 8', 4', 2⅔', 2', 1⅗', 1⅓', 1'), roues phoniques,
+  transistors ou tuyaux, fuite et clic ; **percussion** (deuxième ou troisième harmonique, rapide ou
+  lente) ; **vibrato et chorus** V1–V3/C1–C3 ; préampli saturé ; **cabine tournante** lente/rapide (la molette
+  la fait passer en rapide) avec accélération, pavillon/tambour, profondeur, largeur. 26 préréglages.
+- **Onyx** — distorsion de phase : **quatre oscillateurs** dont la phase est pliée (huit formes, dont trois
+  résonantes), chacun avec son enveloppe de distorsion, qui **se modulent entre eux** (matrice 4×4, la
+  diagonale en réinjection) ; unisson, filtre, enveloppes, LFO. 25 préréglages.
+- **Alliage** — un synthé **à modules** : un oscillateur parmi huit (essaim de sept dents de scie, table
+  d'ondes, impulsion, FM sinus, super-carré, synchro, additif, bande de bruit) dont TIMBRE et FORME changent
+  de sens avec le type, un sub, un filtre parmi sept, deux enveloppes, un LFO. 26 préréglages.
+- **Argile** — analogique **tout en double** : deux oscillateurs (forme, largeur, sub, synchro), du bruit,
+  chaque source envoyée vers le filtre 1 ou 2 ; **deux filtres de huit types** (dont formant) en parallèle
+  ou en série, chacun avec son enveloppe ; **deux amplis** avec leur enveloppe et leur panoramique ; deux
+  LFO. La courbe montre les deux filtres ensemble. 25 préréglages.
+- **Dérive** — analogique **simple et chaleureux** : deux oscillateurs, une **dérive** propre à chaque voix,
+  un filtre (passe-bas 24 ou 12 dB et passe-haut), une deuxième enveloppe qui peut **boucler** comme un LFO,
+  un LFO de sept formes, **trois modulations** libres. 25 préréglages.
+- **Bronze** — des objets **frappés, frottés ou soufflés** : un **maillet** (volume, dureté, bruit, couleur ; plus
+  court et plus clair vers l'aigu) et un **bruit** filtré avec son enveloppe excitent **deux résonateurs** —
+  poutre, marimba, membrane, plaque (modaux, 4 à 32 modes), corde, tuyau fermé, tube ouvert (guides d'onde) —
+  chacun avec son accord, son déclin, sa matière, sa brillance, son inharmonicité, l'endroit frappé et les
+  deux points d'écoute ; **en série** (1 > 2) ou **côte à côte** (1 + 2), une balance, un relâchement, un
+  limiteur ; un LFO. En legato, les objets qui sonnent glissent sans être refrappés. 25 préréglages
+  (Marimba, Vibes, Tubular Bell, Gamelan, Bowl, Gong, Bowed Glass, Plucked String…).
+
+## Les modulations à l'écran
+
+Les dessins des oscillateurs et les boutons suivent aussi l'automation : à la position de la tête de
+lecture, une position de table automatisée redessine la forme et met un point sur son bouton, même à
+l'arrêt. Pendant qu'une note joue, la carte et la fenêtre du synthé montrent ce que fait sa voix la plus
+récente : un point violet sur chaque bouton que ses modulations déplacent (là où elles le mettent), la
+courbe du filtre tracée une seconde fois en violet à la fréquence où le LFO ou l'enveloppe l'emmènent,
+un point qui court sur le dessin de chaque LFO, et une ligne au niveau de chaque enveloppe. Moteur :
+chaque modèle note ce qu'il joue à chaque pas (`detail::Engine::show`, `showLfo`, `showEnvelope`,
+`VoiceLive`) ; la piste publie celui de sa voix la plus récente une cinquantaine de fois par seconde
+(`AudioTrackController::midiTrackVoiceLive`), que `SynthView` lit à chaque image.
 
 ## Piloter
 
@@ -223,6 +288,10 @@ fenêtre (piste sélectionnée).
   (`nebuleuseLayersSound`) : une couche de synthèse juste au la 4, son harmonia qui ajoute la quinte,
   chaque texture en grains bornée en grave et en aigu, les textures accordées qui jouent la note, la
   fin, l'orbe qui ouvre le filtre, les couches dessinées ;
+  (`laterSynthModelsPlay`) : pour Opale, Onyx, Tirette, Alliage, Quartz, Argile, Saphir, Dérive et Bronze, leurs
+  noms, leurs valeurs par défaut dans leurs bornes, le la 4 à 440 Hz, la fin après le relâchement, tout
+  au maximum puis tout au minimum en grave, médium et aigu : fini et borné ;
 - `cydaw2_synths_check` (`tests/v2_synths_check.py`, port 47845) : les réglages par clé, le son mesuré,
   les boutons de la piste, les préréglages, le mixage exporté à 440 Hz, le plug-in exporté, un projet
-  rouvert.
+  rouvert ; pour chacun des neuf suivants, l'instrument qui sonne et finit, ses préréglages d'usine, un
+  préréglage chargé qui sonne.

@@ -63,6 +63,7 @@ std::vector<NodeGraphComponent::EditorNode> NodeGraphComponent::editorNodes() co
         entry.colour = node.colour;
         entry.position = node.position;
         entry.collapsed = node.collapsed;
+        entry.bypassed = node.bypassed;
         entry.protectedNode = node.protectedNode;
         entry.composite = node.composite;
         if (node.composite) {
@@ -516,66 +517,9 @@ bool NodeGraphComponent::editorDisconnect(const std::uint64_t source, const std:
 
 std::map<std::uint64_t, NodeGraphComponent::EditorNativeSpan> NodeGraphComponent::editorNativeSpans() const
 {
-    using Kind = cydaw::engine::NativeDspNodeKind;
-    std::map<std::uint64_t, EditorNativeSpan> spans;
-    const auto native = nativeDspGraph();
-    std::map<std::uint64_t, Kind> audioNodes;
-    for (const auto& node : native.nodes)
-        if (!isControlOnlyNativeKind(node.kind))
-            audioNodes.emplace(node.id, node.kind);
-    for (const auto& card : nodes_) {
-        // The graph's own inputs and outputs are not devices; the ids the
-        // compiler generates for them can even be a boundary card's.
-        if (isBoundaryNode(card))
-            continue;
-        std::set<std::uint64_t> members;
-        auto instrument = false;
-        if (const auto found = audioNodes.find(card.id); found != audioNodes.end()) {
-            if (found->second == Kind::output)
-                continue;
-            // An instrument stands in as the effect chain's input.
-            instrument = found->second == Kind::input;
-            members.insert(card.id);
-        }
-        if (exportCache_.has_value()) {
-            const auto prefix = "node." + juce::String(static_cast<juce::int64>(card.id)) + ".";
-            for (const auto& parameter : exportCache_->publishedParameters)
-                if (juce::String(parameter.key).startsWith(prefix) && audioNodes.contains(parameter.targetNodeId)
-                    && audioNodes.at(parameter.targetNodeId) != Kind::input
-                    && audioNodes.at(parameter.targetNodeId) != Kind::output)
-                    members.insert(parameter.targetNodeId);
-        }
-        if (members.empty())
-            continue;
-        EditorNativeSpan span;
-        span.instrument = instrument;
-        for (const auto member : members) {
-            auto fed = false;
-            auto feeds = false;
-            for (const auto& connection : native.connections) {
-                if (connection.destination == member && members.contains(connection.source))
-                    fed = true;
-                if (connection.source == member && members.contains(connection.destination))
-                    feeds = true;
-            }
-            if (!fed)
-                span.entries.push_back(member);
-            if (!feeds)
-                span.exits.push_back(member);
-        }
-        // A module's side paths are passthroughs; its sound runs through
-        // the processors, so those come first.
-        const auto processorFirst = [&audioNodes](std::vector<std::uint64_t>& ids) {
-            std::stable_partition(ids.begin(), ids.end(), [&audioNodes](const std::uint64_t id) {
-                return audioNodes.at(id) != Kind::passthrough;
-            });
-        };
-        processorFirst(span.entries);
-        processorFirst(span.exits);
-        spans.emplace(card.id, std::move(span));
-    }
-    return spans;
+    return nativeSpansOf(exportedNativeGraph());
 }
+
 
 // ---- Devices made of a graph (modules) -------------------------------------------------------------
 
@@ -878,6 +822,8 @@ juce::Result NodeGraphComponent::editorSetInterface(const ModuleInterfaceState& 
     next.gridRows = state.gridRows;
     next.windowWidth = state.windowWidth;
     next.windowHeight = state.windowHeight;
+    // The person's own layout from now on.
+    next.designed = true;
     next.nextControlId = std::max(next.nextControlId, state.nextControlId);
     for (const auto& control : next.controls)
         next.nextControlId = std::max(next.nextControlId, control.id + 1);
@@ -1182,7 +1128,8 @@ std::optional<NodeGraphComponent::SamplerCardControls> NodeGraphComponent::edito
     if (node == nullptr || (node->typeKey != "sampler" && node->typeKey != "batterie"))
         return std::nullopt;
     return SamplerCardControls { node->parameters.samplerControllers,
-                                 cydaw::engine::samplerValue(node->parameters.sampler, cydaw::engine::SamplerSetting::articulation) };
+                                 cydaw::engine::samplerValue(node->parameters.sampler, cydaw::engine::SamplerSetting::articulation),
+                                 cydaw::engine::samplerValue(node->parameters.sampler, cydaw::engine::SamplerSetting::simple) >= 0.5f };
 }
 
 bool NodeGraphComponent::editorSetAlias(const std::uint64_t id, const juce::String& alias)
@@ -1193,6 +1140,33 @@ bool NodeGraphComponent::editorSetAlias(const std::uint64_t id, const juce::Stri
     node->alias = alias.trim().substring(0, 96);
     node->serialised = juce::var();
     notifyLayoutChanged("v2-alias");
+    return true;
+}
+
+bool NodeGraphComponent::editorSetDescription(const std::uint64_t id, const juce::String& description)
+{
+    auto* node = findNode(id);
+    if (node == nullptr || editingLocked_)
+        return false;
+    node->description = description.substring(0, 2'000);
+    node->serialised = juce::var();
+    notifyLayoutChanged("v2-description");
+    return true;
+}
+
+bool NodeGraphComponent::editorSetBypassed(const std::uint64_t id, const bool bypassed)
+{
+    auto* node = findNode(id);
+    if (node == nullptr || isBoundaryNode(*node) || node->bypassed == bypassed)
+        return node != nullptr && node->bypassed == bypassed;
+    node->bypassed = bypassed;
+    node->serialised = juce::var();
+    // Published as a knob is (the shape stays), its undo step taken as one.
+    parameterHistoryPending_ = true;
+    lastParameterUiChangeTimeMs_ = juce::Time::currentTimeMillis();
+    dispatchParameterNotification();
+    if (!isTimerRunning())
+        startTimerHz(30);
     return true;
 }
 

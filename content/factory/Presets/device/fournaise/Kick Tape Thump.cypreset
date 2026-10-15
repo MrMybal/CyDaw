@@ -1,0 +1,24 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "fournaise",
+ "name": "Kick Tape Thump",
+ "state": {
+  "type": "fournaise",
+  "parameters": {
+   "fournaise.drive": 5.0,
+   "fournaise.tone": -0.1,
+   "fournaise.lowCut": 30.0,
+   "fournaise.highCut": 16000.0,
+   "fournaise.mix": 1.0,
+   "fournaise.output": 0.0,
+   "fournaise.style": 0.0,
+   "fournaise.punish": 0.0,
+   "fournaise.auto": 1.0,
+   "fournaise.thump": 1.0,
+   "fournaise.steep": 0.0,
+   "fournaise.oversampling": 2.0
+  }
+ }
+}

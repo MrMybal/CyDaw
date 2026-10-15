@@ -1,0 +1,16 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "master-guard",
+ "name": "Rumble Guard",
+ "state": {
+  "type": "master-guard",
+  "parameters": {
+   "node.29003.highpass.cutoff": 40.0,
+   "node.29004.compressor.threshold": -4.0,
+   "node.29004.compressor.ratio": 1.5,
+   "node.29005.clip.threshold": 0.99
+  }
+ }
+}

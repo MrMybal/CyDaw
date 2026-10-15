@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "grains",
+ "name": "Dark Tape Grains",
+ "state": {
+  "type": "grains",
+  "parameters": {
+   "grains.time": 450.0,
+   "grains.feedback": 0.65,
+   "grains.pitch": 0.0,
+   "grains.spray": 40.0,
+   "grains.density": 20.0,
+   "grains.pitchRandom": 0.3,
+   "grains.mix": 0.4,
+   "grains.output": 0.0,
+   "grains.sync": 0.0,
+   "grains.size": 140.0,
+   "grains.stereo": 0.5,
+   "grains.reverseChance": 0.0,
+   "grains.freeze": 0.0,
+   "grains.highCut": 3500.0
+  }
+ }
+}

@@ -1,0 +1,28 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "patine",
+ "name": "Mix Bus Analog Touch",
+ "state": {
+  "type": "patine",
+  "parameters": {
+   "patine.noise": 0.08,
+   "patine.wobble": 0.06,
+   "patine.distort": 0.15,
+   "patine.digital": 0.0,
+   "patine.space": 0.0,
+   "patine.magnetic": 0.15,
+   "patine.magnitude": 1.0,
+   "patine.mix": 0.6,
+   "patine.noiseType": 1.0,
+   "patine.wobbleRate": 0.3,
+   "patine.distortType": 1.0,
+   "patine.spaceSize": 0.4,
+   "patine.tone": 0.0,
+   "patine.width": 1.0,
+   "patine.output": 0.0,
+   "patine.noiseFollow": 1.0
+  }
+ }
+}

@@ -1,0 +1,24 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "anneau",
+ "name": "Classic Ring",
+ "state": {
+  "type": "anneau",
+  "parameters": {
+   "anneau.frequency": 440.0,
+   "anneau.drive": 0.0,
+   "anneau.lfoRate": 0.5,
+   "anneau.lfoDepth": 0.0,
+   "anneau.mix": 0.6,
+   "anneau.output": 0.0,
+   "anneau.stereo": 0.0,
+   "anneau.shape": 0.0,
+   "anneau.mode": 0.0,
+   "anneau.sync": 0.0,
+   "anneau.lowCut": 20.0,
+   "anneau.lfoShape": 0.0
+  }
+ }
+}

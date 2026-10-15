@@ -1,0 +1,13 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "stereo-width",
+ "name": "Narrow",
+ "state": {
+  "type": "stereo-width",
+  "parameters": {
+   "stereo.width": 0.5
+  }
+ }
+}

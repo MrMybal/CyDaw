@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "stereo-finisher",
+ "name": "Narrow and Focused",
+ "state": {
+  "type": "stereo-finisher",
+  "parameters": {
+   "node.16002.eq.tone": 0.0,
+   "node.16003.stereo.width": 0.8,
+   "node.16004.compressor.threshold": -10.0,
+   "node.16004.compressor.ratio": 2.0,
+   "node.16005.clip.threshold": 0.97
+  }
+ }
+}

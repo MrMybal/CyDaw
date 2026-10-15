@@ -15,7 +15,7 @@ téléchargé, et aucun échantillon n'est rangé dans le dépôt. Les sons, les
 
 **Piste › Nouveau Kick** crée une piste instrument dont la fenêtre s'ouvre aussitôt. Sur sa carte,
 dans Périphériques, on trouve l'image du kick, une rangée de potards (départ, fin, chute, déclin,
-clic, sub, drive, sortie) et le bouton « Ouvrir Kick ».
+clic, sub, drive, sortie) ; sa fenêtre s'ouvre par le bouton de l'en-tête de la carte.
 
 ### Comment il sonne
 
@@ -61,9 +61,7 @@ chaque coup, dès son départ (la hauteur, la chute, le clic d'un kick suivent l
 
 ### Ses préréglages
 
-Kick a 17 sons d'usine : Init, 808 Long, 808 Short, 909 Punch, House Classic, Deep House, Techno
-Hard, Techno Rumble, Hardstyle, Gabber, Trap Boom, Drum & Bass, Minimal Blip, Big Room, Sub Kick,
-Lo-Fi Dusty et Acoustic Felt. Chacun a sa crête à -1 dBFS. Ils se fabriquent avec
+Kick a 40 sons d'usine (noms en anglais), par exemple Techno Rumble Source, Hard Techno Distorted, Trap Long Sub Tail, Psytrance Tight Click, Synthwave Gated Boom, Boom Bap Chesty Kick. Chacun a sa crête à -1 dBFS. Ils se fabriquent avec
 `tools/factory_content/build_kick_presets.py`, en session silencieuse, et vont dans
 `content/factory/Presets/device/kick-synth`.
 

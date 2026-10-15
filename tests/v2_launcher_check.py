@@ -8,6 +8,8 @@
 * A scene launched: each track plays its clip there; a track whose slot is
   empty stops, unless that slot's stop was taken off; the stop is saved with
   the project.
+* The transport stopped while clips play: they wait, and play starts them
+  again from their start; stop all forgets them.
 
 Exit code 0 when all hold.
 """
@@ -87,12 +89,12 @@ def scenario(scratch: Path) -> None:
         # An instrument that holds its notes (a sustained synth).
         need({"cmd": "insert_device", "track": name, "key": "synth-keys"}, "instrument " + name)
     # A: a chord held the whole bar in scene 1, a note in scene 2; B: scene 1 only.
-    need({"cmd": "add_midi_clip", "track": "A", "name": "A1", "startBeats": 0, "lengthBeats": 4, "looping": True}, "clip")
+    need({"cmd": "add_midi_clip", "track": "A", "name": "A1", "scene": 0, "lengthBeats": 4, "looping": True}, "clip")
     need({"cmd": "add_notes", "track": "A", "clip": "A1",
           "notes": [{"note": n, "start": 0, "length": 4, "velocity": 0.8} for n in (57, 60, 64)]}, "notes")
-    need({"cmd": "add_midi_clip", "track": "A", "name": "A2", "startBeats": 16, "lengthBeats": 4, "looping": True}, "clip")
+    need({"cmd": "add_midi_clip", "track": "A", "name": "A2", "scene": 1, "lengthBeats": 4, "looping": True}, "clip")
     need({"cmd": "add_notes", "track": "A", "clip": "A2", "notes": [{"note": 62, "start": 0, "length": 4}]}, "notes")
-    need({"cmd": "add_midi_clip", "track": "B", "name": "B1", "startBeats": 0, "lengthBeats": 4, "looping": True}, "clip")
+    need({"cmd": "add_midi_clip", "track": "B", "name": "B1", "scene": 0, "lengthBeats": 4, "looping": True}, "clip")
     need({"cmd": "add_notes", "track": "B", "clip": "B1", "notes": [{"note": 48, "start": 0, "length": 4}]}, "notes")
 
     # Picking a track arms nothing; arms are the person's, several at once.
@@ -140,6 +142,29 @@ def scenario(scratch: Path) -> None:
     check(scenes(launched).get("A") == 1 and scenes(launched).get("B") == 0,
           f"without its stop, the track goes on through that scene ({scenes(launched)})")
     need({"cmd": "stop_launcher"}, "stop all")
+    need({"cmd": "transport", "action": "stop"}, "transport stop")
+
+    # The transport stopped while clips play, then played: each starts
+    # again from its start (it does not go on from where it was).
+    need({"cmd": "launch_scene", "scene": 0}, "scene 1 from stopped")
+    time.sleep(0.9)
+    need({"cmd": "transport", "action": "stop"}, "transport stop")
+    waiting = need({"cmd": "launch_scene", "query": True}, "read")
+    pending = {entry["track"]: entry["pending"] for entry in waiting.get("tracks", [])}
+    check(not waiting.get("playing") and pending.get("A") == 0 and pending.get("B") == 0,
+          f"stopped, the clips that played wait for play ({pending})")
+    need({"cmd": "transport", "action": "play"}, "transport play")
+    time.sleep(0.3)
+    again = need({"cmd": "launch_scene", "query": True}, "read")
+    positions = {entry["track"]: entry["position"] for entry in again.get("tracks", [])}
+    check(scenes(again).get("A") == 0 and scenes(again).get("B") == 0
+          and all(0.0 <= positions.get(name, -1.0) < 0.75 for name in ("A", "B")),
+          f"played again, they start again from their start ({scenes(again)}, {positions})")
+    need({"cmd": "transport", "action": "stop"}, "transport stop")
+    need({"cmd": "stop_launcher"}, "stop all")
+    forgotten = need({"cmd": "launch_scene", "query": True}, "read")
+    check(all(entry["pending"] < 0 for entry in forgotten.get("tracks", [])),
+          "stop all: nothing waits for play any more")
 
     # Saved and opened: the stop stays off, the others on.
     project = scratch / "launcher-check.cydaw"

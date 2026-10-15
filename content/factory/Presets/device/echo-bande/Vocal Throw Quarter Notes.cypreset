@@ -1,0 +1,25 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "echo-bande",
+ "name": "Vocal Throw Quarter Notes",
+ "state": {
+  "type": "echo-bande",
+  "parameters": {
+   "echoband.time": 250.0,
+   "echoband.intensity": 0.55,
+   "echoband.echo": 0.7,
+   "echoband.reverb": 0.0,
+   "echoband.bass": -6.0,
+   "echoband.treble": -3.0,
+   "echoband.wow": 0.15,
+   "echoband.mix": 0.3,
+   "echoband.mode": 0.0,
+   "echoband.sync": 9.0,
+   "echoband.drive": 0.0,
+   "echoband.age": 0.35,
+   "echoband.width": 0.5
+  }
+ }
+}

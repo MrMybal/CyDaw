@@ -356,7 +356,7 @@ def save_piece(name):
 
 # Each instrument twice, side by side: its samples, then its sound model. In
 # the arrangement the same phrase plays on the samples (4 bars), then at once
-# on the model (4 bars); in the launcher the two are neighbouring scenes.
+# on the model (4 bars).
 COMPARISON = [
     # key, phrase, the pair's level, the model's against the samples' (dB,
     # measured on the phrase: the two equally loud, a fair comparison)
@@ -594,11 +594,11 @@ def example_prism():
     and the drums (17-24)."""
     new_piece()
     request({"cmd": "set_tempo", "bpm": 124})
-    pad = prism_track("Nappe", "Nappe evolutive", -4.0)
-    pluck = prism_track("Pluck", "Pluck Digital", -2.0)
+    pad = prism_track("Nappe", "Evolving Pad", -4.0)
+    pluck = prism_track("Pluck", "Digital Pluck", -2.0)
     bass = prism_track("Basse Reese", "Reese Bass", -3.0)
     lead = prism_track("Lead", "Supersaw Lead", -6.0)
-    bells = prism_track("Cloches", "Cloche FM", -8.0)
+    bells = prism_track("Cloches", "FM Bell", -8.0)
     growl = prism_track("Basse growl", "Growl Bass", -9.0)
     drums = request({"cmd": "add_factory_instrument", "key": "drums-seventies"})["track"]
 
@@ -1079,11 +1079,11 @@ def example_studio_effects():
             request({"cmd": "set_parameter", "track": track, "key": "node.%s.%s" % (node, suffix), "value": value})
         return node
 
-    add("Saxophone alto", "comp-pro", "Voix douce")
-    add("Saxophone alto", "reverb-pro", "Plaque brillante", {"revpro.mix": 0.18})
-    add("Piano", "reverb-pro", "Grande salle", {"revpro.mix": 0.2})
-    add("Contrebasse", "comp-pro", "Basse tenue")
-    add("Balais", "filter-pro", "Tourbillon stéréo", {"filtpro.mix": 0.45, "filtpro.f1Cutoff": 3_000.0})
+    add("Saxophone alto", "comp-pro", "Gentle Vocal")
+    add("Saxophone alto", "reverb-pro", "Bright Plate", {"revpro.mix": 0.18})
+    add("Piano", "reverb-pro", "Large Hall", {"revpro.mix": 0.2})
+    add("Contrebasse", "comp-pro", "Steady Bass")
+    add("Balais", "filter-pro", "Stereo Swirl", {"filtpro.mix": 0.45, "filtpro.f1Cutoff": 3_000.0})
     # Its gain brought down until the integrated loudness reads -14 LUFS.
     add("master", "limiter-pro", "Streaming -14 LUFS", {"limpro.gain": 1.5})
     save_piece("19-effets-studio")
@@ -1127,7 +1127,7 @@ def example_electro():
     request({"cmd": "set_track", "track": perc, "name": "Percussions et effets"})
     perc = "Percussions et effets"
     bass = prism_track("Basse roulante", "Reese Bass", -9.0)
-    pad = prism_track("Nappe", "Nappe evolutive", -13.0)
+    pad = prism_track("Nappe", "Evolving Pad", -13.0)
     kit = lambda sound: kit_key("Electro 909", sound)  # noqa: E731
     fx = lambda sound: kit_key("Electro Percussion and FX", sound)  # noqa: E731
     groove = list(range(0, 16)) + list(range(24, 32))
@@ -1219,32 +1219,32 @@ def example_amps():
     clean = factory_track("guitar-hofner", gain_db=-4.0)
     request({"cmd": "set_track", "track": clean, "name": "Guitare clean"})
     clean = "Guitare clean"
-    chain_device(clean, "amp-sim", "Clean brillant")
-    chain_device(clean, "cab-sim", "Combo 2x12 clean")
+    chain_device(clean, "amp-sim", "Bright Clean")
+    chain_device(clean, "cab-sim", "Clean 2x12 Combo")
     rhythm = factory_track("guitar-gretsch", gain_db=-10.0)
     request({"cmd": "set_track", "track": rhythm, "name": "Guitare crunch"})
     rhythm = "Guitare crunch"
-    chain_device(rhythm, "amp-sim", "Crunch rock")
-    chain_device(rhythm, "cab-sim", "4x12 classique")
+    chain_device(rhythm, "amp-sim", "Rock Crunch")
+    chain_device(rhythm, "cab-sim", "Classic 4x12")
     lead = factory_track("guitar-epiphone", gain_db=-10.0)
     request({"cmd": "set_track", "track": lead, "name": "Guitare solo"})
     lead = "Guitare solo"
-    chain_device(lead, "amp-sim", "Solo chantant")
-    chain_device(lead, "cab-sim", "4x12 dynamique et ruban")
-    chain_device(lead, "reverb-pro", "Grande salle", {"revpro.mix": 0.18})
+    chain_device(lead, "amp-sim", "Singing Solo")
+    chain_device(lead, "cab-sim", "4x12 Dynamic and Ribbon")
+    chain_device(lead, "reverb-pro", "Large Hall", {"revpro.mix": 0.18})
     bass = factory_track("bass-jazz", gain_db=-8.0)
     request({"cmd": "set_track", "track": bass, "name": "Basse"})
     bass = "Basse"
-    chain_device(bass, "amp-sim", "Basse ronde")
-    chain_device(bass, "cab-sim", "Basse 8x10")
+    chain_device(bass, "amp-sim", "Round Bass")
+    chain_device(bass, "cab-sim", "Bass 8x10")
     voice = factory_track("voice-a", gain_db=-6.0)
     request({"cmd": "set_track", "track": voice, "name": "Voix radio"})
     voice = "Voix radio"
-    chain_device(voice, "mic-sim", "Radio ancienne")
+    chain_device(voice, "mic-sim", "Old Radio")
     phone = factory_track("voice-a", gain_db=-4.0)
     request({"cmd": "set_track", "track": phone, "name": "Voix téléphone"})
     phone = "Voix téléphone"
-    chain_device(phone, "mic-sim", "Téléphone")
+    chain_device(phone, "mic-sim", "Telephone")
     drums = factory_track("drums-seventies", gain_db=-6.0)
     request({"cmd": "set_track", "track": drums, "name": "Batterie"})
     drums = "Batterie"
@@ -1299,6 +1299,210 @@ def example_amps():
     save_piece("22-amplis-et-micros")
 
 
+# ---- 23: the native instruments and effects ----------------------------------------------------
+# D minor: Dm, Bb, F, C, a bar each; 100 BPM.
+NATIVE = [(2, True), (10, False), (5, False), (0, False)]
+
+
+def synth_track(name, instrument, model, preset, gain_db=0.0):
+    """A track playing one of CyDAW's synths, from a factory sound."""
+    track = request({"cmd": "add_midi_track", "name": name, "instrument": instrument})["name"]
+    node = request({"cmd": "synth", "track": track, "model": model})["nodeId"]
+    request({"cmd": "presets", "track": track, "nodeId": node, "action": "load", "name": preset})
+    if gain_db:
+        request({"cmd": "set_track", "track": track, "gainDb": gain_db})
+    return track
+
+
+def example_native():
+    """CyDAW's own instruments and effects in one piece, D minor, 100 BPM:
+    the Nébuleuse pad worn by Patine and the Mosaïque bells through Écho Bande
+    and Halo (bars 1-8); Batterie's pop groove pressed by Pression, the
+    Colosse bass heated by Fournaise and the Ambre chords shaped by Tranche
+    and Velours (9-16); the Prisme lead and a Kick under the drums (17-24);
+    the pad again over a half-time groove (25-32). On the master: Multibande
+    Pro, Finition, Sonomètre."""
+    new_piece()
+    request({"cmd": "set_tempo", "bpm": 100})
+    bars = lambda first, count: [(first + bar, NATIVE[(first + bar) % 4]) for bar in range(count)]  # noqa: E731
+
+    # ---- The tracks and their devices.
+    pad = synth_track("Nappe Nébuleuse", "nebuleuse-instrument", "nebuleuse", "Chord Cloud", -18.0)
+    chain_device(pad, "patine", "Worn Cassette")
+    chain_device(pad, "halo", "Endless Space")
+    bells = synth_track("Cloches Mosaïque", "mosaique-instrument", "mosaique", "Glass Bells", -3.0)
+    chain_device(bells, "echo-bande", "Dotted Quarter")
+    chain_device(bells, "halo", "Concert Hall")
+    drums = request({"cmd": "add_midi_track", "name": "Batterie", "instrument": "batterie-instrument"})["name"]
+    drum_node = request({"cmd": "batterie", "track": drums})["nodeId"]
+    request({"cmd": "presets", "track": drums, "nodeId": drum_node, "action": "load", "name": "Classic Pop Kit"})
+    request({"cmd": "set_track", "track": drums, "gainDb": -3.0})
+    chain_device(drums, "pression", "Crushed Drums")
+    chain_device(drums, "fournaise", "Pushed Drums")
+    kick = kick_track("Kick", "Sub Kick", None, -11.0)
+    chain_device(kick, "tranche", "Kick Drum")
+    bass = synth_track("Basse Colosse", "colosse-instrument", "colosse", "Colossal Bass", 0.0)
+    chain_device(bass, "fournaise", "Fat Bass")
+    chain_device(bass, "tranche", "Round Bass")
+    keys = synth_track("Accords Ambre", "ambre-instrument", "ambre", "Poly Keys", -7.0)
+    chain_device(keys, "tranche", "Bright Synth")
+    chain_device(keys, "velours", "Hard and Precise")
+    lead = prism_track("Lead Prisme", "Supersaw Lead", -7.0)
+    chain_device(lead, "echo-bande", "Eighth Notes")
+    chain_device(lead, "halo", "Vintage Plate")
+    chain_device("master", "multiband-pro", "Gentle Mastering")
+    chain_device("master", "finition", "Balanced Streaming")
+    chain_device("master", "sonometre", "Streaming -14 LUFS")
+
+    # ---- The pad: the chords held, bars 1-8 and 25-32.
+    events = []
+    for bar, (root, minor) in bars(0, 8) + bars(24, 8):
+        events += [(tone, bar * 4, 3.95, 0.6) for tone in chord_tones(root, minor, 50, 65)]
+    clip(pad, "Accords", 0, 128, events, "#c49cff")
+
+    # ---- The bells: the chord broken in eighths, high, bars 1-8 and 17-24.
+    events = []
+    for bar, (root, minor) in bars(0, 8) + bars(16, 8):
+        tones = chord_tones(root, minor, 69, 82)
+        for step, index in enumerate((0, 1, 2, 1, 2, 0, 1, 2)):
+            events.append((tones[index] + (12 if step == 4 else 0), bar * 4 + step * 0.5, 0.45,
+                           0.62 if step % 4 == 0 else 0.5))
+    clip(bells, "Cloches", 0, 128, events, "#8fd3ff")
+
+    # ---- Batterie: the pop groove (a snare fill into the lead, a tom fill
+    # into the last part), then half time.
+    request({"cmd": "groove", "track": drums, "name": "pop", "bars": 8, "fill": "fill-snare", "startBeats": 32})
+    request({"cmd": "groove", "track": drums, "name": "pop", "bars": 8, "fill": "fill-toms", "startBeats": 64})
+    request({"cmd": "groove", "track": drums, "name": "ballade", "bars": 4, "startBeats": 96})
+
+    # ---- Kick: under the drums on each beat's start of the lead, bars 17-24.
+    events = []
+    for bar in range(16, 24):
+        events += [(36, bar * 4 + beat, 0.3, 0.9 if beat == 0 else 0.8) for beat in (0, 2)]
+    clip(kick, "Kick", 0, 128, events, "#ff5a5a")
+
+    # ---- The bass: the root in eighths, its octave and fifth, bars 9-28.
+    events = []
+    for bar, (root, minor) in bars(8, 20):
+        base = near(root, 33)
+        for at, offset, length, velocity in ((0, 0, 0.9, 0.85), (1, 0, 0.4, 0.7), (1.5, 12, 0.4, 0.75),
+                                             (2, 0, 0.9, 0.8), (3, 7, 0.4, 0.7), (3.5, 0, 0.4, 0.72)):
+            events.append((base + offset, bar * 4 + at, length, velocity))
+    clip(bass, "Basse", 0, 128, events, "#b07d62")
+
+    # ---- The chords: offbeat stabs, bars 9-24.
+    events = []
+    for bar, (root, minor) in bars(8, 16):
+        for at in (0.5, 1.5, 2.5, 3.0):
+            events += [(tone, bar * 4 + at, 0.35, 0.62 if at == 0.5 else 0.55) for tone in chord_tones(root, minor, 57, 70)]
+    clip(keys, "Stabs", 0, 128, events, "#ffd27a")
+
+    # ---- The lead: a line over two rounds of the chords, bars 17-24.
+    line = [(69, 0, 1.5), (65, 1.5, 0.5), (69, 2, 1.0), (74, 3, 1.0),
+            (74, 4, 1.5), (72, 5.5, 0.5), (70, 6, 1.0), (69, 7, 1.0),
+            (69, 8, 1.0), (72, 9, 1.0), (77, 10, 1.5), (76, 11.5, 0.5),
+            (76, 12, 2.0), (74, 14, 1.0), (72, 15, 1.0),
+            (77, 16, 1.5), (76, 17.5, 0.5), (74, 18, 1.0), (69, 19, 1.0),
+            (70, 20, 1.0), (74, 21, 1.0), (77, 22, 1.0), (74, 23, 1.0),
+            (72, 24, 1.5), (69, 25.5, 0.5), (72, 26, 1.0), (77, 27, 1.0),
+            (76, 28, 1.0), (72, 29, 1.0), (74, 30, 2.0)]
+    clip(lead, "Mélodie", 0, 128, [(note, 64 + at, length - 0.06, 0.8) for note, at, length in line], "#ff8fb1")
+    save_piece("23-instruments-et-effets-natifs")
+
+
+def catalogue_effect(track, key):
+    """An effect after the track's others, from its first factory sound."""
+    answer = request({"cmd": "insert_device", "track": track, "key": key})
+    nodes = [item["id"] for item in answer.get("nodes", []) if item.get("type") == key]
+    if not nodes:
+        return
+    listed = request({"cmd": "presets", "track": track, "nodeId": nodes[-1]}).get("presets", [])
+    factory = [item["name"] for item in listed if item.get("factory") and item["name"] not in ("Init", "Default")]
+    if factory:
+        request({"cmd": "presets", "track": track, "nodeId": nodes[-1], "action": "load", "name": factory[0]})
+
+
+# Every instrument on its own track, each with one or two effects, and between
+# them every effect: (track name, how it is made, its sound, its effects).
+CATALOGUE = [
+    ("Opale", ("synth", "opale"), "Warm Keys", ["accords", "chorus", "reverb-pro"]),
+    ("Quartz", ("synth", "quartz"), "Electric Piano", ["arpege", "phaser", "echo-bande"]),
+    ("Saphir", ("synth", "saphir"), "Classic E-Piano", ["ping-pong", "eq-pro"]),
+    ("Tirette", ("synth", "tirette"), "Full Organ", ["fournaise", "halo"]),
+    ("Onyx", ("synth", "onyx"), "Vocal Pad", ["flanger", "filter-pro", "vocoder"]),
+    ("Alliage", ("synth", "alliage"), "Acid Line", ["sequenceur", "auto-filter", "comp-pro"]),
+    ("Argile", ("synth", "argile"), "Brass Section", ["multimode-filter", "delay", "decaleur"]),
+    ("Dérive", ("synth", "derive"), "Saturated Lead", ["gamme", "amp-sim", "cab-sim"]),
+    ("Bronze", ("synth", "bronze"), "Marimba", ["reverb", "eq-three", "resonateurs"]),
+    ("Jade", ("synth", "jade"), "Suitcase Auto-Pan", ["rotor", "reverb-pro"]),
+    ("Silex", ("synth", "silex"), "House Kit", ["roulement", "saccade", "pompe"]),
+    ("Ambre", ("synth", "ambre"), "Brass", ["velours", "limiter-pro", "harmonie"]),
+    ("Colosse", ("synth", "colosse"), "Abyssal Pad", ["pression", "multiband-pro", "anneau"]),
+    ("Mosaïque", ("synth", "mosaique"), "Bowed Cello", ["tranche", "finition", "corps"]),
+    ("Nébuleuse", ("synth", "nebuleuse"), "Cathedral Choir", ["stereo-width", "givre"]),
+    ("Prisme", ("instrument", "prism-instrument", "prism-synth"), "Digital Marimba", ["echo-notes", "patine", "drive"]),
+    ("Kick", ("instrument", "kick-instrument", "kick-synth"), "909 Punch", ["transient-shaper", "limiter"]),
+    ("Batterie", ("batterie",), "Classic Pop Kit", ["compressor", "gate"]),
+    ("Rack de pads", ("instrument", "rack-instrument", None), None, ["peigne", "utilitaire"]),
+    ("Échantillonneur simple", ("simple",), None, ["bitcrusher", "lowpass"]),
+    ("Nuée", ("nuee",), None, ["grains", "boucleur"]),
+    ("Sampler", ("factory", "piano"), None, ["alea", "duree", "eq", "tremolo-pan", "empreinte"]),
+    ("Modèle de son", ("model", "Alto Saxophone.cysound"), None, ["justesse", "de-esser", "tuner", "mic-sim", "highpass"]),
+    ("Poly Keys", ("instrument", "synth-keys", None), None, ["hard-clip", "chorus"]),
+]
+
+
+def example_catalogue():
+    """'24-catalogue-instruments-et-effets': CyDAW's instruments one per track,
+    each with a sound of its own and one or two effects, between them every
+    effect; the master's analysers. No clips: a project to look through."""
+    new_piece()
+    request({"cmd": "set_tempo", "bpm": 120})
+    for name, how, sound, effects in CATALOGUE:
+        kind = how[0]
+        if kind == "synth":
+            track = synth_track(name, how[1] + "-instrument", how[1], sound)
+        elif kind == "instrument":
+            track = request({"cmd": "add_midi_track", "name": name, "instrument": how[1]})["name"]
+            if sound and how[2]:
+                graph = request({"cmd": "get_track_graph", "track": track})
+                node = [item["id"] for item in graph["nodes"] if item.get("type") == how[2]][0]
+                request({"cmd": "presets", "track": track, "nodeId": node, "action": "load", "name": sound})
+        elif kind == "batterie":
+            track = request({"cmd": "add_midi_track", "name": name, "instrument": "batterie-instrument"})["name"]
+            graph = request({"cmd": "get_track_graph", "track": track})
+            node = [item["id"] for item in graph["nodes"] if item.get("type") == "batterie"][0]
+            request({"cmd": "presets", "track": track, "nodeId": node, "action": "load", "name": sound})
+        elif kind in ("simple", "nuee"):
+            instrument = "simple-sampler-instrument" if kind == "simple" else "nuee-instrument"
+            track = request({"cmd": "add_midi_track", "name": name, "instrument": instrument})["name"]
+            sample = pathlib.Path("D:/CyDAW/Banks/bear-sax/Samples/ab3_vl3_rr2.wav")
+            if sample.exists():
+                request({"cmd": "load_sampler", "track": track, "file": str(sample).replace(os.sep, "/")})
+        elif kind == "factory":
+            listed = request({"cmd": "factory_instruments"}).get("instruments", [])
+            chosen = next((item["key"] for item in listed if how[1] in item["key"] and item.get("installed", True)), None)
+            if chosen is None:
+                print("skip", name, "(no factory instrument with", how[1], ")")
+                continue
+            made = request({"cmd": "add_factory_instrument", "key": chosen})
+            track = made.get("name") or made.get("track")
+            request({"cmd": "set_track", "track": track, "name": name})
+            track = name
+        else:
+            model = ROOT / "content" / "factory" / "Sound Models" / how[1]
+            made = request({"cmd": "load_sound_model", "file": str(model).replace(os.sep, "/")})
+            track = made.get("name") or made.get("track")
+            request({"cmd": "set_track", "track": track, "name": name})
+            track = name
+        for effect in effects:
+            catalogue_effect(track, effect)
+        print("track", track, effects)
+    for effect in ("spectrometer", "sonometre", "stereoscope"):
+        request({"cmd": "insert_device", "track": "master", "key": effect})
+    save_piece("24-catalogue-instruments-et-effets")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--exe", default=str(DEFAULT_EXE))
@@ -1306,7 +1510,9 @@ def main():
                         help="acoustic: only the factory instruments' comparison; all-instruments: only the project "
                              "with every factory instrument; prism: only Prisme's piece; jazz: only 'Pas de cinq'; "
                              "pianos (or luna, greve, neons, cycles): the solo piano pieces; studio: 'Pas de cinq' "
-                             "through the studio effects; electro: Kick and the CyDAW Electro kits; amps: the amp, cabinet and microphone simulators")
+                             "through the studio effects; electro: Kick and the CyDAW Electro kits; amps: the amp, cabinet and microphone simulators; "
+                             "native: CyDAW's own synths, Batterie and mixing effects; catalogue: every instrument on its "
+                             "own track with one or two effects")
     arguments = parser.parse_args()
     environment = dict(os.environ, CYDAW_NO_RECOVERY="1")
     process = subprocess.Popen([arguments.exe, "--control-port=%d" % PORT, "--silent", "--window-size=1400x900"],
@@ -1336,6 +1542,12 @@ def main():
             return 0
         if arguments.only == "amps":
             example_amps()
+            return 0
+        if arguments.only == "native":
+            example_native()
+            return 0
+        if arguments.only == "catalogue":
+            example_catalogue()
             return 0
         if arguments.only in ("pianos", "luna", "greve", "neons", "cycles"):
             for key in (("luna", "greve", "neons", "cycles") if arguments.only == "pianos" else (arguments.only,)):

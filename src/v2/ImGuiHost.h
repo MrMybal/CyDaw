@@ -30,6 +30,9 @@ public:
     std::function<void(const juce::StringArray&, float x, float y)> onFilesDropped;
     // Called once the ImGui context and fonts exist, before the first frame.
     std::function<void()> onInitialised;
+    // Panels may leave the window as windows of their own (the studio);
+    // a plug-in's window keeps them all. Read when the context is made.
+    bool ownWindows { true };
 
     // Keeps the display rate for a while (input, a change on screen).
     void wake(int frames = 12);
@@ -61,7 +64,16 @@ private:
 
     std::unique_ptr<Native> native_;
     juce::HWNDComponent embed_;
+    double lastVBlankMs_ {};
     juce::VBlankAttachment vblank_;
+    // Frames when no vertical blank comes (a window on no screen, a host
+    // that has none to give): a timer paces them instead.
+    struct Fallback final : juce::Timer {
+        explicit Fallback(ImGuiHost& owner) : host(owner) {}
+        void timerCallback() override;
+        ImGuiHost& host;
+    };
+    Fallback fallback_ { *this };
     int wakeFrames_ { 30 };
     bool animating_ {};
     double lastFrameSeconds_ {};

@@ -1,0 +1,27 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "poly-lead",
+ "name": "Classic Saw Lead",
+ "state": {
+  "type": "poly-lead",
+  "parameters": {
+   "node.36002.voice.mode": 1.0,
+   "node.36002.voice.glide": 40.0,
+   "node.36003.polyOscillator.waveform": 2.0,
+   "node.36003.polyOscillator.level": 0.13,
+   "node.36004.envelope.attack": 6.0,
+   "node.36004.envelope.decay": 320.0,
+   "node.36004.envelope.sustain": 0.7,
+   "node.36004.envelope.release": 380.0,
+   "node.36005.gain.db": 0.0,
+   "node.36006.voiceFilter.cutoff": 3400.0,
+   "node.36006.voiceFilter.resonance": 1.6,
+   "node.36007.drive.db": 5.0,
+   "node.36008.delay.time": 340.0,
+   "node.36008.delay.feedback": 0.26,
+   "node.36008.delay.mix": 0.18
+  }
+ }
+}

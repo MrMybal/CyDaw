@@ -17,6 +17,7 @@ constexpr ImU32 rgb(const unsigned int hex, const float a = 1.0f)
     return (alphaByte << 24) | (b << 16) | (g << 8) | r;
 }
 
+// The first one: deep blue-greys, an amber accent.
 const Palette kPalette {
     rgb(0x111317), // bg0
     rgb(0x16181d), // bg1
@@ -48,6 +49,75 @@ const Palette kPalette {
     rgb(0xe5484d), // meterHigh
     rgb(0xf0a43a, 0.22f) // selection
 };
+
+// Bitwig's mid greys: lighter grounds, dark seams between panels, an
+// orange accent.
+const Palette kMidGrey {
+    rgb(0x262626), // bg0
+    rgb(0x2e2e2e), // bg1
+    rgb(0x373737), // bg2
+    rgb(0x414141), // bg3
+    rgb(0x4b4b4b), // bg4
+    rgb(0x565656), // bg5
+    rgb(0x1f1f1f), // line
+    rgb(0x181818), // lineStrong
+    rgb(0x2d2d2d), // grid
+    rgb(0x383838), // gridStrong
+    rgb(0xdadada), // text
+    rgb(0xa6a6a6), // textDim
+    rgb(0x707070), // textFaint
+    rgb(0xf28a2e), // accent
+    rgb(0xffa552), // accentHover
+    rgb(0x7d4a1d), // accentDim
+    rgb(0x5cb4ef), // audio
+    rgb(0x5fd3a4), // midi
+    rgb(0xf0c94f), // control
+    rgb(0xc69aec), // modulation
+    rgb(0xee5149), // record
+    rgb(0x5cd26e), // play
+    rgb(0xf5a623), // warn
+    rgb(0xf2d14c), // solo
+    rgb(0x5aa9f0), // mute
+    rgb(0x5cd26e), // meterLow
+    rgb(0xe8c547), // meterMid
+    rgb(0xee5149), // meterHigh
+    rgb(0xf28a2e, 0.24f) // selection
+};
+
+// Ableton Live's light greys: dark text, an orange accent, blue selections.
+const Palette kLightGrey {
+    rgb(0xb3b3b3), // bg0
+    rgb(0xc2c2c2), // bg1
+    rgb(0xcbcbcb), // bg2
+    rgb(0xd6d6d6), // bg3
+    rgb(0xe0e0e0), // bg4
+    rgb(0xebebeb), // bg5
+    rgb(0x9c9c9c), // line
+    rgb(0x7f7f7f), // lineStrong
+    rgb(0xa9a9a9), // grid
+    rgb(0x969696), // gridStrong
+    rgb(0x161616), // text
+    rgb(0x3d3d3d), // textDim
+    rgb(0x6e6e6e), // textFaint
+    rgb(0xff8a00), // accent
+    rgb(0xffa233), // accentHover
+    rgb(0xf0c27e), // accentDim
+    rgb(0x2a86d1), // audio
+    rgb(0x169c70), // midi
+    rgb(0xb88a00), // control
+    rgb(0x8f4fc2), // modulation
+    rgb(0xe0302b), // record
+    rgb(0x15a34e), // play
+    rgb(0xd98200), // warn
+    rgb(0x2f7fd6), // solo
+    rgb(0xe6a600), // mute
+    rgb(0x22b14c), // meterLow
+    rgb(0xe0b000), // meterMid
+    rgb(0xe0302b), // meterHigh
+    rgb(0x3d8eff, 0.26f) // selection
+};
+
+Palette gPalette = kMidGrey;
 
 ImFont* gUi {};
 ImFont* gBold {};
@@ -96,11 +166,97 @@ void mergeIcons(const float size)
     ImGui::GetIO().Fonts->AddFontFromFileTTF(icons.getFullPathName().toRawUTF8(), size * 0.95f, &config);
 }
 
+void applyColours(ImGuiStyle& style);
+
 } // namespace
 
 const Palette& palette()
 {
-    return kPalette;
+    return gPalette;
+}
+
+void setPalette(const Palette& palette)
+{
+    gPalette = palette;
+    if (ImGui::GetCurrentContext() != nullptr)
+        applyColours(ImGui::GetStyle());
+}
+
+const std::vector<Theme>& builtInThemes()
+{
+    static const std::vector<Theme> themes {
+        { "mid-grey", "Mid grey", kMidGrey, true, {} },
+        { "light-grey", "Light grey", kLightGrey, true, {} },
+        { "dark", "Dark (the first)", kPalette, true, {} },
+    };
+    return themes;
+}
+
+const std::vector<PaletteField>& paletteFields()
+{
+    static const std::vector<PaletteField> fields {
+        { "bg0", "Fond le plus profond (timeline)", "Deepest ground (timeline)", 0, &Palette::bg0 },
+        { "bg1", "Fond des panneaux", "Panel ground", 0, &Palette::bg1 },
+        { "bg2", "Fond des en-têtes", "Header ground", 0, &Palette::bg2 },
+        { "bg3", "Champs et boutons", "Fields and buttons", 0, &Palette::bg3 },
+        { "bg4", "Survol", "Hover", 0, &Palette::bg4 },
+        { "bg5", "Actif", "Active", 0, &Palette::bg5 },
+        { "line", "Traits", "Lines", 1, &Palette::line },
+        { "lineStrong", "Traits marqués", "Strong lines", 1, &Palette::lineStrong },
+        { "grid", "Grille", "Grid", 1, &Palette::grid },
+        { "gridStrong", "Grille (mesures)", "Grid (bars)", 1, &Palette::gridStrong },
+        { "text", "Texte", "Text", 2, &Palette::text },
+        { "textDim", "Texte secondaire", "Secondary text", 2, &Palette::textDim },
+        { "textFaint", "Texte discret", "Faint text", 2, &Palette::textFaint },
+        { "accent", "Accent", "Accent", 3, &Palette::accent },
+        { "accentHover", "Accent survolé", "Accent hovered", 3, &Palette::accentHover },
+        { "accentDim", "Accent atténué", "Accent dimmed", 3, &Palette::accentDim },
+        { "selection", "Sélection", "Selection", 3, &Palette::selection },
+        { "audio", "Audio", "Audio", 4, &Palette::audio },
+        { "midi", "MIDI", "MIDI", 4, &Palette::midi },
+        { "control", "Contrôle", "Control", 4, &Palette::control },
+        { "modulation", "Modulation", "Modulation", 4, &Palette::modulation },
+        { "record", "Enregistrement", "Record", 4, &Palette::record },
+        { "play", "Lecture", "Play", 4, &Palette::play },
+        { "warn", "Avertissement", "Warning", 4, &Palette::warn },
+        { "solo", "Solo", "Solo", 4, &Palette::solo },
+        { "mute", "Muet", "Mute", 4, &Palette::mute },
+        { "meterLow", "Vu-mètre bas", "Meter low", 5, &Palette::meterLow },
+        { "meterMid", "Vu-mètre moyen", "Meter mid", 5, &Palette::meterMid },
+        { "meterHigh", "Vu-mètre haut", "Meter high", 5, &Palette::meterHigh },
+    };
+    return fields;
+}
+
+juce::var paletteToJson(const Palette& palette)
+{
+    auto* colours = new juce::DynamicObject();
+    for (const auto& field : paletteFields()) {
+        const auto colour = palette.*field.member;
+        const auto r = colour & 0xffu;
+        const auto g = (colour >> 8) & 0xffu;
+        const auto b = (colour >> 16) & 0xffu;
+        const auto a = (colour >> 24) & 0xffu;
+        auto text = "#" + juce::String::toHexString(static_cast<int>((r << 16) | (g << 8) | b)).paddedLeft('0', 6).toUpperCase();
+        if (a != 0xffu)
+            text << juce::String::toHexString(static_cast<int>(a)).paddedLeft('0', 2).toUpperCase();
+        colours->setProperty(field.key, text);
+    }
+    return juce::var(colours);
+}
+
+Palette paletteFromJson(const juce::var& colours, const Palette& base)
+{
+    auto palette = base;
+    for (const auto& field : paletteFields()) {
+        auto text = colours.getProperty(field.key, juce::var()).toString().trim();
+        if (!text.startsWithChar('#') || (text.length() != 7 && text.length() != 9))
+            continue;
+        const auto value = static_cast<unsigned int>(text.substring(1, 7).getHexValue32());
+        const auto a = text.length() == 9 ? static_cast<unsigned int>(text.substring(7).getHexValue32()) & 0xffu : 0xffu;
+        palette.*field.member = (a << 24) | ((value & 0xffu) << 16) | (value & 0xff00u) | ((value >> 16) & 0xffu);
+    }
+    return palette;
 }
 
 ImU32 alpha(const ImU32 colour, const float a)
@@ -169,19 +325,34 @@ float dpi()
     return gDpi;
 }
 
+// The fonts of the context drawing now, in the order loadFonts adds them:
+// several contexts (plug-ins' windows) each have their own.
+ImFont* contextFont(const int index, ImFont* fallback)
+{
+    if (ImGui::GetCurrentContext() == nullptr)
+        return fallback;
+    const auto& fonts = ImGui::GetIO().Fonts->Fonts;
+    return index < fonts.Size ? fonts[index] : fonts.Size > 0 ? fonts[0] : fallback;
+}
+
 ImFont* uiFont()
 {
-    return gUi;
+    return contextFont(0, gUi);
 }
 
 ImFont* boldFont()
 {
-    return gBold != nullptr ? gBold : gUi;
+    return contextFont(1, gBold != nullptr ? gBold : gUi);
 }
 
 ImFont* monoFont()
 {
-    return gMono != nullptr ? gMono : gUi;
+    return contextFont(2, gMono != nullptr ? gMono : gUi);
+}
+
+void useDpi(const float dpiScale)
+{
+    gDpi = std::max(0.5f, dpiScale);
 }
 
 void loadFonts()
@@ -193,7 +364,7 @@ void loadFonts()
     gBold = addFont(windowsFont("seguisb.ttf"), fontsFolder().getChildFile("Roboto-Medium.ttf"), kBaseSize);
     mergeIcons(kBaseSize);
     gMono = addFont(windowsFont("consola.ttf"), fontsFolder().getChildFile("Cousine-Regular.ttf"), kBaseSize - 1.0f);
-    io.FontDefault = gUi;
+    io.FontDefault = io.Fonts->Fonts.Size > 0 ? io.Fonts->Fonts[0] : gUi;
 }
 
 void apply(const float dpiScale)
@@ -201,7 +372,6 @@ void apply(const float dpiScale)
     gDpi = std::max(0.5f, dpiScale);
     auto& style = ImGui::GetStyle();
     style = ImGuiStyle();
-    const auto& p = kPalette;
 
     style.FontSizeBase = kBaseSize;
     style.WindowPadding = ImVec2(8.0f, 6.0f);
@@ -240,7 +410,20 @@ void apply(const float dpiScale)
     style.HoverDelayNormal = 0.55f;
     style.AntiAliasedLines = true;
     style.AntiAliasedFill = true;
+    applyColours(style);
 
+    style.ScaleAllSizes(gDpi);
+    // A panel in a window of its own: square corners, an opaque ground, as
+    // the operating system's window around it is.
+    style.WindowRounding = 0.0f;
+    style.FontScaleDpi = gDpi;
+}
+
+namespace {
+
+void applyColours(ImGuiStyle& style)
+{
+    const auto& p = gPalette;
     auto* c = style.Colors;
     c[ImGuiCol_Text] = vec(p.text);
     c[ImGuiCol_TextDisabled] = vec(p.textFaint);
@@ -294,7 +477,7 @@ void apply(const float dpiScale)
     c[ImGuiCol_TableBorderStrong] = vec(p.lineStrong);
     c[ImGuiCol_TableBorderLight] = vec(p.line);
     c[ImGuiCol_TableRowBg] = vec(0);
-    c[ImGuiCol_TableRowBgAlt] = vec(rgb(0xffffff, 0.018f));
+    c[ImGuiCol_TableRowBgAlt] = vec(alpha(p.text, 0.025f));
     c[ImGuiCol_TextLink] = vec(p.audio);
     c[ImGuiCol_TextSelectedBg] = vec(alpha(p.accent, 0.30f));
     c[ImGuiCol_TreeLines] = vec(p.line);
@@ -305,13 +488,10 @@ void apply(const float dpiScale)
     c[ImGuiCol_NavWindowingHighlight] = vec(alpha(p.accent, 0.7f));
     c[ImGuiCol_NavWindowingDimBg] = vec(rgb(0x000000, 0.35f));
     c[ImGuiCol_ModalWindowDimBg] = vec(rgb(0x000000, 0.45f));
-
-    style.ScaleAllSizes(gDpi);
-    // A panel in a window of its own: square corners, an opaque ground, as
-    // the operating system's window around it is.
-    style.WindowRounding = 0.0f;
-    style.Colors[ImGuiCol_WindowBg].w = 1.0f;
-    style.FontScaleDpi = gDpi;
+    // A panel in a window of its own: an opaque ground.
+    c[ImGuiCol_WindowBg].w = 1.0f;
 }
+
+} // namespace
 
 } // namespace cydaw::v2::theme

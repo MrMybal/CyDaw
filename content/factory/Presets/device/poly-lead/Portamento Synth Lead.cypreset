@@ -1,0 +1,27 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "poly-lead",
+ "name": "Portamento Synth Lead",
+ "state": {
+  "type": "poly-lead",
+  "parameters": {
+   "node.36002.voice.mode": 2.0,
+   "node.36002.voice.glide": 220.0,
+   "node.36003.polyOscillator.waveform": 2.0,
+   "node.36003.polyOscillator.level": 0.12,
+   "node.36004.envelope.attack": 10.0,
+   "node.36004.envelope.decay": 600.0,
+   "node.36004.envelope.sustain": 0.75,
+   "node.36004.envelope.release": 450.0,
+   "node.36005.gain.db": 0.0,
+   "node.36006.voiceFilter.cutoff": 2600.0,
+   "node.36006.voiceFilter.resonance": 2.5,
+   "node.36007.drive.db": 8.0,
+   "node.36008.delay.time": 460.0,
+   "node.36008.delay.feedback": 0.35,
+   "node.36008.delay.mix": 0.24
+  }
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "compressor",
+ "name": "Bus Compression",
+ "state": {
+  "type": "compressor",
+  "parameters": {
+   "compressor.threshold": -10.0,
+   "compressor.ratio": 1.8
+  }
+ }
+}

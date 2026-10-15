@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "transient-shaper",
+ "name": "More Room",
+ "state": {
+  "type": "transient-shaper",
+  "parameters": {
+   "transient.attack": 0.0,
+   "transient.sustain": 0.7,
+   "transient.output": -2.0
+  }
+ }
+}

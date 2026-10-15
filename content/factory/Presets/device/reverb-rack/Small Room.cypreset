@@ -1,0 +1,14 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "reverb-rack",
+ "name": "Small Room",
+ "state": {
+  "type": "reverb-rack",
+  "parameters": {
+   "node.11002.reverb.roomSize": 0.35,
+   "node.11002.reverb.mix": 0.2
+  }
+ }
+}

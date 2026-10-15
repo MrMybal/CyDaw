@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "echo-notes",
+ "name": "Rising Fifths",
+ "state": {
+  "type": "echo-notes",
+  "parameters": {
+   "echonotes.time": 250.0,
+   "echonotes.decay": 0.2,
+   "echonotes.pitch": 7.0,
+   "echonotes.sync": 6.0,
+   "echonotes.repeats": 4.0
+  }
+ }
+}

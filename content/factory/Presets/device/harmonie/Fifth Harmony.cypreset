@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "harmonie",
+ "name": "Fifth Harmony",
+ "state": {
+  "type": "harmonie",
+  "parameters": {
+   "harmonie.shiftA": 7.0,
+   "harmonie.fineA": 0.0,
+   "harmonie.levelA": 0.7,
+   "harmonie.shiftB": 7.0,
+   "harmonie.levelB": 0.0,
+   "harmonie.dry": 1.0,
+   "harmonie.delay": 0.0,
+   "harmonie.output": 0.0,
+   "harmonie.window": 40.0,
+   "harmonie.mode": 1.0,
+   "harmonie.fineB": 0.0,
+   "harmonie.panA": 0.0,
+   "harmonie.panB": 0.0,
+   "harmonie.feedback": 0.0
+  }
+ }
+}

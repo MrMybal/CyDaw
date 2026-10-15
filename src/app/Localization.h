@@ -9,9 +9,14 @@
 
 namespace cydaw::app {
 
-class Localization final : public juce::ChangeBroadcaster {
+// One for the program, made on first use and deleted when JUCE shuts down
+// (not when the module is unloaded: a plug-in's would then be destroyed
+// after JUCE, under the loader's lock, and its host would hang).
+class Localization final : public juce::ChangeBroadcaster, private juce::DeletedAtShutdown {
 public:
     static Localization& instance();
+    ~Localization() override;
+    JUCE_DECLARE_SINGLETON(Localization, false)
 
     [[nodiscard]] juce::String text(juce::StringRef key) const;
     [[nodiscard]] juce::String languageCode() const;
@@ -23,12 +28,6 @@ public:
         juce::String name;
     };
     [[nodiscard]] static std::vector<Language> availableLanguages();
-    // Node names ("node.<name>", the graph's inputs and outputs) stay in
-    // English unless asked otherwise: the names of a node graph, as every
-    // modular tool writes them. Their descriptions and settings follow the
-    // language.
-    [[nodiscard]] bool nodeNamesInEnglish() const;
-    void setNodeNamesInEnglish(bool english);
 
 private:
     // Keyed by exact key: tr() is called thousands of times when a surface
@@ -41,7 +40,6 @@ private:
     [[nodiscard]] static Mappings parseJson(const juce::String& json);
 
     juce::String languageCode_ { "en" };
-    bool nodeNamesInEnglish_ { true };
     Mappings english_;
     Mappings current_;
     juce::ApplicationProperties properties_;

@@ -115,15 +115,15 @@ def main() -> int:
         # ---- Ampli ----
         amp = node_of(need({"cmd": "insert_device", "track": track, "key": "amp-sim"}, "amp"), "amp-sim")
         names = factory(amp)
-        check(len(names) >= 12 and "Métal moderne" in names, f"the amp's factory presets ({len(names)})")
-        load(amp, "Clean jazz")
+        check(len(names) >= 12 and "Modern Metal" in names, f"the amp's factory presets ({len(names)})")
+        load(amp, "Jazz Clean")
         clean = chain(220.0)
-        load(amp, "Métal moderne")
+        load(amp, "Modern Metal")
         metal = chain(220.0)
         check(metal["thirdDb"] > clean["thirdDb"] + 10.0,
               f"high gain distorts more than clean (3rd harmonic {clean['thirdDb']:.1f} -> {metal['thirdDb']:.1f} dB)")
         check(-60.0 < metal["outputDb"] < 0.0 and metal["peakDb"] < 3.0, f"the amp's level is sane ({metal['outputDb']:.1f} dB)")
-        load(amp, "Clean jazz")
+        load(amp, "Jazz Clean")
         keys = {p["key"].split(".", 2)[-1]: p["key"] for p in need({"cmd": "list_parameters", "track": track}, "keys")["parameters"]}
         need({"cmd": "set_parameter", "track": track, "key": keys["amp.treble"], "value": 0.0}, "treble")
         dark = chain(3_000.0, 0.02)
@@ -131,7 +131,7 @@ def main() -> int:
         bright = chain(3_000.0, 0.02)
         check(bright["outputDb"] > dark["outputDb"] + 6.0, f"the treble knob raises the highs ({dark['outputDb']:.1f} -> {bright['outputDb']:.1f} dB)")
         # Two channels: A clean, B the lead; the switch is a value as the others, a lane moves it.
-        load(amp, "Clair et lead A-B")
+        load(amp, "Clean and Lead A-B")
         on_a = chain(220.0)
         need({"cmd": "set_parameter", "track": track, "key": keys["amp.channel"], "value": 1.0}, "channel B")
         on_b = chain(220.0)
@@ -143,13 +143,13 @@ def main() -> int:
         check(lane.get("ok") is True, f"a lane switches the channel ({lane.get('error', '')})")
         need({"cmd": "clear_automation", "track": track, "key": keys["amp.channel"]}, "clear the lane")
         # The cabinet's checks below hear it through the bright clean as before.
-        load(amp, "Clean jazz")
+        load(amp, "Jazz Clean")
         need({"cmd": "set_parameter", "track": track, "key": keys["amp.treble"], "value": 10.0}, "treble")
 
         # ---- Baffle et micro ----
         cab = node_of(need({"cmd": "insert_device", "track": track, "key": "cab-sim"}, "cab"), "cab-sim")
         check(len(factory(cab)) >= 8, "the cabinet's factory presets")
-        load(cab, "4x12 classique")
+        load(cab, "Classic 4x12")
         low = chain(1_000.0, 0.02)
         high = chain(9_000.0, 0.02)
         check(high["outputDb"] < low["outputDb"] - 15.0,
@@ -190,13 +190,13 @@ def main() -> int:
             time.sleep(0.2)
         check(reopened.get("name") == "click-and-echo" and reopened.get("frames") == 301,
               f"a saved project keeps the response ({reopened})")
-        saved = need({"cmd": "presets", "track": track, "nodeId": cab, "action": "save", "name": "Mon IR"}, "save preset")
+        saved = need({"cmd": "presets", "track": track, "nodeId": cab, "action": "save", "name": "My IR"}, "save preset")
         need({"cmd": "cab_impulse", "track": track, "nodeId": cab, "clear": True}, "clear")
         modelled = chain(9_000.0, 0.02)
         check(modelled["outputDb"] < low["outputDb"] - 10.0 and not need({"cmd": "cab_impulse", "track": track, "nodeId": cab},
                                                                           "held").get("name"),
               "taking the response out brings the modelled cabinet back")
-        load(cab, "Mon IR")
+        load(cab, "My IR")
         check(need({"cmd": "cab_impulse", "track": track, "nodeId": cab}, "held").get("name") == "click-and-echo",
               f"a preset brings its response back ({saved.get('current')})")
         need({"cmd": "remove_device", "track": track, "nodeId": cab}, "remove cab")
@@ -204,14 +204,14 @@ def main() -> int:
         # ---- Micro ----
         mic = node_of(need({"cmd": "insert_device", "track": track, "key": "mic-sim"}, "mic"), "mic-sim")
         check(len(factory(mic)) >= 10, "the microphone's factory presets")
-        load(mic, "Téléphone")
+        load(mic, "Telephone")
         band = chain(1_000.0, 0.05)
         under = chain(100.0, 0.05)
         check(under["outputDb"] < band["outputDb"] - 20.0,
               f"the telephone keeps its narrow band (1 kHz {band['outputDb']:.1f}, 100 Hz {under['outputDb']:.1f} dB)")
 
         # ---- A project keeps them ----
-        load(mic, "Ruban doux")
+        load(mic, "Soft Ribbon")
         project = scratch / "Amps.cydaw"
         need({"cmd": "save_project", "path": str(project)}, "save")
         need({"cmd": "new_project"}, "new")

@@ -1,0 +1,40 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "kick-synth",
+ "name": "Two-Step Short Knock",
+ "state": {
+  "type": "kick-synth",
+  "parameters": {
+   "kick.bodyShape": 0.0,
+   "kick.bodyPhase": 15.0,
+   "kick.pitchStart": 300.0,
+   "kick.pitchEnd": 58.29999923706055,
+   "kick.pitchTime": 32.400001525878906,
+   "kick.pitchCurve": 3.0,
+   "kick.bodyLevel": 0.0,
+   "kick.attack": 0.0,
+   "kick.hold": 8.0,
+   "kick.decay": 180.0,
+   "kick.decayCurve": 2.200000047683716,
+   "kick.length": 400.0,
+   "kick.clickType": 1.0,
+   "kick.clickLevel": -9.0,
+   "kick.clickDecay": 5.0,
+   "kick.clickTone": 6500.0,
+   "kick.subLevel": -16.0,
+   "kick.subDecay": 200.0,
+   "kick.subOctave": 0.0,
+   "kick.driveType": 0.0,
+   "kick.drive": 3.0,
+   "kick.driveTone": 14000.0,
+   "kick.lowCut": 30.0,
+   "kick.highCut": 16000.0,
+   "kick.lowBoost": 1.0,
+   "kick.keyTrack": 1.0,
+   "kick.velocity": 0.600000023841858,
+   "kick.output": -2.819999933242798
+  }
+ }
+}

@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "alea",
+ "name": "Velocity Only",
+ "state": {
+  "type": "alea",
+  "parameters": {
+   "alea.timing": 0.0,
+   "alea.velocity": 0.25,
+   "alea.chance": 1.0,
+   "alea.pitchChance": 0.0,
+   "alea.pitchRange": 0.0
+  }
+ }
+}

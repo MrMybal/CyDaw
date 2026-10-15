@@ -58,9 +58,8 @@ La carte, dans Périphériques, montre le kit en petit, les niveaux de la grosse
 claire, du charleston, des toms, du crash et de la ride, l'accord et le niveau du kit, et **Ouvrir
 Batterie**.
 
-**Préréglages d'usine** (13) : Rouillée brute, Rock sec, Metal serré, Toms profonds, Hip-hop poussiéreux,
-Jazz feutré, Jazz lumineux, Tourbillon pop, Funk serré, Indocile ouverte, Balais intimes, Années 70,
-Lo-fi grave. Un préréglage d'un autre kit charge ce kit. Faits par
+**Préréglages d'usine** : 34 (noms en anglais), par exemple Big Room Rock, Dry Funk Pocket, Bebop Bright Ride, Reggae One Drop, Late Night Brushes, Boom Bap Break Kit. Un préréglage garde aussi les réglages des micros (proches, overheads, pièce) que l'on a touchés ; les
+autres reprennent leur valeur de départ. Un préréglage d'un autre kit charge ce kit. Faits par
 `tools/factory_content/build_batterie_presets.py` (chaque son entendu hors ligne par le chemin du
 plug-in exporté).
 

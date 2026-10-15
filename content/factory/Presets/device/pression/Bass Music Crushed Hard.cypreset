@@ -1,0 +1,42 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "pression",
+ "name": "Bass Music Crushed Hard",
+ "state": {
+  "type": "pression",
+  "parameters": {
+   "pression.depth": 1.0,
+   "pression.time": 0.35,
+   "pression.upward": 1.0,
+   "pression.downward": 1.0,
+   "pression.lowGain": 1.0,
+   "pression.midGain": 0.0,
+   "pression.highGain": 2.0,
+   "pression.output": -4.0,
+   "pression.input": 4.0,
+   "pression.crossLow": 100.0,
+   "pression.crossHigh": 2500.0,
+   "pression.lowDownThreshold": -34.0,
+   "pression.lowDownRatio": 66.7,
+   "pression.lowUpThreshold": -42.0,
+   "pression.lowUpRatio": 4.17,
+   "pression.lowAttack": 40.0,
+   "pression.lowRelease": 250.0,
+   "pression.midDownThreshold": -30.0,
+   "pression.midDownRatio": 66.7,
+   "pression.midUpThreshold": -42.0,
+   "pression.midUpRatio": 4.17,
+   "pression.midAttack": 20.0,
+   "pression.midRelease": 250.0,
+   "pression.highDownThreshold": -36.0,
+   "pression.highDownRatio": 66.7,
+   "pression.highUpThreshold": -40.0,
+   "pression.highUpRatio": 4.17,
+   "pression.highAttack": 10.0,
+   "pression.highRelease": 120.0,
+   "pression.solo": 0.0
+  }
+ }
+}

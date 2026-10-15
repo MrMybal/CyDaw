@@ -1,0 +1,16 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "lfo-core",
+ "name": "Saw Ramp",
+ "state": {
+  "type": "lfo-core",
+  "parameters": {
+   "lfo.rate": 1.0,
+   "lfo.depth": 1.0,
+   "lfo.offset": 0.0,
+   "lfo.shape": 2.0
+  }
+ }
+}

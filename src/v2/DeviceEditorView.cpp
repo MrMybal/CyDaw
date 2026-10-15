@@ -1,6 +1,7 @@
 #include "DeviceEditorView.h"
 
-#include "CardFiles.h"
+#include "DeviceBody.h"
+#include "InterfaceEditor.h"
 #include "Theme.h"
 #include "Widgets.h"
 
@@ -13,9 +14,12 @@ using ui::dp;
 using ui::L;
 
 DeviceEditorView::DeviceEditorView(Studio& studio, UiState& state, DeviceSignals& signals)
-    : studio_(studio), state_(state), signals_(signals), presets_(studio, state)
+    : studio_(studio), state_(state), signals_(signals), presets_(studio, state),
+      designed_(std::make_unique<InterfaceEditor>(studio, state))
 {
 }
+
+DeviceEditorView::~DeviceEditorView() = default;
 
 std::string DeviceEditorView::windowId(const TrackRef& track, const std::uint64_t nodeId)
 {
@@ -28,6 +32,8 @@ std::string DeviceEditorView::windowId(const TrackRef& track, const std::uint64_
 
 void DeviceEditorView::draw()
 {
+    // Inside a module: English, whatever the language.
+    const ui::ModuleText english;
     // The sound is tapped for the selected track, which the device panel
     // shows: once a frame whatever the windows open on it.
     if (state_.selectedTrack)
@@ -60,18 +66,12 @@ bool DeviceEditorView::drawWindow(ExpandedPane& expanded, const int order)
         return false;
     const auto& node = *found;
 
-    std::vector<visual::Param> parameters;
-    parameters.reserve(node.parameters.size());
-    for (const auto& parameter : node.parameters)
-        parameters.push_back({ parameter.binding, parameter.label, parameter.unit, parameter.minimum, parameter.maximum,
-                               parameter.value, parameter.defaultValue });
     // Another track's device shows its curves alone.
     const auto selected = state_.selectedTrack && *state_.selectedTrack == expanded.track;
     const auto* span = selected ? signals_.span(node.id) : nullptr;
-    const auto surface = visual::inferSurface(parameters, span != nullptr, span != nullptr && span->instrument);
-    if (surface.panes.empty())
+    auto body = deviceBodyOf(graph, node, span);
+    if (body.empty())
         return false;
-    expanded.pane = std::clamp(expanded.pane, 0, static_cast<int>(surface.panes.size()) - 1);
 
     const auto id = windowId(expanded.track, expanded.nodeId);
     if (expanded.detach) {
@@ -123,52 +123,7 @@ bool DeviceEditorView::drawWindow(ExpandedPane& expanded, const int order)
             live.control = *control;
             live.running = live.running || studio_.engine().isPlaying();
         }
-        const visual::Setter set = [&graph, this](const visual::Param& parameter, const double value) {
-            (void) graph.editorSetParameter(parameter.binding, value);
-            state_.focused = Panel::devices;
-        };
-
-        // The header: its presets, its displays when it has several, the
-        // button that takes the window out of the studio's.
-        const auto track = expanded.track;
-        const auto nodeId = expanded.nodeId;
-        const auto headerTop = ImGui::GetCursorPosY();
-        const auto rightEdge = ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x;
-        if (const auto holder = studio_.devicePresetHolder(track, nodeId)) {
-            presets_.bar("devicePresets", *holder, [this, track, nodeId] { return studio_.devicePresetState(track, nodeId); },
-                         [this, track, nodeId](const juce::var& preset, juce::String& error) {
-                             return studio_.applyDevicePreset(track, nodeId, preset, error);
-                         },
-                         std::min(ImGui::GetContentRegionAvail().x * 0.42f, dp(380.0f)));
-            ImGui::SameLine(0.0f, dp(14.0f));
-        }
-        if (surface.panes.size() > 1)
-            for (auto index = 0; index < static_cast<int>(surface.panes.size()); ++index) {
-                if (index > 0)
-                    ImGui::SameLine(0.0f, dp(4.0f));
-                ImGui::PushID(index);
-                auto current = index == expanded.pane;
-                if (ui::toggle(visual::paneTitle(surface.panes[static_cast<std::size_t>(index)]), &current, theme::palette().accent))
-                    expanded.pane = index;
-                ImGui::PopID();
-                ImGui::SameLine(0.0f, dp(4.0f));
-            }
-        const auto button = ImVec2(dp(24.0f), dp(22.0f));
-        ImGui::SameLine();
-        ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), rightEdge - button.x));
-        ImGui::SetCursorPosY(headerTop);
-        (void) ui::detachButton(id.c_str(), button);
-        ImGui::Spacing();
-
-        const auto colour = IM_COL32(node.colour.getRed(), node.colour.getGreen(), node.colour.getBlue(), 255);
-        const auto origin = ImGui::GetCursorScreenPos();
-        const auto available = ImGui::GetContentRegionAvail();
-        const ImVec2 size(available.x, std::max(dp(240.0f), available.y - dp(2.0f)));
-        const CardFileScope cardFile(studio_, state_, expanded.track, graph, node.id, node.typeKey);
-        (void) visual::drawLargePane("##large", surface.panes[static_cast<std::size_t>(expanded.pane)], parameters, origin, size, colour,
-                                     live, set, &surface.knobs);
-        ImGui::SetCursorScreenPos(origin);
-        ImGui::Dummy(size);
+        drawDeviceBody(body, expanded.pane, studio_, state_, presets_, *designed_, expanded.track, graph, node, live, id.c_str());
         ImGui::PopID();
     }
     ImGui::End();

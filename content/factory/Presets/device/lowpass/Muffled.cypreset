@@ -1,0 +1,14 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "lowpass",
+ "name": "Muffled",
+ "state": {
+  "type": "lowpass",
+  "parameters": {
+   "lowpass.cutoff": 1200.0,
+   "lowpass.resonance": 0.8
+  }
+ }
+}

@@ -1,0 +1,40 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "kick-synth",
+ "name": "Festival Layered Punch",
+ "state": {
+  "type": "kick-synth",
+  "parameters": {
+   "kick.bodyShape": 0.0,
+   "kick.bodyPhase": 30.0,
+   "kick.pitchStart": 420.0,
+   "kick.pitchEnd": 49.0,
+   "kick.pitchTime": 58.0,
+   "kick.pitchCurve": 4.5,
+   "kick.bodyLevel": 0.0,
+   "kick.attack": 0.0,
+   "kick.hold": 55.0,
+   "kick.decay": 480.0,
+   "kick.decayCurve": 1.5,
+   "kick.length": 900.0,
+   "kick.clickType": 1.0,
+   "kick.clickLevel": -6.0,
+   "kick.clickDecay": 7.0,
+   "kick.clickTone": 5500.0,
+   "kick.subLevel": -7.0,
+   "kick.subDecay": 650.0,
+   "kick.subOctave": 0.0,
+   "kick.driveType": 3.0,
+   "kick.drive": 10.0,
+   "kick.driveTone": 9000.0,
+   "kick.lowCut": 28.0,
+   "kick.highCut": 17000.0,
+   "kick.lowBoost": 3.0,
+   "kick.keyTrack": 1.0,
+   "kick.velocity": 0.200000002980232,
+   "kick.output": -9.449999809265137
+  }
+ }
+}

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cydaw/engine/VoiceLive.h>
 #include <cydaw/engine/PrismSynth.h>
 
 #include <array>
@@ -23,11 +24,19 @@
 
 namespace cydaw::engine::synth {
 
-enum class Model : std::uint8_t { none, ambre, colosse, mosaique, nebuleuse, count };
+enum class Model : std::uint8_t { none, ambre, colosse, mosaique, nebuleuse, opale, onyx, tirette, alliage, quartz, argile, saphir, derive, bronze, silex, jade, count };
 inline constexpr int modelCount = static_cast<int>(Model::count);
 
 // How long Nébuleuse's textures last (its scan runs across them).
 inline constexpr double textureSeconds = 3.0;
+
+// Silex's hats: a closed (42) or a pedal (44) hat cuts the open one (46),
+// as on a drum machine. The choke group a note belongs to (0: none).
+inline constexpr int silexOpenHat = 46;
+[[nodiscard]] constexpr int silexChokeGroupOf(const int note) noexcept
+{
+    return note == 42 || note == 44 || note == silexOpenHat ? 1 : 0;
+}
 
 // Room for the largest model's settings.
 inline constexpr int valueCapacity = 256;
@@ -103,6 +112,9 @@ void warmUp(Model model);
 // its periods), `points` values around -1..1; empty when the model has no
 // such picture.
 [[nodiscard]] std::vector<float> picture(Model model, const Values& values, std::string_view part, int points);
+// A model's own filter curve, in dB at `hz`, when its keys alone do not say
+// it (Argile's two filters and their routing); NaN for the others.
+[[nodiscard]] double filterDb(Model model, const Values& values, double hz);
 
 // One voice of any model of the family, from a note-on to silence.
 class Voice final {
@@ -126,6 +138,9 @@ public:
     void setExpression(double pitchSemitones, double gain) noexcept;
     // Adds `count` stereo frames; false once silent.
     bool render(const Values& values, const prism::Context& context, float* left, float* right, int count, double sampleRate) noexcept;
+    // What it plays now: the settings its own modulations move, its LFOs
+    // and its envelopes.
+    [[nodiscard]] const VoiceLive& live() const noexcept;
 
 private:
     struct State;

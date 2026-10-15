@@ -215,6 +215,15 @@ NativeDspRuntime::NativeDspRuntime()
     runtime_.store(compile(graph_, error));
 }
 
+void NativeDspRuntime::applyBypasses(cydaw::engine::AudioRenderPlan& plan, const cydaw::engine::NativeDspGraph& graph)
+{
+    std::vector<cydaw::engine::BypassedNode> bypassed;
+    bypassed.reserve(graph.bypasses.size());
+    for (const auto& entry : graph.bypasses)
+        bypassed.push_back({ entry.node, entry.from });
+    plan.setBypasses(bypassed);
+}
+
 juce::Result NativeDspRuntime::setGraph(
     const cydaw::engine::NativeDspGraph& graph)
 {
@@ -279,6 +288,8 @@ juce::Result NativeDspRuntime::updateParameters(
         }
         current->liveParameters.store(std::move(table));
     }
+    if (current->plan != nullptr)
+        applyBypasses(*current->plan, graph);
     graph_ = graph;
     return juce::Result::ok();
 }
@@ -374,6 +385,7 @@ std::shared_ptr<NativeDspRuntime::RuntimeState> NativeDspRuntime::compile(
         return {};
     }
     runtime->plan = std::move(compiled.plan);
+    applyBypasses(*runtime->plan, graph);
     runtime->sampleRate = sampleRate;
     runtime->modulations = graph.modulations;
     for (const auto& node : graph.nodes)
@@ -765,8 +777,17 @@ void NativeDspRuntime::applyParameters(const RuntimeState& runtime, const double
             const auto found = runtime.liveIndices.find(lane.nodeId);
             if (found == runtime.liveIndices.end())
                 continue;
+            // A clip's lane: its own time, from its start, looping.
+            auto seconds = timelineSeconds;
+            if (lane.clipStartSeconds >= 0.0) {
+                seconds -= lane.clipStartSeconds;
+                if (seconds < 0.0)
+                    continue;
+                if (lane.clipLengthSeconds > 0.0)
+                    seconds = lane.clipLooping ? std::fmod(seconds, lane.clipLengthSeconds) : std::min(seconds, lane.clipLengthSeconds);
+            }
             auto& parameters = parametersOf(found->second);
-            const auto value = automationValueAt(lane.points, timelineSeconds, lane.logarithmic);
+            const auto value = automationValueAt(lane.points, seconds, lane.logarithmic);
             if (lane.field != nullptr)
                 parameters.*lane.field = value;
             else if (lane.slot >= 0 && static_cast<std::size_t>(lane.slot) < parameters.eqBands.size())
@@ -829,6 +850,13 @@ bool NativeDspRuntime::process(juce::AudioBuffer<float>& buffer,
                     frames, input.channel(channel));
     cydaw::engine::ProcessContext context;
     context.transport.beatsPerMinute = sessionTempo();
+    // Where the block is in the bars, when the transport plays (a delay or
+    // a repeat that follows the beat).
+    if (sessionPlaying() && std::isfinite(timelineSeconds)) {
+        context.transport.state = cydaw::engine::PlaybackState::playing;
+        context.transport.quarterNotePosition = std::max(0.0, timelineSeconds) * context.transport.beatsPerMinute / 60.0;
+        context.transport.samplePosition = static_cast<std::int64_t>(std::max(0.0, timelineSeconds) * sampleRate_);
+    }
     // The extra inputs a track is routed into, copied as the main one is.
     std::array<cydaw::engine::AudioBlockView, maximumExtraInputs> extras {};
     auto extraCount = std::size_t {};
@@ -855,7 +883,18 @@ bool NativeDspRuntime::process(juce::AudioBuffer<float>& buffer,
 
 namespace {
 std::atomic<double> sessionTempoBpm { 120.0 };
+std::atomic<bool> sessionTransportPlaying { false };
 } // namespace
+
+void NativeDspRuntime::setSessionPlaying(const bool playing) noexcept
+{
+    sessionTransportPlaying.store(playing, std::memory_order_relaxed);
+}
+
+bool NativeDspRuntime::sessionPlaying() noexcept
+{
+    return sessionTransportPlaying.load(std::memory_order_relaxed);
+}
 
 void NativeDspRuntime::controlValuesNow(const std::uint64_t* nodeIds, float* values,
                                         const std::size_t count) const noexcept
@@ -976,6 +1015,23 @@ bool NativeDspRuntime::readTap(const std::uint64_t nodeId, const bool input,
         return true;
     }
     return false;
+}
+
+void NativeDspRuntime::takeNodePeaks(const std::uint64_t* nodes, const std::size_t count, float* left, float* right) const
+{
+    const auto runtime = runtime_.current();
+    if (runtime == nullptr || runtime->plan == nullptr) {
+        std::fill_n(left, count, 0.0f);
+        std::fill_n(right, count, 0.0f);
+        return;
+    }
+    runtime->plan->takePeaks(nodes, count, left, right);
+}
+
+std::size_t NativeDspRuntime::nodeReadings(const std::uint64_t node, float* into, const std::size_t count) const
+{
+    const auto runtime = runtime_.current();
+    return runtime != nullptr && runtime->plan != nullptr ? runtime->plan->readings(node, into, count) : 0;
 }
 
 std::vector<std::pair<std::uint64_t, float>>

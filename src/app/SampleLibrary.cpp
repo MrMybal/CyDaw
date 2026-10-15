@@ -587,7 +587,8 @@ bool SampleLibrary::isDrumHit(const juce::String& category, const juce::String& 
 juce::String SampleLibrary::typeFor(const double lengthSeconds, const juce::String& name,
                                     const double bpm)
 {
-    if (lengthSeconds < 2.5)
+    // Short, a single hit; but a bar named for its tempo, or a loop, is one.
+    if (lengthSeconds < 2.5 && !(bpmFromName(name) > 0.0 || lower(name).contains("loop")))
         return "one-shot";
     if (lengthSeconds > 60.0)
         return "long";

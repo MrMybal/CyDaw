@@ -1,0 +1,13 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "noise",
+ "name": "Soft Hiss",
+ "state": {
+  "type": "noise",
+  "parameters": {
+   "noise.level": 0.06
+  }
+ }
+}

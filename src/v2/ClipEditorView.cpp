@@ -1,6 +1,7 @@
 #include "ClipEditorView.h"
 
 #include "AudioEditorView.h"
+#include "MasterClipEditor.h"
 
 #include "Icons.h"
 #include "ImGuiHost.h"
@@ -125,6 +126,15 @@ void ClipEditorView::playKey(const int note, const bool on)
 void ClipEditorView::draw()
 {
     auto& engine = studio_.engine();
+    // A track's clip opened after the master's: that one; else the master's.
+    if (state_.editedClip) {
+        state_.editedMasterScene.reset();
+    } else if (state_.editedMasterScene) {
+        if (master_ == nullptr)
+            master_ = std::make_unique<MasterClipEditor>(studio_, state_);
+        master_->draw(*state_.editedMasterScene);
+        return;
+    }
     if (!state_.editedClip) {
         ui::emptyState(L("Aucun clip ouvert", "No clip open"),
                        L("Double-cliquez un clip dans l'arrangement, ou une piste instrument vide pour en créer un.",
@@ -292,7 +302,8 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
     auto* list = ImGui::GetWindowDrawList();
     const auto origin = ImGui::GetCursorScreenPos();
     const auto size = ImGui::GetContentRegionAvail();
-    const auto keyboardWidth = dp(54.0f);
+    // Wide enough for every white key's name.
+    const auto keyboardWidth = dp(72.0f);
     // Over the bars, the band to grab (moves, zooms); beside the notes, the
     // one for their height.
     const auto navigatorHeight = dp(14.0f);
@@ -328,16 +339,31 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
     }
     scrollY_ = std::clamp(scrollY_, 0.0f, std::max(0.0f, 128.0f * rowH - (gridMax_.y - gridMin_.y)));
 
-    // Rows.
+    // The row under the pointer (over the notes or the keys), shown along
+    // both; the selected notes' keys.
+    std::optional<int> pointedNote;
+    if (io.MousePos.y >= gridMin_.y && io.MousePos.y < gridMax_.y && io.MousePos.x >= origin.x && io.MousePos.x < gridMax_.x
+        && ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
+        pointedNote = yToNote(io.MousePos.y);
+    std::set<int> selectedPitches;
+    for (const auto& note : clip.notes)
+        if (selection_.contains(note.id))
+            selectedPitches.insert(note.noteNumber);
+
+    // Rows: the black keys' darker, a line and the name at each C.
     list->PushClipRect(gridMin_, gridMax_, true);
     for (auto note = 0; note < 128; ++note) {
         const auto y = noteToY(note);
         if (y + rowH < gridMin_.y || y > gridMax_.y)
             continue;
-        list->AddRectFilled(ImVec2(gridMin_.x, y), ImVec2(gridMax_.x, y + rowH), isBlack(note) ? theme::mix(p.bg0, p.bg1, 0.3f)
-                                                                                                : theme::mix(p.bg0, p.bg2, 0.55f));
+        list->AddRectFilled(ImVec2(gridMin_.x, y), ImVec2(gridMax_.x, y + rowH), isBlack(note) ? theme::mix(p.bg0, p.bg1, 0.1f)
+                                                                                                : theme::mix(p.bg0, p.bg2, 0.75f));
+        if (pointedNote && *pointedNote == note)
+            list->AddRectFilled(ImVec2(gridMin_.x, y), ImVec2(gridMax_.x, y + rowH), theme::alpha(p.accent, 0.12f));
         if (note % 12 == 0)
-            list->AddLine(ImVec2(gridMin_.x, y + rowH), ImVec2(gridMax_.x, y + rowH), p.gridStrong);
+            list->AddLine(ImVec2(gridMin_.x, y + rowH), ImVec2(gridMax_.x, y + rowH), p.lineStrong, dp(1.5f));
+        else if (note % 12 == 5)
+            list->AddLine(ImVec2(gridMin_.x, y + rowH), ImVec2(gridMax_.x, y + rowH), p.grid);
     }
     // Columns.
     const auto ppb = pixelsPerBeat_ * ImGui::GetStyle().FontScaleDpi;
@@ -349,6 +375,18 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
         const auto bar = std::abs(std::fmod(beat, studio_.engine().beatsPerBar())) < 1.0e-6;
         const auto whole = std::abs(beat - std::round(beat)) < 1.0e-6;
         list->AddLine(ImVec2(x, gridMin_.y), ImVec2(x, gridMax_.y), bar ? p.lineStrong : whole ? p.gridStrong : p.grid);
+    }
+    // Each C's name at the grid's left edge, where the notes are.
+    if (rowH >= dp(7.0f)) {
+        ImGui::PushFont(theme::boldFont(), ui::currentFontBase() * 0.68f);
+        for (auto note = 0; note < 128; note += 12) {
+            const auto y = noteToY(note);
+            if (y + rowH < gridMin_.y || y > gridMax_.y)
+                continue;
+            list->AddText(ImVec2(gridMin_.x + dp(4.0f), y + (rowH - ImGui::GetFontSize()) * 0.5f), theme::alpha(p.textDim, 0.7f),
+                          noteName(note).c_str());
+        }
+        ImGui::PopFont();
     }
     // Outside the clip, shaded; the loop, marked.
     const auto clipEnd = beatToX(clip.lengthBeats);
@@ -538,7 +576,10 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
     if (curveMode && hovered && drag_ == Drag::none)
         pitchHit = hitCurve(Expression::pitch);
 
-    if (hovered && io.MouseWheel != 0.0f) {
+    // The wheel scrolls during a gesture too: a selection rectangle reaches
+    // the notes out of view, notes are carried up or down.
+    const auto gesture = drag_ == Drag::box || drag_ == Drag::move || drag_ == Drag::resize;
+    if ((hovered || (gesture && ImGui::IsItemActive())) && io.MouseWheel != 0.0f) {
         if (io.KeyCtrl) {
             const auto before = xToBeat(mouse.x);
             pixelsPerBeat_ = std::clamp(pixelsPerBeat_ * (io.MouseWheel > 0.0f ? 1.15f : 1.0f / 1.15f), 6.0f, 600.0f);
@@ -557,6 +598,21 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
         scrollBeats_ -= io.MouseDelta.x / ppb;
         scrollY_ -= io.MouseDelta.y;
     }
+    // A gesture held near an edge (or past it) scrolls the roll that way,
+    // faster the further it goes.
+    if (gesture && ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+        const auto edge = dp(18.0f);
+        const auto step = std::min(io.DeltaTime, 0.05f) * 60.0f;
+        if (mouse.y < gridMin_.y + edge)
+            scrollY_ -= (gridMin_.y + edge - mouse.y) * 0.35f * step;
+        else if (mouse.y > gridMax_.y - edge)
+            scrollY_ += (mouse.y - (gridMax_.y - edge)) * 0.35f * step;
+        if (mouse.x < gridMin_.x + edge && scrollBeats_ > -0.25)
+            scrollBeats_ -= (gridMin_.x + edge - mouse.x) * 0.35f * step / ppb;
+        else if (mouse.x > gridMax_.x - edge)
+            scrollBeats_ += (mouse.x - (gridMax_.x - edge)) * 0.35f * step / ppb;
+        scrollY_ = std::clamp(scrollY_, 0.0f, std::max(0.0f, 128.0f * rowH - (gridMax_.y - gridMin_.y)));
+    }
     if (!curveMode && drag_ == Drag::none && hovered && under != nullptr && onEdge)
         ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
     if (curveMode && drag_ == Drag::none && hovered && pitchHit.note != nullptr)
@@ -567,6 +623,8 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
     if (curveMode && hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         state_.focused = Panel::editor;
         dragStart_ = mouse;
+        dragStartBeat_ = mouseBeat;
+        dragStartY_ = mouse.y - gridMin_.y + scrollY_;
         if (pitchHit.note != nullptr && !io.KeyCtrl) {
             pressCurve(Expression::pitch, pitchHit);
         } else if (under != nullptr && io.KeyCtrl) {
@@ -602,6 +660,7 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
         dragStart_ = mouse;
         dragStartBeat_ = mouseBeat;
         dragStartNote_ = mouseNote;
+        dragStartY_ = mouse.y - gridMin_.y + scrollY_;
         if (under != nullptr) {
             if (io.KeyCtrl) {
                 if (selection_.contains(under->id))
@@ -682,6 +741,8 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
         }
     }
     if (drag_ == Drag::box) {
+        // Its start where it was in the roll, however far it has scrolled.
+        dragStart_ = ImVec2(beatToX(dragStartBeat_), gridMin_.y + dragStartY_ - scrollY_);
         const ImVec2 a(std::min(dragStart_.x, mouse.x), std::min(dragStart_.y, mouse.y));
         const ImVec2 b(std::max(dragStart_.x, mouse.x), std::max(dragStart_.y, mouse.y));
         if (b.x - a.x > 3.0f || b.y - a.y > 3.0f) {
@@ -726,10 +787,12 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
         }
         list->AddRect(ImVec2(x0 + 0.5f, y0 + 1.0f), ImVec2(x1 - 0.5f, y0 + rowH - 1.0f), selected ? p.text : theme::alpha(p.bg0, 0.6f),
                       dp(2.0f), selected ? 1.5f : 1.0f);
-        if (rowH > dp(11.0f) && x1 - x0 > dp(26.0f)) {
-            ImGui::PushFont(nullptr, ui::currentFontBase() * 0.72f);
-            list->AddText(ImVec2(x0 + dp(3.0f), y0 + (rowH - ImGui::GetFontSize()) * 0.5f), theme::alpha(p.bg0, 0.85f),
+        if (rowH > dp(9.0f) && x1 - x0 > dp(22.0f)) {
+            ImGui::PushFont(theme::boldFont(), std::min(ui::currentFontBase() * 0.74f, rowH * 0.82f / ImGui::GetStyle().FontScaleDpi));
+            list->PushClipRect(ImVec2(x0, y0), ImVec2(x1 - dp(2.0f), y0 + rowH), true);
+            list->AddText(ImVec2(x0 + dp(3.0f), y0 + (rowH - ImGui::GetFontSize()) * 0.5f), IM_COL32(12, 12, 14, 225),
                           noteName(note.noteNumber).c_str());
+            list->PopClipRect();
             ImGui::PopFont();
         }
     }
@@ -748,6 +811,19 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
         else
             drawCurve(note, Expression::pitch, theme::alpha(p.text, 0.55f), dp(1.2f), false);
     }
+    // Moving notes: the lead one's name beside the pointer.
+    if (drag_ == Drag::move && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 2.0f))
+        for (const auto& note : notes)
+            if (note.id == dragNote_) {
+                ImGui::PushFont(theme::boldFont(), ui::currentFontBase() * 0.9f);
+                const auto name = noteName(note.noteNumber);
+                const auto size = ImGui::CalcTextSize(name.c_str());
+                const ImVec2 at(mouse.x + dp(14.0f), mouse.y - size.y - dp(6.0f));
+                list->AddRectFilled(ImVec2(at.x - dp(4.0f), at.y - dp(2.0f)), ImVec2(at.x + size.x + dp(4.0f), at.y + size.y + dp(2.0f)),
+                                    p.bg4, dp(3.0f));
+                list->AddText(at, p.text, name.c_str());
+                ImGui::PopFont();
+            }
     // Box.
     if (drag_ == Drag::box) {
         const ImVec2 a(std::min(dragStart_.x, mouse.x), std::min(dragStart_.y, mouse.y));
@@ -755,11 +831,22 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
         list->AddRectFilled(a, b, theme::alpha(p.accent, 0.08f));
         list->AddRect(a, b, theme::alpha(p.accent, 0.7f));
     }
-    // Playhead, when the arrangement plays this clip.
+    // Playhead: where the launcher plays this clip (a clip of the launcher,
+    // from its own start, as a stop and a play start it again), or where
+    // the arrangement does (a clip of the arrangement, while it plays).
+    std::optional<double> playing;
     if (engine.isPlaying()) {
-        auto local = engine.position() / spb - clip.startBeats;
-        if (clip.looping && clip.loopEndBeats > clip.loopStartBeats && local > clip.loopEndBeats)
-            local = clip.loopStartBeats + std::fmod(local - clip.loopStartBeats, clip.loopEndBeats - clip.loopStartBeats);
+        if (clip.launcherScene >= 0) {
+            if (studio_.playingScene(track) == clip.launcherScene)
+                playing = clip.playStartBeats + engine.midiLauncherClipPositionSeconds(track.midiId) / spb;
+        } else if (engine.arrangementPlaybackEnabled()) {
+            playing = engine.position() / spb - clip.startBeats;
+        }
+        if (playing && clip.looping && clip.loopEndBeats > clip.loopStartBeats && *playing > clip.loopEndBeats)
+            playing = clip.loopStartBeats + std::fmod(*playing - clip.loopStartBeats, clip.loopEndBeats - clip.loopStartBeats);
+    }
+    if (playing) {
+        const auto local = *playing;
         if (local >= 0.0 && local <= clip.lengthBeats) {
             const auto x = beatToX(local);
             list->AddLine(ImVec2(x, gridMin_.y), ImVec2(x, gridMax_.y), p.play, dp(1.0f));
@@ -821,13 +908,31 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
             continue;
         const auto black = isBlack(note);
         const auto pressed = auditioning_ == note;
-        list->AddRectFilled(ImVec2(origin.x, y), ImVec2(gridMin_.x - (black ? dp(16.0f) : 1.0f), y + rowH - 1.0f),
-                            pressed ? p.accent : black ? IM_COL32(28, 30, 34, 255) : IM_COL32(214, 218, 224, 255), dp(2.0f),
+        const auto pointed = pointedNote && *pointedNote == note;
+        const auto picked = selectedPitches.contains(note);
+        auto key = black ? IM_COL32(28, 30, 34, 255) : IM_COL32(220, 224, 230, 255);
+        if (picked)
+            key = theme::mix(key, p.accent, black ? 0.55f : 0.4f);
+        if (pointed)
+            key = theme::mix(key, p.accent, 0.7f);
+        if (pressed)
+            key = p.accent;
+        list->AddRectFilled(ImVec2(origin.x, y), ImVec2(gridMin_.x - (black ? dp(26.0f) : 1.0f), y + rowH - 1.0f), key, dp(2.0f),
                             ImDrawFlags_RoundCornersRight);
-        if (note % 12 == 0) {
-            ImGui::PushFont(nullptr, ui::currentFontBase() * 0.72f);
-            list->AddText(ImVec2(gridMin_.x - dp(30.0f), y + (rowH - ImGui::GetFontSize()) * 0.5f), IM_COL32(60, 64, 72, 255),
-                          noteName(note).c_str());
+        // C's name always (bold); the other white keys' when there is room;
+        // the pointed key's, black or white.
+        const auto named = note % 12 == 0 || pointed || (!black && rowH >= dp(11.0f));
+        if (named) {
+            ImGui::PushFont(note % 12 == 0 || pointed ? theme::boldFont() : nullptr,
+                            std::min(ui::currentFontBase() * 0.74f, std::max(rowH, dp(9.0f)) * 0.85f / ImGui::GetStyle().FontScaleDpi));
+            const auto name = noteName(note);
+            const auto width = ImGui::CalcTextSize(name.c_str()).x;
+            const auto onBlack = black && !pointed && !pressed;
+            list->AddText(ImVec2(gridMin_.x - width - dp(5.0f), y + (rowH - ImGui::GetFontSize()) * 0.5f),
+                          onBlack ? IM_COL32(230, 232, 236, 255)
+                          : note % 12 == 0 || pointed ? IM_COL32(20, 22, 26, 255)
+                                                      : IM_COL32(90, 96, 106, 255),
+                          name.c_str());
             ImGui::PopFont();
         }
     }

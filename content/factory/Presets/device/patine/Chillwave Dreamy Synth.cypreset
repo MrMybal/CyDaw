@@ -1,0 +1,28 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "patine",
+ "name": "Chillwave Dreamy Synth",
+ "state": {
+  "type": "patine",
+  "parameters": {
+   "patine.noise": 0.2,
+   "patine.wobble": 0.5,
+   "patine.distort": 0.1,
+   "patine.digital": 0.1,
+   "patine.space": 0.3,
+   "patine.magnetic": 0.4,
+   "patine.magnitude": 1.0,
+   "patine.mix": 0.85,
+   "patine.noiseType": 1.0,
+   "patine.wobbleRate": 0.3,
+   "patine.distortType": 1.0,
+   "patine.spaceSize": 0.6,
+   "patine.tone": -0.15,
+   "patine.width": 1.3,
+   "patine.output": 0.0,
+   "patine.noiseFollow": 1.0
+  }
+ }
+}

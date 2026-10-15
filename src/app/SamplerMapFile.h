@@ -126,6 +126,10 @@ bool decodeSampleFile(const juce::File& file, cydaw::engine::SampleData& data, j
 // the nearer. A file with no pitch (a drum) gets one key of its own, from C1
 // up. `name` names the map.
 [[nodiscard]] juce::var samplerMapFromFiles(const juce::Array<juce::File>& files, const juce::String& name);
+// The simple sampler's map: this one file over the whole keyboard, around
+// its note (its name's, its pitch's; middle C for a sound without one),
+// without settings of its own (the card keeps its own).
+[[nodiscard]] juce::var simpleSamplerMap(const juce::File& file);
 // The zones of `json` with these files added, mapped as above among the
 // notes already there.
 [[nodiscard]] juce::var withFilesAdded(const juce::var& json, const juce::Array<juce::File>& files);

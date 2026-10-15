@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "grains",
+ "name": "Dotted Eighth Grains",
+ "state": {
+  "type": "grains",
+  "parameters": {
+   "grains.time": 250.0,
+   "grains.feedback": 0.45,
+   "grains.pitch": 0.0,
+   "grains.spray": 15.0,
+   "grains.density": 30.0,
+   "grains.pitchRandom": 0.0,
+   "grains.mix": 0.35,
+   "grains.output": 0.0,
+   "grains.sync": 8.0,
+   "grains.size": 110.0,
+   "grains.stereo": 0.6,
+   "grains.reverseChance": 0.0,
+   "grains.freeze": 0.0,
+   "grains.highCut": 14000.0
+  }
+ }
+}

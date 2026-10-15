@@ -5,9 +5,21 @@
 
 #include <imgui_internal.h>
 
+#if defined(_WIN32)
+ #ifndef NOMINMAX
+  #define NOMINMAX
+ #endif
+ #ifndef WIN32_LEAN_AND_MEAN
+  #define WIN32_LEAN_AND_MEAN
+ #endif
+ #include <windows.h>
+#endif
+
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
+#include <optional>
 #include <string>
 #include <unordered_map>
 
@@ -73,13 +85,29 @@ float currentFontBase()
     return ImGui::GetCurrentContext()->FontSizeBase;
 }
 
+namespace {
+int gModuleDepth = 0;
+} // namespace
+
+ModuleText::ModuleText() noexcept
+{
+    ++gModuleDepth;
+}
+
+ModuleText::~ModuleText()
+{
+    --gModuleDepth;
+}
+
 bool french()
 {
-    return gFrench;
+    return gFrench && gModuleDepth == 0;
 }
 
 const char* L(const char* fr, const char* en)
 {
+    if (gModuleDepth > 0)
+        return en;
     if (gFrench)
         return fr;
     if (gDictionary.empty() || en == nullptr)
@@ -165,6 +193,153 @@ bool wheelTaken()
     return wheelFrame_ == ImGui::GetFrameCount();
 }
 
+namespace {
+
+bool scriptedPointer_ {};
+
+} // namespace
+
+ImVec2 heldMovement(const ImGuiID key)
+{
+    auto& io = ImGui::GetIO();
+#if defined(_WIN32)
+    if (!scriptedPointer_) {
+        auto* storage = ImGui::GetStateStorage();
+        POINT now {};
+        if (::GetCursorPos(&now) != 0) {
+            ImGui::SetMouseCursor(ImGuiMouseCursor_None);
+            if (ImGui::IsItemActivated()) {
+                storage->SetInt(key, static_cast<int>(now.x));
+                storage->SetInt(key + 1, static_cast<int>(now.y));
+                return {};
+            }
+            const POINT anchor { static_cast<LONG>(storage->GetInt(key, now.x)), static_cast<LONG>(storage->GetInt(key + 1, now.y)) };
+            const ImVec2 moved(static_cast<float>(now.x - anchor.x), static_cast<float>(now.y - anchor.y));
+            if (moved.x != 0.0f || moved.y != 0.0f)
+                ::SetCursorPos(anchor.x, anchor.y);
+            return moved;
+        }
+    }
+#else
+    (void) key;
+#endif
+    return io.MouseDelta;
+}
+
+void setScriptedPointer(const bool scripted)
+{
+    scriptedPointer_ = scripted;
+}
+
+float valueSpeed()
+{
+    const auto& io = ImGui::GetIO();
+    return io.KeyCtrl ? 0.15f : io.KeyShift ? 4.0f : 1.0f;
+}
+
+namespace {
+
+// The field being typed in: whose, what it holds, whether it was just opened.
+ImGuiID entryId_ {};
+char entryText_[64] {};
+bool entryFresh_ {};
+
+// What was typed as a number: a comma for a point, "k" for a thousand; none
+// when it holds no number.
+std::optional<double> typedNumber(std::string text, const std::string& unit)
+{
+    std::replace(text.begin(), text.end(), ',', '.');
+    const auto* start = text.c_str();
+    while (*start == ' ')
+        ++start;
+    char* end = nullptr;
+    const auto number = std::strtod(start, &end);
+    if (end == start || !std::isfinite(number))
+        return std::nullopt;
+    while (end != nullptr && *end == ' ')
+        ++end;
+    const std::string rest = end != nullptr ? end : "";
+    if (!rest.empty() && (rest[0] == 'k' || rest[0] == 'K'))
+        return number * 1'000.0;
+    // A time typed in the other unit than the setting's.
+    if (unit == "s" && rest.rfind("ms", 0) == 0)
+        return number / 1'000.0;
+    if (unit == "ms" && rest.rfind("s", 0) == 0)
+        return number * 1'000.0;
+    return number;
+}
+
+std::string entryNumber(const double shown)
+{
+    char text[64];
+    std::snprintf(text, sizeof(text), "%.6g", shown);
+    return text;
+}
+
+} // namespace
+
+bool valueEntryOpen()
+{
+    return entryId_ != 0 && ImGui::IsPopupOpen(entryId_, ImGuiPopupFlags_None);
+}
+
+bool valueEntry(const ImGuiID id, const ImVec2 min, const ImVec2 max, double& value, const double minimum,
+                const double maximum, const bool open, const double scale, const char* unit)
+{
+    if (open) {
+        entryId_ = id;
+        const auto shown = entryNumber(value * scale);
+        std::snprintf(entryText_, sizeof(entryText_), "%s", shown.c_str());
+        entryFresh_ = true;
+        ImGui::OpenPopupEx(id, ImGuiPopupFlags_None);
+    }
+    if (entryId_ != id)
+        return false;
+    const auto width = std::max(max.x - min.x, dp(72.0f));
+    ImGui::SetNextWindowPos(ImVec2((min.x + max.x - width) * 0.5f, min.y - dp(3.0f)));
+    ImGui::SetNextWindowSize(ImVec2(width, 0.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(dp(2.0f), dp(2.0f)));
+    const auto shown = ImGui::BeginPopupEx(id, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove
+                                                   | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize);
+    ImGui::PopStyleVar();
+    if (!shown) {
+        entryId_ = 0;
+        return false;
+    }
+    auto set = false;
+    if (entryFresh_) {
+        ImGui::SetKeyboardFocusHere();
+        entryFresh_ = false;
+    }
+    ImGui::SetNextItemWidth(-1.0f);
+    if (ImGui::InputText("##typed", entryText_, sizeof(entryText_),
+                         ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll)) {
+        if (const auto typed = typedNumber(entryText_, unit != nullptr ? unit : "")) {
+            value = std::clamp(*typed / (scale != 0.0 ? scale : 1.0), std::min(minimum, maximum), std::max(minimum, maximum));
+            set = true;
+        }
+        ImGui::CloseCurrentPopup();
+        entryId_ = 0;
+    } else if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+        ImGui::CloseCurrentPopup();
+        entryId_ = 0;
+    }
+    ImGui::EndPopup();
+    return set;
+}
+
+bool valueEntryButton(const char* id, const ImVec2 size, double& value, const double minimum, const double maximum,
+                      const double scale, const char* unit)
+{
+    const auto min = ImGui::GetCursorScreenPos();
+    ImGui::InvisibleButton(id, ImVec2(std::max(1.0f, size.x), std::max(1.0f, size.y)));
+    const auto key = ImGui::GetItemID();
+    const auto open = ImGui::IsItemClicked(ImGuiMouseButton_Left);
+    if (ImGui::IsItemHovered())
+        ImGui::SetMouseCursor(ImGuiMouseCursor_TextInput);
+    return valueEntry(key, min, ImVec2(min.x + size.x, min.y + size.y), value, minimum, maximum, open, scale, unit);
+}
+
 bool knob(const char* id, float* value, const float minimum, const float maximum, const float defaultValue,
           const KnobStyle& style)
 {
@@ -181,20 +356,55 @@ bool knob(const char* id, float* value, const float minimum, const float maximum
     const auto logarithmic = (style.flags & knobLogarithmic) != 0;
     auto changed = false;
     auto t = toNormalised(*value, minimum, maximum, logarithmic);
+    const auto steps = std::max(0, style.steps);
+    const auto onStep = [steps](const float position) {
+        return steps > 0 ? std::round(position * static_cast<float>(steps)) / static_cast<float>(steps) : position;
+    };
 
-    if (active && (io.MouseDelta.y != 0.0f || io.MouseDelta.x != 0.0f)) {
-        const auto speed = (io.KeyShift ? 0.0008f : 0.0055f) / std::max(0.5f, ImGui::GetStyle().FontScaleDpi);
-        t = std::clamp(t + (-io.MouseDelta.y + io.MouseDelta.x * 0.35f) * speed, 0.0f, 1.0f);
+    // Dragged: where the drag has taken it, kept between frames unrounded,
+    // so that small moves add up to a step of a stepped setting.
+    auto* storage = ImGui::GetStateStorage();
+    const auto heldKey = ImGui::GetID("##held");
+    const auto movedKey = ImGui::GetID("##moved");
+    const auto knobId = ImGui::GetItemID();
+    const auto movement = active ? heldMovement(ImGui::GetID("##anchor")) : ImVec2();
+    if (ImGui::IsItemActivated()) {
+        storage->SetFloat(heldKey, t);
+        storage->SetBool(movedKey, false);
+    }
+    if (active && (movement.y != 0.0f || movement.x != 0.0f)) {
+        storage->SetBool(movedKey, true);
+        const auto speed = 0.0055f * valueSpeed() / std::max(0.5f, ImGui::GetStyle().FontScaleDpi);
+        const auto held = std::clamp(storage->GetFloat(heldKey, t) + (-movement.y + movement.x * 0.35f) * speed, 0.0f, 1.0f);
+        storage->SetFloat(heldKey, held);
+        t = onStep(held);
         changed = true;
     }
     if (hovered && io.MouseWheel != 0.0f) {
-        t = std::clamp(t + io.MouseWheel * (io.KeyShift ? 0.002f : 0.02f), 0.0f, 1.0f);
+        // A notch: one step of a stepped setting, else a little.
+        const auto notch = steps > 0 ? 1.0f / static_cast<float>(steps) : 0.02f * valueSpeed();
+        t = onStep(std::clamp(t + io.MouseWheel * notch, 0.0f, 1.0f));
         changed = true;
         takeWheel();
     }
     if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
         t = toNormalised(defaultValue, minimum, maximum, logarithmic);
+        storage->SetFloat(heldKey, t);
         changed = true;
+    }
+    // Its number, under it, clicked without a drag: typed in.
+    const auto onNumber = labelHeight > 0.0f && io.MouseClickedPos[0].y >= origin.y + diameter;
+    const auto openEntry = ImGui::IsItemDeactivated() && !storage->GetBool(movedKey, false) && onNumber
+                           && !ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
+    auto typedIn = false;
+    if (labelHeight > 0.0f) {
+        auto typed = static_cast<double>(*value);
+        if (valueEntry(knobId, ImVec2(origin.x, origin.y + diameter), ImVec2(origin.x + width, origin.y + diameter + labelHeight), typed,
+                       minimum, maximum, openEntry)) {
+            *value = (style.flags & knobInteger) != 0 ? std::round(static_cast<float>(typed)) : static_cast<float>(typed);
+            t = toNormalised(*value, minimum, maximum, logarithmic);
+            typedIn = true;
+        }
     }
     if (changed) {
         auto next = fromNormalised(t, minimum, maximum, logarithmic);
@@ -204,6 +414,7 @@ bool knob(const char* id, float* value, const float minimum, const float maximum
         *value = next;
         t = toNormalised(*value, minimum, maximum, logarithmic);
     }
+    changed = changed || typedIn;
 
     auto* list = ImGui::GetWindowDrawList();
     const auto colour = style.colour != 0 ? style.colour : p.accent;
@@ -230,11 +441,20 @@ bool knob(const char* id, float* value, const float minimum, const float maximum
     if (labelHeight > 0.0f) {
         const auto showValue = hovered || active;
         const auto text = showValue ? formatValue(*value, style) : std::string(style.label != nullptr ? style.label : "");
-        ImGui::PushFont(nullptr, currentFontBase() * 0.82f);
-        const auto size = ImGui::CalcTextSize(text.c_str());
-        const auto x = origin.x + std::max(0.0f, (width - size.x) * 0.5f);
-        list->PushClipRect(ImVec2(origin.x - dp(6.0f), origin.y + diameter),
-                           ImVec2(origin.x + width + dp(6.0f), origin.y + diameter + labelHeight + dp(2.0f)), true);
+        // Its room: the knob's width and a little, or more when its cell gives it.
+        const auto room = std::max(width + dp(12.0f), style.labelWidth);
+        auto scale = 0.82f;
+        ImGui::PushFont(nullptr, currentFontBase() * scale);
+        auto size = ImGui::CalcTextSize(text.c_str());
+        if (size.x > room) {
+            ImGui::PopFont();
+            scale = std::max(0.68f, scale * room / size.x);
+            ImGui::PushFont(nullptr, currentFontBase() * scale);
+            size = ImGui::CalcTextSize(text.c_str());
+        }
+        const auto x = origin.x + (width - std::min(size.x, room)) * 0.5f;
+        list->PushClipRect(ImVec2(origin.x + (width - room) * 0.5f, origin.y + diameter),
+                           ImVec2(origin.x + (width + room) * 0.5f, origin.y + diameter + labelHeight + dp(2.0f)), true);
         list->AddText(ImVec2(x, origin.y + diameter + dp(1.0f)), showValue ? p.text : p.textDim, text.c_str());
         list->PopClipRect();
         ImGui::PopFont();
@@ -277,12 +497,12 @@ bool fader(const char* id, float* gainDb, const float minimumDb, const float max
     const auto travel = size.y - dp(14.0f);
     auto position = meterPosition(*gainDb);
     if (active && io.MouseDelta.y != 0.0f) {
-        position = std::clamp(position - io.MouseDelta.y / travel * (io.KeyShift ? 0.1f : 1.0f), 0.0f, 1.0f);
+        position = std::clamp(position - io.MouseDelta.y / travel * valueSpeed(), 0.0f, 1.0f);
         changed = true;
     }
     if (hovered && io.MouseWheel != 0.0f) {
         takeWheel();
-        *gainDb = std::clamp(*gainDb + io.MouseWheel * (io.KeyShift ? 0.1f : 1.0f), minimumDb, maximumDb);
+        *gainDb = std::clamp(*gainDb + io.MouseWheel * valueSpeed(), minimumDb, maximumDb);
         position = meterPosition(*gainDb);
         changed = true;
     } else if (changed) {
@@ -466,6 +686,11 @@ void toolbarSeparator()
                                         ImVec2(origin.x, origin.y + height * 0.82f), theme::palette().lineStrong);
     ImGui::Dummy(ImVec2(dp(1.0f), height));
     ImGui::SameLine(0.0f, dp(6.0f));
+}
+
+void pushTextWrapAt(const float screenX)
+{
+    ImGui::PushTextWrapPos(std::max(1.0f, screenX - ImGui::GetWindowPos().x + ImGui::GetScrollX()));
 }
 
 void tooltip(const char* text)
@@ -653,8 +878,36 @@ std::unordered_map<std::string, Detachment>& detachments()
 
 } // namespace
 
+namespace {
+bool gEmbedded = false;
+} // namespace
+
+void setEmbedded(const bool embedded)
+{
+    gEmbedded = embedded;
+}
+
+bool embedded()
+{
+    return gEmbedded;
+}
+
+bool beginEditorWindow(const char* name, bool* open, const ImGuiWindowFlags flags)
+{
+    if (!gEmbedded)
+        return ImGui::Begin(name, open, flags);
+    const auto* viewport = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(viewport->WorkPos, ImGuiCond_Always);
+    ImGui::SetNextWindowSize(viewport->WorkSize, ImGuiCond_Always);
+    return ImGui::Begin(name, nullptr,
+                        flags | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse
+                            | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking);
+}
+
 void beforeDetachable(const char* id)
 {
+    if (gEmbedded)
+        return;
     auto& detachment = detachments()[id];
     if (detachment.placing > 0) {
         // Out: over the right half of the studio, a window of its own the
@@ -702,6 +955,11 @@ void setDetached(const char* id, const bool detached)
 
 bool detachButton(const char* id, const ImVec2 size)
 {
+    // A plug-in's window has nothing to take out: its place kept empty.
+    if (gEmbedded) {
+        ImGui::Dummy(size);
+        return false;
+    }
     const auto detached = isDetached(id);
     ImGui::PushID(id);
     const auto pressed = iconButton(detached ? icon::backToWindow : icon::newWindow,

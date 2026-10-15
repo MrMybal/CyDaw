@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "tremolo-pan",
+ "name": "Eighth Chop",
+ "state": {
+  "type": "tremolo-pan",
+  "parameters": {
+   "tremolo.rate": 4.0,
+   "tremolo.depth": 1.0,
+   "tremolo.shape": 3.0,
+   "tremolo.spread": 0.0,
+   "tremolo.sync": 6.0
+  }
+ }
+}

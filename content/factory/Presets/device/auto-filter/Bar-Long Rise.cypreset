@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "auto-filter",
+ "name": "Bar-Long Rise",
+ "state": {
+  "type": "auto-filter",
+  "parameters": {
+   "autofilter.cutoff": 400.0,
+   "autofilter.resonance": 3.5,
+   "autofilter.rate": 0.5,
+   "autofilter.depth": 1.0,
+   "autofilter.sync": 12.0
+  }
+ }
+}

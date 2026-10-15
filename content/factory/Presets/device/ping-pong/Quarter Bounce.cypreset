@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "ping-pong",
+ "name": "Quarter Bounce",
+ "state": {
+  "type": "ping-pong",
+  "parameters": {
+   "pingpong.time": 500.0,
+   "pingpong.feedback": 0.4,
+   "pingpong.mix": 0.28,
+   "pingpong.width": 1.0,
+   "pingpong.sync": 9.0
+  }
+ }
+}

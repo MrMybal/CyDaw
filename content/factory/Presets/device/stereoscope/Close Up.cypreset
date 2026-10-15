@@ -1,0 +1,16 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "stereoscope",
+ "name": "Close Up",
+ "state": {
+  "type": "stereoscope",
+  "parameters": {
+   "stereoscope.zoom": 2.5,
+   "stereoscope.persistence": 0.5,
+   "stereoscope.history": 10.0,
+   "stereoscope.displayMode": 0.0
+  }
+ }
+}

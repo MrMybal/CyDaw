@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cydaw/engine/VoiceLive.h>
 #include <cydaw/engine/Sampler.h>
 
 #include <array>
@@ -254,6 +255,8 @@ public:
     // The modulated value of a parameter (0..1) as the voice last played it,
     // for an interface to show where a modulated knob is.
     [[nodiscard]] float modulated(int index) const noexcept;
+    // What it plays now: its modulated settings, LFOs and envelopes.
+    void live(VoiceLive& out) const noexcept;
 
 private:
     struct State;

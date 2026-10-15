@@ -69,7 +69,7 @@ constexpr float kDefaultHeight = 420.0f;
 
 } // namespace
 
-InterfaceEditor::InterfaceEditor(Studio& studio, UiState& state) : studio_(studio), state_(state) {}
+InterfaceEditor::InterfaceEditor(DeviceHost& studio, UiState& state) : studio_(studio), state_(state) {}
 
 void InterfaceEditor::report(const juce::String& message)
 {
@@ -528,6 +528,8 @@ void InterfaceEditor::drawControl(ImDrawList* list, const Control& control, cons
 void InterfaceEditor::drawPlayed(const char* id, const app::ModuleInterfaceState& state, const ImVec2 size,
                                  const std::function<void(const juce::String&, double)>& setValue)
 {
+    // Inside a module: English, whatever the language.
+    const ui::ModuleText english;
     const auto& p = theme::palette();
     auto& io = ImGui::GetIO();
     // The controls read the state through the editor's own lookups.
@@ -599,7 +601,7 @@ void InterfaceEditor::drawPlayed(const char* id, const app::ModuleInterfaceState
                 set01(control->parameterBinding, (mouse.x - a.x) / std::max(1.0f, b.x - a.x));
                 set01(control->secondaryParameterBinding, 1.0 - (mouse.y - a.y) / std::max(1.0f, b.y - a.y));
             } else {
-                const auto fine = io.KeyShift ? 0.2 : 1.0;
+                const auto fine = static_cast<double>(ui::valueSpeed());
                 set01(control->parameterBinding, gesture.startValue - (mouse.y - gesture.start.y) / dp(180.0f) * fine);
             }
         }
@@ -765,7 +767,7 @@ void InterfaceEditor::drawCanvas(GraphSlot& slot)
                     setValue01(slot, control->parameterBinding, (mouse.x - min.x) / std::max(1.0f, max.x - min.x));
                     setValue01(slot, control->secondaryParameterBinding, 1.0 - (mouse.y - min.y) / std::max(1.0f, max.y - min.y));
                 } else {
-                    const auto fine = io.KeyShift ? 0.2 : 1.0;
+                    const auto fine = static_cast<double>(ui::valueSpeed());
                     setValue01(slot, control->parameterBinding, playStart_ - (mouse.y - dragStart_.y) / dp(180.0f) * fine);
                 }
             }

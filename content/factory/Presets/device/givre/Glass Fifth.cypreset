@@ -1,0 +1,21 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "givre",
+ "name": "Glass Fifth",
+ "state": {
+  "type": "givre",
+  "parameters": {
+   "givre.blur": 0.400000005960464,
+   "givre.smear": 0.2,
+   "givre.shift": 7.0,
+   "givre.tone": 0.4,
+   "givre.scatter": 0.2,
+   "givre.mix": 0.35,
+   "givre.output": 0.0,
+   "givre.freeze": 0.0,
+   "givre.sync": 0.0
+  }
+ }
+}

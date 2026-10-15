@@ -1,0 +1,13 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "midi-transpose",
+ "name": "Fifth Up",
+ "state": {
+  "type": "midi-transpose",
+  "parameters": {
+   "midi.transpose": 7.0
+  }
+ }
+}

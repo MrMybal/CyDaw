@@ -547,7 +547,127 @@ void SamplerVoice::start(const SamplerMap& map, const SamplerValues& values, con
     // Controllers move a level over 5 ms, so a fader does not click.
     rulesEase_ = 1.0 - std::exp(-1.0 / (0.005 * rate_));
     addLanes(map, choice, values, cues, velocityGainOf(values, velocity), false);
+    // Granular: the first lane's zone is read as grains, whatever its place.
+    granular_ = value(SamplerSetting::grains) >= 0.5 && laneCount_ > 0;
+    if (granular_) {
+        laneCount_ = 1;
+        lanes_[0].done = false;
+        for (auto& grain : grains_)
+            grain.active = false;
+        grainCountdown_ = 0.0;
+        grainScan_ = 0.0;
+        grainSeed_ = 0x9e3779b9u ^ (round_ * 2'654'435'761u) ^ static_cast<std::uint32_t>(midiNote * 977.0);
+    }
     active_ = laneCount_ > 0;
+}
+
+double SamplerVoice::grainRandom() noexcept
+{
+    grainSeed_ ^= grainSeed_ << 13;
+    grainSeed_ ^= grainSeed_ >> 17;
+    grainSeed_ ^= grainSeed_ << 5;
+    return static_cast<double>(grainSeed_ & 0xffffffu) / static_cast<double>(0x1000000);
+}
+
+// Grains: short windowed pieces of the sample taken around a place (that
+// moves when it scans), each at the note's pitch give or take its random
+// part, placed in the stereo field, some backwards; their sum kept at about
+// the level of one, however many overlap.
+void SamplerVoice::nextGrains(const SamplerMap& map, const SamplerValues& values, double& left, double& right) noexcept
+{
+    auto& lane = lanes_[0];
+    if (lane.done)
+        return;
+    if (lane.zone < 0 || static_cast<std::size_t>(lane.zone) >= map.zones.size()
+        || map.zones[static_cast<std::size_t>(lane.zone)].sample.get() != lane.sample) {
+        finish(lane);
+        return;
+    }
+    const auto& zone = map.zones[static_cast<std::size_t>(lane.zone)];
+    const auto& sample = *zone.sample;
+    if (lane.pending) {
+        if (sample.failed.load(std::memory_order_acquire) || lane.waited > rate_ * 60.0) {
+            finish(lane);
+            return;
+        }
+        if (!sample.playable()) {
+            lane.waited += 1.0;
+            return;
+        }
+        place(lane, zone, sample, 0.0);
+        lane.pending = false;
+        lane.done = false;
+    }
+    const auto value = [&values](const SamplerSetting setting) {
+        return static_cast<double>(samplerValue(values, setting));
+    };
+    // What can be read: the zone, within what is in memory.
+    const auto first = std::max<std::int64_t>({ 0, zone.start, sample.heldStart() });
+    const auto end = std::min(zoneEnd(zone, sample), sample.heldEnd());
+    const auto span = static_cast<double>(end - first);
+    if (span < 64.0)
+        return;
+    const auto sampleRate = sample.sampleRate;
+    const auto size = std::clamp(value(SamplerSetting::grainSize), 10.0, 1'000.0) * 0.001 * rate_;
+    const auto density = std::clamp(value(SamplerSetting::grainDensity), 1.0, 120.0);
+    grainScan_ += std::clamp(value(SamplerSetting::grainScan), -2.0, 2.0) * sampleRate / rate_;
+    grainScan_ = std::fmod(grainScan_, span);
+    if (--grainCountdown_ <= 0.0) {
+        grainCountdown_ = rate_ / density * (0.75 + 0.5 * grainRandom());
+        for (auto& grain : grains_) {
+            if (grain.active)
+                continue;
+            const auto spray = std::clamp(value(SamplerSetting::grainSpray), 0.0, 1.0);
+            auto centre = std::clamp(value(SamplerSetting::grainPosition), 0.0, 1.0) * span + grainScan_ + (grainRandom() - 0.5) * spray * span;
+            centre = std::fmod(centre, span);
+            if (centre < 0.0)
+                centre += span;
+            const auto randomPitch = (grainRandom() * 2.0 - 1.0) * std::clamp(value(SamplerSetting::grainPitch), 0.0, 12.0);
+            auto increment = lane.increment * std::pow(2.0, randomPitch / 12.0) * pitchRatio_;
+            if (grainRandom() < std::clamp(value(SamplerSetting::grainReverse), 0.0, 1.0))
+                increment = -increment;
+            const auto reach = std::abs(increment) * size;
+            grain.position = static_cast<double>(first) + std::clamp(centre - increment * size * 0.5, 0.0, std::max(0.0, span - reach - 2.0));
+            if (increment < 0.0)
+                grain.position = std::max(static_cast<double>(first) + reach + 1.0, grain.position);
+            grain.increment = increment;
+            grain.age = 0.0;
+            grain.length = std::max(16.0, size);
+            const auto pan = (grainRandom() * 2.0 - 1.0) * std::clamp(value(SamplerSetting::grainStereo), 0.0, 1.0);
+            grain.gainLeft = std::min(1.0, 1.0 - pan);
+            grain.gainRight = std::min(1.0, 1.0 + pan);
+            grain.active = true;
+            break;
+        }
+    }
+    // A soft window (a bell) or one with short edges.
+    const auto edge = 0.5 - 0.47 * std::clamp(value(SamplerSetting::grainShape), 0.0, 1.0);
+    // Overlapping grains add in power: their sum brought back to the
+    // sound's level, the window's own loss counted (a bell keeps 3/8 of it).
+    const auto overlap = density * size / rate_;
+    const auto windowPower = std::clamp(1.0 - 1.25 * edge, 0.3, 1.0);
+    const auto level = 1.0 / std::sqrt(std::max(windowPower, overlap * windowPower));
+    auto sumLeft = 0.0;
+    auto sumRight = 0.0;
+    for (auto& grain : grains_) {
+        if (!grain.active)
+            continue;
+        const auto t = grain.age / grain.length;
+        const auto window = t < edge ? 0.5 - 0.5 * std::cos(std::numbers::pi * t / edge)
+                            : t > 1.0 - edge ? 0.5 - 0.5 * std::cos(std::numbers::pi * (1.0 - t) / edge)
+                                             : 1.0;
+        auto l = 0.0;
+        auto r = 0.0;
+        readFrame(sample, nullptr, grain.position, l, r);
+        sumLeft += l * window * grain.gainLeft;
+        sumRight += r * window * grain.gainRight;
+        grain.position += grain.increment;
+        grain.age += 1.0;
+        if (grain.age >= grain.length || grain.position < static_cast<double>(first) || grain.position >= static_cast<double>(end - 1))
+            grain.active = false;
+    }
+    left = sumLeft * level * lane.gainLeft;
+    right = sumRight * level * lane.gainRight;
 }
 
 void SamplerVoice::startRelease(const SamplerMap& map, const SamplerValues& values, const SamplerCues& cues) noexcept
@@ -647,6 +767,18 @@ void SamplerVoice::next(const SamplerMap* map, const SamplerValues& values, cons
             startRelease(*map, values, cues);
     }
     played_ += 1.0;
+    if (granular_) {
+        nextGrains(*map, values, left, right);
+        const auto width = std::clamp(static_cast<double>(samplerValue(values, SamplerSetting::width)), 0.0, 2.0);
+        if (width != 1.0) {
+            const auto mid = 0.5 * (left + right);
+            const auto side = 0.5 * (left - right) * width;
+            left = mid + side;
+            right = mid - side;
+        }
+        active_ = laneCount_ > 0 && !lanes_[0].done;
+        return;
+    }
     // The controllers are read again every 64 samples.
     const auto refresh = --rulesCountdown_ <= 0;
     if (refresh)

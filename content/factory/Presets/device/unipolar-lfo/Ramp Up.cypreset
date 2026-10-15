@@ -1,0 +1,20 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "unipolar-lfo",
+ "name": "Ramp Up",
+ "state": {
+  "type": "unipolar-lfo",
+  "parameters": {
+   "node.22001.lfo.rate": 0.5,
+   "node.22001.lfo.depth": 1.0,
+   "node.22001.lfo.offset": 0.0,
+   "node.22001.lfo.shape": 2.0,
+   "node.22002.map.inputMinimum": -1.0,
+   "node.22002.map.inputMaximum": 1.0,
+   "node.22002.map.outputMinimum": 0.0,
+   "node.22002.map.outputMaximum": 1.0
+  }
+ }
+}

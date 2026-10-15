@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "grains",
+ "name": "Octave Down Haze",
+ "state": {
+  "type": "grains",
+  "parameters": {
+   "grains.time": 350.0,
+   "grains.feedback": 0.4,
+   "grains.pitch": -12.0,
+   "grains.spray": 80.0,
+   "grains.density": 30.0,
+   "grains.pitchRandom": 0.0,
+   "grains.mix": 0.4,
+   "grains.output": 0.0,
+   "grains.sync": 0.0,
+   "grains.size": 220.0,
+   "grains.stereo": 0.7,
+   "grains.reverseChance": 0.0,
+   "grains.freeze": 0.0,
+   "grains.highCut": 6000.0
+  }
+ }
+}

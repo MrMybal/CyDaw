@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "gamme",
+ "name": "C Major Scale Notes Only",
+ "state": {
+  "type": "gamme",
+  "parameters": {
+   "gamme.transpose": 0.0,
+   "gamme.degrees": 0.0,
+   "gamme.key": 0.0,
+   "gamme.scale": 1.0,
+   "gamme.mode": 3.0
+  }
+ }
+}

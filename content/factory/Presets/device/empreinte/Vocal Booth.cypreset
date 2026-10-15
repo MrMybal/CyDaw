@@ -1,0 +1,23 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "empreinte",
+ "name": "Vocal Booth",
+ "state": {
+  "type": "empreinte",
+  "parameters": {
+   "empreinte.mix": 0.18,
+   "empreinte.predelay": 0.0,
+   "empreinte.lowCut": 120.0,
+   "empreinte.highCut": 12000.0,
+   "empreinte.width": 1.0,
+   "empreinte.early": 0.0,
+   "empreinte.tail": -3.0,
+   "empreinte.output": 0.0,
+   "empreinte.space": 0.0,
+   "empreinte.length": 0.7,
+   "empreinte.reverse": 0.0
+  }
+ }
+}

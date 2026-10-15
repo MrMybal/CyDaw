@@ -1,0 +1,30 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "comp-pro",
+ "name": "Spoken Voice (Podcast and Radio)",
+ "state": {
+  "type": "comp-pro",
+  "parameters": {
+   "comppro.threshold": -26.0,
+   "comppro.ratio": 3.0,
+   "comppro.knee": 10.0,
+   "comppro.attack": 10.0,
+   "comppro.release": 180.0,
+   "comppro.makeup": 6.0,
+   "comppro.mix": 1.0,
+   "comppro.sidechain": 90.0,
+   "comppro.style": 3.0,
+   "comppro.range": 14.0,
+   "comppro.hold": 0.0,
+   "comppro.lookahead": 2.0,
+   "comppro.autoRelease": 1.0,
+   "comppro.autoGain": 0.0,
+   "comppro.sidechainLow": 8000.0,
+   "comppro.link": 1.0,
+   "comppro.channels": 0.0,
+   "comppro.audition": 0.0
+  }
+ }
+}

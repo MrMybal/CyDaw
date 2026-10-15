@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "saccade",
+ "name": "Tape Stop Repeat",
+ "state": {
+  "type": "saccade",
+  "parameters": {
+   "saccade.chance": 1.0,
+   "saccade.variation": 0.0,
+   "saccade.decay": 0.15,
+   "saccade.pitchDecay": 0.6,
+   "saccade.filter": 6000.0,
+   "saccade.mix": 1.0,
+   "saccade.output": 0.0,
+   "saccade.interval": 12.0,
+   "saccade.offset": 12.0,
+   "saccade.gate": 4.0,
+   "saccade.grid": 6.0,
+   "saccade.mode": 1.0,
+   "saccade.reverseChance": 0.0,
+   "saccade.repeat": 0.0
+  }
+ }
+}

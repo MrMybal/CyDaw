@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "ping-pong",
+ "name": "Sixteenth Ripple",
+ "state": {
+  "type": "ping-pong",
+  "parameters": {
+   "pingpong.time": 125.0,
+   "pingpong.feedback": 0.55,
+   "pingpong.mix": 0.25,
+   "pingpong.width": 0.8,
+   "pingpong.sync": 3.0
+  }
+ }
+}

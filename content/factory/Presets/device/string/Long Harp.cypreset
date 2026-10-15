@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "string",
+ "name": "Long Harp",
+ "state": {
+  "type": "string",
+  "parameters": {
+   "string.frequency": 220.0,
+   "string.damping": 0.3,
+   "string.decay": 12.0
+  }
+ }
+}

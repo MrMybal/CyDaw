@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "ping-pong",
+ "name": "Free Wide Echo",
+ "state": {
+  "type": "ping-pong",
+  "parameters": {
+   "pingpong.time": 420.0,
+   "pingpong.feedback": 0.5,
+   "pingpong.mix": 0.32,
+   "pingpong.width": 1.0,
+   "pingpong.sync": 0.0
+  }
+ }
+}

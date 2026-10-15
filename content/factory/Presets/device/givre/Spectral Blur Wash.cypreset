@@ -1,0 +1,21 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "givre",
+ "name": "Spectral Blur Wash",
+ "state": {
+  "type": "givre",
+  "parameters": {
+   "givre.blur": 0.7,
+   "givre.smear": 0.0,
+   "givre.shift": 0.0,
+   "givre.tone": 0.0,
+   "givre.scatter": 0.3,
+   "givre.mix": 0.5,
+   "givre.output": 0.0,
+   "givre.freeze": 0.0,
+   "givre.sync": 0.0
+  }
+ }
+}

@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "delay",
+ "name": "Doubler",
+ "state": {
+  "type": "delay",
+  "parameters": {
+   "delay.time": 25.0,
+   "delay.feedback": 0.0,
+   "delay.mix": 0.4
+  }
+ }
+}

@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "vocal-strip",
+ "name": "Upfront Vocal",
+ "state": {
+  "type": "vocal-strip",
+  "parameters": {
+   "node.12002.compressor.threshold": -22.0,
+   "node.12002.compressor.ratio": 4.0,
+   "node.12003.eq.tone": 0.25
+  }
+ }
+}

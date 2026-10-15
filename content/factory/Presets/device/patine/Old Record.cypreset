@@ -1,0 +1,28 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "patine",
+ "name": "Old Record",
+ "state": {
+  "type": "patine",
+  "parameters": {
+   "patine.noise": 0.6,
+   "patine.wobble": 0.3,
+   "patine.distort": 0.15,
+   "patine.digital": 0.0,
+   "patine.space": 0.1,
+   "patine.magnetic": 0.1,
+   "patine.magnitude": 1.0,
+   "patine.mix": 1.0,
+   "patine.noiseType": 0.0,
+   "patine.wobbleRate": 0.300000011920929,
+   "patine.distortType": 0.0,
+   "patine.spaceSize": 0.400000005960464,
+   "patine.tone": -0.3,
+   "patine.width": 1.0,
+   "patine.output": 0.0,
+   "patine.noiseFollow": 0.0
+  }
+ }
+}

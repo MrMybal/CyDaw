@@ -8,8 +8,8 @@
 
 // How each model of the synth family (SynthFamily.h) shows itself: its
 // window as pages of rows of panels, each a title, a picture perhaps and its
-// controls (by their keys, a short name under each knob); its card as a
-// picture and one row of knobs. SynthView draws any of them.
+// controls (by their keys, a short name under each knob); its card as a few
+// small panels of its main settings. SynthView draws any of them.
 
 namespace cydaw::v2::synth_layout {
 
@@ -63,11 +63,9 @@ struct Layout {
     ImU32 colour {};
     const char* title {}; // "AMBRE"
     std::vector<Page> pages;
-    // The card: its picture, a choice beside its button, one row of knobs.
-    Picture panePicture { Picture::filter };
-    const char* paneKey {};
-    const char* paneChoice {};
-    std::vector<Control> pane;
+    // The card in Devices: a few small panels side by side, the sound's main
+    // settings (the window has them all).
+    std::vector<Panel> card;
 };
 
 [[nodiscard]] const Layout& layoutFor(engine::synth::Model model);

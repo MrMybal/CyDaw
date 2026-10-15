@@ -1,0 +1,23 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "de-esser",
+ "name": "Heavy Reduction",
+ "state": {
+  "type": "de-esser",
+  "parameters": {
+   "deesser.threshold": -40.0,
+   "deesser.frequency": 6000.0,
+   "deesser.range": 18.0,
+   "deesser.release": 90.0,
+   "deesser.output": 0.0,
+   "deesser.mode": 1.0,
+   "deesser.detectorType": 0.0,
+   "deesser.listen": 0.0,
+   "deesser.bandwidth": 1.0,
+   "deesser.attack": 1.0,
+   "deesser.link": 1.0
+  }
+ }
+}

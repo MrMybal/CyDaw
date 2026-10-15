@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "eq-three",
+ "name": "Mid Focus",
+ "state": {
+  "type": "eq-three",
+  "parameters": {
+   "eq3.low": -3.0,
+   "eq3.mid": 3.0,
+   "eq3.high": -2.0,
+   "eq3.lowFrequency": 250.0,
+   "eq3.highFrequency": 3500.0
+  }
+ }
+}

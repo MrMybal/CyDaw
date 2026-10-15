@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "alea",
+ "name": "Few Dropped Notes",
+ "state": {
+  "type": "alea",
+  "parameters": {
+   "alea.timing": 0.0,
+   "alea.velocity": 0.1,
+   "alea.chance": 0.85,
+   "alea.pitchChance": 0.0,
+   "alea.pitchRange": 0.0
+  }
+ }
+}

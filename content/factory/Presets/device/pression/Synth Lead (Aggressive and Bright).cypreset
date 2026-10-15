@@ -1,0 +1,42 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "pression",
+ "name": "Synth Lead (Aggressive and Bright)",
+ "state": {
+  "type": "pression",
+  "parameters": {
+   "pression.depth": 0.7,
+   "pression.time": 0.3,
+   "pression.upward": 1.0,
+   "pression.downward": 1.0,
+   "pression.lowGain": -3.0,
+   "pression.midGain": 0.0,
+   "pression.highGain": 2.5,
+   "pression.output": -2.0,
+   "pression.input": 2.0,
+   "pression.crossLow": 200.0,
+   "pression.crossHigh": 3000.0,
+   "pression.lowDownThreshold": -32.0,
+   "pression.lowDownRatio": 40.0,
+   "pression.lowUpThreshold": -42.0,
+   "pression.lowUpRatio": 4.0,
+   "pression.lowAttack": 30.0,
+   "pression.lowRelease": 200.0,
+   "pression.midDownThreshold": -30.0,
+   "pression.midDownRatio": 40.0,
+   "pression.midUpThreshold": -42.0,
+   "pression.midUpRatio": 4.0,
+   "pression.midAttack": 15.0,
+   "pression.midRelease": 200.0,
+   "pression.highDownThreshold": -34.0,
+   "pression.highDownRatio": 40.0,
+   "pression.highUpThreshold": -40.0,
+   "pression.highUpRatio": 4.5,
+   "pression.highAttack": 8.0,
+   "pression.highRelease": 100.0,
+   "pression.solo": 0.0
+  }
+ }
+}

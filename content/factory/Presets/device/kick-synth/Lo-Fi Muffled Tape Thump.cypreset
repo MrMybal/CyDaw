@@ -1,0 +1,40 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "kick-synth",
+ "name": "Lo-Fi Muffled Tape Thump",
+ "state": {
+  "type": "kick-synth",
+  "parameters": {
+   "kick.bodyShape": 2.0,
+   "kick.bodyPhase": 0.0,
+   "kick.pitchStart": 160.0,
+   "kick.pitchEnd": 52.0,
+   "kick.pitchTime": 70.0,
+   "kick.pitchCurve": 2.5,
+   "kick.bodyLevel": 0.0,
+   "kick.attack": 2.0,
+   "kick.hold": 15.0,
+   "kick.decay": 320.0,
+   "kick.decayCurve": 1.700000047683716,
+   "kick.length": 600.0,
+   "kick.clickType": 1.0,
+   "kick.clickLevel": -14.0,
+   "kick.clickDecay": 18.0,
+   "kick.clickTone": 1200.0,
+   "kick.subLevel": -60.0,
+   "kick.subDecay": 600.0,
+   "kick.subOctave": 0.0,
+   "kick.driveType": 3.0,
+   "kick.drive": 10.0,
+   "kick.driveTone": 2500.0,
+   "kick.lowCut": 35.0,
+   "kick.highCut": 2800.0,
+   "kick.lowBoost": 4.0,
+   "kick.keyTrack": 1.0,
+   "kick.velocity": 0.600000023841858,
+   "kick.output": -9.920000076293945
+  }
+ }
+}

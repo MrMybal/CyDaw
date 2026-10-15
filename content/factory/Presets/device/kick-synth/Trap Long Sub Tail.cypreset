@@ -1,0 +1,40 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "kick-synth",
+ "name": "Trap Long Sub Tail",
+ "state": {
+  "type": "kick-synth",
+  "parameters": {
+   "kick.bodyShape": 0.0,
+   "kick.bodyPhase": 0.0,
+   "kick.pitchStart": 150.0,
+   "kick.pitchEnd": 43.650001525878906,
+   "kick.pitchTime": 90.0,
+   "kick.pitchCurve": 2.200000047683716,
+   "kick.bodyLevel": 0.0,
+   "kick.attack": 0.5,
+   "kick.hold": 20.0,
+   "kick.decay": 3200.0,
+   "kick.decayCurve": 1.0,
+   "kick.length": 4500.0,
+   "kick.clickType": 2.0,
+   "kick.clickLevel": -14.0,
+   "kick.clickDecay": 2.0,
+   "kick.clickTone": 3500.0,
+   "kick.subLevel": -8.0,
+   "kick.subDecay": 3500.0,
+   "kick.subOctave": 0.0,
+   "kick.driveType": 0.0,
+   "kick.drive": 8.0,
+   "kick.driveTone": 6000.0,
+   "kick.lowCut": 20.0,
+   "kick.highCut": 12000.0,
+   "kick.lowBoost": 2.0,
+   "kick.keyTrack": 1.0,
+   "kick.velocity": 0.300000011920929,
+   "kick.output": -6.519999980926514
+  }
+ }
+}

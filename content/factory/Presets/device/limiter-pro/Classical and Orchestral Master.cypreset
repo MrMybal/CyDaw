@@ -1,0 +1,27 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "limiter-pro",
+ "name": "Classical and Orchestral Master",
+ "state": {
+  "type": "limiter-pro",
+  "parameters": {
+   "limpro.gain": 2.0,
+   "limpro.output": -1.0,
+   "limpro.lookahead": 5.0,
+   "limpro.attack": 30.0,
+   "limpro.release": 400.0,
+   "limpro.style": 0.0,
+   "limpro.linkTransients": 1.0,
+   "limpro.linkRelease": 1.0,
+   "limpro.truePeak": 1.0,
+   "limpro.oversampling": 3.0,
+   "limpro.dither": 1.0,
+   "limpro.shaping": 2.0,
+   "limpro.dcFilter": 0.0,
+   "limpro.unity": 0.0,
+   "limpro.target": -18.0
+  }
+ }
+}

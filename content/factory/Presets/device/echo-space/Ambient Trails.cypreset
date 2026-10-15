@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "echo-space",
+ "name": "Ambient Trails",
+ "state": {
+  "type": "echo-space",
+  "parameters": {
+   "node.15002.delay.time": 900.0,
+   "node.15002.delay.feedback": 0.6,
+   "node.15002.delay.mix": 0.35,
+   "node.15003.reverb.roomSize": 0.93,
+   "node.15003.reverb.mix": 0.45
+  }
+ }
+}

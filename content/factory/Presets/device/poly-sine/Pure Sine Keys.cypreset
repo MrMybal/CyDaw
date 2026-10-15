@@ -1,0 +1,23 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "poly-sine",
+ "name": "Pure Sine Keys",
+ "state": {
+  "type": "poly-sine",
+  "parameters": {
+   "node.10002.voice.mode": 0.0,
+   "node.10002.voice.glide": 0.0,
+   "node.10003.polyOscillator.waveform": 0.0,
+   "node.10003.polyOscillator.level": 0.16,
+   "node.10004.envelope.attack": 4.0,
+   "node.10004.envelope.decay": 300.0,
+   "node.10004.envelope.sustain": 0.6,
+   "node.10004.envelope.release": 260.0,
+   "node.10007.gain.db": 0.0,
+   "node.10005.voiceFilter.cutoff": 12000.0,
+   "node.10005.voiceFilter.resonance": 0.7
+  }
+ }
+}

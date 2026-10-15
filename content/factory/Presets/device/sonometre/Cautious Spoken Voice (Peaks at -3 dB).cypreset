@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "sonometre",
+ "name": "Cautious Spoken Voice (Peaks at -3 dB)",
+ "state": {
+  "type": "sonometre",
+  "parameters": {
+   "sonometre.target": 3.0,
+   "sonometre.history": 300.0,
+   "sonometre.truePeak": -3.0
+  }
+ }
+}

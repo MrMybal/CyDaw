@@ -1,0 +1,40 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "kick-synth",
+ "name": "Minimal Tight Knock",
+ "state": {
+  "type": "kick-synth",
+  "parameters": {
+   "kick.bodyShape": 1.0,
+   "kick.bodyPhase": 0.0,
+   "kick.pitchStart": 700.0,
+   "kick.pitchEnd": 65.4000015258789,
+   "kick.pitchTime": 15.0,
+   "kick.pitchCurve": 3.0,
+   "kick.bodyLevel": 0.0,
+   "kick.attack": 0.0,
+   "kick.hold": 8.0,
+   "kick.decay": 150.0,
+   "kick.decayCurve": 2.200000047683716,
+   "kick.length": 260.0,
+   "kick.clickType": 3.0,
+   "kick.clickLevel": -8.0,
+   "kick.clickDecay": 4.0,
+   "kick.clickTone": 3000.0,
+   "kick.subLevel": -60.0,
+   "kick.subDecay": 600.0,
+   "kick.subOctave": 0.0,
+   "kick.driveType": 0.0,
+   "kick.drive": 3.0,
+   "kick.driveTone": 12000.0,
+   "kick.lowCut": 40.0,
+   "kick.highCut": 14000.0,
+   "kick.lowBoost": 0.0,
+   "kick.keyTrack": 1.0,
+   "kick.velocity": 0.600000023841858,
+   "kick.output": -2.640000104904175
+  }
+ }
+}

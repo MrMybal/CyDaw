@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "bass-zone",
+ "name": "Below Middle C",
+ "state": {
+  "type": "bass-zone",
+  "parameters": {
+   "node.34002.midi.note.minimum": 0.0,
+   "node.34002.midi.note.maximum": 59.0,
+   "node.34003.midi.velocity": 0.95
+  }
+ }
+}

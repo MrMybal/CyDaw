@@ -1,0 +1,21 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "arpege",
+ "name": "Up Sixteenths",
+ "state": {
+  "type": "arpege",
+  "parameters": {
+   "arpege.gate": 0.600000023841858,
+   "arpege.swing": 0.0,
+   "arpege.velocity": 100.0,
+   "arpege.rate": 3.0,
+   "arpege.mode": 0.0,
+   "arpege.octaves": 1.0,
+   "arpege.velocityMode": 0.0,
+   "arpege.latch": 0.0,
+   "arpege.retrigger": 1.0
+  }
+ }
+}

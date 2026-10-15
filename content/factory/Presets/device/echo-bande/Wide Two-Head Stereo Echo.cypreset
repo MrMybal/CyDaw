@@ -1,0 +1,25 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "echo-bande",
+ "name": "Wide Two-Head Stereo Echo",
+ "state": {
+  "type": "echo-bande",
+  "parameters": {
+   "echoband.time": 200.0,
+   "echoband.intensity": 0.4,
+   "echoband.echo": 0.6,
+   "echoband.reverb": 0.0,
+   "echoband.bass": -3.0,
+   "echoband.treble": 0.0,
+   "echoband.wow": 0.05,
+   "echoband.mix": 0.3,
+   "echoband.mode": 3.0,
+   "echoband.sync": 6.0,
+   "echoband.drive": 0.0,
+   "echoband.age": 0.0,
+   "echoband.width": 1.0
+  }
+ }
+}

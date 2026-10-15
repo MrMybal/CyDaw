@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "sonometre",
+ "name": "CD and Club",
+ "state": {
+  "type": "sonometre",
+  "parameters": {
+   "sonometre.target": 6.0,
+   "sonometre.history": 120.0,
+   "sonometre.truePeak": -0.3
+  }
+ }
+}

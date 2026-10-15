@@ -1,0 +1,13 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "eq",
+ "name": "A Bit Brighter",
+ "state": {
+  "type": "eq",
+  "parameters": {
+   "eq.tone": 0.15
+  }
+ }
+}

@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "mic-sim",
+ "name": "Snare Top Dynamic",
+ "state": {
+  "type": "mic-sim",
+  "parameters": {
+   "micsim.distance": 4.0,
+   "micsim.angle": 30.0,
+   "micsim.drive": 4.0,
+   "micsim.lowCut": 90.0,
+   "micsim.highCut": 15000.0,
+   "micsim.room": 0.05,
+   "micsim.output": 0.0,
+   "micsim.mix": 1.0,
+   "micsim.model": 0.0,
+   "micsim.pattern": 3.0,
+   "micsim.preamp": 2.0,
+   "micsim.noise": -90.0,
+   "micsim.roomSize": 0.2,
+   "micsim.roomTone": 5000.0
+  }
+ }
+}

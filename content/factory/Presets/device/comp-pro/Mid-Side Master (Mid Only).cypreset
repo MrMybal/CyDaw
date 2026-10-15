@@ -1,0 +1,30 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "comp-pro",
+ "name": "Mid-Side Master (Mid Only)",
+ "state": {
+  "type": "comp-pro",
+  "parameters": {
+   "comppro.threshold": -16.0,
+   "comppro.ratio": 2.0,
+   "comppro.knee": 10.0,
+   "comppro.attack": 30.0,
+   "comppro.release": 250.0,
+   "comppro.makeup": 1.0,
+   "comppro.mix": 1.0,
+   "comppro.sidechain": 60.0,
+   "comppro.style": 4.0,
+   "comppro.range": 3.0,
+   "comppro.hold": 0.0,
+   "comppro.lookahead": 3.0,
+   "comppro.autoRelease": 1.0,
+   "comppro.autoGain": 0.0,
+   "comppro.sidechainLow": 20000.0,
+   "comppro.link": 1.0,
+   "comppro.channels": 1.0,
+   "comppro.audition": 0.0
+  }
+ }
+}

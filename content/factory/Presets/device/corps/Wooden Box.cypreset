@@ -1,0 +1,22 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "corps",
+ "name": "Wooden Box",
+ "state": {
+  "type": "corps",
+  "parameters": {
+   "corps.tune": 180.0,
+   "corps.decay": 0.3,
+   "corps.material": 0.1,
+   "corps.inharmonic": 0.0,
+   "corps.position": 0.4,
+   "corps.mix": 0.35,
+   "corps.output": 0.0,
+   "corps.width": 0.5,
+   "corps.type": 4.0,
+   "corps.lowCut": 80.0
+  }
+ }
+}

@@ -1,0 +1,42 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "pression",
+ "name": "Acoustic Guitar (Playing Details)",
+ "state": {
+  "type": "pression",
+  "parameters": {
+   "pression.depth": 0.25,
+   "pression.time": 0.6,
+   "pression.upward": 0.8,
+   "pression.downward": 0.6,
+   "pression.lowGain": -1.5,
+   "pression.midGain": 0.0,
+   "pression.highGain": 1.0,
+   "pression.output": 0.0,
+   "pression.input": 0.0,
+   "pression.crossLow": 180.0,
+   "pression.crossHigh": 4000.0,
+   "pression.lowDownThreshold": -28.0,
+   "pression.lowDownRatio": 6.0,
+   "pression.lowUpThreshold": -50.0,
+   "pression.lowUpRatio": 2.0,
+   "pression.lowAttack": 30.0,
+   "pression.lowRelease": 250.0,
+   "pression.midDownThreshold": -26.0,
+   "pression.midDownRatio": 5.0,
+   "pression.midUpThreshold": -48.0,
+   "pression.midUpRatio": 2.5,
+   "pression.midAttack": 15.0,
+   "pression.midRelease": 200.0,
+   "pression.highDownThreshold": -30.0,
+   "pression.highDownRatio": 6.0,
+   "pression.highUpThreshold": -48.0,
+   "pression.highUpRatio": 2.5,
+   "pression.highAttack": 5.0,
+   "pression.highRelease": 120.0,
+   "pression.solo": 0.0
+  }
+ }
+}

@@ -1,0 +1,14 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "lowpass",
+ "name": "Gentle Top Cut",
+ "state": {
+  "type": "lowpass",
+  "parameters": {
+   "lowpass.cutoff": 12000.0,
+   "lowpass.resonance": 0.7
+  }
+ }
+}

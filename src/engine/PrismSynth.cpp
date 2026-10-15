@@ -651,7 +651,8 @@ struct Envelope {
             break;
         }
         case sustain:
-            value = std::clamp(static_cast<double>(p[envSustain]), 0.0, 1.0);
+            // Toward the knob a few milliseconds behind: turned, no step.
+            value += (std::clamp(static_cast<double>(p[envSustain]), 0.0, 1.0) - value) * std::min(1.0, dt / 0.003);
             break;
         case release: {
             const auto length = time(p[envRelease]);
@@ -1005,6 +1006,9 @@ struct Voice::State {
     std::array<float, parameterCount> lastModulated {};
     double expressionPitch {};
     double expressionGain { 1.0 };
+    // The master as last heard (below 0: none yet), ramped across each block.
+    double masterHeard { -1.0 };
+    double masterRightHeard { -1.0 };
 
     double random() noexcept { return random01(seed); }
     double white() noexcept { return 2.0 * random01(seed) - 1.0; }
@@ -1044,6 +1048,8 @@ void Voice::start(const PrismValues& values, const int note, const float velocit
     s.releasingNow = false;
     s.expressionPitch = 0.0;
     s.expressionGain = 1.0;
+    s.masterHeard = -1.0;
+    s.masterRightHeard = -1.0;
     for (auto& envelope : s.envelopes) {
         envelope.value = 0.0;
         envelope.start();
@@ -1138,6 +1144,22 @@ void Voice::setExpression(const double pitchSemitones, const double gain) noexce
 float Voice::modulated(const int index) const noexcept
 {
     return state_->lastModulated[static_cast<std::size_t>(std::clamp(index, 0, parameterCount - 1))];
+}
+
+void Voice::live(VoiceLive& out) const noexcept
+{
+    static_assert(static_cast<std::size_t>(parameterCount) <= VoiceLive::valueCount);
+    const auto& s = *state_;
+    out.clear();
+    for (int index = 0; index < parameterCount; ++index)
+        if (s.modulation[static_cast<std::size_t>(index)] != 0.0f)
+            out.values[static_cast<std::size_t>(index)] = denormalise(index, s.lastModulated[static_cast<std::size_t>(index)]);
+    for (int lfo = 0; lfo < lfoCount && lfo < static_cast<int>(VoiceLive::lfoCount); ++lfo) {
+        out.lfos[static_cast<std::size_t>(lfo)] = static_cast<float>(s.lfos[lfo].value);
+        out.lfoPhases[static_cast<std::size_t>(lfo)] = static_cast<float>(s.lfos[lfo].phase);
+    }
+    for (int envelope = 0; envelope < envelopeCount && envelope < static_cast<int>(VoiceLive::envelopeCount); ++envelope)
+        out.envelopes[static_cast<std::size_t>(envelope)] = static_cast<float>(s.envelopes[envelope].value);
 }
 
 bool Voice::render(const PrismValues& values, const Tables& tables, const Context& context, float* left, float* right,
@@ -1540,6 +1562,11 @@ bool Voice::render(const PrismValues& values, const Tables& tables, const Contex
         const auto velocityGain = 1.0 - velocityAmount * (1.0 - s.velocity);
         const auto master = modulated(voiceBase + voiceMaster) * velocityGain * 0.5 * s.expressionGain;
         const auto masterRight = modulatedRight(voiceBase + voiceMaster) * velocityGain * 0.5 * s.expressionGain;
+        // From where the last block left it: a knob turned, the level slides.
+        const auto masterFrom = s.masterHeard >= 0.0 ? s.masterHeard : master;
+        const auto masterRightFrom = s.masterRightHeard >= 0.0 ? s.masterRightHeard : masterRight;
+        s.masterHeard = master;
+        s.masterRightHeard = masterRight;
 
         // LFOs this block.
         double lfoIncrements[lfoCount] {};
@@ -1820,8 +1847,9 @@ bool Voice::render(const PrismValues& values, const Tables& tables, const Contex
                 filterLeft = runFilter(0, s.filters[0], filterLeft);
                 filterRight = runFilter(1, s.filters[1], filterRight);
             }
-            const auto amplitude = s.envelopes[0].value * master;
-            const auto amplitudeRight = s.envelopes[0].value * masterRight;
+            const auto along = static_cast<double>(i + 1) / static_cast<double>(length);
+            const auto amplitude = s.envelopes[0].value * (masterFrom + (master - masterFrom) * along);
+            const auto amplitudeRight = s.envelopes[0].value * (masterRightFrom + (masterRight - masterRightFrom) * along);
             left[offset + i] += static_cast<float>((filterLeft + directLeft) * amplitude);
             right[offset + i] += static_cast<float>((filterRight + directRight) * amplitudeRight);
         }

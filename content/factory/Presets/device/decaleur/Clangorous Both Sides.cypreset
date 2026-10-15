@@ -1,0 +1,24 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "decaleur",
+ "name": "Clangorous Both Sides",
+ "state": {
+  "type": "decaleur",
+  "parameters": {
+   "decaleur.shift": 300.0,
+   "decaleur.fine": 0.0,
+   "decaleur.spread": 0.0,
+   "decaleur.feedback": 0.0,
+   "decaleur.lfoRate": 0.5,
+   "decaleur.lfoDepth": 0.0,
+   "decaleur.mix": 0.8,
+   "decaleur.output": 0.0,
+   "decaleur.mode": 1.0,
+   "decaleur.sync": 0.0,
+   "decaleur.lfoShape": 0.0,
+   "decaleur.delay": 0.0
+  }
+ }
+}

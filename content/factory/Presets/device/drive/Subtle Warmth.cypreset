@@ -1,0 +1,13 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "drive",
+ "name": "Subtle Warmth",
+ "state": {
+  "type": "drive",
+  "parameters": {
+   "drive.db": 4.0
+  }
+ }
+}

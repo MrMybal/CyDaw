@@ -1,0 +1,35 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "reverb-pro",
+ "name": "Muffled Next Room",
+ "state": {
+  "type": "reverb-pro",
+  "parameters": {
+   "revpro.space": 0.4,
+   "revpro.decay": 1.5,
+   "revpro.predelay": 25.0,
+   "revpro.distance": 1.0,
+   "revpro.brightness": -0.8,
+   "revpro.character": 0.3,
+   "revpro.width": 0.7,
+   "revpro.mix": 0.6,
+   "revpro.lowDecay": 1.3,
+   "revpro.lowFrequency": 200.0,
+   "revpro.midDecay": 0.9,
+   "revpro.midFrequency": 800.0,
+   "revpro.highDecay": 0.2,
+   "revpro.highFrequency": 2000.0,
+   "revpro.lowCut": 80.0,
+   "revpro.highCut": 2500.0,
+   "revpro.ducking": 0.0,
+   "revpro.duckRelease": 300.0,
+   "revpro.freeze": 0.0,
+   "revpro.sync": 0.0,
+   "revpro.diffusion": 0.9,
+   "revpro.output": -2.0,
+   "revpro.early": -24.0
+  }
+ }
+}

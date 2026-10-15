@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "poly-bass",
+ "name": "Acid Squelch",
+ "state": {
+  "type": "poly-bass",
+  "parameters": {
+   "node.19002.voice.mode": 1.0,
+   "node.19002.voice.glide": 60.0,
+   "node.19003.polyOscillator.waveform": 2.0,
+   "node.19003.polyOscillator.level": 0.16,
+   "node.19004.envelope.attack": 2.0,
+   "node.19004.envelope.decay": 180.0,
+   "node.19004.envelope.sustain": 0.2,
+   "node.19004.envelope.release": 90.0,
+   "node.19005.gain.db": 0.0,
+   "node.19006.voiceFilter.cutoff": 520.0,
+   "node.19006.voiceFilter.resonance": 9.0,
+   "node.19007.drive.db": 10.0,
+   "node.19008.compressor.threshold": -16.0,
+   "node.19008.compressor.ratio": 4.0
+  }
+ }
+}

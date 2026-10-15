@@ -254,27 +254,19 @@ queue des graves (orange) et des aigus (bleu) au fil du temps, et les premières
 
 ## Préréglages
 
-Construits par `tools/factory_content/build_studio_presets.py --only pression,fournaise,echo-bande,multiband-pro,velours,patine,sonometre` :
+Construits par `tools/factory_content/build_studio_presets.py` (leurs réglages dans
+`tools/factory_content/studio_presets/`, une famille par fichier), tous nommés en anglais :
 
-- Pression : Pression totale, Pression douce, Basse épaisse, Voix en avant, Batterie écrasée, Nappe
-  lumineuse, Seulement vers le haut, Seulement vers le bas ;
-- Fournaise : Bande chaude, Console de mixage, Classe A sur la voix, Lampe mordante, Pentode détruite,
-  Batterie poussée, Basse grasse, Lo-fi, Saturation parallèle ;
-- Écho Bande : Slapback, Écho dub, Ressort de surf, Trois têtes, Emballement, Noire pointée, Croches,
-  Bande usée ;
-- Multibande Pro : Mastering doux, Basse tenue, Sifflantes, Gate de batterie, Voix pleine, Attaques en
-  avant, Bus de batterie ;
-- Velours : Voix douce, Guitare acoustique, Bus agressif, Sifflantes, Résonances graves, Dur et précis ;
-- Patine : Vieux disque, Cassette usée, Radio AM, Lo-fi hip-hop, Bande chaude, Échantillonneur 12 bits,
-  Ronflement secteur, Juste un peu ;
-- Sonomètre : Streaming, Apple Music, Radio et télé EBU, CD et club ;
-- Tranche : Voix lead, Choeurs en retrait, Grosse caisse, Caisse claire, Basse ronde, Guitare électrique,
-  Guitare acoustique, Piano, Synthé brillant, Nettoyage seul ;
-- Finition : Streaming équilibré, Pop brillante, Électro puissante, Acoustique naturelle, Hip-hop grave,
-  Rock dense, Podcast, Radio et télé EBU, Club fort ;
-- Halo : Grande salle, Salle brillante des années 80, Plaque vocale, Plaque vintage, Petite pièce,
-  Chambre d'écho, Espace qui dérive, Nappe chorus, Air autour, Sanctuaire, Caisse claire des années 80,
-  Croche pointée, Espace infini.
+- Pression : 27 (noms en anglais), par exemple Rap Vocal (Dense and Upfront), Drum Bus (Parallel Energy), Synth Bass (Big and Even), Full Pressure ;
+- Fournaise : 29 (noms en anglais), par exemple Kick Tape Thump, Parallel Drum Smash, Rap Vocal Valve Edge, Master Bus Tape Kiss ;
+- Écho Bande : 27 (noms en anglais), par exemple Dub Echoes Taking Off, Rockabilly Vocal Slap, Surf Guitar Echo and Spring, Self-Oscillating Dub Siren ;
+- Multibande Pro : 28 (noms en anglais), par exemple Electronic Master (Tight Lows), Lead Vocal Without Mud or Sibilance, Distorted Guitars (Held Palm Mutes), Hiss and Background Noise Reduction ;
+- Velours : 25 (noms en anglais), par exemple Pop Lead Vocal (Harsh Highs), Distorted Guitar (Fizz and Honk), Boxy Room (Room Modes), Master (2 to 5 kHz Harshness) ;
+- Patine : 26 (noms en anglais), par exemple Lo-Fi Hip-Hop Dusty Keys, Answering Machine Tape, Warped Vinyl Wobble, Old Film Soundtrack ;
+- Sonomètre : 13 (noms en anglais), par exemple Streaming -14 LUFS, Podcast -16 LUFS, US Television -24 LUFS, Whole Album (Long History) ;
+- Tranche : 27 (noms en anglais), par exemple Modern Pop Vocal Up Front, Live Rock Kick, Round Toms Without Ringing, Acoustic Guitar Behind a Vocal ;
+- Finition : 26 (noms en anglais), par exemple Modern Streaming Pop, Massive EDM Club, Orchestral and Film Score, Dusty Lo-Fi Hip-Hop ;
+- Halo : 29 (noms en anglais), par exemple Seventies Vocal Chamber, Synthwave Gated Toms, Shoegaze Chorus Wall, Ambient Sanctuary Drone.
 
 ## Vérifié
 
@@ -333,3 +325,9 @@ sans fenêtre plantaient. Chaque graphe et chaque classe est maintenant construi
 - Le maximiseur de Finition tient la crête d'échantillon, pas la crête vraie (entre les échantillons) :
   gardez un plafond à -1 dB pour le streaming.
 - Les assistants ne connaissent pas le genre du morceau : ils visent une pente équilibrée générale.
+
+
+**Tranche, l'égaliseur en grand** : un double-clic dans la courbe y place une bande (une coupure tout à
+gauche ou tout à droite, sinon la bande qui convient le mieux parmi celles encore à plat : un plateau
+vers les bords, une cloche ailleurs ; l'égaliseur s'allume s'il était éteint). Un double-clic sur une
+poignée la remet à plat (une coupure : hors de la bande). Même chose pour les poignées de Finition.

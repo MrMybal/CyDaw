@@ -8,6 +8,7 @@
 #include <cydaw/engine/AudioAnalysis.h>
 #include <cydaw/engine/NativeDspGraph.h>
 #include <cydaw/engine/PolySynthGraph.h>
+#include <cydaw/engine/VoiceLive.h>
 #include <cydaw/realtime/RtPublisher.h>
 #include <cydaw/realtime/SpscRing.h>
 
@@ -139,6 +140,30 @@ public:
     // position, a range node's mapped value. Read on the message thread.
     [[nodiscard]] std::vector<std::pair<std::uint64_t, float>>
         controlValues() const;
+    // The loudest each plug-in gave out since it was last asked, in its order.
+    void takePluginPeaks(std::vector<float>& left, std::vector<float>& right)
+    {
+        const auto count = std::min(pluginCount_.load(std::memory_order_acquire), maximumPluginCount);
+        left.assign(count, 0.0f);
+        right.assign(count, 0.0f);
+        for (std::size_t index = 0; index < count; ++index) {
+            left[index] = pluginPeaks_[index * 2].exchange(0.0f, std::memory_order_relaxed);
+            right[index] = pluginPeaks_[index * 2 + 1].exchange(0.0f, std::memory_order_relaxed);
+        }
+    }
+    [[nodiscard]] std::size_t nodeReadings(const std::uint64_t node, float* into, const std::size_t count) const
+    {
+        return nativeGraphSet_.load(std::memory_order_acquire) ? nativeGraph_.nodeReadings(node, into, count) : 0;
+    }
+    void takeNodePeaks(const std::uint64_t* nodes, std::size_t count, float* left, float* right) const
+    {
+        if (nativeGraphSet_.load(std::memory_order_acquire)) {
+            nativeGraph_.takeNodePeaks(nodes, count, left, right);
+        } else {
+            std::fill_n(left, count, 0.0f);
+            std::fill_n(right, count, 0.0f);
+        }
+    }
     // Signals of the chain's nodes, for the device panel's displays.
     void setNodeTaps(const std::vector<NativeDspRuntime::TapRequest>& taps) noexcept
     {
@@ -244,6 +269,9 @@ private:
     int maximumBlockSize_ { 512 };
     int graphChannelCount_ { 2 };
     std::array<std::unique_ptr<IsolatedPluginHost>, maximumPluginCount> pluginHosts_;
+    // The loudest each plug-in gave out since asked (two channels), for the
+    // device panel's meters.
+    std::array<std::atomic<float>, maximumPluginCount * 2> pluginPeaks_ {};
     std::atomic<std::size_t> pluginCount_ {};
     std::atomic<bool> pluginsAvailable_ { true };
     std::atomic<int> pluginCallbacksInFlight_ {};
@@ -388,6 +416,77 @@ private:
     NativeDspRuntime inputBusGraph_;
 };
 
+// A loop auditioned at the project's tempo (the sound library): stretched
+// beforehand, played over and over from the device's callback, in step with
+// the transport while it plays. The mix is wrapped in a clock (ClockStart
+// before it, this source after it) so the message thread can read the
+// transport's position together with the block it belongs to.
+class LoopAuditionSource final : public juce::AudioSource {
+public:
+    struct Loop {
+        std::uint64_t generation {};
+        // At the device's rate, `frames` long: `beats` beats at `tempo`
+        // (shared by the loops that only move it in step again).
+        std::shared_ptr<const std::vector<std::vector<float>>> channels;
+        std::int64_t frames {};
+        int beats { 1 };
+        double tempo { 120.0 };
+        double rate { 48'000.0 };
+        // In step with the transport: its position when the clock stood at
+        // `clockFrames`, and how late the mix is heard.
+        bool sync {};
+        std::int64_t clockFrames {};
+        double positionSeconds {};
+        double latencySeconds {};
+        // Not in step: the frame of the loop it starts from.
+        std::int64_t startFrame {};
+    };
+    // Before the mix: a block begins.
+    class ClockStart final : public juce::AudioSource {
+    public:
+        explicit ClockStart(LoopAuditionSource& owner) noexcept : owner_(owner) {}
+        void prepareToPlay(int, double) override {}
+        void releaseResources() override {}
+        void getNextAudioBlock(const juce::AudioSourceChannelInfo& info) override
+        {
+            owner_.sequence_.fetch_add(1, std::memory_order_acq_rel);
+            info.clearActiveBufferRegion();
+        }
+
+    private:
+        LoopAuditionSource& owner_;
+    };
+
+    explicit LoopAuditionSource(const std::atomic<float>& gainDb) noexcept : gainDb_(gainDb) {}
+    [[nodiscard]] ClockStart& clockStart() noexcept { return clockStart_; }
+    void play(std::shared_ptr<const Loop> loop) { loop_.store(std::move(loop)); }
+    void stop() { loop_.store(nullptr); }
+    [[nodiscard]] bool playing() const noexcept { return playing_.load(std::memory_order_acquire); }
+    // Where in the loop it is, 0..1.
+    [[nodiscard]] double fraction() const noexcept { return fraction_.load(std::memory_order_relaxed); }
+    [[nodiscard]] double sampleRate() const noexcept { return rate_.load(std::memory_order_acquire); }
+    // The clock: frames the device has played, and its sequence (odd while
+    // a block is being made). False when it did not hold still.
+    [[nodiscard]] bool clock(std::int64_t& frames, const std::function<void()>& readWithIt) const;
+
+    void prepareToPlay(int, double sampleRate) override { rate_.store(std::max(1.0, sampleRate), std::memory_order_release); }
+    void releaseResources() override {}
+    void getNextAudioBlock(const juce::AudioSourceChannelInfo& info) override;
+
+private:
+    const std::atomic<float>& gainDb_;
+    ClockStart clockStart_ { *this };
+    cydaw::realtime::RtPublisher<Loop> loop_;
+    std::atomic<std::uint64_t> sequence_ {};
+    std::atomic<std::int64_t> frames_ {};
+    std::atomic<double> rate_ { 48'000.0 };
+    std::atomic<bool> playing_ {};
+    std::atomic<double> fraction_ {};
+    // The audio thread's own.
+    std::uint64_t generation_ {};
+    std::int64_t phase_ {};
+};
+
 class MasterOutputAudioSource final : public juce::AudioSource {
 public:
     explicit MasterOutputAudioSource(juce::AudioSource& input);
@@ -411,6 +510,12 @@ public:
     juce::Result updateChainParameters(const cydaw::engine::NativeDspGraph& graph);
     [[nodiscard]] NativeDspRuntime& chain() noexcept { return chain_; }
     [[nodiscard]] const NativeDspRuntime& chain() const noexcept { return chain_; }
+    // The master's own clock (seconds, as the timeline counts them), which
+    // runs while the transport plays: what its launcher clip's automation
+    // follows.
+    void setClock(double seconds) noexcept { clock_.store(seconds, std::memory_order_relaxed); }
+    void setClockRunning(bool running) noexcept { clockRunning_.store(running, std::memory_order_release); }
+    [[nodiscard]] double clock() const noexcept { return clock_.load(std::memory_order_relaxed); }
     // How late the master's devices make the mix (look-aheads).
     [[nodiscard]] int chainLatencySamples() const noexcept
     {
@@ -431,6 +536,8 @@ private:
     std::atomic<juce::AudioFormatWriter::ThreadedWriter*> activeWriter_ {};
     std::atomic<int> callbacksInFlight_ {};
     std::atomic<double> sampleRate_ {};
+    std::atomic<double> clock_ {};
+    std::atomic<bool> clockRunning_ {};
     std::atomic<juce::int64> targetSamples_ {};
     std::atomic<juce::int64> capturedSamples_ {};
     std::atomic<juce::int64> skipSamples_ {};
@@ -447,7 +554,9 @@ private:
 
 class AudioTrackController final {
 public:
-    static constexpr int maximumLauncherScenes = 8;
+    // The launcher's rows: as many as a large project brings (Bitwig's
+    // can have hundreds).
+    static constexpr int maximumLauncherScenes = 256;
     static constexpr std::size_t maximumAudioClipsPerTrack = 64;
     static constexpr std::size_t maximumAudioTakesPerClip = 32;
 
@@ -513,6 +622,10 @@ public:
         // Clip-local automation. Time is relative to the beginning of this
         // MIDI clip, never to the global arrangement.
         std::vector<AutomationPoint> automation;
+        // The launcher's slot that holds it (its scene), or -1: a clip of
+        // the arrangement. A launcher clip is played only when launched; the
+        // arrangement neither plays nor shows it.
+        int launcherScene { -1 };
     };
 
     struct MidiTrackInfo {
@@ -756,8 +869,25 @@ public:
         double initialClipStartSeconds = 0.0);
     [[nodiscard]] juce::Result addEmptyAudioTrack(
         std::size_t* newTrackIndex = nullptr);
+    // A sample auditioned at the project's tempo: its own tempo (0: as it
+    // is) and how it is stretched.
+    struct SamplePreviewTempo {
+        double sourceBpm {};
+        int algorithm { 1 }; // StretchMode: repitch, tonal, beats, texture
+    };
+    // At its tempo (a loop of whole beats, 32 s at most): stretched to the
+    // project's, played over and over, in step with the transport when it
+    // plays; another sound, or no tempo, as it is.
     [[nodiscard]] juce::Result startSamplePreview(
-        const juce::File& file, double startSeconds = 0.0);
+        const juce::File& file, double startSeconds = 0.0, const SamplePreviewTempo& tempo = {});
+    // The loop being auditioned at the project's tempo: its beats, else 0.
+    [[nodiscard]] int samplePreviewLoopBeats() const noexcept;
+    // The device's rate, as the audition plays at it.
+    [[nodiscard]] double auditionSampleRate() const noexcept { return loopAudition_.sampleRate(); }
+    // Now and then (the message thread): a loop auditioned at the tempo
+    // comes back in step with the transport when it jumped (its loop, a
+    // move of the playhead) or started.
+    void followTempoPreview();
     void stopSamplePreview();
     [[nodiscard]] bool isSamplePreviewing() const noexcept;
     [[nodiscard]] double samplePreviewPositionSeconds() const noexcept;
@@ -875,6 +1005,26 @@ public:
     juce::Result setMasterNativeDspGraph(const cydaw::engine::NativeDspGraph& graph);
     juce::Result updateMasterNativeDspParameters(const cydaw::engine::NativeDspGraph& graph);
     [[nodiscard]] std::vector<std::pair<std::uint64_t, float>> masterControlValues() const;
+    // The master's devices' knobs that follow its launcher clip, on the
+    // master's clock (which runs while the transport plays).
+    void setMasterNativeAutomation(std::vector<NativeDspRuntime::AutomationLane> lanes);
+    [[nodiscard]] double masterClockSeconds() const noexcept { return masterOutput_.clock(); }
+    // The loudest each of these nodes of a chain gave out since it was last
+    // asked (two channels), for the device panel's meters: a track's, an
+    // instrument track's (its instrument is the chain's input), the master's.
+    void masterNodePeaks(const std::vector<std::uint64_t>& nodes, std::vector<float>& left, std::vector<float>& right) const;
+    void trackNodePeaks(std::size_t trackIndex, const std::vector<std::uint64_t>& nodes, std::vector<float>& left,
+                        std::vector<float>& right) const;
+    // The same for a track's VST3 plug-ins, in their order.
+    void trackPluginPeaks(std::size_t trackIndex, std::vector<float>& left, std::vector<float>& right);
+    void midiTrackNodePeaks(std::uint64_t trackId, const std::vector<std::uint64_t>& nodes, std::vector<float>& left,
+                            std::vector<float>& right) const;
+    // What a node of a chain shows of its work now (an equaliser's dynamic
+    // bands), the master's, an audio track's, an instrument track's; empty
+    // when it shows nothing.
+    void masterNodeReadings(std::uint64_t node, std::vector<float>& into) const;
+    void trackNodeReadings(std::size_t trackIndex, std::uint64_t node, std::vector<float>& into) const;
+    void midiTrackNodeReadings(std::uint64_t trackId, std::uint64_t node, std::vector<float>& into) const;
     void setMasterNodeTaps(const std::vector<NativeDspRuntime::TapRequest>& taps);
     [[nodiscard]] bool readMasterNodeTap(std::uint64_t nodeId, bool input, cydaw::engine::AudioAnalysisFrame& frame) const;
     [[nodiscard]] bool isMasterMuted() const noexcept;
@@ -1229,16 +1379,20 @@ public:
     [[nodiscard]] bool removeMidiTrack(std::uint64_t trackId);
     void clearMidiTracks();
     [[nodiscard]] std::vector<MidiTrackInfo> midiTracks() const;
+    // `launcherScene`: the launcher's slot it goes in, -1 for the
+    // arrangement (then at `startBeats`).
     [[nodiscard]] std::uint64_t addMidiClip(std::uint64_t trackId,
                                             juce::String name,
                                             double startBeats = 0.0,
                                             double lengthBeats = 16.0,
                                             bool looping = false,
-                                            std::uint32_t colour = 0xff4fd3ae);
+                                            std::uint32_t colour = 0xff4fd3ae,
+                                            int launcherScene = -1);
+    // A MIDI clip moved into a launcher slot (-1: into the arrangement).
+    [[nodiscard]] bool setMidiClipLauncherScene(std::uint64_t trackId, std::uint64_t clipId, int launcherScene);
     [[nodiscard]] bool removeMidiClip(std::uint64_t trackId,
                                       std::uint64_t clipId);
-    // Where a MIDI clip sits in the arrangement, in beats — and so which
-    // launcher scene holds it, one scene per sixteen beats.
+    // Where a MIDI clip of the arrangement sits, in beats.
     [[nodiscard]] bool setMidiClipStartBeats(std::uint64_t trackId,
                                              std::uint64_t clipId,
                                              double startBeats);
@@ -1386,6 +1540,19 @@ public:
     // The control cables of an instrument's graph that move its voices.
     void setMidiTrackVoiceModulations(std::uint64_t trackId,
                                       std::vector<cydaw::engine::PolyVoiceModulation> modulations);
+    // ---- A rack's pads (an instrument track's "drum-rack" card) ----
+    // Pad `pad` (0..15): its instrument's plan and the effects after it
+    // (values only when its chain keeps its shape; else compiled again).
+    static constexpr std::size_t maximumRackPads = 16;
+    [[nodiscard]] juce::Result setMidiTrackRackPad(std::uint64_t trackId, std::size_t pad,
+                                                   const cydaw::engine::PolySynthGraphPlan& plan,
+                                                   const cydaw::engine::NativeDspGraph& effects);
+    // Its key (-1: the pad is empty), the note it plays (-1: its key), its
+    // level, pan, mute, solo and choke group.
+    void setMidiTrackRackPadMix(std::uint64_t trackId, std::size_t pad, int note, int playAs, float gainDb, float pan,
+                                bool muted, bool solo, int choke);
+    // How loud it sounds now (linear, falling).
+    [[nodiscard]] float midiTrackRackPadPeak(std::uint64_t trackId, std::size_t pad) const;
     [[nodiscard]] bool readMidiTrackNodeTap(std::uint64_t trackId, std::uint64_t nodeId, bool input,
                                             cydaw::engine::AudioAnalysisFrame& frame) const;
     [[nodiscard]] bool setLiveMidiTrack(std::uint64_t trackId) noexcept;
@@ -1418,6 +1585,10 @@ public:
         std::uint64_t trackId) const noexcept;
     [[nodiscard]] double midiLauncherClipPositionSeconds(
         std::uint64_t trackId) const noexcept;
+    // What the track's newest voice plays now (a Prisme's, a synth's of the
+    // family): its modulated settings, LFOs and envelopes. False when no
+    // voice of theirs plays.
+    [[nodiscard]] bool midiTrackVoiceLive(std::uint64_t trackId, cydaw::engine::VoiceLive& out) const noexcept;
     void setTempo(double beatsPerMinute);
     [[nodiscard]] double tempo() const noexcept;
     // The project's metre: how many beats a bar has (numerator) and their
@@ -1546,6 +1717,16 @@ public:
     [[nodiscard]] bool seekLauncherClip(
         std::size_t trackIndex, int sceneIndex, double localSeconds);
     [[nodiscard]] bool launchScene(int sceneIndex);
+    // Clips started together, at once and from their start, the
+    // arrangement off: what played when the transport stopped, on play.
+    struct ClipToRestart {
+        bool midi {};
+        std::size_t trackIndex {};
+        std::uint64_t midiTrackId {};
+        std::uint64_t midiClipId {};
+        int sceneIndex {};
+    };
+    [[nodiscard]] bool restartLauncherClips(const std::vector<ClipToRestart>& clips);
     [[nodiscard]] bool stopLauncherTrack(std::size_t trackIndex,
                                          bool quantized = true);
     void stopLauncher();
@@ -1882,6 +2063,18 @@ private:
     juce::AudioTransportSource samplePreviewTransport_;
     std::unique_ptr<juce::AudioFormatReaderSource> samplePreviewReader_;
     std::atomic<float> samplePreviewGainDb_ { -3.0f };
+    LoopAuditionSource loopAudition_ { samplePreviewGainDb_ };
+    // The loop auditioned at the tempo, made again when the tempo moves.
+    struct TempoPreview {
+        juce::File file;
+        SamplePreviewTempo tempo;
+        int beats {};
+        double sourceSeconds {};
+        std::uint64_t generation {};
+        std::shared_ptr<const LoopAuditionSource::Loop> loop;
+        juce::uint32 checked {};
+    } tempoPreview_;
+    [[nodiscard]] juce::Result startTempoPreview(const juce::File& file, double startSeconds, const SamplePreviewTempo& tempo);
     std::unique_ptr<PlaybackTrack> clipPreviewTrack_;
     juce::MixerAudioSource auditionMixer_;
     VirtualBusRouter virtualBusRouter_ { auditionMixer_ };

@@ -52,7 +52,7 @@ public:
                    const bool softAttack = false) noexcept
     {
         if (!plan.enabled || midiNote < plan.minimumMidiNote
-            || midiNote > plan.maximumMidiNote) {
+            || midiNote > plan.maximumMidiNote || plan.waveform == PolyOscillatorWaveform::rack) {
             clear();
             return false;
         }
@@ -68,6 +68,8 @@ public:
             prismPlaying_ = false;
             familyPlaying_ = true;
             const auto note = std::clamp(midiNote + plan.transposeSemitones, 0, 127);
+            familyModel_ = plan.synthModel;
+            familyNote_ = note;
             family_.start(plan.synthModel, plan.synthValues, note,
                           static_cast<float>(std::clamp(static_cast<double>(velocity) * plan.velocityScale, 0.0, 1.0)),
                           glideFrom >= 0.0 ? glideFrom + plan.transposeSemitones : -1.0, sampleRate);
@@ -139,6 +141,7 @@ public:
         oneShot_ = plan.waveform == PolyOscillatorWaveform::sampler
                    && samplerValue(plan.samplerValues, SamplerSetting::oneShot) >= 0.5f;
         envelope_ = 0.0;
+        levelHeard_ = static_cast<double>(plan.oscillatorLevel);
         filter_.reset();
         filterRight_.reset();
         stage_ = Stage::attack;
@@ -163,6 +166,9 @@ public:
     // The choke group whose notes cut this voice (a sampler's open hat), 0: none.
     [[nodiscard]] int chokedBy(const PolySynthGraphPlan& plan) const noexcept
     {
+        // Silex's open hat: cut by a closed or a pedal hat.
+        if (familyPlaying_ && familyModel_ == synth::Model::silex && isActive())
+            return synth::silexChokeGroupOf(familyNote_) == 1 && familyNote_ == synth::silexOpenHat ? 1 : 0;
         if (prismPlaying_ || kickPlaying_ || familyPlaying_ || !isActive())
             return 0;
         return source_.samplerOffBy(plan);
@@ -194,7 +200,11 @@ public:
             return;
         }
         if (familyPlaying_) {
-            family_.release();
+            // A drum of Silex plays out whatever the key does: cut, it goes.
+            if (familyModel_ == synth::Model::silex)
+                family_.kill();
+            else
+                family_.release();
             return;
         }
         if (stage_ == Stage::idle)
@@ -261,6 +271,23 @@ public:
         source_.reset();
     }
 
+    // What it plays now, for an interface to show: its modulated settings,
+    // LFOs and envelopes (Prisme and the synth family; false for the others).
+    bool live(VoiceLive& out) const noexcept
+    {
+        if (!isActive())
+            return false;
+        if (prismPlaying_) {
+            prism_.live(out);
+            return true;
+        }
+        if (familyPlaying_) {
+            out = family_.live();
+            return true;
+        }
+        return false;
+    }
+
     [[nodiscard]] bool isActive() const noexcept
     {
         if (prismPlaying_)
@@ -322,9 +349,14 @@ public:
         filter_.setCoefficients(plan.filterCutoffHz, plan.filterResonance, rate);
         if (stereo_)
             filterRight_.setCoefficients(plan.filterCutoffHz, plan.filterResonance, rate);
+        // The level and the sustain follow their knobs sample by sample (a
+        // couple of milliseconds behind): no step where a block begins.
+        const auto ease = 1.0 - std::exp(-1.0 / (0.002 * rate));
+        const auto wantedLevel = static_cast<double>(plan.oscillatorLevel);
 
         for (int sample = 0; sample < count; ++sample) {
             currentGain_ += gainStep;
+            levelHeard_ += (wantedLevel - levelHeard_) * ease;
             if (glideOffset_ != 0.0) {
                 glideOffset_ -= glideStep_;
                 if ((glideStep_ > 0.0 && glideOffset_ < 0.0) || (glideStep_ < 0.0 && glideOffset_ > 0.0) || glideStep_ == 0.0)
@@ -351,7 +383,7 @@ public:
                 }
                 break;
             case Stage::sustain:
-                envelope_ = plan.sustainLevel;
+                envelope_ += (static_cast<double>(plan.sustainLevel) - envelope_) * ease;
                 break;
             case Stage::release:
                 envelope_ *= releaseMultiplier;
@@ -392,8 +424,8 @@ public:
                     tailLeft *= drumLeft * drumLevel_;
                     tailRight *= drumRight * drumLevel_;
                 }
-                const auto level = static_cast<double>(plan.oscillatorLevel) * envelope_ * currentGain_;
-                const auto tailLevel = static_cast<double>(plan.oscillatorLevel) * currentGain_;
+                const auto level = levelHeard_ * envelope_ * currentGain_;
+                const auto tailLevel = levelHeard_ * currentGain_;
                 const auto leftValue = static_cast<float>(filter_.process(left * level + tailLeft * tailLevel));
                 const auto rightValue = static_cast<float>(filterRight_.process(right * level + tailRight * tailLevel));
                 if (channelCount == 1) {
@@ -407,9 +439,7 @@ public:
                 continue;
             }
             const auto oscillator = source_.nextSample(plan, frequency, rate);
-            const auto raw = oscillator * (modelled_ ? 1.0 : velocity_)
-                             * static_cast<double>(plan.oscillatorLevel)
-                             * envelope_ * currentGain_;
+            const auto raw = oscillator * (modelled_ ? 1.0 : velocity_) * levelHeard_ * envelope_ * currentGain_;
             const auto value = static_cast<float>(filter_.process(raw));
             for (int channel = 0; channel < channelCount; ++channel)
                 channels[channel][startSample + sample] += value;
@@ -546,6 +576,8 @@ private:
     std::uint32_t drumSeed_ { 0x6d2b79f5u };
     synth::Voice family_;
     bool familyPlaying_ {};
+    synth::Model familyModel_ { synth::Model::none };
+    int familyNote_ {};
     kick::Voice kick_;
     bool kickPlaying_ {};
     int kickNote_ {};
@@ -567,6 +599,8 @@ private:
     bool softAttack_ {};
     double velocity_ {};
     double envelope_ {};
+    // The level as heard, easing toward the plan's.
+    double levelHeard_ {};
     bool modelled_ {};
     bool stereo_ {};
     bool oneShot_ {};

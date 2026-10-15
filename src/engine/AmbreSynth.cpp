@@ -328,6 +328,13 @@ public:
                                    + lfo[1] * v(lfo2Cutoff) * 36.0 + v(filterKey) * (target_ - 60.0);
             const auto cutoff = std::clamp(std::pow(2.0, semitones / 12.0), 20.0, std::min(20'000.0, rate_ * 0.45));
             const auto g = std::tan(kPi * cutoff / rate_);
+            showLfo(0, lfo[0] * lfoFade, lfoPhases_[0]);
+            showLfo(1, lfo[1], lfoPhases_[1]);
+            showEnvelope(0, ampLevel);
+            showEnvelope(1, filterLevel);
+            show(filterCutoff, cutoff, v(filterCutoff));
+            show(osc1Pw, widths[0], v(osc1Pw));
+            show(osc2Pw, widths[1], v(osc2Pw));
             const auto tremolo = 1.0 - v(lfo2Amp) * 0.5 * (1.0 - lfo[1]);
             const auto level = ampLevel * velocityLevel * master * tremolo * expressionGain * 0.5 / std::sqrt(static_cast<double>(voices));
             // The level eased across the step: no steps heard on a quick attack.

@@ -1,0 +1,41 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "amp-sim",
+ "name": "Deep Dub Bass A-B",
+ "state": {
+  "type": "amp-sim",
+  "parameters": {
+   "amp.gain": 2.5,
+   "amp.bass": 8.0,
+   "amp.middle": 4.0,
+   "amp.treble": 2.0,
+   "amp.presence": 2.0,
+   "amp.master": 5.5,
+   "amp.output": 0.0,
+   "amp.mix": 1.0,
+   "amp.model": 6.0,
+   "amp.bright": 0.0,
+   "amp.depth": 7.5,
+   "amp.sag": 0.4,
+   "amp.tight": 20.0,
+   "amp.gate": -90.0,
+   "amp.pedal": 0.0,
+   "amp.pedalDrive": 0.5,
+   "amp.pedalTone": 0.5,
+   "amp.pedalLevel": 0.0,
+   "amp.oversampling": 2.0,
+   "amp.channel": 0.0,
+   "amp.modelB": 7.0,
+   "amp.gainB": 3.0,
+   "amp.bassB": 7.0,
+   "amp.middleB": 5.5,
+   "amp.trebleB": 3.5,
+   "amp.presenceB": 3.0,
+   "amp.masterB": 5.0,
+   "amp.brightB": 0.0,
+   "amp.depthB": 7.0
+  }
+ }
+}

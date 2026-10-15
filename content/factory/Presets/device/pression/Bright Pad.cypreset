@@ -1,0 +1,42 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "pression",
+ "name": "Bright Pad",
+ "state": {
+  "type": "pression",
+  "parameters": {
+   "pression.depth": 0.5,
+   "pression.time": 0.5,
+   "pression.upward": 1.0,
+   "pression.downward": 0.5,
+   "pression.lowGain": 0.0,
+   "pression.midGain": 0.0,
+   "pression.highGain": 3.0,
+   "pression.output": 0.0,
+   "pression.input": 0.0,
+   "pression.crossLow": 88.0,
+   "pression.crossHigh": 2500.0,
+   "pression.lowDownThreshold": -33.79999923706055,
+   "pression.lowDownRatio": 66.69999694824219,
+   "pression.lowUpThreshold": -41.79999923706055,
+   "pression.lowUpRatio": 4.170000076293945,
+   "pression.lowAttack": 47.79999923706055,
+   "pression.lowRelease": 282.0,
+   "pression.midDownThreshold": -30.200000762939453,
+   "pression.midDownRatio": 66.69999694824219,
+   "pression.midUpThreshold": -41.79999923706055,
+   "pression.midUpRatio": 4.170000076293945,
+   "pression.midAttack": 22.399999618530273,
+   "pression.midRelease": 282.0,
+   "pression.highDownThreshold": -35.5,
+   "pression.highDownRatio": 66.69999694824219,
+   "pression.highUpThreshold": -40.79999923706055,
+   "pression.highUpRatio": 4.170000076293945,
+   "pression.highAttack": 13.5,
+   "pression.highRelease": 132.0,
+   "pression.solo": 0.0
+  }
+ }
+}

@@ -1,0 +1,24 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "fournaise",
+ "name": "Orchestral Strings Tape Warmth",
+ "state": {
+  "type": "fournaise",
+  "parameters": {
+   "fournaise.drive": 3.0,
+   "fournaise.tone": -0.1,
+   "fournaise.lowCut": 50.0,
+   "fournaise.highCut": 16000.0,
+   "fournaise.mix": 0.8,
+   "fournaise.output": 0.0,
+   "fournaise.style": 0.0,
+   "fournaise.punish": 0.0,
+   "fournaise.auto": 1.0,
+   "fournaise.thump": 0.0,
+   "fournaise.steep": 0.0,
+   "fournaise.oversampling": 1.0
+  }
+ }
+}

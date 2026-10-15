@@ -1,0 +1,29 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "resonateurs",
+ "name": "Octave Drone",
+ "state": {
+  "type": "resonateurs",
+  "parameters": {
+   "resonateurs.note": 50.0,
+   "resonateurs.decay": 0.95,
+   "resonateurs.colour": 0.4,
+   "resonateurs.width": 0.8,
+   "resonateurs.mix": 0.35,
+   "resonateurs.output": 0.0,
+   "resonateurs.tone": 0.0,
+   "resonateurs.mode": 0.0,
+   "resonateurs.interval2": 12.0,
+   "resonateurs.interval3": -12.0,
+   "resonateurs.interval4": 24.0,
+   "resonateurs.interval5": -24.0,
+   "resonateurs.gain1": 1.0,
+   "resonateurs.gain2": 0.800000011920929,
+   "resonateurs.gain3": 0.699999988079071,
+   "resonateurs.gain4": 0.45,
+   "resonateurs.gain5": 0.35
+  }
+ }
+}

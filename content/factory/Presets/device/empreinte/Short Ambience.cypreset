@@ -1,0 +1,23 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "empreinte",
+ "name": "Short Ambience",
+ "state": {
+  "type": "empreinte",
+  "parameters": {
+   "empreinte.mix": 0.2,
+   "empreinte.predelay": 0.0,
+   "empreinte.lowCut": 10.0,
+   "empreinte.highCut": 20000.0,
+   "empreinte.width": 1.0,
+   "empreinte.early": 3.0,
+   "empreinte.tail": -6.0,
+   "empreinte.output": 0.0,
+   "empreinte.space": 1.0,
+   "empreinte.length": 0.35,
+   "empreinte.reverse": 0.0
+  }
+ }
+}

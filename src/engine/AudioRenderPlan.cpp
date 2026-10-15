@@ -1,4 +1,5 @@
 #include <cydaw/engine/AudioRenderPlan.h>
+#include <cydaw/engine/EffectCatalogue.h>
 
 #include <algorithm>
 #include <cmath>
@@ -7,6 +8,19 @@
 #include <unordered_set>
 
 namespace cydaw::engine {
+
+namespace {
+
+// A stretch of a block: `frames` from `offset`.
+AudioBlockView piece(const AudioBlockView& view, const std::uint32_t offset, const std::uint32_t frames) noexcept
+{
+    return { view.data != nullptr ? view.data + offset : nullptr, view.channelCount, frames, view.channelStride };
+}
+
+// While a node's values glide, it processes this many frames at a time.
+constexpr std::uint32_t kGlidePiece = 32;
+
+} // namespace
 
 void AudioRenderPlan::process(const AudioBlockView input,
                               const AudioBlockView output,
@@ -78,20 +92,185 @@ void AudioRenderPlan::process(const AudioBlockView input, const AudioBlockView* 
         }
 
         clearAudio(nodeOutput);
-        if (node.multiBusProcessor != nullptr) {
-            for (auto bus = std::size_t {}; bus < node.inputBuses.size(); ++bus)
-                node.inputBusViews[bus] = { node.inputBuses[bus].portId, node.inputBuses[bus].buffer.view(frames) };
-            node.multiBusProcessor->processAudioBuses(node.inputBusViews,
-                                                       nodeOutput, context);
+        auto& processor = *node.processor;
+        const auto run = [&node, &processor, nodeInput, nodeOutput, frames](const std::uint32_t offset, const std::uint32_t count,
+                                                                            const ProcessContext& at) noexcept {
+            if (node.multiBusProcessor != nullptr) {
+                for (auto bus = std::size_t {}; bus < node.inputBuses.size(); ++bus)
+                    node.inputBusViews[bus] = { node.inputBuses[bus].portId, piece(node.inputBuses[bus].buffer.view(frames), offset, count) };
+                node.multiBusProcessor->processAudioBuses(node.inputBusViews, piece(nodeOutput, offset, count), at);
+            } else {
+                processor.process(piece(nodeInput, offset, count), piece(nodeOutput, offset, count), at);
+            }
+        };
+        if (!processor.valuesGliding()) {
+            run(0, frames, context);
         } else {
-            node.processor->process(nodeInput, nodeOutput, context);
+            // A knob being turned: short pieces, its values a little
+            // further each, so the change is heard as a slope, not a jump.
+            const auto playing = context.transport.state == PlaybackState::playing
+                                 || context.transport.state == PlaybackState::recording;
+            for (std::uint32_t offset = 0; offset < frames; offset += kGlidePiece) {
+                const auto count = std::min(kGlidePiece, frames - offset);
+                processor.glideValues(count, spec_.sampleRate);
+                auto at = context;
+                if (playing && offset > 0) {
+                    at.transport.samplePosition += offset;
+                    at.transport.quarterNotePosition += static_cast<double>(offset) / spec_.sampleRate
+                                                        * context.transport.beatsPerMinute / 60.0;
+                }
+                run(offset, count, at);
+            }
         }
         nodeLatency_[index] = std::min(maximumLatency_, arrival + std::min(node.processor->latencySamples(),
                                                                            node.processor->maximumLatencySamples()));
+        if (bypasses_ != nullptr
+            && (anyBypass_.load(std::memory_order_relaxed) || bypasses_[index].mix > 0.0f
+                || bypasses_[index].ring.maximumFrameCount() > 1))
+            bypass(index, frames);
+        // How loud it came out, for the meters.
+        if (peaks_ != nullptr) {
+            const auto produced = nodes_[index].outputBuffer.view(frames);
+            for (std::uint32_t channel = 0; channel < std::min<std::uint32_t>(2, produced.channelCount); ++channel) {
+                const auto* samples = produced.channel(channel);
+                auto loudest = 0.0f;
+                for (std::uint32_t frame = 0; frame < frames; ++frame)
+                    loudest = std::max(loudest, std::abs(samples[frame]));
+                auto& kept = peaks_[index * 2 + channel];
+                if (loudest > kept.load(std::memory_order_relaxed))
+                    kept.store(loudest, std::memory_order_relaxed);
+            }
+        }
     }
 
     copyAudio({ output.data, output.channelCount, frames, output.channelStride },
               nodes_[outputNodeIndex_].outputBuffer.view(frames));
+}
+
+void AudioRenderPlan::mainInput(const std::size_t index, const AudioBlockView into) noexcept
+{
+    const auto frames = into.frameCount;
+    auto& node = nodes_[index];
+    copyAudio(into, node.inputBuffer.view(frames));
+    for (auto& bus : node.inputBuses) {
+        if (bus.portId != effectSidechainPortId)
+            continue;
+        const auto key = bus.buffer.view(frames);
+        const auto channels = std::min(into.channelCount, key.channelCount);
+        for (std::uint32_t channel = 0; channel < channels; ++channel) {
+            auto* to = into.channel(channel);
+            const auto* from = key.channel(channel);
+            for (std::uint32_t frame = 0; frame < frames; ++frame)
+                to[frame] -= from[frame];
+        }
+    }
+}
+
+void AudioRenderPlan::bypass(const std::size_t index, const std::uint32_t frames) noexcept
+{
+    auto& state = bypasses_[index];
+    const auto wanted = state.wanted.load(std::memory_order_relaxed);
+    if (wanted != -1)
+        state.from = wanted;
+    const auto target = wanted != -1 ? 1.0f : 0.0f;
+    // A node with a latency keeps its line filled while it plays, so what
+    // passes when it is switched off comes in step at once.
+    const auto size = state.ring.maximumFrameCount();
+    if (state.mix == 0.0f && target == 0.0f && size <= 1)
+        return;
+    // What passes instead: the input of the node it starts from, held back
+    // as long as this one's own latency (a node's own input only: a module's
+    // inner latency is not made up).
+    const auto source = state.from >= 0 ? state.from : (size > 1 ? static_cast<std::int32_t>(index) : -1);
+    const auto dry = bypassScratch_.view(frames);
+    clearAudio(dry);
+    if (source >= 0 && static_cast<std::size_t>(source) < nodes_.size()) {
+        mainInput(static_cast<std::size_t>(source), dry);
+        if (size > 1) {
+            auto& processor = *nodes_[index].processor;
+            const auto wait = std::min(std::min(processor.latencySamples(), processor.maximumLatencySamples()), size - 1);
+            const auto ring = state.ring.view(size);
+            const auto channels = std::min(ring.channelCount, dry.channelCount);
+            for (std::uint32_t channel = 0; channel < channels; ++channel) {
+                auto* stored = ring.channel(channel);
+                auto* signal = dry.channel(channel);
+                auto write = state.write;
+                for (std::uint32_t frame = 0; frame < frames; ++frame) {
+                    stored[write] = signal[frame];
+                    signal[frame] = stored[write >= wait ? write - wait : write + size - wait];
+                    if (++write == size)
+                        write = 0;
+                }
+            }
+            state.write = (state.write + frames) % size;
+        }
+    }
+    if (state.mix == 0.0f && target == 0.0f)
+        return;
+    // Across ten milliseconds, sample by sample.
+    const auto step = static_cast<float>(1.0 / std::max(1.0, 0.01 * spec_.sampleRate));
+    const auto output = nodes_[index].outputBuffer.view(frames);
+    const auto channels = std::min(output.channelCount, dry.channelCount);
+    auto mix = state.mix;
+    for (std::uint32_t frame = 0; frame < frames; ++frame) {
+        mix = target > mix ? std::min(target, mix + step) : std::max(target, mix - step);
+        for (std::uint32_t channel = 0; channel < channels; ++channel) {
+            auto& sample = output.channel(channel)[frame];
+            sample += (dry.channel(channel)[frame] - sample) * mix;
+        }
+    }
+    state.mix = mix;
+}
+
+void AudioRenderPlan::takePeaks(const NodeId* nodes, const std::size_t count, float* left, float* right) noexcept
+{
+    for (std::size_t at = 0; at < count; ++at) {
+        left[at] = 0.0f;
+        right[at] = 0.0f;
+        if (peaks_ == nullptr)
+            continue;
+        for (std::size_t index = 0; index < nodes_.size(); ++index) {
+            if (nodes_[index].id != nodes[at])
+                continue;
+            left[at] = peaks_[index * 2].exchange(0.0f, std::memory_order_relaxed);
+            right[at] = nodes_[index].outputBuffer.channelCount() > 1 ? peaks_[index * 2 + 1].exchange(0.0f, std::memory_order_relaxed)
+                                                                      : left[at];
+            break;
+        }
+    }
+}
+
+std::size_t AudioRenderPlan::readings(const NodeId node, float* into, const std::size_t count) const noexcept
+{
+    for (const auto& candidate : nodes_)
+        if (candidate.id == node)
+            return candidate.processor != nullptr ? candidate.processor->readings(into, count) : 0;
+    return 0;
+}
+
+void AudioRenderPlan::setBypasses(const std::span<const BypassedNode> bypassed) noexcept
+{
+    if (bypasses_ == nullptr)
+        return;
+    const auto indexOf = [this](const NodeId id) -> std::int32_t {
+        for (std::size_t index = 0; index < nodes_.size(); ++index)
+            if (nodes_[index].id == id)
+                return static_cast<std::int32_t>(index);
+        return -1;
+    };
+    auto any = false;
+    for (std::size_t index = 0; index < nodes_.size(); ++index) {
+        auto wanted = std::int32_t { -1 };
+        for (const auto& entry : bypassed) {
+            if (entry.node != nodes_[index].id)
+                continue;
+            const auto from = entry.from == 0 ? -2 : indexOf(entry.from);
+            wanted = from == -1 ? static_cast<std::int32_t>(index) : from;
+        }
+        any = any || wanted != -1;
+        bypasses_[index].wanted.store(wanted, std::memory_order_relaxed);
+    }
+    anyBypass_.store(any, std::memory_order_release);
 }
 
 bool AudioRenderPlan::lastSignals(const NodeId node, const std::uint32_t frameCount, AudioBlockView& input,
@@ -314,6 +493,14 @@ RenderPlanResult AudioRenderPlanBuilder::compile(const ProcessSpec spec, const N
                 plan->delayLines_.push_back(std::move(line));
             }
         }
+    // The switches, each node on; a node with a latency keeps a line for
+    // its input to wait in when it is switched off.
+    plan->bypasses_ = std::make_unique<AudioRenderPlan::Bypass[]>(plan->nodes_.size());
+    for (std::size_t index = 0; index < plan->nodes_.size(); ++index)
+        if (const auto latency = plan->nodes_[index].processor->maximumLatencySamples(); latency > 0)
+            plan->bypasses_[index].ring = AudioBuffer(spec.channelCount, std::min<std::uint32_t>(latency, 1u << 17) + 1);
+    plan->bypassScratch_ = AudioBuffer(spec.channelCount, spec.maximumBlockSize);
+    plan->peaks_ = std::make_unique<std::atomic<float>[]>(plan->nodes_.size() * 2);
     return { RenderPlanError::none, {}, std::move(plan) };
 }
 

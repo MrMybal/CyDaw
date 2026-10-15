@@ -1,0 +1,42 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "pression",
+ "name": "Rap Vocal (Dense and Upfront)",
+ "state": {
+  "type": "pression",
+  "parameters": {
+   "pression.depth": 0.4,
+   "pression.time": 0.45,
+   "pression.upward": 0.8,
+   "pression.downward": 1.0,
+   "pression.lowGain": -1.5,
+   "pression.midGain": 1.0,
+   "pression.highGain": 1.5,
+   "pression.output": 0.0,
+   "pression.input": 0.0,
+   "pression.crossLow": 180.0,
+   "pression.crossHigh": 4000.0,
+   "pression.lowDownThreshold": -26.0,
+   "pression.lowDownRatio": 6.0,
+   "pression.lowUpThreshold": -46.0,
+   "pression.lowUpRatio": 2.5,
+   "pression.lowAttack": 25.0,
+   "pression.lowRelease": 200.0,
+   "pression.midDownThreshold": -22.0,
+   "pression.midDownRatio": 6.0,
+   "pression.midUpThreshold": -44.0,
+   "pression.midUpRatio": 3.0,
+   "pression.midAttack": 10.0,
+   "pression.midRelease": 150.0,
+   "pression.highDownThreshold": -26.0,
+   "pression.highDownRatio": 10.0,
+   "pression.highUpThreshold": -46.0,
+   "pression.highUpRatio": 2.5,
+   "pression.highAttack": 3.0,
+   "pression.highRelease": 80.0,
+   "pression.solo": 0.0
+  }
+ }
+}

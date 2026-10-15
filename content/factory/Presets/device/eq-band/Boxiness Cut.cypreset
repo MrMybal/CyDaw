@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "eq-band",
+ "name": "Boxiness Cut",
+ "state": {
+  "type": "eq-band",
+  "parameters": {
+   "eqBand.frequency": 600.0,
+   "eqBand.gain": -3.0,
+   "eqBand.q": 1.5
+  }
+ }
+}

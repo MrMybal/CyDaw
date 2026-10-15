@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "tuner",
+ "name": "Silent Tuning",
+ "state": {
+  "type": "tuner",
+  "parameters": {
+   "tuner.reference": 440.0,
+   "tuner.mute": 1.0,
+   "tuner.displayMode": 0.0
+  }
+ }
+}

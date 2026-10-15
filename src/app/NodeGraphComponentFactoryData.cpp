@@ -146,6 +146,30 @@ void NodeGraphComponent::initialiseFactoryPresets()
         parameters.oscillatorLevel = 1.0f;
         return parameters;
     };
+    // The simple sampler: one sample over the keys, its waveform on the card.
+    const auto simpled = [] {
+        Parameters parameters;
+        parameters.oscillatorFrequencyHz = 220.0f;
+        parameters.oscillatorLevel = 1.0f;
+        parameters.sampler[static_cast<std::size_t>(cydaw::engine::SamplerSetting::simple)] = 1.0f;
+        return parameters;
+    };
+    // Nuée: one sample over the keys, read as grains.
+    const auto clouded = [] {
+        Parameters parameters;
+        parameters.oscillatorFrequencyHz = 220.0f;
+        parameters.oscillatorLevel = 1.0f;
+        parameters.sampler[static_cast<std::size_t>(cydaw::engine::SamplerSetting::simple)] = 1.0f;
+        parameters.sampler[static_cast<std::size_t>(cydaw::engine::SamplerSetting::grains)] = 1.0f;
+        parameters.sampler[static_cast<std::size_t>(cydaw::engine::SamplerSetting::loop)] = 0.0f;
+        parameters.sampler[static_cast<std::size_t>(cydaw::engine::SamplerSetting::grainScan)] = 0.05f;
+        parameters.sampler[static_cast<std::size_t>(cydaw::engine::SamplerSetting::grainSpray)] = 0.08f;
+        parameters.sampler[static_cast<std::size_t>(cydaw::engine::SamplerSetting::grainSize)] = 160.0f;
+        parameters.sampler[static_cast<std::size_t>(cydaw::engine::SamplerSetting::grainDensity)] = 28.0f;
+        parameters.sampler[static_cast<std::size_t>(cydaw::engine::SamplerSetting::grainPitch)] = 0.1f;
+        parameters.sampler[static_cast<std::size_t>(cydaw::engine::SamplerSetting::grainStereo)] = 0.7f;
+        return parameters;
+    };
     // A Batterie: a sampler whose every hit plays to its end, at its own pitch.
     const auto drummed = [] {
         Parameters parameters;
@@ -192,6 +216,94 @@ void NodeGraphComponent::initialiseFactoryPresets()
         parameters.oscillatorLevel = 1.0f;
         parameters.synthModel = static_cast<float>(cydaw::engine::synth::Model::nebuleuse);
         parameters.synth = cydaw::engine::synth::defaultValues(cydaw::engine::synth::Model::nebuleuse);
+        return parameters;
+    };
+    const auto opaled = [] {
+        Parameters parameters;
+        parameters.oscillatorFrequencyHz = 220.0f;
+        parameters.oscillatorLevel = 1.0f;
+        parameters.synthModel = static_cast<float>(cydaw::engine::synth::Model::opale);
+        parameters.synth = cydaw::engine::synth::defaultValues(cydaw::engine::synth::Model::opale);
+        return parameters;
+    };
+    const auto onyxd = [] {
+        Parameters parameters;
+        parameters.oscillatorFrequencyHz = 220.0f;
+        parameters.oscillatorLevel = 1.0f;
+        parameters.synthModel = static_cast<float>(cydaw::engine::synth::Model::onyx);
+        parameters.synth = cydaw::engine::synth::defaultValues(cydaw::engine::synth::Model::onyx);
+        return parameters;
+    };
+    const auto tiretted = [] {
+        Parameters parameters;
+        parameters.oscillatorFrequencyHz = 220.0f;
+        parameters.oscillatorLevel = 1.0f;
+        parameters.synthModel = static_cast<float>(cydaw::engine::synth::Model::tirette);
+        parameters.synth = cydaw::engine::synth::defaultValues(cydaw::engine::synth::Model::tirette);
+        return parameters;
+    };
+    const auto alliaged = [] {
+        Parameters parameters;
+        parameters.oscillatorFrequencyHz = 220.0f;
+        parameters.oscillatorLevel = 1.0f;
+        parameters.synthModel = static_cast<float>(cydaw::engine::synth::Model::alliage);
+        parameters.synth = cydaw::engine::synth::defaultValues(cydaw::engine::synth::Model::alliage);
+        return parameters;
+    };
+    const auto quartzd = [] {
+        Parameters parameters;
+        parameters.oscillatorFrequencyHz = 220.0f;
+        parameters.oscillatorLevel = 1.0f;
+        parameters.synthModel = static_cast<float>(cydaw::engine::synth::Model::quartz);
+        parameters.synth = cydaw::engine::synth::defaultValues(cydaw::engine::synth::Model::quartz);
+        return parameters;
+    };
+    const auto argiled = [] {
+        Parameters parameters;
+        parameters.oscillatorFrequencyHz = 220.0f;
+        parameters.oscillatorLevel = 1.0f;
+        parameters.synthModel = static_cast<float>(cydaw::engine::synth::Model::argile);
+        parameters.synth = cydaw::engine::synth::defaultValues(cydaw::engine::synth::Model::argile);
+        return parameters;
+    };
+    const auto saphird = [] {
+        Parameters parameters;
+        parameters.oscillatorFrequencyHz = 220.0f;
+        parameters.oscillatorLevel = 1.0f;
+        parameters.synthModel = static_cast<float>(cydaw::engine::synth::Model::saphir);
+        parameters.synth = cydaw::engine::synth::defaultValues(cydaw::engine::synth::Model::saphir);
+        return parameters;
+    };
+    const auto derived = [] {
+        Parameters parameters;
+        parameters.oscillatorFrequencyHz = 220.0f;
+        parameters.oscillatorLevel = 1.0f;
+        parameters.synthModel = static_cast<float>(cydaw::engine::synth::Model::derive);
+        parameters.synth = cydaw::engine::synth::defaultValues(cydaw::engine::synth::Model::derive);
+        return parameters;
+    };
+    const auto bronzed = [] {
+        Parameters parameters;
+        parameters.oscillatorFrequencyHz = 220.0f;
+        parameters.oscillatorLevel = 1.0f;
+        parameters.synthModel = static_cast<float>(cydaw::engine::synth::Model::bronze);
+        parameters.synth = cydaw::engine::synth::defaultValues(cydaw::engine::synth::Model::bronze);
+        return parameters;
+    };
+    const auto silexd = [] {
+        Parameters parameters;
+        parameters.oscillatorFrequencyHz = 220.0f;
+        parameters.oscillatorLevel = 1.0f;
+        parameters.synthModel = static_cast<float>(cydaw::engine::synth::Model::silex);
+        parameters.synth = cydaw::engine::synth::defaultValues(cydaw::engine::synth::Model::silex);
+        return parameters;
+    };
+    const auto jaded = [] {
+        Parameters parameters;
+        parameters.oscillatorFrequencyHz = 220.0f;
+        parameters.oscillatorLevel = 1.0f;
+        parameters.synthModel = static_cast<float>(cydaw::engine::synth::Model::jade);
+        parameters.synth = cydaw::engine::synth::defaultValues(cydaw::engine::synth::Model::jade);
         return parameters;
     };
     // Halo after it: a long, wide space by default.
@@ -553,6 +665,31 @@ void NodeGraphComponent::initialiseFactoryPresets()
                 { 3, 4, 2, 2 }, { 4, 5, 3, 1 }, { 5, 6 } } });
     });
     buildApart([&] {
+        factoryPresets_.push_back({ "simple-sampler-instrument", "nodes.preset.simpleSamplerInstrument",
+              { { "midi-input", { 0.03f, 0.42f } },
+                { "voice-allocator", { 0.18f, 0.42f } },
+                { "sampler", { 0.36f, 0.20f }, simpled() },
+                { "envelope", { 0.36f, 0.72f }, shaped(1.0f, 1.0f, 1.0f, 200.0f) },
+                { "gain", { 0.56f, 0.42f } },
+                { "voice-filter", { 0.74f, 0.42f }, filtered(20'000.0f) },
+                { "master", { 0.94f, 0.42f } } },
+              { { 0, 1 }, { 1, 2, 2, 2 }, { 1, 3, 3, 1 }, { 2, 4, 1, 1 },
+                { 3, 4, 2, 2 }, { 4, 5, 3, 1 }, { 5, 6 } } });
+    });
+    buildApart([&] {
+        factoryPresets_.push_back({ "nuee-instrument", "nodes.preset.nueeInstrument",
+              { { "midi-input", { 0.03f, 0.42f } },
+                { "voice-allocator", { 0.16f, 0.42f } },
+                { "sampler", { 0.32f, 0.20f }, clouded() },
+                { "envelope", { 0.32f, 0.72f }, shaped(180.0f, 400.0f, 1.0f, 1'400.0f) },
+                { "gain", { 0.48f, 0.42f } },
+                { "voice-filter", { 0.62f, 0.42f }, filtered(20'000.0f) },
+                { "halo", { 0.78f, 0.42f }, haloed() },
+                { "master", { 0.94f, 0.42f } } },
+              { { 0, 1 }, { 1, 2, 2, 2 }, { 1, 3, 3, 1 }, { 2, 4, 1, 1 },
+                { 3, 4, 2, 2 }, { 4, 5, 3, 1 }, { 5, 6 }, { 6, 7 } } });
+    });
+    buildApart([&] {
         factoryPresets_.push_back({ "prism-instrument", "nodes.preset.prismInstrument",
               { { "midi-input", { 0.03f, 0.42f } },
                 { "voice-allocator", { 0.18f, 0.42f } },
@@ -612,6 +749,155 @@ void NodeGraphComponent::initialiseFactoryPresets()
                 { "master", { 0.94f, 0.42f } } },
               { { 0, 1 }, { 1, 2, 2, 2 }, { 1, 3, 3, 1 }, { 2, 4, 1, 1 },
                 { 3, 4, 2, 2 }, { 4, 5, 3, 1 }, { 5, 6 }, { 6, 7 } } });
+    });
+    buildApart([&] {
+        factoryPresets_.push_back({ "opale-instrument", "nodes.preset.opaleInstrument",
+              { { "midi-input", { 0.03f, 0.42f } },
+                { "voice-allocator", { 0.18f, 0.42f } },
+                { "opale-synth", { 0.36f, 0.20f }, opaled() },
+                { "envelope", { 0.36f, 0.72f }, shaped(0.1f, 1.0f, 1.0f, 8'000.0f) },
+                { "gain", { 0.56f, 0.42f } },
+                { "voice-filter", { 0.74f, 0.42f }, filtered(20'000.0f) },
+                { "master", { 0.94f, 0.42f } } },
+              { { 0, 1 }, { 1, 2, 2, 2 }, { 1, 3, 3, 1 }, { 2, 4, 1, 1 },
+                { 3, 4, 2, 2 }, { 4, 5, 3, 1 }, { 5, 6 } } });
+    });
+    buildApart([&] {
+        factoryPresets_.push_back({ "onyx-instrument", "nodes.preset.onyxInstrument",
+              { { "midi-input", { 0.03f, 0.42f } },
+                { "voice-allocator", { 0.18f, 0.42f } },
+                { "onyx-synth", { 0.36f, 0.20f }, onyxd() },
+                { "envelope", { 0.36f, 0.72f }, shaped(0.1f, 1.0f, 1.0f, 8'000.0f) },
+                { "gain", { 0.56f, 0.42f } },
+                { "voice-filter", { 0.74f, 0.42f }, filtered(20'000.0f) },
+                { "master", { 0.94f, 0.42f } } },
+              { { 0, 1 }, { 1, 2, 2, 2 }, { 1, 3, 3, 1 }, { 2, 4, 1, 1 },
+                { 3, 4, 2, 2 }, { 4, 5, 3, 1 }, { 5, 6 } } });
+    });
+    buildApart([&] {
+        factoryPresets_.push_back({ "tirette-instrument", "nodes.preset.tiretteInstrument",
+              { { "midi-input", { 0.03f, 0.42f } },
+                { "voice-allocator", { 0.18f, 0.42f } },
+                { "tirette-synth", { 0.36f, 0.20f }, tiretted() },
+                { "envelope", { 0.36f, 0.72f }, shaped(0.1f, 1.0f, 1.0f, 8'000.0f) },
+                { "gain", { 0.56f, 0.42f } },
+                { "voice-filter", { 0.74f, 0.42f }, filtered(20'000.0f) },
+                { "master", { 0.94f, 0.42f } } },
+              { { 0, 1 }, { 1, 2, 2, 2 }, { 1, 3, 3, 1 }, { 2, 4, 1, 1 },
+                { 3, 4, 2, 2 }, { 4, 5, 3, 1 }, { 5, 6 } } });
+    });
+    buildApart([&] {
+        factoryPresets_.push_back({ "alliage-instrument", "nodes.preset.alliageInstrument",
+              { { "midi-input", { 0.03f, 0.42f } },
+                { "voice-allocator", { 0.18f, 0.42f } },
+                { "alliage-synth", { 0.36f, 0.20f }, alliaged() },
+                { "envelope", { 0.36f, 0.72f }, shaped(0.1f, 1.0f, 1.0f, 8'000.0f) },
+                { "gain", { 0.56f, 0.42f } },
+                { "voice-filter", { 0.74f, 0.42f }, filtered(20'000.0f) },
+                { "master", { 0.94f, 0.42f } } },
+              { { 0, 1 }, { 1, 2, 2, 2 }, { 1, 3, 3, 1 }, { 2, 4, 1, 1 },
+                { 3, 4, 2, 2 }, { 4, 5, 3, 1 }, { 5, 6 } } });
+    });
+    buildApart([&] {
+        factoryPresets_.push_back({ "quartz-instrument", "nodes.preset.quartzInstrument",
+              { { "midi-input", { 0.03f, 0.42f } },
+                { "voice-allocator", { 0.18f, 0.42f } },
+                { "quartz-synth", { 0.36f, 0.20f }, quartzd() },
+                { "envelope", { 0.36f, 0.72f }, shaped(0.1f, 1.0f, 1.0f, 8'000.0f) },
+                { "gain", { 0.56f, 0.42f } },
+                { "voice-filter", { 0.74f, 0.42f }, filtered(20'000.0f) },
+                { "master", { 0.94f, 0.42f } } },
+              { { 0, 1 }, { 1, 2, 2, 2 }, { 1, 3, 3, 1 }, { 2, 4, 1, 1 },
+                { 3, 4, 2, 2 }, { 4, 5, 3, 1 }, { 5, 6 } } });
+    });
+    buildApart([&] {
+        factoryPresets_.push_back({ "argile-instrument", "nodes.preset.argileInstrument",
+              { { "midi-input", { 0.03f, 0.42f } },
+                { "voice-allocator", { 0.18f, 0.42f } },
+                { "argile-synth", { 0.36f, 0.20f }, argiled() },
+                { "envelope", { 0.36f, 0.72f }, shaped(0.1f, 1.0f, 1.0f, 8'000.0f) },
+                { "gain", { 0.56f, 0.42f } },
+                { "voice-filter", { 0.74f, 0.42f }, filtered(20'000.0f) },
+                { "master", { 0.94f, 0.42f } } },
+              { { 0, 1 }, { 1, 2, 2, 2 }, { 1, 3, 3, 1 }, { 2, 4, 1, 1 },
+                { 3, 4, 2, 2 }, { 4, 5, 3, 1 }, { 5, 6 } } });
+    });
+    buildApart([&] {
+        factoryPresets_.push_back({ "saphir-instrument", "nodes.preset.saphirInstrument",
+              { { "midi-input", { 0.03f, 0.42f } },
+                { "voice-allocator", { 0.18f, 0.42f } },
+                { "saphir-synth", { 0.36f, 0.20f }, saphird() },
+                { "envelope", { 0.36f, 0.72f }, shaped(0.1f, 1.0f, 1.0f, 8'000.0f) },
+                { "gain", { 0.56f, 0.42f } },
+                { "voice-filter", { 0.74f, 0.42f }, filtered(20'000.0f) },
+                { "master", { 0.94f, 0.42f } } },
+              { { 0, 1 }, { 1, 2, 2, 2 }, { 1, 3, 3, 1 }, { 2, 4, 1, 1 },
+                { 3, 4, 2, 2 }, { 4, 5, 3, 1 }, { 5, 6 } } });
+    });
+    buildApart([&] {
+        factoryPresets_.push_back({ "derive-instrument", "nodes.preset.deriveInstrument",
+              { { "midi-input", { 0.03f, 0.42f } },
+                { "voice-allocator", { 0.18f, 0.42f } },
+                { "derive-synth", { 0.36f, 0.20f }, derived() },
+                { "envelope", { 0.36f, 0.72f }, shaped(0.1f, 1.0f, 1.0f, 8'000.0f) },
+                { "gain", { 0.56f, 0.42f } },
+                { "voice-filter", { 0.74f, 0.42f }, filtered(20'000.0f) },
+                { "master", { 0.94f, 0.42f } } },
+              { { 0, 1 }, { 1, 2, 2, 2 }, { 1, 3, 3, 1 }, { 2, 4, 1, 1 },
+                { 3, 4, 2, 2 }, { 4, 5, 3, 1 }, { 5, 6 } } });
+    });
+    buildApart([&] {
+        factoryPresets_.push_back({ "bronze-instrument", "nodes.preset.bronzeInstrument",
+              { { "midi-input", { 0.03f, 0.42f } },
+                { "voice-allocator", { 0.18f, 0.42f } },
+                { "bronze-synth", { 0.36f, 0.20f }, bronzed() },
+                { "envelope", { 0.36f, 0.72f }, shaped(0.1f, 1.0f, 1.0f, 8'000.0f) },
+                { "gain", { 0.56f, 0.42f } },
+                { "voice-filter", { 0.74f, 0.42f }, filtered(20'000.0f) },
+                { "master", { 0.94f, 0.42f } } },
+              { { 0, 1 }, { 1, 2, 2, 2 }, { 1, 3, 3, 1 }, { 2, 4, 1, 1 },
+                { 3, 4, 2, 2 }, { 4, 5, 3, 1 }, { 5, 6 } } });
+    });
+    buildApart([&] {
+        factoryPresets_.push_back({ "silex-instrument", "nodes.preset.silexInstrument",
+              { { "midi-input", { 0.03f, 0.42f } },
+                { "voice-allocator", { 0.18f, 0.42f } },
+                { "silex-synth", { 0.36f, 0.20f }, silexd() },
+                { "envelope", { 0.36f, 0.72f }, shaped(0.1f, 1.0f, 1.0f, 8'000.0f) },
+                { "gain", { 0.56f, 0.42f } },
+                { "voice-filter", { 0.74f, 0.42f }, filtered(20'000.0f) },
+                { "master", { 0.94f, 0.42f } } },
+              { { 0, 1 }, { 1, 2, 2, 2 }, { 1, 3, 3, 1 }, { 2, 4, 1, 1 },
+                { 3, 4, 2, 2 }, { 4, 5, 3, 1 }, { 5, 6 } } });
+    });
+    buildApart([&] {
+        // A rack of pads: the notes go to its pads, each an instrument of its
+        // own (the voices' cards are its frame, silent).
+        Parameters racked;
+        racked.oscillatorFrequencyHz = 220.0f;
+        racked.oscillatorLevel = 1.0f;
+        factoryPresets_.push_back({ "rack-instrument", "nodes.preset.rackInstrument",
+              { { "midi-input", { 0.03f, 0.42f } },
+                { "voice-allocator", { 0.18f, 0.42f } },
+                { "drum-rack", { 0.36f, 0.20f }, racked },
+                { "envelope", { 0.36f, 0.72f }, shaped(0.1f, 1.0f, 1.0f, 50.0f) },
+                { "gain", { 0.56f, 0.42f } },
+                { "voice-filter", { 0.74f, 0.42f }, filtered(20'000.0f) },
+                { "master", { 0.94f, 0.42f } } },
+              { { 0, 1 }, { 1, 2, 2, 2 }, { 1, 3, 3, 1 }, { 2, 4, 1, 1 },
+                { 3, 4, 2, 2 }, { 4, 5, 3, 1 }, { 5, 6 } } });
+    });
+    buildApart([&] {
+        factoryPresets_.push_back({ "jade-instrument", "nodes.preset.jadeInstrument",
+              { { "midi-input", { 0.03f, 0.42f } },
+                { "voice-allocator", { 0.18f, 0.42f } },
+                { "jade-synth", { 0.36f, 0.20f }, jaded() },
+                { "envelope", { 0.36f, 0.72f }, shaped(0.1f, 1.0f, 1.0f, 8'000.0f) },
+                { "gain", { 0.56f, 0.42f } },
+                { "voice-filter", { 0.74f, 0.42f }, filtered(20'000.0f) },
+                { "master", { 0.94f, 0.42f } } },
+              { { 0, 1 }, { 1, 2, 2, 2 }, { 1, 3, 3, 1 }, { 2, 4, 1, 1 },
+                { 3, 4, 2, 2 }, { 4, 5, 3, 1 }, { 5, 6 } } });
     });
     buildApart([&] {
         factoryPresets_.push_back({ "kick-instrument", "nodes.preset.kickInstrument",
@@ -797,14 +1083,6 @@ void NodeGraphComponent::initialiseFactoryPresets()
               { { 0, 1 }, { 1, 2 }, { 2, 3 }, { 3, 4 } } });
     });
     buildApart([&] {
-        factoryPresets_.push_back({ "de-esser", "nodes.preset.deEsser",
-              { { "graph-audio-input-2", { 0.03f, 0.42f } },
-                { "highpass", { 0.30f, 0.42f }, highPassed(4'500.0f) },
-                { "compressor", { 0.60f, 0.42f }, compressed(-22.0f, 6.0f) },
-                { "graph-audio-output-2", { 0.96f, 0.42f } } },
-              { { 0, 1 }, { 1, 2 }, { 2, 3 } } });
-    });
-    buildApart([&] {
         factoryPresets_.push_back({ "telephone", "nodes.preset.telephone",
               { { "graph-audio-input-2", { 0.03f, 0.42f } },
                 { "highpass", { 0.26f, 0.42f }, highPassed(700.0f) },
@@ -876,17 +1154,34 @@ void NodeGraphComponent::initialiseCatalog()
         { "sound-model", "node.soundModel", {}, "nodes.category.generators", juce::Colour(0xffc49cff), false, audio, true, audio, false, false },
         { "sampler", "node.sampler", {}, "nodes.category.generators", juce::Colour(0xff8fc8ff), false, audio, true, audio, false, false },
         { "batterie", "node.batterie", {}, "nodes.category.generators", juce::Colour(0xffe8c06a), false, audio, true, audio, false, false },
+        { "drum-rack", "node.drumRack", {}, "nodes.category.generators", juce::Colour(0xffe86a8c), false, audio, true, audio, false, false },
         { "prism-synth", "node.prismSynth", {}, "nodes.category.generators", juce::Colour(0xffff8a3d), false, audio, true, audio, false, false },
         { "kick-synth", "node.kickSynth", {}, "nodes.category.generators", juce::Colour(0xffff5a5a), false, audio, true, audio, false, false },
         { "ambre-synth", "node.ambreSynth", {}, "nodes.category.generators", juce::Colour(0xffffb04a), false, audio, true, audio, false, false },
         { "colosse-synth", "node.colosseSynth", {}, "nodes.category.generators", juce::Colour(0xff4fd1ff), false, audio, true, audio, false, false },
         { "mosaique-synth", "node.mosaiqueSynth", {}, "nodes.category.generators", juce::Colour(0xff6ee7c7), false, audio, true, audio, false, false },
         { "nebuleuse-synth", "node.nebuleuseSynth", {}, "nodes.category.generators", juce::Colour(0xff9ad5ff), false, audio, true, audio, false, false },
+        { "bronze-synth", "node.bronzeSynth", {}, "nodes.category.generators", juce::Colour(0xffd08c4c), false, audio, true, audio, false, false },
+        { "jade-synth", "node.jadeSynth", {}, "nodes.category.generators", juce::Colour(0xff48b38c), false, audio, true, audio, false, false },
+        { "silex-synth", "node.silexSynth", {}, "nodes.category.generators", juce::Colour(0xffe0705a), false, audio, true, audio, false, false },
+        { "derive-synth", "node.deriveSynth", {}, "nodes.category.generators", juce::Colour(0xffff8f6b), false, audio, true, audio, false, false },
+        { "saphir-synth", "node.saphirSynth", {}, "nodes.category.generators", juce::Colour(0xff5b8cff), false, audio, true, audio, false, false },
+        { "argile-synth", "node.argileSynth", {}, "nodes.category.generators", juce::Colour(0xffe08a5c), false, audio, true, audio, false, false },
+        { "quartz-synth", "node.quartzSynth", {}, "nodes.category.generators", juce::Colour(0xfff59ed0), false, audio, true, audio, false, false },
+        { "alliage-synth", "node.alliageSynth", {}, "nodes.category.generators", juce::Colour(0xffe8c25a), false, audio, true, audio, false, false },
+        { "tirette-synth", "node.tiretteSynth", {}, "nodes.category.generators", juce::Colour(0xffe8c08a), false, audio, true, audio, false, false },
+        { "onyx-synth", "node.onyxSynth", {}, "nodes.category.generators", juce::Colour(0xffd68cff), false, audio, true, audio, false, false },
+        { "opale-synth", "node.opaleSynth", {}, "nodes.category.generators", juce::Colour(0xfff2a6e8), false, audio, true, audio, false, false },
         { "spectrum", "node.spectrum", {}, "nodes.category.analyzers", juce::Colour(0xff6cb8ff), true, audio, true, audio, false, false },
         { "oscilloscope", "node.oscilloscope", {}, "nodes.category.analyzers", juce::Colour(0xff69c7ff), true, audio, true, audio, false, false },
         { "level-meter", "node.levelMeter", {}, "nodes.category.analyzers", juce::Colour(0xff7ed878), true, audio, true, audio, false, false },
         { "value-display", "node.valueDisplay", {}, "nodes.category.analyzers", juce::Colour(0xff75d6ac), true, control, true, control, false, false },
         { "midi-monitor", "node.midiMonitor", {}, "nodes.category.analyzers", juce::Colour(0xffd47be8), true, midi, true, midi, false, false },
+        // A plug-in an imported project used that is not here: its place
+        // kept, its name shown (the sound passes an effect's; an
+        // instrument's is silent).
+        { "missing-plugin", "node.missingPlugin", {}, "nodes.category.utilities", juce::Colour(0xff8b909a), true, audio, true, audio, false, false },
+        { "missing-instrument", "node.missingInstrument", {}, "nodes.category.generators", juce::Colour(0xff8b909a), true, midi, true, audio, false, false },
         { "midi-arp", "node.arpeggiator", {}, "nodes.category.midi", juce::Colour(0xffd47be8), true, midi, true, midi, false, false },
         { "note-filter", "node.noteFilter", {}, "nodes.category.midi", juce::Colour(0xffcf78dd), true, midi, true, midi, false, false },
         { "midi-transpose", "node.midiTranspose", {}, "nodes.category.midi", juce::Colour(0xffcf78dd), true, midi, true, midi, false, false },
@@ -930,9 +1225,11 @@ void NodeGraphComponent::initialiseCatalog()
     // The effect catalogue's cards; their sockets and schema come from the
     // primitive registry like everyone else's.
     for (const auto& effect : cydaw::engine::effectCatalogue) {
+        // The MIDI effects carry notes.
+        const auto carried = effect.midi ? midi : audio;
         NodeType type { juce::String(std::string(effect.typeKey)), juce::String(std::string(effect.titleKey)), {},
                         juce::String(std::string(effect.categoryKey)), juce::Colour(effect.colour),
-                        true, audio, true, audio, false, false };
+                        true, carried, true, carried, false, false };
         type.descriptionKey = juce::String(std::string(effect.descriptionKey));
         if (effect.convertsChannels()) {
             type.inputChannels = effect.inputChannels;
@@ -1520,14 +1817,15 @@ void NodeGraphComponent::ensureFactoryModules()
                         "graph.library.arpMotion.description",
                         { "midi", "arpeggiator", "transpose", "velocity" });
         Parameters arp;
-        arp.modulationRateHz = 0.125f;
+        if (const auto* arpeggiator = cydaw::engine::effectForType("arpege"))
+            cydaw::engine::applyEffectDefaults(*arpeggiator, arp);
         Parameters arpTranspose;
         arpTranspose.midiTranspose = 12.0f;
         Parameters arpVelocity;
         arpVelocity.midiVelocityScale = 0.86f;
         arpMotion.nodes = {
             { 20'001, "graph-midi-input", tr("node.graphMidiInput"), { 0.06f, 0.42f }, {} },
-            { 20'002, "midi-arp", tr("node.arpeggiator"), { 0.30f, 0.42f }, arp },
+            { 20'002, "arpege", tr("node.arpege"), { 0.30f, 0.42f }, arp },
             { 20'003, "midi-transpose", tr("node.midiTranspose"), { 0.52f, 0.42f }, arpTranspose },
             { 20'004, "velocity-map", tr("node.velocityMap"), { 0.72f, 0.42f }, arpVelocity },
             { 20'005, "graph-midi-output", tr("node.graphMidiOutput"), { 0.92f, 0.42f }, {} }

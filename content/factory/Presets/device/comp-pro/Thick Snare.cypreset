@@ -1,0 +1,30 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "comp-pro",
+ "name": "Thick Snare",
+ "state": {
+  "type": "comp-pro",
+  "parameters": {
+   "comppro.threshold": -22.0,
+   "comppro.ratio": 5.0,
+   "comppro.knee": 4.0,
+   "comppro.attack": 8.0,
+   "comppro.release": 120.0,
+   "comppro.makeup": 4.0,
+   "comppro.mix": 1.0,
+   "comppro.sidechain": 100.0,
+   "comppro.style": 1.0,
+   "comppro.range": 12.0,
+   "comppro.hold": 10.0,
+   "comppro.lookahead": 0.0,
+   "comppro.autoRelease": 0.0,
+   "comppro.autoGain": 0.0,
+   "comppro.sidechainLow": 12000.0,
+   "comppro.link": 1.0,
+   "comppro.channels": 0.0,
+   "comppro.audition": 0.0
+  }
+ }
+}

@@ -1201,6 +1201,8 @@ void GraphEditor::drawWires(ImDrawList* list, const std::vector<EditorConnection
 
 void GraphEditor::drawNode(app::NodeGraphComponent& graph, const NodeLayout& layout, ImDrawList* list)
 {
+    // Inside a module: English, whatever the language.
+    const ui::ModuleText english;
     const auto& p = theme::palette();
     const auto& node = *layout.node;
     const auto s = scale();

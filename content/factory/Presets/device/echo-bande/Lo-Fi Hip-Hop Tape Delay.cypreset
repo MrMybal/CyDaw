@@ -1,0 +1,25 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "echo-bande",
+ "name": "Lo-Fi Hip-Hop Tape Delay",
+ "state": {
+  "type": "echo-bande",
+  "parameters": {
+   "echoband.time": 200.0,
+   "echoband.intensity": 0.45,
+   "echoband.echo": 0.6,
+   "echoband.reverb": 0.0,
+   "echoband.bass": -5.0,
+   "echoband.treble": -7.0,
+   "echoband.wow": 0.6,
+   "echoband.mix": 0.35,
+   "echoband.mode": 1.0,
+   "echoband.sync": 6.0,
+   "echoband.drive": 6.0,
+   "echoband.age": 0.85,
+   "echoband.width": 0.3
+  }
+ }
+}

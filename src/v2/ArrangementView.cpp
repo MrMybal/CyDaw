@@ -1,4 +1,5 @@
 #include "ArrangementView.h"
+#include "AddTrackMenu.h"
 
 #include "Icons.h"
 #include "ImGuiHost.h"
@@ -129,7 +130,8 @@ double ArrangementView::contentEndSeconds() const
     for (const auto& summary : engine.midiTrackSummaries())
         if (const auto* clips = engine.midiClipsView(summary.id))
             for (const auto& clip : *clips)
-                end = std::max(end, (clip.startBeats + clip.lengthBeats) * secondsPerBeat());
+                if (clip.launcherScene < 0)
+                    end = std::max(end, (clip.startBeats + clip.lengthBeats) * secondsPerBeat());
     return end;
 }
 
@@ -179,24 +181,10 @@ void ArrangementView::draw()
 void ArrangementView::drawToolbar()
 {
     const auto& p = theme::palette();
-    if (ui::iconButton(icon::add, L("Nouvelle piste audio", "New audio track")))
-        if (const auto track = studio_.addAudioTrack())
-            state_.selectedTrack = track;
-    ImGui::SameLine(0.0f, dp(2.0f));
-    ImGui::TextDisabled("%s", L("Audio", "Audio"));
-    ImGui::SameLine(0.0f, dp(10.0f));
-    if (ui::iconButton(icon::note, L("Nouvelle piste instrument (synthé clavier)", "New instrument track (keys synth)")))
-        if (const auto track = studio_.addMidiTrack({}, "synth-keys"))
-            state_.selectedTrack = track;
-    ImGui::SameLine(0.0f, dp(2.0f));
-    ImGui::TextDisabled("%s", L("Instrument", "Instrument"));
-    ImGui::SameLine(0.0f, dp(10.0f));
-    if (ui::iconButton(icon::connect, L("Nouvelle piste bus : d'autres pistes s'y routent (groupe, réverbération partagée…)",
-                                        "New bus track: other tracks are routed into it (a group, a shared reverb…)")))
-        if (const auto track = studio_.addBusTrack())
-            state_.selectedTrack = track;
-    ImGui::SameLine(0.0f, dp(2.0f));
-    ImGui::TextDisabled("%s", L("Bus", "Bus"));
+    // A track added: instrument, audio, bus, or an instrument of one's choice.
+    add_track::button(studio_, state_, "arrangementAdd", ImVec2(ImGui::GetFrameHeight() * 1.4f, ImGui::GetFrameHeight()));
+    ImGui::SameLine(0.0f, dp(4.0f));
+    ImGui::TextDisabled("%s", L("Piste", "Track"));
 
     ui::toolbarSeparator();
     ImGui::TextDisabled("%s", L("Grille", "Grid"));
@@ -359,6 +347,9 @@ void ArrangementView::drawCanvas()
                 }
         } else if (const auto* clips = engine.midiClipsView(lane.track.midiId)) {
             for (const auto& clip : *clips) {
+                // The launcher's clips live in its slots, not here.
+                if (clip.launcherScene >= 0)
+                    continue;
                 const auto start = clip.startBeats * spb;
                 const auto duration = clip.lengthBeats * spb;
                 const auto x0 = timeToX(start);
@@ -2028,13 +2019,35 @@ void ArrangementView::laneChooserMenu()
     for (const auto& node : nodes) {
         ImGui::PushID(static_cast<int>(node.id));
         if (ImGui::BeginMenu(node.title.toRawUTF8())) {
-            for (const auto& parameter : node.parameters) {
-                // What the engine can follow: the chain's cards, the knobs
-                // inside its modules, the instrument's own settings.
+            // What the engine can follow: the chain's cards, the knobs
+            // inside its modules, the instrument's own settings.
+            const auto item = [&](const auto& parameter, const juce::String& label) {
                 const auto reachable = studio_.canAutomate(track, parameter.binding);
-                if (ImGui::MenuItem(parameter.label.toRawUTF8(), isAutomated(parameter.binding) ? mark : nullptr,
-                                    shown == parameter.binding, reachable))
+                if (ImGui::MenuItem(label.toRawUTF8(), isAutomated(parameter.binding) ? mark : nullptr, shown == parameter.binding,
+                                    reachable))
                     studio_.setShownLane(track, parameter.binding);
+            };
+            // Many values (an equaliser's eight bands and their dynamics):
+            // a menu for each group their names start with ("Bande 3 · Gain").
+            const auto grouped = node.parameters.size() > 16;
+            const auto separator = juce::String::fromUTF8(" \xc2\xb7 ");
+            std::vector<juce::String> groups;
+            for (const auto& parameter : node.parameters) {
+                const auto at = parameter.label.indexOf(separator);
+                if (!grouped || at <= 0) {
+                    item(parameter, parameter.label);
+                    continue;
+                }
+                const auto group = parameter.label.substring(0, at);
+                if (std::find(groups.begin(), groups.end(), group) != groups.end())
+                    continue;
+                groups.push_back(group);
+                if (ImGui::BeginMenu(group.toRawUTF8())) {
+                    for (const auto& member : node.parameters)
+                        if (member.label.startsWith(group + separator))
+                            item(member, member.label.substring(group.length() + separator.length()));
+                    ImGui::EndMenu();
+                }
             }
             ImGui::EndMenu();
         }

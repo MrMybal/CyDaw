@@ -9,11 +9,13 @@
 #include "SemanticSearch.h"
 #include "SoundBanks.h"
 #include "AudioEdit.h"
+#include "DeviceHost.h"
 #include "TrackModulation.h"
 
 #include <juce_data_structures/juce_data_structures.h>
 
 #include <array>
+#include <bitset>
 #include <atomic>
 #include <functional>
 #include <map>
@@ -42,69 +44,21 @@ struct MeterState {
     int channels { 2 };
 };
 
-// One track as the interface lists it. Audio tracks come first, then MIDI
-// tracks, in the engine's own order.
-struct TrackRef {
-    bool midi {};
-    std::size_t audioIndex {};   // audio tracks: the engine index
-    std::uint64_t midiId {};     // MIDI tracks: the engine id
-    // The master track: its devices and its fader, not one of the engine's
-    // tracks (isValid() says no; its graph, name and mix answer).
-    bool master {};
-    // A virtual input or output of the software (its bus id): its effects
-    // edited as a track's devices are. `master` is set too, so whatever is
-    // not one of the engine's tracks leaves it alone as it does the master;
-    // what is the master's own (its graph, name, mix, meter) asks for this
-    // first.
-    std::uint64_t bus {};
-
-    [[nodiscard]] static TrackRef ofBus(const std::uint64_t id) noexcept
-    {
-        TrackRef track;
-        track.master = true;
-        track.bus = id;
-        track.audioIndex = static_cast<std::size_t>(-1);
-        return track;
-    }
-    [[nodiscard]] bool isMaster() const noexcept { return master && bus == 0; }
-    [[nodiscard]] bool isBus() const noexcept { return bus != 0; }
-
-    [[nodiscard]] bool operator==(const TrackRef& other) const noexcept
-    {
-        if (master || other.master)
-            return master == other.master && bus == other.bus;
-        return midi == other.midi && (midi ? midiId == other.midiId : audioIndex == other.audioIndex);
-    }
-};
-
-class GraphSlot final {
-public:
-    // module: the inside of a device made of a graph, open for editing;
-    // workshop: a device the workshop holds itself; modulation: a track's
-    // value graph (what moves its parameters), never compiled for sound.
-    enum class Owner { audioTrack, midiTrack, bus, module, workshop, master, modulation };
-    GraphSlot(Owner owner, std::function<void(GraphSlot&, bool structural)> changed);
-    ~GraphSlot();
-
-    [[nodiscard]] app::NodeGraphComponent& graph() noexcept { return *graph_; }
-    [[nodiscard]] const app::NodeGraphComponent& graph() const noexcept { return *graph_; }
-    [[nodiscard]] Owner owner() const noexcept { return owner_; }
-    // Bumped by every change, so a view can tell when to refresh caches.
-    [[nodiscard]] std::uint64_t revision() const noexcept { return revision_; }
-    // A change made around the editor's notifications (the control port's).
-    void touch() noexcept { ++revision_; }
-    // Restoring does not notify: the caller publishes once afterwards.
-    void restore(const juce::var& stateWithLibrary);
-    [[nodiscard]] juce::var serialise() const;
-    [[nodiscard]] juce::String lastCompileError() const { return lastError_; }
-    void setLastCompileError(juce::String error) { lastError_ = std::move(error); }
-
-private:
-    Owner owner_;
-    std::unique_ptr<app::NodeGraphComponent> graph_;
-    std::uint64_t revision_ { 1 };
-    bool restoring_ {};
-    juce::String lastError_;
+// A launcher clip of the master (one a scene): its devices' knobs, and its
+// level, automated from when it is launched, over its length, looping.
+struct MasterClip {
+    juce::String name;
+    juce::uint32 colour { 0xffffb84d };
+    double lengthBeats { 16.0 };
+    bool looping { true };
+    struct Point {
+        double beats {};
+        float value {};
+    };
+    // By binding (a master device's knob, or Studio::masterGainLane for its
+    // level): points in time order, beats from the clip's start, in the
+    // knob's own units.
+    std::map<juce::String, std::vector<Point>> lanes;
 };
 
 // A track's device automation: each lane a published parameter of its
@@ -145,7 +99,7 @@ struct TrackInput {
 struct AudioTrackState {
     juce::String name;
     // The launcher's empty slots whose stop was taken off, a bit per scene.
-    std::uint8_t launcherStopOff {};
+    std::bitset<app::AudioTrackController::maximumLauncherScenes> launcherStopOff;
     // Stable while tracks move: what routing names it by.
     std::uint64_t uid {};
     // A bus: a track without clips that other tracks are routed into.
@@ -181,9 +135,26 @@ struct AudioTrackState {
     std::map<juce::String, float> pluginModulationSent;
 };
 
+// A pad of a rack: the key that plays it, its name, the note it plays (-1:
+// its key's own), its level, pan, mute, solo and choke group, and its graph
+// (an instrument and its effects).
+struct RackPadState {
+    int note { 36 };
+    juce::String name;
+    int playAs { -1 };
+    float gainDb {};
+    float pan {};
+    bool muted {};
+    bool solo {};
+    int choke {};
+    std::unique_ptr<GraphSlot> graph;
+};
+
 struct MidiTrackState {
     std::uint64_t id {};
-    std::uint8_t launcherStopOff {};
+    // Its rack's pads (when its instrument is the "drum-rack" card).
+    std::vector<RackPadState> pads;
+    std::bitset<app::AudioTrackController::maximumLauncherScenes> launcherStopOff;
     juce::uint32 colour {};
     std::vector<TrackOutput> outputs;
     int laneHeight { 88 };
@@ -201,7 +172,7 @@ namespace project_io {
 class DocumentLoad;
 }
 
-class Studio final {
+class Studio final : public DeviceHost {
 public:
     Studio();
     ~Studio();
@@ -223,6 +194,12 @@ public:
     // The sample library the browser shows (folders, the banks, cache,
     // analysis), and its optional semantic search with the models it runs.
     [[nodiscard]] app::SampleLibrary& samples() noexcept { return *samples_; }
+    // A sample heard from the library: a loop with a tempo, at the project's
+    // when `atTempo` (stretched as its family asks: drums by their attacks,
+    // the rest keeping their tone), anything else as it is.
+    juce::Result auditionSample(const juce::String& path, double startSeconds, bool atTempo);
+    // The tempo the sample auditioned now was taken at, 0 when as it is.
+    [[nodiscard]] double auditionTempoOf(const juce::String& path) const;
     [[nodiscard]] AiModels& aiModels() noexcept { return aiModels_; }
     [[nodiscard]] SemanticSearch& semantic() noexcept { return *semantic_; }
     // The library started: the banks' catalogue read (on a thread of its
@@ -257,16 +234,12 @@ public:
     // a card of a track's chain (its knobs by key, a sampler's map, a model
     // card's model, a wavetable's table; one undo step), a hosted plug-in
     // (its whole state), a track's whole chain (an instrument and its effects).
-    struct PresetHolder {
-        juce::String kind;   // "device", "plugin", "chain"
-        juce::String target; // the card's type, the plug-in's name, the chain's role
-        juce::String key;    // which one it is in the session (its last preset's name)
-    };
-    [[nodiscard]] std::optional<PresetHolder> devicePresetHolder(const TrackRef& track, std::uint64_t nodeId) const;
+    using PresetHolder = v2::PresetHolder;
+    [[nodiscard]] std::optional<PresetHolder> devicePresetHolder(const TrackRef& track, std::uint64_t nodeId) const override;
     [[nodiscard]] std::optional<PresetHolder> pluginPresetHolder(const TrackRef& track, int pluginIndex) const;
     [[nodiscard]] std::optional<PresetHolder> chainPresetHolder(const TrackRef& track) const;
-    [[nodiscard]] juce::var devicePresetState(const TrackRef& track, std::uint64_t nodeId) const;
-    bool applyDevicePreset(const TrackRef& track, std::uint64_t nodeId, const juce::var& state, juce::String& error);
+    [[nodiscard]] juce::var devicePresetState(const TrackRef& track, std::uint64_t nodeId) const override;
+    bool applyDevicePreset(const TrackRef& track, std::uint64_t nodeId, const juce::var& state, juce::String& error) override;
 
     // ---- Audio editing (a clip's own sound) -----------------------------------------
     // Where destructive edits' results are written: the project's folder
@@ -314,17 +287,17 @@ public:
     // cycle, any other sound cut into cycles at its pitch. Kept in the card
     // (the project, presets, an exported plug-in). One undo step.
     bool importPrismTable(const TrackRef& track, std::uint64_t nodeId, int oscillator, const juce::File& file,
-                          juce::String& error);
+                          juce::String& error) override;
     // Back to the factory table its setting names.
-    bool clearPrismTable(const TrackRef& track, std::uint64_t nodeId, int oscillator);
+    bool clearPrismTable(const TrackRef& track, std::uint64_t nodeId, int oscillator) override;
 
     // ---- A cabinet's impulse response ---------------------------------------------
     // A recorded cabinet (and its microphone) as a sound file, played by a
     // "Baffle et micro" card instead of its models: one or two channels, two
     // seconds at most, its silences before and after trimmed. Kept in the
     // card (project, presets, an exported plug-in). One undo step.
-    bool loadCabImpulse(const TrackRef& track, std::uint64_t nodeId, const juce::File& file, juce::String& error);
-    bool clearCabImpulse(const TrackRef& track, std::uint64_t nodeId);
+    bool loadCabImpulse(const TrackRef& track, std::uint64_t nodeId, const juce::File& file, juce::String& error) override;
+    bool clearCabImpulse(const TrackRef& track, std::uint64_t nodeId) override;
     [[nodiscard]] juce::var pluginPresetState(const TrackRef& track, int pluginIndex);
     bool applyPluginPreset(const TrackRef& track, int pluginIndex, const juce::var& state, juce::String& error);
     // A hosted plug-in's own programs (its factory presets) and the current
@@ -334,8 +307,8 @@ public:
     [[nodiscard]] juce::var chainPresetState(const TrackRef& track) const;
     bool applyChainPreset(const TrackRef& track, const juce::var& state, juce::String& error);
     // The preset last loaded or saved on a holder (by its key), shown on it.
-    [[nodiscard]] juce::String presetName(const juce::String& holderKey) const;
-    void setPresetName(const juce::String& holderKey, const juce::String& name);
+    [[nodiscard]] juce::String presetName(const juce::String& holderKey) const override;
+    void setPresetName(const juce::String& holderKey, const juce::String& name) override;
 
     // ---- Sound banks -----------------------------------------------------------
     // The banks CyDAW knows, what of them is here, their downloads. A
@@ -369,8 +342,15 @@ public:
         juce::String doing;  // what is being done, for a person to read
         juce::int64 bytes {};
         double seconds {};
+        // A project of another software being imported (not a .cydaw).
+        bool import {};
     };
     bool startOpeningProject(const juce::File& file);
+    // The same for a project of another software (Bitwig, Ableton, Studio
+    // One, DAWproject): read on a thread, its tracks made a few a frame.
+    // What it brought (importSummary) once done.
+    bool startImportingProject(const juce::File& file);
+    [[nodiscard]] const juce::String& importSummary() const noexcept { return importSummary_; }
     // About budgetMs of the work, once a frame; the outcome once the project
     // is open (or could not be), nothing while it goes on.
     std::optional<juce::Result> continueOpeningProject(double budgetMs);
@@ -401,12 +381,15 @@ public:
     // On quit: written when there are unsaved changes, removed otherwise.
     void finishRecovery();
     void setAutosaveEnabled(bool enabled) noexcept { autosaveEnabled_ = enabled; }
+    // A person's session (not an automated one): what it changes of the
+    // settings is kept.
+    [[nodiscard]] bool keepsSettings() const noexcept { return autosaveEnabled_; }
 
     // ---- Tracks -----------------------------------------------------------------
     [[nodiscard]] std::vector<TrackRef> tracks() const;
     [[nodiscard]] std::size_t trackCount() const;
-    [[nodiscard]] bool isValid(const TrackRef& track) const;
-    [[nodiscard]] juce::String trackName(const TrackRef& track) const;
+    [[nodiscard]] bool isValid(const TrackRef& track) const override;
+    [[nodiscard]] juce::String trackName(const TrackRef& track) const override;
     [[nodiscard]] juce::uint32 trackColour(const TrackRef& track) const;
     void setTrackName(const TrackRef& track, const juce::String& name);
     void setTrackColour(const TrackRef& track, juce::uint32 argb);
@@ -420,7 +403,7 @@ public:
     using AutomationCurve = app::AudioTrackController::AutomationCurve;
     [[nodiscard]] bool automationVisible(const TrackRef& track) const;
     // Showing the lane makes the track taller, as CyDAW 1 does.
-    void setAutomationVisible(const TrackRef& track, bool visible);
+    void setAutomationVisible(const TrackRef& track, bool visible) override;
     [[nodiscard]] std::vector<AutomationPoint> automationPoints(const TrackRef& track) const;
     std::uint64_t addAutomationPoint(const TrackRef& track, double seconds, float valueDb);
     bool updateAutomationPoint(const TrackRef& track, std::uint64_t id, double seconds, float valueDb);
@@ -443,8 +426,11 @@ public:
     bool removeLanePoint(const TrackRef& track, const juce::String& lane, std::uint64_t id);
     // Replaces every point (undo, redo); none removes the lane.
     void setLanePoints(const TrackRef& track, const juce::String& lane, const std::vector<AutomationPoint>& points);
+    // Whether a lane has points; its points all removed.
+    [[nodiscard]] bool hasLane(const TrackRef& track, const juce::String& lane) const override { return !lanePoints(track, lane).empty(); }
+    void clearLane(const TrackRef& track, const juce::String& lane) override { setLanePoints(track, lane, {}); }
     // The parameters that have points, plugins' included.
-    [[nodiscard]] std::vector<juce::String> automatedParameters(const TrackRef& track) const;
+    [[nodiscard]] std::vector<juce::String> automatedParameters(const TrackRef& track) const override;
     // A plugin parameter's lane name, and back.
     [[nodiscard]] static juce::String pluginLaneName(std::size_t plugin, std::uint32_t parameter);
     [[nodiscard]] static bool parsePluginLane(const juce::String& lane, std::size_t& plugin, std::uint32_t& parameter);
@@ -454,9 +440,9 @@ public:
     [[nodiscard]] juce::String pluginParameterName(const TrackRef& track, const juce::String& lane) const;
     // The lane the arrangement shows under the track.
     [[nodiscard]] juce::String shownLane(const TrackRef& track) const;
-    void setShownLane(const TrackRef& track, const juce::String& lane);
+    void setShownLane(const TrackRef& track, const juce::String& lane) override;
     // Where a parameter's lane puts it at the playhead; none without points.
-    [[nodiscard]] std::optional<float> laneValueNow(const TrackRef& track, const juce::String& lane) const;
+    [[nodiscard]] std::optional<float> laneValueNow(const TrackRef& track, const juce::String& lane) const override;
     // Hands a track's lanes to the engine (after an edit, after loading).
     void publishParameterAutomation(const TrackRef& track);
 
@@ -738,7 +724,55 @@ public:
     [[nodiscard]] const std::vector<app::NodeGraphComponent::DeviceCatalogueEntry>& deviceCatalogue();
     // A new instrument track playing it, its knobs as made: its samples on a
     // sampler, or (`model`) its sound model.
-    std::optional<TrackRef> addFactoryInstrument(const juce::String& key, juce::String& error, bool model = false);
+    // On a new track, or `onto` an instrument track (its instrument
+    // replaced, its effects kept).
+    std::optional<TrackRef> addFactoryInstrument(const juce::String& key, juce::String& error, bool model = false,
+                                                 std::optional<TrackRef> onto = std::nullopt);
+    // An instrument track's instrument changed for another (a device key of
+    // the catalogue, an instrument preset): the effects after it, their
+    // automation and modulators stay. Named after it when its name was its
+    // instrument's (or the default one).
+    juce::Result replaceInstrument(const TrackRef& track, const juce::String& key, const juce::String& name = {});
+
+    // ---- A rack of pads (an instrument track playing the "drum-rack" card) ----
+    // Each pad an instrument and its effects of their own (its graph: the
+    // track's TrackRef with `pad` set), played by its key.
+    [[nodiscard]] bool isRack(const TrackRef& track) const;
+    [[nodiscard]] std::size_t rackPadCount(const TrackRef& track) const;
+    [[nodiscard]] const RackPadState* rackPad(const TrackRef& track, std::size_t pad) const;
+    [[nodiscard]] std::optional<std::size_t> rackPadOfNote(const TrackRef& track, int note) const;
+    // A pad on `note` playing a factory instrument ("silex-instrument"…): its index.
+    std::optional<std::size_t> addRackPad(const TrackRef& track, int note, const juce::String& instrumentKey, juce::String& error);
+    bool removeRackPad(const TrackRef& track, std::size_t pad);
+    bool setRackPadInstrument(const TrackRef& track, std::size_t pad, const juce::String& instrumentKey, juce::String& error);
+    struct RackPadMix {
+        int note { 36 };
+        juce::String name;
+        int playAs { -1 };
+        float gainDb {};
+        float pan {};
+        bool muted {};
+        bool solo {};
+        int choke {};
+    };
+    bool setRackPadMix(const TrackRef& track, std::size_t pad, const RackPadMix& mix);
+    // A sound onto the pad of `note` (made when there is none): a simple
+    // sampler playing it at its own pitch.
+    bool loadRackPadSample(const TrackRef& track, int note, const juce::File& file, juce::String& error);
+    [[nodiscard]] float rackPadPeak(const TrackRef& track, std::size_t pad) const;
+    // The rack a new one starts with: a kick, a snare, a clap, two hats.
+    void fillDefaultRack(const TrackRef& track);
+    // Its pads as a project keeps them, and back.
+    [[nodiscard]] juce::var rackPadsState(const TrackRef& track) const;
+    void restoreRackPads(const TrackRef& track, const juce::var& state);
+    // A plug-in that is not here, its place kept on the track: a card that
+    // says so (its name, its maker, its format); an instrument's is silent,
+    // an effect's lets the sound through. Its card.
+    std::uint64_t addMissingPlugin(const TrackRef& track, const juce::String& name, const juce::String& vendor,
+                                   const juce::String& format, bool instrument);
+    // The track's first synth of the family given these settings (by the
+    // model's keys; a choice by its index): how many were set.
+    int setSynthSettings(const TrackRef& track, const std::vector<std::pair<std::string, float>>& settings);
     // A new sampler track playing these files: their notes from their names
     // and their pitch, several on a note as velocity layers or round robins.
     std::optional<TrackRef> newSamplerTrack(const juce::Array<juce::File>& files, juce::String& error);
@@ -779,7 +813,7 @@ public:
     // Whether a parameter of the track's graph can follow a lane: a card of
     // its chain, a knob inside a module there, or a setting of its
     // instrument's voice (Prisme's, Kick's, a sampler's...).
-    [[nodiscard]] bool canAutomate(const TrackRef& track, const juce::String& binding) const;
+    [[nodiscard]] bool canAutomate(const TrackRef& track, const juce::String& binding) const override;
     // The binding as the native graph names it: a module's inner knob
     // ("node.12.node.4.lowpass.cutoff") on the node the compiler made for it
     // ("node.31.lowpass.cutoff"); any other binding as it is.
@@ -804,8 +838,52 @@ public:
     void launchScene(int scene);
     void stopAllClips();
     [[nodiscard]] bool slotHasClip(const TrackRef& track, int scene) const;
+    // What a MIDI track's newest voice plays now (a Prisme's, a synth's of
+    // the family): its modulated settings, LFOs and envelopes. False when
+    // none of theirs plays.
+    bool voiceLive(const TrackRef& track, engine::VoiceLive& out) const override;
     // The scene a track plays (-1: none), and the one it waits to play.
     [[nodiscard]] int playingScene(const TrackRef& track) const;
+    // How many scenes the launcher shows: those that hold a clip or a
+    // stop taken off, two more to fill, eight at least.
+    [[nodiscard]] int launcherSceneCount() const;
+
+    // ---- The master's launcher clips: automation, one a scene ----
+    // The master's level, as a lane of its clips.
+    static constexpr const char* masterGainLane = "master.gain";
+    [[nodiscard]] const std::map<int, MasterClip>& masterClips() const { return masterClips_; }
+    [[nodiscard]] const MasterClip* masterClip(int scene) const;
+    // A clip made in an empty slot (or the one there), its name "Master n".
+    MasterClip& createMasterClip(int scene);
+    void removeMasterClip(int scene);
+    // A clip edited (its lanes, length, loop): heard at once if it plays.
+    void setMasterClip(int scene, MasterClip clip);
+    // A project's clips, the playing one stopped.
+    void setMasterClips(std::map<int, MasterClip> clips);
+    // From the next launch quantisation on the master's clock (with the
+    // transport stopped: when it plays).
+    bool launchMasterClip(int scene);
+    void stopMasterClip();
+    [[nodiscard]] int playingMasterScene() const { return masterPlaying_; }
+    // Remembered at the stop, to start again from its beginning.
+    [[nodiscard]] int pendingMasterScene() const { return engine_.isPlaying() ? -1 : masterAtStop_; }
+    // How far into its length the playing clip is (0..1).
+    [[nodiscard]] float masterClipProgress() const;
+    // What a master clip can automate: its level, then its devices' knobs.
+    struct MasterLaneChoice {
+        juce::String binding;
+        juce::String label;
+        juce::String unit;
+        double minimum {};
+        double maximum { 1.0 };
+        double value {};
+        // A frequency or a time: drawn and glided on its logarithmic scale.
+        bool logarithmic {};
+    };
+    [[nodiscard]] std::vector<MasterLaneChoice> masterLaneChoices() const;
+    // Where a clip's lane stands at a place of it (in beats from its start):
+    // the first point's value before it, the last one's after it.
+    [[nodiscard]] static float masterLaneValueAt(const std::vector<MasterClip::Point>& points, double beats, bool logarithmic);
     [[nodiscard]] int pendingScene(const TrackRef& track) const;
     // An empty slot's stop: on by default.
     [[nodiscard]] bool slotStops(const TrackRef& track, int scene) const;
@@ -820,12 +898,12 @@ public:
     bool moveTrack(const TrackRef& track, int delta);
 
     // ---- Graphs -----------------------------------------------------------------
-    [[nodiscard]] GraphSlot* graphFor(const TrackRef& track);
-    [[nodiscard]] const GraphSlot* graphFor(const TrackRef& track) const;
+    [[nodiscard]] GraphSlot* graphFor(const TrackRef& track) override;
+    [[nodiscard]] const GraphSlot* graphFor(const TrackRef& track) const override;
     [[nodiscard]] GraphSlot* busGraph(std::uint64_t busId);
     // A whole device from the catalogue: a preset replaces the graph, a
     // module or node is spliced before the output.
-    juce::Result insertDevice(const TrackRef& track, const juce::String& key);
+    juce::Result insertDevice(const TrackRef& track, const juce::String& key) override;
     // Recompiles and publishes a track's graph to the engine.
     juce::Result publishGraph(const TrackRef& track, bool structural);
     // The graph the live values are fed to (the one on screen).
@@ -860,7 +938,12 @@ public:
     [[nodiscard]] bool loopEnabled() const noexcept { return loopEnabled_; }
     void setLoopEnabled(bool enabled);
     void setLoopRange(double startSeconds, double endSeconds);
+    // Stopping remembers the clips the launcher plays; play starts them
+    // again from their start (the launcher shows them waiting).
     void togglePlay();
+    void play();
+    // Stops where it is; stop() stops, or goes back to the start when stopped.
+    void stopPlayback();
     void stop();
     void rewind();
 
@@ -895,6 +978,9 @@ public:
     // Graph slots for an engine track that already exists.
     AudioTrackState& adoptAudioTrack(std::size_t index, const juce::var& graphState);
     MidiTrackState& adoptMidiTrack(std::uint64_t id, const juce::var& graphState);
+    // A pad's mix sent to the engine (silent when its track is no rack).
+    void publishRackPadMix(const TrackRef& track, std::size_t pad);
+    [[nodiscard]] RackPadState* rackPadState(const TrackRef& track);
     BusState& adoptBus(std::uint64_t id, const juce::var& graphState);
 
     // Settings and layout values a project carries for the interface.
@@ -907,6 +993,9 @@ private:
     void clearSession();
     void applyTrackModulations();
     std::vector<modulation::Assignment> syncModulationTargets(AudioTrackState& state);
+    // A track modulator's targets in a graph about to be published, where
+    // the modulator last left them (not back on their knobs for a moment).
+    void modulateNativeGraph(AudioTrackState& state, cydaw::engine::NativeDspGraph& graph);
     // A finished audio recording kept: loop passes as takes, a take of the
     // clip it was played over, or a clip of its own.
     juce::Result keepRecordedAudio(const TrackRef& track);
@@ -963,6 +1052,12 @@ private:
     // Sound matching.
     Companion companion_;
     mutable SoundBanks banks_;
+    // The factory instruments as last listed (factoryInstruments).
+    mutable std::vector<FactoryInstrument> factoryCache_;
+    mutable int factoryCacheGeneration_ { -1 };
+    mutable juce::String factoryCacheLanguage_;
+    mutable bool factoryCachePending_ {};
+    mutable double factoryCacheTime_ {};
     AiModels aiModels_;
     std::unique_ptr<SemanticSearch> semantic_;
     std::vector<app::NodeGraphComponent::DeviceCatalogueEntry> deviceCatalogue_;
@@ -1023,6 +1118,12 @@ private:
     // A project being opened in steps (startOpeningProject).
     struct Opening;
     std::unique_ptr<Opening> opening_;
+    // An imported project made into the session in steps (its tracks, then
+    // their instruments and graphs).
+    struct ImportBuild;
+    // One step of it; false once it is done.
+    bool importStep(ImportBuild& build);
+    juce::String importSummary_;
     void beginApplying(const juce::File& file, const juce::var& document);
     juce::Result finishApplying(const juce::File& file, const juce::Result& applied);
     std::unique_ptr<project_io::DocumentLoad> applying_;
@@ -1037,6 +1138,19 @@ private:
     double recordingStart_ {};
     bool recordingStartedPlayback_ {};
     bool recordingLoopWasOn_ {};
+    // The clips playing when the transport stopped (track, scene).
+    std::vector<std::pair<TrackRef, int>> clipsAtStop_;
+    // The master's clips, the one playing (and since when on the master's
+    // clock), the one remembered at a stop, the level before it moved it.
+    std::map<int, MasterClip> masterClips_;
+    int masterPlaying_ { -1 };
+    int masterAtStop_ { -1 };
+    double masterStartSeconds_ {};
+    double masterPublishedTempo_ {};
+    std::optional<float> masterGainBeforeClip_;
+    void publishMasterClip();
+    void followMasterClip();
+    void forgetClipAtStop(const TrackRef& track);
 };
 
 // Project documents (ProjectIo.cpp): the same .cydaw files CyDAW 1 reads and

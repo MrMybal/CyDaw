@@ -32,6 +32,7 @@ class PrismView;
 class KickView;
 class SynthView;
 class BatterieView;
+class RackView;
 class ClipEditorView;
 class BrowserView;
 class LibraryWindow;
@@ -44,6 +45,8 @@ class WorkshopView;
 class PluginWindows;
 class Vst3Build;
 class ContextMenus;
+class ComputerKeyboard;
+class ThemesView;
 
 class AppUi final : public RemoteUi {
 public:
@@ -162,6 +165,10 @@ public:
     bool snapshot(const juce::File& png) override;
     void sessionReplaced() override;
     bool openProjectInSteps(const juce::File& file) override;
+    // A project of another software, imported in steps (its bar shown), its
+    // summary at the end.
+    bool importProjectInSteps(const juce::File& file) override;
+    bool importing_ {};
     void tracksChanged() override;
     void requestQuit() override;
     [[nodiscard]] std::optional<TrackRef> selectedTrack() const override { return state_.selectedTrack; }
@@ -170,10 +177,13 @@ public:
     void browseSamples(const juce::String& query, bool semantic, const juce::String& family, const juce::String& category,
                        const juce::String& source) override;
     juce::var library(const juce::String& command, const juce::var& request) override;
+    juce::var midiInputs(const juce::String& command, const juce::var& request) override;
+    juce::var themes(const juce::var& request) override;
     bool showDeviceEditor(std::uint64_t nodeId, int pane, bool detached = false) override;
     void showWorkshop() override { state_.bringToFront = Panel::workshop; }
     void showDeviceCatalogue() override { state_.openDeviceCatalogue = true; }
     void showModulationGraph(const bool modulation) override { state_.graphShowsModulation = modulation; }
+    void openRackPad(const std::optional<std::pair<TrackRef, int>>& pad) override { state_.openRackPad = pad; }
     void editClip(const TrackRef& track, const std::uint64_t clipId, const int face) override
     {
         state_.selectedTrack = track;
@@ -192,6 +202,8 @@ public:
     juce::String injectInput(const juce::var& events) override;
     // The scripted mouse, between the system's input and the frame.
     void applyScriptedInput();
+    // A scripted key pressed, let go on the next event.
+    int pendingKeyUp_ {};
     // Named layouts, in CyDAW/Layouts beside the current one.
     [[nodiscard]] juce::StringArray layoutNames() const override;
     juce::Result saveLayoutAs(const juce::String& name) override;
@@ -220,6 +232,13 @@ private:
     void redo();
     void toggleRecording();
     void drawAudioSettings();
+    // The audio settings' MIDI tab: the devices, the computer's keyboard.
+    void drawMidiInputs();
+    void openMidiInputs()
+    {
+        showAudioSettings_ = true;
+        selectMidiTab_ = true;
+    }
     // Its device tab: driver, devices, rate, buffer.
     void drawAudioDevice();
     // Options › Compagnon Python: which Python, what it has, and setting up
@@ -253,6 +272,7 @@ private:
     std::unique_ptr<KickView> kick_;
     std::unique_ptr<SynthView> synth_;
     std::unique_ptr<BatterieView> batterie_;
+    std::unique_ptr<RackView> rack_;
     std::unique_ptr<DeviceEditorView> deviceEditor_;
     std::unique_ptr<Vst3Build> vst3Build_;
     std::unique_ptr<ContextMenus> contextMenus_;
@@ -285,6 +305,15 @@ private:
     [[nodiscard]] unsigned long long logo(float pixels);
     bool showWarnings_ {};
     bool showAudioSettings_ {};
+    bool selectMidiTab_ {};
+    bool selectMidiTabNow_ {};
+    // The computer's keys as a MIDI keyboard.
+    std::unique_ptr<ComputerKeyboard> computerKeyboard_;
+    // The colour themes.
+    std::unique_ptr<ThemesView> themes_;
+    // The MIDI devices, asked again now and then (asking is slow).
+    juce::Array<juce::MidiDeviceInfo> midiDevices_;
+    double midiDevicesTime_ { -100.0 };
     // The audio settings open on the card's inputs and outputs.
     bool showSoundCard_ {};
     bool selectSoundCardTab_ {};

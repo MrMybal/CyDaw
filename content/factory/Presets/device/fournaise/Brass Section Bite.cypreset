@@ -1,0 +1,24 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "fournaise",
+ "name": "Brass Section Bite",
+ "state": {
+  "type": "fournaise",
+  "parameters": {
+   "fournaise.drive": 4.0,
+   "fournaise.tone": 0.35,
+   "fournaise.lowCut": 110.0,
+   "fournaise.highCut": 13000.0,
+   "fournaise.mix": 0.9,
+   "fournaise.output": 0.0,
+   "fournaise.style": 3.0,
+   "fournaise.punish": 0.0,
+   "fournaise.auto": 1.0,
+   "fournaise.thump": 0.0,
+   "fournaise.steep": 0.0,
+   "fournaise.oversampling": 2.0
+  }
+ }
+}

@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "stereo-finisher",
+ "name": "Transparent",
+ "state": {
+  "type": "stereo-finisher",
+  "parameters": {
+   "node.16002.eq.tone": 0.0,
+   "node.16003.stereo.width": 1.0,
+   "node.16004.compressor.threshold": -4.0,
+   "node.16004.compressor.ratio": 1.3,
+   "node.16005.clip.threshold": 1.0
+  }
+ }
+}

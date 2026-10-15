@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "auto-filter",
+ "name": "Sixteenth Gate Filter",
+ "state": {
+  "type": "auto-filter",
+  "parameters": {
+   "autofilter.cutoff": 1200.0,
+   "autofilter.resonance": 3.0,
+   "autofilter.rate": 8.0,
+   "autofilter.depth": 0.9,
+   "autofilter.sync": 3.0
+  }
+ }
+}

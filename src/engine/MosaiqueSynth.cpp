@@ -755,6 +755,26 @@ public:
             const auto noise = std::clamp(v(noiseLevel) + mods[dstNoise], 0.0, 1.0);
             const auto noiseSendValue = v(noiseSend);
             const auto drive = std::clamp(v(driveAmount) + mods[dstDrive], 0.0, 1.0);
+            showLfo(0, lfo[0], lfoPhases_[0]);
+            showLfo(1, lfo[1], lfoPhases_[1]);
+            showEnvelope(0, ampLevel);
+            showEnvelope(1, env2Level);
+            showEnvelope(2, env3Level);
+            for (std::size_t engine = 0; engine < 2; ++engine) {
+                const auto base = bases[engine];
+                const auto& shape = shapes_[engine];
+                show(base + eLevel, shape.level, v(base + eLevel));
+                show(base + eSend, shape.send, v(base + eSend));
+                show(base + eWave, shape.morph, v(base + eWave));
+                show(base + ePosition, shape.position, v(base + ePosition));
+                show(base + eWarp, shape.warp, v(base + eWarp));
+            }
+            show(f1Cutoff, cutoffOf(f1Cutoff, mods[dstCutoff1] + mods[dstCutoffs]), v(f1Cutoff));
+            show(f2Cutoff, cutoffOf(f2Cutoff, mods[dstCutoff2] + mods[dstCutoffs]), v(f2Cutoff));
+            show(f1Resonance, std::clamp(v(f1Resonance) + mods[dstResonance], 0.0, 1.0), v(f1Resonance));
+            show(f2Resonance, std::clamp(v(f2Resonance) + mods[dstResonance], 0.0, 1.0), v(f2Resonance));
+            show(noiseLevel, noise, v(noiseLevel));
+            show(driveAmount, drive, v(driveAmount));
             const auto pan = std::clamp(mods[dstPan], -1.0, 1.0);
             const std::array<double, 2> panGains { std::min(1.0, 1.0 - pan), std::min(1.0, 1.0 + pan) };
             const auto secondUsed = !parallel || shapes_[0].send > 0.0 || shapes_[1].send > 0.0 || (noise > 0.0 && noiseSendValue > 0.0);

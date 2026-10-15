@@ -1,0 +1,14 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "compressor",
+ "name": "Heavy Squash",
+ "state": {
+  "type": "compressor",
+  "parameters": {
+   "compressor.threshold": -40.0,
+   "compressor.ratio": 20.0
+  }
+ }
+}

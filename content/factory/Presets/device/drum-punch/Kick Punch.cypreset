@@ -1,0 +1,18 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "drum-punch",
+ "name": "Kick Punch",
+ "state": {
+  "type": "drum-punch",
+  "parameters": {
+   "node.25002.highpass.cutoff": 30.0,
+   "node.25003.compressor.threshold": -18.0,
+   "node.25003.compressor.ratio": 4.0,
+   "node.25004.drive.db": 3.0,
+   "node.25005.clip.threshold": 0.95,
+   "node.25006.gain.db": -1.0
+  }
+ }
+}

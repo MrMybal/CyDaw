@@ -1,0 +1,16 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "lfo",
+ "name": "Fast Vibrato",
+ "state": {
+  "type": "lfo",
+  "parameters": {
+   "node.9001.lfo.rate": 6.0,
+   "node.9001.lfo.depth": 0.2,
+   "node.9001.lfo.offset": 0.0,
+   "node.9001.lfo.shape": 0.0
+  }
+ }
+}

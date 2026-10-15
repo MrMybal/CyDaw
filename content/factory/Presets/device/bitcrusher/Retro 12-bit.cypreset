@@ -1,0 +1,16 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "bitcrusher",
+ "name": "Retro 12-bit",
+ "state": {
+  "type": "bitcrusher",
+  "parameters": {
+   "crusher.bits": 12.0,
+   "crusher.downsample": 2.0,
+   "crusher.drive": 2.0,
+   "crusher.mix": 1.0
+  }
+ }
+}

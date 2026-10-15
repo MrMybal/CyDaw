@@ -1,0 +1,41 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "amp-sim",
+ "name": "Bass DI Growl A-B",
+ "state": {
+  "type": "amp-sim",
+  "parameters": {
+   "amp.gain": 5.5,
+   "amp.bass": 6.0,
+   "amp.middle": 6.5,
+   "amp.treble": 5.5,
+   "amp.presence": 5.5,
+   "amp.master": 5.0,
+   "amp.output": 0.0,
+   "amp.mix": 1.0,
+   "amp.model": 7.0,
+   "amp.bright": 0.0,
+   "amp.depth": 6.0,
+   "amp.sag": 0.2,
+   "amp.tight": 20.0,
+   "amp.gate": -90.0,
+   "amp.pedal": 2.0,
+   "amp.pedalDrive": 0.3,
+   "amp.pedalTone": 0.45,
+   "amp.pedalLevel": 0.0,
+   "amp.oversampling": 2.0,
+   "amp.channel": 0.0,
+   "amp.modelB": 6.0,
+   "amp.gainB": 6.0,
+   "amp.bassB": 6.0,
+   "amp.middleB": 6.5,
+   "amp.trebleB": 4.5,
+   "amp.presenceB": 4.5,
+   "amp.masterB": 6.0,
+   "amp.brightB": 0.0,
+   "amp.depthB": 6.0
+  }
+ }
+}

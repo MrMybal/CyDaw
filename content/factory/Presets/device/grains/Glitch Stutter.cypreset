@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "grains",
+ "name": "Glitch Stutter",
+ "state": {
+  "type": "grains",
+  "parameters": {
+   "grains.time": 30.0,
+   "grains.feedback": 0.3,
+   "grains.pitch": 0.0,
+   "grains.spray": 40.0,
+   "grains.density": 80.0,
+   "grains.pitchRandom": 2.0,
+   "grains.mix": 0.5,
+   "grains.output": 0.0,
+   "grains.sync": 0.0,
+   "grains.size": 20.0,
+   "grains.stereo": 0.8,
+   "grains.reverseChance": 0.4,
+   "grains.freeze": 0.0,
+   "grains.highCut": 14000.0
+  }
+ }
+}

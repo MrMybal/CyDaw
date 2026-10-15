@@ -1,0 +1,41 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "amp-sim",
+ "name": "Country Chicken Picking A-B",
+ "state": {
+  "type": "amp-sim",
+  "parameters": {
+   "amp.gain": 3.0,
+   "amp.bass": 4.5,
+   "amp.middle": 3.5,
+   "amp.treble": 7.5,
+   "amp.presence": 7.0,
+   "amp.master": 6.0,
+   "amp.output": 0.0,
+   "amp.mix": 1.0,
+   "amp.model": 0.0,
+   "amp.bright": 1.0,
+   "amp.depth": 4.0,
+   "amp.sag": 0.15,
+   "amp.tight": 80.0,
+   "amp.gate": -75.0,
+   "amp.pedal": 1.0,
+   "amp.pedalDrive": 0.25,
+   "amp.pedalTone": 0.7,
+   "amp.pedalLevel": -1.0,
+   "amp.oversampling": 2.0,
+   "amp.channel": 0.0,
+   "amp.modelB": 5.0,
+   "amp.gainB": 4.5,
+   "amp.bassB": 4.5,
+   "amp.middleB": 5.0,
+   "amp.trebleB": 7.0,
+   "amp.presenceB": 6.5,
+   "amp.masterB": 6.0,
+   "amp.brightB": 1.0,
+   "amp.depthB": 4.0
+  }
+ }
+}

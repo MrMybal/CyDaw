@@ -1,0 +1,16 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "bitcrusher",
+ "name": "Telephone Grit",
+ "state": {
+  "type": "bitcrusher",
+  "parameters": {
+   "crusher.bits": 6.0,
+   "crusher.downsample": 8.0,
+   "crusher.drive": 6.0,
+   "crusher.mix": 0.8
+  }
+ }
+}

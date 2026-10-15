@@ -1,0 +1,41 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "amp-sim",
+ "name": "Snappy Funk Clean A-B",
+ "state": {
+  "type": "amp-sim",
+  "parameters": {
+   "amp.gain": 2.5,
+   "amp.bass": 4.0,
+   "amp.middle": 3.5,
+   "amp.treble": 7.0,
+   "amp.presence": 6.5,
+   "amp.master": 5.0,
+   "amp.output": 0.0,
+   "amp.mix": 1.0,
+   "amp.model": 0.0,
+   "amp.bright": 1.0,
+   "amp.depth": 3.5,
+   "amp.sag": 0.1,
+   "amp.tight": 90.0,
+   "amp.gate": -72.0,
+   "amp.pedal": 1.0,
+   "amp.pedalDrive": 0.1,
+   "amp.pedalTone": 0.65,
+   "amp.pedalLevel": 0.0,
+   "amp.oversampling": 2.0,
+   "amp.channel": 0.0,
+   "amp.modelB": 5.0,
+   "amp.gainB": 4.0,
+   "amp.bassB": 4.0,
+   "amp.middleB": 5.5,
+   "amp.trebleB": 6.5,
+   "amp.presenceB": 6.0,
+   "amp.masterB": 5.5,
+   "amp.brightB": 1.0,
+   "amp.depthB": 4.0
+  }
+ }
+}

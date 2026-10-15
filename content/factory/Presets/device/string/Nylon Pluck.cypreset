@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "string",
+ "name": "Nylon Pluck",
+ "state": {
+  "type": "string",
+  "parameters": {
+   "string.frequency": 220.0,
+   "string.damping": 0.45,
+   "string.decay": 3.0
+  }
+ }
+}

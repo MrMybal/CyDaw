@@ -1,0 +1,24 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "fournaise",
+ "name": "Rap Vocal Valve Edge",
+ "state": {
+  "type": "fournaise",
+  "parameters": {
+   "fournaise.drive": 5.0,
+   "fournaise.tone": 0.3,
+   "fournaise.lowCut": 120.0,
+   "fournaise.highCut": 15000.0,
+   "fournaise.mix": 0.7,
+   "fournaise.output": 0.0,
+   "fournaise.style": 3.0,
+   "fournaise.punish": 0.0,
+   "fournaise.auto": 1.0,
+   "fournaise.thump": 0.0,
+   "fournaise.steep": 0.0,
+   "fournaise.oversampling": 2.0
+  }
+ }
+}

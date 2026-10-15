@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "phaser",
+ "name": "Classic Phaser",
+ "state": {
+  "type": "phaser",
+  "parameters": {
+   "phaser.rate": 0.35,
+   "phaser.depth": 0.8,
+   "phaser.frequency": 700.0,
+   "phaser.feedback": 0.5,
+   "phaser.mix": 0.5
+  }
+ }
+}

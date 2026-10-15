@@ -1,0 +1,22 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "peigne",
+ "name": "Phase Sweep Notches",
+ "state": {
+  "type": "peigne",
+  "parameters": {
+   "peigne.frequency": 500.0,
+   "peigne.feedback": 0.8,
+   "peigne.damping": 9000.0,
+   "peigne.spread": 0.0,
+   "peigne.lfoDepth": 0.8,
+   "peigne.lfoRate": 0.15,
+   "peigne.mix": 1.0,
+   "peigne.output": 0.0,
+   "peigne.mode": 1.0,
+   "peigne.sync": 0.0
+  }
+ }
+}

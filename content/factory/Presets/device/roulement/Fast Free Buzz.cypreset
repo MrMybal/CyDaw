@@ -1,0 +1,16 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "roulement",
+ "name": "Fast Free Buzz",
+ "state": {
+  "type": "roulement",
+  "parameters": {
+   "roulement.rate": 24.0,
+   "roulement.gate": 0.4,
+   "roulement.ramp": 0.0,
+   "roulement.sync": 0.0
+  }
+ }
+}

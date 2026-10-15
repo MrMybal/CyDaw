@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "mic-sim",
+ "name": "Film Phone Call",
+ "state": {
+  "type": "mic-sim",
+  "parameters": {
+   "micsim.distance": 8.0,
+   "micsim.angle": 0.0,
+   "micsim.drive": 6.0,
+   "micsim.lowCut": 320.0,
+   "micsim.highCut": 3400.0,
+   "micsim.room": 0.05,
+   "micsim.output": 0.0,
+   "micsim.mix": 1.0,
+   "micsim.model": 8.0,
+   "micsim.pattern": 1.0,
+   "micsim.preamp": 0.0,
+   "micsim.noise": -62.0,
+   "micsim.roomSize": 0.1,
+   "micsim.roomTone": 3000.0
+  }
+ }
+}

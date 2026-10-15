@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "echo-space",
+ "name": "Dub Space",
+ "state": {
+  "type": "echo-space",
+  "parameters": {
+   "node.15002.delay.time": 750.0,
+   "node.15002.delay.feedback": 0.7,
+   "node.15002.delay.mix": 0.38,
+   "node.15003.reverb.roomSize": 0.85,
+   "node.15003.reverb.mix": 0.3
+  }
+ }
+}

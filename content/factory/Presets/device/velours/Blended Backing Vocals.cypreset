@@ -1,0 +1,24 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "velours",
+ "name": "Blended Backing Vocals",
+ "state": {
+  "type": "velours",
+  "parameters": {
+   "velours.depth": 8.0,
+   "velours.sharpness": 0.4,
+   "velours.selectivity": 0.4,
+   "velours.attack": 10.0,
+   "velours.release": 150.0,
+   "velours.focusLow": 300.0,
+   "velours.focusHigh": 12000.0,
+   "velours.mix": 1.0,
+   "velours.mode": 0.0,
+   "velours.delta": 0.0,
+   "velours.output": 1.0,
+   "velours.link": 1.0
+  }
+ }
+}

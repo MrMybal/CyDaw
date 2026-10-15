@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "dark-room",
+ "name": "Dark Chamber",
+ "state": {
+  "type": "dark-room",
+  "parameters": {
+   "node.27002.lowpass.cutoff": 3200.0,
+   "node.27002.lowpass.resonance": 0.9,
+   "node.27003.reverb.roomSize": 0.88,
+   "node.27003.reverb.mix": 0.45,
+   "node.27004.eq.tone": -0.16
+  }
+ }
+}

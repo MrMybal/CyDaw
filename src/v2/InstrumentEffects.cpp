@@ -12,7 +12,7 @@ namespace cydaw::v2::instrument_effects {
 using ui::dp;
 using ui::L;
 
-void draw(Studio& studio, UiState& state, const TrackRef& track, const juce::String& ownType,
+void draw(DeviceHost& studio, UiState& state, const TrackRef& track, const juce::String& ownType,
           const juce::String& instrumentName, const std::span<const Choice> choices, const ImU32 colour)
 {
     auto* slot = studio.graphFor(track);

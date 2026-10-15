@@ -1,0 +1,16 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "bitcrusher",
+ "name": "Lo-Fi Sampler",
+ "state": {
+  "type": "bitcrusher",
+  "parameters": {
+   "crusher.bits": 10.0,
+   "crusher.downsample": 3.0,
+   "crusher.drive": 4.0,
+   "crusher.mix": 0.6
+  }
+ }
+}

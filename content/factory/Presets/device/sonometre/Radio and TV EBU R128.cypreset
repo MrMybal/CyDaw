@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "sonometre",
+ "name": "Radio and TV EBU R128",
+ "state": {
+  "type": "sonometre",
+  "parameters": {
+   "sonometre.target": 4.0,
+   "sonometre.history": 300.0,
+   "sonometre.truePeak": -1.0
+  }
+ }
+}

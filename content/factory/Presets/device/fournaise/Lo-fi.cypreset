@@ -3,7 +3,7 @@
  "version": 1,
  "kind": "device",
  "target": "fournaise",
- "name": "Lo-fi",
+ "name": "Lo-Fi",
  "state": {
   "type": "fournaise",
   "parameters": {

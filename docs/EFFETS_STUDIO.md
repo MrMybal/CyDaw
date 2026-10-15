@@ -31,8 +31,7 @@ lentement, avec un filtre de décroissance par ligne : le temps de réverbérati
 - **Après** : coupe-bas, coupe-haut, **Diffusion**, **Réflexions** (niveau des premières réflexions),
   **Ducking** (la réverbération s'efface quand le son direct joue) et son retour, **Sortie**, **Gel**
   (la queue tient sans fin, rien de nouveau n'y entre).
-- Préréglages : Petite pièce, Studio boisé, Plaque brillante, Grande salle, Cathédrale, Voix en avant
-  (ducking), Nappe immense.
+- Préréglages : 29 (noms en anglais), par exemple Lead Vocal Plate, Snare Room Slam, Piano Concert Hall, Shoegaze Wash, Cinematic Trailer Hall.
 
 ## Compresseur Pro
 
@@ -49,8 +48,7 @@ réglages prennent les valeurs d'avant).
   **Lien stéréo**, **Détecteur PH / PB** (filtrer ce qu'entend le détecteur).
 - Options : **Stéréo / Mid / Side** (ne compresser que le centre ou les côtés), **Relâchement auto**,
   **Gain auto**, **Écoute** (entendre le détecteur, après ses filtres).
-- Préréglages : Voix douce, Batterie percutante, Colle de bus, Compression parallèle, Opto chaleureux,
-  Mastering léger, Pompage, Basse tenue.
+- Préréglages : 31 (noms en anglais), par exemple Pop Lead Vocal Tight Control, Snappy Kick, Explosive Parallel Drums, Synth Bass Ducking Under the Kick (Sidechain), Mid-Side Master (Mid Only).
 - **Sidechain** : le bouton maillons de sa carte (dans Périphériques) choisit la piste que son détecteur
   écoute à la place du son qu'il compresse : un kick qui fait pomper une basse, une voix qui baisse la
   musique. CyDAW ajoute à la piste une entrée « Sidechain », la relie à la prise sidechain du
@@ -83,8 +81,7 @@ les échantillons, que la conversion fera entendre).
   unité** (pour comparer au même niveau).
 - Pour viser un loudness (−14 LUFS pour le streaming) : régler la cible, puis monter le **Gain**
   jusqu'à ce que la mesure **I** l'atteigne sur tout le morceau.
-- Préréglages : Mastering transparent, Fort et moderne, Percutant, Agressif, Bus de batterie,
-  Sécurité sans distorsion, Streaming -14 LUFS, CD 16 bits.
+- Préréglages : 29 (noms en anglais), par exemple Pop Streaming Master (-14 LUFS), Loud Club Master (-8 LUFS), Film and TV EBU R128 (-23 LUFS), 24-bit Export with Dither, Vinyl Pre-Master.
 
 ## Filtre Pro
 
@@ -106,14 +103,13 @@ Quatre filtres modulés, à la manière de Volcano.
   **modulations** (source, cible, quantité). **Glisser** l'étiquette d'un LFO ou du suiveur sur une
   molette (coupure, résonance, saturation, mélange, sortie) ou sur une poignée : une modulation libre
   la prend.
-- Préréglages : Passe-bas doux, Wah automatique, Balayage lent, Wobble 1/8, Téléphone, Voyelles, Peigne
-  métallique, Tourbillon stéréo, Hachures aléatoires.
+- Préréglages : 29 (noms en anglais), par exemple Wobble Bass Triplet Growl, Funk Guitar Envelope Filter, Talking Bass Formants, Old Radio Tuning Drift, EDM Bar-Long High-Pass Rise.
 
 ## Exemple
 
 **19-effets-studio** (Fichier › Modèles) : « Pas de cinq » à travers les quatre effets, chacun depuis
-un préréglage — une plaque et le compresseur « Voix douce » sur le saxophone, une grande salle sur le
-piano, « Basse tenue » sur la contrebasse, les balais qui tournent dans le Filtre Pro, et le Limiteur
+un préréglage — une plaque et le compresseur « Gentle Vocal » sur le saxophone, une grande salle sur le
+piano, « Steady Bass » sur la contrebasse, les balais qui tournent dans le Filtre Pro, et le Limiteur
 Pro « Streaming -14 LUFS » sur le master (plafond -1 dBTP, mesuré sur l'export).
 
 ## Pour les curieux

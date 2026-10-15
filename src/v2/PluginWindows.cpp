@@ -33,6 +33,8 @@ std::string PluginWindows::windowId(const PluginWindow& window)
 
 void PluginWindows::draw()
 {
+    // Inside a module: English, whatever the language.
+    const ui::ModuleText english;
     std::vector<PluginWindow> closed;
     for (const auto& window : state_.pluginWindows) {
         auto* slot = studio_.graphFor(window.track);

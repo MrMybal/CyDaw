@@ -1,0 +1,24 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "rotor",
+ "name": "Wide Stereo Spin",
+ "state": {
+  "type": "rotor",
+  "parameters": {
+   "rotor.slow": 0.8,
+   "rotor.fast": 6.2,
+   "rotor.acceleration": 1.2,
+   "rotor.balance": 0.0,
+   "rotor.doppler": 0.5,
+   "rotor.drive": 3.0,
+   "rotor.mix": 1.0,
+   "rotor.output": 0.0,
+   "rotor.speed": 2.0,
+   "rotor.crossover": 800.0,
+   "rotor.width": 1.0,
+   "rotor.room": 0.4
+  }
+ }
+}

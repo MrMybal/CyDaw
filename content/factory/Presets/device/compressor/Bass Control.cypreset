@@ -1,0 +1,14 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "compressor",
+ "name": "Bass Control",
+ "state": {
+  "type": "compressor",
+  "parameters": {
+   "compressor.threshold": -18.0,
+   "compressor.ratio": 5.0
+  }
+ }
+}

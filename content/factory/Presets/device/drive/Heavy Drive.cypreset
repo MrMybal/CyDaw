@@ -1,0 +1,13 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "drive",
+ "name": "Heavy Drive",
+ "state": {
+  "type": "drive",
+  "parameters": {
+   "drive.db": 22.0
+  }
+ }
+}

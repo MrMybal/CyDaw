@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "grains",
+ "name": "Scattered Echoes",
+ "state": {
+  "type": "grains",
+  "parameters": {
+   "grains.time": 380.0,
+   "grains.feedback": 0.45,
+   "grains.pitch": 0.0,
+   "grains.spray": 300.0,
+   "grains.density": 12.0,
+   "grains.pitchRandom": 0.0,
+   "grains.mix": 0.4,
+   "grains.output": 0.0,
+   "grains.sync": 0.0,
+   "grains.size": 70.0,
+   "grains.stereo": 1.0,
+   "grains.reverseChance": 0.0,
+   "grains.freeze": 0.0,
+   "grains.highCut": 14000.0
+  }
+ }
+}

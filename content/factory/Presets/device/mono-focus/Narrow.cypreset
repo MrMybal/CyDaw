@@ -1,0 +1,13 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "mono-focus",
+ "name": "Narrow",
+ "state": {
+  "type": "mono-focus",
+  "parameters": {
+   "node.28002.stereo.width": 0.4
+  }
+ }
+}

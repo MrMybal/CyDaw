@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "transient-shaper",
+ "name": "Pluck Snap",
+ "state": {
+  "type": "transient-shaper",
+  "parameters": {
+   "transient.attack": 1.0,
+   "transient.sustain": -0.2,
+   "transient.output": -2.0
+  }
+ }
+}

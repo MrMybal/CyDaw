@@ -17,6 +17,16 @@ namespace cydaw::v2::ui {
 // i18n/v2/<code>.json beside the program ({"English": "translation"}),
 // keeping the English for what it does not have.
 [[nodiscard]] bool french();
+// While one lives, the texts drawn are a module's (a device's card or window,
+// an instrument's, a node of the graph, a plug-in's window): English,
+// whatever the language (french() false, L() its English).
+class ModuleText final {
+public:
+    ModuleText() noexcept;
+    ~ModuleText();
+    ModuleText(const ModuleText&) = delete;
+    ModuleText& operator=(const ModuleText&) = delete;
+};
 [[nodiscard]] const char* L(const char* fr, const char* en);
 // The same, as a juce::String (inline text is UTF-8).
 [[nodiscard]] inline juce::String Ls(const char* fr, const char* en)
@@ -56,7 +66,44 @@ struct KnobStyle {
     const char* valueText {};
     int flags { knobNone };
     float modulation { -1.0f };// a live position (0..1) shown as a dot, <0 for none
+    // A setting with this many steps across its course (a number of voices):
+    // the knob lands on them, a drag gathering what it needs to reach the
+    // next; 0 for one that takes any value.
+    int steps {};
+    // The room its label has, centred under it (0: the knob's own width); a
+    // label wider than that is drawn a little smaller.
+    float labelWidth {};
 };
+
+// The pointer driven by the control port (tests): knobs then follow its
+// movement as given, instead of holding the system's pointer still.
+void setScriptedPointer(bool scripted);
+// For the item just submitted while it is held (a knob, a value dragged):
+// how far the pointer moved this frame. The system's pointer is hidden and
+// put back where the drag began, so it never stops at a screen's edge and
+// is where it was when let go. `key` keeps where the drag began.
+[[nodiscard]] ImVec2 heldMovement(ImGuiID key);
+
+// How fast a drag or the wheel moves a value now: slowly with Ctrl held
+// (fine), quickly with Shift, else at its usual pace (1).
+[[nodiscard]] float valueSpeed();
+
+// A number typed in. Called each frame for a value's text: `open` (the
+// caller saw a click on it, without a drag) opens a field over
+// [min, max] holding the value; Enter sets what was typed (a comma is a
+// decimal point, a "k" multiplies by a thousand), Escape or a click
+// elsewhere leaves it. `scale`: what the text shows of the value (100 for
+// a fraction shown in percent). True, with `value` set, when a number was
+// typed.
+bool valueEntry(ImGuiID id, ImVec2 min, ImVec2 max, double& value, double minimum, double maximum, bool open,
+                double scale = 1.0, const char* unit = nullptr);
+// The same over the text of a value just drawn: an invisible button of
+// `size` at the cursor (where a Dummy would have gone), a click on it
+// opens the field.
+bool valueEntryButton(const char* id, ImVec2 size, double& value, double minimum, double maximum, double scale = 1.0,
+                      const char* unit = nullptr);
+// Whether a field is open: the keyboard then belongs to it.
+[[nodiscard]] bool valueEntryOpen();
 
 // The wheel this frame went to a knob, a fader or a display under the
 // pointer: a view that scrolls with the wheel leaves it to them.
@@ -64,7 +111,8 @@ void takeWheel();
 [[nodiscard]] bool wheelTaken();
 
 // Returns true while the value changes. The default is restored with a
-// double click.
+// double click; Ctrl drags slowly, Shift quickly; a click on its number
+// (without a drag) lets it be typed.
 bool knob(const char* id, float* value, float minimum, float maximum, float defaultValue,
           const KnobStyle& style = {});
 
@@ -89,6 +137,9 @@ bool primaryButton(const char* label, ImVec2 size = ImVec2(0.0f, 0.0f));
 void toolbarSeparator();
 // A delayed tooltip for the last item.
 void tooltip(const char* text);
+// Text wrapped at `screenX` (ImGui::PushTextWrapPos takes the window's own
+// space, not the screen's); ImGui::PopTextWrapPos() after.
+void pushTextWrapAt(float screenX);
 // The band over a timeline to grab: left and right move through it, down
 // zooms in, up zooms out, the point grabbed staying under the pointer. True
 // on a double click (show everything). `position` is the first unit shown,
@@ -124,6 +175,13 @@ void clippedText(ImDrawList* list, ImVec2 position, float maxWidth, ImU32 colour
 // back; by its ImGui id ("###prismEditor"). Call before its Begin: it is
 // placed when it goes or comes, and kept out while out.
 void beforeDetachable(const char* id);
+// A plug-in's window: an instrument's window fills it (no title, no cross,
+// nothing to take out); set once by the plug-in.
+void setEmbedded(bool embedded);
+[[nodiscard]] bool embedded();
+// ImGui::Begin for an instrument's or a device's window, filling the
+// plug-in's window when embedded.
+bool beginEditorWindow(const char* name, bool* open, ImGuiWindowFlags flags);
 // The button of its header that sends it out or brings it back; true when
 // pressed.
 bool detachButton(const char* id, ImVec2 size = ImVec2(0.0f, 0.0f));

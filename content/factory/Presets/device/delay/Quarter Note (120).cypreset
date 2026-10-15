@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "delay",
+ "name": "Quarter Note (120)",
+ "state": {
+  "type": "delay",
+  "parameters": {
+   "delay.time": 500.0,
+   "delay.feedback": 0.35,
+   "delay.mix": 0.25
+  }
+ }
+}

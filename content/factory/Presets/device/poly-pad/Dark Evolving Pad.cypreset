@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "poly-pad",
+ "name": "Dark Evolving Pad",
+ "state": {
+  "type": "poly-pad",
+  "parameters": {
+   "node.18002.voice.mode": 0.0,
+   "node.18002.voice.glide": 0.0,
+   "node.18003.polyOscillator.waveform": 2.0,
+   "node.18003.polyOscillator.level": 0.12,
+   "node.18004.envelope.attack": 1500.0,
+   "node.18004.envelope.decay": 3000.0,
+   "node.18004.envelope.sustain": 0.65,
+   "node.18004.envelope.release": 6000.0,
+   "node.18005.gain.db": 0.0,
+   "node.18006.voiceFilter.cutoff": 1400.0,
+   "node.18006.voiceFilter.resonance": 2.2,
+   "node.18007.stereo.width": 1.5,
+   "node.18008.reverb.roomSize": 0.9,
+   "node.18008.reverb.mix": 0.4
+  }
+ }
+}

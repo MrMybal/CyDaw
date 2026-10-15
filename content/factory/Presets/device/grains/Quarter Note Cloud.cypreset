@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "grains",
+ "name": "Quarter Note Cloud",
+ "state": {
+  "type": "grains",
+  "parameters": {
+   "grains.time": 250.0,
+   "grains.feedback": 0.55,
+   "grains.pitch": 0.0,
+   "grains.spray": 100.0,
+   "grains.density": 60.0,
+   "grains.pitchRandom": 0.0,
+   "grains.mix": 0.4,
+   "grains.output": 0.0,
+   "grains.sync": 9.0,
+   "grains.size": 250.0,
+   "grains.stereo": 0.9,
+   "grains.reverseChance": 0.0,
+   "grains.freeze": 0.0,
+   "grains.highCut": 14000.0
+  }
+ }
+}

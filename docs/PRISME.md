@@ -12,7 +12,8 @@ entendre (nappe, pluck, basse Reese, lead supersaw, cloches, basse growl et une 
 ## L'interface
 
 Sur la carte (Périphériques) : la table de l'oscillateur A, les potards qui comptent le plus (positions A et B,
-fréquence et résonance du filtre, attaque et relâchement, macros, volume) et **Ouvrir Prisme**.
+fréquence et résonance du filtre, attaque et relâchement, macros, volume) ; sa fenêtre s'ouvre par
+le bouton de l'en-tête de la carte.
 
 La fenêtre, quatre onglets :
 
@@ -59,12 +60,8 @@ La fenêtre, quatre onglets :
 
 **Moduler** : glisser une source (ENV 2, LFO 1, M1…) sur un potard, ou clic droit › Moduler par. Un anneau
 violet autour du potard montre jusqu'où il va ; clic droit pour régler la quantité ou retirer. Double-clic :
-valeur par défaut. Les préréglages (barre du haut de la fenêtre, bouton de la carte) : 30 sons d'usine
-(Supersaw Lead, Reese Bass, Pluck Digital, Nappe évolutive, Growl Bass, Wobble, Voix formant, Cloche FM,
-Sub 808, Arpège synchro, Cuivres, Orgue, Bruit et souffle, Init ; et avec les trois oscillateurs, les spectres et
-les LFO stéréo : Trois oscillateurs, Cloche spectrale, Formant qui parle, Pad stéréo, Pincé spectral, Peigne
-mouvant, Impairs creux, Basse à trois, Nappe en octaves, Arpège stéréo, Cristal haut, Voix synthétique, Trémolo
-stéréo, Croissance FM, Orgue spectral, Basse spectrale) et les vôtres.
+valeur par défaut. Les préréglages (barre du haut de la fenêtre, bouton de la carte) : 65 sons d'usine (noms en anglais), par exemple Breathing Reese, Neuro Growler, Trance Supersaw, Pumping Future Bass Chords, Trance Gate, Tension Riser, et les vôtres. Un préréglage garde le son entier : le troisième oscillateur, les spectres, la stéréo
+des LFO et leurs points dessinés compris ; ce qu'il ne fixe pas reprend sa valeur par défaut.
 
 ## Le moteur
 
@@ -147,3 +144,10 @@ des flèches) revient aux tables de Prisme. Port de contrôle : `prism {importTa
 ## Limites
 
 - Les effets de l'onglet EFFETS s'ajoutent dans l'ordre des clics (ils se réordonnent dans Périphériques).
+
+## Les modulations à l'écran
+
+Pendant qu'une note joue, Prisme montre ce que fait sa voix la plus récente : sur chaque bouton
+modulé, un point là où la matrice le met (en plus de l'arc de sa plage), la courbe du filtre tracée
+une seconde fois en violet là où elle se trouve, un point qui court sur chaque LFO et une ligne au
+niveau de chaque enveloppe (`prism::Voice::live`, `VoiceLive`, lus par `PrismView`).

@@ -1,0 +1,24 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "velours",
+ "name": "Fingerpicked Acoustic (Softened Attacks)",
+ "state": {
+  "type": "velours",
+  "parameters": {
+   "velours.depth": 5.0,
+   "velours.sharpness": 0.55,
+   "velours.selectivity": 0.6,
+   "velours.attack": 1.0,
+   "velours.release": 50.0,
+   "velours.focusLow": 2000.0,
+   "velours.focusHigh": 10000.0,
+   "velours.mix": 1.0,
+   "velours.mode": 0.0,
+   "velours.delta": 0.0,
+   "velours.output": 0.3,
+   "velours.link": 0.8
+  }
+ }
+}

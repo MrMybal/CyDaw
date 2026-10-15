@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "bass-zone",
+ "name": "Left Hand Split",
+ "state": {
+  "type": "bass-zone",
+  "parameters": {
+   "node.34002.midi.note.minimum": 0.0,
+   "node.34002.midi.note.maximum": 53.0,
+   "node.34003.midi.velocity": 1.0
+  }
+ }
+}

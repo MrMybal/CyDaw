@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "tremolo-pan",
+ "name": "Slow Stereo Drift",
+ "state": {
+  "type": "tremolo-pan",
+  "parameters": {
+   "tremolo.rate": 0.3,
+   "tremolo.depth": 0.6,
+   "tremolo.shape": 1.0,
+   "tremolo.spread": 1.0,
+   "tremolo.sync": 0.0
+  }
+ }
+}

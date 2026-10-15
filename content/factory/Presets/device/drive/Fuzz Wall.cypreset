@@ -1,0 +1,13 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "drive",
+ "name": "Fuzz Wall",
+ "state": {
+  "type": "drive",
+  "parameters": {
+   "drive.db": 34.0
+  }
+ }
+}

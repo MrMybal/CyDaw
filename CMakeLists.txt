@@ -121,6 +121,15 @@ add_library(cydaw_core STATIC
     src/engine/MixEffects.cpp
     src/engine/SuiteEffects.cpp
     src/engine/HaloReverb.cpp
+    src/engine/AddedEffects.cpp
+    src/engine/MidiEffects.cpp
+    src/engine/VoiceEffects.cpp
+    src/engine/PitchEffects.cpp
+    src/engine/SpaceEffects.cpp
+    src/engine/RhythmEffects.cpp
+    src/engine/MotionEffects.cpp
+    src/engine/ResonanceEffects.cpp
+    src/engine/UtilityEffects.cpp
     src/engine/Convolver.cpp
     src/engine/TimeStretch.cpp
     src/engine/KickSynth.cpp
@@ -133,6 +142,17 @@ add_library(cydaw_core STATIC
     src/engine/ColosseSynth.cpp
     src/engine/MosaiqueSynth.cpp
     src/engine/NebuleuseSynth.cpp
+    src/engine/BronzeSynth.cpp
+    src/engine/JadeSynth.cpp
+    src/engine/SilexSynth.cpp
+    src/engine/DeriveSynth.cpp
+    src/engine/SaphirSynth.cpp
+    src/engine/ArgileSynth.cpp
+    src/engine/QuartzSynth.cpp
+    src/engine/AlliageSynth.cpp
+    src/engine/TiretteSynth.cpp
+    src/engine/OnyxSynth.cpp
+    src/engine/OpaleSynth.cpp
     src/engine/SynthTables.cpp
     src/engine/DrumKit.cpp
     src/engine/Sampler.cpp
@@ -459,6 +479,24 @@ if(CYDAW_BUILD_DESKTOP)
             endif()
         endif()
 
+        # Dear ImGui (docking branch, third_party/imgui), drawn with Direct3D 11:
+        # CyDAW 2's interface, and the window of every plug-in exported from it.
+        if(WIN32 AND NOT TARGET cydaw_imgui)
+            add_library(cydaw_imgui STATIC
+                third_party/imgui/imgui.cpp
+                third_party/imgui/imgui_draw.cpp
+                third_party/imgui/imgui_tables.cpp
+                third_party/imgui/imgui_widgets.cpp
+                third_party/imgui/imgui_demo.cpp
+                third_party/imgui/backends/imgui_impl_win32.cpp
+                third_party/imgui/backends/imgui_impl_dx11.cpp
+            )
+            target_include_directories(cydaw_imgui PUBLIC third_party/imgui)
+            target_compile_definitions(cydaw_imgui PUBLIC IMGUI_DISABLE_OBSOLETE_FUNCTIONS)
+            target_compile_features(cydaw_imgui PUBLIC cxx_std_17)
+            target_link_libraries(cydaw_imgui PUBLIC d3d11 dxgi dwmapi d3dcompiler)
+        endif()
+
         function(cydaw_add_graph_runtime_plugin target_name)
             set(options IS_SYNTH ACCEPTS_MIDI PRODUCES_MIDI)
             set(one_value_args PRODUCT_NAME COMPANY_NAME BUNDLE_ID
@@ -515,6 +553,39 @@ if(CYDAW_BUILD_DESKTOP)
             target_include_directories(${target_name} PRIVATE
                 "${cydaw_root}/src/app"
                 "${cydaw_root}/src/graph_plugin")
+            if(WIN32)
+                # Its window: CyDAW's own interface of its device (Dear ImGui),
+                # the same views as in CyDAW 2.
+                target_sources(${target_name} PRIVATE
+                    "${cydaw_root}/src/plugin_ui/PluginInterface.cpp"
+                    "${cydaw_root}/src/app/NodeGraphComponentEditorAccess.cpp"
+                    "${cydaw_root}/src/plugin_ui/PluginInterface.h"
+                    "${cydaw_root}/src/v2/ImGuiHost.cpp"
+                    "${cydaw_root}/src/v2/Theme.cpp"
+                    "${cydaw_root}/src/v2/Widgets.cpp"
+                    "${cydaw_root}/src/v2/UiState.cpp"
+                    "${cydaw_root}/src/v2/GraphSlot.cpp"
+                    "${cydaw_root}/src/v2/DeviceOps.cpp"
+                    "${cydaw_root}/src/v2/DeviceBody.cpp"
+                    "${cydaw_root}/src/v2/DeviceSignals.cpp"
+                    "${cydaw_root}/src/v2/SignalAnalysis.cpp"
+                    "${cydaw_root}/src/v2/DeviceVisuals.cpp"
+                    "${cydaw_root}/src/v2/StudioEffectsView.cpp"
+                    "${cydaw_root}/src/v2/CardFiles.cpp"
+                    "${cydaw_root}/src/v2/InterfaceEditor.cpp"
+                    "${cydaw_root}/src/v2/Presets.cpp"
+                    "${cydaw_root}/src/v2/PresetMenu.cpp"
+                    "${cydaw_root}/src/v2/Locations.cpp"
+                    "${cydaw_root}/src/v2/InstrumentEffects.cpp"
+                    "${cydaw_root}/src/v2/SynthLayouts.cpp"
+                    "${cydaw_root}/src/v2/SynthView.cpp"
+                    "${cydaw_root}/src/v2/PrismView.cpp"
+                    "${cydaw_root}/src/v2/KickView.cpp")
+                target_include_directories(${target_name} PRIVATE
+                    "${cydaw_root}/src/v2"
+                    "${cydaw_root}/src/plugin_ui")
+                target_link_libraries(${target_name} PRIVATE cydaw_imgui juce::juce_dsp)
+            endif()
             target_compile_features(${target_name} PRIVATE cxx_std_20)
             target_compile_definitions(${target_name} PRIVATE
                 JUCE_USE_CURL=0
@@ -558,9 +629,11 @@ if(CYDAW_BUILD_DESKTOP)
                 target_compile_definitions(cydaw_graph_runtime_host PRIVATE
                     JUCE_USE_CURL=0
                     JUCE_WEB_BROWSER=0
-                    JUCE_PLUGINHOST_VST3=1)
+                    JUCE_PLUGINHOST_VST3=1
+                    JUCE_MODAL_LOOPS_PERMITTED=1)
                 target_link_libraries(cydaw_graph_runtime_host PRIVATE
                     juce::juce_audio_processors
+                    juce::juce_gui_extra
                     juce::juce_recommended_config_flags
                     juce::juce_recommended_warning_flags)
                 add_dependencies(cydaw_graph_runtime_host CyDAWGraphRuntime_VST3)
@@ -902,20 +975,6 @@ if(CYDAW_BUILD_DESKTOP)
         # Version 1 above stays buildable; src/v2 holds the new interface.
         option(CYDAW_BUILD_V2 "Build CyDAW 2, the Dear ImGui interface" ON)
         if(WIN32 AND CYDAW_BUILD_V2)
-            add_library(cydaw_imgui STATIC
-                third_party/imgui/imgui.cpp
-                third_party/imgui/imgui_draw.cpp
-                third_party/imgui/imgui_tables.cpp
-                third_party/imgui/imgui_widgets.cpp
-                third_party/imgui/imgui_demo.cpp
-                third_party/imgui/backends/imgui_impl_win32.cpp
-                third_party/imgui/backends/imgui_impl_dx11.cpp
-            )
-            target_include_directories(cydaw_imgui PUBLIC third_party/imgui)
-            target_compile_definitions(cydaw_imgui PUBLIC IMGUI_DISABLE_OBSOLETE_FUNCTIONS)
-            target_compile_features(cydaw_imgui PUBLIC cxx_std_17)
-            target_link_libraries(cydaw_imgui PUBLIC d3d11 dxgi dwmapi d3dcompiler)
-
             juce_add_gui_app(CyDAW2
                 PRODUCT_NAME "CyDAW 2"
                 VERSION "${PROJECT_VERSION}"
@@ -946,6 +1005,18 @@ if(CYDAW_BUILD_DESKTOP)
                 src/v2/ImGuiHost.h
                 src/v2/Icons.h
                 src/v2/Studio.cpp
+                src/v2/GraphSlot.cpp
+                src/v2/DeviceOps.cpp
+                src/v2/DeviceOps.h
+                src/v2/StudioTypes.h
+                src/v2/DeviceHost.h
+                src/v2/ImportedInstruments.cpp
+                src/v2/AddTrackMenu.cpp
+                src/v2/RackView.cpp
+                src/v2/RackView.h
+                src/v2/AddTrackMenu.h
+                src/v2/EditorWindows.h
+                src/v2/ImportedInstruments.h
                 src/v2/TrackModulation.cpp
                 src/v2/SignalAnalysis.cpp
                 src/v2/SignalAnalysis.h
@@ -998,8 +1069,16 @@ if(CYDAW_BUILD_DESKTOP)
                 src/v2/CardFiles.h
                 src/v2/AudioEditorView.cpp
                 src/v2/AudioEditorView.h
+                src/v2/MasterClipEditor.cpp
+                src/v2/MasterClipEditor.h
+                src/v2/ComputerKeyboard.cpp
+                src/v2/ComputerKeyboard.h
+                src/v2/ThemesView.cpp
+                src/v2/ThemesView.h
                 src/v2/SamplerView.h
                 src/v2/DeviceEditorView.cpp
+                src/v2/DeviceBody.cpp
+                src/v2/DeviceBody.h
                 src/v2/DeviceEditorView.h
                 src/v2/WorkshopView.cpp
                 src/v2/PluginWindows.cpp
@@ -1262,6 +1341,23 @@ if(CYDAW_BUILD_DESKTOP)
                              COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/v2_synths_check.py"
                                      --port 47845 --exe "$<TARGET_FILE:CyDAW2>")
                     set_tests_properties(cydaw2_synths_check PROPERTIES TIMEOUT 300)
+                    # The creative effects, the MIDI effects, the pad rack, Silex
+                    # and Nuée: presets, sound, order, a project keeping the pads.
+                    add_test(NAME cydaw2_creative_check
+                             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/v2_creative_check.py"
+                                     --port 47852 --exe "$<TARGET_FILE:CyDAW2>")
+                    set_tests_properties(cydaw2_creative_check PROPERTIES TIMEOUT 400)
+                    # An exported plug-in's window: CyDAW's own interface of its
+                    # device (Prisme, Jade, Kick, the effects' large views), off
+                    # the screen, and a host that closes it and exits.
+                    if(TARGET cydaw_graph_runtime_host)
+                        add_test(NAME cydaw2_plugin_window_check
+                                 COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/v2_plugin_window_check.py"
+                                         --port 47853 --exe "$<TARGET_FILE:CyDAW2>"
+                                         --host "$<TARGET_FILE:cydaw_graph_runtime_host>"
+                                         --plugin "${CMAKE_BINARY_DIR}/CyDAWGraphRuntime_artefacts/$<CONFIG>/VST3/CyDAW Graph Runtime.vst3")
+                        set_tests_properties(cydaw2_plugin_window_check PROPERTIES TIMEOUT 600)
+                    endif()
                     # Batterie: its kits (the banks downloaded on this computer;
                     # skipped without them), its pieces' mix, grooves, presets.
                     add_test(NAME cydaw2_batterie_check
@@ -1274,6 +1370,28 @@ if(CYDAW_BUILD_DESKTOP)
                              COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/v2_sfz_live_check.py"
                                      --port 47847 --exe "$<TARGET_FILE:CyDAW2>")
                     set_tests_properties(cydaw2_sfz_live_check PROPERTIES TIMEOUT 300)
+                    # The library's loops heard at the project's tempo, in step
+                    # with the transport.
+                    add_test(NAME cydaw2_tempo_audition_check
+                             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/v2_tempo_audition_check.py"
+                                     --port 47848 --exe "$<TARGET_FILE:CyDAW2>")
+                    set_tests_properties(cydaw2_tempo_audition_check PROPERTIES TIMEOUT 300)
+                    # Cards switched off: an effect lets its input through,
+                    # an instrument falls silent, saved with the project.
+                    add_test(NAME cydaw2_bypass_check
+                             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/v2_bypass_check.py"
+                                     --port 47849 --exe "$<TARGET_FILE:CyDAW2>")
+                    set_tests_properties(cydaw2_bypass_check PROPERTIES TIMEOUT 300)
+                    # A knob jumping while a note plays is heard as a slope.
+                    add_test(NAME cydaw2_knob_glide_check
+                             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/v2_knob_glide_check.py"
+                                     --port 47850 --exe "$<TARGET_FILE:CyDAW2>")
+                    set_tests_properties(cydaw2_knob_glide_check PROPERTIES TIMEOUT 300)
+                    # What a synth's voice plays, shown as it plays.
+                    add_test(NAME cydaw2_voice_live_check
+                             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/v2_voice_live_check.py"
+                                     --port 47851 --exe "$<TARGET_FILE:CyDAW2>")
+                    set_tests_properties(cydaw2_voice_live_check PROPERTIES TIMEOUT 300)
                     # Presets of a card, a track's chain and a hosted plug-in (the
                     # graph runtime VST3), in a presets folder of the test's own.
                     set(cydaw_presets_plugin_arguments)

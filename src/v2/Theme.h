@@ -2,9 +2,14 @@
 
 #include <imgui.h>
 
+#include <juce_core/juce_core.h>
+
+#include <vector>
+
 // The look of CyDAW 2: one palette, one set of sizes, the fonts. Every panel
 // draws with these, so the interface stays consistent and can be retuned in
-// one place.
+// one place. The palette is the theme's: a built-in one, or one the person
+// made (colours only).
 
 namespace cydaw::v2::theme {
 
@@ -46,6 +51,36 @@ struct Palette {
 };
 
 [[nodiscard]] const Palette& palette();
+// The palette drawn with from the next frame on, ImGui's own colours with it.
+void setPalette(const Palette& palette);
+
+// A colour theme: a built-in one, or a file of the person's (.cytheme).
+struct Theme {
+    juce::String key;
+    juce::String name;
+    Palette palette {};
+    bool builtIn {};
+    juce::File file;
+};
+// CyDAW's own: mid grey (the default, as Bitwig's), light grey (as Ableton
+// Live's), the first dark one. Their names in English; the interface says
+// them in its language (ThemesView).
+[[nodiscard]] const std::vector<Theme>& builtInThemes();
+inline constexpr const char* defaultThemeKey = "mid-grey";
+// The palette's colours by name, in the order an editor shows them, with
+// the group each belongs to.
+struct PaletteField {
+    const char* key;
+    const char* french;
+    const char* english;
+    int group; // 0 grounds, 1 lines, 2 text, 3 accent, 4 signals, 5 meters
+    ImU32 Palette::*member;
+};
+[[nodiscard]] const std::vector<PaletteField>& paletteFields();
+// A theme file's colours ("#RRGGBB" or "#RRGGBBAA"), and back; what a file
+// lacks keeps `base`'s.
+[[nodiscard]] juce::var paletteToJson(const Palette& palette);
+[[nodiscard]] Palette paletteFromJson(const juce::var& colours, const Palette& base);
 
 // Applies colours and sizes, scaled for the display.
 void apply(float dpiScale);
@@ -55,6 +90,9 @@ void apply(float dpiScale);
 void loadFonts();
 
 [[nodiscard]] ImFont* uiFont();
+// The scale the next frame draws at (a context made at another), without
+// touching the style.
+void useDpi(float dpiScale);
 [[nodiscard]] ImFont* boldFont();
 [[nodiscard]] ImFont* monoFont();
 // The base size the interface text is drawn at, before the display scale.

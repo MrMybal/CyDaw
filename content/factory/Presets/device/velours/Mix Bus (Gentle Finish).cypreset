@@ -1,0 +1,24 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "velours",
+ "name": "Mix Bus (Gentle Finish)",
+ "state": {
+  "type": "velours",
+  "parameters": {
+   "velours.depth": 3.0,
+   "velours.sharpness": 0.4,
+   "velours.selectivity": 0.5,
+   "velours.attack": 10.0,
+   "velours.release": 150.0,
+   "velours.focusLow": 200.0,
+   "velours.focusHigh": 12000.0,
+   "velours.mix": 0.7,
+   "velours.mode": 0.0,
+   "velours.delta": 0.0,
+   "velours.output": 0.0,
+   "velours.link": 1.0
+  }
+ }
+}

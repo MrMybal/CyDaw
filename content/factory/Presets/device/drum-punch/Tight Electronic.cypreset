@@ -1,0 +1,18 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "drum-punch",
+ "name": "Tight Electronic",
+ "state": {
+  "type": "drum-punch",
+  "parameters": {
+   "node.25002.highpass.cutoff": 45.0,
+   "node.25003.compressor.threshold": -20.0,
+   "node.25003.compressor.ratio": 5.0,
+   "node.25004.drive.db": 4.0,
+   "node.25005.clip.threshold": 0.88,
+   "node.25006.gain.db": -2.0
+  }
+ }
+}

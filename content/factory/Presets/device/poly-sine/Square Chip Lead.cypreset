@@ -1,0 +1,23 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "poly-sine",
+ "name": "Square Chip Lead",
+ "state": {
+  "type": "poly-sine",
+  "parameters": {
+   "node.10002.voice.mode": 1.0,
+   "node.10002.voice.glide": 25.0,
+   "node.10003.polyOscillator.waveform": 3.0,
+   "node.10003.polyOscillator.level": 0.09,
+   "node.10004.envelope.attack": 2.0,
+   "node.10004.envelope.decay": 120.0,
+   "node.10004.envelope.sustain": 0.75,
+   "node.10004.envelope.release": 90.0,
+   "node.10007.gain.db": 0.0,
+   "node.10005.voiceFilter.cutoff": 7000.0,
+   "node.10005.voiceFilter.resonance": 0.8
+  }
+ }
+}

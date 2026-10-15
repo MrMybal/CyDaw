@@ -1,0 +1,13 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "highpass",
+ "name": "Thin Out",
+ "state": {
+  "type": "highpass",
+  "parameters": {
+   "highpass.cutoff": 300.0
+  }
+ }
+}

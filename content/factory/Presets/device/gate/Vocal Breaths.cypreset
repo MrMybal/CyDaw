@@ -1,0 +1,16 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "gate",
+ "name": "Vocal Breaths",
+ "state": {
+  "type": "gate",
+  "parameters": {
+   "gate.threshold": -45.0,
+   "gate.attack": 2.0,
+   "gate.release": 200.0,
+   "gate.range": -12.0
+  }
+ }
+}

@@ -1,0 +1,22 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "utilitaire",
+ "name": "Flip Left Polarity",
+ "state": {
+  "type": "utilitaire",
+  "parameters": {
+   "utilitaire.gain": 0.0,
+   "utilitaire.pan": 0.0,
+   "utilitaire.width": 1.0,
+   "utilitaire.monoBass": 20.0,
+   "utilitaire.invertLeft": 1.0,
+   "utilitaire.invertRight": 0.0,
+   "utilitaire.channelMode": 0.0,
+   "utilitaire.dcFilter": 0.0,
+   "utilitaire.mute": 0.0,
+   "utilitaire.delay": 0.0
+  }
+ }
+}

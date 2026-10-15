@@ -76,6 +76,7 @@ inline constexpr const char* crop = "\xee\x9e\xa8"; // U+E7A8
 inline constexpr const char* trim = "\xee\x9e\x8a"; // U+E78A
 inline constexpr const char* download = "\xee\xa2\x96"; // U+E896
 inline constexpr const char* presets = "\xee\xa3\xb1"; // U+E8F1
+inline constexpr const char* keyboard = "\xee\x9d\xa5"; // U+E765
 inline constexpr const char* lightbulb = "\xee\xa0\xaf"; // U+E82F
 
 } // namespace cydaw::v2::icon

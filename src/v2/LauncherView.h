@@ -1,6 +1,9 @@
 #pragma once
 
+#include "Studio.h"
 #include "UiState.h"
+
+#include <imgui.h>
 
 namespace cydaw::v2 {
 
@@ -18,6 +21,10 @@ public:
 private:
     void launchScene(int scene);
     void stopAll();
+    // A slot of the master's column: its automation clip (launched by its
+    // triangle, opened with a double click), or an empty slot where a double
+    // click makes one.
+    void masterSlot(int scene, ImVec2 min, ImVec2 max);
 
     Studio& studio_;
     UiState& state_;

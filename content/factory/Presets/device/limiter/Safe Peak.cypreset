@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "limiter",
+ "name": "Safe Peak",
+ "state": {
+  "type": "limiter",
+  "parameters": {
+   "limiter.gain": 0.0,
+   "limiter.ceiling": -1.0,
+   "limiter.release": 100.0
+  }
+ }
+}

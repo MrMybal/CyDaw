@@ -1,0 +1,16 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "multimode-filter",
+ "name": "Narrow Notch",
+ "state": {
+  "type": "multimode-filter",
+  "parameters": {
+   "filter.mode": 3.0,
+   "filter.cutoff": 1000.0,
+   "filter.resonance": 4.0,
+   "filter.drive": 0.0
+  }
+ }
+}

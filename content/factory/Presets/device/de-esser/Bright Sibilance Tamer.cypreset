@@ -1,0 +1,23 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "de-esser",
+ "name": "Bright Sibilance Tamer",
+ "state": {
+  "type": "de-esser",
+  "parameters": {
+   "deesser.threshold": -34.0,
+   "deesser.frequency": 7500.0,
+   "deesser.range": 12.0,
+   "deesser.release": 50.0,
+   "deesser.output": 0.0,
+   "deesser.mode": 0.0,
+   "deesser.detectorType": 0.0,
+   "deesser.listen": 0.0,
+   "deesser.bandwidth": 1.0,
+   "deesser.attack": 0.5,
+   "deesser.link": 1.0
+  }
+ }
+}

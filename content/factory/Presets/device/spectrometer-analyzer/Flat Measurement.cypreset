@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "spectrometer-analyzer",
+ "name": "Flat Measurement",
+ "state": {
+  "type": "spectrometer-analyzer",
+  "parameters": {
+   "node.48002.spectrometer.floor": -110.0,
+   "node.48002.spectrometer.tilt": 0.0,
+   "node.48002.spectrometer.smoothing": 0.2,
+   "node.48002.spectrometer.hold": 0.0,
+   "node.48002.spectrometer.history": 4.0
+  }
+ }
+}

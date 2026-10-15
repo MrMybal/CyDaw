@@ -281,6 +281,15 @@ void draw(Studio& studio, UiState& state, const TrackRef& track, app::NodeGraphC
                 ui::clippedText(list, ImVec2(x, y), cell - dp(4.0f), hovered || active ? p.text : p.textDim, text.toRawUTF8());
                 const auto textHeight = ImGui::GetFontSize();
                 ImGui::PopFont();
+                // A click on its name types its value in (0 to 127).
+                {
+                    ImGui::SetCursorScreenPos(ImVec2(origin.x + dp(2.0f), y));
+                    auto typed = static_cast<double>(value);
+                    if (ui::valueEntryButton("##typed", ImVec2(cell - dp(4.0f), textHeight), typed, 0.0, 127.0))
+                        set(suffix, typed);
+                    if (ImGui::IsItemHovered())
+                        ui::tooltip(L("Clic : taper la valeur (0 à 127)", "Click: type the value (0 to 127)"));
+                }
                 ImGui::SetCursorScreenPos(origin);
                 ImGui::Dummy(ImVec2(cell, dp(diameter) + textHeight + dp(8.0f)));
                 ImGui::EndGroup();

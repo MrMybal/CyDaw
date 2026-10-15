@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "sonometre",
+ "name": "Cautious Streaming (Peaks at -2 dB)",
+ "state": {
+  "type": "sonometre",
+  "parameters": {
+   "sonometre.target": 0.0,
+   "sonometre.history": 120.0,
+   "sonometre.truePeak": -2.0
+  }
+ }
+}

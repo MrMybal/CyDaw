@@ -1,0 +1,35 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "reverb-pro",
+ "name": "Trap Vocal Tight Plate",
+ "state": {
+  "type": "reverb-pro",
+  "parameters": {
+   "revpro.space": 0.35,
+   "revpro.decay": 0.9,
+   "revpro.predelay": 12.0,
+   "revpro.distance": 0.25,
+   "revpro.brightness": 0.35,
+   "revpro.character": 0.25,
+   "revpro.width": 1.3,
+   "revpro.mix": 0.18,
+   "revpro.lowDecay": 0.5,
+   "revpro.lowFrequency": 300.0,
+   "revpro.midDecay": 1.0,
+   "revpro.midFrequency": 2000.0,
+   "revpro.highDecay": 0.8,
+   "revpro.highFrequency": 7000.0,
+   "revpro.lowCut": 300.0,
+   "revpro.highCut": 13000.0,
+   "revpro.ducking": 8.0,
+   "revpro.duckRelease": 200.0,
+   "revpro.freeze": 0.0,
+   "revpro.sync": 3.0,
+   "revpro.diffusion": 0.95,
+   "revpro.output": 0.0,
+   "revpro.early": -10.0
+  }
+ }
+}

@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "accords",
+ "name": "Octave Doubler",
+ "state": {
+  "type": "accords",
+  "parameters": {
+   "accords.velocity": 0.850000023841858,
+   "accords.strum": 0.0,
+   "accords.chord": 10.0,
+   "accords.interval1": 4.0,
+   "accords.interval2": 7.0,
+   "accords.interval3": 0.0,
+   "accords.interval4": 0.0,
+   "accords.interval5": 0.0,
+   "accords.interval6": 0.0,
+   "accords.inversion": 0.0,
+   "accords.spread": 0.0,
+   "accords.strumMode": 0.0,
+   "accords.key": 0.0,
+   "accords.scale": 0.0
+  }
+ }
+}

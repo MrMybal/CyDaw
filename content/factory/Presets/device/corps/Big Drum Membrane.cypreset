@@ -1,0 +1,22 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "corps",
+ "name": "Big Drum Membrane",
+ "state": {
+  "type": "corps",
+  "parameters": {
+   "corps.tune": 60.0,
+   "corps.decay": 0.55,
+   "corps.material": 0.4,
+   "corps.inharmonic": 0.0,
+   "corps.position": 0.25,
+   "corps.mix": 0.45,
+   "corps.output": 0.0,
+   "corps.width": 0.5,
+   "corps.type": 3.0,
+   "corps.lowCut": 30.0
+  }
+ }
+}

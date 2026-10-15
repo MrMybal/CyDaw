@@ -1,0 +1,40 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "kick-synth",
+ "name": "Deep House Warm Round",
+ "state": {
+  "type": "kick-synth",
+  "parameters": {
+   "kick.bodyShape": 2.0,
+   "kick.bodyPhase": 0.0,
+   "kick.pitchStart": 180.0,
+   "kick.pitchEnd": 46.0,
+   "kick.pitchTime": 107.5,
+   "kick.pitchCurve": 2.599999904632568,
+   "kick.bodyLevel": 0.0,
+   "kick.attack": 1.5,
+   "kick.hold": 45.0,
+   "kick.decay": 560.0,
+   "kick.decayCurve": 1.5,
+   "kick.length": 1100.0,
+   "kick.clickType": 3.0,
+   "kick.clickLevel": -22.0,
+   "kick.clickDecay": 4.0,
+   "kick.clickTone": 1800.0,
+   "kick.subLevel": -12.0,
+   "kick.subDecay": 500.0,
+   "kick.subOctave": 0.0,
+   "kick.driveType": 3.0,
+   "kick.drive": 3.0,
+   "kick.driveTone": 4000.0,
+   "kick.lowCut": 22.0,
+   "kick.highCut": 6000.0,
+   "kick.lowBoost": 3.0,
+   "kick.keyTrack": 1.0,
+   "kick.velocity": 0.5,
+   "kick.output": -8.899999618530273
+  }
+ }
+}

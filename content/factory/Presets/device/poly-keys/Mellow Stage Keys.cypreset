@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "poly-keys",
+ "name": "Mellow Stage Keys",
+ "state": {
+  "type": "poly-keys",
+  "parameters": {
+   "node.37002.voice.mode": 0.0,
+   "node.37002.voice.glide": 0.0,
+   "node.37003.polyOscillator.waveform": 1.0,
+   "node.37003.polyOscillator.level": 0.14,
+   "node.37004.envelope.attack": 8.0,
+   "node.37004.envelope.decay": 1500.0,
+   "node.37004.envelope.sustain": 0.5,
+   "node.37004.envelope.release": 900.0,
+   "node.37005.gain.db": 0.0,
+   "node.37006.voiceFilter.cutoff": 2600.0,
+   "node.37006.voiceFilter.resonance": 0.9,
+   "node.37007.compressor.threshold": -12.0,
+   "node.37007.compressor.ratio": 2.0,
+   "node.37008.stereo.width": 1.35
+  }
+ }
+}

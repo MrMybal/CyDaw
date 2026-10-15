@@ -283,24 +283,35 @@ void Vst3Build::run()
         return;
     }
     phase_ = Phase::building;
+    // The build folder is every export's: the bundles an earlier export left
+    // there go first, so the one found next is this device's.
+    const auto built = output.getChildFile("CyDAWGeneratedGraphPlugin_artefacts").getChildFile("Release").getChildFile("VST3");
+    for (const auto& old : built.findChildFiles(juce::File::findDirectories, false, "*.vst3"))
+        (void) old.deleteRecursively();
     if (!runStep({ tools.cmake.getFullPathName(), "--build", output.getFullPathName(), "--config", "Release", "--target", kTarget,
                    "--parallel" })) {
         finish(threadShouldExit() ? Phase::cancelled : Phase::failed, "the build failed; the log says why");
         return;
     }
-    // The bundle, beside the project the person keeps.
-    const auto built = output.getChildFile("CyDAWGeneratedGraphPlugin_artefacts").getChildFile("Release").getChildFile("VST3");
-    const auto bundles = built.findChildFiles(juce::File::findDirectories, false, "*.vst3");
+    // The bundle, beside the project the person keeps: the one named after
+    // the product, else the newest (a name the build wrote otherwise).
+    auto bundles = built.findChildFiles(juce::File::findDirectories, false, "*.vst3");
     if (bundles.isEmpty()) {
         finish(Phase::failed, "no .vst3 in " + built.getFullPathName());
         return;
     }
+    auto made = bundles.getFirst();
+    for (const auto& bundle : bundles)
+        if (bundle.getFileNameWithoutExtension() == productName)
+            made = bundle;
+        else if (made.getFileNameWithoutExtension() != productName && bundle.getLastModificationTime() > made.getLastModificationTime())
+            made = bundle;
     auto name = juce::File::createLegalFileName(productName).trim();
     if (name.isEmpty())
-        name = bundles.getFirst().getFileNameWithoutExtension();
+        name = made.getFileNameWithoutExtension();
     const auto target = destination.getChildFile(name + ".vst3");
     if ((target.exists() && !target.deleteRecursively()) || !destination.createDirectory()
-        || !bundles.getFirst().copyDirectoryTo(target)) {
+        || !made.copyDirectoryTo(target)) {
         finish(Phase::failed, "could not copy the plugin to " + target.getFullPathName());
         return;
     }

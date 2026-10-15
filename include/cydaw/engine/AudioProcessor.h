@@ -3,6 +3,7 @@
 #include <cydaw/engine/AudioBuffer.h>
 #include <cydaw/engine/Transport.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <span>
 
@@ -52,6 +53,16 @@ public:
     // holds from prepare() on.
     [[nodiscard]] virtual std::uint32_t latencySamples() const noexcept { return 0; }
     [[nodiscard]] virtual std::uint32_t maximumLatencySamples() const noexcept { return 0; }
+    // Values on their way to those last set (a knob being turned): true
+    // while some still move. The render plan then processes the block in
+    // short pieces and calls glideValues() before each, so what is heard
+    // moves in small steps instead of one jump a block. Audio thread.
+    [[nodiscard]] virtual bool valuesGliding() noexcept { return false; }
+    // What it shows of its work now, for an interface (how far an
+    // equaliser's dynamic bands moved): up to `count` values into `into`;
+    // how many. Any thread while the audio thread runs, so atomics' business.
+    [[nodiscard]] virtual std::size_t readings(float* /*into*/, std::size_t /*count*/) const noexcept { return 0; }
+    virtual void glideValues(std::uint32_t /*frames*/, double /*sampleRate*/) noexcept {}
 };
 
 } // namespace cydaw::engine

@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "mic-sim",
+ "name": "Voice Through the Wall",
+ "state": {
+  "type": "mic-sim",
+  "parameters": {
+   "micsim.distance": 200.0,
+   "micsim.angle": 60.0,
+   "micsim.drive": 0.0,
+   "micsim.lowCut": 150.0,
+   "micsim.highCut": 2500.0,
+   "micsim.room": 0.85,
+   "micsim.output": 0.0,
+   "micsim.mix": 1.0,
+   "micsim.model": 4.0,
+   "micsim.pattern": 1.0,
+   "micsim.preamp": 0.0,
+   "micsim.noise": -75.0,
+   "micsim.roomSize": 0.5,
+   "micsim.roomTone": 2000.0
+  }
+ }
+}

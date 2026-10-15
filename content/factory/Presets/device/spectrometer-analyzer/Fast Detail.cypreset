@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "spectrometer-analyzer",
+ "name": "Fast Detail",
+ "state": {
+  "type": "spectrometer-analyzer",
+  "parameters": {
+   "node.48002.spectrometer.floor": -100.0,
+   "node.48002.spectrometer.tilt": 3.0,
+   "node.48002.spectrometer.smoothing": 0.05,
+   "node.48002.spectrometer.hold": 1.0,
+   "node.48002.spectrometer.history": 3.0
+  }
+ }
+}

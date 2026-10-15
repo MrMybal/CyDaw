@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "grains",
+ "name": "Granular Slapback",
+ "state": {
+  "type": "grains",
+  "parameters": {
+   "grains.time": 90.0,
+   "grains.feedback": 0.1,
+   "grains.pitch": 0.0,
+   "grains.spray": 5.0,
+   "grains.density": 50.0,
+   "grains.pitchRandom": 0.0,
+   "grains.mix": 0.35,
+   "grains.output": 0.0,
+   "grains.sync": 0.0,
+   "grains.size": 60.0,
+   "grains.stereo": 0.3,
+   "grains.reverseChance": 0.0,
+   "grains.freeze": 0.0,
+   "grains.highCut": 14000.0
+  }
+ }
+}

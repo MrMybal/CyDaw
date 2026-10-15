@@ -26,12 +26,24 @@ constexpr double kPi = std::numbers::pi;
 constexpr double lowestHz = 20.0;
 constexpr double highestHz = 20'000.0;
 constexpr float windowKnob = 34.0f;
-constexpr float paneKnob = 26.0f;
+constexpr float cardKnob = 24.0f;
 
 // A section's colour (stored as 0xAARRGGBB) as ImGui draws it.
 ImU32 fromArgb(const std::uint32_t argb)
 {
     return IM_COL32((argb >> 16) & 0xffu, (argb >> 8) & 0xffu, argb & 0xffu, (argb >> 24) & 0xffu);
+}
+
+std::string upperCase(const std::string& text)
+{
+    auto upper = juce::String::fromUTF8(text.c_str()).toUpperCase();
+    static const char* const accents[][2] { { "\xc3\xa0", "\xc3\x80" }, { "\xc3\xa2", "\xc3\x82" }, { "\xc3\xa7", "\xc3\x87" },
+                                            { "\xc3\xa8", "\xc3\x88" }, { "\xc3\xa9", "\xc3\x89" }, { "\xc3\xaa", "\xc3\x8a" },
+                                            { "\xc3\xab", "\xc3\x8b" }, { "\xc3\xae", "\xc3\x8e" }, { "\xc3\xaf", "\xc3\x8f" },
+                                            { "\xc3\xb4", "\xc3\x94" }, { "\xc3\xb9", "\xc3\x99" }, { "\xc3\xbb", "\xc3\x9b" } };
+    for (const auto& [lower, capital] : accents)
+        upper = upper.replace(juce::String::fromUTF8(lower), juce::String::fromUTF8(capital));
+    return upper.toStdString();
 }
 
 const char* textOf(const char* french, const char* english)
@@ -76,16 +88,26 @@ double hashNoise(const int index)
 
 } // namespace
 
-SynthView::SynthView(Studio& studio, UiState& state) : studio_(studio), state_(state), presets_(studio, state) {}
+SynthView::SynthView(DeviceHost& studio, UiState& state) : studio_(studio), state_(state), presets_(studio, state) {}
 
 bool SynthView::handles(const juce::String& typeKey)
 {
     return synth::modelForType(typeKey.toStdString()) != synth::Model::none;
 }
 
-float SynthView::paneWidth()
+float SynthView::paneWidth(app::NodeGraphComponent& graph, const std::uint64_t nodeId, const float height)
 {
-    return dp(360.0f);
+    const auto values = graph.editorSynthValues(nodeId);
+    if (!values || values->first == synth::Model::none)
+        return dp(360.0f);
+    // Measured on its settings (a kind's controls come and go); the card's
+    // own binding follows when it is drawn.
+    card_.model = values->first;
+    card_.values = values->second;
+    auto width = 0.0f;
+    for (const auto& section : cardSections(height))
+        width += section.width + dp(4.0f);
+    return std::max(dp(120.0f), width - dp(4.0f));
 }
 
 bool SynthView::bind(const TrackRef& track, app::NodeGraphComponent& graph, const std::uint64_t nodeId)
@@ -98,7 +120,28 @@ bool SynthView::bind(const TrackRef& track, app::NodeGraphComponent& graph, cons
     card_.nodeId = nodeId;
     card_.model = values->first;
     card_.values = values->second;
+    card_.live = studio_.voiceLive(track, card_.heard);
+    // As it plays: the lanes at the playhead, then the voice's modulations.
+    card_.played = card_.values;
+    const auto prefix = "node." + juce::String(static_cast<juce::int64>(nodeId)) + "." + juce::String(synth::info(card_.model).prefix) + ".";
+    for (const auto& binding : studio_.automatedParameters(track))
+        if (binding.startsWith(prefix))
+            if (const auto index = synth::parameterIndex(card_.model, binding.substring(prefix.length()).toStdString()); index >= 0)
+                if (const auto now = studio_.laneValueNow(track, binding))
+                    card_.played[static_cast<std::size_t>(index)] = synth::clampValue(card_.model, index, *now);
+    if (card_.live)
+        for (int index = 0; index < synth::parameterCount(card_.model) && static_cast<std::size_t>(index) < card_.heard.values.size(); ++index)
+            if (const auto now = card_.heard.values[static_cast<std::size_t>(index)]; std::isfinite(now))
+                card_.played[static_cast<std::size_t>(index)] = now;
     return true;
+}
+
+std::optional<float> SynthView::heard(const int index) const
+{
+    if (index < 0 || index >= synth::parameterCount(card_.model))
+        return std::nullopt;
+    const auto played = card_.played[static_cast<std::size_t>(index)];
+    return played != card_.values[static_cast<std::size_t>(index)] ? std::optional<float>(played) : std::nullopt;
 }
 
 int SynthView::indexOf(const char* key) const
@@ -165,14 +208,70 @@ ImVec2 SynthView::controlSize(const Control& item, const float diameter) const
     if (index < 0 || (item.hide && !met(item)))
         return ImVec2(0.0f, 0.0f);
     switch (synth::parameter(card_.model, index).kind) {
-    case synth::Kind::choice: return ImVec2(dp(item.width > 0.0f ? item.width : 104.0f), ImGui::GetFrameHeight());
+    case synth::Kind::choice: {
+        const auto wide = item.width > 0.0f ? item.width : 104.0f;
+        return ImVec2(dp(compact_ ? std::min(wide, 92.0f) : wide), ImGui::GetFrameHeight());
+    }
     case synth::Kind::toggle: {
         const auto* label = textOf(item.french, item.english);
         const auto text = ImGui::CalcTextSize(label != nullptr ? label : "").x;
         return ImVec2(std::max(dp(62.0f), text + dp(18.0f)), ImGui::GetFrameHeight());
     }
-    default: return ImVec2(dp(diameter + 14.0f), dp(diameter) + ui::currentFontBase() * 0.78f + dp(3.0f));
+    default: {
+        // On the card, as wide as its name (within reason): no name over another.
+        auto width = dp(diameter + 14.0f);
+        if (compact_) {
+            const auto* label = textOf(item.french, item.english);
+            ImGui::PushFont(nullptr, ui::currentFontBase() * labelScale());
+            width = std::max(width, std::min(dp(64.0f), ImGui::CalcTextSize(label != nullptr ? label : "").x + dp(4.0f)));
+            ImGui::PopFont();
+        }
+        return ImVec2(width, dp(diameter) + ui::currentFontBase() * labelScale() + dp(3.0f));
     }
+    }
+}
+
+void SynthView::describeCondition(const Control& item)
+{
+    const auto other = indexOf(item.onlyWhen);
+    if (other < 0)
+        return;
+    const auto& waited = synth::parameter(card_.model, other);
+    const auto from = synth::displayValue(card_.model, other, item.from, ui::french());
+    const auto to = synth::displayValue(card_.model, other, item.to, ui::french());
+    const auto upward = item.to >= waited.maximum - 1.0e-4f;
+    const auto name = ui::french() ? waited.french : waited.english;
+    // Its short name: the one under the knob it waits on ("UNISSON"), else
+    // the last part of its own ("FORME"), and the values that wake it.
+    std::string who;
+    for (const auto& page : synth_layout::layoutFor(card_.model).pages)
+        for (const auto& row : page.rows)
+            for (const auto& panel : row)
+                for (const auto& control : panel.controls)
+                    if (who.empty() && control.key != nullptr && std::string_view(control.key) == item.onlyWhen)
+                        if (const auto* label = textOf(control.french, control.english))
+                            who = label;
+    if (who.empty()) {
+        who = name;
+        if (const auto dot = who.rfind("\xc2\xb7 "); dot != std::string::npos)
+            who = who.substr(dot + 3);
+        who = upperCase(who);
+    }
+    greyedWho_ = (ui::french() ? "si " : "if ") + who;
+    greyedWhen_ = item.from == item.to ? "= " + from : upward ? "\xe2\x89\xa5 " + from : from + " \xe2\x80\x93 " + to;
+    // A few choices by their names ("= Multimode / SVF").
+    if (waited.kind == synth::Kind::choice && item.from != item.to && item.to - item.from <= 2.5f) {
+        greyedWhen_ = "=";
+        for (auto choice = std::lround(item.from); choice <= std::lround(item.to); ++choice)
+            greyedWhen_ += (choice == std::lround(item.from) ? " " : " / ")
+                           + synth::displayValue(card_.model, other, static_cast<float>(choice), ui::french());
+    }
+    if (ui::french())
+        greyedBecause_ = "Grisé : agit quand « " + name + " » "
+                         + (item.from == item.to ? "vaut " + from : upward ? "vaut " + from + " ou plus" : "est entre " + from + " et " + to);
+    else
+        greyedBecause_ = "Greyed: acts when \"" + name + "\" "
+                         + (item.from == item.to ? "is " + from : upward ? "is " + from + " or more" : "is between " + from + " and " + to);
 }
 
 void SynthView::control(const Control& item, const float diameter)
@@ -183,16 +282,54 @@ void SynthView::control(const Control& item, const float diameter)
     const auto enabled = met(item);
     if (!enabled && item.hide)
         return;
-    if (!enabled)
+    if (!enabled) {
+        // Plainly off: far dimmer than a control that acts; what would make
+        // it act said on it (or over its group) and in its tooltip.
+        ImGui::PushStyleVar(ImGuiStyleVar_DisabledAlpha, 0.32f);
         ImGui::BeginDisabled();
+        describeCondition(item);
+    }
     const auto* label = textOf(item.french, item.english);
     switch (synth::parameter(card_.model, index).kind) {
     case synth::Kind::choice: choice(index, controlSize(item, diameter).x); break;
     case synth::Kind::toggle: toggle(index, label != nullptr ? label : "", controlSize(item, diameter).x); break;
-    default: knob(index, label, diameter); break;
+    default:
+        knobCell_ = controlSize(item, diameter).x;
+        knob(index, label, diameter);
+        knobCell_ = 0.0f;
+        break;
     }
-    if (!enabled)
+    if (!enabled) {
         ImGui::EndDisabled();
+        ImGui::PopStyleVar();
+    }
+    greyedBecause_.clear();
+    greyedWho_.clear();
+    greyedWhen_.clear();
+}
+
+void SynthView::markGreyed(const bool knob) const
+{
+    // A knob says it under itself; a group says it once over all.
+    if (greyedWho_.empty() || knob || quietGreyed_)
+        return;
+    const auto& p = theme::palette();
+    auto* list = ImGui::GetWindowDrawList();
+    const auto min = ImGui::GetItemRectMin();
+    const auto max = ImGui::GetItemRectMax();
+    // In place of its value, inside it: all of it when it fits, else whom
+    // it waits on.
+    ImGui::PushFont(nullptr, ui::currentFontBase() * 0.7f);
+    const auto whole = greyedWho_ + " " + greyedWhen_;
+    const auto& text = ImGui::CalcTextSize(whole.c_str()).x + dp(8.0f) <= max.x - min.x ? whole : greyedWho_;
+    list->AddRectFilled(min, max, theme::alpha(p.bg1, 0.96f), dp(3.0f));
+    list->AddRect(min, max, theme::alpha(p.warn, 0.7f), dp(3.0f), dp(1.0f));
+    list->PushClipRect(ImVec2(min.x + dp(2.0f), min.y), ImVec2(max.x - dp(2.0f), max.y), true);
+    const auto size = ImGui::CalcTextSize(text.c_str());
+    list->AddText(ImVec2(std::max(min.x + dp(4.0f), (min.x + max.x - size.x) * 0.5f), (min.y + max.y - size.y) * 0.5f), p.warn,
+                  text.c_str());
+    list->PopClipRect();
+    ImGui::PopFont();
 }
 
 bool SynthView::knob(const int index, const char* label, const float diameter)
@@ -208,9 +345,19 @@ bool SynthView::knob(const int index, const char* label, const float diameter)
     style.flags = ui::knobNoLabel;
     if (parameter.minimum < 0.0f && parameter.maximum > 0.0f)
         style.flags |= ui::knobBipolar;
-    style.colour = colourOf(index);
+    // A whole number (voices, octaves): the knob lands on each.
+    if (parameter.kind != synth::Kind::continuous)
+        style.steps = static_cast<int>(std::lround(parameter.maximum - parameter.minimum));
+    const auto greyed = !greyedWho_.empty();
+    style.colour = greyed ? p.textFaint : colourOf(index);
+    if (const auto moved = heard(index); moved && !greyed)
+        style.modulation = synth::normalise(card_.model, index, *moved);
     const auto origin = ImGui::GetCursorScreenPos();
+    // In a cell as wide as its name (on the card), the knob in its middle.
+    const auto width = std::max(dp(diameter + 14.0f), knobCell_);
+    ImGui::SetCursorScreenPos(ImVec2(origin.x + (width - dp(diameter + 14.0f)) * 0.5f, origin.y));
     const auto changed = ui::knob("##knob", &normalised, 0.0f, 1.0f, defaultNormalised, style);
+    markGreyed(true);
     const auto hovered = ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled);
     const auto active = ImGui::IsItemActive();
     if (changed)
@@ -224,7 +371,7 @@ bool SynthView::knob(const int index, const char* label, const float diameter)
             set(index, parameter.defaultValue);
         const auto binding = bindingOf(index);
         if (studio_.isValid(card_.track) && studio_.canAutomate(card_.track, binding)) {
-            const auto automated = !studio_.lanePoints(card_.track, binding).empty();
+            const auto automated = studio_.hasLane(card_.track, binding);
             if (ImGui::MenuItem(automated ? L("Afficher l'automation", "Show the automation")
                                           : L("Automatiser dans l'arrangement", "Automate in the arrangement"))) {
                 studio_.setShownLane(card_.track, binding);
@@ -233,26 +380,36 @@ bool SynthView::knob(const int index, const char* label, const float diameter)
                 state_.bringToFront = Panel::arrangement;
             }
             if (automated && ImGui::MenuItem(L("Effacer l'automation", "Clear the automation")))
-                studio_.setLanePoints(card_.track, binding, {});
+                studio_.clearLane(card_.track, binding);
         }
         ImGui::EndPopup();
     }
     if (hovered && !active)
         ImGui::SetTooltip("%s : %s\n%s", name.toRawUTF8(), shown.c_str(),
-                          L("Double-clic : valeur de départ · clic droit : automatiser", "Double click: default · right click: automate"));
-    const auto width = dp(diameter + 14.0f);
-    // Its name, its value while touched.
-    const auto text = hovered || active ? juce::String::fromUTF8(shown.c_str()) : juce::String::fromUTF8(label != nullptr ? label : "");
+                          !greyedBecause_.empty() ? greyedBecause_.c_str()
+                                                  : L("Double-clic : valeur de départ · clic droit : automatiser",
+                                                      "Double click: default · right click: automate"));
+    // Its name, its value while touched; greyed alone, what it waits on.
+    const auto waits = greyed && !quietGreyed_ && !hovered && !active;
+    const auto text = hovered || active ? juce::String::fromUTF8(shown.c_str())
+                      : waits           ? juce::String::fromUTF8(greyedWho_.c_str())
+                                        : juce::String::fromUTF8(label != nullptr ? label : "");
     auto* list = ImGui::GetWindowDrawList();
-    ImGui::PushFont(nullptr, ui::currentFontBase() * 0.78f);
+    ImGui::PushFont(nullptr, ui::currentFontBase() * labelScale());
     const auto textHeight = ImGui::GetFontSize();
     const auto size = ImGui::CalcTextSize(text.toRawUTF8());
     const auto y = origin.y + dp(diameter) + dp(1.0f);
-    list->PushClipRect(ImVec2(origin.x - dp(8.0f), y), ImVec2(origin.x + width + dp(8.0f), y + textHeight + dp(2.0f)), true);
-    list->AddText(ImVec2(origin.x + (width - size.x) * 0.5f, y), hovered || active ? p.text : p.textDim, text.toRawUTF8());
+    const auto spill = compact_ ? 0.0f : dp(8.0f);
+    list->PushClipRect(ImVec2(origin.x - spill, y), ImVec2(origin.x + width + spill, y + textHeight + dp(2.0f)), true);
+    list->AddText(ImVec2(origin.x + std::max(-dp(8.0f), (width - size.x) * 0.5f), y),
+                  waits ? theme::alpha(p.warn, 0.85f) : greyed ? p.textFaint : hovered || active ? p.text : p.textDim, text.toRawUTF8());
     list->PopClipRect();
     ImGui::PopFont();
-    ImGui::Dummy(ImVec2(width, textHeight + dp(2.0f)));
+    // Its name, or its number: a click on it types the value in.
+    auto typed = static_cast<double>(value(index));
+    if (ui::valueEntryButton("##number", ImVec2(width, textHeight + dp(2.0f)), typed, parameter.minimum, parameter.maximum,
+                             parameter.unit.empty() && parameter.minimum >= -1.0f && parameter.maximum <= 1.0f ? 100.0 : 1.0, parameter.unit.c_str()))
+        set(index, static_cast<float>(typed));
     ImGui::EndGroup();
     ImGui::PopID();
     return changed;
@@ -274,8 +431,10 @@ void SynthView::choice(const int index, const float width)
         }
         ImGui::EndCombo();
     }
+    markGreyed(false);
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-        ImGui::SetTooltip("%s", (ui::french() ? parameter.french : parameter.english).c_str());
+        ImGui::SetTooltip("%s%s%s", (ui::french() ? parameter.french : parameter.english).c_str(), greyedBecause_.empty() ? "" : "\n",
+                          greyedBecause_.c_str());
     ImGui::PopID();
 }
 
@@ -286,32 +445,121 @@ void SynthView::toggle(const int index, const char* label, const float width)
     auto on = value(index) >= 0.5f;
     if (ui::toggle(label, &on, colourOf(index), ImVec2(width, 0.0f), (ui::french() ? parameter.french : parameter.english).c_str()))
         set(index, on ? 1.0f : 0.0f);
+    markGreyed(false);
     ImGui::PopID();
 }
 
-float SynthView::flow(const std::vector<Control>& controls, const ImVec2 origin, const float width, const float diameter, const bool draw)
+float SynthView::flow(const std::vector<Control>& controls, const ImVec2 origin, const float width, const float diameter, const bool draw,
+                      const float maxHeight)
 {
     const auto gap = dp(6.0f);
+    struct Placed {
+        const Control* item {};
+        ImVec2 at;
+        ImVec2 size;
+        int line {};
+    };
+    std::vector<Placed> placed;
     auto x = origin.x;
     auto y = origin.y;
     auto lineHeight = 0.0f;
+    auto line = 0;
+    auto bottom = origin.y;
+    clipped_ = false;
     for (const auto& item : controls) {
         const auto size = controlSize(item, diameter);
         if (size.x <= 0.0f)
             continue;
-        if (x > origin.x && (item.newLine || x + size.x > origin.x + width)) {
+        if (x > origin.x && ((item.newLine && !compact_) || x + size.x > origin.x + width)) {
             x = origin.x;
             y += lineHeight + gap;
             lineHeight = 0.0f;
+            ++line;
         }
-        if (draw) {
-            ImGui::SetCursorScreenPos(ImVec2(x, y));
-            control(item, diameter);
+        if (maxHeight > 0.0f && y + size.y - origin.y > maxHeight + 0.5f) {
+            // No room left: the rest is in the window.
+            clipped_ = true;
+            break;
         }
+        placed.push_back({ &item, ImVec2(x, y), size, line });
         x += size.x + gap;
         lineHeight = std::max(lineHeight, size.y);
+        bottom = std::max(bottom, y + lineHeight);
     }
-    return y + lineHeight - origin.y;
+    if (!draw)
+        return bottom - origin.y;
+    // Knobs side by side on a line, greyed for the same reason: one group
+    // (a choice or a switch says it inside itself).
+    const auto knobbed = [this](const Control& item) {
+        const auto index = indexOf(item.key);
+        return index >= 0 && synth::parameter(card_.model, index).kind != synth::Kind::choice
+               && synth::parameter(card_.model, index).kind != synth::Kind::toggle;
+    };
+    const auto same = [this, &knobbed](const Control& a, const Control& b) {
+        return a.onlyWhen != nullptr && b.onlyWhen != nullptr && std::string_view(a.onlyWhen) == b.onlyWhen && a.from == b.from
+               && a.to == b.to && !met(a) && knobbed(a) && knobbed(b);
+    };
+    std::vector<std::pair<std::size_t, std::size_t>> groups;
+    for (std::size_t at = 0; at < placed.size();) {
+        auto end = at + 1;
+        while (end < placed.size() && placed[end].line == placed[at].line && same(*placed[at].item, *placed[end].item))
+            ++end;
+        if (end - at >= 2)
+            groups.emplace_back(at, end);
+        at = end;
+    }
+    for (std::size_t at = 0; at < placed.size(); ++at) {
+        quietGreyed_ = std::any_of(groups.begin(), groups.end(), [at](const auto& group) { return at >= group.first && at < group.second; });
+        ImGui::SetCursorScreenPos(placed[at].at);
+        control(*placed[at].item, diameter);
+    }
+    quietGreyed_ = false;
+    const auto& p = theme::palette();
+    auto* list = ImGui::GetWindowDrawList();
+    for (const auto& [first, end] : groups) {
+        // Over the group's knobs (or switches): what would wake them.
+        const auto left = placed[first].at.x;
+        const auto right = placed[end - 1].at.x + placed[end - 1].size.x;
+        auto top = placed[first].at.y;
+        auto low = top;
+        for (auto at = first; at < end; ++at) {
+            low = std::max(low, placed[at].at.y + dp(diameter));
+            top = std::min(top, placed[at].at.y);
+        }
+        describeCondition(*placed[first].item);
+        ImGui::PushFont(nullptr, ui::currentFontBase() * 0.66f);
+        const auto lineSize = ImGui::GetFontSize();
+        const auto whole = greyedWho_ + " " + greyedWhen_;
+        const auto oneLine = ImGui::CalcTextSize(whole.c_str()).x + dp(10.0f) <= right - left;
+        const auto widest = oneLine ? ImGui::CalcTextSize(whole.c_str()).x
+                                    : std::max(ImGui::CalcTextSize(greyedWho_.c_str()).x, ImGui::CalcTextSize(greyedWhen_.c_str()).x);
+        const auto half = std::min(widest * 0.5f + dp(5.0f), (right - left) * 0.5f);
+        const auto centre = ImVec2((left + right) * 0.5f, (top + low) * 0.5f);
+        const auto lines = oneLine ? 1.0f : 2.0f;
+        const ImVec2 boxMin(centre.x - half, centre.y - lineSize * lines * 0.5f - dp(2.0f));
+        const ImVec2 boxMax(centre.x + half, centre.y + lineSize * lines * 0.5f + dp(2.0f));
+        list->AddRectFilled(boxMin, boxMax, theme::alpha(p.bg1, 0.94f), dp(4.0f));
+        list->AddRect(boxMin, boxMax, theme::alpha(p.warn, 0.7f), dp(4.0f), dp(1.0f));
+        list->PushClipRect(boxMin, boxMax, true);
+        const auto put = [&](const std::string& words, const float at, const ImU32 colour) {
+            const auto size = ImGui::CalcTextSize(words.c_str());
+            list->AddText(ImVec2(std::max(boxMin.x + dp(4.0f), centre.x - size.x * 0.5f), at), colour, words.c_str());
+        };
+        if (oneLine) {
+            put(whole, centre.y - lineSize * 0.5f, p.warn);
+        } else {
+            put(greyedWho_, centre.y - lineSize, p.warn);
+            put(greyedWhen_, centre.y, p.text);
+        }
+        list->PopClipRect();
+        ImGui::PopFont();
+        if (ImGui::IsMouseHoveringRect(boxMin, boxMax) && ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem))
+            ImGui::SetTooltip("%s", greyedBecause_.c_str());
+        greyedBecause_.clear();
+        greyedWho_.clear();
+        greyedWhen_.clear();
+    }
+    return bottom - origin.y;
 }
 
 float SynthView::pictureHeight(const Picture picture) const
@@ -339,12 +587,68 @@ float SynthView::panelHeight(const synth_layout::Panel& item, const float width)
     return height;
 }
 
-void SynthView::panel(const synth_layout::Panel& item, const float width, const float height)
+ImU32 SynthView::sectionColour(const int section) const
 {
     const auto& info = synth::info(card_.model);
-    const auto colour = item.section >= 0 && item.section < static_cast<int>(info.sections.size())
-                            ? fromArgb(info.sections[static_cast<std::size_t>(item.section)].colour)
-                            : synth_layout::layoutFor(card_.model).colour;
+    return section >= 0 && section < static_cast<int>(info.sections.size()) ? fromArgb(info.sections[static_cast<std::size_t>(section)].colour)
+                                                                            : synth_layout::layoutFor(card_.model).colour;
+}
+
+float SynthView::labelScale() const
+{
+    return compact_ ? 0.7f : 0.78f;
+}
+
+float SynthView::cardTitleHeight() const
+{
+    return ui::currentFontBase() * 0.78f + dp(8.0f);
+}
+
+float SynthView::compactPictureHeight(const Picture picture) const
+{
+    switch (picture) {
+    case Picture::wave: return dp(40.0f);
+    case Picture::filter: return dp(50.0f);
+    case Picture::envelope: return dp(40.0f);
+    case Picture::lfo: return dp(32.0f);
+    case Picture::steps: return dp(50.0f);
+    case Picture::orb: return dp(90.0f);
+    default: return 0.0f;
+    }
+}
+
+std::vector<SynthView::CardSection> SynthView::cardSections(const float height)
+{
+    const auto& layout = synth_layout::layoutFor(card_.model);
+    std::vector<const synth_layout::Panel*> panels;
+    for (const auto& item : layout.card)
+        panels.push_back(&item);
+    compact_ = true;
+    const auto padding = dp(5.0f);
+    const auto inner = height - cardTitleHeight() - padding;
+    const auto knobHeight = dp(cardKnob) + ui::currentFontBase() * labelScale() + dp(3.0f);
+    const auto cell = dp(cardKnob + 14.0f + 6.0f);
+    std::vector<CardSection> sections;
+    for (const auto* item : panels) {
+        const auto pictureHeight = compactPictureHeight(item->picture);
+        const auto pictured = item->picture != Picture::none && inner - pictureHeight - dp(4.0f) >= knobHeight;
+        const auto room = inner - (pictured ? pictureHeight + dp(4.0f) : 0.0f);
+        // The narrowest that holds all its controls in that height.
+        auto widest = 0.0f;
+        for (const auto& control : item->controls)
+            widest = std::max(widest, controlSize(control, cardKnob).x);
+        auto width = std::max(widest, pictured ? dp(item->picture == Picture::filter ? 150.0f : 110.0f) : cell);
+        while (width < dp(560.0f) && flow(item->controls, ImVec2(0.0f, 0.0f), width, cardKnob, false) > room + 0.5f)
+            width += cell;
+        sections.push_back({ item, width + padding * 2.0f, pictured });
+    }
+    compact_ = false;
+    return sections;
+}
+
+void SynthView::panel(const synth_layout::Panel& item, const float width, const float height)
+{
+    const auto colour = sectionColour(item.section);
     ImGui::BeginChild(item.id, ImVec2(width, height), ImGuiChildFlags_Borders, ImGuiWindowFlags_NoScrollbar);
     ImGui::PushFont(theme::boldFont(), 0.0f);
     ImGui::TextColored(theme::vec(colour), "%s", L(item.french, item.english));
@@ -422,6 +726,13 @@ void SynthView::drawWave(ImDrawList* list, const char* key, const ImVec2 origin,
     const auto half = size.y * 0.42f;
     list->AddLine(ImVec2(left, middle), ImVec2(left + width, middle), p.grid);
     const auto count = static_cast<int>(width);
+    // As it plays now (a table's position automated, swept): the settings
+    // played stand in for the knobs while it is drawn.
+    struct Playing {
+        Card& card;
+        explicit Playing(Card& c) : card(c) { std::swap(card.values, card.played); }
+        ~Playing() { std::swap(card.values, card.played); }
+    } playing { card_ };
     // One oscillator as its engine draws it, or the oscillators' sum.
     const auto drawn = key != nullptr ? synth::picture(card_.model, card_.values, key, count + 1) : std::vector<float> {};
     std::vector<double> samples(static_cast<std::size_t>(count) + 1);
@@ -545,6 +856,9 @@ double SynthView::filterDb(const double hz) const
 {
     using complex = std::complex<double>;
     complex response;
+    // A model that draws its own curve.
+    if (const auto own = synth::filterDb(card_.model, card_.values, hz); std::isfinite(own))
+        return own;
     if (indexOf("f.type") >= 0) {
         // One filter of the family's kinds.
         response = colosseStage(static_cast<int>(std::lround(valueOf("f.type"))), static_cast<double>(valueOf("f.cutoff")),
@@ -660,6 +974,30 @@ void SynthView::drawFilter(ImDrawList* list, const char* key, const char* second
         list->AddQuadFilled(curve[at - 1], curve[at], ImVec2(curve[at].x, bottom), ImVec2(curve[at - 1].x, bottom),
                             (colour & 0x00ffffffu) | 0x30000000u);
     list->AddPolyline(curve.data(), static_cast<int>(curve.size()), colour, dp(1.8f));
+    // Where the newest note's modulations put it now.
+    if (card_.live) {
+        auto moved = card_.values;
+        auto any = false;
+        for (const auto& handle : handles)
+            for (const auto index : { handle.cutoff, handle.resonance })
+                if (const auto now = heard(index)) {
+                    moved[static_cast<std::size_t>(index)] = *now;
+                    any = true;
+                }
+        if (any) {
+            std::swap(card_.values, moved);
+            std::vector<ImVec2> live;
+            for (int at = 0; at <= steps; ++at) {
+                const auto x = left + width * static_cast<float>(at) / static_cast<float>(std::max(1, steps));
+                live.emplace_back(x, yOf(filterDb(hzOf(x))));
+            }
+            const auto hz = static_cast<double>(value(handles[0].cutoff));
+            const ImVec2 point(xOf(hz), std::clamp(yOf(filterDb(hz)), top + dp(5.0f), bottom - dp(5.0f)));
+            std::swap(card_.values, moved);
+            list->AddPolyline(live.data(), static_cast<int>(live.size()), theme::alpha(p.modulation, 0.9f), dp(1.4f));
+            list->AddCircleFilled(point, dp(3.5f), p.modulation);
+        }
+    }
     // The handles: each filter's cutoff on the curve.
     const auto handleCount = handles[1].cutoff >= 0 ? 2 : 1;
     std::array<ImVec2, 2> points {};
@@ -683,6 +1021,7 @@ void SynthView::drawFilter(ImDrawList* list, const char* key, const char* second
     const auto id = "##filter." + prefix;
     ImGui::SetCursorScreenPos(origin);
     ImGui::InvisibleButton(id.c_str(), size);
+    const auto widget = ImGui::GetItemID();
     const auto hovered = ImGui::IsItemHovered();
     const auto& io = ImGui::GetIO();
     auto nearest = 0;
@@ -691,12 +1030,12 @@ void SynthView::drawFilter(ImDrawList* list, const char* key, const char* second
         nearest = distance(points[1]) < distance(points[0]) ? 1 : 0;
     }
     if (ImGui::IsItemActivated()) {
-        dragging_ = id;
+        dragging_ = widget;
         draggingPoint_ = nearest;
     }
-    if (!ImGui::IsItemActive() && dragging_ == id)
-        dragging_.clear();
-    const auto chosen = dragging_ == id ? std::clamp(draggingPoint_, 0, handleCount - 1) : nearest;
+    if (!ImGui::IsItemActive() && dragging_ == widget)
+        dragging_ = 0;
+    const auto chosen = dragging_ == widget ? std::clamp(draggingPoint_, 0, handleCount - 1) : nearest;
     const auto& handle = handles[static_cast<std::size_t>(chosen)];
     if (ImGui::IsItemActive()) {
         set(handle.cutoff, static_cast<float>(hzOf(io.MousePos.x)));
@@ -777,6 +1116,23 @@ void SynthView::drawEnvelope(ImDrawList* list, const char* prefix, const ImVec2 
                             (colour & 0x00ffffffu) | 0x2a000000u);
     list->AddPolyline(line.data(), static_cast<int>(line.size()), colour, dp(1.7f));
     list->AddLine(ImVec2(x2, yOf(level)), ImVec2(x3, yOf(level)), colour, dp(1.7f));
+    // Where the newest note's envelope is now: a line at its level.
+    if (card_.live) {
+        const auto name = std::string(prefix != nullptr ? prefix : "");
+        const auto which = name == "amp" || name == "amp1"     ? 0
+                           : name == "fenv" || name == "env2" || name == "fenv1" ? 1
+                           : name == "env3" || name == "amp2"  ? 2
+                           : name == "fenv2"                   ? 3
+                                                               : -1;
+        if (which >= 0) {
+            const auto now = card_.heard.envelopes[static_cast<std::size_t>(which)];
+            if (std::isfinite(now)) {
+                const auto y = yOf(std::clamp(static_cast<double>(now), 0.0, 1.0));
+                list->AddLine(ImVec2(left, y), ImVec2(right, y), theme::alpha(p.modulation, 0.55f), dp(1.0f));
+                list->AddCircleFilled(ImVec2(right, y), dp(3.5f), p.modulation);
+            }
+        }
+    }
     if (!interactive)
         return;
     // The points: the attack's top, the decay's end (with the sustain), the release's end.
@@ -784,6 +1140,7 @@ void SynthView::drawEnvelope(ImDrawList* list, const char* prefix, const ImVec2 
     const auto id = std::string("##envelope.") + (prefix != nullptr ? prefix : "");
     ImGui::SetCursorScreenPos(origin);
     ImGui::InvisibleButton(id.c_str(), size);
+    const auto widget = ImGui::GetItemID();
     const auto& io = ImGui::GetIO();
     auto nearest = -1;
     auto nearestDistance = dp(14.0f);
@@ -797,12 +1154,12 @@ void SynthView::drawEnvelope(ImDrawList* list, const char* prefix, const ImVec2 
         }
     }
     if (ImGui::IsItemActivated() && nearest >= 0) {
-        dragging_ = id;
+        dragging_ = widget;
         draggingPoint_ = nearest;
     }
-    if (!ImGui::IsItemActive() && dragging_ == id)
-        dragging_.clear();
-    const auto mine = dragging_ == id;
+    if (!ImGui::IsItemActive() && dragging_ == widget)
+        dragging_ = 0;
+    const auto mine = dragging_ == widget;
     if (mine) {
         const auto toTime = [&](const int index, const float from) {
             set(index, synth::denormalise(card_.model, index, std::clamp((io.MousePos.x - from) / stretch, 0.0f, 1.0f)));
@@ -854,10 +1211,34 @@ void SynthView::drawLfo(ImDrawList* list, const char* prefix, const ImVec2 origi
     static constexpr double held[] = { 0.35, -0.7, 0.85, -0.15, 0.55, -0.9, 0.1, 0.7 };
     for (int at = 0; at <= count; ++at) {
         const auto phase = 2.0 * static_cast<double>(at) / std::max(1, count);
-        const auto y = shape >= 4 ? held[static_cast<int>(phase * 4.0) % 8] : lfoWave(shape, phase);
+        // Dérive has two more: a rising saw, a wandering line.
+        const auto derive = card_.model == synth::Model::derive;
+        auto y = shape >= 4 ? held[static_cast<int>(phase * 4.0) % 8] : lfoWave(shape, phase);
+        if (derive && shape == 5)
+            y = -lfoWave(2, phase);
+        if (derive && shape == 6) {
+            // Wandering: the random steps joined smoothly.
+            const auto step = phase * 4.0;
+            const auto from = held[static_cast<int>(step) % 8];
+            const auto to = held[(static_cast<int>(step) + 1) % 8];
+            y = from + (to - from) * (0.5 - 0.5 * std::cos(kPi * (step - std::floor(step))));
+        }
         line.emplace_back(left + static_cast<float>(at), middle - static_cast<float>(y) * half);
     }
     list->AddPolyline(line.data(), static_cast<int>(line.size()), colour, dp(1.6f));
+    // Where the newest note's LFO is now, on its first cycle.
+    if (card_.live) {
+        const auto which = base == "lfo1" ? 0 : base == "lfo2" ? 1 : -1;
+        if (which >= 0) {
+            const auto now = card_.heard.lfos[static_cast<std::size_t>(which)];
+            const auto phase = card_.heard.lfoPhases[static_cast<std::size_t>(which)];
+            if (std::isfinite(now) && std::isfinite(phase)) {
+                const ImVec2 point(left + width * 0.5f * std::clamp(phase, 0.0f, 1.0f), middle - std::clamp(now, -1.0f, 1.0f) * half);
+                list->AddCircleFilled(point, dp(4.0f), p.modulation);
+                list->AddCircle(point, dp(4.0f), p.bg0, 0, dp(1.0f));
+            }
+        }
+    }
     // Its pace: the note value when synced, its rate otherwise.
     std::string pace;
     if (syncIndex >= 0 && value(syncIndex) >= 0.5f)
@@ -1022,74 +1403,101 @@ void SynthView::drawOrb(ImDrawList* list, const char* prefix, const ImVec2 origi
 void SynthView::drawPane(const TrackRef& track, app::NodeGraphComponent& graph, const std::uint64_t nodeId, const ImVec2 origin,
                          const ImVec2 size, const ImU32 colour)
 {
+    // Inside a module: English, whatever the language.
+    const ui::ModuleText english;
     if (!bind(track, graph, nodeId))
         return;
     (void) colour;
-    const auto& layout = synth_layout::layoutFor(card_.model);
-    const auto& info = synth::info(card_.model);
+    const auto& p = theme::palette();
+    auto* list = ImGui::GetWindowDrawList();
     ImGui::PushID(static_cast<int>(nodeId) + 41'000);
-    ImGui::SetCursorScreenPos(origin);
-    ImGui::BeginGroup();
-    const auto open = juce::String(ui::french() ? "Ouvrir " : "Open ") + juce::String::fromUTF8((ui::french() ? info.french : info.english).c_str());
-    if (ui::primaryButton(open.toRawUTF8(), ImVec2(dp(120.0f), 0.0f)))
-        openEditor(track, nodeId);
-    if (const auto index = indexOf(layout.paneChoice); index >= 0) {
-        ImGui::SameLine();
-        ImGui::TextDisabled("%s", synth::displayValue(card_.model, index, value(index), ui::french()).c_str());
+    const auto sections = cardSections(size.y);
+    compact_ = true;
+    const auto padding = dp(5.0f);
+    auto x = origin.x;
+    for (const auto& section : sections) {
+        const auto& item = *section.panel;
+        const ImVec2 min(x, origin.y);
+        const ImVec2 max(x + section.width, origin.y + size.y);
+        const auto tint = sectionColour(item.section);
+        list->AddRectFilled(min, max, p.bg1, dp(4.0f));
+        list->AddRect(min, max, theme::alpha(tint, 0.35f), dp(4.0f));
+        ImGui::PushID(item.id);
+        const auto inner = section.width - padding * 2.0f;
+        auto y = min.y + cardTitleHeight();
+        if (section.pictured) {
+            const auto height = compactPictureHeight(item.picture);
+            drawPicture(item.picture, item.pictureKey, item.secondKey, ImVec2(min.x + padding, y), ImVec2(inner, height), true);
+            y += height + dp(4.0f);
+        }
+        (void) flow(item.controls, ImVec2(min.x + padding, y), inner, cardKnob, true, max.y - padding - y);
+        const auto more = clipped_;
+        // Its name in its colour; a double click opens the window (where
+        // the rest is, when it did not all fit).
+        ImGui::PushFont(theme::boldFont(), ui::currentFontBase() * 0.78f);
+        const auto title = juce::String::fromUTF8(L(item.french, item.english)) + (more ? juce::String::fromUTF8(" \xe2\x80\xa6") : juce::String());
+        ui::clippedText(list, ImVec2(min.x + padding, min.y + dp(3.0f)), inner, tint, title.toRawUTF8());
+        ImGui::PopFont();
+        ImGui::SetCursorScreenPos(ImVec2(min.x, min.y));
+        ImGui::InvisibleButton("##title", ImVec2(section.width, cardTitleHeight() - dp(2.0f)));
+        if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+            openEditor(track, nodeId);
+        ui::tooltip(more ? L("D'autres réglages dans la grande fenêtre : double-clic.", "More settings in the large window: double click.")
+                         : L("Double-clic : la grande fenêtre.", "Double click: the large window."));
+        ImGui::PopID();
+        x += section.width + dp(4.0f);
     }
-    const auto knobsHeight = dp(paneKnob) + ui::currentFontBase() * 0.78f + dp(3.0f);
-    const auto pictureOrigin = ImGui::GetCursorScreenPos();
-    const ImVec2 pictureSize(size.x, std::max(dp(36.0f), size.y - (pictureOrigin.y - origin.y) - knobsHeight - dp(6.0f)));
-    drawPicture(layout.panePicture, layout.paneKey, nullptr, pictureOrigin, pictureSize, false);
-    ImGui::SetCursorScreenPos(ImVec2(pictureOrigin.x, pictureOrigin.y + pictureSize.y + dp(4.0f)));
-    for (std::size_t at = 0; at < layout.pane.size(); ++at) {
-        if (at > 0)
-            ImGui::SameLine(0.0f, dp(2.0f));
-        control(layout.pane[at], paneKnob);
-    }
-    ImGui::EndGroup();
+    compact_ = false;
     ImGui::PopID();
 }
 
 void SynthView::openEditor(const TrackRef& track, const std::uint64_t nodeId, const bool detached)
 {
-    editor_ = Target { track, nodeId };
-    focusEditor_ = true;
+    const auto id = windows_.open(track, nodeId, state_.manyInstrumentWindows);
     if (detached)
-        ui::setDetached(editorWindowId, true);
+        ui::setDetached(id.c_str(), true);
 }
 
 void SynthView::drawEditor()
 {
-    if (!editor_)
-        return;
+    // Inside a module: English, whatever the language.
+    const ui::ModuleText english;
+    windows_.each([this](const TrackRef& track, const std::uint64_t nodeId, const bool focus) {
+        editor_ = Target { track, nodeId };
+        windowId_ = windows_.idOf(track, nodeId);
+        const auto open = drawEditorWindow(focus);
+        editor_.reset();
+        return open;
+    });
+}
+
+bool SynthView::drawEditorWindow(const bool focus)
+{
     const auto target = *editor_;
     auto* slot = studio_.graphFor(target.track);
     if (slot == nullptr || !studio_.isValid(target.track) || !bind(target.track, slot->graph(), target.nodeId)) {
-        editor_.reset();
-        return;
+        return false;
     }
     const auto& p = theme::palette();
     const auto& layout = synth_layout::layoutFor(card_.model);
     const auto& info = synth::info(card_.model);
-    ui::beforeDetachable(editorWindowId);
+    ui::beforeDetachable(windowId_.c_str());
+    windows_.placeFirst(target.track, target.nodeId);
     ImGui::SetNextWindowSize(ImVec2(dp(1'180.0f), dp(780.0f)), ImGuiCond_FirstUseEver);
-    if (focusEditor_) {
+    if (focus)
         ImGui::SetNextWindowFocus();
-        focusEditor_ = false;
-    }
     auto open = true;
     const auto title = juce::String::fromUTF8((ui::french() ? info.french : info.english).c_str()) + juce::String::fromUTF8(" \xe2\x80\x94 ")
-                       + studio_.trackName(target.track) + editorWindowId;
+                       + studio_.trackName(target.track) + juce::String(windowId_);
     ImGui::PushStyleColor(ImGuiCol_TitleBgActive, theme::mix(layout.colour, p.bg2 | 0xff000000u, 0.65f));
-    const auto visible = ImGui::Begin(title.toRawUTF8(), &open, ImGuiWindowFlags_NoCollapse);
+    const auto visible = ui::beginEditorWindow(title.toRawUTF8(), &open, ImGuiWindowFlags_NoCollapse);
     ImGui::PopStyleColor();
     if (visible) {
         // Out of the studio's window, as a plug-in's (another screen), and back.
         {
             const auto headerY = ImGui::GetCursorPosY();
             ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - dp(24.0f));
-            (void) ui::detachButton(editorWindowId, ImVec2(dp(24.0f), dp(22.0f)));
+            (void) ui::detachButton(windowId_.c_str(), ImVec2(dp(24.0f), dp(22.0f)));
             ImGui::SetCursorPosY(headerY);
         }
         ImGui::PushFont(theme::boldFont(), ImGui::GetStyle().FontSizeBase * 1.3f);
@@ -1147,8 +1555,7 @@ void SynthView::drawEditor()
         }
     }
     ImGui::End();
-    if (!open)
-        editor_.reset();
+    return open;
 }
 
 void SynthView::drawSynthTab(const synth_layout::Page& page)

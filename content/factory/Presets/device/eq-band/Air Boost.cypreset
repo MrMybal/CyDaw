@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "eq-band",
+ "name": "Air Boost",
+ "state": {
+  "type": "eq-band",
+  "parameters": {
+   "eqBand.frequency": 12000.0,
+   "eqBand.gain": 4.0,
+   "eqBand.q": 0.7
+  }
+ }
+}

@@ -1,0 +1,22 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "corps",
+ "name": "Organ Pipe",
+ "state": {
+  "type": "corps",
+  "parameters": {
+   "corps.tune": 220.0,
+   "corps.decay": 0.6,
+   "corps.material": 0.7,
+   "corps.inharmonic": 0.0,
+   "corps.position": 0.2,
+   "corps.mix": 0.4,
+   "corps.output": 0.0,
+   "corps.width": 0.5,
+   "corps.type": 5.0,
+   "corps.lowCut": 80.0
+  }
+ }
+}

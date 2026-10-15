@@ -12,6 +12,10 @@
 #include <utility>
 #include <vector>
 
+namespace cydaw::engine {
+class AudioRenderPlan;
+}
+
 namespace cydaw::app {
 
 // Lock-free runtime used wherever a visual native graph must process an
@@ -88,6 +92,13 @@ public:
         // turns: a straight line in the lane is what is heard.
         bool logarithmic {};
         std::vector<AutomationPoint> points;
+        // A launcher clip's lane: its points count from `clipStartSeconds`
+        // on the timeline (before it, the knob's own value) and, past
+        // `clipLengthSeconds`, loop (`clipLooping`) or hold the last value.
+        // Below 0: a lane of the timeline itself.
+        double clipStartSeconds { -1.0 };
+        double clipLengthSeconds {};
+        bool clipLooping {};
     };
     void setAutomation(std::vector<AutomationLane> lanes);
     // Where a lane stands at a time: the first point's value before it, the
@@ -99,6 +110,12 @@ public:
     // entirely outside real-time processing.
     [[nodiscard]] std::vector<std::pair<std::uint64_t, float>>
         controlValues() const;
+    // The loudest these nodes gave out since they were last asked (two
+    // channels), for the device panel's meters. Message thread.
+    void takeNodePeaks(const std::uint64_t* nodes, std::size_t count, float* left, float* right) const;
+    // What a node shows of its work now (an equaliser's dynamic bands):
+    // up to `count` values, how many. Message thread.
+    [[nodiscard]] std::size_t nodeReadings(std::uint64_t node, float* into, std::size_t count) const;
     // On the audio thread, between two process() calls: the last value of
     // each control node asked for, NaN for one the graph does not have.
     void controlValuesNow(const std::uint64_t* nodeIds, float* values,
@@ -108,6 +125,11 @@ public:
     // a note value). One for the process; the controller sets it.
     static void setSessionTempo(double beatsPerMinute) noexcept;
     [[nodiscard]] static double sessionTempo() noexcept;
+    // Whether the session's transport plays: a processor then hears where
+    // it is (its beat, from the block's place on the timeline) and follows
+    // the bars; stopped, it runs free at the tempo.
+    static void setSessionPlaying(bool playing) noexcept;
+    [[nodiscard]] static bool sessionPlaying() noexcept;
 
     // ---- Signal taps -----------------------------------------------------
     // What a node received or produced, kept for the interface's displays
@@ -128,6 +150,8 @@ public:
                                cydaw::engine::AudioAnalysisFrame& frame) const noexcept;
 
 private:
+    // The graph's cards switched off, into its compiled plan.
+    static void applyBypasses(cydaw::engine::AudioRenderPlan& plan, const cydaw::engine::NativeDspGraph& graph);
     std::array<const juce::AudioBuffer<float>*, maximumExtraInputs> extraInputs_ {};
     struct Tap {
         // nodeId * 2 + input; zero when the slot is free.

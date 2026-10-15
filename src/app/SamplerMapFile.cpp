@@ -1026,7 +1026,9 @@ std::vector<ZoneSpec> zonesOf(const juce::var& json)
 
 // What a map says beyond its zones: its controllers' starting values, the
 // controls a card shows, its curves, its keyswitches.
-constexpr std::array<const char*, 4> mapExtras { "controllers", "controls", "curves", "keyswitches" };
+// "whole": its recordings kept whole in memory, never read from the disk as they
+// play (a single sound: the simple sampler, read anywhere by its grains).
+constexpr std::array<const char*, 5> mapExtras { "controllers", "controls", "curves", "keyswitches", "whole" };
 
 // `from`: the map whose extras it keeps (an SFZ read: its own).
 juce::var mapVar(const juce::String& name, const std::vector<ZoneSpec>& zones, const juce::var& settings,
@@ -1340,12 +1342,16 @@ SamplerMapRef samplerMapFromVar(const juce::var& json, juce::String& error)
                 break;
             }
     // The samples: decoded now those the instrument reaches as it opens,
-    // the others (a microphone at zero, another articulation) once asked for.
+    // the others (a microphone at zero, another articulation) once asked for;
+    // a long one keeps its head in memory and is read from the disk past it,
+    // unless the map keeps them whole.
+    const auto whole = static_cast<bool>(json.getProperty("whole", false));
     for (std::size_t index = 0; index < map->zones.size(); ++index) {
         auto& zone = map->zones[index];
         const auto reached = cydaw::engine::samplerZoneReachable(*map, zone, {});
-        zone.sample = SampleStore::instance().acquire(resolveSamplePath(files[index]), !reached, std::max<std::int64_t>(0, zone.start),
-                                                      zone.loops() ? zone.loopEnd : -1);
+        zone.sample = SampleStore::instance().acquire(resolveSamplePath(files[index]), !reached,
+                                                      whole ? -1 : std::max<std::int64_t>(0, zone.start),
+                                                      whole ? -1 : zone.loops() ? zone.loopEnd : -1);
     }
     error.clear();
     return map;
@@ -1408,6 +1414,27 @@ juce::var samplerMapFromFiles(const juce::Array<juce::File>& files, const juce::
         settings = juce::var(values);
     }
     return mapVar(name, zones, settings);
+}
+
+juce::var simpleSamplerMap(const juce::File& file)
+{
+    auto json = samplerMapFromFiles(juce::Array<juce::File> { file }, file.getFileNameWithoutExtension());
+    const auto unpitched = static_cast<int>(json.getProperty("settings", {}).getProperty("key-track", 1)) == 0;
+    if (auto* zones = json.getProperty("zones", {}).getArray(); zones != nullptr && !zones->isEmpty()) {
+        zones->removeRange(1, zones->size() - 1);
+        if (auto* zone = zones->getReference(0).getDynamicObject()) {
+            zone->setProperty("keys", juce::Array<juce::var> { 0, 127 });
+            zone->setProperty("velocities", juce::Array<juce::var> { 1, 127 });
+            if (unpitched)
+                zone->setProperty("root", 60);
+        }
+    }
+    if (auto* object = json.getDynamicObject()) {
+        object->removeProperty("settings");
+        // One sound, read anywhere (its grains): kept whole in memory.
+        object->setProperty("whole", true);
+    }
+    return json;
 }
 
 juce::var withFilesAdded(const juce::var& json, const juce::Array<juce::File>& files)

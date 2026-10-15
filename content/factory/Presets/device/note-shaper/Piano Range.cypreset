@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "note-shaper",
+ "name": "Piano Range",
+ "state": {
+  "type": "note-shaper",
+  "parameters": {
+   "node.21002.midi.note.minimum": 21.0,
+   "node.21002.midi.note.maximum": 108.0,
+   "node.21003.midi.velocity": 1.0
+  }
+ }
+}

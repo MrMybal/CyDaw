@@ -188,15 +188,12 @@ source pour régler sa distance et son angle. À droite s'affiche la réponse.
 
 ## Préréglages d'usine
 
-- **Ampli** (13) : Clean brillant, Clean jazz, Chime funky, Crunch rock, Blues poussé, Lead années 80,
-  Solo chantant, Métal moderne, Djent serré, Fuzz vintage, Basse ronde, Basse grognante, Basse moderne
-  slap.
-- **Baffle et micro** (9) : 4x12 classique, 4x12 dynamique et ruban, 4x12 vintage chaud, Combo 2x12
-  clean, Combo ouvert et pièce, Petit combo lo-fi, Basse 8x10, Basse 1x15 ronde, Deux micros déphasés.
-- **Micro** (12) : Voix studio, Voix proche et chaude, Voix de scène, Vintage à lampe, Ruban doux,
-  Podcast, Téléphone, Mégaphone, Radio ancienne, Talkie-walkie, Voix lointaine, Derrière le micro.
+- **Ampli** : 38 (noms en anglais), par exemple Snappy Funk Clean A-B, Blues Crunch at the Edge A-B, Seven-String Djent Rhythm A-B, Shoegaze Fuzz Wall A-B, Bass DI Growl A-B ; chacun règle les deux canaux.
+- **Baffle et micro** : 28 (noms en anglais), par exemple Classic 4x12, Felted Jazz 1x12 with Ribbon, Precise Djent 4x12, Shoegaze Stereo Mic Pair, Rock Bass 8x10 Clear Attack.
+- **Micro** : 29 (noms en anglais), par exemple Dry Close Vocal Booth, Deep Close Radio Host, Film Phone Call, Laptop Video Call, Snare Top Dynamic.
 
-Ils se fabriquent avec `tools/factory_content/build_studio_presets.py --only amp-sim,cab-sim,mic-sim`.
+Ils se fabriquent avec `tools/factory_content/build_studio_presets.py --only amp-sim,cab-sim,mic-sim` (réglages dans
+`tools/factory_content/studio_presets/amps.py`).
 
 ## Exemple
 

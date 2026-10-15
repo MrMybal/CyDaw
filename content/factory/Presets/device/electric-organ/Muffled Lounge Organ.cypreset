@@ -1,0 +1,27 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "electric-organ",
+ "name": "Muffled Lounge Organ",
+ "state": {
+  "type": "electric-organ",
+  "parameters": {
+   "node.39002.voice.mode": 0.0,
+   "node.39002.voice.glide": 0.0,
+   "node.39003.polyOscillator.waveform": 3.0,
+   "node.39003.polyOscillator.level": 0.1,
+   "node.39004.envelope.attack": 20.0,
+   "node.39004.envelope.decay": 120.0,
+   "node.39004.envelope.sustain": 0.85,
+   "node.39004.envelope.release": 300.0,
+   "node.39005.gain.db": 0.0,
+   "node.39006.voiceFilter.cutoff": 2400.0,
+   "node.39006.voiceFilter.resonance": 0.8,
+   "node.39007.drive.db": 4.0,
+   "node.39008.compressor.threshold": -14.0,
+   "node.39008.compressor.ratio": 2.5,
+   "node.39009.stereo.width": 1.25
+  }
+ }
+}

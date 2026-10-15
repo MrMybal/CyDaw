@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "auto-filter",
+ "name": "Quarter Wobble",
+ "state": {
+  "type": "auto-filter",
+  "parameters": {
+   "autofilter.cutoff": 700.0,
+   "autofilter.resonance": 4.0,
+   "autofilter.rate": 2.0,
+   "autofilter.depth": 0.8,
+   "autofilter.sync": 9.0
+  }
+ }
+}

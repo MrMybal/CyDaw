@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "phaser",
+ "name": "Fast Bubbles",
+ "state": {
+  "type": "phaser",
+  "parameters": {
+   "phaser.rate": 5.0,
+   "phaser.depth": 0.6,
+   "phaser.frequency": 1800.0,
+   "phaser.feedback": 0.5,
+   "phaser.mix": 0.45
+  }
+ }
+}

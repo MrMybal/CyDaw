@@ -1,0 +1,13 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "hard-clip",
+ "name": "Soft Ceiling",
+ "state": {
+  "type": "hard-clip",
+  "parameters": {
+   "clip.threshold": 0.95
+  }
+ }
+}

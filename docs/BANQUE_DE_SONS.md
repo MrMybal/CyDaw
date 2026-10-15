@@ -89,6 +89,14 @@ Windows, qu'on peut mettre sur un autre écran. Échap la ferme.
   - un volet d'écoute : grande forme d'onde (un clic écoute depuis là), détails, « Ajouter à la
     piste », « Sons similaires ».
   Les flèches passent au son suivant en l'écoutant, Entrée le pose sur la piste.
+- **Au tempo** (case à côté d'« Écoute au clic », dans la bibliothèque et le navigateur, cochée par
+  défaut) : une boucle dont le tempo est sûr (dans son nom, saisi à la main, ou bien détecté sur une
+  boucle qui n'est pas une note tenue d'instrument) s'écoute au tempo du projet. Elle est étirée sans
+  changer de hauteur (une batterie par ses attaques, le reste en gardant son timbre), sur un nombre
+  entier de temps, et rejouée en boucle ; quand le transport tourne, elle entre sur le temps où il en
+  est (après la latence du mix) et s'y recale s'il saute (boucle, tête de lecture déplacée). Changer
+  le tempo la refait. Le volet affiche « 100 → 120 BPM ». Un coup, ou une boucle au tempo incertain,
+  s'écoute tel quel. Une boucle de plus de 32 s aussi.
 - **Instruments** :
   - les instruments d'usine (échantillonnés ou en modèle de son), les synthés de CyDAW et mes
     instruments ;
@@ -277,10 +285,20 @@ Un agent (MCP) ne passe jamais `acceptLicence: true` de lui-même : il montre la
   - rend les lignes, le total, les comptes de chaque colonne, les premiers noms, et le temps de la
     requête et de la construction.
 - `library_perf {items}` mesure le catalogue sur autant de sons (construction et requêtes types).
+- `preview_sample {path, start, atTempo}` : avec `atTempo`, une boucle au tempo sûr au tempo du projet
+  (`loopBeats`, `fromBpm`, `tempo`) ; `preview_sample {query: true}` dit ce qui joue (`position` dans
+  la boucle, `transportPosition`, `transportPlaying`, `latencySeconds`).
 - `classify_samples` : avec un modèle installé, c'est CLAP de la recherche sémantique qui classe.
   Sinon, l'ancien script `tools/samples/classify_samples.py`.
 
 ## Test
+
+`tests/v2_tempo_audition_check.py` (ctest `cydaw2_tempo_audition_check`, silencieux) : une boucle de
+batterie de quatre temps nommée « 100bpm » et un coup, dans un dossier à lui ; la boucle écoutée à
+120 BPM (quatre temps, 100 → 120), un coup tel quel, l'entrée sur le temps du transport et sans
+dérive, le recalage après un saut de la tête de lecture, le changement de tempo suivi, la case
+décochée. Le moteur : `stretchedLoopKeepsItsBeats` (`cydaw_engine_tests`) — la boucle étirée dure
+exactement ses temps au nouveau tempo, ses clics y tombent, une note tenue garde sa hauteur.
 
 `tests/v2_sample_search_check.py` (ctest `cydaw2_sample_search_check`) est silencieux et hors
 ligne. Tout lui appartient : registre de banques, emplacements, réglages de la bibliothèque

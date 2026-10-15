@@ -1,0 +1,14 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "lowpass",
+ "name": "Warm Roll-Off",
+ "state": {
+  "type": "lowpass",
+  "parameters": {
+   "lowpass.cutoff": 6000.0,
+   "lowpass.resonance": 0.7
+  }
+ }
+}

@@ -1,0 +1,42 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "pression",
+ "name": "Electric Guitar (Compact Wall)",
+ "state": {
+  "type": "pression",
+  "parameters": {
+   "pression.depth": 0.35,
+   "pression.time": 0.5,
+   "pression.upward": 0.5,
+   "pression.downward": 1.0,
+   "pression.lowGain": -1.0,
+   "pression.midGain": 0.5,
+   "pression.highGain": -1.0,
+   "pression.output": 0.0,
+   "pression.input": 0.0,
+   "pression.crossLow": 140.0,
+   "pression.crossHigh": 2800.0,
+   "pression.lowDownThreshold": -26.0,
+   "pression.lowDownRatio": 10.0,
+   "pression.lowUpThreshold": -48.0,
+   "pression.lowUpRatio": 2.0,
+   "pression.lowAttack": 20.0,
+   "pression.lowRelease": 150.0,
+   "pression.midDownThreshold": -24.0,
+   "pression.midDownRatio": 8.0,
+   "pression.midUpThreshold": -46.0,
+   "pression.midUpRatio": 2.0,
+   "pression.midAttack": 15.0,
+   "pression.midRelease": 150.0,
+   "pression.highDownThreshold": -28.0,
+   "pression.highDownRatio": 10.0,
+   "pression.highUpThreshold": -50.0,
+   "pression.highUpRatio": 2.0,
+   "pression.highAttack": 5.0,
+   "pression.highRelease": 100.0,
+   "pression.solo": 0.0
+  }
+ }
+}

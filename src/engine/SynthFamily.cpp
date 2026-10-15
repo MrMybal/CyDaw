@@ -87,6 +87,138 @@ const Catalogue& catalogue()
         nebuleuse.englishHint = "A synth of atmospheres: two layers (synthesis or grains of seven textures), chords, the orb that moves it all";
         nebuleuse.parameters = detail::nebuleuseParameters();
         nebuleuse.sections = detail::nebuleuseSections();
+        auto& opale = result.models[static_cast<std::size_t>(Model::opale)];
+        opale.model = Model::opale;
+        opale.typeKey = "opale-synth";
+        opale.prefix = "opale";
+        opale.processorKey = "core.opale-synth";
+        opale.instrument = "opale-instrument";
+        opale.french = "Opale";
+        opale.english = "Opale";
+        opale.frenchHint = "Le synthé polyphonique de tous les jours : deux oscillateurs profonds (formes continues, sub, synchro, unisson), un mélangeur créatif à six modes, un filtre de sept sortes";
+        opale.englishHint = "The everyday polysynth: two deep oscillators (continuous shapes, sub, sync, unison), a creative six-mode mixer, a filter of seven kinds";
+        opale.parameters = detail::opaleParameters();
+        opale.sections = detail::opaleSections();
+        auto& onyx = result.models[static_cast<std::size_t>(Model::onyx)];
+        onyx.model = Model::onyx;
+        onyx.typeKey = "onyx-synth";
+        onyx.prefix = "onyx";
+        onyx.processorKey = "core.onyx-synth";
+        onyx.instrument = "onyx-instrument";
+        onyx.french = "Onyx";
+        onyx.english = "Onyx";
+        onyx.frenchHint = "Un synthé à distorsion de phase : quatre oscillateurs aux phases pliées (huit formes, dont trois résonantes) qui se modulent entre eux, un filtre de sept sortes ; brillant, numérique, vocal";
+        onyx.englishHint = "A phase-distortion synth: four oscillators with bent phases (eight shapes, three of them resonant) modulating one another, a filter of seven kinds; bright, digital, vocal";
+        onyx.parameters = detail::onyxParameters();
+        onyx.sections = detail::onyxSections();
+        auto& tirette = result.models[static_cast<std::size_t>(Model::tirette)];
+        tirette.model = Model::tirette;
+        tirette.typeKey = "tirette-synth";
+        tirette.prefix = "tirette";
+        tirette.processorKey = "core.tirette-synth";
+        tirette.instrument = "tirette-instrument";
+        tirette.french = "Tirette";
+        tirette.english = "Tirette";
+        tirette.frenchHint = "Un orgue à tirettes : neuf tirettes, roues phoniques, transistors ou tuyaux, percussion, vibrato et chorus, saturation et cabine tournante";
+        tirette.englishHint = "A drawbar organ: nine drawbars, tone wheels, transistors or pipes, percussion, vibrato and chorus, overdrive and a rotary speaker";
+        tirette.parameters = detail::tiretteParameters();
+        tirette.sections = detail::tiretteSections();
+        auto& alliage = result.models[static_cast<std::size_t>(Model::alliage)];
+        alliage.model = Model::alliage;
+        alliage.typeKey = "alliage-synth";
+        alliage.prefix = "alliage";
+        alliage.processorKey = "core.alliage-synth";
+        alliage.instrument = "alliage-instrument";
+        alliage.french = "Alliage";
+        alliage.english = "Alliage";
+        alliage.frenchHint = "Un synthé à modules : un oscillateur parmi huit (essaim, table d'ondes, impulsion, FM, synchro, additif, bande de bruit…), un filtre parmi sept, deux enveloppes et un LFO : vite des sons très différents";
+        alliage.englishHint = "A pick-and-mix synth: one oscillator of eight kinds (swarm, wavetable, pulse, FM, sync, additive, noise band…), one filter of seven, two envelopes and an LFO: very different sounds, fast";
+        alliage.parameters = detail::alliageParameters();
+        alliage.sections = detail::alliageSections();
+        auto& quartz = result.models[static_cast<std::size_t>(Model::quartz)];
+        quartz.model = Model::quartz;
+        quartz.typeKey = "quartz-synth";
+        quartz.prefix = "quartz";
+        quartz.processorKey = "core.quartz-synth";
+        quartz.instrument = "quartz-instrument";
+        quartz.french = "Quartz";
+        quartz.english = "Quartz";
+        quartz.frenchHint = "Un synthé FM à quatre opérateurs : une matrice libre où chacun module les autres et lui-même, du bruit, une enveloppe par opérateur, un filtre de sept sortes";
+        quartz.englishHint = "A four-operator FM synth: a free matrix where each operator modulates the others and itself, noise, an envelope per operator, a filter of seven kinds";
+        quartz.parameters = detail::quartzParameters();
+        quartz.sections = detail::quartzSections();
+        auto& argile = result.models[static_cast<std::size_t>(Model::argile)];
+        argile.model = Model::argile;
+        argile.typeKey = "argile-synth";
+        argile.prefix = "argile";
+        argile.processorKey = "core.argile-synth";
+        argile.instrument = "argile-instrument";
+        argile.french = "Argile";
+        argile.english = "Argile";
+        argile.frenchHint = "Un synthé analogique classique, tout en double : deux oscillateurs avec leur sub, deux filtres de huit types en parallèle ou en série, deux amplis avec leur enveloppe et leur panoramique, deux LFO";
+        argile.englishHint = "A classic analog synth with two of everything: two oscillators with their subs, two filters of eight types side by side or in series, two amplifiers each with its own envelope and pan, two LFOs";
+        argile.parameters = detail::argileParameters();
+        argile.sections = detail::argileSections();
+        auto& saphir = result.models[static_cast<std::size_t>(Model::saphir)];
+        saphir.model = Model::saphir;
+        saphir.typeKey = "saphir-synth";
+        saphir.prefix = "saphir";
+        saphir.processorKey = "core.saphir-synth";
+        saphir.instrument = "saphir-instrument";
+        saphir.french = "Saphir";
+        saphir.english = "Saphir";
+        saphir.frenchHint = "Un synthé FM à quatre opérateurs : onze algorithmes, douze formes d'onde, des enveloppes qui bouclent, un filtre, une enveloppe de hauteur et un LFO";
+        saphir.englishHint = "A four-operator FM synth: eleven algorithms, twelve waves, looping envelopes, a filter, a pitch envelope and an LFO";
+        saphir.parameters = detail::saphirParameters();
+        saphir.sections = detail::saphirSections();
+        auto& derive = result.models[static_cast<std::size_t>(Model::derive)];
+        derive.model = Model::derive;
+        derive.typeKey = "derive-synth";
+        derive.prefix = "derive";
+        derive.processorKey = "core.derive-synth";
+        derive.instrument = "derive-instrument";
+        derive.french = "Dérive";
+        derive.english = "Dérive";
+        derive.frenchHint = "Un synthé analogique simple et chaleureux : deux oscillateurs, une dérive vivante par voix, une enveloppe qui peut tourner en boucle, trois modulations";
+        derive.englishHint = "A simple, warm analog synth: two oscillators, a living drift on each voice, an envelope that can cycle, three modulations";
+        derive.parameters = detail::deriveParameters();
+        derive.sections = detail::deriveSections();
+        auto& bronze = result.models[static_cast<std::size_t>(Model::bronze)];
+        bronze.model = Model::bronze;
+        bronze.typeKey = "bronze-synth";
+        bronze.prefix = "bronze";
+        bronze.processorKey = "core.bronze-synth";
+        bronze.instrument = "bronze-instrument";
+        bronze.french = "Bronze";
+        bronze.english = "Bronze";
+        bronze.frenchHint = "Des objets frappés, frottés ou soufflés : un maillet et un bruit qui excitent deux résonateurs (poutre, marimba, membrane, plaque, corde, tuyau, tube), en série ou côte à côte";
+        bronze.englishHint = "Struck, rubbed and blown objects: a mallet and a noise exciting two resonators (beam, marimba, membrane, plate, string, pipe, tube), in series or side by side";
+        bronze.parameters = detail::bronzeParameters();
+        bronze.sections = detail::bronzeSections();
+        auto& jade = result.models[static_cast<std::size_t>(Model::jade)];
+        jade.model = Model::jade;
+        jade.typeKey = "jade-synth";
+        jade.prefix = "jade";
+        jade.processorKey = "core.jade-synth";
+        jade.instrument = "jade-instrument";
+        jade.french = "Jade";
+        jade.english = "Jade";
+        jade.frenchHint = "Un piano électrique modélisé : lames et barres de ton, anches ou cordes frappées, lues par leur micro (cloche, aboiement, grognement), avec trémolo panoramique et chorus";
+        jade.englishHint = "A modelled electric piano: tines and tone bars, reeds or struck strings, read by their pickup (bell, bark, growl), with auto-pan tremolo and chorus";
+        jade.parameters = detail::jadeParameters();
+        jade.sections = detail::jadeSections();
+        auto& silex = result.models[static_cast<std::size_t>(Model::silex)];
+        silex.model = Model::silex;
+        silex.typeKey = "silex-synth";
+        silex.prefix = "silex";
+        silex.processorKey = "core.silex-synth";
+        silex.instrument = "silex-instrument";
+        silex.french = "Silex";
+        silex.english = "Silex";
+        silex.frenchHint = "Une boîte à rythmes dont chaque son est synthétisé : grosse caisse, caisse claire, clap, charlestons, toms, cymbales et percussions, chacun ses réglages ; trois caractères (analogique, numérique, lo-fi)";
+        silex.englishHint = "A drum machine whose every sound is synthesised: kick, snare, clap, hi-hats, toms, cymbals and percussion, each with its own settings; three characters (analog, digital, lo-fi)";
+        silex.parameters = detail::silexParameters();
+        silex.sections = detail::silexSections();
         for (std::size_t model = 0; model < result.models.size(); ++model)
             for (int index = 0; index < static_cast<int>(result.models[model].parameters.size()); ++index)
                 result.indices[model][result.models[model].parameters[static_cast<std::size_t>(index)].key] = index;
@@ -145,8 +277,10 @@ void warmUp(const Model model)
 {
     switch (model) {
     case Model::colosse:
-    case Model::mosaique: detail::tables::prepare(); break;
+    case Model::mosaique:
+    case Model::alliage: detail::tables::prepare(); break;
     case Model::nebuleuse: detail::nebuleuseWarmUp(); break;
+    case Model::saphir: detail::saphirWarmUp(); break;
     default: break;
     }
 }
@@ -250,12 +384,30 @@ std::string displayValue(const Model model, const int index, const float value, 
     return text;
 }
 
+double filterDb(const Model model, const Values& values, const double hz)
+{
+    if (model == Model::argile)
+        return detail::argileFilterDb(values, hz);
+    return std::numeric_limits<double>::quiet_NaN();
+}
+
 std::vector<float> picture(const Model model, const Values& values, const std::string_view part, const int points)
 {
     switch (model) {
     case Model::colosse: return detail::colossePicture(values, part, points);
     case Model::mosaique: return detail::mosaiquePicture(values, part, points);
     case Model::nebuleuse: return detail::nebuleusePicture(values, part, points);
+    case Model::opale: return detail::opalePicture(values, part, points);
+    case Model::onyx: return detail::onyxPicture(values, part, points);
+    case Model::tirette: return detail::tirettePicture(values, part, points);
+    case Model::alliage: return detail::alliagePicture(values, part, points);
+    case Model::quartz: return detail::quartzPicture(values, part, points);
+    case Model::argile: return detail::argilePicture(values, part, points);
+    case Model::saphir: return detail::saphirPicture(values, part, points);
+    case Model::derive: return detail::derivePicture(values, part, points);
+    case Model::bronze: return detail::bronzePicture(values, part, points);
+    case Model::jade: return detail::jadePicture(values, part, points);
+    case Model::silex: return detail::silexPicture(values, part, points);
     default: return {};
     }
 }
@@ -268,6 +420,8 @@ struct Voice::State {
     Model model { Model::none };
     double expressionPitch {};
     double expressionGain { 1.0 };
+    // What the playing engine plays, for an interface to show.
+    VoiceLive live;
 
     State()
     {
@@ -275,6 +429,21 @@ struct Voice::State {
         engines[static_cast<std::size_t>(Model::colosse)] = detail::makeColosse();
         engines[static_cast<std::size_t>(Model::mosaique)] = detail::makeMosaique();
         engines[static_cast<std::size_t>(Model::nebuleuse)] = detail::makeNebuleuse();
+        engines[static_cast<std::size_t>(Model::opale)] = detail::makeOpale();
+        engines[static_cast<std::size_t>(Model::onyx)] = detail::makeOnyx();
+        engines[static_cast<std::size_t>(Model::tirette)] = detail::makeTirette();
+        engines[static_cast<std::size_t>(Model::alliage)] = detail::makeAlliage();
+        engines[static_cast<std::size_t>(Model::quartz)] = detail::makeQuartz();
+        engines[static_cast<std::size_t>(Model::argile)] = detail::makeArgile();
+        engines[static_cast<std::size_t>(Model::saphir)] = detail::makeSaphir();
+        engines[static_cast<std::size_t>(Model::derive)] = detail::makeDerive();
+        engines[static_cast<std::size_t>(Model::bronze)] = detail::makeBronze();
+        engines[static_cast<std::size_t>(Model::jade)] = detail::makeJade();
+        engines[static_cast<std::size_t>(Model::silex)] = detail::makeSilex();
+        live.clear();
+        for (auto& engine : engines)
+            if (engine != nullptr)
+                engine->showInto(&live);
     }
     [[nodiscard]] detail::Engine* engine() const noexcept { return engines[static_cast<std::size_t>(model)].get(); }
 };
@@ -299,6 +468,7 @@ void Voice::start(const Model model, const Values& values, const int note, const
     state_->model = model;
     state_->expressionPitch = 0.0;
     state_->expressionGain = 1.0;
+    state_->live.clear();
     if (auto* engine = state_->engine())
         engine->start(values, note, velocity, glideFrom, sampleRate);
 }
@@ -352,6 +522,11 @@ bool Voice::render(const Values& values, const prism::Context& context, float* l
     if (engine == nullptr || !engine->active())
         return false;
     return engine->render(values, context, left, right, count, sampleRate, state_->expressionPitch, state_->expressionGain);
+}
+
+const VoiceLive& Voice::live() const noexcept
+{
+    return state_->live;
 }
 
 } // namespace cydaw::engine::synth

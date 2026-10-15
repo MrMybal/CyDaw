@@ -1,0 +1,20 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "dynamic-filter",
+ "name": "Bass Quack",
+ "state": {
+  "type": "dynamic-filter",
+  "parameters": {
+   "node.32002.follower.attack": 0.003,
+   "node.32002.follower.release": 0.1,
+   "node.32003.map.inputMinimum": 0.0,
+   "node.32003.map.inputMaximum": 1.0,
+   "node.32003.map.outputMinimum": 120.0,
+   "node.32003.map.outputMaximum": 2200.0,
+   "node.32004.lowpass.cutoff": 1000.0,
+   "node.32004.lowpass.resonance": 8.0
+  }
+ }
+}

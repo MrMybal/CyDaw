@@ -94,7 +94,7 @@ void arc(ImDrawList* list, const ImVec2 centre, const float radius, const float 
 
 } // namespace
 
-PrismView::PrismView(Studio& studio, UiState& state) : studio_(studio), state_(state), presets_(studio, state) {}
+PrismView::PrismView(DeviceHost& studio, UiState& state) : studio_(studio), state_(state), presets_(studio, state) {}
 
 float PrismView::paneWidth()
 {
@@ -111,7 +111,28 @@ bool PrismView::bind(const TrackRef& track, app::NodeGraphComponent& graph, cons
     card_.nodeId = nodeId;
     card_.values = *values;
     card_.own = graph.nodePrismTables(nodeId);
+    card_.live = studio_.voiceLive(track, card_.heard);
+    // As it plays: the lanes at the playhead, then the voice's modulations.
+    card_.played = card_.values;
+    const auto prefix = "node." + juce::String(static_cast<juce::int64>(nodeId)) + ".prism.";
+    for (const auto& binding : studio_.automatedParameters(track))
+        if (binding.startsWith(prefix))
+            if (const auto index = prism::parameterIndex(binding.substring(prefix.length()).toStdString()); index >= 0)
+                if (const auto now = studio_.laneValueNow(track, binding))
+                    card_.played[static_cast<std::size_t>(index)] = prism::clampValue(index, *now);
+    if (card_.live)
+        for (int index = 0; index < prism::parameterCount; ++index)
+            if (const auto now = card_.heard.values[static_cast<std::size_t>(index)]; std::isfinite(now))
+                card_.played[static_cast<std::size_t>(index)] = now;
     return true;
+}
+
+std::optional<float> PrismView::heard(const int index) const
+{
+    if (index < 0 || index >= prism::parameterCount)
+        return std::nullopt;
+    const auto played = card_.played[static_cast<std::size_t>(index)];
+    return played != card_.values[static_cast<std::size_t>(index)] ? std::optional<float>(played) : std::nullopt;
 }
 
 prism::WavetableRef PrismView::tableOf(const int osc) const
@@ -236,7 +257,7 @@ void PrismView::modulationMenu(const int index)
     const auto binding = "node." + juce::String(static_cast<juce::int64>(card_.nodeId)) + ".prism."
                          + juce::String(prism::parameter(index).key);
     if (studio_.isValid(card_.track) && studio_.canAutomate(card_.track, binding)) {
-        const auto automated = !studio_.lanePoints(card_.track, binding).empty();
+        const auto automated = studio_.hasLane(card_.track, binding);
         if (ImGui::MenuItem(automated ? L("Afficher l'automation", "Show the automation")
                                       : L("Automatiser dans l'arrangement", "Automate in the arrangement"))) {
             studio_.setShownLane(card_.track, binding);
@@ -245,7 +266,7 @@ void PrismView::modulationMenu(const int index)
             state_.bringToFront = Panel::arrangement;
         }
         if (automated && ImGui::MenuItem(L("Effacer l'automation", "Clear the automation")))
-            studio_.setLanePoints(card_.track, binding, {});
+            studio_.clearLane(card_.track, binding);
     }
     const auto destination = destinationOf(index);
     if (destination != 0) {
@@ -298,6 +319,12 @@ bool PrismView::knob(const int index, const char* label, const float diameter)
     style.colour = prismOrange;
     if (parameter.minimum < 0.0f && std::abs(parameter.minimum + parameter.maximum) < 1.0e-6f)
         style.flags |= ui::knobBipolar;
+    // A whole number (voices, octaves): the knob lands on each.
+    if (parameter.kind != prism::Kind::continuous)
+        style.steps = static_cast<int>(std::lround(parameter.maximum - parameter.minimum));
+    // Where the automation and the newest note's modulations put it now.
+    if (const auto moved = heard(index))
+        style.modulation = prism::normalise(index, *moved);
     const auto origin = ImGui::GetCursorScreenPos();
     const auto changed = ui::knob("##knob", &normalised, 0.0f, 1.0f, defaultNormalised, style);
     const auto hovered = ImGui::IsItemHovered();
@@ -333,7 +360,11 @@ bool PrismView::knob(const int index, const char* label, const float diameter)
     list->AddText(ImVec2(origin.x + (width - size.x) * 0.5f, y), hovered || active ? p.text : p.textDim, text.toRawUTF8());
     list->PopClipRect();
     ImGui::PopFont();
-    ImGui::Dummy(ImVec2(width, textHeight + dp(2.0f)));
+    // Its name, or its number: a click on it types the value in.
+    auto typed = static_cast<double>(value(index));
+    if (ui::valueEntryButton("##number", ImVec2(width, textHeight + dp(2.0f)), typed, parameter.minimum, parameter.maximum,
+                             parameter.unit == "%" ? 100.0 : 1.0, parameter.unit.c_str()))
+        set(index, static_cast<float>(typed));
     ImGui::EndGroup();
     ImGui::PopID();
     return changed;
@@ -408,6 +439,13 @@ void PrismView::sourceChip(const int source, const char* label, const ImVec2 siz
 
 void PrismView::drawWavetable(const int osc, const ImVec2 origin, const ImVec2 size, const bool compact)
 {
+    // As it plays now (its position automated, swept): the settings played
+    // stand in for the knobs while it is drawn.
+    struct Playing {
+        Card& card;
+        explicit Playing(Card& c) : card(c) { std::swap(card.values, card.played); }
+        ~Playing() { std::swap(card.values, card.played); }
+    } playing { card_ };
     const auto& p = theme::palette();
     auto* list = ImGui::GetWindowDrawList();
     list->AddRectFilled(origin, ImVec2(origin.x + size.x, origin.y + size.y), p.bg0, dp(4.0f));
@@ -458,7 +496,8 @@ void PrismView::drawFilterResponse(const ImVec2 origin, const ImVec2 size)
 {
     const auto& p = theme::palette();
     auto* list = ImGui::GetWindowDrawList();
-    list->AddRectFilled(origin, ImVec2(origin.x + size.x, origin.y + size.y), p.bg0, dp(4.0f));
+    if (!drawingHeard_)
+        list->AddRectFilled(origin, ImVec2(origin.x + size.x, origin.y + size.y), p.bg0, dp(4.0f));
     const auto on = value(prism::filterBase + prism::filterOn) >= 0.5f;
     const auto type = static_cast<prism::FilterType>(std::lround(value(prism::filterBase + prism::filterType)));
     const auto cutoff = static_cast<double>(value(prism::filterBase + prism::filterCutoff));
@@ -474,12 +513,14 @@ void PrismView::drawFilterResponse(const ImVec2 origin, const ImVec2 size)
         high = (s * s) / d;
     };
     // Grid: octaves.
-    for (double f = 100.0; f < 20'000.0; f *= 10.0) {
-        const auto x = origin.x + size.x * static_cast<float>(std::log(f / 20.0) / std::log(1'000.0));
-        list->AddLine(ImVec2(x, origin.y), ImVec2(x, origin.y + size.y), p.grid);
+    if (!drawingHeard_) {
+        for (double f = 100.0; f < 20'000.0; f *= 10.0) {
+            const auto x = origin.x + size.x * static_cast<float>(std::log(f / 20.0) / std::log(1'000.0));
+            list->AddLine(ImVec2(x, origin.y), ImVec2(x, origin.y + size.y), p.grid);
+        }
+        const auto zeroY = origin.y + size.y * (18.0f / 54.0f);
+        list->AddLine(ImVec2(origin.x, zeroY), ImVec2(origin.x + size.x, zeroY), p.grid);
     }
-    const auto zeroY = origin.y + size.y * (18.0f / 54.0f);
-    list->AddLine(ImVec2(origin.x, zeroY), ImVec2(origin.x + size.x, zeroY), p.grid);
     constexpr int points = 120;
     ImVec2 line[points];
     for (int i = 0; i < points; ++i) {
@@ -547,7 +588,26 @@ void PrismView::drawFilterResponse(const ImVec2 origin, const ImVec2 size)
         line[i] = ImVec2(origin.x + size.x * static_cast<float>(i) / (points - 1),
                          origin.y + size.y * static_cast<float>((18.0 - db) / 54.0));
     }
-    list->AddPolyline(line, points, on ? prismOrange : p.textFaint, dp(2.0f));
+    list->AddPolyline(line, points, drawingHeard_ ? theme::alpha(p.modulation, 0.9f) : on ? prismOrange : p.textFaint,
+                      drawingHeard_ ? dp(1.4f) : dp(2.0f));
+    // Where the newest note's modulations put it now.
+    if (!drawingHeard_ && on && card_.live) {
+        auto moved = card_.values;
+        auto any = false;
+        for (const auto index : { prism::filterBase + prism::filterCutoff, prism::filterBase + prism::filterResonance,
+                                  prism::filterBase + prism::filterVariation, prism::filterBase + prism::filterMix })
+            if (const auto now = heard(index)) {
+                moved[static_cast<std::size_t>(index)] = *now;
+                any = true;
+            }
+        if (any) {
+            std::swap(card_.values, moved);
+            drawingHeard_ = true;
+            drawFilterResponse(origin, size);
+            drawingHeard_ = false;
+            std::swap(card_.values, moved);
+        }
+    }
 }
 
 void PrismView::drawEnvelope(const int env, const ImVec2 origin, const ImVec2 size)
@@ -593,6 +653,14 @@ void PrismView::drawEnvelope(const int env, const ImVec2 origin, const ImVec2 si
     fill.emplace_back(line.front().x, bottom);
     list->AddConcavePolyFilled(fill.data(), static_cast<int>(fill.size()), theme::alpha(sourceColour(1 + env), 0.18f));
     list->AddPolyline(line.data(), static_cast<int>(line.size()), sourceColour(1 + env), dp(2.0f));
+    // Where the newest note's envelope is now: a line at its level.
+    if (card_.live && env >= 0 && static_cast<std::size_t>(env) < card_.heard.envelopes.size())
+        if (const auto now = card_.heard.envelopes[static_cast<std::size_t>(env)]; std::isfinite(now)) {
+            const auto at = y(std::clamp(static_cast<double>(now), 0.0, 1.0));
+            list->AddLine(ImVec2(origin.x + dp(4.0f), at), ImVec2(origin.x + size.x - dp(4.0f), at), theme::alpha(p.modulation, 0.55f),
+                          dp(1.0f));
+            list->AddCircleFilled(ImVec2(origin.x + size.x - dp(5.0f), at), dp(3.5f), p.modulation);
+        }
 }
 
 void PrismView::drawLfo(const int lfo, const ImVec2 origin, const ImVec2 size)
@@ -647,6 +715,23 @@ void PrismView::drawLfo(const int lfo, const ImVec2 origin, const ImVec2 size)
                          bottom - (bottom - top) * static_cast<float>(level));
     }
     list->AddPolyline(line, points, sourceColour(5 + lfo), dp(2.0f));
+    // Where the newest note's LFO is now.
+    if (card_.live && lfo >= 0 && static_cast<std::size_t>(lfo) < card_.heard.lfos.size()) {
+        const auto now = card_.heard.lfos[static_cast<std::size_t>(lfo)];
+        const auto phase = card_.heard.lfoPhases[static_cast<std::size_t>(lfo)];
+        if (std::isfinite(now) && std::isfinite(phase)) {
+            auto along = static_cast<double>(phase);
+            if (!drawn) {
+                const auto cycles = along >= phaseOffset ? along : along + 1.0;
+                along = (cycles - phaseOffset) * 0.5;
+            }
+            const auto level = unipolar ? static_cast<double>(now) : 0.5 * (static_cast<double>(now) + 1.0);
+            const ImVec2 at(origin.x + dp(3.0f) + (size.x - dp(6.0f)) * static_cast<float>(std::clamp(along, 0.0, 1.0)),
+                            bottom - (bottom - top) * static_cast<float>(std::clamp(level, 0.0, 1.0)));
+            list->AddCircleFilled(at, dp(4.0f), p.modulation);
+            list->AddCircle(at, dp(4.0f), p.bg0, 0, dp(1.0f));
+        }
+    }
     // The points one draws, on the line.
     if (drawn)
         for (int point = 0; point < prism::drawPoints; ++point) {
@@ -1231,6 +1316,8 @@ void PrismView::drawGlobalTab()
 void PrismView::drawPane(const TrackRef& track, app::NodeGraphComponent& graph, const std::uint64_t nodeId, const ImVec2 origin,
                          const ImVec2 size, const ImU32 colour)
 {
+    // Inside a module: English, whatever the language.
+    const ui::ModuleText english;
     if (!bind(track, graph, nodeId))
         return;
     const auto& p = theme::palette();
@@ -1238,12 +1325,11 @@ void PrismView::drawPane(const TrackRef& track, app::NodeGraphComponent& graph, 
     ImGui::PushID(static_cast<int>(nodeId) + 31'000);
     ImGui::SetCursorScreenPos(origin);
     ImGui::BeginGroup();
-    // Its window.
-    if (ui::primaryButton(L("Ouvrir Prisme", "Open Prisme"), ImVec2(dp(120.0f), 0.0f)))
-        openEditor(track, nodeId);
-    ImGui::SameLine();
+    // Its window opens from the card's header.
     if (const auto table = tableOf(0))
         ImGui::TextDisabled("%s", table->name.c_str());
+    else
+        ImGui::NewLine();
     const auto displayOrigin = ImGui::GetCursorScreenPos();
     const ImVec2 displaySize(size.x, std::max(dp(36.0f), size.y * 0.24f));
     drawWavetable(0, displayOrigin, displaySize, true);
@@ -1274,48 +1360,57 @@ void PrismView::drawPane(const TrackRef& track, app::NodeGraphComponent& graph, 
 
 void PrismView::openEditor(const TrackRef& track, const std::uint64_t nodeId, const bool detached, const bool here)
 {
-    editor_ = Target { track, nodeId };
-    focusEditor_ = true;
-    placeHere_ = here && !detached;
+    const auto id = windows_.open(track, nodeId, state_.manyInstrumentWindows);
+    placeHere_ = here && !detached ? id : std::string();
     if (detached)
-        ui::setDetached(editorWindowId, true);
+        ui::setDetached(id.c_str(), true);
     else if (here)
-        ui::setDetached(editorWindowId, false);
+        ui::setDetached(id.c_str(), false);
 }
 
 void PrismView::drawEditor()
 {
-    if (!editor_)
-        return;
+    // Inside a module: English, whatever the language.
+    const ui::ModuleText english;
+    windows_.each([this](const TrackRef& track, const std::uint64_t nodeId, const bool focus) {
+        editor_ = Target { track, nodeId };
+        windowId_ = windows_.idOf(track, nodeId);
+        const auto open = drawEditorWindow(focus);
+        editor_.reset();
+        return open;
+    });
+}
+
+bool PrismView::drawEditorWindow(const bool focus)
+{
     const auto target = *editor_;
     auto* slot = studio_.graphFor(target.track);
     if (slot == nullptr || !studio_.isValid(target.track) || !bind(target.track, slot->graph(), target.nodeId)) {
-        editor_.reset();
-        return;
+        return false;
     }
     const auto& p = theme::palette();
-    ui::beforeDetachable(editorWindowId);
-    if (std::exchange(placeHere_, false)) {
+    ui::beforeDetachable(windowId_.c_str());
+    windows_.placeFirst(target.track, target.nodeId);
+    if (!placeHere_.empty() && placeHere_ == windowId_) {
+        placeHere_.clear();
         const auto* main = ImGui::GetMainViewport();
         ImGui::SetNextWindowPos(ImVec2(main->Pos.x + dp(40.0f), main->Pos.y + dp(60.0f)), ImGuiCond_Always);
         ImGui::SetNextWindowViewport(main->ID);
     }
     ImGui::SetNextWindowSize(ImVec2(dp(1'240.0f), dp(800.0f)), ImGuiCond_FirstUseEver);
-    if (focusEditor_) {
+    if (focus)
         ImGui::SetNextWindowFocus();
-        focusEditor_ = false;
-    }
     auto open = true;
-    const auto title = juce::String::fromUTF8("Prisme — ") + studio_.trackName(target.track) + "###prismEditor";
+    const auto title = juce::String::fromUTF8("Prisme — ") + studio_.trackName(target.track) + juce::String(windowId_);
     ImGui::PushStyleColor(ImGuiCol_TitleBgActive, theme::mix(prismOrange, p.bg2 | 0xff000000u, 0.65f));
-    const auto visible = ImGui::Begin(title.toRawUTF8(), &open, ImGuiWindowFlags_NoCollapse);
+    const auto visible = ui::beginEditorWindow(title.toRawUTF8(), &open, ImGuiWindowFlags_NoCollapse);
     ImGui::PopStyleColor();
     if (visible) {
         // Out of the studio's window, as a plug-in's (another screen), and back.
         {
             const auto headerY = ImGui::GetCursorPosY();
             ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - dp(24.0f));
-            (void) ui::detachButton(editorWindowId, ImVec2(dp(24.0f), dp(22.0f)));
+            (void) ui::detachButton(windowId_.c_str(), ImVec2(dp(24.0f), dp(22.0f)));
             ImGui::SetCursorPosY(headerY);
         }
         // The header: the name, its presets, the master.
@@ -1357,8 +1452,7 @@ void PrismView::drawEditor()
         }
     }
     ImGui::End();
-    if (!open)
-        editor_.reset();
+    return open;
 }
 
 } // namespace cydaw::v2

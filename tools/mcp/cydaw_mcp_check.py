@@ -410,12 +410,17 @@ def main():
             failures.append("import_midi added no track")
         moved_clip = client.tool("set_midi_clip", track="Nappes", clip="Nappes",
                                  startBeats=16, name="Nappes 2", colour="#ff8844")
-        if moved_clip["scene"] != 1 or moved_clip["name"] != "Nappes 2":
+        if moved_clip["startBeats"] != 16 or moved_clip["scene"] != -1 or moved_clip["name"] != "Nappes 2":
             failures.append("set_midi_clip start/name: %s" % moved_clip)
-        new_clip = client.tool("add_midi_clip", track="Nappes", name="Vide", startBeats=32,
-                               lengthBeats=8)
+        new_clip = client.tool("add_midi_clip", track="Nappes", name="Vide", scene=2, lengthBeats=8)
         if new_clip["scene"] != 2:
             failures.append("add_midi_clip scene: %s" % new_clip)
+        slotted = client.tool("set_midi_clip", track="Nappes", clip="Nappes 2", scene=3)
+        if slotted["scene"] != 3:
+            failures.append("set_midi_clip scene: %s" % slotted)
+        back = client.tool("set_midi_clip", track="Nappes", clip="Nappes 2", scene=-1, startBeats=16)
+        if back["scene"] != -1 or back["startBeats"] != 16:
+            failures.append("set_midi_clip back to the arrangement: %s" % back)
         first_midi = len(client.tool("status")["audioTracks"])
         moved = client.tool("move_track", track="Nappes", to=first_midi)
         if moved["midiTracks"][0]["name"] != "Nappes":

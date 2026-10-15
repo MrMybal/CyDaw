@@ -72,7 +72,7 @@ double spanOf(const kick::KickValues& values)
 
 } // namespace
 
-KickView::KickView(Studio& studio, UiState& state) : studio_(studio), state_(state), presets_(studio, state) {}
+KickView::KickView(DeviceHost& studio, UiState& state) : studio_(studio), state_(state), presets_(studio, state) {}
 
 float KickView::paneWidth()
 {
@@ -135,7 +135,7 @@ bool KickView::knob(const int index, const char* label, const float diameter)
             set(index, parameter.defaultValue);
         const auto binding = "node." + juce::String(static_cast<juce::int64>(card_.nodeId)) + ".kick." + juce::String(parameter.key);
         if (studio_.isValid(card_.track) && studio_.canAutomate(card_.track, binding)) {
-            const auto automated = !studio_.lanePoints(card_.track, binding).empty();
+            const auto automated = studio_.hasLane(card_.track, binding);
             if (ImGui::MenuItem(automated ? L("Afficher l'automation", "Show the automation")
                                           : L("Automatiser dans l'arrangement", "Automate in the arrangement"))) {
                 studio_.setShownLane(card_.track, binding);
@@ -144,7 +144,7 @@ bool KickView::knob(const int index, const char* label, const float diameter)
                 state_.bringToFront = Panel::arrangement;
             }
             if (automated && ImGui::MenuItem(L("Effacer l'automation", "Clear the automation")))
-                studio_.setLanePoints(card_.track, binding, {});
+                studio_.clearLane(card_.track, binding);
         }
         ImGui::EndPopup();
     }
@@ -166,7 +166,11 @@ bool KickView::knob(const int index, const char* label, const float diameter)
     list->AddText(ImVec2(origin.x + (width - size.x) * 0.5f, y), hovered || active ? p.text : p.textDim, text.toRawUTF8());
     list->PopClipRect();
     ImGui::PopFont();
-    ImGui::Dummy(ImVec2(width, textHeight + dp(2.0f)));
+    // Its name, or its number: a click on it types the value in.
+    auto typed = static_cast<double>(value(index));
+    if (ui::valueEntryButton("##number", ImVec2(width, textHeight + dp(2.0f)), typed, parameter.minimum, parameter.maximum,
+                             parameter.unit == "%" ? 100.0 : 1.0, parameter.unit.c_str()))
+        set(index, static_cast<float>(typed));
     ImGui::EndGroup();
     ImGui::PopID();
     return changed;
@@ -521,15 +525,15 @@ void KickView::drawGlobal()
 void KickView::drawPane(const TrackRef& track, app::NodeGraphComponent& graph, const std::uint64_t nodeId, const ImVec2 origin,
                         const ImVec2 size, const ImU32 colour)
 {
+    // Inside a module: English, whatever the language.
+    const ui::ModuleText english;
     if (!bind(track, graph, nodeId))
         return;
     (void) colour;
     ImGui::PushID(static_cast<int>(nodeId) + 37'000);
     ImGui::SetCursorScreenPos(origin);
     ImGui::BeginGroup();
-    if (ui::primaryButton(L("Ouvrir Kick", "Open Kick"), ImVec2(dp(110.0f), 0.0f)))
-        openEditor(track, nodeId);
-    ImGui::SameLine();
+    // Its window opens from the card's header.
     ImGui::TextDisabled("%s", kick::displayValue(kick::bodyShape, value(kick::bodyShape), ui::french()).c_str());
     const auto knobsHeight = dp(26.0f + 16.0f);
     const auto displayOrigin = ImGui::GetCursorScreenPos();
@@ -558,40 +562,48 @@ void KickView::drawPane(const TrackRef& track, app::NodeGraphComponent& graph, c
 
 void KickView::openEditor(const TrackRef& track, const std::uint64_t nodeId, const bool detached)
 {
-    editor_ = Target { track, nodeId };
-    focusEditor_ = true;
+    const auto id = windows_.open(track, nodeId, state_.manyInstrumentWindows);
     if (detached)
-        ui::setDetached(editorWindowId, true);
+        ui::setDetached(id.c_str(), true);
 }
 
 void KickView::drawEditor()
 {
-    if (!editor_)
-        return;
+    // Inside a module: English, whatever the language.
+    const ui::ModuleText english;
+    windows_.each([this](const TrackRef& track, const std::uint64_t nodeId, const bool focus) {
+        editor_ = Target { track, nodeId };
+        windowId_ = windows_.idOf(track, nodeId);
+        const auto open = drawEditorWindow(focus);
+        editor_.reset();
+        return open;
+    });
+}
+
+bool KickView::drawEditorWindow(const bool focus)
+{
     const auto target = *editor_;
     auto* slot = studio_.graphFor(target.track);
     if (slot == nullptr || !studio_.isValid(target.track) || !bind(target.track, slot->graph(), target.nodeId)) {
-        editor_.reset();
-        return;
+        return false;
     }
     const auto& p = theme::palette();
-    ui::beforeDetachable(editorWindowId);
+    ui::beforeDetachable(windowId_.c_str());
+    windows_.placeFirst(target.track, target.nodeId);
     ImGui::SetNextWindowSize(ImVec2(dp(1'080.0f), dp(700.0f)), ImGuiCond_FirstUseEver);
-    if (focusEditor_) {
+    if (focus)
         ImGui::SetNextWindowFocus();
-        focusEditor_ = false;
-    }
     auto open = true;
-    const auto title = juce::String::fromUTF8("Kick \xe2\x80\x94 ") + studio_.trackName(target.track) + "###kickEditor";
+    const auto title = juce::String::fromUTF8("Kick \xe2\x80\x94 ") + studio_.trackName(target.track) + juce::String(windowId_);
     ImGui::PushStyleColor(ImGuiCol_TitleBgActive, theme::mix(kickRed, p.bg2 | 0xff000000u, 0.65f));
-    const auto visible = ImGui::Begin(title.toRawUTF8(), &open, ImGuiWindowFlags_NoCollapse);
+    const auto visible = ui::beginEditorWindow(title.toRawUTF8(), &open, ImGuiWindowFlags_NoCollapse);
     ImGui::PopStyleColor();
     if (visible) {
         // Out of the studio's window, as a plug-in's (another screen), and back.
         {
             const auto headerY = ImGui::GetCursorPosY();
             ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - dp(24.0f));
-            (void) ui::detachButton(editorWindowId, ImVec2(dp(24.0f), dp(22.0f)));
+            (void) ui::detachButton(windowId_.c_str(), ImVec2(dp(24.0f), dp(22.0f)));
             ImGui::SetCursorPosY(headerY);
         }
         ImGui::PushFont(theme::boldFont(), ImGui::GetStyle().FontSizeBase * 1.3f);
@@ -642,8 +654,7 @@ void KickView::drawEditor()
         }
     }
     ImGui::End();
-    if (!open)
-        editor_.reset();
+    return open;
 }
 
 void KickView::drawKickTab()

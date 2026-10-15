@@ -1,0 +1,23 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "empreinte",
+ "name": "Deep Cave",
+ "state": {
+  "type": "empreinte",
+  "parameters": {
+   "empreinte.mix": 0.4,
+   "empreinte.predelay": 60.0,
+   "empreinte.lowCut": 10.0,
+   "empreinte.highCut": 20000.0,
+   "empreinte.width": 1.0,
+   "empreinte.early": 0.0,
+   "empreinte.tail": 2.0,
+   "empreinte.output": 0.0,
+   "empreinte.space": 9.0,
+   "empreinte.length": 1.0,
+   "empreinte.reverse": 0.0
+  }
+ }
+}

@@ -1,0 +1,24 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "velours",
+ "name": "Master (2 to 5 kHz Harshness)",
+ "state": {
+  "type": "velours",
+  "parameters": {
+   "velours.depth": 3.0,
+   "velours.sharpness": 0.45,
+   "velours.selectivity": 0.6,
+   "velours.attack": 5.0,
+   "velours.release": 120.0,
+   "velours.focusLow": 2000.0,
+   "velours.focusHigh": 5000.0,
+   "velours.mix": 0.8,
+   "velours.mode": 0.0,
+   "velours.delta": 0.0,
+   "velours.output": 0.0,
+   "velours.link": 1.0
+  }
+ }
+}

@@ -1,0 +1,16 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "duree",
+ "name": "Quarter Notes",
+ "state": {
+  "type": "duree",
+  "parameters": {
+   "duree.length": 250.0,
+   "duree.factor": 1.5,
+   "duree.mode": 1.0,
+   "duree.sync": 9.0
+  }
+ }
+}

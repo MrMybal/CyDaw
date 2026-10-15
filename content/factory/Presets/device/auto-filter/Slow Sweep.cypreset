@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "auto-filter",
+ "name": "Slow Sweep",
+ "state": {
+  "type": "auto-filter",
+  "parameters": {
+   "autofilter.cutoff": 600.0,
+   "autofilter.resonance": 2.5,
+   "autofilter.rate": 0.2,
+   "autofilter.depth": 0.7,
+   "autofilter.sync": 0.0
+  }
+ }
+}

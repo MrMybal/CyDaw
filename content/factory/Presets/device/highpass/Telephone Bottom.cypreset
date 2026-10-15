@@ -1,0 +1,13 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "highpass",
+ "name": "Telephone Bottom",
+ "state": {
+  "type": "highpass",
+  "parameters": {
+   "highpass.cutoff": 500.0
+  }
+ }
+}

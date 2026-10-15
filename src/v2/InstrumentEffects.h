@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Studio.h"
+#include "DeviceHost.h"
 #include "UiState.h"
 
 #include <imgui.h>
@@ -21,7 +21,7 @@ struct Choice {
 };
 
 // `ownType`: the instrument card's type, never listed as an effect.
-void draw(Studio& studio, UiState& state, const TrackRef& track, const juce::String& ownType,
+void draw(DeviceHost& studio, UiState& state, const TrackRef& track, const juce::String& ownType,
           const juce::String& instrumentName, std::span<const Choice> choices, ImU32 colour);
 
 } // namespace cydaw::v2::instrument_effects

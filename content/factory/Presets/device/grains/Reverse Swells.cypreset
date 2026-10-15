@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "grains",
+ "name": "Reverse Swells",
+ "state": {
+  "type": "grains",
+  "parameters": {
+   "grains.time": 600.0,
+   "grains.feedback": 0.35,
+   "grains.pitch": 0.0,
+   "grains.spray": 150.0,
+   "grains.density": 8.0,
+   "grains.pitchRandom": 0.0,
+   "grains.mix": 0.45,
+   "grains.output": 0.0,
+   "grains.sync": 0.0,
+   "grains.size": 400.0,
+   "grains.stereo": 0.6,
+   "grains.reverseChance": 1.0,
+   "grains.freeze": 0.0,
+   "grains.highCut": 14000.0
+  }
+ }
+}

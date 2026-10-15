@@ -1,0 +1,28 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "percussive-bell",
+ "name": "Vibraphone",
+ "state": {
+  "type": "percussive-bell",
+  "parameters": {
+   "node.40002.voice.mode": 0.0,
+   "node.40002.voice.glide": 0.0,
+   "node.40003.polyOscillator.waveform": 0.0,
+   "node.40003.polyOscillator.level": 0.15,
+   "node.40004.envelope.attack": 2.0,
+   "node.40004.envelope.decay": 1800.0,
+   "node.40004.envelope.sustain": 0.1,
+   "node.40004.envelope.release": 1600.0,
+   "node.40005.gain.db": 0.0,
+   "node.40006.voiceFilter.cutoff": 6000.0,
+   "node.40006.voiceFilter.resonance": 1.2,
+   "node.40007.delay.time": 400.0,
+   "node.40007.delay.feedback": 0.2,
+   "node.40007.delay.mix": 0.12,
+   "node.40008.reverb.roomSize": 0.75,
+   "node.40008.reverb.mix": 0.28
+  }
+ }
+}

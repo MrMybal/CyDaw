@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "delay",
+ "name": "Dotted Eighth (120)",
+ "state": {
+  "type": "delay",
+  "parameters": {
+   "delay.time": 375.0,
+   "delay.feedback": 0.4,
+   "delay.mix": 0.28
+  }
+ }
+}

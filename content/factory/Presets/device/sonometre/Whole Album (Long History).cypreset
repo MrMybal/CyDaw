@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "sonometre",
+ "name": "Whole Album (Long History)",
+ "state": {
+  "type": "sonometre",
+  "parameters": {
+   "sonometre.target": 0.0,
+   "sonometre.history": 600.0,
+   "sonometre.truePeak": -1.0
+  }
+ }
+}

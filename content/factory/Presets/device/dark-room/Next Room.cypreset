@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "dark-room",
+ "name": "Next Room",
+ "state": {
+  "type": "dark-room",
+  "parameters": {
+   "node.27002.lowpass.cutoff": 1200.0,
+   "node.27002.lowpass.resonance": 0.8,
+   "node.27003.reverb.roomSize": 0.5,
+   "node.27003.reverb.mix": 0.35,
+   "node.27004.eq.tone": -0.4
+  }
+ }
+}

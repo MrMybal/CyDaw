@@ -64,6 +64,22 @@ public:
         juce::ignoreUnused(command, request);
         return {};
     }
+    // computer_keyboard: the computer's keys as a MIDI keyboard, read or set
+    // {enabled, octave, velocity}; midi_inputs: the MIDI devices, read or one
+    // switched {device, enabled}. Null when there is no interface.
+    // theme: the colour themes, and the one on; {name or key} puts one on,
+    // {create, from} makes one of the person's from another, {key, colours}
+    // changes its colours ("#RRGGBB" by palette name).
+    virtual juce::var themes(const juce::var& request)
+    {
+        juce::ignoreUnused(request);
+        return {};
+    }
+    virtual juce::var midiInputs(const juce::String& command, const juce::var& request)
+    {
+        juce::ignoreUnused(command, request);
+        return {};
+    }
     // ui_input: mouse events played into the interface, one per frame, in
     // the window's pixels (those of a snapshot), without the system's
     // pointer: {"type": "move"|"down"|"up"|"wheel"|"wait"|"release", "x",
@@ -98,6 +114,8 @@ public:
     virtual void showDeviceCatalogue() {}
     // The graph editor on the selected track's modulation graph, or its sound's.
     virtual void showModulationGraph(bool) {}
+    // A rack's pad open in the device panel (its chain), or none.
+    virtual void openRackPad(const std::optional<std::pair<TrackRef, int>>&) {}
     // A clip in the editor (an audio clip on a face of its editor: 0 sample,
     // 1 takes, 2 stretch).
     virtual void editClip(const TrackRef& track, std::uint64_t clipId, int face)
@@ -139,6 +157,12 @@ public:
     // A project opened as the person opens it: in steps, the interface
     // drawing a bar meanwhile. False when it cannot start.
     virtual bool openProjectInSteps(const juce::File& file)
+    {
+        (void) file;
+        return false;
+    }
+    // A project of another software imported the same way.
+    virtual bool importProjectInSteps(const juce::File& file)
     {
         (void) file;
         return false;

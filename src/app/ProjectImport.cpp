@@ -340,6 +340,18 @@ private:
                     imported.devices.add(deviceName);
                     if (attributeText(device, "deviceRole").equalsIgnoreCase("instrument"))
                         imported.hadInstrument = true;
+                    ImportedDevice entry;
+                    entry.name = deviceName;
+                    entry.vendor = attributeText(device, "deviceVendor");
+                    const auto tag = device->getTagName();
+                    entry.plugin = tag.endsWithIgnoreCase("Plugin");
+                    entry.format = tag.startsWith("Vst3") ? "VST3" : tag.startsWith("Vst2") ? "VST2" : tag.startsWith("Clap") ? "CLAP"
+                                   : tag.startsWith("Au") ? "AU" : juce::String();
+                    entry.type = entry.plugin ? juce::String() : tag;
+                    const auto role = attributeText(device, "deviceRole");
+                    entry.instrument = role.equalsIgnoreCase("instrument");
+                    entry.noteEffect = role.equalsIgnoreCase("noteFX");
+                    imported.chain.push_back(std::move(entry));
                 }
         }
         const auto index = static_cast<int>(out_.tracks.size());
@@ -708,6 +720,53 @@ private:
                         break;
                     }
                 imported.devices.add(deviceName);
+                ImportedDevice entry;
+                entry.name = deviceName;
+                const auto tag = device->getTagName();
+                entry.plugin = tag == "PluginDevice" || tag == "AuPluginDevice";
+                entry.format = valueAt(device, "PluginDesc/Vst3PluginInfo/Name").isNotEmpty()   ? "VST3"
+                               : valueAt(device, "PluginDesc/VstPluginInfo/PlugName").isNotEmpty() ? "VST2"
+                               : valueAt(device, "PluginDesc/ClapPluginInfo/Name").isNotEmpty()    ? "CLAP"
+                               : tag == "AuPluginDevice"                                            ? "AU"
+                                                                                                    : juce::String();
+                entry.vendor = valueAt(device, "PluginDesc/Vst3PluginInfo/DeviceCreator");
+                entry.type = entry.plugin ? juce::String() : tag;
+                // Live's own instruments, by their tag; a plug-in on a MIDI
+                // track before any effect is its instrument.
+                static const juce::StringArray instruments { "Operator", "UltraAnalog", "Collision", "Drift", "OriginalSimpler",
+                                                              "MultiSampler", "InstrumentVector", "InstrumentMeld", "LoungeLizard",
+                                                              "StringStudio", "Tension", "Electric", "InstrumentImpulse",
+                                                              "DrumGroupDevice", "InstrumentGroupDevice", "Sampler", "Simpler" };
+                static const juce::StringArray noteEffects { "MidiArpeggiator", "MidiChord", "MidiNoteLength", "MidiPitcher",
+                                                              "MidiRandom", "MidiScale", "MidiVelocity" };
+                entry.noteEffect = noteEffects.contains(tag);
+                const auto hasInstrument = std::any_of(imported.chain.begin(), imported.chain.end(),
+                                                       [](const ImportedDevice& earlier) { return earlier.instrument; });
+                entry.instrument = imported.midi && !hasInstrument && !entry.noteEffect
+                                   && (instruments.contains(tag) || (entry.plugin && imported.chain.empty())
+                                       || (entry.plugin && std::all_of(imported.chain.begin(), imported.chain.end(),
+                                                                       [](const ImportedDevice& earlier) { return earlier.noteEffect; })));
+                // Its settings: each element with a <Manual Value="…"/>, by
+                // its path in the device ("Operator.0/Envelope/AttackTime").
+                if (!entry.plugin) {
+                    std::function<void(const juce::XmlElement*, const juce::String&, int)> walk
+                        = [&](const juce::XmlElement* element, const juce::String& path, const int depth) {
+                              if (depth > 8 || entry.settings.size() > 600)
+                                  return;
+                              for (const auto* item : element->getChildIterator()) {
+                                  const auto tagName = item->getTagName();
+                                  const auto itemPath = path.isEmpty() ? tagName : path + "/" + tagName;
+                                  if (const auto* manual = item->getChildByName("Manual"); manual != nullptr && manual->hasAttribute("Value")) {
+                                      const auto text = manual->getStringAttribute("Value");
+                                      entry.settings.emplace_back(itemPath, text == "true" ? 1.0 : text == "false" ? 0.0 : text.getDoubleValue());
+                                  } else if (tagName != "Manual" && tagName != "AutomationTarget" && tagName != "ModulationTarget") {
+                                      walk(item, itemPath, depth + 1);
+                                  }
+                              }
+                          };
+                    walk(device, {}, 0);
+                }
+                imported.chain.push_back(std::move(entry));
             }
         imported.hadInstrument = imported.midi && !imported.devices.isEmpty();
 
@@ -1466,6 +1525,7 @@ constexpr int signatureNumerator = 622;
 constexpr int signatureDenominator = 623;
 constexpr int trackGroup = 1245;
 constexpr int trackList = 1246;
+constexpr int effectTrackList = 1247;
 constexpr int masterTrack = 1248;
 constexpr int title = 347;
 constexpr int colour = 1356;
@@ -1551,8 +1611,10 @@ public:
         out_.application = "Bitwig Studio";
         readMeta();
         parser_.seek(contentOffset);
+        // The project is one tree; what follows it (where the header's next
+        // offset points: Bitwig 4 keeps other data there) is not objects.
         std::vector<Value> roots;
-        while (parser_.ok() && !parser_.atEnd())
+        if (parser_.ok() && !parser_.atEnd())
             roots.push_back(parser_.object(0));
         if (roots.empty() || roots.front().kind != Value::Kind::object)
             return juce::Result::fail("The Bitwig project holds no readable object tree.");
@@ -1704,7 +1766,11 @@ private:
     {
         if (group == nullptr || !listed.insert(group).second)
             return;
-        for (const auto* item : list(group, id::trackList)) {
+        // Its tracks, then its effect tracks (the returns).
+        auto items = list(group, id::trackList);
+        for (const auto* effect : list(group, id::effectTrackList))
+            items.push_back(effect);
+        for (const auto* item : items) {
             if (item->classId == 477) {
                 appendGroup(item, tracks, listed);
                 continue;
@@ -1753,35 +1819,35 @@ private:
             }
         }
 
-        // The tracks: the root group's list, a group track's own list where
-        // it sits; the master is the track of type 2 wherever it sits.
+        // The tracks: the root group's list (and its effect tracks), a group
+        // track's own list where it sits. The master is the one the root
+        // group names (master_track); a track of type 2 elsewhere is a
+        // hybrid track (notes and audio together), read as the others are.
         std::vector<const Node*> tracks;
         std::set<const Node*> listed;
         std::set<const Node*> seen;
         std::vector<const Node*> rootGroups;
         collectInside(root, 477, rootGroups, seen);
+        const Node* master = nullptr;
+        for (const auto* group : rootGroups)
+            if (master == nullptr)
+                master = child(group, id::masterTrack);
+        if (master != nullptr)
+            listed.insert(master);
         for (const auto* group : rootGroups)
             appendGroup(group, tracks, listed);
         if (tracks.empty()) {
             seen.clear();
             collect(root, 144, tracks, seen);
         }
-        seen.clear();
-        std::vector<const Node*> allTracks;
-        collect(root, 144, allTracks, seen);
-        for (const auto* track : allTracks)
-            if (integer(track, id::trackType, -1) == 2) {
-                if (const auto* mixer = child(track, id::mixer))
-                    if (const auto* volume = child(mixer, id::volume))
-                        out_.masterGainDb = volumeToDb(number(volume, id::value, 1.0));
-                break;
-            }
+        if (master != nullptr)
+            if (const auto* mixer = child(master, id::mixer))
+                if (const auto* volume = child(mixer, id::volume))
+                    out_.masterGainDb = volumeToDb(number(volume, id::value, 1.0));
         auto index = 0;
-        for (const auto* track : tracks) {
-            if (integer(track, id::trackType, -1) == 2)
-                continue;
-            readTrack(track, ++index);
-        }
+        for (const auto* track : tracks)
+            if (track != master)
+                readTrack(track, ++index);
     }
 
     void readTrack(const Node* track, const int index)
@@ -1813,13 +1879,55 @@ private:
                     continue;
                 const auto creator = text(preset, id::deviceCreator);
                 imported.devices.add(creator.isNotEmpty() && creator != "Bitwig" ? name + " (" + creator + ")" : name);
+                ImportedDevice entry;
+                entry.name = name;
+                entry.plugin = creator.isNotEmpty() && creator != "Bitwig";
+                entry.vendor = entry.plugin ? creator : juce::String();
+                entry.type = entry.plugin ? juce::String() : name;
+                entry.instrument = deviceType != 0 && deviceType != 1;
+                entry.noteEffect = deviceType == 1;
+                // Its settings: each parameter an object with its id as text
+                // (697) and its value as the first number, whole number or
+                // switch beside it ("F1FREQ" 47.6, "OSC1OCT" 2).
+                {
+                    std::set<const Node*> seenSettings;
+                    std::function<void(const Node*, int)> walk = [&](const Node* node, const int depth) {
+                        if (node == nullptr || depth > 12 || !seenSettings.insert(node).second || entry.settings.size() > 400)
+                            return;
+                        const auto* key = node->field(697);
+                        if (key != nullptr && key->kind == Value::Kind::text && key->text.isNotEmpty())
+                            for (const auto& field : node->fields) {
+                                if (field.id == 697)
+                                    continue;
+                                if (field.value.kind == Value::Kind::number)
+                                    entry.settings.emplace_back(key->text, field.value.number);
+                                else if (field.value.kind == Value::Kind::integer)
+                                    entry.settings.emplace_back(key->text, static_cast<double>(field.value.integer));
+                                else if (field.value.kind == Value::Kind::boolean)
+                                    entry.settings.emplace_back(key->text, field.value.boolean ? 1.0 : 0.0);
+                                else
+                                    continue;
+                                break;
+                            }
+                        for (const auto& field : node->fields) {
+                            if (field.value.kind == Value::Kind::object)
+                                walk(parser_.resolve(field.value), depth + 1);
+                            else if (field.value.kind == Value::Kind::list)
+                                for (const auto& item : field.value.list)
+                                    if (item.kind == Value::Kind::object)
+                                        walk(parser_.resolve(item), depth + 1);
+                        }
+                    };
+                    walk(device, 0);
+                }
+                imported.chain.push_back(std::move(entry));
                 if (deviceType != 0 && deviceType != 1) {
                     imported.hadInstrument = true;
                     if (instrumentName.isEmpty())
                         instrumentName = name;
                 }
             }
-        if (type == 0)
+        if (type == 0 || type == 2)
             imported.hadInstrument = true;
 
         if (const auto* timeline = child(track, id::timeline))
@@ -1848,15 +1956,12 @@ private:
                 return;
             imported.midi = type == 0;
         }
+        // Unnamed, as Bitwig shows it: its instrument's name, else its kind
+        // and its place ("Audio 14").
         if (imported.name.isEmpty()) {
-            if (!imported.audioClips.empty())
-                imported.name = imported.audioClips.front().name;
-            else if (!imported.midiClips.empty())
-                imported.name = imported.midiClips.front().name;
-            if (imported.name.isEmpty() && instrumentName.isNotEmpty())
-                imported.name = instrumentName;
+            imported.name = instrumentName;
             if (imported.name.isEmpty())
-                imported.name = (imported.midi ? "Inst " : "Audio ") + juce::String(index);
+                imported.name = (type == 1 ? "Audio " : type == 2 ? "Hybrid " : imported.midi ? "Inst " : "Audio ") + juce::String(index);
         }
         out_.tracks.push_back(std::move(imported));
     }

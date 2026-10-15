@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "transient-shaper",
+ "name": "Punchy Drums",
+ "state": {
+  "type": "transient-shaper",
+  "parameters": {
+   "transient.attack": 0.8,
+   "transient.sustain": -0.3,
+   "transient.output": -1.5
+  }
+ }
+}

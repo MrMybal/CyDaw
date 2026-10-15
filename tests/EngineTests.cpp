@@ -15,6 +15,15 @@
 #include <cydaw/engine/DrumSynth.h>
 #include <cydaw/engine/AmpDesign.h>
 #include <cydaw/engine/HaloDesign.h>
+#include <cydaw/engine/MidiEffects.h>
+#include <cydaw/engine/PitchTracker.h>
+#include <cydaw/engine/VoiceDesign.h>
+#include <cydaw/engine/PitchDesign.h>
+#include <cydaw/engine/SpaceDesign.h>
+#include <cydaw/engine/RhythmDesign.h>
+#include <cydaw/engine/MotionDesign.h>
+#include <cydaw/engine/ResonanceDesign.h>
+#include <cydaw/engine/UtilityDesign.h>
 #include <cydaw/engine/MixDesign.h>
 #include <cydaw/engine/DrumKit.h>
 #include <cydaw/engine/SynthFamily.h>
@@ -348,6 +357,287 @@ void dynamicsListenToTheirSidechain()
     const auto opened = run(NativeDspNodeKind::gate, gate, 0.8f);
     expect(closed >= 0.0 && closed < steady * 0.01, "sidechain: a gate whose key is silent stays shut on a loud sound");
     expect(std::abs(opened - steady) < steady * 0.05, "sidechain: a loud key opens the gate");
+}
+
+void equaliserBandsMoveWithTheSound()
+{
+    // A dynamic bell at 1 kHz (range -12 dB over -30 dB): a loud tone there
+    // is cut by its range, a quiet one passes; a range upward lifts the loud
+    // tone; a static band does nothing of it. What the processor shows is
+    // what it did. Keyed on the sidechain, the band follows the key, not the
+    // sound.
+    using namespace cydaw::engine;
+    const auto settingsFor = [](const float range, const bool dynamic, const float detector, const float threshold) {
+        NativeDspNodeParameters parameters;
+        if (const auto* descriptor = effectForKind(NativeDspNodeKind::parametricEq))
+            applyEffectDefaults(*descriptor, parameters);
+        const auto set = [&parameters](const EffectParameter* parameter, const float value) {
+            if (parameter != nullptr)
+                setEffectValue(parameters, *parameter, value);
+        };
+        set(effectParameterForSuffix("eqpro.b1Enabled"), 1.0f);
+        set(effectParameterForSuffix("eqpro.b1Type"), 0.0f);
+        set(effectParameterForSuffix("eqpro.b1Frequency"), 1'000.0f);
+        set(effectParameterForSuffix("eqpro.b1Gain"), 0.0f);
+        set(effectParameterForSuffix("eqpro.b1Q"), 1.0f);
+        set(effectParameterForSuffix("eqpro.b1Dynamic"), dynamic ? 1.0f : 0.0f);
+        set(effectParameterForSuffix("eqpro.b1Range"), range);
+        set(effectParameterForSuffix("eqpro.b1Threshold"), threshold);
+        set(effectParameterForSuffix("eqpro.b1Attack"), 1.0f);
+        set(effectParameterForSuffix("eqpro.b1Release"), 50.0f);
+        set(effectParameterForSuffix("eqpro.b1Detector"), detector);
+        return parameters;
+    };
+    // The tone's level out over its level in (dB), once settled, and what
+    // the processor shows of band 1: its gain moved, its detector's level.
+    struct Heard {
+        double changeDb {};
+        float movedDb {};
+        float levelDb {};
+    };
+    const auto play = [](const NativeDspNodeParameters& parameters, const double amplitude) {
+        NativeDspNode node;
+        node.id = 1;
+        node.kind = NativeDspNodeKind::parametricEq;
+        node.parameters = parameters;
+        auto processor = makeEffectProcessor(node);
+        Heard heard;
+        if (processor == nullptr)
+            return heard;
+        processor->prepare({ 48'000.0, 256, 2 });
+        AudioBuffer input(2, 256);
+        AudioBuffer output(2, 256);
+        auto phase = 0.0;
+        auto in = 0.0;
+        auto out = 0.0;
+        for (int block = 0; block < 60; ++block) {
+            for (std::uint32_t frame = 0; frame < 256; ++frame) {
+                const auto sample = static_cast<float>(amplitude * std::sin(phase));
+                phase += 2.0 * std::numbers::pi * 1'000.0 / 48'000.0;
+                input.view(256).channel(0)[frame] = sample;
+                input.view(256).channel(1)[frame] = sample;
+            }
+            processor->process(input.view(256), output.view(256), {});
+            if (block >= 40)
+                for (std::uint32_t frame = 0; frame < 256; ++frame) {
+                    in += static_cast<double>(input.view(256).channel(0)[frame]) * input.view(256).channel(0)[frame];
+                    out += static_cast<double>(output.view(256).channel(0)[frame]) * output.view(256).channel(0)[frame];
+                }
+        }
+        heard.changeDb = 10.0 * std::log10(std::max(out, 1.0e-20) / std::max(in, 1.0e-20));
+        std::array<float, eqProReadingCount> shown {};
+        if (processor->readings(shown.data(), shown.size()) == shown.size()) {
+            heard.movedDb = shown[0];
+            heard.levelDb = shown[eqProBands];
+        }
+        return heard;
+    };
+    const auto loud = play(settingsFor(-12.0f, true, 0.0f, -30.0f), 0.5);
+    expect(std::abs(loud.changeDb + 12.0) < 1.0, "dynamic EQ: a loud tone in a dynamic band is cut by its range");
+    expect(std::abs(loud.movedDb + 12.0f) < 0.5f, "dynamic EQ: the processor shows the band's gain moved by its range");
+    expect(std::abs(loud.levelDb + 6.0f) < 1.5f, "dynamic EQ: the detector hears the tone's level in its band");
+    const auto quiet = play(settingsFor(-12.0f, true, 0.0f, -30.0f), 0.01);
+    expect(std::abs(quiet.changeDb) < 0.2, "dynamic EQ: a quiet tone, under the threshold, passes");
+    expect(std::abs(quiet.movedDb) < 0.05f, "dynamic EQ: under the threshold, nothing moved");
+    const auto lifted = play(settingsFor(6.0f, true, 0.0f, -30.0f), 0.5);
+    expect(std::abs(lifted.changeDb - 6.0) < 1.0, "dynamic EQ: a range upward lifts a loud tone");
+    const auto still = play(settingsFor(-12.0f, false, 0.0f, -30.0f), 0.5);
+    expect(std::abs(still.changeDb) < 0.2, "dynamic EQ: a static band leaves the tone it would cut");
+    expect(still.movedDb == 0.0f && still.levelDb <= -119.0f, "dynamic EQ: a static band shows nothing moving");
+
+    // Keyed: the sound alone stays under the threshold, the key over it.
+    const auto keyed = [&settingsFor](const float detector, const float keyLevel) {
+        NativeDspGraph graph;
+        NativeDspNode main;
+        main.id = 1;
+        main.kind = NativeDspNodeKind::input;
+        NativeDspNode key;
+        key.id = 2;
+        key.kind = NativeDspNodeKind::input;
+        key.inputBus = 1;
+        NativeDspNode effect;
+        effect.id = 3;
+        effect.kind = NativeDspNodeKind::parametricEq;
+        effect.parameters = settingsFor(-12.0f, true, detector, -10.0f);
+        NativeDspNode out;
+        out.id = 4;
+        out.kind = NativeDspNodeKind::output;
+        graph.nodes = { main, key, effect, out };
+        graph.connections = { { 1, 3, 0, 1 }, { 2, 3, 0, effectSidechainPortId }, { 3, 4, 0, 0 } };
+        graph.outputNodeId = 4;
+        auto compiled = compileNativeDspGraph(graph, { 48'000.0, 256, 2 });
+        if (!compiled)
+            return 99.0;
+        AudioBuffer input(2, 256);
+        AudioBuffer side(2, 256);
+        AudioBuffer output(2, 256);
+        auto phase = 0.0;
+        auto in = 0.0;
+        auto out2 = 0.0;
+        for (int block = 0; block < 60; ++block) {
+            for (std::uint32_t frame = 0; frame < 256; ++frame) {
+                const auto tone = std::sin(phase);
+                phase += 2.0 * std::numbers::pi * 1'000.0 / 48'000.0;
+                for (std::uint32_t channel = 0; channel < 2; ++channel) {
+                    input.view(256).channel(channel)[frame] = static_cast<float>(0.1 * tone);
+                    side.view(256).channel(channel)[frame] = static_cast<float>(keyLevel * tone);
+                }
+            }
+            const auto extra = side.view(256);
+            compiled.plan->process(input.view(256), &extra, 1, output.view(256), {});
+            if (block >= 40)
+                for (std::uint32_t frame = 0; frame < 256; ++frame) {
+                    in += static_cast<double>(input.view(256).channel(0)[frame]) * input.view(256).channel(0)[frame];
+                    out2 += static_cast<double>(output.view(256).channel(0)[frame]) * output.view(256).channel(0)[frame];
+                }
+        }
+        return 10.0 * std::log10(std::max(out2, 1.0e-20) / std::max(in, 1.0e-20));
+    };
+    // A key at -2 dB: 8 dB over -10, three quarters of it, 6 dB down.
+    const auto ducked = keyed(1.0f, 0.8f);
+    expect(std::abs(ducked + 6.0) < 1.0, "dynamic EQ: a band keyed on the sidechain dips when the key is loud");
+    expect(std::abs(keyed(1.0f, 0.0f)) < 0.2, "dynamic EQ: keyed, a silent key leaves the sound");
+    expect(std::abs(keyed(0.0f, 0.8f)) < 0.2, "dynamic EQ: a band hearing itself ignores the key");
+}
+
+void knobsGlideAndCardsSwitchOff()
+{
+    // A knob turned at once is heard as a slope, not a jump; a card switched
+    // off lets its input through, crossfaded and as late as it was; an
+    // instrument switched off falls silent.
+    using namespace cydaw::engine;
+    const auto graphWith = [](const NativeDspNodeKind kind, const std::vector<std::pair<const char*, float>>& settings) {
+        NativeDspGraph graph;
+        NativeDspNode in;
+        in.id = 1;
+        in.kind = NativeDspNodeKind::input;
+        NativeDspNode effect;
+        effect.id = 2;
+        effect.kind = kind;
+        if (const auto* descriptor = effectForKind(kind))
+            applyEffectDefaults(*descriptor, effect.parameters);
+        for (const auto& [name, value] : settings)
+            if (const auto* parameter = effectParameterForSuffix(name))
+                setEffectValue(effect.parameters, *parameter, value);
+        NativeDspNode out;
+        out.id = 3;
+        out.kind = NativeDspNodeKind::output;
+        graph.nodes = { in, effect, out };
+        graph.connections = { { 1, 2, 0, 0 }, { 2, 3, 0, 0 } };
+        graph.outputNodeId = 3;
+        return graph;
+    };
+    constexpr std::uint32_t block = 512;
+    AudioBuffer input(2, block);
+    AudioBuffer output(2, block);
+    auto phase = 0.0;
+    std::vector<float> heard;
+    const auto run = [&](AudioRenderPlan& plan, const int blocks) {
+        for (int index = 0; index < blocks; ++index) {
+            for (std::uint32_t frame = 0; frame < block; ++frame) {
+                const auto sample = static_cast<float>(0.25 * std::sin(phase));
+                phase += 2.0 * std::numbers::pi * 6'000.0 / 48'000.0;
+                input.view(block).channel(0)[frame] = sample;
+                input.view(block).channel(1)[frame] = sample;
+            }
+            plan.process(input.view(block), output.view(block), {});
+            for (std::uint32_t frame = 0; frame < block; ++frame)
+                heard.push_back(output.view(block).channel(0)[frame]);
+        }
+    };
+    // The loudest of each stretch of 32 samples, in dB, from `from` on.
+    const auto pieces = [&heard](const std::size_t from) {
+        std::vector<double> levels;
+        for (auto at = from; at + 32 <= heard.size(); at += 32) {
+            auto peak = 0.0f;
+            for (std::size_t frame = at; frame < at + 32; ++frame)
+                peak = std::max(peak, std::abs(heard[frame]));
+            levels.push_back(20.0 * std::log10(std::max(1.0e-9f, peak)));
+        }
+        return levels;
+    };
+
+    // ---- A knob turned at once: its three gains from 0 to -24 dB.
+    AudioProcessor* equaliser {};
+    auto graph = graphWith(NativeDspNodeKind::threeBandEq, {});
+    auto compiled = compileNativeDspGraph(graph, { 48'000.0, block, 2 }, [&equaliser](const NativeDspNode& node, AudioProcessor* processor) {
+        if (node.id == 2)
+            equaliser = processor;
+    });
+    expect(static_cast<bool>(compiled) && equaliser != nullptr, "glide: a three-band equaliser compiles");
+    if (!compiled || equaliser == nullptr)
+        return;
+    run(*compiled.plan, 10);
+    const auto before = heard.size();
+    auto turned = graph.nodes[1];
+    for (const auto* key : { "eq3.low", "eq3.mid", "eq3.high" })
+        setEffectValue(turned.parameters, *effectParameterForSuffix(key), -24.0f);
+    expect(updateEffectProcessor(*equaliser, turned), "glide: the equaliser takes its new values");
+    run(*compiled.plan, 6);
+    const auto levels = pieces(before);
+    auto steepest = 0.0;
+    for (std::size_t index = 1; index < levels.size(); ++index)
+        steepest = std::max(steepest, std::abs(levels[index] - levels[index - 1]));
+    expect(levels.front() > -15.0, "glide: the first samples after the change still sound as before");
+    expect(steepest < 4.5, "glide: 24 dB at once is heard in steps of a few dB, 32 samples apart (" + std::to_string(steepest) + " dB)");
+    const auto lowered = levels.back();
+    expect(lowered < -33.0 && lowered > -42.0, "glide: it lands where the knob went (" + std::to_string(lowered) + " dB)");
+
+    // ---- Switched off: the sound at its full level again, crossfaded;
+    // switched on: back down.
+    const BypassedNode off[] { { 2, 2 } };
+    auto start = heard.size();
+    compiled.plan->setBypasses(off);
+    run(*compiled.plan, 4);
+    auto through = pieces(start);
+    steepest = 0.0;
+    for (std::size_t index = 1; index < through.size(); ++index)
+        steepest = std::max(steepest, std::abs(through[index] - through[index - 1]));
+    expect(std::abs(through.back() + 12.0) < 0.5, "bypass: switched off, the input goes through (" + std::to_string(through.back()) + " dB)");
+    expect(through.front() < lowered + 8.0 && steepest < 9.0, "bypass: the switch is crossfaded, not a jump");
+    start = heard.size();
+    compiled.plan->setBypasses({});
+    run(*compiled.plan, 4);
+    expect(std::abs(pieces(start).back() - lowered) < 1.0, "bypass: switched on again, it plays as before");
+    // An instrument switched off: silence.
+    const BypassedNode silenced[] { { 2, 0 } };
+    compiled.plan->setBypasses(silenced);
+    start = heard.size();
+    run(*compiled.plan, 3);
+    expect(pieces(start).back() < -100.0, "bypass: switched off with nothing to pass, it falls silent");
+    // The chain's input itself (where an instrument's voices come in).
+    const BypassedNode voice[] { { 1, 0 } };
+    compiled.plan->setBypasses(voice);
+    start = heard.size();
+    run(*compiled.plan, 3);
+    expect(pieces(start).back() < -100.0, "bypass: the chain's input switched off, nothing comes in (" + std::to_string(pieces(start).back()) + " dB)");
+
+    // ---- A look-ahead switched off: what passes is as late as it was.
+    AudioProcessor* compressor {};
+    auto late = graphWith(NativeDspNodeKind::compressorPro, { { "comppro.lookahead", 10.0f }, { "comppro.threshold", 0.0f },
+                                                              { "comppro.ratio", 1.0f } });
+    auto withLookAhead = compileNativeDspGraph(late, { 48'000.0, block, 2 }, [&compressor](const NativeDspNode& node, AudioProcessor* processor) {
+        if (node.id == 2)
+            compressor = processor;
+    });
+    expect(static_cast<bool>(withLookAhead) && compressor != nullptr && compressor->latencySamples() == 480,
+           "bypass: a compressor looking 10 ms ahead is 480 samples late");
+    if (!withLookAhead || compressor == nullptr)
+        return;
+    heard.clear();
+    phase = 0.0;
+    run(*withLookAhead.plan, 8);
+    const auto playing = heard;
+    heard.clear();
+    phase = 0.0;
+    withLookAhead.plan->reset();
+    run(*withLookAhead.plan, 4);
+    withLookAhead.plan->setBypasses(off);
+    run(*withLookAhead.plan, 4);
+    auto worst = 0.0f;
+    for (std::size_t frame = 6 * block; frame < heard.size(); ++frame)
+        worst = std::max(worst, std::abs(heard[frame] - playing[frame]));
+    expect(worst < 0.01f, "bypass: switched off, what passes keeps the look-ahead's delay (" + std::to_string(worst) + ")");
 }
 
 void renderPlanRejectsCycles()
@@ -3399,6 +3689,207 @@ void mosaiqueEnginesPlayInTune()
            "Mosaïque draws its engines");
 }
 
+// The models added after Nébuleuse, each the same way: found by its names,
+// its defaults within its ranges, A4 at 440 Hz, a released note that ends,
+// every setting at its top still bounded.
+void laterSynthModelsPlay()
+{
+    using namespace cydaw::engine;
+    using synth::Model;
+    constexpr auto rate = 48'000.0;
+    const prism::Context context;
+    for (const auto model : { Model::opale, Model::onyx, Model::tirette, Model::alliage, Model::quartz, Model::argile, Model::saphir,
+                              Model::derive, Model::bronze, Model::jade }) {
+        synth::warmUp(model);
+        const auto& info = synth::info(model);
+        const auto name = std::string(info.prefix);
+        expect(synth::modelForType(info.typeKey) == model && synth::modelForPrefix(info.prefix) == model
+                   && synth::parameterCount(model) > synth::voicingFieldCount
+                   && synth::parameterIndex(model, "voice.master") == synth::voicingMaster,
+               (name + " is found by its type and prefix, the voicing first").c_str());
+        const auto defaults = synth::defaultValues(model);
+        auto inRange = true;
+        for (int index = 0; index < synth::parameterCount(model); ++index)
+            inRange = inRange && synth::clampValue(model, index, defaults[static_cast<std::size_t>(index)]) == defaults[static_cast<std::size_t>(index)];
+        expect(inRange, (name + "'s defaults are within its ranges").c_str());
+        const auto play = [&](const synth::Values& values, const int note, const double seconds, const double releaseAt) {
+            synth::Voice voice;
+            voice.prepare(rate);
+            voice.start(model, values, note, 1.0f, -1.0, rate);
+            std::vector<float> left(static_cast<std::size_t>(seconds * rate), 0.0f);
+            std::vector<float> right(left.size(), 0.0f);
+            for (std::size_t at = 0; at < left.size(); at += 256) {
+                if (releaseAt >= 0.0 && static_cast<double>(at) >= releaseAt * rate && !voice.releasing())
+                    voice.release();
+                const auto count = static_cast<int>(std::min<std::size_t>(256, left.size() - at));
+                voice.render(values, context, left.data() + at, right.data() + at, count, rate);
+            }
+            return left;
+        };
+        const auto a4 = play(defaults, 69, 1.0, -1.0);
+        const auto at440 = toneLevelDb(a4, 440.0, 9'600, 48'000);
+        expect(at440 > -50.0 && at440 > toneLevelDb(a4, 415.0, 9'600, 48'000) + 6.0 && at440 > toneLevelDb(a4, 466.0, 9'600, 48'000) + 6.0,
+               (name + " plays A4 at 440 Hz").c_str());
+        const auto released = play(defaults, 60, 10.0, 1.0);
+        auto tail = 0.0;
+        for (std::size_t i = static_cast<std::size_t>(9.5 * rate); i < released.size(); ++i)
+            tail = std::max(tail, static_cast<double>(std::abs(released[i])));
+        expect(tail < 1.0e-3, (name + "'s note ends after its release").c_str());
+        // Every setting at its top (and every one at its bottom): finite, bounded.
+        for (const auto top : { true, false }) {
+            auto extreme = defaults;
+            for (int index = 0; index < synth::parameterCount(model); ++index) {
+                const auto& parameter = synth::parameter(model, index);
+                if (index == synth::voicingMaster)
+                    continue;
+                extreme[static_cast<std::size_t>(index)] = synth::clampValue(model, index, top ? parameter.maximum : parameter.minimum);
+            }
+            auto finite = true;
+            auto peak = 0.0;
+            for (const auto note : { 24, 60, 108 })
+                for (const auto sample : play(extreme, note, 0.5, 0.3)) {
+                    finite = finite && std::isfinite(sample);
+                    peak = std::max(peak, static_cast<double>(std::abs(sample)));
+                }
+            expect(finite && peak < 16.0, (name + (top ? " at every top" : " at every bottom") + " stays finite and bounded").c_str());
+        }
+    }
+}
+
+// Jade: its table in order, found by its names; each mechanism plays A4 at
+// 440 Hz; a harder blow is louder and brighter; the damper stops a released
+// note; a held one sustains then dies away; the auto-pan moves the sides
+// apart; every mechanism with every setting at an end stays finite and
+// bounded.
+void jadePlaysInTune()
+{
+    using namespace cydaw::engine;
+    using synth::Model;
+    const auto key = [](const char* name) { return static_cast<std::size_t>(synth::parameterIndex(Model::jade, name)); };
+    expect(synth::parameterCount(Model::jade) == 39 && synth::parameterIndex(Model::jade, "model") == synth::voicingFieldCount
+               && synth::parameterIndex(Model::jade, "chorus.mix") == 38 && synth::modelForType("jade-synth") == Model::jade
+               && synth::modelForPrefix("jade") == Model::jade && synth::modelForProcessor("core.jade-synth") == Model::jade,
+           "Jade's settings are in their order, found by its names");
+    constexpr auto rate = 48'000.0;
+    const prism::Context context;
+    const auto play = [&](const synth::Values& values, const int note, const float velocity, const double seconds, const double releaseAt,
+                          std::vector<float>* right = nullptr) {
+        synth::Voice voice;
+        voice.prepare(rate);
+        voice.start(Model::jade, values, note, velocity, -1.0, rate);
+        std::vector<float> left(static_cast<std::size_t>(seconds * rate), 0.0f);
+        std::vector<float> other(left.size(), 0.0f);
+        for (std::size_t at = 0; at < left.size(); at += 256) {
+            if (releaseAt >= 0.0 && static_cast<double>(at) >= releaseAt * rate && !voice.releasing())
+                voice.release();
+            const auto count = static_cast<int>(std::min<std::size_t>(256, left.size() - at));
+            voice.render(values, context, left.data() + at, other.data() + at, count, rate);
+        }
+        if (right != nullptr)
+            *right = other;
+        return left;
+    };
+    const auto peakOf = [](const std::vector<float>& samples, const double from, const double to) {
+        auto peak = 0.0;
+        const auto last = std::min(samples.size(), static_cast<std::size_t>(to * 48'000.0));
+        for (auto i = static_cast<std::size_t>(from * 48'000.0); i < last; ++i)
+            peak = std::max(peak, static_cast<double>(std::abs(samples[i])));
+        return peak;
+    };
+    // How bright: the slope's level against the level, over the attack.
+    const auto brightness = [](const std::vector<float>& samples) {
+        auto level = 1.0e-12;
+        auto slope = 0.0;
+        for (std::size_t i = 1; i < std::min<std::size_t>(samples.size(), 7'200); ++i) {
+            level += static_cast<double>(samples[i]) * samples[i];
+            const auto change = static_cast<double>(samples[i]) - samples[i - 1];
+            slope += change * change;
+        }
+        return std::sqrt(slope / level);
+    };
+    const auto defaults = synth::defaultValues(Model::jade);
+    for (int mechanism = 0; mechanism < 3; ++mechanism) {
+        auto values = defaults;
+        values[key("model")] = static_cast<float>(mechanism);
+        values[key("tune.detune")] = 0.0f;
+        // In tune: the strongest frequency near A4 within a few cents of 440 Hz.
+        const auto a4 = play(values, 69, 0.8f, 1.0, -1.0);
+        auto best = 0.0;
+        auto bestDb = -400.0;
+        for (auto hz = 430.0; hz <= 450.0; hz += 0.1)
+            if (const auto db = toneLevelDb(a4, hz, 9'600, 48'000); db > bestDb) {
+                bestDb = db;
+                best = hz;
+            }
+        expect(bestDb > -40.0 && std::abs(best - 440.0) < 1.0 && bestDb > toneLevelDb(a4, 415.0, 9'600, 48'000) + 12.0,
+               "every Jade mechanism plays A4 at 440 Hz");
+        // Struck harder, louder and brighter (the blow shorter, the pickup's curve reached further).
+        const auto soft = play(values, 60, 0.25f, 0.2, -1.0);
+        const auto hard = play(values, 60, 1.0f, 0.2, -1.0);
+        expect(brightness(hard) > brightness(soft) * 1.3 && peakOf(hard, 0.0, 0.2) > peakOf(soft, 0.0, 0.2) * 1.5,
+               "a harder blow makes Jade louder and brighter");
+        // Let go of, the damper stops it; held, it sustains and dies away by itself.
+        const auto released = play(values, 60, 0.8f, 1.2, 0.4);
+        expect(peakOf(released, 0.9, 1.2) < 1.0e-3 * peakOf(released, 0.0, 0.4), "Jade's damper stops a released note");
+        const auto held = play(values, 60, 0.8f, 4.0, -1.0);
+        expect(peakOf(held, 3.5, 4.0) < 0.3 * peakOf(held, 0.0, 0.5) && peakOf(held, 3.5, 4.0) > 1.0e-5,
+               "a held Jade note sustains, then dies away");
+        // One voice near -1..1 at its master.
+        expect(peakOf(hard, 0.0, 0.2) > 0.1 && peakOf(hard, 0.0, 0.2) < 1.5, "a Jade voice plays near full scale");
+        // Every setting at an end (each mechanism kept): finite, bounded.
+        for (const auto top : { true, false }) {
+            auto extreme = values;
+            for (int index = 0; index < synth::parameterCount(Model::jade); ++index) {
+                const auto& parameter = synth::parameter(Model::jade, index);
+                if (index == synth::voicingMaster || parameter.key == "model")
+                    continue;
+                extreme[static_cast<std::size_t>(index)] = synth::clampValue(Model::jade, index, top ? parameter.maximum : parameter.minimum);
+            }
+            auto finite = true;
+            auto peak = 0.0;
+            for (const auto note : { 21, 60, 108, 127 })
+                for (const auto velocity : { 0.05f, 1.0f })
+                    for (const auto sample : play(extreme, note, velocity, 0.4, 0.25)) {
+                        finite = finite && std::isfinite(sample);
+                        peak = std::max(peak, static_cast<double>(std::abs(sample)));
+                    }
+            expect(finite && peak < 8.0, "every Jade mechanism stays finite and bounded at its ends");
+        }
+    }
+    // The auto-pan: the tremolo swings the note from one side to the other.
+    auto panned = defaults;
+    panned[key("tremolo.depth")] = 1.0f;
+    panned[key("tremolo.stereo")] = 1.0f;
+    panned[key("tremolo.rate")] = 4.0f;
+    std::vector<float> right;
+    const auto left = play(panned, 60, 0.8f, 1.0, -1.0, &right);
+    auto apart = 0.0;
+    for (std::size_t i = 0; i < left.size(); ++i)
+        apart = std::max(apart, static_cast<double>(std::abs(left[i] - right[i])));
+    expect(apart > 0.2 * peakOf(left, 0.0, 1.0), "Jade's auto-pan moves the note across");
+    // Rung out while still held, then let go of: the voice ends.
+    {
+        auto brief = defaults;
+        brief[key("tine.decay")] = 0.3f;
+        synth::Voice voice;
+        voice.prepare(rate);
+        voice.start(Model::jade, brief, 96, 0.5f, -1.0, rate);
+        std::vector<float> scratchLeft(256);
+        std::vector<float> scratchRight(256);
+        for (int block = 0; block < static_cast<int>(3.0 * rate / 256.0); ++block)
+            voice.render(brief, context, scratchLeft.data(), scratchRight.data(), 256, rate);
+        const auto stillHeld = voice.active() && !voice.releasing();
+        voice.release();
+        voice.render(brief, context, scratchLeft.data(), scratchRight.data(), 256, rate);
+        expect(stillHeld && !voice.active(), "a Jade note rung out ends once let go of");
+    }
+    // Its pictures: the pickup's wave and its curve; nothing for another part.
+    expect(synth::picture(Model::jade, defaults, "pickup", 64).size() == 64 && synth::picture(Model::jade, defaults, "curve", 64).size() == 64
+               && synth::picture(Model::jade, defaults, "osc1", 64).empty(),
+           "Jade draws its pickup");
+}
+
+
 void nebuleuseLayersSound()
 {
     using namespace cydaw::engine;
@@ -3981,6 +4472,58 @@ void timeStretchKeepsAttacks()
 }
 
 
+void stretchedLoopKeepsItsBeats()
+{
+    // A loop of four beats at 100 BPM (2.4 s): a click on each beat. At
+    // 120 BPM it lasts two seconds exactly, its clicks on the new beats, and
+    // played round its end comes back to its start without a gap.
+    std::vector<std::vector<float>> loop(2, std::vector<float>(115'200, 0.0f));
+    for (int beat = 0; beat < 4; ++beat)
+        for (std::size_t i = 0; i < 1'200; ++i)
+            for (auto& channel : loop)
+                channel[static_cast<std::size_t>(beat) * 28'800 + i]
+                    = static_cast<float>(0.8 * std::exp(-static_cast<double>(i) / 120.0)
+                                         * std::sin(2.0 * std::numbers::pi * 3'000.0 * static_cast<double>(i) / 48'000.0));
+    for (const auto algorithm : { StretchAlgorithm::beats, StretchAlgorithm::repitch }) {
+        const auto out = renderStretchedLoop(loop, 48'000.0, 100.0, 4, 120.0, 48'000.0, algorithm);
+        expect(out.size() == 2 && out[0].size() == 96'000, "a stretched loop lasts its beats at the new tempo");
+        if (out.empty() || out[0].size() != 96'000)
+            continue;
+        auto weakest = 1.0f;
+        auto between = 0.0f;
+        for (std::size_t beat = 0; beat < 4; ++beat) {
+            auto peak = 0.0f;
+            for (auto at = beat * 24'000; at < beat * 24'000 + 600; ++at)
+                peak = std::max(peak, std::abs(out[0][at]));
+            weakest = std::min(weakest, peak);
+            for (auto at = beat * 24'000 + 6'000; at < beat * 24'000 + 18'000; ++at)
+                between = std::max(between, std::abs(out[0][at]));
+        }
+        expect(weakest > 0.5f && between < 0.05f,
+               std::string(algorithm == StretchAlgorithm::beats ? "beats" : "repitch")
+                   + ": each click on its beat at the new tempo, silence between");
+    }
+    // A held tone keeps its pitch (tonal), and its end runs into its start.
+    std::vector<std::vector<float>> tone(1, std::vector<float>(115'200));
+    for (std::size_t i = 0; i < tone[0].size(); ++i)
+        tone[0][i] = static_cast<float>(0.5 * std::sin(2.0 * std::numbers::pi * 250.0 * static_cast<double>(i) / 48'000.0));
+    const auto held = renderStretchedLoop(tone, 48'000.0, 100.0, 4, 120.0, 48'000.0, StretchAlgorithm::tonal);
+    if (held.empty() || held[0].size() != 96'000) {
+        expect(false, "a held loop renders");
+        return;
+    }
+    auto crossings = 0;
+    for (std::size_t i = 24'000; i < 72'000; ++i)
+        crossings += (held[0][i - 1] < 0.0f) != (held[0][i] < 0.0f) ? 1 : 0;
+    const auto frequency = static_cast<double>(crossings) / 2.0;
+    auto seam = 0.0;
+    for (std::size_t i = 0; i < 480; ++i)
+        seam = std::max(seam, static_cast<double>(std::abs(held[0][i])) + std::abs(held[0][95'999 - i]));
+    expect(std::abs(frequency - 250.0) < 3.0 && seam > 0.5,
+           "a held loop keeps its pitch, and sounds through its seam (" + std::to_string(frequency) + " Hz)");
+}
+
+
 // ---- Convolution -----------------------------------------------------------------------------
 
 void convolverMatchesDirectConvolution()
@@ -4022,6 +4565,19 @@ void convolverMatchesDirectConvolution()
     expect(std::abs(energy - 1.0) < 1.0e-3, "a response is scaled to unit power");
 }
 
+// The effects added on 2026-10-14.
+#include "VoiceEffectTests.inc"
+#include "PitchEffectTests.inc"
+#include "SpaceEffectTests.inc"
+#include "RhythmEffectTests.inc"
+#include "MotionEffectTests.inc"
+#include "ResonanceEffectTests.inc"
+#include "UtilityEffectTests.inc"
+#include "MidiEffectTests.inc"
+#include "PitchTrackerTests.inc"
+#include "GrainTests.inc"
+#include "SilexTests.inc"
+
 } // namespace
 
 int main()
@@ -4031,6 +4587,8 @@ int main()
     renderPlanProcessesBranchesAndMixes();
     renderPlanAlignsParallelLatencies();
     dynamicsListenToTheirSidechain();
+    equaliserBandsMoveWithTheSound();
+    knobsGlideAndCardsSwitchOff();
     renderPlanRejectsCycles();
     sharedNativeGraphCompilerBuildsTheHostIndependentProgram();
     realtimeEngineAppliesCommandsAtBlockBoundary();
@@ -4082,11 +4640,25 @@ int main()
     colosseSoundsEveryWay();
     mosaiqueEnginesPlayInTune();
     nebuleuseLayersSound();
+    laterSynthModelsPlay();
+    jadePlaysInTune();
     prismGoesFurther();
     batterieMixesItsPieces();
     timeStretchKeepsPitchAndLength();
     timeStretchKeepsAttacks();
+    stretchedLoopKeepsItsBeats();
     convolverMatchesDirectConvolution();
+    voiceEffectTests();
+    pitchEffectTests();
+    spacefxEffectTests();
+    rhythmEffectTests();
+    motionEffectTests();
+    resonanceEffectTests();
+    utilityEffectTests();
+    midiEffectTests();
+    pitchTrackerReadsInTune();
+    samplerPlaysGrains();
+    silexPlaysItsPieces();
 
     if (failures != 0) {
         std::cerr << failures << " test(s) failed\n";

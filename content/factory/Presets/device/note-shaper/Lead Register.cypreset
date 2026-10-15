@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "note-shaper",
+ "name": "Lead Register",
+ "state": {
+  "type": "note-shaper",
+  "parameters": {
+   "node.21002.midi.note.minimum": 60.0,
+   "node.21002.midi.note.maximum": 96.0,
+   "node.21003.midi.velocity": 0.95
+  }
+ }
+}

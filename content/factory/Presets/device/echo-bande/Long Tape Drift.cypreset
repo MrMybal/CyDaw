@@ -1,0 +1,25 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "echo-bande",
+ "name": "Long Tape Drift",
+ "state": {
+  "type": "echo-bande",
+  "parameters": {
+   "echoband.time": 340.0,
+   "echoband.intensity": 0.75,
+   "echoband.echo": 0.65,
+   "echoband.reverb": 0.0,
+   "echoband.bass": -4.0,
+   "echoband.treble": -6.0,
+   "echoband.wow": 0.55,
+   "echoband.mix": 0.4,
+   "echoband.mode": 2.0,
+   "echoband.sync": 0.0,
+   "echoband.drive": 3.0,
+   "echoband.age": 0.6,
+   "echoband.width": 0.5
+  }
+ }
+}

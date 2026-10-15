@@ -204,7 +204,10 @@ struct Interaction {
     ImVec2 mouse {};
     ImVec2 delta {};
     float wheel {};
+    // Ctrl held: slowly (fine); Shift: quickly. `speed` says how fast a
+    // drag or the wheel moves what it moves (0.15, 1, 4).
     bool fine {};
+    float speed { 1.0f };
 };
 
 Interaction interact(const char* id, const Plot& plot)
@@ -220,7 +223,8 @@ Interaction interact(const char* id, const Plot& plot)
     result.mouse = io.MousePos;
     result.delta = io.MouseDelta;
     result.wheel = result.hovered ? io.MouseWheel : 0.0f;
-    result.fine = io.KeyShift;
+    result.fine = io.KeyCtrl;
+    result.speed = ui::valueSpeed();
     if (result.hovered && result.wheel != 0.0f) {
         ImGui::SetItemKeyOwner(ImGuiKey_MouseWheelY);
         ui::takeWheel();
@@ -302,6 +306,7 @@ const char* paneTitleOf(const Pane& pane)
     case PaneKind::width: return L("STÉRÉO", "STEREO");
     case PaneKind::level: return L("NIVEAU", "LEVEL");
     case PaneKind::lfo: return "LFO";
+    case PaneKind::scope: return L("OSCILLOSCOPE", "OSCILLOSCOPE");
     case PaneKind::multiFilter: return L("FILTRE", "FILTER");
     case PaneKind::autoFilter: return L("FILTRE AUTO", "AUTO FILTER");
     case PaneKind::eqThree: return L("EQ 3 BANDES", "3-BAND EQ");
@@ -329,6 +334,33 @@ const char* paneTitleOf(const Pane& pane)
     case PaneKind::tranche: return "TRANCHE";
     case PaneKind::finition: return "FINITION";
     case PaneKind::halo: return "HALO";
+    case PaneKind::vocoder: return L("VOCODEUR", "VOCODER");
+    case PaneKind::deEsser: return L("DÉ-ESSEUR", "DE-ESSER");
+    case PaneKind::tuner: return L("ACCORDEUR", "TUNER");
+    case PaneKind::harmonie: return L("HARMONIE", "HARMONIE");
+    case PaneKind::justesse: return L("JUSTESSE", "JUSTESSE");
+    case PaneKind::empreinte: return L("EMPREINTE", "EMPREINTE");
+    case PaneKind::givre: return L("GIVRE", "GIVRE");
+    case PaneKind::grains: return L("GRAINS", "GRAINS");
+    case PaneKind::saccade: return L("SACCADE", "SACCADE");
+    case PaneKind::boucleur: return L("BOUCLEUR", "LOOPER");
+    case PaneKind::pompe: return L("POMPE", "POMPE");
+    case PaneKind::decaleur: return L("DÉCALEUR", "DECALEUR");
+    case PaneKind::anneau: return L("ANNEAU", "ANNEAU");
+    case PaneKind::rotor: return L("ROTOR", "ROTOR");
+    case PaneKind::resonateurs: return L("RÉSONATEURS", "RESONATORS");
+    case PaneKind::corps: return L("CORPS", "CORPS");
+    case PaneKind::peigne: return L("PEIGNE", "COMB");
+    case PaneKind::utilitaire: return L("UTILITAIRE", "UTILITY");
+    case PaneKind::stereoscope: return L("STÉRÉOSCOPE", "STEREOSCOPE");
+    case PaneKind::arpege: return L("ARPÈGE", "ARPEGGIATOR");
+    case PaneKind::accords: return L("ACCORDS", "CHORDS");
+    case PaneKind::gamme: return L("GAMME", "SCALE");
+    case PaneKind::echoNotes: return L("ÉCHO DE NOTES", "NOTE ECHO");
+    case PaneKind::alea: return L("ALÉA", "RANDOM");
+    case PaneKind::duree: return L("DURÉE", "NOTE LENGTH");
+    case PaneKind::sequenceur: return L("SÉQUENCEUR", "STEP SEQUENCER");
+    case PaneKind::roulement: return L("ROULEMENT", "NOTE REPEAT");
     case PaneKind::spectrometer: return L("SPECTROMÈTRE", "SPECTROMETER");
     }
     return "";
@@ -799,6 +831,26 @@ void scope(ImDrawList* list, const Plot& plot, const engine::AudioAnalysisFrame*
     }
 }
 
+// The oscilloscope: the sound's last samples across, its zero line, its
+// full scale.
+bool scopePlot(const Plot& plot, const ImU32 colour, const Live& live)
+{
+    const auto& p = theme::palette();
+    auto* list = ImGui::GetWindowDrawList();
+    const auto centre = (plot.min.y + plot.max.y) * 0.5f;
+    const auto half = plot.height() * 0.46f;
+    for (const auto level : { -1.0f, -0.5f, 0.5f, 1.0f })
+        list->AddLine(ImVec2(plot.min.x, centre - level * half), ImVec2(plot.max.x, centre - level * half), p.grid);
+    list->AddLine(ImVec2(plot.min.x, centre), ImVec2(plot.max.x, centre), theme::alpha(p.line, 0.9f));
+    const auto* frame = live.afterFrame != nullptr ? live.afterFrame : live.beforeFrame;
+    if (!live.running || frame == nullptr || frame->waveformCount < 16) {
+        ui::centredText(list, plot.min, plot.max, p.textFaint, L("lecture arrêtée", "not playing"));
+        return false;
+    }
+    scope(list, plot, frame, colour, 1.0f, 1'024);
+    return false;
+}
+
 bool saturationPlot(const Plot& plot, Param* amount, const bool clip, const ImU32 colour, const Live& live, const Setter& set)
 {
     const auto& p = theme::palette();
@@ -817,7 +869,7 @@ bool saturationPlot(const Plot& plot, Param* amount, const bool clip, const ImU3
     auto changed = false;
     if (interaction.active && interaction.delta.y != 0.0f) {
         const auto t = normalised(*amount, amount->value)
-                       + (clip ? 1.0 : -1.0) * interaction.delta.y / std::max(1.0f, plot.height()) * (interaction.fine ? 0.2 : 1.0);
+                       + (clip ? 1.0 : -1.0) * interaction.delta.y / std::max(1.0f, plot.height()) * interaction.speed;
         changed |= apply(*amount, fromNormalised(*amount, t), set);
     }
     if (interaction.wheel != 0.0f)
@@ -1110,7 +1162,7 @@ bool delayPlot(const Plot& plot, Param* time, Param* feedback, Param* mix, const
             }
             storage->SetFloat(stepId, travel);
         } else if (interaction.delta.x != 0.0f)
-            changed |= apply(*time, time->value * std::pow(2.0, interaction.delta.x / (interaction.fine ? dp(800.0f) : dp(160.0f))), set);
+            changed |= apply(*time, time->value * std::pow(2.0, interaction.delta.x * interaction.speed / dp(160.0f)), set);
         if (feedback != nullptr && interaction.delta.y != 0.0f)
             changed |= apply(*feedback, feedback->value - interaction.delta.y / std::max(1.0f, inner.height()), set);
     }
@@ -1266,7 +1318,7 @@ bool lfoPlot(const Plot& plot, Param* rate, Param* depth, Param* offset, Param* 
     const auto interaction = interact("##lfo", plot);
     auto changed = false;
     if (interaction.active && (interaction.delta.x != 0.0f || interaction.delta.y != 0.0f)) {
-        changed |= apply(*rate, rate->value * std::pow(2.0, interaction.delta.x / (interaction.fine ? dp(600.0f) : dp(120.0f))), set);
+        changed |= apply(*rate, rate->value * std::pow(2.0, interaction.delta.x * interaction.speed / dp(120.0f)), set);
         if (depth != nullptr)
             changed |= apply(*depth, depth->value - interaction.delta.y / std::max(1.0f, plot.height() * 0.5f), set);
     }
@@ -1648,7 +1700,7 @@ bool sweepPlot(const Plot& plot, Param* rate, Param* depth, Param* third, Param*
     const auto interaction = interact("##sweep", plot);
     auto changed = false;
     if (interaction.active && (interaction.delta.x != 0.0f || interaction.delta.y != 0.0f)) {
-        changed |= apply(*rate, rate->value * std::pow(2.0, interaction.delta.x / (interaction.fine ? dp(600.0f) : dp(120.0f))), set);
+        changed |= apply(*rate, rate->value * std::pow(2.0, interaction.delta.x * interaction.speed / dp(120.0f)), set);
         changed |= apply(*depth, depth->value - interaction.delta.y / std::max(1.0f, plot.height() * 0.5f), set);
     }
     if (interaction.doubleClicked) {
@@ -1698,7 +1750,7 @@ bool tremoloPlot(const Plot& plot, Param* rate, Param* depth, Param* shape, Para
     const auto interaction = interact("##tremolo", plot);
     auto changed = false;
     if (interaction.active && (interaction.delta.x != 0.0f || interaction.delta.y != 0.0f)) {
-        changed |= apply(*rate, rate->value * std::pow(2.0, interaction.delta.x / (interaction.fine ? dp(600.0f) : dp(120.0f))), set);
+        changed |= apply(*rate, rate->value * std::pow(2.0, interaction.delta.x * interaction.speed / dp(120.0f)), set);
         changed |= apply(*depth, depth->value - interaction.delta.y / std::max(1.0f, plot.height()), set);
     }
     if (shape != nullptr && interaction.hovered && ImGui::IsMouseReleased(ImGuiMouseButton_Left)
@@ -1913,12 +1965,30 @@ int eqProValueOf(const juce::String& binding)
     return -1;
 }
 
-// Values that only take whole steps: a band's shape, slope and switch.
+// Which of a band's dynamics a binding is ("node.4.eqpro.b3Range" →
+// range), or -1.
+int eqProDynamicOf(const juce::String& binding)
+{
+    const auto at = binding.lastIndexOf("eqpro.b");
+    if (at < 0)
+        return -1;
+    const auto name = binding.substring(at + 7).trimCharactersAtStart("0123456789");
+    static const char* names[] { "Dynamic", "Range", "Threshold", "Attack", "Release", "Detector" };
+    for (auto index = 0; index < static_cast<int>(std::size(names)); ++index)
+        if (name == names[index])
+            return index;
+    return -1;
+}
+
+// Values that only take whole steps: a band's shape, slope and switches,
+// what its dynamics listen to.
 bool isStepped(const Param& parameter)
 {
     const auto value = eqProValueOf(parameter.binding);
+    const auto dynamic = eqProDynamicOf(parameter.binding);
     return value == static_cast<int>(engine::EqProValue::enabled) || value == static_cast<int>(engine::EqProValue::type)
-           || value == static_cast<int>(engine::EqProValue::slope) || studioStepped(parameter);
+           || value == static_cast<int>(engine::EqProValue::slope) || dynamic == static_cast<int>(engine::EqProDynamic::on)
+           || dynamic == static_cast<int>(engine::EqProDynamic::detector) || studioStepped(parameter);
 }
 
 struct EqBand {
@@ -1928,6 +1998,13 @@ struct EqBand {
     Param* gain {};
     Param* q {};
     Param* slope {};
+    // Its dynamics, in EqProDynamic order.
+    Param* dynamic {};
+    Param* range {};
+    Param* threshold {};
+    Param* attack {};
+    Param* release {};
+    Param* detector {};
 
     [[nodiscard]] bool complete() const
     {
@@ -1954,11 +2031,20 @@ struct EqBand {
     {
         return shape() == engine::EqBandType::lowCut || shape() == engine::EqBandType::highCut;
     }
+    [[nodiscard]] bool hasDynamics() const
+    {
+        return dynamic != nullptr && range != nullptr && threshold != nullptr && attack != nullptr && release != nullptr
+               && detector != nullptr;
+    }
+    // Its gain moves with the sound: only a shape with a gain can.
+    [[nodiscard]] bool isDynamic() const { return hasDynamics() && dynamic->value >= 0.5 && hasGain(); }
 };
 
 struct Eq {
     std::array<EqBand, engine::eqProBands> bands {};
     Param* output {};
+    // The band heard alone (0 none, n band n), while a listen is held.
+    Param* listen {};
     // The start the device's bindings share, which names its view.
     juce::String key;
 
@@ -1982,8 +2068,18 @@ Eq eqOf(std::vector<Param>& parameters, const Pane& pane)
         item.gain = at(engine::EqProValue::gain);
         item.q = at(engine::EqProValue::q);
         item.slope = at(engine::EqProValue::slope);
+        const auto dynamicAt = [&](const engine::EqProDynamic value) {
+            return parameterAt(parameters, pane, static_cast<std::size_t>(engine::eqProDynamicIndex(band, value)));
+        };
+        item.dynamic = dynamicAt(engine::EqProDynamic::on);
+        item.range = dynamicAt(engine::EqProDynamic::range);
+        item.threshold = dynamicAt(engine::EqProDynamic::threshold);
+        item.attack = dynamicAt(engine::EqProDynamic::attack);
+        item.release = dynamicAt(engine::EqProDynamic::release);
+        item.detector = dynamicAt(engine::EqProDynamic::detector);
     }
     eq.output = parameterAt(parameters, pane, static_cast<std::size_t>(engine::eqProBands * engine::eqProValuesPerBand));
+    eq.listen = parameterAt(parameters, pane, static_cast<std::size_t>(engine::eqProBands * engine::eqProValuesPerBand + 1));
     if (eq.bands[0].frequency != nullptr)
         eq.key = eq.bands[0].frequency->binding.upToLastOccurrenceOf("eqpro.", true, false);
     return eq;
@@ -2041,6 +2137,49 @@ double liveValueOf(const Param& parameter, const Live& live)
 bool isModulated(const Param* parameter, const Live& live)
 {
     return parameter != nullptr && live.modulated != nullptr && live.modulated->count(parameter->binding) > 0;
+}
+
+// How far a band's dynamics move its gain now (dB), and the level its
+// detector hears (dB), as the processor shows them; still while the
+// transport stands.
+float movedDbOf(const Live& live, const int band)
+{
+    if (!live.running || live.readings == nullptr || live.readingCount < engine::eqProReadingCount)
+        return 0.0f;
+    const auto value = live.readings[band];
+    return std::isfinite(value) ? std::clamp(value, -30.0f, 30.0f) : 0.0f;
+}
+
+float detectorDbOf(const Live& live, const int band)
+{
+    if (!live.running || live.readings == nullptr || live.readingCount < engine::eqProReadingCount)
+        return -120.0f;
+    const auto value = live.readings[engine::eqProBands + band];
+    return std::isfinite(value) ? std::max(value, -120.0f) : -120.0f;
+}
+
+// A band's dynamics switched on or off; on without a range, a cut of 6 dB
+// to start from.
+bool setDynamic(EqBand& band, const bool on, const Setter& set)
+{
+    if (!band.hasDynamics())
+        return false;
+    auto changed = apply(*band.dynamic, on ? 1.0 : 0.0, set);
+    if (on && std::abs(band.range->value) < 0.05)
+        changed |= apply(*band.range, -6.0, set);
+    return changed;
+}
+
+// The region between two curves over the same frequencies.
+void fillBetween(ImDrawList* list, const std::vector<ImVec2>& upper, const std::vector<ImVec2>& lower, const ImU32 colour)
+{
+    if (upper.size() < 2 || upper.size() != lower.size() || (colour & IM_COL32_A_MASK) == 0)
+        return;
+    const auto flags = list->Flags;
+    list->Flags &= ~ImDrawListFlags_AntiAliasedFill;
+    for (std::size_t index = 0; index + 1 < upper.size(); ++index)
+        list->AddQuadFilled(upper[index], upper[index + 1], lower[index + 1], lower[index], colour);
+    list->Flags = flags;
 }
 
 // The region between a curve and a level line it may cross.
@@ -2196,6 +2335,11 @@ bool eqMenu(Eq& eq, EqView& view, const Setter& set)
                 if (ImGui::MenuItem(slopeName(slope), nullptr, band.slopeIndex() == slope))
                     changed |= apply(*band.slope, slope, set);
         }
+        if (band.hasGain() && band.hasDynamics()) {
+            ImGui::Separator();
+            if (ImGui::MenuItem(L("Bande dynamique", "Dynamic band"), nullptr, band.isDynamic()))
+                changed |= setDynamic(band, !band.isDynamic(), set);
+        }
         ImGui::Separator();
         if (ImGui::MenuItem(L("Retirer la bande", "Remove the band"))) {
             changed |= apply(*band.enabled, 0.0, set);
@@ -2244,18 +2388,45 @@ bool eqProPlot(const Plot& plot, std::vector<Param>& parameters, const Pane& pan
     if (live.after != nullptr)
         drawSpectrum(list, plot, *live.after, theme::alpha(colour, 0.5f), theme::alpha(colour, 0.13f));
 
-    // The handles, where the bands are set.
+    // The handles, where the bands are set, and each dynamic band's
+    // diamond, where its range would take its gain (kept clear of its
+    // handle).
     const auto radius = large ? dp(8.5f) : dp(6.0f);
+    const auto diamond = radius * 0.8f;
     std::array<ImVec2, engine::eqProBands> handles {};
-    for (auto index = 0; index < engine::eqProBands; ++index) {
-        const auto& band = eq.bands[static_cast<std::size_t>(index)];
-        const auto y = band.hasGain() ? yAt(static_cast<float>(band.gain->value)) : yAt(0.0f);
-        handles[static_cast<std::size_t>(index)]
-            = ImVec2(xOfHz(plot, static_cast<float>(band.frequency->value)), std::clamp(y, plot.min.y + radius, plot.max.y - radius));
-    }
+    std::array<ImVec2, engine::eqProBands> diamonds {};
+    const auto place = [&] {
+        for (auto index = 0; index < engine::eqProBands; ++index) {
+            const auto& band = eq.bands[static_cast<std::size_t>(index)];
+            const auto y = band.hasGain() ? yAt(static_cast<float>(band.gain->value)) : yAt(0.0f);
+            const auto x = xOfHz(plot, static_cast<float>(band.frequency->value));
+            auto& handle = handles[static_cast<std::size_t>(index)];
+            handle = ImVec2(x, std::clamp(y, plot.min.y + radius, plot.max.y - radius));
+            if (!band.isDynamic())
+                continue;
+            auto end = yAt(static_cast<float>(band.gain->value + band.range->value));
+            const auto clear = radius + diamond + dp(3.0f);
+            if (std::abs(end - handle.y) < clear)
+                end = handle.y + (band.range->value > 0.0 ? -clear : clear);
+            diamonds[static_cast<std::size_t>(index)] = ImVec2(x, std::clamp(end, plot.min.y + diamond, plot.max.y - diamond));
+        }
+    };
+    place();
+
+    // The band in hand's listen: a headphone over its handle, held.
+    const auto listenable = view.selected >= 0 && eq.listen != nullptr && eq.bands[static_cast<std::size_t>(view.selected)].on();
+    const auto listenSize = large ? dp(9.0f) : dp(7.0f);
+    const auto listenAt = listenable ? ImVec2(handles[static_cast<std::size_t>(view.selected)].x,
+                                              std::max(plot.min.y + listenSize, handles[static_cast<std::size_t>(view.selected)].y
+                                                                                     - radius - listenSize - dp(5.0f)))
+                                     : ImVec2();
+    const auto onListen = [&](const ImVec2 point) {
+        return listenable && std::abs(point.x - listenAt.x) <= listenSize && std::abs(point.y - listenAt.y) <= listenSize;
+    };
 
     const auto interaction = interact("##eqpro", plot);
     auto hit = -1;
+    auto diamondHit = -1;
     if (interaction.hovered) {
         auto best = (radius + dp(4.0f)) * (radius + dp(4.0f));
         for (auto index = 0; index < engine::eqProBands; ++index) {
@@ -2268,21 +2439,68 @@ bool eqProPlot(const Plot& plot, std::vector<Param>& parameters, const Pane& pan
                 hit = index;
             }
         }
+        if (hit < 0) {
+            auto nearest = (diamond + dp(4.0f)) * (diamond + dp(4.0f));
+            for (auto index = 0; index < engine::eqProBands; ++index) {
+                if (!eq.bands[static_cast<std::size_t>(index)].isDynamic())
+                    continue;
+                const auto dx = diamonds[static_cast<std::size_t>(index)].x - interaction.mouse.x;
+                const auto dy = diamonds[static_cast<std::size_t>(index)].y - interaction.mouse.y;
+                if (const auto distance = dx * dx + dy * dy; distance < nearest) {
+                    nearest = distance;
+                    diamondHit = index;
+                }
+            }
+        }
     }
     auto* storage = ImGui::GetStateStorage();
     const auto grabId = ImGui::GetID("##eqGrab");
+    const auto rangeGrabId = ImGui::GetID("##eqRangeGrab");
+    const auto listenId = ImGui::GetID("##eqListen");
+    auto changed = false;
     if (interaction.activated) {
+        // Pressed on the headphone, or Alt on a handle: that band alone,
+        // as long as the button is held.
+        const auto alone = onListen(interaction.mouse) ? view.selected : ImGui::GetIO().KeyAlt ? hit : -1;
+        if (alone >= 0 && eq.listen != nullptr) {
+            storage->SetInt(listenId, alone);
+            view.selected = alone;
+            view.anchor = handles[static_cast<std::size_t>(alone)];
+            changed |= apply(*eq.listen, static_cast<double>(alone + 1), set);
+            hit = -1;
+            diamondHit = -1;
+        }
         storage->SetInt(grabId, hit);
+        storage->SetInt(rangeGrabId, diamondHit);
         if (hit >= 0) {
             view.selected = hit;
             view.anchor = handles[static_cast<std::size_t>(hit)];
+        } else if (diamondHit >= 0) {
+            // Where the range truly ends, the diamond kept clear or not.
+            const auto& band = eq.bands[static_cast<std::size_t>(diamondHit)];
+            view.selected = diamondHit;
+            view.anchor = ImVec2(diamonds[static_cast<std::size_t>(diamondHit)].x,
+                                 yAt(static_cast<float>(band.gain->value + band.range->value)));
         }
     }
+    const auto heardAlone = storage->GetInt(listenId, -1);
+    if (heardAlone >= 0 && !interaction.active) {
+        storage->SetInt(listenId, -1);
+        if (eq.listen != nullptr)
+            changed |= apply(*eq.listen, 0.0, set);
+    }
     const auto grabbed = interaction.active ? storage->GetInt(grabId, -1) : -1;
-    auto changed = false;
+    const auto rangeGrabbed = interaction.active ? storage->GetInt(rangeGrabId, -1) : -1;
+    // A band heard alone follows the mouse along the frequencies, so it can
+    // be searched by ear; the wheel narrows or widens it.
+    const auto listening = interaction.active ? storage->GetInt(listenId, -1) : -1;
+    if (listening >= 0 && eq.bands[static_cast<std::size_t>(listening)].on() && interaction.delta.x != 0.0f) {
+        view.anchor.x += interaction.delta.x * interaction.speed;
+        changed |= apply(*eq.bands[static_cast<std::size_t>(listening)].frequency, hzOfX(plot, view.anchor.x), set);
+    }
     if (grabbed >= 0 && eq.bands[static_cast<std::size_t>(grabbed)].on()
         && (interaction.delta.x != 0.0f || interaction.delta.y != 0.0f)) {
-        const auto scale = interaction.fine ? 0.15f : 1.0f;
+        const auto scale = interaction.speed;
         view.anchor.x += interaction.delta.x * scale;
         view.anchor.y += interaction.delta.y * scale;
         auto& band = eq.bands[static_cast<std::size_t>(grabbed)];
@@ -2292,16 +2510,26 @@ bool eqProPlot(const Plot& plot, std::vector<Param>& parameters, const Pane& pan
         else if (interaction.delta.y != 0.0f)
             changed |= apply(*band.q, band.q->value * std::pow(2.0, -interaction.delta.y * scale / dp(70.0f)), set);
     }
-    if (const auto wheelBand = grabbed >= 0 ? grabbed : hit; interaction.wheel != 0.0f && wheelBand >= 0) {
+    // A diamond dragged up or down: the range, from the band's gain.
+    if (rangeGrabbed >= 0 && eq.bands[static_cast<std::size_t>(rangeGrabbed)].isDynamic() && interaction.delta.y != 0.0f) {
+        view.anchor.y += interaction.delta.y * interaction.speed;
+        auto& band = eq.bands[static_cast<std::size_t>(rangeGrabbed)];
+        changed |= apply(*band.range, std::clamp(static_cast<double>(dbOfY(plot, view.anchor.y, range, -range)) - band.gain->value, -30.0, 30.0),
+                         set);
+    }
+    if (const auto wheelBand = listening >= 0 ? listening : grabbed >= 0 ? grabbed : hit; interaction.wheel != 0.0f && wheelBand >= 0) {
         auto& band = eq.bands[static_cast<std::size_t>(wheelBand)];
-        changed |= apply(*band.q, band.q->value * std::pow(interaction.fine ? 1.03 : 1.15, interaction.wheel), set);
+        changed |= apply(*band.q, band.q->value * std::pow(1.15, interaction.wheel * interaction.speed), set);
         view.selected = wheelBand;
     }
-    if (interaction.doubleClicked) {
+    if (interaction.doubleClicked && !onListen(interaction.mouse)) {
         if (hit >= 0) {
             changed |= apply(*eq.bands[static_cast<std::size_t>(hit)].enabled, 0.0, set);
             if (view.selected == hit)
                 view.selected = -1;
+        } else if (diamondHit >= 0) {
+            // On a diamond: the band static again.
+            changed |= setDynamic(eq.bands[static_cast<std::size_t>(diamondHit)], false, set);
         } else {
             const auto hz = hzOfX(plot, interaction.mouse.x);
             const auto type = hz < 30.0f        ? engine::EqBandType::lowCut
@@ -2314,23 +2542,20 @@ bool eqProPlot(const Plot& plot, std::vector<Param>& parameters, const Pane& pan
         }
     }
     if (interaction.hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
-        view.menuBand = hit;
+        view.menuBand = hit >= 0 ? hit : diamondHit;
         view.menuHz = hzOfX(plot, interaction.mouse.x);
         view.menuDb = dbAt(interaction.mouse.y);
-        if (hit >= 0)
-            view.selected = hit;
+        if (view.menuBand >= 0)
+            view.selected = view.menuBand;
         ImGui::OpenPopup("##eqMenu");
     }
     changed |= eqMenu(eq, view, set);
     // Handles move with what was just set.
-    for (auto index = 0; index < engine::eqProBands; ++index) {
-        const auto& band = eq.bands[static_cast<std::size_t>(index)];
-        const auto y = band.hasGain() ? yAt(static_cast<float>(band.gain->value)) : yAt(0.0f);
-        handles[static_cast<std::size_t>(index)]
-            = ImVec2(xOfHz(plot, static_cast<float>(band.frequency->value)), std::clamp(y, plot.min.y + radius, plot.max.y - radius));
-    }
+    place();
 
-    // Each band's curve, then their sum with the output.
+    // Each band's curve where its gain is now (a dynamic band's moved by
+    // what it hears, its range shaded from its gain), then their sum with
+    // the output.
     const auto steps = std::max(64, static_cast<int>(plot.width() / dp(1.5f)));
     std::vector<float> xs(static_cast<std::size_t>(steps) + 1);
     std::vector<float> hzs(xs.size());
@@ -2339,10 +2564,13 @@ bool eqProPlot(const Plot& plot, std::vector<Param>& parameters, const Pane& pan
         hzs[step] = hzOfX(plot, xs[step]);
     }
     const auto zeroY = yAt(0.0f);
-    const auto emphasised = grabbed >= 0 ? grabbed : hit >= 0 ? hit : view.selected;
+    const auto emphasised = grabbed >= 0 ? grabbed : hit >= 0 ? hit : rangeGrabbed >= 0 ? rangeGrabbed : diamondHit >= 0 ? diamondHit : view.selected;
     const auto outputDb = eq.output != nullptr ? static_cast<float>(eq.output->value) : 0.0f;
     std::vector<float> total(xs.size(), outputDb);
     std::vector<ImVec2> points(xs.size());
+    std::vector<ImVec2> setPoints(xs.size());
+    std::vector<ImVec2> rangePoints(xs.size());
+    std::array<float, engine::eqProBands> moved {};
     auto anyOn = false;
     auto anyModulated = isModulated(eq.output, live);
     for (auto index = 0; index < engine::eqProBands; ++index) {
@@ -2351,14 +2579,29 @@ bool eqProPlot(const Plot& plot, std::vector<Param>& parameters, const Pane& pan
             continue;
         anyOn = true;
         anyModulated = anyModulated || isModulated(band.frequency, live) || isModulated(band.gain, live) || isModulated(band.q, live);
-        const auto bandCurve = curveOf(band.shape(), band.frequency->value, band.gain->value, band.q->value, band.slopeIndex());
+        const auto dynamic = band.isDynamic();
+        moved[static_cast<std::size_t>(index)] = dynamic ? movedDbOf(live, index) : 0.0f;
+        const auto bandColour = kBandColours[index];
+        const auto strong = index == emphasised;
+        if (dynamic) {
+            const auto setCurve = curveOf(band.shape(), band.frequency->value, band.gain->value, band.q->value, band.slopeIndex());
+            const auto rangeCurve = curveOf(band.shape(), band.frequency->value, band.gain->value + band.range->value, band.q->value,
+                                            band.slopeIndex());
+            for (std::size_t step = 0; step < xs.size(); ++step) {
+                setPoints[step] = ImVec2(xs[step], yAt(setCurve.at(hzs[step])));
+                rangePoints[step] = ImVec2(xs[step], yAt(rangeCurve.at(hzs[step])));
+            }
+            fillBetween(list, setPoints, rangePoints, theme::alpha(bandColour, strong ? 0.16f : 0.07f));
+            list->AddPolyline(rangePoints.data(), static_cast<int>(rangePoints.size()), theme::alpha(bandColour, strong ? 0.55f : 0.25f),
+                              dp(1.0f));
+        }
+        const auto bandCurve = curveOf(band.shape(), band.frequency->value, band.gain->value + moved[static_cast<std::size_t>(index)],
+                                       band.q->value, band.slopeIndex());
         for (std::size_t step = 0; step < xs.size(); ++step) {
             const auto db = bandCurve.at(hzs[step]);
             total[step] += db;
             points[step] = ImVec2(xs[step], yAt(db));
         }
-        const auto bandColour = kBandColours[index];
-        const auto strong = index == emphasised;
         fillToLine(list, points, zeroY, theme::alpha(bandColour, strong ? 0.2f : 0.06f));
         list->AddPolyline(points.data(), static_cast<int>(points.size()), theme::alpha(bandColour, strong ? 0.85f : 0.35f),
                           strong ? dp(1.4f) : dp(1.0f));
@@ -2369,18 +2612,45 @@ bool eqProPlot(const Plot& plot, std::vector<Param>& parameters, const Pane& pan
     list->AddPolyline(points.data(), static_cast<int>(points.size()), theme::mix(colour, p.text, 0.62f), large ? dp(2.4f) : dp(2.0f));
     // Where the modulation puts the sum now.
     if (anyModulated) {
-        std::vector<float> moved(xs.size(), eq.output != nullptr ? static_cast<float>(liveValueOf(*eq.output, live)) : 0.0f);
-        for (const auto& band : eq.bands) {
+        std::vector<float> modulated(xs.size(), eq.output != nullptr ? static_cast<float>(liveValueOf(*eq.output, live)) : 0.0f);
+        for (auto index = 0; index < engine::eqProBands; ++index) {
+            const auto& band = eq.bands[static_cast<std::size_t>(index)];
             if (!band.on())
                 continue;
             const auto bandCurve = curveOf(band.shape(), std::clamp(liveValueOf(*band.frequency, live), 10.0, 22'000.0),
-                                           liveValueOf(*band.gain, live), std::max(0.1, liveValueOf(*band.q, live)), band.slopeIndex());
+                                           liveValueOf(*band.gain, live) + moved[static_cast<std::size_t>(index)],
+                                           std::max(0.1, liveValueOf(*band.q, live)), band.slopeIndex());
             for (std::size_t step = 0; step < xs.size(); ++step)
-                moved[step] += bandCurve.at(hzs[step]);
+                modulated[step] += bandCurve.at(hzs[step]);
         }
         for (std::size_t step = 0; step < xs.size(); ++step)
-            points[step] = ImVec2(xs[step], yAt(moved[step]));
+            points[step] = ImVec2(xs[step], yAt(modulated[step]));
         list->AddPolyline(points.data(), static_cast<int>(points.size()), theme::alpha(p.modulation, 0.9f), dp(1.6f));
+    }
+
+    // A dynamic band's line from its handle to its diamond, where its gain
+    // is now on it, the diamond.
+    for (auto index = 0; index < engine::eqProBands; ++index) {
+        const auto& band = eq.bands[static_cast<std::size_t>(index)];
+        if (!band.isDynamic())
+            continue;
+        const auto bandColour = kBandColours[index];
+        const auto centre = handles[static_cast<std::size_t>(index)];
+        const auto end = diamonds[static_cast<std::size_t>(index)];
+        list->AddLine(centre, end, theme::alpha(bandColour, 0.6f), dp(1.4f));
+        if (const auto now = moved[static_cast<std::size_t>(index)]; std::abs(now) > 0.05f) {
+            const ImVec2 at(centre.x, std::clamp(yAt(static_cast<float>(band.gain->value) + now), plot.min.y + dp(3.0f), plot.max.y - dp(3.0f)));
+            list->AddLine(centre, at, bandColour, dp(3.0f));
+            list->AddCircleFilled(at, radius * 0.42f, bandColour, 16);
+        }
+        const auto hot = index == diamondHit || index == rangeGrabbed;
+        const auto d = hot ? diamond * 1.15f : diamond;
+        const ImVec2 top(end.x, end.y - d);
+        const ImVec2 right(end.x + d, end.y);
+        const ImVec2 bottom(end.x, end.y + d);
+        const ImVec2 left(end.x - d, end.y);
+        list->AddQuadFilled(top, right, bottom, left, hot ? theme::alpha(bandColour, 0.9f) : theme::alpha(p.bg0, 0.92f));
+        list->AddQuad(top, right, bottom, left, bandColour, dp(1.6f));
     }
 
     // The handles over it all, numbered.
@@ -2400,12 +2670,34 @@ bool eqProPlot(const Plot& plot, std::vector<Param>& parameters, const Pane& pan
         const auto textSize = smallTextSize(number, scale);
         smallText(list, ImVec2(centre.x - textSize.x * 0.5f, centre.y - textSize.y * 0.5f), kHandleText, number, scale);
     }
+    if (listenable) {
+        const auto held = storage->GetInt(listenId, -1) >= 0;
+        const auto over = interaction.hovered && onListen(interaction.mouse);
+        list->AddCircleFilled(listenAt, listenSize, held ? kBandColours[view.selected] : theme::alpha(p.bg0, over ? 0.95f : 0.75f), 20);
+        list->AddCircle(listenAt, listenSize, theme::alpha(kBandColours[view.selected], over || held ? 1.0f : 0.6f), 20, dp(1.2f));
+        ImGui::PushFont(nullptr, listenSize * 1.25f);
+        ui::centredText(list, ImVec2(listenAt.x - listenSize, listenAt.y - listenSize), ImVec2(listenAt.x + listenSize, listenAt.y + listenSize),
+                        held ? kHandleText : p.text, icon::headphone);
+        ImGui::PopFont();
+        if (over && !held)
+            ImGui::SetTooltip("%s", L("Maintenir pour écouter cette bande seule (ou Alt + clic maintenu sur une bande) : en écoutant, "
+                                      "glisser la déplace, la molette la resserre ou l'élargit",
+                                      "Hold to hear this band alone (or Alt + click held on a band): while listening, dragging moves "
+                                      "it, the wheel narrows or widens it"));
+    }
     if (!anyOn)
         ui::centredText(list, plot.min, plot.max, p.textFaint,
                         L("Double-clic pour ajouter une bande", "Double-click to add a band"));
 
-    // What is under the mouse.
-    if (const auto shown = grabbed >= 0 ? grabbed : hit; shown >= 0 && !ImGui::IsPopupOpen("##eqMenu")) {
+    // What is under the mouse; the band heard alone, while it is.
+    if (listening >= 0) {
+        const auto& band = eq.bands[static_cast<std::size_t>(listening)];
+        auto text = ui::Ls("Bande ", "Band ") + juce::String(listening + 1) + ui::Ls(" seule", " alone") + "\n"
+                    + formatValue(*band.frequency, band.frequency->value) + "   " + noteOf(band.frequency->value) + "\nQ "
+                    + juce::String(band.q->value, 2) + "\n"
+                    + ui::Ls("Glisser : la fréquence \xc2\xb7 molette : la largeur", "Drag: the frequency \xc2\xb7 wheel: the width");
+        ImGui::SetTooltip("%s", text.toRawUTF8());
+    } else if (const auto shown = grabbed >= 0 ? grabbed : hit; shown >= 0 && !ImGui::IsPopupOpen("##eqMenu")) {
         const auto& band = eq.bands[static_cast<std::size_t>(shown)];
         auto text = ui::Ls("Bande ", "Band ") + juce::String(shown + 1) + juce::String::fromUTF8(" \xc2\xb7 ") + juce::String::fromUTF8(shapeName(band.shape()));
         text << "\n" << formatValue(*band.frequency, band.frequency->value) << "   " << noteOf(band.frequency->value);
@@ -2414,7 +2706,24 @@ bool eqProPlot(const Plot& plot, std::vector<Param>& parameters, const Pane& pan
         text << "\nQ " << juce::String(band.q->value, 2);
         if (band.isCut())
             text << "   " << slopeName(band.slopeIndex());
+        if (band.isDynamic()) {
+            char dynamics[96];
+            std::snprintf(dynamics, sizeof(dynamics), "%s %+.1f dB \xc2\xb7 %s %.1f dB", L("Dynamique : plage", "Dynamic: range"),
+                          band.range->value, L("seuil", "threshold"), band.threshold->value);
+            text << "\n" << juce::String::fromUTF8(dynamics);
+        }
         ImGui::SetTooltip("%s", text.toRawUTF8());
+    } else if (const auto ranged = rangeGrabbed >= 0 ? rangeGrabbed : diamondHit; ranged >= 0 && !ImGui::IsPopupOpen("##eqMenu")) {
+        const auto& band = eq.bands[static_cast<std::size_t>(ranged)];
+        char text[192];
+        std::snprintf(text, sizeof(text), "%s %d \xc2\xb7 %s %+.1f dB\n%s", ui::french() ? "Bande" : "Band", ranged + 1,
+                      L("plage dynamique", "dynamic range"), band.range->value,
+                      L("Glisser : la plage \xc2\xb7 double-clic : bande statique", "Drag: the range \xc2\xb7 double-click: static band"));
+        ImGui::SetTooltip("%s", text);
+    } else if (interaction.hovered && !large && anyOn && !onListen(interaction.mouse)) {
+        const auto* hint = L("Double-clic : ajouter une bande", "Double-click: add a band");
+        const auto size = smallTextSize(hint, 0.66f);
+        smallText(list, ImVec2(plot.max.x - size.x - dp(6.0f), plot.min.y + dp(4.0f)), p.textDim, hint, 0.66f);
     } else if (interaction.hovered && large) {
         const auto hz = hzOfX(plot, interaction.mouse.x);
         char db[24];
@@ -2426,10 +2735,164 @@ bool eqProPlot(const Plot& plot, std::vector<Param>& parameters, const Pane& pan
     return changed;
 }
 
+// The band in hand's dynamics, a row under the large equaliser's: on or
+// off, what its detector hears, its range, threshold, attack and release,
+// the level its detector hears against its threshold, and a threshold
+// taken from what the band has heard lately.
+bool eqDynamicsRow(const ImVec2 origin, const float width, Eq& eq, const int index, const Live& live, const Setter& set)
+{
+    const auto& p = theme::palette();
+    auto* list = ImGui::GetWindowDrawList();
+    auto& band = eq.bands[static_cast<std::size_t>(index)];
+    if (!band.hasDynamics() || !band.on())
+        return false;
+    auto changed = false;
+    auto x = origin.x;
+    const auto bandColour = kBandColours[index];
+    list->AddLine(ImVec2(origin.x, origin.y - dp(7.0f)), ImVec2(origin.x + width, origin.y - dp(7.0f)), theme::alpha(p.line, 0.7f));
+    char title[64];
+    std::snprintf(title, sizeof(title), "%s %d", L("DYNAMIQUE \xc2\xb7 BANDE", "DYNAMICS \xc2\xb7 BAND"), index + 1);
+    smallText(list, ImVec2(x, origin.y), bandColour, title, 0.7f);
+    const auto top = origin.y + dp(18.0f);
+    if (!band.hasGain()) {
+        smallText(list, ImVec2(x, top + dp(6.0f)), p.textDim,
+                  L("Une coupe, un réjecteur ou un passe-bande n'a pas de gain : pas de dynamique.",
+                    "A cut, a notch or a band-pass has no gain: no dynamics."),
+                  0.8f);
+        return false;
+    }
+    const auto dynamic = band.isDynamic();
+    ImGui::PushID(2'000 + index);
+
+    // On or off, then what the detector hears.
+    ImGui::SetCursorScreenPos(ImVec2(x, top + dp(2.0f)));
+    auto on = dynamic;
+    if (ui::toggle(L("Dynamique", "Dynamic"), &on, bandColour, ImVec2(dp(118.0f), dp(26.0f)),
+                   L("Le gain de la bande bouge avec le son : au-dessus du seuil, il va vers sa plage",
+                     "The band's gain moves with the sound: over the threshold, it goes toward its range")))
+        changed |= setDynamic(band, on, set);
+    const ImVec2 sourceSize(dp(58.0f), dp(22.0f));
+    for (auto source = 0; source < 2; ++source) {
+        const ImVec2 min(x + static_cast<float>(source) * (sourceSize.x + dp(2.0f)), top + dp(34.0f));
+        const ImVec2 max(min.x + sourceSize.x, min.y + sourceSize.y);
+        ImGui::SetCursorScreenPos(min);
+        ImGui::PushID(source);
+        ImGui::BeginDisabled(!dynamic);
+        if (ImGui::InvisibleButton("##detector", sourceSize))
+            changed |= apply(*band.detector, static_cast<double>(source), set);
+        const auto hovered = ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled);
+        ImGui::EndDisabled();
+        if (hovered)
+            ImGui::SetTooltip("%s", source == 0 ? L("Le détecteur écoute cette bande du son lui-même",
+                                                    "The detector hears this band of the sound itself")
+                                                : L("Le détecteur écoute cette bande du sidechain (choisi dans l'en-tête de la carte) ; "
+                                                    "sans sidechain, la bande elle-même",
+                                                    "The detector hears this band of the sidechain (chosen in the card's header); "
+                                                    "without one, the band itself"));
+        ImGui::PopID();
+        const auto current = static_cast<int>(std::lround(band.detector->value)) == source;
+        list->AddRectFilled(min, max, current && dynamic ? theme::alpha(bandColour, 0.3f) : hovered && dynamic ? p.bg4 : p.bg3, dp(3.0f));
+        if (current && dynamic)
+            list->AddRect(min, max, bandColour, dp(3.0f), dp(1.2f));
+        ui::centredText(list, min, max, !dynamic ? p.textFaint : current ? p.text : p.textDim,
+                        source == 0 ? L("Sa bande", "Its band") : "Sidechain");
+    }
+    smallText(list, ImVec2(x, top + dp(59.0f)), p.textFaint, L("ce que le détecteur écoute", "what the detector hears"), 0.66f);
+    x += dp(136.0f);
+
+    // Range, threshold, attack, release.
+    const auto knobAt = [&](Param& parameter, const char* label, const char* format, const char* unit, const int flags) {
+        ImGui::SetCursorScreenPos(ImVec2(x, top));
+        auto value = static_cast<float>(parameter.value);
+        ui::KnobStyle style;
+        style.diameter = 46.0f;
+        style.label = label;
+        style.format = format;
+        style.unit = unit;
+        style.colour = bandColour;
+        style.flags = flags;
+        ImGui::PushID(label);
+        ImGui::BeginDisabled(!dynamic);
+        if (ui::knob("##knob", &value, static_cast<float>(parameter.minimum), static_cast<float>(parameter.maximum),
+                     static_cast<float>(parameter.defaultValue), style))
+            changed |= apply(parameter, value, set);
+        ImGui::EndDisabled();
+        ImGui::PopID();
+        const auto text = dynamic ? formatValue(parameter, parameter.value) : juce::String::fromUTF8("\xe2\x80\x94");
+        const auto size = smallTextSize(text.toRawUTF8(), 0.78f);
+        smallText(list, ImVec2(x + (dp(58.0f) - size.x) * 0.5f, top + dp(46.0f) + ImGui::GetFontSize() * 0.95f),
+                  dynamic ? p.text : p.textFaint, text.toRawUTF8(), 0.78f);
+        x += dp(76.0f);
+    };
+    knobAt(*band.range, L("Plage", "Range"), "%+.1f", "dB", ui::knobBipolar);
+    knobAt(*band.threshold, L("Seuil", "Threshold"), "%.1f", "dB", 0);
+    knobAt(*band.attack, L("Attaque", "Attack"), "%.1f", "ms", ui::knobLogarithmic);
+    knobAt(*band.release, L("Relâchement", "Release"), "%.0f", "ms", ui::knobLogarithmic);
+
+    // What the detector hears (-60..0 dB), the threshold across it.
+    const auto level = detectorDbOf(live, index);
+    const auto threshold = static_cast<float>(band.threshold->value);
+    const ImVec2 meterMin(x + dp(6.0f), top + dp(2.0f));
+    const ImVec2 meterMax(meterMin.x + dp(12.0f), top + dp(58.0f));
+    const auto yOfLevel = [&](const float db) {
+        return meterMax.y - (std::clamp(db, -60.0f, 0.0f) + 60.0f) / 60.0f * (meterMax.y - meterMin.y);
+    };
+    list->AddRectFilled(meterMin, meterMax, p.bg3, dp(2.0f));
+    if (dynamic && level > -60.0f)
+        list->AddRectFilled(ImVec2(meterMin.x, yOfLevel(level)), meterMax, level > threshold ? bandColour : theme::alpha(bandColour, 0.45f),
+                            dp(2.0f));
+    if (dynamic) {
+        const auto thresholdY = yOfLevel(threshold);
+        list->AddLine(ImVec2(meterMin.x - dp(3.0f), thresholdY), ImVec2(meterMax.x + dp(3.0f), thresholdY), p.text, dp(1.5f));
+    }
+    ImGui::SetCursorScreenPos(meterMin);
+    ImGui::InvisibleButton("##heard", ImVec2(meterMax.x - meterMin.x, meterMax.y - meterMin.y));
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("%s", L("Ce que le détecteur de la bande entend (le trait : son seuil)",
+                                  "What the band's detector hears (the line: its threshold)"));
+    char heardText[24];
+    if (dynamic && level > -100.0f)
+        std::snprintf(heardText, sizeof(heardText), "%.0f dB", static_cast<double>(level));
+    else
+        std::snprintf(heardText, sizeof(heardText), "\xe2\x80\x94");
+    const auto heardSize = smallTextSize(heardText, 0.66f);
+    smallText(list, ImVec2(meterMin.x + dp(6.0f) - heardSize.x * 0.5f, meterMax.y + dp(4.0f)), p.textDim, heardText, 0.66f);
+    x += dp(40.0f);
+
+    // A threshold from what the band heard lately: 6 dB under its loudest
+    // of the last few seconds, while the transport runs.
+    struct Heard {
+        float peak { -120.0f };
+        double when {};
+    };
+    static std::map<juce::String, Heard> heard;
+    auto& recent = heard[eq.key + juce::String(index)];
+    const auto now = ImGui::GetTime();
+    if (level > recent.peak || now - recent.when > 4.0) {
+        recent.peak = level;
+        recent.when = now;
+    }
+    ImGui::SetCursorScreenPos(ImVec2(x, top + dp(2.0f)));
+    const auto learnable = dynamic && live.running && recent.peak > -60.0f;
+    ImGui::BeginDisabled(!learnable);
+    if (ImGui::Button(L("Seuil auto", "Auto threshold"), ImVec2(dp(112.0f), dp(26.0f))))
+        changed |= apply(*band.threshold, std::clamp(recent.peak - 6.0f, -60.0f, 0.0f), set);
+    ImGui::EndDisabled();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        ImGui::SetTooltip("%s", L("Pendant la lecture : le seuil se place 6 dB sous les crêtes que la bande a eues ces dernières secondes",
+                                  "While playing: the threshold goes 6 dB under the peaks the band had in the last seconds"));
+    smallText(list, ImVec2(x, top + dp(32.0f)), p.textFaint, L("6 dB sous ses crêtes", "6 dB under its peaks"), 0.66f);
+    smallText(list, ImVec2(x, top + dp(32.0f) + ImGui::GetFontSize() * 0.8f), p.textFaint,
+              L("(pendant la lecture)", "(while playing)"), 0.66f);
+    ImGui::PopID();
+    return changed;
+}
+
+
 // Under the large equaliser: the bands as numbered chips, then the band in
 // hand (its shape, slope, frequency, gain and Q), then the output and the
-// scale.
-bool eqBandPanel(const ImVec2 origin, const float width, Eq& eq, EqView& view, const Setter& set)
+// scale; on a second row, the band in hand's dynamics.
+bool eqBandPanel(const ImVec2 origin, const float width, Eq& eq, EqView& view, const Live& live, const Setter& set)
 {
     const auto& p = theme::palette();
     auto* list = ImGui::GetWindowDrawList();
@@ -2476,8 +2939,9 @@ bool eqBandPanel(const ImVec2 origin, const float width, Eq& eq, EqView& view, c
         ui::centredText(list, min, max, band.on() ? kHandleText : theme::alpha(bandColour, 0.8f), number);
     }
     const auto hints = { L("Double-clic sur le fond : ajouter une bande", "Double-click the ground: add a band"),
-                         L("Glisser : fréquence et gain · Maj : réglage fin", "Drag: frequency and gain · Shift: fine"),
-                         L("Molette : Q · Clic droit : forme et pente", "Wheel: Q · Right click: shape and slope") };
+                         L("Glisser : fréquence et gain · Ctrl : fin · Maj : rapide", "Drag: frequency and gain · Ctrl: fine · Shift: fast"),
+                         L("Molette : Q · Clic droit : forme et pente", "Wheel: Q · Right click: shape and slope"),
+                         L("Losange : plage d'une bande dynamique", "Diamond: a dynamic band's range") };
     auto hintY = y + chip + dp(9.0f);
     for (const auto* hint : hints) {
         smallText(list, ImVec2(x, hintY), theme::alpha(p.textDim, 0.8f), hint, 0.72f);
@@ -2558,8 +3022,14 @@ bool eqBandPanel(const ImVec2 origin, const float width, Eq& eq, EqView& view, c
                 changed |= apply(parameter, value, set);
             ImGui::EndDisabled();
             ImGui::PopID();
-            // The value under the name, always.
+            // The value under the name, always; a click on it types it in.
             valueUnder(x, dp(58.0f), enabled ? formatValue(parameter, parameter.value) : juce::String::fromUTF8("\xe2\x80\x94"), 0);
+            if (enabled) {
+                ImGui::PushID(label);
+                changed |= typedValue("##typed", parameter, ImVec2(x, y + dp(46.0f) + ImGui::GetFontSize() * 0.95f),
+                                      ImVec2(dp(58.0f), ImGui::GetFontSize() * 0.85f), set);
+                ImGui::PopID();
+            }
             x += dp(76.0f);
         };
         knobAt(*band.frequency, L("Fréquence", "Frequency"), "%.0f", "Hz", ui::knobLogarithmic, true);
@@ -2576,6 +3046,34 @@ bool eqBandPanel(const ImVec2 origin, const float width, Eq& eq, EqView& view, c
         if (ui::iconButton(icon::trash, L("Retirer la bande", "Remove the band"), false, 0, ImVec2(dp(78.0f), dp(26.0f)))) {
             changed |= apply(*band.enabled, 0.0, set);
             view.selected = -1;
+        }
+        // Held: this band alone.
+        if (eq.listen != nullptr && band.on()) {
+            ImGui::SetCursorScreenPos(ImVec2(x + dp(86.0f), y + dp(2.0f)));
+            const auto alone = static_cast<int>(std::lround(eq.listen->value)) == view.selected + 1;
+            (void) ui::iconButton(icon::headphone,
+                                  L("Maintenir pour écouter cette bande seule : en écoutant, glisser à gauche ou à droite la déplace, "
+                                    "la molette la resserre ou l'élargit",
+                                    "Hold to hear this band alone: while listening, dragging left or right moves it, the wheel "
+                                    "narrows or widens it"),
+                                  alone, bandColour, ImVec2(dp(40.0f), dp(58.0f)));
+            if (ImGui::IsItemActivated())
+                changed |= apply(*eq.listen, static_cast<double>(view.selected + 1), set);
+            if (ImGui::IsItemActive()) {
+                // Held: the band follows the mouse (an octave every 60
+                // points), the wheel turns its width.
+                auto& io = ImGui::GetIO();
+                if (io.MouseDelta.x != 0.0f)
+                    changed |= apply(*band.frequency,
+                                     band.frequency->value * std::pow(2.0, io.MouseDelta.x * ui::valueSpeed() / dp(60.0f)), set);
+                if (io.MouseWheel != 0.0f) {
+                    changed |= apply(*band.q, band.q->value * std::pow(1.15, io.MouseWheel * ui::valueSpeed()), set);
+                    ui::takeWheel();
+                }
+            }
+            if (ImGui::IsItemDeactivated())
+                changed |= apply(*eq.listen, 0.0, set);
+            x += dp(50.0f);
         }
         ImGui::PopID();
         x += dp(96.0f);
@@ -2625,6 +3123,10 @@ bool eqBandPanel(const ImVec2 origin, const float width, Eq& eq, EqView& view, c
     }
     smallText(list, ImVec2(right - dp(80.0f), y + 2.0f * (rangeSize.y + dp(3.0f)) + dp(2.0f)), p.textFaint,
               L("échelle (dB)", "scale (dB)"), 0.66f);
+
+    // The band in hand's dynamics.
+    if (view.selected >= 0 && view.selected < engine::eqProBands)
+        changed |= eqDynamicsRow(ImVec2(origin.x, y + dp(110.0f)), width, eq, view.selected, live, set);
     return changed;
 }
 
@@ -2747,7 +3249,7 @@ bool compProPlot(const Plot& plot, std::vector<Param>& parameters, const Pane& p
         if (interaction.active && interaction.delta.y != 0.0f)
             changed |= apply(*c.threshold,
                              c.threshold->value
-                                 - interaction.delta.y * (interaction.fine ? 0.15f : 1.0f) * -floorDb / std::max(1.0f, history.height()),
+                                 - interaction.delta.y * interaction.speed * -floorDb / std::max(1.0f, history.height()),
                              set);
         if (interaction.wheel != 0.0f)
             changed |= apply(*c.ratio, c.ratio->value * std::pow(1.1, interaction.wheel), set);
@@ -2798,13 +3300,13 @@ bool compProPlot(const Plot& plot, std::vector<Param>& parameters, const Pane& p
         if (interaction.delta.x != 0.0f)
             changed |= apply(*c.threshold,
                              c.threshold->value
-                                 + interaction.delta.x * (interaction.fine ? 0.15f : 1.0f) * -floorDb / std::max(1.0f, transfer.width()),
+                                 + interaction.delta.x * interaction.speed * -floorDb / std::max(1.0f, transfer.width()),
                              set);
         if (interaction.delta.y != 0.0f)
-            changed |= apply(*c.ratio, c.ratio->value * std::pow(interaction.fine ? 1.003 : 1.015, -interaction.delta.y / ImGui::GetStyle().FontScaleDpi), set);
+            changed |= apply(*c.ratio, c.ratio->value * std::pow(1.015, -interaction.delta.y * interaction.speed / ImGui::GetStyle().FontScaleDpi), set);
     }
     if (interaction.wheel != 0.0f)
-        changed |= apply(*c.knee, c.knee->value + interaction.wheel * (interaction.fine ? 0.25 : 1.0), set);
+        changed |= apply(*c.knee, c.knee->value + interaction.wheel * interaction.speed, set);
     if (interaction.doubleClicked) {
         changed |= apply(*c.threshold, c.threshold->defaultValue, set);
         changed |= apply(*c.ratio, c.ratio->defaultValue, set);
@@ -2895,6 +3397,20 @@ juce::String fixed(const double value, const int decimals)
 
 } // namespace
 
+bool typedValue(const char* id, Param& parameter, const ImVec2 min, const ImVec2 size, const Setter& set)
+{
+    const auto percent = parameter.unit.isEmpty() && parameter.minimum >= 0.0 && parameter.maximum <= 1.0 + 1.0e-9
+                         && parameter.maximum > 0.0;
+    auto typed = parameter.value;
+    ImGui::SetCursorScreenPos(min);
+    if (ui::valueEntryButton(id, ImVec2(std::max(1.0f, size.x), std::max(1.0f, size.y)), typed, parameter.minimum, parameter.maximum,
+                             percent ? 100.0 : 1.0))
+        return apply(parameter, typed, set);
+    if (ImGui::IsItemHovered())
+        ui::tooltip(L("Clic : taper la valeur", "Click: type the value"));
+    return false;
+}
+
 juce::String formatValue(const Param& parameter, const double value)
 {
     if (auto studio = studioFormat(parameter, value); studio.isNotEmpty())
@@ -2903,6 +3419,11 @@ juce::String formatValue(const Param& parameter, const double value)
         if (const auto* division = engine::noteDivisionFor(static_cast<float>(value)))
             return juce::String(std::string(division->name));
         return ui::Ls("Libre", "Free");
+    }
+    // A voice allocator's playing: three words, as the card says them.
+    if (parameter.binding.endsWith("voice.mode")) {
+        static const char* modes[] { "Poly", "Mono", "Legato" };
+        return modes[std::clamp(static_cast<int>(std::round(value)), 0, 2)];
     }
     if (parameter.binding.endsWith("filter.mode")) {
         static const char* modesFr[] { "Passe-bas", "Passe-haut", "Passe-bande", "Réjecteur" };
@@ -2917,6 +3438,11 @@ juce::String formatValue(const Param& parameter, const double value)
             std::clamp(static_cast<int>(std::lround(value)), 0, engine::eqBandTypeCount - 1))));
     case static_cast<int>(engine::EqProValue::slope): return slopeName(static_cast<int>(std::lround(value)));
     case static_cast<int>(engine::EqProValue::q): return "Q " + juce::String(value, 2);
+    default: break;
+    }
+    switch (eqProDynamicOf(parameter.binding)) {
+    case static_cast<int>(engine::EqProDynamic::on): return (value >= 0.5 ? ui::Ls("Active", "On") : ui::Ls("Coupée", "Off"));
+    case static_cast<int>(engine::EqProDynamic::detector): return value >= 0.5 ? juce::String("Sidechain") : ui::Ls("Sa bande", "Its band");
     default: break;
     }
     if (parameter.binding.endsWith("crusher.bits"))
@@ -2965,12 +3491,18 @@ bool valueField(const char* id, Param& parameter, const float width, const ImU32
     auto t = normalised(parameter, parameter.value);
     const auto stepped = isStepped(parameter);
     auto* storage = ImGui::GetStateStorage();
+    const auto fieldId = ImGui::GetItemID();
     const auto gatheredId = ImGui::GetID("##gathered");
-    if (ImGui::IsItemActivated())
+    const auto movedId = ImGui::GetID("##moved");
+    const auto movement = active ? ui::heldMovement(ImGui::GetID("##anchor")) : ImVec2();
+    if (ImGui::IsItemActivated()) {
         storage->SetFloat(gatheredId, static_cast<float>(t));
-    if (active && (io.MouseDelta.x != 0.0f || io.MouseDelta.y != 0.0f)) {
-        const auto speed = (io.KeyShift ? 0.0007 : 0.0045) / std::max(0.5f, ImGui::GetStyle().FontScaleDpi);
-        const auto step = (-io.MouseDelta.y + io.MouseDelta.x * 0.5f) * speed;
+        storage->SetBool(movedId, false);
+    }
+    if (active && (movement.x != 0.0f || movement.y != 0.0f)) {
+        storage->SetBool(movedId, true);
+        const auto speed = 0.0045 * ui::valueSpeed() / std::max(0.5f, ImGui::GetStyle().FontScaleDpi);
+        const auto step = (-movement.y + movement.x * 0.5f) * speed;
         if (stepped) {
             // Whole steps: the drag gathers until it reaches the next one.
             const auto gathered = std::clamp(storage->GetFloat(gatheredId, static_cast<float>(t)) + static_cast<float>(step) * 1.6f, 0.0f, 1.0f);
@@ -2985,10 +3517,21 @@ bool valueField(const char* id, Param& parameter, const float width, const ImU32
         if (stepped)
             changed |= apply(parameter, parameter.value + (io.MouseWheel > 0.0f ? 1.0 : -1.0), set);
         else
-            changed |= apply(parameter, fromNormalised(parameter, t + io.MouseWheel * (io.KeyShift ? 0.002 : 0.02)), set);
+            changed |= apply(parameter, fromNormalised(parameter, t + io.MouseWheel * 0.02 * ui::valueSpeed()), set);
     }
     if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
         changed |= apply(parameter, parameter.defaultValue, set);
+    // Clicked without a drag: its number typed in (a fraction in percent).
+    if (!stepped) {
+        const auto percent = parameter.unit.isEmpty() && parameter.minimum >= 0.0 && parameter.maximum <= 1.0 + 1.0e-9
+                             && parameter.maximum > 0.0;
+        auto typed = parameter.value;
+        const auto open = ImGui::IsItemDeactivated() && !storage->GetBool(movedId, false)
+                          && !ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
+        if (ui::valueEntry(fieldId, origin, ImVec2(origin.x + width, origin.y + height), typed, parameter.minimum,
+                           parameter.maximum, open, percent ? 100.0 : 1.0))
+            changed |= apply(parameter, typed, set);
+    }
     if (hovered || active)
         ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
     if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && parameterMenu())
@@ -3011,7 +3554,7 @@ bool valueField(const char* id, Param& parameter, const float width, const ImU32
 
 // ---- Choosing the displays ---------------------------------------------------------------------
 
-Surface inferSurface(const std::vector<Param>& parameters, const bool hasSignal, const bool instrument)
+Surface inferSurface(const std::vector<Param>& parameters, const bool hasSignal, const bool instrument, const juce::String& typeKey)
 {
     Surface surface;
     // node.2.node.19004.envelope.attack → prefix "node.2.node.19004.",
@@ -3187,6 +3730,33 @@ Surface inferSurface(const std::vector<Param>& parameters, const bool hasSignal,
         studio("tranche.gateThreshold", PaneKind::tranche, "tranche");
         studio("finition.gain", PaneKind::finition, "finition");
         studio("halo.mix", PaneKind::halo, "halo");
+        studio("vocoder.mix", PaneKind::vocoder, "vocoder");
+        studio("deesser.threshold", PaneKind::deEsser, "de-esser");
+        studio("tuner.reference", PaneKind::tuner, "tuner");
+        studio("harmonie.shiftA", PaneKind::harmonie, "harmonie");
+        studio("justesse.speed", PaneKind::justesse, "justesse");
+        studio("empreinte.mix", PaneKind::empreinte, "empreinte");
+        studio("givre.blur", PaneKind::givre, "givre");
+        studio("grains.time", PaneKind::grains, "grains");
+        studio("saccade.chance", PaneKind::saccade, "saccade");
+        studio("boucleur.feedback", PaneKind::boucleur, "boucleur");
+        studio("pompe.depth", PaneKind::pompe, "pompe");
+        studio("decaleur.shift", PaneKind::decaleur, "decaleur");
+        studio("anneau.frequency", PaneKind::anneau, "anneau");
+        studio("rotor.slow", PaneKind::rotor, "rotor");
+        studio("resonateurs.note", PaneKind::resonateurs, "resonateurs");
+        studio("corps.tune", PaneKind::corps, "corps");
+        studio("peigne.frequency", PaneKind::peigne, "peigne");
+        studio("utilitaire.gain", PaneKind::utilitaire, "utilitaire");
+        studio("stereoscope.zoom", PaneKind::stereoscope, "stereoscope");
+        studio("arpege.gate", PaneKind::arpege, "arpege");
+        studio("accords.velocity", PaneKind::accords, "accords");
+        studio("gamme.transpose", PaneKind::gamme, "gamme");
+        studio("echonotes.time", PaneKind::echoNotes, "echo-notes");
+        studio("alea.timing", PaneKind::alea, "alea");
+        studio("duree.length", PaneKind::duree, "duree");
+        studio("sequenceur.swing", PaneKind::sequenceur, "sequenceur");
+        studio("roulement.rate", PaneKind::roulement, "roulement");
         if (find(group, "eqpro.b1Frequency") >= 0) {
             Pane pane { PaneKind::eqPro, {}, 0 };
             static const char* values[] { "Enabled", "Type", "Frequency", "Gain", "Q", "Slope" };
@@ -3194,6 +3764,11 @@ Surface inferSurface(const std::vector<Param>& parameters, const bool hasSignal,
                 for (const auto* value : values)
                     pane.parameters.push_back(take(find(group, ("eqpro.b" + juce::String(band) + value).toRawUTF8())));
             pane.parameters.push_back(take(find(group, "eqpro.output")));
+            pane.parameters.push_back(take(find(group, "eqpro.listen")));
+            static const char* dynamics[] { "Dynamic", "Range", "Threshold", "Attack", "Release", "Detector" };
+            for (auto band = 1; band <= engine::eqProBands; ++band)
+                for (const auto* value : dynamics)
+                    pane.parameters.push_back(take(find(group, ("eqpro.b" + juce::String(band) + value).toRawUTF8())));
             surface.panes.push_back(std::move(pane));
         }
         if (const auto floor = find(group, "spectrometer.floor"); floor >= 0)
@@ -3212,10 +3787,16 @@ Surface inferSurface(const std::vector<Param>& parameters, const bool hasSignal,
     if (surface.panes.empty() && hasSignal && !instrument && parameters.size() == 1
         && parameters.front().binding.endsWith("gain.db"))
         surface.panes.push_back({ PaneKind::level, { take(0) }, 0 });
+    // The analysers: what each is for.
+    if (typeKey == "oscilloscope")
+        surface.panes.push_back({ PaneKind::scope, {}, 0 });
+    if (typeKey == "level-meter")
+        surface.panes.push_back({ PaneKind::level, {}, 0 });
     // Every device that sounds shows its sound, if nothing above does.
     const auto showsSignal = std::any_of(surface.panes.begin(), surface.panes.end(), [](const Pane& pane) {
         return pane.kind == PaneKind::filter || pane.kind == PaneKind::equalizer || pane.kind == PaneKind::dynamics
                || pane.kind == PaneKind::saturation || pane.kind == PaneKind::level || pane.kind == PaneKind::spectrum
+               || pane.kind == PaneKind::scope
                || pane.kind == PaneKind::multiFilter || pane.kind == PaneKind::autoFilter || pane.kind == PaneKind::eqThree
                || pane.kind == PaneKind::limiter || pane.kind == PaneKind::gate || pane.kind == PaneKind::eqPro
                || pane.kind == PaneKind::compPro || pane.kind == PaneKind::spectrometer || isStudioPane(pane.kind);
@@ -3244,6 +3825,7 @@ float paneWidth(const Pane& pane, const float height)
     case PaneKind::reverb: factor = 1.25f; break;
     case PaneKind::width: factor = 0.9f; break;
     case PaneKind::level: factor = 0.55f; break;
+    case PaneKind::scope: factor = 1.6f; break;
     case PaneKind::lfo: factor = 1.3f; break;
     case PaneKind::multiFilter: factor = 1.45f; break;
     case PaneKind::autoFilter: factor = 1.45f; break;
@@ -3273,6 +3855,7 @@ float paneWidth(const Pane& pane, const float height)
     case PaneKind::tranche: factor = 2.5f; break;
     case PaneKind::finition: factor = 2.5f; break;
     case PaneKind::halo: factor = 2.3f; break;
+    default: factor = addedPaneFactor(pane.kind); break;
     }
     const auto wide = pane.kind == PaneKind::eqPro || pane.kind == PaneKind::compPro || isStudioPane(pane.kind);
     return std::clamp(height * factor, dp(110.0f), dp(pane.kind == PaneKind::spectrometer ? 640.0f : wide ? 460.0f : 380.0f));
@@ -3359,6 +3942,9 @@ bool paneBody(const Pane& pane, std::vector<Param>& parameters, const Plot& plot
     case PaneKind::level:
         changed = levelPlot(plot, colour, live);
         break;
+    case PaneKind::scope:
+        changed = scopePlot(plot, colour, live);
+        break;
     case PaneKind::eqPro:
         changed = eqProPlot(plot, parameters, pane, colour, live, set, large);
         break;
@@ -3388,6 +3974,33 @@ bool paneBody(const Pane& pane, std::vector<Param>& parameters, const Plot& plot
     case PaneKind::tranche:
     case PaneKind::finition:
     case PaneKind::halo:
+    case PaneKind::vocoder:
+    case PaneKind::deEsser:
+    case PaneKind::tuner:
+    case PaneKind::harmonie:
+    case PaneKind::justesse:
+    case PaneKind::empreinte:
+    case PaneKind::givre:
+    case PaneKind::grains:
+    case PaneKind::saccade:
+    case PaneKind::boucleur:
+    case PaneKind::pompe:
+    case PaneKind::decaleur:
+    case PaneKind::anneau:
+    case PaneKind::rotor:
+    case PaneKind::resonateurs:
+    case PaneKind::corps:
+    case PaneKind::peigne:
+    case PaneKind::utilitaire:
+    case PaneKind::stereoscope:
+    case PaneKind::arpege:
+    case PaneKind::accords:
+    case PaneKind::gamme:
+    case PaneKind::echoNotes:
+    case PaneKind::alea:
+    case PaneKind::duree:
+    case PaneKind::sequenceur:
+    case PaneKind::roulement:
         changed = studioPane(pane, parameters, plot.min, plot.max, colour, live, set);
         break;
     }
@@ -3433,21 +4046,18 @@ const char* paneTitle(const Pane& pane)
     return paneTitleOf(pane);
 }
 
-bool drawPane(const char* id, const Pane& pane, std::vector<Param>& parameters, const ImVec2 position, const ImVec2 size,
-              const ImU32 colour, const Live& live, const Setter& set, const bool withFields, bool* expand)
+namespace {
+
+// What a pane edits under it (its slots): all its parameters; for the
+// equaliser its tone and the band in hand; for the parametric one the band
+// chosen (`eqBand` set to it) and its output; for the studio compressor its
+// six main ones; for a studio effect its main ones.
+std::vector<int> paneFields(const Pane& pane, std::vector<Param>& parameters, const int selectedBand, int* eqBand)
 {
-    const auto& p = theme::palette();
-    auto* list = ImGui::GetWindowDrawList();
-    ImGui::PushID(id);
-    // The fields this pane edits, under it.
     std::vector<int> fields;
     for (std::size_t slot = 0; slot < pane.parameters.size(); ++slot)
         if (parameterAt(parameters, pane, slot) != nullptr)
             fields.push_back(static_cast<int>(slot));
-    auto* storage = ImGui::GetStateStorage();
-    const auto bandId = ImGui::GetID("##band");
-    auto selectedBand = storage->GetInt(bandId, 0);
-    // An equaliser's fields are its tone and the band in hand.
     if (pane.kind == PaneKind::equalizer) {
         std::vector<int> shown;
         if (parameterAt(parameters, pane, 0) != nullptr)
@@ -3457,15 +4067,13 @@ bool drawPane(const char* id, const Pane& pane, std::vector<Param>& parameters, 
                 shown.push_back(1 + selectedBand * 3 + offset);
         fields = shown;
     }
-    // The parametric one's: the band in hand's shape, frequency, gain or
-    // slope, Q, then the output.
-    auto eqBand = -1;
     if (pane.kind == PaneKind::eqPro) {
         std::vector<int> shown;
         if (auto eq = eqOf(parameters, pane); eq.valid()) {
             const auto& view = eqView(eq.key);
             if (view.selected >= 0 && view.selected < engine::eqProBands && eq.bands[static_cast<std::size_t>(view.selected)].on()) {
-                eqBand = view.selected;
+                if (eqBand != nullptr)
+                    *eqBand = view.selected;
                 const auto& band = eq.bands[static_cast<std::size_t>(view.selected)];
                 const auto slotOf = [&](const engine::EqProValue value) { return engine::eqProSlot(view.selected, value); };
                 shown.push_back(slotOf(engine::EqProValue::type));
@@ -3475,6 +4083,10 @@ bool drawPane(const char* id, const Pane& pane, std::vector<Param>& parameters, 
                 else if (band.isCut())
                     shown.push_back(slotOf(engine::EqProValue::slope));
                 shown.push_back(slotOf(engine::EqProValue::q));
+                if (band.isDynamic()) {
+                    shown.push_back(engine::eqProDynamicIndex(view.selected, engine::EqProDynamic::range));
+                    shown.push_back(engine::eqProDynamicIndex(view.selected, engine::EqProDynamic::threshold));
+                }
             }
             if (eq.output != nullptr)
                 shown.push_back(engine::eqProBands * engine::eqProValuesPerBand);
@@ -3489,6 +4101,32 @@ bool drawPane(const char* id, const Pane& pane, std::vector<Param>& parameters, 
             if (parameterAt(parameters, pane, static_cast<std::size_t>(slot)) != nullptr)
                 fields.push_back(slot);
     }
+    return fields;
+}
+
+} // namespace
+
+std::vector<int> cardSlots(const char* id, const Pane& pane, std::vector<Param>& parameters)
+{
+    // The band in hand, as drawPane keeps it under the same id.
+    ImGui::PushID(id);
+    const auto selectedBand = ImGui::GetStateStorage()->GetInt(ImGui::GetID("##band"), 0);
+    ImGui::PopID();
+    return paneFields(pane, parameters, selectedBand, nullptr);
+}
+
+bool drawPane(const char* id, const Pane& pane, std::vector<Param>& parameters, const ImVec2 position, const ImVec2 size,
+              const ImU32 colour, const Live& live, const Setter& set, const bool withFields, bool* expand)
+{
+    const auto& p = theme::palette();
+    auto* list = ImGui::GetWindowDrawList();
+    ImGui::PushID(id);
+    // The fields this pane edits, under it.
+    auto* storage = ImGui::GetStateStorage();
+    const auto bandId = ImGui::GetID("##band");
+    auto selectedBand = storage->GetInt(bandId, 0);
+    auto eqBand = -1;
+    auto fields = paneFields(pane, parameters, selectedBand, &eqBand);
     if (!withFields)
         fields.clear();
     const auto fieldHeight = fields.empty() ? 0.0f : ImGui::GetFontSize() * 1.75f + dp(4.0f);
@@ -3518,7 +4156,7 @@ bool drawPane(const char* id, const Pane& pane, std::vector<Param>& parameters, 
             ImGui::SetCursorScreenPos(ImVec2(x, frame.max.y + dp(4.0f)));
             auto* parameter = parameterAt(parameters, pane, static_cast<std::size_t>(slot));
             ImGui::PushID(slot);
-            if (eqBand >= 0 && slot < engine::eqProBands * engine::eqProValuesPerBand) {
+            if (eqBand >= 0 && slot != engine::eqProBands * engine::eqProValuesPerBand) {
                 // A band's field: its own colour, "Gain" for "Bande 3 · Gain".
                 auto shown = *parameter;
                 shown.label = parameter->label.fromLastOccurrenceOf(juce::String::fromUTF8("\xc2\xb7 "), false, false);
@@ -3668,6 +4306,109 @@ bool nativeLarge(const Pane& pane, std::vector<Param>& parameters, const ImVec2 
 
 } // namespace
 
+bool drawOverview(const char* id, const std::vector<Pane>& panes, std::vector<Param>& parameters, const ImVec2 position,
+                  const ImVec2 size, const ImU32 colour, const Live& live, const Setter& set, const std::vector<int>& extras,
+                  int* expand)
+{
+    ImGui::PushID(id);
+    auto changed = false;
+    // Every setting large under them all: each display's, under its name,
+    // then the ones no display takes.
+    std::vector<ControlGroup> groups;
+    std::vector<int> taken;
+    const auto add = [&](const char* title, const std::vector<int>& indices) {
+        ControlGroup group { juce::String::fromUTF8(title), {} };
+        for (const auto index : indices)
+            if (index >= 0 && index < static_cast<int>(parameters.size()) && std::find(taken.begin(), taken.end(), index) == taken.end()) {
+                group.indices.push_back(index);
+                taken.push_back(index);
+            }
+        groups.push_back(std::move(group));
+    };
+    for (const auto& pane : panes) {
+        // The parametric equaliser: its band chosen (its curve has them all).
+        std::vector<int> indices;
+        if (pane.kind == PaneKind::eqPro) {
+            for (const auto slot : paneFields(pane, parameters, 0, nullptr))
+                indices.push_back(pane.parameters[static_cast<std::size_t>(slot)]);
+        } else {
+            indices = pane.parameters;
+        }
+        add(paneTitleOf(pane), indices);
+    }
+    add(L("AUTRES RÉGLAGES", "OTHER SETTINGS"), extras);
+    const auto controlsHeight = controlGroups(parameters, groups, position, size.x, colour, live, set, false, nullptr);
+    const auto tapped = live.before != nullptr || live.after != nullptr;
+    const auto metersWidth = tapped ? dp(96.0f) : 0.0f;
+    const auto gap = dp(8.0f);
+    const auto width = size.x - (tapped ? metersWidth + gap : 0.0f);
+    const auto height = std::max(dp(160.0f), size.y - controlsHeight - (controlsHeight > 0.0f ? dp(10.0f) : 0.0f));
+
+    // The panes as large as they go: on as few rows as fit their widths at
+    // that height, each row's panes widened to fill it.
+    auto rows = 1;
+    auto paneHeight = height;
+    for (; rows <= 4; ++rows) {
+        paneHeight = (height - gap * static_cast<float>(rows - 1)) / static_cast<float>(rows);
+        auto row = 1;
+        auto x = 0.0f;
+        for (const auto& pane : panes) {
+            const auto natural = paneWidth(pane, paneHeight);
+            if (x > 0.0f && x + gap + natural > width) {
+                ++row;
+                x = 0.0f;
+            }
+            x += (x > 0.0f ? gap : 0.0f) + natural;
+        }
+        if (row <= rows)
+            break;
+    }
+    rows = std::min(rows, 4);
+    std::vector<std::vector<std::size_t>> lines(1);
+    {
+        auto x = 0.0f;
+        for (std::size_t index = 0; index < panes.size(); ++index) {
+            const auto natural = paneWidth(panes[index], paneHeight);
+            if (!lines.back().empty() && x + gap + natural > width && static_cast<int>(lines.size()) < rows) {
+                lines.emplace_back();
+                x = 0.0f;
+            }
+            x += (lines.back().empty() ? 0.0f : gap) + natural;
+            lines.back().push_back(index);
+        }
+    }
+    auto y = position.y;
+    for (const auto& line : lines) {
+        auto natural = 0.0f;
+        for (const auto index : line)
+            natural += paneWidth(panes[index], paneHeight);
+        const auto room = width - gap * static_cast<float>(line.size() - 1);
+        const auto scale = natural > 0.0f ? room / natural : 1.0f;
+        auto x = position.x;
+        for (const auto index : line) {
+            const auto paneSize = ImVec2(paneWidth(panes[index], paneHeight) * scale, paneHeight);
+            ImGui::PushID(static_cast<int>(index));
+            auto open = false;
+            changed |= drawPane("##overviewPane", panes[index], parameters, ImVec2(x, y), paneSize, colour, live, set, false, &open);
+            if (open && expand != nullptr)
+                *expand = static_cast<int>(index);
+            ImGui::PopID();
+            x += paneSize.x + gap;
+        }
+        y += paneHeight + gap;
+    }
+    if (tapped)
+        levelColumn(Plot { ImVec2(position.x + width + gap, position.y), ImVec2(position.x + size.x, position.y + height) }, colour, live);
+    if (controlsHeight > 0.0f) {
+        bool moved = false;
+        (void) controlGroups(parameters, groups, ImVec2(position.x, position.y + height + dp(10.0f)), size.x, colour, live, set, true,
+                             &moved);
+        changed |= moved;
+    }
+    ImGui::PopID();
+    return changed;
+}
+
 bool drawLargePane(const char* id, const Pane& pane, std::vector<Param>& parameters, const ImVec2 position, const ImVec2 size,
                    const ImU32 colour, const Live& live, const Setter& set, const std::vector<int>* extras)
 {
@@ -3704,7 +4445,7 @@ bool drawLargePane(const char* id, const Pane& pane, std::vector<Param>& paramet
     const auto& p = theme::palette();
     auto* list = ImGui::GetWindowDrawList();
     ImGui::PushID(id);
-    const auto panelHeight = dp(112.0f);
+    const auto panelHeight = dp(204.0f);
     const Plot frame { position, ImVec2(position.x + size.x, position.y + std::max(dp(140.0f), size.y - panelHeight - dp(10.0f))) };
     list->AddRectFilled(frame.min, frame.max, theme::mix(p.bg0, p.bg1, 0.35f), dp(4.0f));
     list->AddRect(frame.min, frame.max, theme::alpha(p.line, 0.8f), dp(4.0f));
@@ -3713,7 +4454,7 @@ bool drawLargePane(const char* id, const Pane& pane, std::vector<Param>& paramet
     auto changed = eqProPlot(plot, parameters, pane, colour, live, set, true);
     list->PopClipRect();
     if (auto eq = eqOf(parameters, pane); eq.valid())
-        changed |= eqBandPanel(ImVec2(position.x + dp(4.0f), frame.max.y + dp(12.0f)), size.x - dp(8.0f), eq, eqView(eq.key), set);
+        changed |= eqBandPanel(ImVec2(position.x + dp(4.0f), frame.max.y + dp(12.0f)), size.x - dp(8.0f), eq, eqView(eq.key), live, set);
     ImGui::PopID();
     return changed;
 }

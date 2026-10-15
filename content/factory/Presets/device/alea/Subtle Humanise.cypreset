@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "alea",
+ "name": "Subtle Humanise",
+ "state": {
+  "type": "alea",
+  "parameters": {
+   "alea.timing": 6.0,
+   "alea.velocity": 0.08,
+   "alea.chance": 1.0,
+   "alea.pitchChance": 0.0,
+   "alea.pitchRange": 0.0
+  }
+ }
+}

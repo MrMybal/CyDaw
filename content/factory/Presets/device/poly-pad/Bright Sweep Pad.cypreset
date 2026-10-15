@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "poly-pad",
+ "name": "Bright Sweep Pad",
+ "state": {
+  "type": "poly-pad",
+  "parameters": {
+   "node.18002.voice.mode": 0.0,
+   "node.18002.voice.glide": 0.0,
+   "node.18003.polyOscillator.waveform": 2.0,
+   "node.18003.polyOscillator.level": 0.11,
+   "node.18004.envelope.attack": 2000.0,
+   "node.18004.envelope.decay": 3000.0,
+   "node.18004.envelope.sustain": 0.75,
+   "node.18004.envelope.release": 4000.0,
+   "node.18005.gain.db": 0.0,
+   "node.18006.voiceFilter.cutoff": 7600.0,
+   "node.18006.voiceFilter.resonance": 3.0,
+   "node.18007.stereo.width": 1.45,
+   "node.18008.reverb.roomSize": 0.8,
+   "node.18008.reverb.mix": 0.3
+  }
+ }
+}

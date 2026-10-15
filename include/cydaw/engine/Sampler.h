@@ -293,6 +293,18 @@ enum class SamplerSetting : std::uint8_t {
     width,             // stereo width, 0 mono .. 2
     oneShot,           // 1: plays to its end whatever the key does
     articulation,      // the keyswitch chosen on the card, -1: the instrument's own
+    simple,            // 1: the simple sampler's card (one sample over the keys, its waveform shown)
+    // Granular (Nuée): the sample read as grains rather than played through.
+    grains,            // 1: granular
+    grainPosition,     // where in the sample the grains are taken, 0..1
+    grainScan,         // how fast that place moves through it (1: as recorded, -1 backwards), -2..2
+    grainSize,         // a grain's length, ms 10..1000
+    grainDensity,      // grains a second, 1..120
+    grainSpray,        // how far around the place they are taken, 0..1 of the sample
+    grainPitch,        // random pitch of each grain, semitones 0..12
+    grainStereo,       // how far they spread in the stereo field, 0..1
+    grainReverse,      // the chance a grain plays backwards, 0..1
+    grainShape,        // its window: 0 soft (bell) .. 1 hard (square edges)
     count
 };
 inline constexpr std::size_t samplerSettingCount = static_cast<std::size_t>(SamplerSetting::count);
@@ -309,9 +321,20 @@ inline constexpr std::array<SoundModelSettingInfo, samplerSettingCount> samplerS
     { "width", "sampler.width", "sampler.parameter.width", "", 0.0f, 2.0f, 1.0f },
     { "one-shot", "sampler.oneShot", "sampler.parameter.oneShot", "", 0.0f, 1.0f, 0.0f },
     { "articulation", "sampler.articulation", "sampler.parameter.articulation", "", -1.0f, 127.0f, -1.0f },
+    { "simple", "sampler.simple", "sampler.parameter.simple", "", 0.0f, 1.0f, 0.0f },
+    { "grains", "sampler.grains", "sampler.parameter.grains", "", 0.0f, 1.0f, 0.0f },
+    { "grain-position", "sampler.grainPosition", "sampler.parameter.grainPosition", "", 0.0f, 1.0f, 0.3f },
+    { "grain-scan", "sampler.grainScan", "sampler.parameter.grainScan", "", -2.0f, 2.0f, 0.0f },
+    { "grain-size", "sampler.grainSize", "sampler.parameter.grainSize", "ms", 10.0f, 1'000.0f, 120.0f },
+    { "grain-density", "sampler.grainDensity", "sampler.parameter.grainDensity", "Hz", 1.0f, 120.0f, 24.0f },
+    { "grain-spray", "sampler.grainSpray", "sampler.parameter.grainSpray", "", 0.0f, 1.0f, 0.05f },
+    { "grain-pitch", "sampler.grainPitch", "sampler.parameter.grainPitch", "st", 0.0f, 12.0f, 0.0f },
+    { "grain-stereo", "sampler.grainStereo", "sampler.parameter.grainStereo", "", 0.0f, 1.0f, 0.5f },
+    { "grain-reverse", "sampler.grainReverse", "sampler.parameter.grainReverse", "", 0.0f, 1.0f, 0.0f },
+    { "grain-shape", "sampler.grainShape", "sampler.parameter.grainShape", "", 0.0f, 1.0f, 0.2f },
 } };
 
-using SamplerValues = std::array<float, 16>;
+using SamplerValues = std::array<float, 32>;
 
 [[nodiscard]] constexpr SamplerValues defaultSamplerValues() noexcept
 {
@@ -525,6 +548,25 @@ private:
     int rulesCountdown_ {};
     double rulesEase_ { 0.01 };
     double pitchRatio_ { 1.0 };
+
+    // A granular note: grains read from its first zone's sample.
+    struct Grain {
+        double position {};
+        double increment {};
+        double age {};
+        double length { 1.0 };
+        double gainLeft {};
+        double gainRight {};
+        bool active {};
+    };
+    static constexpr int grainCapacity = 64;
+    void nextGrains(const SamplerMap& map, const SamplerValues& values, double& left, double& right) noexcept;
+    [[nodiscard]] double grainRandom() noexcept;
+    std::array<Grain, grainCapacity> grains_ {};
+    bool granular_ {};
+    double grainCountdown_ {};
+    double grainScan_ {};
+    std::uint32_t grainSeed_ { 0x9e3779b9u };
 };
 
 } // namespace cydaw::engine

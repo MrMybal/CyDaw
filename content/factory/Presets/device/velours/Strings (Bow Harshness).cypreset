@@ -1,0 +1,24 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "velours",
+ "name": "Strings (Bow Harshness)",
+ "state": {
+  "type": "velours",
+  "parameters": {
+   "velours.depth": 6.0,
+   "velours.sharpness": 0.45,
+   "velours.selectivity": 0.5,
+   "velours.attack": 15.0,
+   "velours.release": 200.0,
+   "velours.focusLow": 1500.0,
+   "velours.focusHigh": 7000.0,
+   "velours.mix": 1.0,
+   "velours.mode": 0.0,
+   "velours.delta": 0.0,
+   "velours.output": 0.5,
+   "velours.link": 0.8
+  }
+ }
+}

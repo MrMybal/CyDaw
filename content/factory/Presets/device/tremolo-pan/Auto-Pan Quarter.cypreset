@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "tremolo-pan",
+ "name": "Auto-Pan Quarter",
+ "state": {
+  "type": "tremolo-pan",
+  "parameters": {
+   "tremolo.rate": 2.0,
+   "tremolo.depth": 0.8,
+   "tremolo.shape": 0.0,
+   "tremolo.spread": 1.0,
+   "tremolo.sync": 9.0
+  }
+ }
+}

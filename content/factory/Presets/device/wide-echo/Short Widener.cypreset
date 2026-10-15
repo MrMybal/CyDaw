@@ -1,0 +1,18 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "wide-echo",
+ "name": "Short Widener",
+ "state": {
+  "type": "wide-echo",
+  "parameters": {
+   "node.26002.delay.time": 18.0,
+   "node.26002.delay.feedback": 0.0,
+   "node.26002.delay.mix": 0.25,
+   "node.26003.stereo.width": 1.8,
+   "node.26004.lowpass.cutoff": 12000.0,
+   "node.26004.lowpass.resonance": 0.7
+  }
+ }
+}

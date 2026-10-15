@@ -1,0 +1,35 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "reverb-pro",
+ "name": "Piano Concert Hall",
+ "state": {
+  "type": "reverb-pro",
+  "parameters": {
+   "revpro.space": 0.75,
+   "revpro.decay": 2.4,
+   "revpro.predelay": 22.0,
+   "revpro.distance": 0.5,
+   "revpro.brightness": -0.05,
+   "revpro.character": 0.3,
+   "revpro.width": 1.2,
+   "revpro.mix": 0.24,
+   "revpro.lowDecay": 1.25,
+   "revpro.lowFrequency": 200.0,
+   "revpro.midDecay": 1.0,
+   "revpro.midFrequency": 1200.0,
+   "revpro.highDecay": 0.6,
+   "revpro.highFrequency": 5000.0,
+   "revpro.lowCut": 60.0,
+   "revpro.highCut": 13000.0,
+   "revpro.ducking": 0.0,
+   "revpro.duckRelease": 300.0,
+   "revpro.freeze": 0.0,
+   "revpro.sync": 0.0,
+   "revpro.diffusion": 0.8,
+   "revpro.output": 0.0,
+   "revpro.early": -4.0
+  }
+ }
+}

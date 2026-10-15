@@ -1,0 +1,23 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "de-esser",
+ "name": "Find The Sibilance",
+ "state": {
+  "type": "de-esser",
+  "parameters": {
+   "deesser.threshold": -28.0,
+   "deesser.frequency": 6500.0,
+   "deesser.range": 10.0,
+   "deesser.release": 60.0,
+   "deesser.output": 0.0,
+   "deesser.mode": 0.0,
+   "deesser.detectorType": 1.0,
+   "deesser.listen": 1.0,
+   "deesser.bandwidth": 1.0,
+   "deesser.attack": 1.0,
+   "deesser.link": 1.0
+  }
+ }
+}

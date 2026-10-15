@@ -1,0 +1,20 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "dynamic-filter",
+ "name": "Soft Touch",
+ "state": {
+  "type": "dynamic-filter",
+  "parameters": {
+   "node.32002.follower.attack": 0.01,
+   "node.32002.follower.release": 0.3,
+   "node.32003.map.inputMinimum": 0.0,
+   "node.32003.map.inputMaximum": 1.0,
+   "node.32003.map.outputMinimum": 800.0,
+   "node.32003.map.outputMaximum": 14000.0,
+   "node.32004.lowpass.cutoff": 1000.0,
+   "node.32004.lowpass.resonance": 0.9
+  }
+ }
+}

@@ -1,0 +1,28 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "patine",
+ "name": "Cassette Demo Guitar",
+ "state": {
+  "type": "patine",
+  "parameters": {
+   "patine.noise": 0.3,
+   "patine.wobble": 0.35,
+   "patine.distort": 0.2,
+   "patine.digital": 0.0,
+   "patine.space": 0.05,
+   "patine.magnetic": 0.5,
+   "patine.magnitude": 1.0,
+   "patine.mix": 1.0,
+   "patine.noiseType": 1.0,
+   "patine.wobbleRate": 0.45,
+   "patine.distortType": 1.0,
+   "patine.spaceSize": 0.3,
+   "patine.tone": -0.15,
+   "patine.width": 0.9,
+   "patine.output": 0.0,
+   "patine.noiseFollow": 0.0
+  }
+ }
+}

@@ -116,10 +116,41 @@ enum class NativeDspNodeKind : std::uint8_t {
     tranche,
     finition,
     // A reverb of characters (HaloDesign.h).
-    halo
+    halo,
+    // The effects added on 2026-10-14 (VoiceDesign.h, PitchDesign.h,
+    // SpaceDesign.h, RhythmDesign.h, MotionDesign.h, ResonanceDesign.h,
+    // UtilityDesign.h).
+    vocoder,
+    deEsser,
+    tuner,
+    harmonie,
+    justesse,
+    empreinte,
+    givre,
+    grains,
+    saccade,
+    boucleur,
+    pompe,
+    decaleur,
+    anneau,
+    rotor,
+    resonateurs,
+    corps,
+    peigne,
+    utilitaire,
+    stereoscope,
+    // The MIDI effects (MidiEffects.h): their cards carry notes, not sound.
+    arpege,
+    accords,
+    gamme,
+    echoNotes,
+    alea,
+    duree,
+    sequenceur,
+    roulement
 };
 // The last kind: what a stored graph may name (a kind appended moves it).
-inline constexpr NativeDspNodeKind lastNativeDspNodeKind = NativeDspNodeKind::halo;
+inline constexpr NativeDspNodeKind lastNativeDspNodeKind = NativeDspNodeKind::roulement;
 
 // A compact, dependency-free parameter payload that travels with a graph node.
 // Fields that are not used by a given node kind keep their defaults. Keeping the
@@ -202,8 +233,9 @@ struct NativeDspNodeParameters {
     float effect6 {};
     float effect7 {};
     float effect8 {};
-    // The parametric equaliser's bands, six values each.
-    std::array<float, 48> eqBands {};
+    // The parametric equaliser's bands, six values each, then their
+    // dynamics, six each; the other effects' slots.
+    std::array<float, 96> eqBands {};
     // A sound-model card's settings, in SoundModelSetting order.
     SoundModelValues soundModel { defaultSoundModelValues() };
     // A sampler card's settings, in SamplerSetting order.
@@ -280,11 +312,22 @@ struct NativeDspModulationConnection {
         const NativeDspModulationConnection&) const = default;
 };
 
+// A card switched off: its last node gives out what its first one received
+// (`from` 0: silence, an instrument switched off). Not part of the graph's
+// shape: switching recompiles nothing.
+struct NativeDspBypass {
+    std::uint64_t node {};
+    std::uint64_t from {};
+
+    [[nodiscard]] bool operator==(const NativeDspBypass&) const = default;
+};
+
 struct NativeDspGraph {
     std::vector<NativeDspNode> nodes;
     std::vector<NativeDspConnection> connections;
     std::vector<NativeDspModulationConnection> modulations;
     std::uint64_t outputNodeId {};
+    std::vector<NativeDspBypass> bypasses;
 
     [[nodiscard]] bool operator==(const NativeDspGraph&) const = default;
 };

@@ -1,0 +1,24 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "fournaise",
+ "name": "Snare Crack Valve",
+ "state": {
+  "type": "fournaise",
+  "parameters": {
+   "fournaise.drive": 5.5,
+   "fournaise.tone": 0.25,
+   "fournaise.lowCut": 100.0,
+   "fournaise.highCut": 14000.0,
+   "fournaise.mix": 0.8,
+   "fournaise.output": 0.0,
+   "fournaise.style": 3.0,
+   "fournaise.punish": 0.0,
+   "fournaise.auto": 1.0,
+   "fournaise.thump": 0.0,
+   "fournaise.steep": 0.0,
+   "fournaise.oversampling": 2.0
+  }
+ }
+}

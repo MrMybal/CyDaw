@@ -104,9 +104,11 @@ TOOLS = [
                         "(Bitwig) et .song (Studio One, au mieux). Tempo, "
                         "pistes, mixage, clips, notes et fichiers audio ; le "
                         "rapport liste ce qui n'a pas pu passer (devices, "
-                        "fichiers manquants)."),
+                        "fichiers manquants). background true : comme "
+                        "l'utilisateur, par etapes avec la barre de progression "
+                        "(status.opening dit ou il en est)."),
         "inputSchema": {"type": "object",
-                        "properties": {"file": {"type": "string"}},
+                        "properties": {"file": {"type": "string"}, "background": {"type": "boolean"}},
                         "required": ["file"]},
     },
     {
@@ -266,6 +268,65 @@ TOOLS = [
                         "required": ["track", "scene"]},
     },
     {
+        "name": "theme",
+        "description": ("Les themes de couleurs de l'interface (mid-grey : gris "
+                        "moyen, par defaut ; light-grey : gris clair ; dark : le "
+                        "sombre d'origine ; et ceux de l'utilisateur) et celui en "
+                        "place. key ou name : "
+                        "en mettre un ; create (un nom) et from : en faire un a soi "
+                        "a partir d'un autre ; key et colours ({bg0: \"#262626\"...}) : "
+                        "changer les couleurs d'un theme a soi."),
+        "inputSchema": {"type": "object",
+                        "properties": {"key": {"type": "string"}, "name": {"type": "string"},
+                                       "create": {"type": "string"}, "from": {"type": "string"},
+                                       "colours": {"type": "object"}}},
+    },
+    {
+        "name": "computer_keyboard",
+        "description": ("Le clavier de l'ordinateur comme clavier MIDI (comme "
+                        "Bitwig) : la rangee du milieu les touches blanches, celle "
+                        "du dessus les noires, selon la place des touches (AZERTY "
+                        "ou QWERTY). Il joue la piste instrument choisie. Le lit, "
+                        "ou change enabled, octave (-1..8, 4 : Do4) et velocity "
+                        "(1..127) ; held : les notes tenues, keys : ses touches."),
+        "inputSchema": {"type": "object",
+                        "properties": {"enabled": {"type": "boolean"},
+                                       "octave": {"type": "integer"},
+                                       "velocity": {"type": "integer"}}},
+    },
+    {
+        "name": "midi_inputs",
+        "description": ("Les claviers et controleurs MIDI branches et s'ils jouent ; "
+                        "device (nom ou identifiant) et enabled pour en allumer ou "
+                        "eteindre un."),
+        "inputSchema": {"type": "object",
+                        "properties": {"device": {"type": "string"},
+                                       "enabled": {"type": "boolean"}}},
+    },
+    {
+        "name": "master_clip",
+        "description": ("Le clip du master d'une scene du lanceur (scene 0..255) : "
+                        "de l'automation du master jouee quand la scene est lancee. "
+                        "action set (par defaut des qu'un champ est donne) : le cree "
+                        "ou le change — name, lengthBeats, looping, et une courbe "
+                        "lane avec points [[temps, valeur]...] (temps depuis le debut "
+                        "du clip ; points vide : courbe retiree ; lane master.gain : "
+                        "le volume du master en dB, sinon un reglage de ses effets). "
+                        "lanes : ce qu'une courbe peut automatiser. remove, launch, "
+                        "stop. Sans rien : le lit (et ce qui joue)."),
+        "inputSchema": {"type": "object",
+                        "properties": {"scene": {"type": "integer"},
+                                       "action": {"type": "string",
+                                                  "enum": ["read", "set", "remove", "launch", "stop", "lanes"]},
+                                       "name": {"type": "string"},
+                                       "lengthBeats": {"type": "number"},
+                                       "looping": {"type": "boolean"},
+                                       "lane": {"type": "string"},
+                                       "points": {"type": "array",
+                                                  "items": {"type": "array", "items": {"type": "number"}}}},
+                        "required": ["scene"]},
+    },
+    {
         "name": "factory_instruments",
         "description": ("Les instruments d'usine de CyDAW (echantillons CC0 : "
                         "pianos, clavecins, harpes, cordes solo et d'orchestre, "
@@ -282,10 +343,12 @@ TOOLS = [
                         "sampler, ou avec model true son modele de son (les memes "
                         "notes analysees en harmoniques et bruit, sans "
                         "telechargement). download true : telecharge aussi ses "
-                        "echantillons manquants (la piste joue des qu'ils sont la)."),
+                        "echantillons manquants (la piste joue des qu'ils sont la). "
+                        "track : sur cette piste instrument a la place de son "
+                        "instrument (ses effets gardes) au lieu d'une nouvelle piste."),
         "inputSchema": {"type": "object",
                         "properties": {"key": {"type": "string"}, "model": {"type": "boolean"},
-                                       "download": {"type": "boolean"}},
+                                       "download": {"type": "boolean"}, "track": TRACK},
                         "required": ["key"]},
     },
     {
@@ -667,7 +730,8 @@ TOOLS = [
                         "catalogue : true ouvre le catalogue (+) du panneau "
                         "Peripheriques. device : l'id d'une carte de la piste "
                         "selectionnee, sa grande fenetre ouverte (pane : lequel de "
-                        "ses affichages ; 0 ferme toutes ces fenetres) ; detached : "
+                        "ses affichages, -1 ou rien : tous a la fois ; device 0 "
+                        "ferme toutes ces fenetres) ; detached : "
                         "true la met dans une fenetre separee hors du studio, "
                         "comme un VST, false la remet dans le studio."),
         "inputSchema": {"type": "object",
@@ -829,9 +893,10 @@ TOOLS = [
     },
     {
         "name": "set_language",
-        "description": ("Change la langue de l'interface et des textes du moteur "
-                        "(noms des noeuds, messages) : fr, en, ou une langue dont "
-                        "i18n/<code>.json existe ; status donne la liste."),
+        "description": ("Change la langue de l'interface et des messages du moteur : "
+                        "fr, en, ou une langue dont i18n/<code>.json existe ; status "
+                        "donne la liste. Les modules (noms, reglages, cartes, fenetres) "
+                        "restent en anglais."),
         "inputSchema": {"type": "object",
                         "properties": {"code": {"type": "string"}},
                         "required": ["code"]},
@@ -898,12 +963,14 @@ TOOLS = [
     {
         "name": "set_midi_clip",
         "description": ("Regle un clip MIDI : startBeats (sa place dans "
-                        "l'arrangement, 16 temps par scene du lanceur), longueur, "
-                        "bouclage, name, colour (#rrggbb)."),
+                        "l'arrangement), scene (le ranger dans cette case du lanceur, "
+                        "-1 pour le rendre a l'arrangement), longueur, bouclage, name, "
+                        "colour (#rrggbb)."),
         "inputSchema": {"type": "object",
                         "properties": {"track": TRACK,
                                        "clip": {"type": "string"},
                                        "startBeats": {"type": "number"},
+                                       "scene": {"type": "integer"},
                                        "lengthBeats": {"type": "number"},
                                        "looping": {"type": "boolean"},
                                        "name": {"type": "string"},
@@ -1090,11 +1157,14 @@ TOOLS = [
     },
     {
         "name": "add_midi_clip",
-        "description": ("Cree un clip MIDI vide : name, startBeats (16 temps par "
-                        "scene du lanceur), lengthBeats, looping, colour (#rrggbb)."),
+        "description": ("Cree un clip MIDI vide : name, startBeats (sa place dans "
+                        "l'arrangement) ou scene (la case du lanceur qui le garde, "
+                        "0 a 255 ; l'arrangement ne le joue pas), lengthBeats, looping, "
+                        "colour (#rrggbb)."),
         "inputSchema": {"type": "object",
                         "properties": {"track": TRACK, "name": {"type": "string"},
                                        "startBeats": {"type": "number"},
+                                       "scene": {"type": "integer"},
                                        "lengthBeats": {"type": "number"},
                                        "looping": {"type": "boolean"},
                                        "colour": {"type": "string"}},
@@ -1153,13 +1223,30 @@ TOOLS = [
                         "required": ["track", "source", "destination"]},
     },
     {
+        "name": "voice_live",
+        "description": "Ce que joue la voix la plus recente d'une piste (Prisme, Ambre, Colosse, Mosaique, Nebuleuse) : "
+                       "ses reglages deplaces par ses propres modulations (par cle, la ou elles les mettent), "
+                       "ses LFO (valeur, phase) et ses enveloppes. playing=false si aucune ne joue.",
+        "inputSchema": {"type": "object", "properties": {"track": TRACK}, "required": ["track"]},
+    },
+    {
+        "name": "move_device",
+        "description": "Deplace un peripherique dans la chaine d'une piste, juste avant la carte before (0 ou absent : en dernier), "
+                       "comme un glisser dans Peripheriques. nodeId et before viennent de get_track_graph.",
+        "inputSchema": {"type": "object",
+                        "properties": {"track": TRACK, "nodeId": {"type": "integer"}, "before": {"type": "integer"}},
+                        "required": ["track", "nodeId"]},
+    },
+    {
         "name": "set_node",
-        "description": "Renomme, deplace (x, y en 0..1) ou replie (collapsed) une carte.",
+        "description": "Renomme, deplace (x, y en 0..1), replie (collapsed) ou eteint (bypassed : le son passe sans elle, "
+                       "un instrument se tait) une carte.",
         "inputSchema": {"type": "object",
                         "properties": {"track": TRACK, "nodeId": {"type": "integer"},
                                        "title": {"type": "string"},
                                        "x": {"type": "number"}, "y": {"type": "number"},
-                                       "collapsed": {"type": "boolean"}},
+                                       "collapsed": {"type": "boolean"},
+                                       "bypassed": {"type": "boolean"}},
                         "required": ["track", "nodeId"]},
     },
     {
@@ -1656,12 +1743,17 @@ TOOLS = [
     {
         "name": "preview_sample",
         "description": ("Ecoute un fichier audio (path, start en secondes, gainDb) ; "
-                        "stop: true arrete la pre-ecoute."),
+                        "stop: true arrete la pre-ecoute. atTempo: une boucle au tempo "
+                        "sur (nom, saisi, ou bien detecte) jouee au tempo du projet, "
+                        "calee sur la mesure si le transport tourne (loopBeats, fromBpm). "
+                        "query: true dit ce qui joue (position, transport)."),
         "inputSchema": {"type": "object",
                         "properties": {"path": {"type": "string"},
                                        "start": {"type": "number"},
                                        "gainDb": {"type": "number"},
-                                       "stop": {"type": "boolean"}}},
+                                       "stop": {"type": "boolean"},
+                                       "atTempo": {"type": "boolean"},
+                                       "query": {"type": "boolean"}}},
     },
     {
         "name": "set_sample",

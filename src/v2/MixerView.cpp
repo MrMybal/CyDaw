@@ -1,4 +1,5 @@
 #include "MixerView.h"
+#include "AddTrackMenu.h"
 
 #include "RoutingUi.h"
 
@@ -20,12 +21,47 @@ using ui::L;
 namespace {
 
 constexpr float kStripWidth = 84.0f;
-// The pan beside the name; the fader and its meter fill the rest.
-constexpr float kPanDiameter = 20.0f;
+// The pan on its own row under the name, its value beside it; the fader and
+// its meter fill the rest.
+constexpr float kPanDiameter = 26.0f;
 constexpr float kFaderWidth = 44.0f;
 constexpr float kMeterWidth = 20.0f;
-constexpr float kFaderTop = 40.0f;
+constexpr float kFaderTop = 62.0f;
 constexpr float kFaderBlock = kFaderWidth + 6.0f + kMeterWidth;
+
+// A pan as read: "C", "L 30", "R 20" (percent).
+std::string panText(const float pan)
+{
+    const auto percent = static_cast<int>(std::lround(std::abs(pan) * 100.0f));
+    if (percent == 0)
+        return "C";
+    char text[16];
+    std::snprintf(text, sizeof(text), "%s %d", pan < 0.0f ? "L" : "R", percent);
+    return text;
+}
+
+std::string gainText(float db);
+
+// The text under a fader, a click on it types the level in.
+bool gainEntry(ImDrawList* list, const ImVec2 origin, const float width, const float y, float& gainDb)
+{
+    const auto& p = theme::palette();
+    ImGui::PushFont(theme::monoFont(), ImGui::GetStyle().FontSizeBase * 0.78f);
+    const auto text = gainText(gainDb);
+    const auto textWidth = ImGui::CalcTextSize(text.c_str()).x;
+    const auto height = ImGui::GetFontSize() + dp(2.0f);
+    ImGui::SetCursorScreenPos(ImVec2(origin.x + dp(4.0f), y));
+    auto typed = static_cast<double>(gainDb);
+    const auto set = ui::valueEntryButton("##gainText", ImVec2(width - dp(8.0f), height), typed, -60.0, 12.0, 1.0, "dB");
+    const auto hovered = ImGui::IsItemHovered();
+    list->AddText(ImVec2(origin.x + (width - textWidth) * 0.5f, y + dp(1.0f)), hovered ? p.text : p.textDim, text.c_str());
+    ImGui::PopFont();
+    if (hovered)
+        ImGui::SetTooltip("%s", L("Clic : taper le niveau (dB)", "Click: type the level (dB)"));
+    if (set)
+        gainDb = static_cast<float>(typed);
+    return set;
+}
 
 std::string gainText(const float db)
 {
@@ -53,13 +89,17 @@ void MixerView::draw()
     ImGui::BeginChild("##strips", ImVec2(ImGui::GetContentRegionAvail().x - masterWidth, height), ImGuiChildFlags_None,
                       ImGuiWindowFlags_HorizontalScrollbar);
     if (tracks.empty())
-        ui::emptyState(L("Aucune piste", "No tracks"), L("Ajoutez une piste depuis l'arrangement.", "Add a track from the arrangement."));
+        ui::emptyState(L("Aucune piste", "No tracks"), L("Ajoutez une piste avec le +.", "Add a track with the +."));
     for (std::size_t index = 0; index < tracks.size(); ++index) {
         if (index > 0)
             ImGui::SameLine();
         mixer_strip::track(studio_, state_, tracks[index], static_cast<int>(index), stripWidth,
                            height - ImGui::GetStyle().ScrollbarSize - dp(4.0f));
     }
+    // After the last strip: a "+" that adds a track.
+    if (!tracks.empty())
+        ImGui::SameLine();
+    add_track::button(studio_, state_, "mixerAdd", ImVec2(dp(34.0f), dp(34.0f)));
     ImGui::EndChild();
     ImGui::SameLine();
     const auto origin = ImGui::GetCursorScreenPos();
@@ -94,7 +134,7 @@ void mixer_strip::track(Studio& studio_, UiState& state_, const TrackRef& track,
     ImGui::BeginGroup();
     // Name, clicking selects.
     ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + dp(6.0f)));
-    ImGui::InvisibleButton("##select", ImVec2(width, ImGui::GetFontSize() + dp(4.0f)),
+    ImGui::InvisibleButton("##select", ImVec2(width, ImGui::GetFontSize() + dp(2.0f)),
                            ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
     if (ImGui::IsItemClicked())
         state_.selectTrack(track);
@@ -107,24 +147,47 @@ void mixer_strip::track(Studio& studio_, UiState& state_, const TrackRef& track,
     ui::clippedText(list, ImVec2(origin.x + dp(6.0f), origin.y + dp(7.0f)), width - dp(40.0f), p.text,
                     studio_.trackName(track).toRawUTF8());
     ImGui::PopFont();
-    ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 0.75f);
-    const auto bus = studio_.isBusTrack(track);
-    list->AddText(ImVec2(origin.x + dp(6.0f), origin.y + dp(8.0f) + ImGui::GetFontSize() * 1.35f),
-                  track.midi ? p.midi : bus ? p.accent : p.audio, track.midi ? "MIDI" : bus ? "BUS" : "AUDIO");
-    ImGui::PopFont();
-
     auto mix = studio_.trackMix(track);
     auto changed = false;
-    // Pan: small, beside the name.
-    ImGui::SetCursorScreenPos(ImVec2(origin.x + width - dp(kPanDiameter + 12.0f) - dp(2.0f), origin.y + dp(6.0f)));
+    // Pan: its own row under the name, a knob big enough to take, its value
+    // beside it ("C", "L 30"), which a click types in; the track's kind on
+    // the right.
+    const auto panTop = origin.y + dp(24.0f);
+    ImGui::SetCursorScreenPos(ImVec2(origin.x + inset + dp(2.0f), panTop));
     ui::KnobStyle panStyle;
     panStyle.diameter = kPanDiameter;
     panStyle.format = "%+.2f";
     panStyle.flags = ui::knobBipolar | ui::knobNoLabel;
     panStyle.colour = colour;
     changed |= ui::knob("##pan", &mix.pan, -1.0f, 1.0f, 0.0f, panStyle);
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Pan %+.2f", static_cast<double>(mix.pan));
+    if (ImGui::IsItemHovered() && !ImGui::IsItemActive())
+        ImGui::SetTooltip("%s", (L("Panoramique ", "Pan ") + panText(mix.pan) + L(" · double-clic : centre", " · double click: centre"))
+                                    .c_str());
+    {
+        ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 0.82f);
+        const auto text = panText(mix.pan);
+        const auto textHeight = ImGui::GetFontSize() + dp(4.0f);
+        const ImVec2 at(origin.x + inset + dp(kPanDiameter + 18.0f), panTop + (dp(kPanDiameter) - textHeight) * 0.5f);
+        ImGui::SetCursorScreenPos(at);
+        auto typed = static_cast<double>(mix.pan);
+        if (ui::valueEntryButton("##panText", ImVec2(dp(34.0f), textHeight), typed, -1.0, 1.0, 100.0)) {
+            mix.pan = static_cast<float>(typed);
+            changed = true;
+        }
+        const auto hovered = ImGui::IsItemHovered();
+        if (hovered)
+            ImGui::SetTooltip("%s", L("Clic : taper le panoramique (-100 à gauche, 100 à droite)",
+                                      "Click: type the pan (-100 left, 100 right)"));
+        list->AddText(ImVec2(at.x, at.y + dp(2.0f)), hovered ? p.text : p.textDim, text.c_str());
+        ImGui::PopFont();
+        ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 0.7f);
+        const auto bus = studio_.isBusTrack(track);
+        const auto* kind = track.midi ? "MIDI" : bus ? "BUS" : "AUDIO";
+        const auto kindWidth = ImGui::CalcTextSize(kind).x;
+        list->AddText(ImVec2(origin.x + width - kindWidth - dp(6.0f), at.y + dp(3.0f)), track.midi ? p.midi : bus ? p.accent : p.audio,
+                      kind);
+        ImGui::PopFont();
+    }
 
     // Fader and meter, as tall as the strip lets them.
     const auto faderTop = origin.y + dp(kFaderTop);
@@ -137,13 +200,7 @@ void mixer_strip::track(Studio& studio_, UiState& state_, const TrackRef& track,
     ImGui::SetCursorScreenPos(ImVec2(left + dp(kFaderWidth + 6.0f), faderTop + dp(7.0f)));
     ui::meter("##meter", ImVec2(dp(kMeterWidth), faderHeight - dp(14.0f)), meterState.peak[0], meterState.peak[1],
               meterState.rms[0], meterState.rms[1], true);
-    ImGui::PushFont(theme::monoFont(), ImGui::GetStyle().FontSizeBase * 0.78f);
-    {
-        const auto text = gainText(mix.gainDb);
-        const auto textWidth = ImGui::CalcTextSize(text.c_str()).x;
-        list->AddText(ImVec2(origin.x + (width - textWidth) * 0.5f, faderTop + faderHeight + dp(1.0f)), p.textDim, text.c_str());
-    }
-    ImGui::PopFont();
+    changed |= gainEntry(list, origin, width, faderTop + faderHeight, mix.gainDb);
 
     // Where it goes: a click edits its outputs and sends.
     {
@@ -233,13 +290,8 @@ void mixer_strip::master(Studio& studio_, UiState& state_, const float width, co
     ImGui::SetCursorScreenPos(ImVec2(left + dp(kFaderWidth + 6.0f), faderTop + dp(7.0f)));
     ui::meter("##masterMeter", ImVec2(dp(kMeterWidth), faderHeight - dp(14.0f)), meter.peak[0], meter.peak[1], meter.rms[0],
               meter.rms[1], true);
-    ImGui::PushFont(theme::monoFont(), ImGui::GetStyle().FontSizeBase * 0.78f);
-    {
-        const auto text = gainText(gain);
-        const auto textWidth = ImGui::CalcTextSize(text.c_str()).x;
-        list->AddText(ImVec2(origin.x + (width - textWidth) * 0.5f, faderTop + faderHeight + dp(1.0f)), p.textDim, text.c_str());
-    }
-    ImGui::PopFont();
+    if (gainEntry(list, origin, width, faderTop + faderHeight, gain))
+        engine.setMasterGain(gain);
     // Mute: the whole mix silenced, its level kept.
     ImGui::SetCursorScreenPos(ImVec2(origin.x + dp(5.0f), origin.y + height - buttonsHeight + dp(16.0f)));
     ImGui::PushFont(theme::boldFont(), ImGui::GetStyle().FontSizeBase * 0.78f);

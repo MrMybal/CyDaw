@@ -729,6 +729,21 @@ public:
                                            std::min(20'000.0, rate_ * 0.45));
             const auto coefficients = MultiFilter::coefficients(filterKind, cutoff, std::clamp(v(fResonance) + mods[dstResonance], 0.0, 1.0), rate_,
                                                                 filters_[0].combSize());
+            showLfo(0, lfo[0], lfoPhases_[0]);
+            showLfo(1, lfo[1], lfoPhases_[1]);
+            showEnvelope(0, ampLevel);
+            showEnvelope(1, env2Level);
+            for (std::size_t index = 0; index < 2; ++index) {
+                const auto base = bases[index];
+                const auto& shape = shapes_[index];
+                show(base + lLevel, shape.level, v(base + lLevel));
+                show(base + lTimbre, shape.timbre, v(base + lTimbre));
+                if (!shape.granular)
+                    show(base + lPosition, shape.position, v(base + lPosition));
+                show(base + lHarmoniaLevel, shape.chordLevel, v(base + lHarmoniaLevel));
+            }
+            show(fCutoff, cutoff, v(fCutoff));
+            show(fResonance, std::clamp(v(fResonance) + mods[dstResonance], 0.0, 1.0), v(fResonance));
             const auto pan = std::clamp(mods[dstPan], -1.0, 1.0);
             const std::array<double, 2> panGains { std::min(1.0, 1.0 - pan), std::min(1.0, 1.0 + pan) };
             const auto level = ampLevel * velocityLevel * master * std::clamp(1.0 + mods[dstVolume], 0.0, 2.0) * expressionGain * 0.5;

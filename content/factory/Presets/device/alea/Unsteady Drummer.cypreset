@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "alea",
+ "name": "Unsteady Drummer",
+ "state": {
+  "type": "alea",
+  "parameters": {
+   "alea.timing": 35.0,
+   "alea.velocity": 0.3,
+   "alea.chance": 1.0,
+   "alea.pitchChance": 0.0,
+   "alea.pitchRange": 0.0
+  }
+ }
+}

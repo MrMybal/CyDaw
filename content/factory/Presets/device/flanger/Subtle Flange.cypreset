@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "flanger",
+ "name": "Subtle Flange",
+ "state": {
+  "type": "flanger",
+  "parameters": {
+   "flanger.rate": 0.25,
+   "flanger.depth": 0.4,
+   "flanger.delay": 1.2,
+   "flanger.feedback": 0.3,
+   "flanger.mix": 0.35
+  }
+ }
+}

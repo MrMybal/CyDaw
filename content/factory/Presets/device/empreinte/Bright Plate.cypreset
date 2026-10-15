@@ -1,0 +1,23 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "empreinte",
+ "name": "Bright Plate",
+ "state": {
+  "type": "empreinte",
+  "parameters": {
+   "empreinte.mix": 0.25,
+   "empreinte.predelay": 12.0,
+   "empreinte.lowCut": 150.0,
+   "empreinte.highCut": 20000.0,
+   "empreinte.width": 1.0,
+   "empreinte.early": 0.0,
+   "empreinte.tail": 0.0,
+   "empreinte.output": 0.0,
+   "empreinte.space": 5.0,
+   "empreinte.length": 1.0,
+   "empreinte.reverse": 0.0
+  }
+ }
+}

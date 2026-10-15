@@ -1,0 +1,24 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "fournaise",
+ "name": "Class A Vocal",
+ "state": {
+  "type": "fournaise",
+  "parameters": {
+   "fournaise.drive": 3.5,
+   "fournaise.tone": 0.0,
+   "fournaise.lowCut": 80.0,
+   "fournaise.highCut": 20000.0,
+   "fournaise.mix": 1.0,
+   "fournaise.output": 0.0,
+   "fournaise.style": 2.0,
+   "fournaise.punish": 0.0,
+   "fournaise.auto": 1.0,
+   "fournaise.thump": 0.0,
+   "fournaise.steep": 0.0,
+   "fournaise.oversampling": 1.0
+  }
+ }
+}

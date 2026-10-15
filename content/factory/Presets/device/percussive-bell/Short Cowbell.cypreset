@@ -1,0 +1,28 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "percussive-bell",
+ "name": "Short Cowbell",
+ "state": {
+  "type": "percussive-bell",
+  "parameters": {
+   "node.40002.voice.mode": 0.0,
+   "node.40002.voice.glide": 0.0,
+   "node.40003.polyOscillator.waveform": 3.0,
+   "node.40003.polyOscillator.level": 0.09,
+   "node.40004.envelope.attack": 1.0,
+   "node.40004.envelope.decay": 160.0,
+   "node.40004.envelope.sustain": 0.0,
+   "node.40004.envelope.release": 120.0,
+   "node.40005.gain.db": 0.0,
+   "node.40006.voiceFilter.cutoff": 4200.0,
+   "node.40006.voiceFilter.resonance": 4.5,
+   "node.40007.delay.time": 200.0,
+   "node.40007.delay.feedback": 0.1,
+   "node.40007.delay.mix": 0.05,
+   "node.40008.reverb.roomSize": 0.5,
+   "node.40008.reverb.mix": 0.12
+  }
+ }
+}

@@ -1,0 +1,28 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "patine",
+ "name": "Distant Old Ballroom",
+ "state": {
+  "type": "patine",
+  "parameters": {
+   "patine.noise": 0.55,
+   "patine.wobble": 0.3,
+   "patine.distort": 0.2,
+   "patine.digital": 0.0,
+   "patine.space": 0.6,
+   "patine.magnetic": 0.3,
+   "patine.magnitude": 1.0,
+   "patine.mix": 1.0,
+   "patine.noiseType": 0.0,
+   "patine.wobbleRate": 0.2,
+   "patine.distortType": 0.0,
+   "patine.spaceSize": 0.8,
+   "patine.tone": -0.5,
+   "patine.width": 0.6,
+   "patine.output": 0.0,
+   "patine.noiseFollow": 0.0
+  }
+ }
+}

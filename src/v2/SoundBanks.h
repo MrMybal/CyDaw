@@ -10,6 +10,7 @@
 #include <mutex>
 #include <optional>
 #include <set>
+#include <thread>
 #include <vector>
 
 // The sound banks CyDAW knows and what of them is on this machine. CyDAW
@@ -114,6 +115,12 @@ public:
     // with it, the disk asked now (before a download).
     [[nodiscard]] Missing missingFor(const juce::var& mapJson, bool exact = false);
     [[nodiscard]] Missing missingForFile(const juce::File& mapFile, bool exact = false);
+    // Maps read ahead on a thread of their own (the factory's are 26 MB of
+    // zones): until one is, missingForFile says it `pending` rather than
+    // reading it on the caller's thread.
+    void preloadMaps(std::vector<juce::File> maps);
+    // Moves on when what is on disk may have changed (a download, a count).
+    [[nodiscard]] int diskGeneration() const noexcept { return diskGeneration_; }
     [[nodiscard]] Missing missingOfBank(const juce::String& id);
 
     // Downloads what is missing (and each bank's licence and readme), as one
@@ -191,6 +198,27 @@ private:
         Missing missing;
     };
     std::map<juce::String, MapFiles> maps_;
+    // What the preloading thread read: each map's "bank:" paths and the stamp
+    // they were read at; the maps it still has to read.
+    struct Preloaded {
+        juce::int64 stamp {};
+        std::vector<juce::String> paths;
+    };
+    std::mutex preloadLock_;
+    std::map<juce::String, Preloaded> preloaded_;
+    std::set<juce::String> preloadWaiting_;
+    // The banks' file lists read ahead the same way (some are thousands of
+    // files), and those it still has to read.
+    struct PreloadedList {
+        std::vector<BankFile> files;
+        std::map<juce::String, std::size_t> index;
+    };
+    std::map<juce::String, PreloadedList> preloadedLists_;
+    std::set<juce::String> listsWaiting_;
+    [[nodiscard]] static PreloadedList readList(const juce::File& list);
+    std::thread preloader_;
+    std::atomic<bool> stopPreload_ {};
+    [[nodiscard]] static std::vector<juce::String> pathsOfMap(const juce::var& mapJson);
     int diskGeneration_ {};
 
     mutable std::mutex mutex_;

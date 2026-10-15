@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "string",
+ "name": "Bright Koto",
+ "state": {
+  "type": "string",
+  "parameters": {
+   "string.frequency": 220.0,
+   "string.damping": 0.1,
+   "string.decay": 2.0
+  }
+ }
+}

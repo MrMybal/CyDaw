@@ -176,13 +176,67 @@ bool eqHandle(std::vector<Param>& parameters, const Pane& pane, const Box& plot,
         if (db != nullptr)
             changed |= apply(db, (((plot.min.y + plot.max.y) * 0.5f - mouse.y) / (plot.height() * 0.5f)) * range, set);
     }
+    // Double-click: a band flat again, a cut out of the way.
+    if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+        changed |= db != nullptr ? apply(db, 0.0, set) : apply(hz, hz->defaultValue, set);
     if (ImGui::IsItemHovered() && !active)
-        ImGui::SetTooltip("%s", L("Glissez : fréquence de côté, gain de haut en bas. Clic droit : ses réglages.",
-                                  "Drag: frequency sideways, gain up and down. Right click: its settings."));
+        ImGui::SetTooltip("%s", db != nullptr ? L("Glissez : fréquence de côté, gain de haut en bas. Double-clic : à plat. Clic droit : ses réglages.",
+                                                  "Drag: frequency sideways, gain up and down. Double click: flat. Right click: its settings.")
+                                              : L("Glissez : sa fréquence. Double-clic : hors de la bande. Clic droit : ses réglages.",
+                                                  "Drag: its frequency. Double click: out of the way. Right click: its settings."));
     if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
         openParameterMenu(*hz);
     ImGui::PopID();
     handleDot(list, centre, colour, active || ImGui::IsItemHovered(), label);
+    return changed;
+}
+
+// Tranche's equaliser: a double-click in its curve puts a band there. At
+// the far ends, a cut; elsewhere the band that suits that place best among
+// those still flat (a shelf toward the ends, a bell in between), else the
+// nearest. The equaliser is switched on if it was off.
+bool placeTrancheBand(std::vector<Param>& parameters, const Pane& pane, const Box& plot, const double range, const ImVec2 mouse,
+                      const Setter& set)
+{
+    const auto hz = hzOfX(plot, mouse.x);
+    const auto db = std::clamp((((plot.min.y + plot.max.y) * 0.5f - mouse.y) / (plot.height() * 0.5f)) * range, -range, range);
+    auto changed = false;
+    if (auto* on = at(parameters, pane, suited::trancheEqOn); on != nullptr && on->value < 0.5)
+        changed |= apply(on, 1.0, set);
+    if (hz < 40.0)
+        return apply(at(parameters, pane, suited::trancheLowCut), hz, set) || changed;
+    if (hz > 15'000.0)
+        return apply(at(parameters, pane, suited::trancheHighCut), hz, set) || changed;
+    struct Band {
+        int hz;
+        int db;
+        double below; // a shelf suits below this frequency (low) ...
+        double above; // ... or above this one (high); a bell anywhere
+    };
+    const std::array<Band, 4> bands { { { suited::trancheLowShelfHz, suited::trancheLowShelfDb, 220.0, 0.0 },
+                                        { suited::trancheBell1Hz, suited::trancheBell1Db, 0.0, 0.0 },
+                                        { suited::trancheBell2Hz, suited::trancheBell2Db, 0.0, 0.0 },
+                                        { suited::trancheHighShelfHz, suited::trancheHighShelfDb, 0.0, 5'000.0 } } };
+    const Band* best {};
+    auto bestScore = 1.0e9;
+    for (const auto& band : bands) {
+        auto* frequency = at(parameters, pane, band.hz);
+        auto* gain = at(parameters, pane, band.db);
+        if (frequency == nullptr || gain == nullptr)
+            continue;
+        const auto shelf = band.below > 0.0 || band.above > 0.0;
+        const auto suits = !shelf || (band.below > 0.0 && hz < band.below) || (band.above > 0.0 && hz > band.above);
+        const auto score = (std::abs(gain->value) < 0.05 ? 0.0 : 100.0) + (suits ? 0.0 : 50.0)
+                           + std::abs(std::log2(std::max(1.0, frequency->value) / hz));
+        if (score < bestScore) {
+            bestScore = score;
+            best = &band;
+        }
+    }
+    if (best == nullptr)
+        return changed;
+    changed |= apply(at(parameters, pane, best->hz), hz, set);
+    changed |= apply(at(parameters, pane, best->db), db, set);
     return changed;
 }
 
@@ -219,6 +273,17 @@ bool trancheDisplay(std::vector<Param>& parameters, const Pane& pane, const Box&
     const auto points = curveOver(plot, range, [&](const double hz) { return eqOn ? suited::trancheEqDb(sections, hz, kCurveRate) : 0.0; });
     fillUnder(list, points, (plot.min.y + plot.max.y) * 0.5f, theme::alpha(colour, eqOn ? 0.16f : 0.05f));
     list->AddPolyline(points.data(), static_cast<int>(points.size()), eqOn ? colour : theme::alpha(colour, 0.4f), dp(large ? 2.2f : 1.5f));
+    if (large) {
+        // Under the handles: a double-click in the curve puts a band there.
+        ImGui::SetCursorScreenPos(plot.min);
+        ImGui::SetNextItemAllowOverlap();
+        ImGui::InvisibleButton("##trancheCurve", ImVec2(std::max(1.0f, plot.width()), std::max(1.0f, plot.height())));
+        if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+            changed |= placeTrancheBand(parameters, pane, plot, range, ImGui::GetIO().MousePos, set);
+        else if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", L("Double-clic : une bande à cet endroit (les poignées se glissent)",
+                                      "Double click: a band here (the handles can be dragged)"));
+    }
     if (large && eqOn) {
         changed |= eqHandle(parameters, pane, plot, range, suited::trancheLowCut, -1, "C", p.textDim, set, 1);
         changed |= eqHandle(parameters, pane, plot, range, suited::trancheLowShelfHz, suited::trancheLowShelfDb, "G", colour, set, 2);

@@ -1,0 +1,40 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "kick-synth",
+ "name": "Gabber Overload Stomp",
+ "state": {
+  "type": "kick-synth",
+  "parameters": {
+   "kick.bodyShape": 3.0,
+   "kick.bodyPhase": 0.0,
+   "kick.pitchStart": 1100.0,
+   "kick.pitchEnd": 61.70000076293945,
+   "kick.pitchTime": 90.0,
+   "kick.pitchCurve": 4.0,
+   "kick.bodyLevel": 0.0,
+   "kick.attack": 0.0,
+   "kick.hold": 180.0,
+   "kick.decay": 420.0,
+   "kick.decayCurve": 1.0,
+   "kick.length": 700.0,
+   "kick.clickType": 2.0,
+   "kick.clickLevel": -4.0,
+   "kick.clickDecay": 2.0,
+   "kick.clickTone": 5000.0,
+   "kick.subLevel": -60.0,
+   "kick.subDecay": 600.0,
+   "kick.subOctave": 0.0,
+   "kick.driveType": 1.0,
+   "kick.drive": 32.0,
+   "kick.driveTone": 3200.0,
+   "kick.lowCut": 45.0,
+   "kick.highCut": 9000.0,
+   "kick.lowBoost": 3.0,
+   "kick.keyTrack": 1.0,
+   "kick.velocity": 0.0,
+   "kick.output": -9.119999885559082
+  }
+ }
+}

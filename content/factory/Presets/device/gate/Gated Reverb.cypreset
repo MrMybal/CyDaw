@@ -1,0 +1,16 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "gate",
+ "name": "Gated Reverb",
+ "state": {
+  "type": "gate",
+  "parameters": {
+   "gate.threshold": -24.0,
+   "gate.attack": 0.5,
+   "gate.release": 40.0,
+   "gate.range": -80.0
+  }
+ }
+}

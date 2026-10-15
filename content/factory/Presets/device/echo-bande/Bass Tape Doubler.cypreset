@@ -1,0 +1,25 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "echo-bande",
+ "name": "Bass Tape Doubler",
+ "state": {
+  "type": "echo-bande",
+  "parameters": {
+   "echoband.time": 45.0,
+   "echoband.intensity": 0.0,
+   "echoband.echo": 0.5,
+   "echoband.reverb": 0.0,
+   "echoband.bass": -12.0,
+   "echoband.treble": 0.0,
+   "echoband.wow": 0.1,
+   "echoband.mix": 0.3,
+   "echoband.mode": 0.0,
+   "echoband.sync": 0.0,
+   "echoband.drive": 6.0,
+   "echoband.age": 0.2,
+   "echoband.width": 0.5
+  }
+ }
+}

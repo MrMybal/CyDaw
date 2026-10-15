@@ -57,6 +57,7 @@ static const juce::Identifier buses("buses");
 static const juce::Identifier category("category");
 static const juce::Identifier channels("channels");
 static const juce::Identifier clipThreshold("clipThreshold");
+static const juce::Identifier bypassed("bypassed");
 static const juce::Identifier collapsed("collapsed");
 static const juce::Identifier colour("colour");
 static const juce::Identifier comments("comments");
@@ -1624,6 +1625,21 @@ double nativeParameterValue(const cydaw::engine::NativeDspNodeParameters& parame
     return 0.0;
 }
 
+// A card's published settings named as `fresh` names them (a card saved
+// with its settings named in French reads them in English again).
+void relabelPublishedParameters(ModuleInterfaceState& state, const ModuleInterfaceState& fresh)
+{
+    std::map<juce::String, juce::String> labels;
+    for (const auto& made : fresh.parameters)
+        labels.emplace(made.key, made.label);
+    for (auto& parameter : state.parameters)
+        if (const auto found = labels.find(parameter.key); found != labels.end() && parameter.label != found->second) {
+            if (parameter.description == parameter.label)
+                parameter.description = found->second;
+            parameter.label = found->second;
+        }
+}
+
 void appendPublishedParameters(
     ModuleInterfaceState& state,
     const juce::String& typeKey,
@@ -1650,7 +1666,12 @@ void appendPublishedParameters(
         for (const auto& item : effect->parameters)
             if (!item.key.empty())
                 add(juce::String(std::string(item.suffix)),
-                    item.band >= 0 ? tr(effect->typeKey == "filter-pro" ? "effect.parameter.filterUnit" : "effect.parameter.band") + " "
+                    item.band >= 0 ? tr(effect->typeKey == "filter-pro"    ? "effect.parameter.filterUnit"
+                                        : effect->typeKey == "pompe"       ? "effect.parameter.pointWord"
+                                        : effect->typeKey == "resonateurs" ? "effect.parameter.resonatorWord"
+                                        : effect->typeKey == "accords"     ? "effect.parameter.noteWord"
+                                        : effect->typeKey == "sequenceur"  ? "effect.parameter.stepWord"
+                                                                           : "effect.parameter.band") + " "
                                          + juce::String(item.band + 1) + juce::String::fromUTF8(" \xc2\xb7 ")
                                          + tr(juce::String(std::string(item.labelKey)))
                                    : tr(juce::String(std::string(item.labelKey))),
@@ -1682,16 +1703,19 @@ void appendPublishedParameters(
     }
     else if (typeKey == "prism-synth") {
         // Every setting: the card's own panel shows them its way; a host and
-        // the workshop list them all, named by their section.
-        const auto french = Localization::instance().languageCode() == "fr";
+        // the workshop list them all, named by their section (in English,
+        // whatever the language: a module's settings).
         // (A drawn LFO's points are drawn in Prisme's window, not listed: they
-        // are kept with the card all the same.)
-        for (int index = 0; index < cydaw::engine::prism::drawBase(0); ++index) {
+        // are kept with the card all the same. The third oscillator, the
+        // spectral morphs and the LFOs' stereo come after them.)
+        for (int index = 0; index < cydaw::engine::prism::parameterCount; ++index) {
+            if (index == cydaw::engine::prism::drawBase(0))
+                index = cydaw::engine::prism::oscCBase;
             const auto& setting = cydaw::engine::prism::parameter(index);
             const auto section = juce::String(setting.key).upToFirstOccurrenceOf(".", false, false);
             const auto label = (setting.group == cydaw::engine::prism::Group::macro ? juce::String()
                                                                                     : section.toUpperCase() + " · ")
-                               + juce::String::fromUTF8((french ? setting.french : setting.english).c_str());
+                               + juce::String::fromUTF8(setting.english.c_str());
             add("prism." + juce::String(setting.key), label, juce::String::fromUTF8(setting.unit.c_str()), setting.minimum,
                 setting.maximum, parameters.prism[static_cast<std::size_t>(index)]);
             // A host takes 32 at most: the ones a performance moves are
@@ -1706,31 +1730,29 @@ void appendPublishedParameters(
         }
     }
     else if (typeKey == "kick-synth") {
-        // Every setting, named by its section; all of them fit a host.
-        const auto french = Localization::instance().languageCode() == "fr";
+        // Every setting, named by its section (in English); all of them fit a host.
         for (int index = 0; index < cydaw::engine::kick::parameterCount; ++index) {
             const auto& setting = cydaw::engine::kick::parameter(index);
             using Group = cydaw::engine::kick::Group;
             const char* section = "";
             switch (setting.group) {
-            case Group::body: section = french ? "CORPS" : "BODY"; break;
+            case Group::body: section = "BODY"; break;
             case Group::amplitude: section = "AMPLITUDE"; break;
-            case Group::click: section = french ? "CLIC" : "CLICK"; break;
+            case Group::click: section = "CLICK"; break;
             case Group::sub: section = "SUB"; break;
-            case Group::drive: section = french ? "SATURATION" : "DRIVE"; break;
-            case Group::tone: section = french ? "TIMBRE" : "TONE"; break;
+            case Group::drive: section = "DRIVE"; break;
+            case Group::tone: section = "TONE"; break;
             case Group::global: section = ""; break;
             }
             const auto label = (juce::String(section).isEmpty() ? juce::String() : juce::String(section) + " · ")
-                               + juce::String::fromUTF8((french ? setting.french : setting.english).c_str());
+                               + juce::String::fromUTF8(setting.english.c_str());
             add("kick." + juce::String(setting.key), label, juce::String::fromUTF8(setting.unit.c_str()), setting.minimum,
                 setting.maximum, parameters.kick[static_cast<std::size_t>(index)]);
         }
     }
     else if (const auto model = cydaw::engine::synth::modelForType(typeKey.toStdString()); model != cydaw::engine::synth::Model::none) {
-        // A synth of the family: every setting named by its section; the ones
-        // a performance moves offered to a host (32 at most).
-        const auto french = Localization::instance().languageCode() == "fr";
+        // A synth of the family: every setting named by its section (in
+        // English); the ones a performance moves offered to a host (32 at most).
         const auto& info = cydaw::engine::synth::info(model);
         const auto prefix = juce::String(info.prefix) + ".";
         static const std::set<std::string> performed { "voice.glide", "voice.master", "filter.cutoff", "filter.resonance", "filter.env",
@@ -1741,10 +1763,10 @@ void appendPublishedParameters(
             const auto& setting = cydaw::engine::synth::parameter(model, index);
             const auto& section = info.sections[static_cast<std::size_t>(
                 std::clamp(setting.section, 0, std::max(0, static_cast<int>(info.sections.size()) - 1)))];
-            const auto name = juce::String::fromUTF8((french ? setting.french : setting.english).c_str());
+            const auto name = juce::String::fromUTF8(setting.english.c_str());
             const auto label = setting.section == 0 || name.contains(juce::String::fromUTF8("\xc2\xb7"))
                                    ? name
-                                   : juce::String::fromUTF8((french ? section.french : section.english).c_str()) + juce::String::fromUTF8(" \xc2\xb7 ") + name;
+                                   : juce::String::fromUTF8(section.english.c_str()) + juce::String::fromUTF8(" \xc2\xb7 ") + name;
             add(prefix + juce::String(setting.key), label, juce::String::fromUTF8(setting.unit.c_str()), setting.minimum, setting.maximum,
                 parameters.synth[static_cast<std::size_t>(index)]);
             const auto offered = performed.contains(setting.key);
@@ -1766,11 +1788,18 @@ void appendPublishedParameters(
             add(juce::String(std::string(setting.suffix)), tr(juce::String(std::string(setting.labelKey))),
                 juce::String(std::string(setting.unit)), setting.minimum, setting.maximum,
                 parameters.sampler[index]);
-            // The articulation is chosen by its name (the controls' tab), not on a knob.
-            if (index == static_cast<std::size_t>(cydaw::engine::SamplerSetting::articulation)) {
+            // The articulation is chosen by its name (the controls' tab), not on a
+            // knob; the simple card is what the card is, not a setting to play.
+            if (index == static_cast<std::size_t>(cydaw::engine::SamplerSetting::articulation)
+                || index == static_cast<std::size_t>(cydaw::engine::SamplerSetting::simple)
+                || index == static_cast<std::size_t>(cydaw::engine::SamplerSetting::grains)) {
                 state.parameters.back().publishToHost = false;
                 state.parameters.back().showInDevice = false;
             }
+            // The grains' settings are on the card's own pane (its waveform),
+            // shown when it plays grains.
+            if (index > static_cast<std::size_t>(cydaw::engine::SamplerSetting::grains))
+                state.parameters.back().showInDevice = false;
         }
         // The controls its map has (an SFZ's microphones, blends, pedal),
         // 0..127: automated and set by name, not on the card's face.
@@ -4837,6 +4866,8 @@ juce::var NodeGraphComponent::serialise() const
         value->setProperty(jsonKeys::interfaceLayoutOverridden,
                            node.interfaceLayoutOverridden);
         value->setProperty(jsonKeys::collapsed, node.collapsed);
+        if (node.bypassed)
+            value->setProperty(jsonKeys::bypassed, true);
         if (node.wavetableShape != nullptr) {
             juce::Array<juce::var> harmonics;
             harmonics.ensureStorageAllocated(
@@ -5006,6 +5037,102 @@ juce::var NodeGraphComponent::serialise() const
 }
 
 cydaw::engine::NativeDspGraph NodeGraphComponent::nativeDspGraph() const
+{
+    auto graph = exportedNativeGraph();
+    if (std::none_of(nodes_.begin(), nodes_.end(), [](const Node& node) { return node.bypassed; }))
+        return graph;
+    // A card switched off: its last node gives out what its first one
+    // received; an instrument, silence. A module's other exits fall silent
+    // (they would add the same sound again).
+    const auto spans = nativeSpansOf(graph);
+    const auto voice = instrumentVoiceBoundary();
+    auto voiceSilenced = false;
+    for (const auto& node : nodes_) {
+        if (!node.bypassed)
+            continue;
+        // A card of the instrument's voice: the voice falls silent where it
+        // enters the effects.
+        if (voice.voiceNodes.contains(node.id)) {
+            if (!voiceSilenced)
+                graph.bypasses.push_back({ voice.outputNodeId, 0 });
+            voiceSilenced = true;
+            continue;
+        }
+        const auto span = spans.find(node.id);
+        if (span == spans.end() || span->second.exits.empty())
+            continue;
+        const auto from = span->second.instrument || span->second.entries.empty() ? std::uint64_t {} : span->second.entries.front();
+        graph.bypasses.push_back({ span->second.exits.front(), from });
+        for (std::size_t exit = 1; exit < span->second.exits.size(); ++exit)
+            graph.bypasses.push_back({ span->second.exits[exit], 0 });
+    }
+    return graph;
+}
+
+std::map<std::uint64_t, NodeGraphComponent::EditorNativeSpan> NodeGraphComponent::nativeSpansOf(
+    const cydaw::engine::NativeDspGraph& native) const
+{
+    using Kind = cydaw::engine::NativeDspNodeKind;
+    std::map<std::uint64_t, EditorNativeSpan> spans;
+    std::map<std::uint64_t, Kind> audioNodes;
+    for (const auto& node : native.nodes)
+        if (!isControlOnlyNativeKind(node.kind))
+            audioNodes.emplace(node.id, node.kind);
+    for (const auto& card : nodes_) {
+        // The graph's own inputs and outputs are not devices; the ids the
+        // compiler generates for them can even be a boundary card's.
+        if (isBoundaryNode(card))
+            continue;
+        std::set<std::uint64_t> members;
+        auto instrument = false;
+        if (const auto found = audioNodes.find(card.id); found != audioNodes.end()) {
+            if (found->second == Kind::output)
+                continue;
+            // An instrument stands in as the effect chain's input.
+            instrument = found->second == Kind::input;
+            members.insert(card.id);
+        }
+        if (exportCache_.has_value()) {
+            const auto prefix = "node." + juce::String(static_cast<juce::int64>(card.id)) + ".";
+            for (const auto& parameter : exportCache_->publishedParameters)
+                if (juce::String(parameter.key).startsWith(prefix) && audioNodes.contains(parameter.targetNodeId)
+                    && audioNodes.at(parameter.targetNodeId) != Kind::input
+                    && audioNodes.at(parameter.targetNodeId) != Kind::output)
+                    members.insert(parameter.targetNodeId);
+        }
+        if (members.empty())
+            continue;
+        EditorNativeSpan span;
+        span.instrument = instrument;
+        for (const auto member : members) {
+            auto fed = false;
+            auto feeds = false;
+            for (const auto& connection : native.connections) {
+                if (connection.destination == member && members.contains(connection.source))
+                    fed = true;
+                if (connection.source == member && members.contains(connection.destination))
+                    feeds = true;
+            }
+            if (!fed)
+                span.entries.push_back(member);
+            if (!feeds)
+                span.exits.push_back(member);
+        }
+        // A module's side paths are passthroughs; its sound runs through
+        // the processors, so those come first.
+        const auto processorFirst = [&audioNodes](std::vector<std::uint64_t>& ids) {
+            std::stable_partition(ids.begin(), ids.end(), [&audioNodes](const std::uint64_t id) {
+                return audioNodes.at(id) != Kind::passthrough;
+            });
+        };
+        processorFirst(span.entries);
+        processorFirst(span.exits);
+        spans.emplace(card.id, std::move(span));
+    }
+    return spans;
+}
+
+cydaw::engine::NativeDspGraph NodeGraphComponent::exportedNativeGraph() const
 {
     const auto signature = structuralSignature();
     if (exportCache_.has_value() && exportCacheSignature_ == signature) {
@@ -5370,8 +5497,10 @@ cydaw::engine::NativeDspGraph NodeGraphComponent::buildNativeDspGraph(
         if (typeKey == "reverb-rack") return Kind::reverbRack;
         if (typeKey == "vocal-strip") return Kind::vocalStrip;
         if (typeKey == "mixer-4") return Kind::mixer;
+        // A MIDI effect has no sound to process: the instrument's plan
+        // carries it (PolySynthGraphPlan::midiEffects).
         if (const auto* effect = cydaw::engine::effectForType(typeKey.toStdString()))
-            return effect->kind;
+            return effect->midi ? Kind::passthrough : effect->kind;
         return Kind::passthrough;
     };
 
@@ -6000,6 +6129,9 @@ juce::Result NodeGraphComponent::compilePolySynthGraph(
         for (int index = 0; index < cydaw::engine::synth::parameterCount(familyModel); ++index)
             destination.synthValues[static_cast<std::size_t>(index)] = cydaw::engine::synth::clampValue(
                 familyModel, index, oscillator->parameters.synth[static_cast<std::size_t>(index)]);
+    } else if (oscillator->typeKey == "drum-rack") {
+        // A rack: its pads play (the track's engine), its voices nothing.
+        destination.waveform = Waveform::rack;
     } else if (oscillator == stringVoice && stringVoice != nullptr) {
         destination.waveform = Waveform::string;
         destination.stringDamping = juce::jlimit(
@@ -6037,6 +6169,43 @@ juce::Result NodeGraphComponent::compilePolySynthGraph(
                 static_cast<int>(std::lround(node.parameters.midiMaximumNote)));
         } else if (node.typeKey == "velocity-map") {
             destination.velocityScale *= node.parameters.midiVelocityScale;
+        }
+    }
+    // The MIDI effects on the way, in the order the notes meet them (by
+    // their number of cables from the input).
+    {
+        const auto distance = [&](const NodeId destinationId) {
+            std::vector<std::pair<NodeId, int>> pending { { midiInput->id, 0 } };
+            std::set<NodeId> visited;
+            for (std::size_t at = 0; at < pending.size(); ++at) {
+                const auto [current, steps] = pending[at];
+                if (current == destinationId)
+                    return steps;
+                if (!visited.insert(current).second)
+                    continue;
+                for (const auto& connection : flatConnections)
+                    if (connection.source == current)
+                        pending.emplace_back(connection.destination, steps + 1);
+            }
+            return 1'000'000;
+        };
+        std::vector<std::pair<int, const FlatNode*>> chain;
+        for (const auto& node : flatNodes)
+            if (cydaw::engine::isMidiEffectType(node.typeKey.toStdString()) && reaches(midiInput->id, node.id)
+                && reaches(node.id, allocator->id))
+                chain.emplace_back(distance(node.id), &node);
+        std::stable_sort(chain.begin(), chain.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+        destination.midiEffects.reset();
+        if (!chain.empty()) {
+            auto effects = std::make_shared<cydaw::engine::MidiEffectsPlan>();
+            for (const auto& [steps, node] : chain) {
+                if (effects->count >= cydaw::engine::midiEffectMost)
+                    break;
+                const auto* effect = cydaw::engine::effectForType(node->typeKey.toStdString());
+                effects->effects[effects->count++] = effect != nullptr ? cydaw::engine::midiEffectSettingsOf(*effect, node->parameters)
+                                                                       : cydaw::engine::legacyArpeggiatorSettings(0.25, 1.0);
+            }
+            destination.midiEffects = std::move(effects);
         }
     }
     destination.transposeSemitones = juce::jlimit(
@@ -6775,6 +6944,10 @@ void NodeGraphComponent::restore(const juce::var& state)
                 interfaceValue.getDynamicObject() != nullptr
                     ? restoreModuleInterface(interfaceValue)
                     : createNodeInterface(restoredNode);
+            // A native card's settings are named in English, whatever the
+            // language they were saved in.
+            if (interfaceValue.getDynamicObject() != nullptr && findModule(restoredNode.typeKey) == nullptr)
+                relabelPublishedParameters(restoredNode.interfaceState, createNodeInterface(restoredNode));
             // The interface's values are what they were when the file was
             // written; the native parameters are what the card holds, and
             // a file may tune those alone. The graph's published list reads
@@ -6790,6 +6963,7 @@ void NodeGraphComponent::restore(const juce::var& state)
                     "interfaceLayoutOverridden"));
             restoredNode.collapsed = schemaVersion >= 24
                 && static_cast<bool>(object->getProperty(jsonKeys::collapsed));
+            restoredNode.bypassed = static_cast<bool>(object->getProperty(jsonKeys::bypassed));
             if (schemaVersion >= 29)
                 if (const auto* harmonics
                     = object->getProperty(jsonKeys::wavetable).getArray())
@@ -7724,6 +7898,237 @@ NodeGraphComponent::factoryPresetSummaries() const
     return summaries;
 }
 
+juce::Result NodeGraphComponent::replaceInstrument(const juce::String& presetKey)
+{
+    const auto preset = std::find_if(factoryPresets_.begin(), factoryPresets_.end(),
+                                     [&presetKey](const auto& candidate) { return candidate.key == presetKey; });
+    if (preset == factoryPresets_.end())
+        return juce::Result::fail("Unknown instrument preset: " + presetKey);
+    // A voice section's place, by what its node does: 0 allocator, 1 source,
+    // 2 envelope, 3 gain, 4 voice filter.
+    const auto roleOfType = [](const juce::String& typeKey) {
+        const auto key = primitiveProcessorKeyForType(typeKey);
+        if (key == "core.voice-allocator")
+            return 0;
+        if (cydaw::graph::isPolyphonicVoiceSource(key.toStdString()))
+            return 1;
+        if (key == "core.adsr")
+            return 2;
+        if (key == "core.gain")
+            return 3;
+        if (key == "core.lowpass")
+            return 4;
+        return -1;
+    };
+    // The preset's own way in (its MIDI input into its allocator) and out
+    // (the node that feeds its master).
+    std::optional<std::size_t> presetMidi, presetMaster, presetAllocator, presetOut;
+    cydaw::graph::PortId presetInPort {}, presetOutPort {}, presetMasterPort {};
+    for (std::size_t index = 0; index < preset->nodes.size(); ++index) {
+        const auto& typeKey = preset->nodes[index].typeKey;
+        if (typeKey == "midi-input")
+            presetMidi = index;
+        else if (typeKey == "master")
+            presetMaster = index;
+        else if (!presetAllocator && roleOfType(typeKey) == 0)
+            presetAllocator = index;
+    }
+    for (const auto& connection : preset->connections) {
+        if (presetMaster && connection.destinationIndex == *presetMaster) {
+            presetOut = connection.sourceIndex;
+            presetOutPort = connection.sourcePort;
+            presetMasterPort = connection.destinationPort;
+        }
+        if (presetMidi && presetAllocator && connection.sourceIndex == *presetMidi && connection.destinationIndex == *presetAllocator)
+            presetInPort = connection.destinationPort;
+    }
+    const auto boundary = instrumentVoiceBoundary();
+    const auto nodeIdOfType = [this](const char* typeKey) -> NodeId {
+        const auto found = std::find_if(nodes_.begin(), nodes_.end(), [typeKey](const Node& node) { return node.typeKey == typeKey; });
+        return found != nodes_.end() ? found->id : NodeId {};
+    };
+    const auto midiInput = nodeIdOfType("midi-input");
+    const auto master = nodeIdOfType("master");
+    // A missing plug-in's card stands for the instrument when there is no
+    // voice section: the new one takes its place.
+    const auto missing = boundary.voiceNodes.empty() ? nodeIdOfType("missing-instrument") : NodeId {};
+    if (!presetMidi || !presetMaster || !presetAllocator || !presetOut || (boundary.voiceNodes.empty() && missing == 0) || midiInput == 0
+        || master == 0)
+        return applyFactoryPreset(*preset);
+
+    // The old voice: each node's place and type, and the cables between it
+    // and the rest.
+    std::map<NodeId, std::pair<int, juce::String>> oldVoice;
+    for (const auto id : boundary.voiceNodes)
+        if (const auto* node = findNode(id))
+            oldVoice[id] = { roleOfType(node->typeKey), node->typeKey };
+    if (missing != 0)
+        oldVoice[missing] = { -1, "missing-instrument" };
+    // A preset's own nodes after its voice filter (Nébuleuse's halo) are its
+    // instrument's too, while the chain still starts with them.
+    auto soundOut = missing != 0 ? missing : boundary.outputNodeId;
+    {
+        juce::String sourceType;
+        for (const auto& [id, entry] : oldVoice)
+            if (entry.first == 1)
+                sourceType = entry.second;
+        const auto made = std::find_if(factoryPresets_.begin(), factoryPresets_.end(), [&sourceType](const FactoryPreset& candidate) {
+            return std::any_of(candidate.nodes.begin(), candidate.nodes.end(),
+                               [&sourceType](const PresetNode& node) { return node.typeKey == sourceType; });
+        });
+        std::vector<juce::String> extras;
+        if (sourceType.isNotEmpty() && made != factoryPresets_.end()) {
+            std::optional<std::size_t> filterIndex, masterIndex;
+            for (std::size_t index = 0; index < made->nodes.size(); ++index) {
+                if (!filterIndex && roleOfType(made->nodes[index].typeKey) == 4)
+                    filterIndex = index;
+                if (made->nodes[index].typeKey == "master")
+                    masterIndex = index;
+            }
+            if (filterIndex && masterIndex)
+                for (auto at = *filterIndex, guard = std::size_t {}; guard < 16; ++guard) {
+                    const auto next = std::find_if(made->connections.begin(), made->connections.end(),
+                                                   [at](const PresetConnection& connection) { return connection.sourceIndex == at; });
+                    if (next == made->connections.end() || next->destinationIndex == *masterIndex)
+                        break;
+                    at = next->destinationIndex;
+                    extras.push_back(made->nodes[at].typeKey);
+                }
+        }
+        for (const auto& typeKey : extras) {
+            const auto next = std::find_if(connections_.begin(), connections_.end(), [soundOut](const Connection& connection) {
+                return connection.source == soundOut && connection.kind == PortKind::audio;
+            });
+            const auto* node = next != connections_.end() ? findNode(next->destination) : nullptr;
+            if (node == nullptr || node->typeKey != typeKey)
+                break;
+            oldVoice[node->id] = { -1, node->typeKey };
+            soundOut = node->id;
+        }
+    }
+    std::vector<Connection> kept, intoVoice, fromVoice;
+    for (const auto& connection : connections_) {
+        const auto fromOld = oldVoice.contains(connection.source);
+        const auto toOld = oldVoice.contains(connection.destination);
+        if (fromOld && toOld)
+            continue;
+        if (!fromOld && !toOld)
+            kept.push_back(connection);
+        else if (toOld)
+            intoVoice.push_back(connection);
+        else
+            fromVoice.push_back(connection);
+    }
+    const auto previousNodes = nodes_;
+    const auto previousConnections = connections_;
+    const auto rollBack = [&](const juce::String& why) {
+        nodes_ = previousNodes;
+        connections_ = previousConnections;
+        synchroniseGraphInterface();
+        rebuildEmbeddedSliders();
+        return juce::Result::fail(why);
+    };
+
+    // Out with the old voice; in with the preset's, its boundaries the graph's.
+    std::erase_if(nodes_, [&oldVoice](const Node& node) { return oldVoice.contains(node.id); });
+    connections_ = kept;
+    selectedNodes_.clear();
+    std::vector<NodeId> ids(preset->nodes.size());
+    std::array<NodeId, 5> newByRole {};
+    std::array<juce::String, 5> newTypeByRole {};
+    for (std::size_t index = 0; index < preset->nodes.size(); ++index) {
+        if (index == *presetMidi) {
+            ids[index] = midiInput;
+            continue;
+        }
+        if (index == *presetMaster) {
+            ids[index] = master;
+            continue;
+        }
+        const auto& presetNode = preset->nodes[index];
+        const auto* type = findType(presetNode.typeKey);
+        if (type == nullptr)
+            return rollBack("Instrument preset references an unknown node: " + presetNode.typeKey);
+        addNodeFromType(*type, presetNode.position);
+        auto& added = nodes_.back();
+        added.parameters = presetNode.parameters;
+        if (findModule(added.typeKey) == nullptr)
+            applyParameterPortDefaults(added.typeKey, added.parameters, added.ports);
+        added.interfaceState = createNodeInterface(added);
+        ids[index] = added.id;
+        if (const auto role = roleOfType(added.typeKey); role >= 0 && newByRole[static_cast<std::size_t>(role)] == 0) {
+            newByRole[static_cast<std::size_t>(role)] = added.id;
+            newTypeByRole[static_cast<std::size_t>(role)] = added.typeKey;
+        }
+    }
+    // A cable made again as it was (its mode and amount).
+    const auto reconnect = [this](const Connection& old, const NodeId source, const NodeId destination,
+                                  const cydaw::graph::PortId sourcePort, const cydaw::graph::PortId destinationPort) {
+        if (!connectNodes(source, destination, sourcePort, destinationPort))
+            return false;
+        for (auto& connection : connections_)
+            if (connection.source == source && connection.destination == destination && connection.sourcePort == sourcePort
+                && connection.destinationPort == destinationPort) {
+                connection.mode = old.mode;
+                connection.amount = old.amount;
+            }
+        return true;
+    };
+    // The preset's own cables, but for its way in and out.
+    for (const auto& connection : preset->connections) {
+        if (connection.sourceIndex == *presetMidi && connection.destinationIndex == *presetAllocator)
+            continue;
+        if (connection.destinationIndex == *presetMaster)
+            continue;
+        if (!connectNodes(ids[connection.sourceIndex], ids[connection.destinationIndex], connection.sourcePort,
+                          connection.destinationPort))
+            return rollBack("The instrument preset could not be wired: " + statusMessage_);
+    }
+    // In: what fed the old allocator's notes (the MIDI input, a note effect)
+    // feeds the new one; cables into the old envelope, gain or filter (an
+    // LFO on the cutoff) reach the new ones of the same kind.
+    auto fedNotes = false;
+    for (const auto& connection : intoVoice) {
+        const auto& [role, typeKey] = oldVoice[connection.destination];
+        if (role < 0 || newByRole[static_cast<std::size_t>(role)] == 0 || newTypeByRole[static_cast<std::size_t>(role)] != typeKey)
+            continue;
+        if (reconnect(connection, connection.source, newByRole[static_cast<std::size_t>(role)], connection.sourcePort,
+                      connection.destinationPort)
+            && role == 0)
+            fedNotes = true;
+    }
+    if (!fedNotes && !connectNodes(midiInput, ids[*presetAllocator], 0, presetInPort))
+        return rollBack("The instrument could not get its notes: " + statusMessage_);
+    // Out: the new sound goes where the old one went — the effects after
+    // it, or the master; what else left the old voice (an envelope driving
+    // a knob) leaves the new one of its kind.
+    auto sounded = false;
+    for (const auto& connection : fromVoice) {
+        const auto& [role, typeKey] = oldVoice[connection.source];
+        if (connection.source == soundOut && connection.kind == PortKind::audio) {
+            sounded = reconnect(connection, ids[*presetOut], connection.destination, presetOutPort, connection.destinationPort) || sounded;
+            continue;
+        }
+        if (role >= 0 && newByRole[static_cast<std::size_t>(role)] != 0 && newTypeByRole[static_cast<std::size_t>(role)] == typeKey)
+            (void) reconnect(connection, newByRole[static_cast<std::size_t>(role)], connection.destination, connection.sourcePort,
+                             connection.destinationPort);
+    }
+    if (!sounded && !connectNodes(ids[*presetOut], master, presetOutPort, presetMasterPort))
+        return rollBack("The instrument could not reach the output: " + statusMessage_);
+
+    synchroniseGraphInterface();
+    rebuildEmbeddedSliders();
+    graphRole_ = inferCurrentGraphRole();
+    refreshGraphAssetValidation();
+    setStatus(tr("nodes.status.presetLoaded", "name", tr(preset->translationKey)));
+    resized();
+    repaint();
+    commitEditHistory(false);
+    if (layoutChangedHandler_)
+        layoutChangedHandler_();
+    return juce::Result::ok();
+}
+
 juce::Result NodeGraphComponent::insertFactoryDevice(
     const juce::String& deviceKey)
 {
@@ -7995,6 +8400,41 @@ juce::Result NodeGraphComponent::insertNodeBeforeOutput(
                          "The node cannot be inserted before the output");
     }
     return juce::Result::fail("The output has no audio cable");
+}
+
+juce::Result NodeGraphComponent::insertNodeBeforeInstrument(
+    const juce::String& insertedNodeTypeKey)
+{
+    if (editingLocked_)
+        return juce::Result::fail("The Graph is locked");
+    const auto* insertedType = findType(insertedNodeTypeKey);
+    if (insertedType == nullptr)
+        return juce::Result::fail("Unknown inserted Graph node: " + insertedNodeTypeKey);
+    // The notes' cable into the first card that is not a MIDI card (the
+    // voice allocator, a module that plays): the new one goes last among
+    // the MIDI cards.
+    for (std::size_t index = 0; index < connections_.size(); ++index) {
+        const auto& connection = connections_[index];
+        if (connection.kind != PortKind::midi)
+            continue;
+        const auto* destination = readNode(connection.destination);
+        if (destination == nullptr)
+            continue;
+        // A MIDI card takes notes and gives notes; the voice allocator gives
+        // voices, and is where the notes end.
+        const auto* destinationType = findType(destination->typeKey);
+        const auto midiCard = destination->typeKey != "voice-allocator" && destinationType != nullptr
+                              && destinationType->hasInput && destinationType->inputKind == PortKind::midi
+                              && destinationType->hasOutput && destinationType->outputKind == PortKind::midi;
+        if (midiCard)
+            continue;
+        const auto* source = readNode(connection.source);
+        const auto position = source != nullptr ? (source->position + destination->position) * 0.5f : destination->position;
+        return spliceNodeIntoConnection(static_cast<int>(index), *insertedType, position)
+                   ? juce::Result::ok()
+                   : juce::Result::fail("The MIDI card cannot be inserted before the instrument");
+    }
+    return juce::Result::fail("The graph has no instrument fed by notes");
 }
 
 juce::Result NodeGraphComponent::connectNodePorts(
@@ -25129,7 +25569,8 @@ NodeGraphComponent::deviceCatalogue() const
     // only in the sense that the default graph keeps them.
     for (const auto& type : catalog_) {
         if (!type.hasOutput || type.composite || type.key.startsWith("graph-")
-            || type.key == "midi-input" || type.key == "audio-clips")
+            || type.key == "midi-input" || type.key == "audio-clips" || type.key.startsWith("missing-")
+            || type.key == "midi-arp")
             continue;
         entries.push_back({ type.key,
                             type.title.isNotEmpty() ? type.title
@@ -25214,6 +25655,86 @@ bool NodeGraphComponent::editorRemoveFromChain(const std::uint64_t id)
     synchroniseGraphInterface();
     rebuildEmbeddedSliders();
     notifyLayoutChanged("v2-remove-from-chain");
+    return true;
+}
+
+bool NodeGraphComponent::editorMoveInChain(const std::uint64_t id, const std::uint64_t before)
+{
+    auto* node = findNode(id);
+    if (editingLocked_ || node == nullptr || isBoundaryNode(*node) || id == before
+        || instrumentVoiceBoundary().voiceNodes.contains(id))
+        return false;
+    // Where the signal goes in and comes out: the first audio ports (a
+    // sidechain is not the way through).
+    const auto mainPort = [](const Node& card, const bool input) -> std::optional<cydaw::graph::PortId> {
+        for (const auto& port : card.ports)
+            if (port.input == input && port.type == cydaw::graph::PortType::audio && port.key != "sidechain-in")
+                return port.id;
+        return std::nullopt;
+    };
+    const auto in = mainPort(*node, true);
+    const auto out = mainPort(*node, false);
+    if (!in || !out)
+        return false;
+    // Before what: the card named, else the chain's output.
+    const Node* target = before != 0 ? findNode(static_cast<NodeId>(before)) : nullptr;
+    if (before == 0)
+        for (const auto& candidate : nodes_) {
+            auto input = false;
+            if (candidate.typeKey == "master" || (isGraphAudioBoundaryKey(candidate.typeKey, &input) && !input)) {
+                target = &candidate;
+                break;
+            }
+        }
+    if (target == nullptr || target->id == id || instrumentVoiceBoundary().voiceNodes.contains(target->id))
+        return false;
+    const auto targetId = target->id;
+    const auto targetIn = mainPort(*target, true);
+    if (!targetIn)
+        return false;
+    // Already there: what feeds the target is this card.
+    if (std::any_of(connections_.begin(), connections_.end(), [&](const Connection& connection) {
+            return connection.kind == PortKind::audio && connection.destination == targetId
+                   && connection.destinationPort == *targetIn && connection.source == id;
+        }))
+        return false;
+
+    // Out of the chain: what fed it now feeds what it fed.
+    std::vector<Connection> into;
+    std::vector<Connection> onward;
+    for (const auto& connection : connections_) {
+        if (connection.kind != PortKind::audio)
+            continue;
+        if (connection.destination == id && connection.destinationPort == *in && connection.source != id)
+            into.push_back(connection);
+        if (connection.source == id && connection.sourcePort == *out && connection.destination != id)
+            onward.push_back(connection);
+    }
+    std::erase_if(connections_, [&](const Connection& connection) {
+        return connection.kind == PortKind::audio
+               && ((connection.destination == id && connection.destinationPort == *in)
+                   || (connection.source == id && connection.sourcePort == *out));
+    });
+    for (const auto& source : into)
+        for (const auto& destination : onward)
+            (void) connectReplacingInput(source.source, destination.destination, source.sourcePort, destination.destinationPort);
+    // Back in, before the target: what fed the target feeds it.
+    std::vector<Connection> feeding;
+    for (const auto& connection : connections_)
+        if (connection.kind == PortKind::audio && connection.destination == targetId && connection.destinationPort == *targetIn)
+            feeding.push_back(connection);
+    std::erase_if(connections_, [&](const Connection& connection) {
+        return connection.kind == PortKind::audio && connection.destination == targetId && connection.destinationPort == *targetIn;
+    });
+    for (const auto& source : feeding)
+        (void) connectReplacingInput(source.source, id, source.sourcePort, *in);
+    (void) connectReplacingInput(id, targetId, *out, *targetIn);
+    selectedConnection_ = -1;
+    for (auto& item : nodes_)
+        item.serialised = juce::var();
+    synchroniseGraphInterface();
+    rebuildEmbeddedSliders();
+    notifyLayoutChanged("v2-move-in-chain");
     return true;
 }
 
@@ -25388,6 +25909,7 @@ juce::var NodeGraphComponent::describeNodeForRemote(const std::uint64_t id) cons
     object->setProperty("alias", node->alias);
     object->setProperty("x", node->position.x);
     object->setProperty("y", node->position.y);
+    object->setProperty("bypassed", node->bypassed);
     object->setProperty("ports", remotePorts(node->ports));
     return result;
 }

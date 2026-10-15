@@ -1,0 +1,25 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "echo-bande",
+ "name": "Piano Soft Tape Echo",
+ "state": {
+  "type": "echo-bande",
+  "parameters": {
+   "echoband.time": 320.0,
+   "echoband.intensity": 0.3,
+   "echoband.echo": 0.45,
+   "echoband.reverb": 0.3,
+   "echoband.bass": -4.0,
+   "echoband.treble": -5.0,
+   "echoband.wow": 0.2,
+   "echoband.mix": 0.25,
+   "echoband.mode": 4.0,
+   "echoband.sync": 0.0,
+   "echoband.drive": 0.0,
+   "echoband.age": 0.5,
+   "echoband.width": 0.6
+  }
+ }
+}

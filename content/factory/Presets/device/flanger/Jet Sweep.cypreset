@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "flanger",
+ "name": "Jet Sweep",
+ "state": {
+  "type": "flanger",
+  "parameters": {
+   "flanger.rate": 0.15,
+   "flanger.depth": 0.9,
+   "flanger.delay": 2.0,
+   "flanger.feedback": 0.7,
+   "flanger.mix": 0.5
+  }
+ }
+}

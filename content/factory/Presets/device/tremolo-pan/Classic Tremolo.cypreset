@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "tremolo-pan",
+ "name": "Classic Tremolo",
+ "state": {
+  "type": "tremolo-pan",
+  "parameters": {
+   "tremolo.rate": 4.0,
+   "tremolo.depth": 0.6,
+   "tremolo.shape": 0.0,
+   "tremolo.spread": 0.0,
+   "tremolo.sync": 0.0
+  }
+ }
+}

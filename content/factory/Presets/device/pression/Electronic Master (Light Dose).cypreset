@@ -1,0 +1,42 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "pression",
+ "name": "Electronic Master (Light Dose)",
+ "state": {
+  "type": "pression",
+  "parameters": {
+   "pression.depth": 0.15,
+   "pression.time": 0.5,
+   "pression.upward": 0.6,
+   "pression.downward": 0.8,
+   "pression.lowGain": 0.0,
+   "pression.midGain": 0.0,
+   "pression.highGain": 0.0,
+   "pression.output": 0.0,
+   "pression.input": 0.0,
+   "pression.crossLow": 88.0,
+   "pression.crossHigh": 2500.0,
+   "pression.lowDownThreshold": -30.0,
+   "pression.lowDownRatio": 20.0,
+   "pression.lowUpThreshold": -44.0,
+   "pression.lowUpRatio": 3.0,
+   "pression.lowAttack": 40.0,
+   "pression.lowRelease": 250.0,
+   "pression.midDownThreshold": -28.0,
+   "pression.midDownRatio": 20.0,
+   "pression.midUpThreshold": -44.0,
+   "pression.midUpRatio": 3.0,
+   "pression.midAttack": 20.0,
+   "pression.midRelease": 250.0,
+   "pression.highDownThreshold": -32.0,
+   "pression.highDownRatio": 20.0,
+   "pression.highUpThreshold": -42.0,
+   "pression.highUpRatio": 3.0,
+   "pression.highAttack": 12.0,
+   "pression.highRelease": 130.0,
+   "pression.solo": 0.0
+  }
+ }
+}

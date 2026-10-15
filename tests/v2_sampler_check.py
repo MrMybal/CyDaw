@@ -171,6 +171,20 @@ def scenario(scratch: Path) -> None:
         write_note(path, frequency, level)
         files.append(str(path).replace(os.sep, "/"))
 
+    # The simple sampler: one sound over the whole keyboard around its note;
+    # another dropped replaces it.
+    simple = need({"cmd": "add_midi_track", "name": "Simple", "instrument": "simple-sampler-instrument"}, "simple sampler")["name"]
+    need({"cmd": "load_sampler", "track": simple, "file": files[2]}, "simple sample")
+    held = need({"cmd": "sampler_map", "track": simple}, "simple map")["map"]["zones"]
+    check(len(held) == 1 and held[0]["keys"] == [0, 127] and held[0]["root"] == 69,
+          f"the simple sampler spreads its one sound over the keys ({held})")
+    need({"cmd": "load_sampler", "track": simple, "file": files[0]}, "simple sample replaced")
+    held = need({"cmd": "sampler_map", "track": simple}, "simple map")["map"]["zones"]
+    check(len(held) == 1 and held[0]["root"] == 57 and "Test_A3_v1" in held[0]["file"], f"a sound dropped replaces it ({held})")
+    refused = request({"cmd": "load_sampler", "track": simple, "file": files[0].replace(".wav", ".missing.wav")})
+    check(not refused.get("ok"), "a sound that is not there is refused")
+    need({"cmd": "remove_track", "track": simple}, "simple removed")
+
     made = need({"cmd": "new_sampler", "files": files}, "new sampler")
     track = made["track"]
     status = need({"cmd": "sampler_status", "track": track, "wait": 30}, "status")

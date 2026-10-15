@@ -1,0 +1,29 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "ambient-glass",
+ "name": "Frozen Shimmer",
+ "state": {
+  "type": "ambient-glass",
+  "parameters": {
+   "node.38002.voice.mode": 0.0,
+   "node.38002.voice.glide": 0.0,
+   "node.38003.polyOscillator.waveform": 1.0,
+   "node.38003.polyOscillator.level": 0.1,
+   "node.38004.envelope.attack": 800.0,
+   "node.38004.envelope.decay": 2500.0,
+   "node.38004.envelope.sustain": 0.7,
+   "node.38004.envelope.release": 6000.0,
+   "node.38005.gain.db": 0.0,
+   "node.38006.voiceFilter.cutoff": 9500.0,
+   "node.38006.voiceFilter.resonance": 2.4,
+   "node.38007.delay.time": 620.0,
+   "node.38007.delay.feedback": 0.6,
+   "node.38007.delay.mix": 0.35,
+   "node.38008.reverb.roomSize": 0.95,
+   "node.38008.reverb.mix": 0.55,
+   "node.38009.stereo.width": 1.8
+  }
+ }
+}

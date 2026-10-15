@@ -1,0 +1,30 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "halo",
+ "name": "Acoustic Guitar Room",
+ "state": {
+  "type": "halo",
+  "parameters": {
+   "halo.mix": 0.22,
+   "halo.decay": 0.9,
+   "halo.predelay": 8.0,
+   "halo.size": 0.45,
+   "halo.highCut": 12000.0,
+   "halo.lowCut": 120.0,
+   "halo.modDepth": 0.2,
+   "halo.modRate": 0.6,
+   "halo.mode": 3.0,
+   "halo.colour": 2.0,
+   "halo.attack": 0.3,
+   "halo.earlyDiffusion": 0.6,
+   "halo.lateDiffusion": 0.7,
+   "halo.bassMultiplier": 0.9,
+   "halo.bassCrossover": 300.0,
+   "halo.damping": 8000.0,
+   "halo.sync": 0.0,
+   "halo.width": 0.9
+  }
+ }
+}

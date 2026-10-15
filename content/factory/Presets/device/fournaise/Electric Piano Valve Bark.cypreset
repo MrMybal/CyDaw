@@ -1,0 +1,24 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "fournaise",
+ "name": "Electric Piano Valve Bark",
+ "state": {
+  "type": "fournaise",
+  "parameters": {
+   "fournaise.drive": 4.5,
+   "fournaise.tone": 0.1,
+   "fournaise.lowCut": 60.0,
+   "fournaise.highCut": 12000.0,
+   "fournaise.mix": 1.0,
+   "fournaise.output": 0.0,
+   "fournaise.style": 3.0,
+   "fournaise.punish": 0.0,
+   "fournaise.auto": 1.0,
+   "fournaise.thump": 0.0,
+   "fournaise.steep": 0.0,
+   "fournaise.oversampling": 2.0
+  }
+ }
+}

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Studio.h"
 #include "UiState.h"
 
 #include <imgui.h>
@@ -19,6 +20,7 @@ namespace cydaw::v2 {
 
 class ImGuiHost;
 class AudioEditorView;
+class MasterClipEditor;
 
 class ClipEditorView final {
 public:
@@ -62,6 +64,8 @@ private:
     ImGuiHost& host_;
     // An audio clip's editor (its sample, its takes, its stretch).
     std::unique_ptr<AudioEditorView> audio_;
+    // A master's launcher clip (its automation lanes).
+    std::unique_ptr<MasterClipEditor> master_;
 
     // View.
     float pixelsPerBeat_ { 64.0f };
@@ -85,6 +89,9 @@ private:
     Drag drag_ { Drag::none };
     ImVec2 dragStart_ {};
     double dragStartBeat_ {};
+    // Where a selection rectangle began, in the roll's own height (pixels
+    // from its top note): it stays there while the roll scrolls under it.
+    float dragStartY_ {};
     int dragStartNote_ {};
     std::map<std::uint64_t, MidiNote> origins_;
     std::uint64_t dragNote_ {};

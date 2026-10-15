@@ -17,6 +17,7 @@
 #include "KickView.h"
 #include "SynthView.h"
 #include "BatterieView.h"
+#include "RackView.h"
 #include "Icons.h"
 #include "ImGuiHost.h"
 #include "InspectorView.h"
@@ -28,6 +29,8 @@
 #include "BanksView.h"
 #include "SemanticSearchView.h"
 #include "LibraryWindow.h"
+#include "ComputerKeyboard.h"
+#include "ThemesView.h"
 #include "SampleCatalog.h"
 #include "Theme.h"
 #include "Widgets.h"
@@ -101,7 +104,64 @@ AppUi::AppUi(Studio& studio, ImGuiHost& host)
     : studio_(studio), host_(host), waveforms_(studio.engine().formatManager())
 {
     arrangement_ = std::make_unique<ArrangementView>(studio_, state_, waveforms_, host_);
-    signals_ = std::make_unique<DeviceSignals>(studio_);
+    computerKeyboard_ = std::make_unique<ComputerKeyboard>(studio_);
+    themes_ = std::make_unique<ThemesView>(studio_, state_);
+    themes_->applySaved();
+    state_.manyInstrumentWindows = studio_.settings().getBoolValue("manyInstrumentWindows", true);
+    {
+        // The displays' taps: the track's chain in the engine (or the simulator's).
+        auto* session = &studio_;
+        DeviceSignals::Source source;
+        source.setTaps = [session](const bool simulation, const TrackRef& track, const DeviceSignals::Source::Taps& taps) {
+            auto& engine = session->engine();
+            if (simulation)
+                engine.setSimulationTaps(taps);
+            else if (track.isBus())
+                engine.setVirtualBusTaps(track.bus, taps);
+            else if (track.master)
+                engine.setMasterNodeTaps(taps);
+            else if (track.midi)
+                engine.setMidiTrackNodeTaps(track.midiId, taps);
+            else
+                engine.setTrackNodeTaps(track.audioIndex, taps);
+        };
+        source.readTap = [session](const bool simulation, const TrackRef& track, const std::uint64_t nodeId, const bool input,
+                                  engine::AudioAnalysisFrame& frame) {
+            auto& engine = session->engine();
+            if (simulation)
+                return engine.readSimulationTap(nodeId, input, frame);
+            if (track.isBus())
+                return engine.readVirtualBusTap(track.bus, nodeId, input, frame);
+            if (track.master)
+                return engine.readMasterNodeTap(nodeId, input, frame);
+            return track.midi ? engine.readMidiTrackNodeTap(track.midiId, nodeId, input, frame)
+                              : engine.readTrackNodeTap(track.audioIndex, nodeId, input, frame);
+        };
+        source.readings = [session](const TrackRef& track, const std::uint64_t nodeId, std::vector<float>& readings) {
+            auto& engine = session->engine();
+            if (track.master)
+                engine.masterNodeReadings(nodeId, readings);
+            else if (track.midi)
+                engine.midiTrackNodeReadings(track.midiId, nodeId, readings);
+            else
+                engine.trackNodeReadings(track.audioIndex, nodeId, readings);
+        };
+        source.peaks = [session](const TrackRef& track, const std::vector<std::uint64_t>& nodes, std::vector<float>& left,
+                                std::vector<float>& right) {
+            auto& engine = session->engine();
+            if (track.master)
+                engine.masterNodePeaks(nodes, left, right);
+            else if (track.midi)
+                engine.midiTrackNodePeaks(track.midiId, nodes, left, right);
+            else
+                engine.trackNodePeaks(track.audioIndex, nodes, left, right);
+        };
+        source.tempo = [session] { return session->engine().tempo(); };
+        source.stillThere = [session](const TrackRef& track) {
+            return track.isMaster() || session->isValid(track) || (track.isBus() && session->hardwareBus(track.bus));
+        };
+        signals_ = std::make_unique<DeviceSignals>(std::move(source));
+    }
     graph_ = std::make_unique<GraphEditor>(studio_, state_, host_, *signals_);
     mixer_ = std::make_unique<MixerView>(studio_, state_);
     routing_ = std::make_unique<RoutingView>(studio_, state_);
@@ -120,6 +180,8 @@ AppUi::AppUi(Studio& studio, ImGuiHost& host)
     devices_->setSynthView(synth_.get());
     batterie_ = std::make_unique<BatterieView>(studio_, state_);
     devices_->setBatterieView(batterie_.get());
+    rack_ = std::make_unique<RackView>(studio_, state_);
+    devices_->setRackView(rack_.get());
     deviceEditor_ = std::make_unique<DeviceEditorView>(studio_, state_, *signals_);
     vst3Build_ = std::make_unique<Vst3Build>();
     contextMenus_ = std::make_unique<ContextMenus>(studio_, state_);
@@ -676,8 +738,38 @@ bool AppUi::openProjectInSteps(const juce::File& file)
 void AppUi::continueOpening()
 {
     // A share of each frame: the bar moves, the window answers.
-    if (const auto result = studio_.continueOpeningProject(24.0))
-        projectOpened(opening_, *result);
+    if (const auto result = studio_.continueOpeningProject(24.0)) {
+        if (!std::exchange(importing_, false)) {
+            projectOpened(opening_, *result);
+            return;
+        }
+        // An import: its summary, what it could not bring.
+        const auto file = std::exchange(opening_, juce::File {});
+        state_ = UiState {};
+        waveforms_.clear();
+        if (result->failed()) {
+            notify(result->getErrorMessage(), true);
+            return;
+        }
+        if (const auto tracks = studio_.tracks(); !tracks.empty())
+            state_.selectedTrack = tracks.front();
+        dialogTitle_ = ui::Ls("Projet importé", "Project imported");
+        dialogLines_ = juce::StringArray::fromLines(studio_.importSummary());
+        showWarnings_ = true;
+        notify(ui::Ls("Importé : ", "Imported: ") + file.getFileName());
+    }
+}
+
+bool AppUi::importProjectInSteps(const juce::File& file)
+{
+    if (studio_.openingProject() || !studio_.startImportingProject(file)) {
+        notify(ui::Ls("Impossible d'importer ", "Could not import ") + file.getFullPathName(), true);
+        return false;
+    }
+    opening_ = file;
+    importing_ = true;
+    host_.wake();
+    return true;
 }
 
 void AppUi::projectOpened(const juce::File& file, const juce::Result& result)
@@ -760,20 +852,8 @@ void AppUi::chooseImportProject()
     chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                           [this](const juce::FileChooser& chooser) {
                               const auto file = chooser.getResult();
-                              if (!file.existsAsFile())
-                                  return;
-                              juce::String summary;
-                              const auto result = studio_.importProject(file, summary);
-                              state_ = UiState {};
-                              waveforms_.clear();
-                              if (result.failed()) {
-                                  notify(result.getErrorMessage(), true);
-                                  return;
-                              }
-                              dialogTitle_ = ui::Ls("Projet importé", "Project imported");
-                              dialogLines_ = juce::StringArray::fromLines(summary);
-                              showWarnings_ = true;
-                              notify(ui::Ls("Importé : ", "Imported: ") + file.getFileName());
+                              if (file.existsAsFile())
+                                  importProjectInSteps(file);
                           });
 }
 
@@ -813,7 +893,7 @@ void AppUi::chooseImportMidi()
                               // The new tracks get a graph and an instrument.
                               for (const auto id : summary.trackIds) {
                                   studio_.adoptMidiTrack(id, {});
-                                  (void) studio_.insertDevice(TrackRef { true, 0, id }, "synth-keys");
+                                  (void) studio_.insertDevice(TrackRef { true, 0, id }, "opale-instrument");
                               }
                               studio_.markDirty();
                               notify(juce::String(static_cast<int>(summary.noteCount)) + ui::Ls(" notes importées", " notes imported"));
@@ -848,11 +928,9 @@ void AppUi::filesDropped(const juce::StringArray& files, const float x, const fl
         }
         for (const auto& extension : app::project_import::supportedProjectExtensions())
             if (file.hasFileExtension(extension)) {
-                juce::String summary;
-                if (studio_.importProject(file, summary).wasOk()) {
-                    state_ = UiState {};
-                    notify(ui::Ls("Importé : ", "Imported: ") + file.getFileName());
-                }
+                // As from the menu: the project open is saved first if the
+                // person wants, then the other one comes in, its bar shown.
+                whenSaved([this, file] { importProjectInSteps(file); });
                 return;
             }
     }
@@ -973,6 +1051,31 @@ void AppUi::frame()
         }
     }
 
+    // The computer's keys play the picked instrument track, before the
+    // shortcuts can take them; not where letters are shortcuts of their own
+    // (the graph, the workshop).
+    computerKeyboard_->update(state_.selectedTrack && state_.selectedTrack->midi && !state_.workshopMode
+                              && state_.focused != Panel::graph);
+    // A MIDI keyboard plugged in for the first time plays at once, as in
+    // Bitwig; one switched off in the MIDI inputs stays off.
+    if (ImGui::GetTime() - midiDevicesTime_ > 2.0) {
+        midiDevicesTime_ = ImGui::GetTime();
+        midiDevices_ = juce::MidiInput::getAvailableDevices();
+        auto& settings = studio_.settings();
+        auto known = juce::StringArray::fromLines(settings.getValue("knownMidiInputs"));
+        auto changed = false;
+        // An automated session leaves the person's devices as they are.
+        for (const auto& device : midiDevices_)
+            if (studio_.keepsSettings() && !known.contains(device.identifier)) {
+                known.add(device.identifier);
+                studio_.engine().deviceManager().setMidiInputDeviceEnabled(device.identifier, true);
+                changed = true;
+            }
+        if (changed) {
+            settings.setValue("knownMidiInputs", known.joinIntoString(juce::newLine));
+            studio_.saveAudioSetup();
+        }
+    }
     handleShortcuts();
     drawMenuBar();
     drawTransportBar();
@@ -1037,7 +1140,8 @@ void AppUi::drawOpening()
     }
     auto y = centre.y + logoSize + dp(18.0f);
     ImGui::PushFont(theme::boldFont(), ImGui::GetStyle().FontSizeBase * 1.25f);
-    const auto title = ui::Ls("Ouverture de ", "Opening ") + opening.file.getFileNameWithoutExtension();
+    const auto title = (opening.import ? ui::Ls("Importation de ", "Importing ") : ui::Ls("Ouverture de ", "Opening "))
+                       + opening.file.getFileNameWithoutExtension();
     ui::centredText(list, ImVec2(centre.x - width * 0.5f, y), ImVec2(centre.x + width * 0.5f, y + ImGui::GetFontSize()), p.text,
                     title.toRawUTF8());
     y += ImGui::GetFontSize() + dp(14.0f);
@@ -1182,6 +1286,7 @@ void AppUi::drawAudioSettings()
         showAudioSettings_ = false;
         selectSoundCardTab_ = showSoundCard_;
         showSoundCard_ = false;
+        selectMidiTabNow_ = std::exchange(selectMidiTab_, false);
     }
     // Large: the card's inputs and outputs are tables of their own.
     const auto* viewport = ImGui::GetMainViewport();
@@ -1218,6 +1323,14 @@ void AppUi::drawAudioSettings()
             ImGui::EndChild();
             ImGui::EndTabItem();
         }
+        // Asked for (the Options menu, the keyboard's right click): in front.
+        const auto midiTab = std::exchange(selectMidiTabNow_, false) ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
+        if (ImGui::BeginTabItem(ui::labelId(L("Entrées MIDI", "MIDI inputs"), "audioMidi").c_str(), nullptr, midiTab)) {
+            ImGui::BeginChild("##midi", ImVec2(0.0f, -footer));
+            drawMidiInputs();
+            ImGui::EndChild();
+            ImGui::EndTabItem();
+        }
         ImGui::EndTabBar();
     }
     ImGui::Spacing();
@@ -1230,6 +1343,216 @@ void AppUi::drawAudioSettings()
         ImGui::CloseCurrentPopup();
     }
     ImGui::EndPopup();
+}
+
+void AppUi::drawMidiInputs()
+{
+    const auto& p = theme::palette();
+    auto& manager = studio_.engine().deviceManager();
+    auto& keyboard = *computerKeyboard_;
+    ui::sectionTitle(L("Claviers et contrôleurs MIDI", "MIDI keyboards and controllers"));
+    if (midiDevices_.isEmpty())
+        ImGui::TextColored(theme::vec(p.textFaint), "%s",
+                           L("Aucun appareil MIDI branché (ils apparaissent ici dès qu'ils le sont).",
+                             "No MIDI device plugged in (they show here as soon as they are)."));
+    for (const auto& device : midiDevices_) {
+        auto on = manager.isMidiInputDeviceEnabled(device.identifier);
+        if (ImGui::Checkbox(ui::labelId(device.name.toRawUTF8(), device.identifier.toRawUTF8()).c_str(), &on)) {
+            manager.setMidiInputDeviceEnabled(device.identifier, on);
+            if (studio_.keepsSettings())
+                studio_.saveAudioSetup();
+        }
+    }
+    ImGui::TextColored(theme::vec(p.textDim), "%s",
+                       L("Ils jouent la piste instrument choisie (ou les pistes armées).",
+                         "They play the picked instrument track (or the armed tracks)."));
+    ImGui::Spacing();
+    ImGui::Spacing();
+
+    ui::sectionTitle(L("Clavier de l'ordinateur", "Computer keyboard"));
+    auto enabled = keyboard.enabled();
+    if (ImGui::Checkbox(L("Jouer des notes avec le clavier de l'ordinateur (Ctrl+K)", "Play notes with the computer keyboard (Ctrl+K)"),
+                        &enabled))
+        keyboard.setEnabled(enabled);
+    ImGui::BeginDisabled(!enabled);
+    auto octave = keyboard.octave();
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextColored(theme::vec(p.textDim), "%s", L("Octave", "Octave"));
+    ImGui::SameLine(dp(110.0f));
+    ImGui::SetNextItemWidth(dp(140.0f));
+    if (ImGui::SliderInt("##keyboardOctave", &octave, -1, 8))
+        keyboard.setOctave(octave);
+    auto velocity = keyboard.velocity();
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextColored(theme::vec(p.textDim), "%s", L("Vélocité", "Velocity"));
+    ImGui::SameLine(dp(110.0f));
+    ImGui::SetNextItemWidth(dp(140.0f));
+    if (ImGui::SliderInt("##keyboardVelocity", &velocity, 1, 127))
+        keyboard.setVelocity(velocity);
+
+    // Its keys drawn as a piano: what each one plays, as this keyboard has it.
+    ImGui::Spacing();
+    const auto origin = ImGui::GetCursorScreenPos();
+    auto* list = ImGui::GetWindowDrawList();
+    const auto white = dp(40.0f);
+    const auto height = dp(84.0f);
+    const auto blackHeight = dp(50.0f);
+    static constexpr int whiteOf[] = { 0, -1, 1, -1, 2, 3, -1, 4, -1, 5, -1, 6 };
+    const auto held = keyboard.heldNotes();
+    const auto base = (keyboard.octave() + 1) * 12;
+    const auto isHeld = [&held, base](const int semitone) { return std::find(held.begin(), held.end(), base + semitone) != held.end(); };
+    const auto whiteIndex = [](const int semitone) { return (semitone / 12) * 7 + whiteOf[semitone % 12]; };
+    for (const auto& key : keyboard.keys()) {
+        if (key.semitone < 0 || whiteOf[key.semitone % 12] < 0)
+            continue;
+        const auto x = origin.x + static_cast<float>(whiteIndex(key.semitone)) * white;
+        const ImVec2 min(x, origin.y);
+        const ImVec2 max(x + white - dp(2.0f), origin.y + height);
+        list->AddRectFilled(min, max, isHeld(key.semitone) ? p.accent : theme::mix(p.text, p.bg3, 0.12f), dp(3.0f));
+        char name[16];
+        const auto note = base + key.semitone;
+        static const char* namesFr[] = { "Do", "Do#", "Ré", "Ré#", "Mi", "Fa", "Fa#", "Sol", "Sol#", "La", "La#", "Si" };
+        static const char* namesEn[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+        std::snprintf(name, sizeof(name), "%s%d", (ui::french() ? namesFr : namesEn)[note % 12], note / 12 - 1);
+        ui::centredText(list, ImVec2(min.x, max.y - dp(34.0f)), ImVec2(max.x, max.y - dp(18.0f)), p.bg0, key.label.c_str());
+        ui::centredText(list, ImVec2(min.x, max.y - dp(18.0f)), ImVec2(max.x, max.y - dp(2.0f)), theme::mix(p.bg0, p.text, 0.4f), name);
+    }
+    for (const auto& key : keyboard.keys()) {
+        if (key.semitone < 0 || whiteOf[key.semitone % 12] >= 0)
+            continue;
+        const auto x = origin.x + static_cast<float>(whiteIndex(key.semitone - 1) + 1) * white - white * 0.32f;
+        const ImVec2 min(x, origin.y);
+        const ImVec2 max(x + white * 0.62f, origin.y + blackHeight);
+        list->AddRectFilled(min, max, isHeld(key.semitone) ? p.accent : p.bg0, dp(3.0f));
+        list->AddRect(min, max, p.line, dp(3.0f));
+        ui::centredText(list, ImVec2(min.x, max.y - dp(20.0f)), ImVec2(max.x, max.y - dp(4.0f)), p.text, key.label.c_str());
+    }
+    ImGui::Dummy(ImVec2(white * 11.0f, height + dp(6.0f)));
+    std::string octaveKeys, velocityKeys;
+    for (const auto& key : keyboard.keys()) {
+        if (key.semitone == -1 || key.semitone == -2)
+            octaveKeys += (octaveKeys.empty() ? "" : " / ") + key.label;
+        if (key.semitone == -3 || key.semitone == -4)
+            velocityKeys += (velocityKeys.empty() ? "" : " / ") + key.label;
+    }
+    ImGui::TextColored(theme::vec(p.textDim), "%s %s    %s %s", L("Octave − / + :", "Octave − / +:"), octaveKeys.c_str(),
+                       L("Vélocité − / + :", "Velocity − / +:"), velocityKeys.c_str());
+    ImGui::EndDisabled();
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextColored(theme::vec(p.textFaint), "%s",
+                       L("Il joue la piste instrument choisie, comme un clavier MIDI. Ses touches passent avant les raccourcis "
+                         "d'une seule lettre (S, L…) tant qu'une piste instrument est choisie ; Ctrl et Alt gardent les leurs. "
+                         "Dans le graphe et l'atelier, les lettres restent des raccourcis.",
+                         "It plays the picked instrument track, as a MIDI keyboard does. Its keys come before the one-letter "
+                         "shortcuts (S, L…) while an instrument track is picked; Ctrl and Alt keep theirs. In the graph and "
+                         "the workshop, letters stay shortcuts."));
+    ImGui::PopTextWrapPos();
+}
+
+juce::var AppUi::themes(const juce::var& request)
+{
+    if (request.hasProperty("create")) {
+        const auto from = request.getProperty("from", themes_->currentKey()).toString();
+        const auto key = themes_->createFrom(from, request.getProperty("create", juce::var()).toString());
+        if (key.isEmpty())
+            return juce::var("no theme \"" + from + "\" to make one from");
+        (void) themes_->choose(key);
+    }
+    for (const auto* field : { "key", "name" })
+        if (request.hasProperty(field) && !request.hasProperty("colours")) {
+            const auto wanted = request.getProperty(field, juce::var()).toString();
+            auto found = false;
+            for (const auto& entry : themes_->themes())
+                if (entry.key == wanted || entry.name == wanted)
+                    found = themes_->choose(entry.key);
+            if (!found)
+                return juce::var("no theme \"" + wanted + "\"");
+        }
+    if (request.hasProperty("colours")) {
+        const auto key = request.getProperty("key", themes_->currentKey()).toString();
+        const theme::Theme* target = nullptr;
+        for (const auto& entry : themes_->themes())
+            if (entry.key == key)
+                target = &entry;
+        if (target == nullptr || target->builtIn)
+            return juce::var("only a theme of one's own changes its colours");
+        const auto palette = theme::paletteFromJson(request.getProperty("colours", juce::var()), target->palette);
+        if (!themes_->save(key, target->name, palette))
+            return juce::var("the theme could not be written");
+        (void) themes_->choose(key);
+    }
+    auto* result = new juce::DynamicObject();
+    result->setProperty("current", themes_->currentKey());
+    juce::Array<juce::var> list;
+    for (const auto& entry : themes_->themes()) {
+        auto* item = new juce::DynamicObject();
+        item->setProperty("key", entry.key);
+        item->setProperty("name", entry.name);
+        item->setProperty("builtIn", entry.builtIn);
+        if (entry.key == themes_->currentKey())
+            item->setProperty("colours", theme::paletteToJson(entry.palette));
+        list.add(juce::var(item));
+    }
+    result->setProperty("themes", list);
+    result->setProperty("folder", ThemesView::folder().getFullPathName());
+    return juce::var(result);
+}
+
+juce::var AppUi::midiInputs(const juce::String& command, const juce::var& request)
+{
+    auto& keyboard = *computerKeyboard_;
+    auto& manager = studio_.engine().deviceManager();
+    auto* result = new juce::DynamicObject();
+    if (command == "computer_keyboard") {
+        if (request.hasProperty("enabled"))
+            keyboard.setEnabled(static_cast<bool>(request.getProperty("enabled", true)));
+        if (request.hasProperty("octave"))
+            keyboard.setOctave(static_cast<int>(request.getProperty("octave", 4)));
+        if (request.hasProperty("velocity"))
+            keyboard.setVelocity(static_cast<int>(request.getProperty("velocity", 100)));
+        result->setProperty("enabled", keyboard.enabled());
+        result->setProperty("active", keyboard.active());
+        result->setProperty("octave", keyboard.octave());
+        result->setProperty("velocity", keyboard.velocity());
+        juce::Array<juce::var> held;
+        for (const auto note : keyboard.heldNotes())
+            held.add(note);
+        result->setProperty("held", held);
+        juce::Array<juce::var> keys;
+        for (const auto& key : keyboard.keys()) {
+            auto* entry = new juce::DynamicObject();
+            entry->setProperty("label", juce::String(key.label));
+            entry->setProperty("semitone", key.semitone);
+            keys.add(juce::var(entry));
+        }
+        result->setProperty("keys", keys);
+        return juce::var(result);
+    }
+    const auto devices = juce::MidiInput::getAvailableDevices();
+    if (request.hasProperty("device")) {
+        const auto wanted = request.getProperty("device", juce::var()).toString();
+        auto found = false;
+        for (const auto& device : devices)
+            if (device.identifier == wanted || device.name == wanted) {
+                manager.setMidiInputDeviceEnabled(device.identifier, static_cast<bool>(request.getProperty("enabled", true)));
+                if (studio_.keepsSettings())
+                    studio_.saveAudioSetup();
+                found = true;
+            }
+        if (!found)
+            return juce::var("no MIDI device \"" + wanted + "\"");
+    }
+    juce::Array<juce::var> list;
+    for (const auto& device : devices) {
+        auto* entry = new juce::DynamicObject();
+        entry->setProperty("name", device.name);
+        entry->setProperty("identifier", device.identifier);
+        entry->setProperty("enabled", manager.isMidiInputDeviceEnabled(device.identifier));
+        list.add(juce::var(entry));
+    }
+    result->setProperty("devices", list);
+    result->setProperty("computerKeyboard", keyboard.enabled());
+    return juce::var(result);
 }
 
 void AppUi::drawAudioDevice()
@@ -1526,6 +1849,7 @@ void AppUi::drawDialogs()
     drawCompanionWindow();
     locations_->draw();
     banks_->draw();
+    themes_->draw();
     semanticView_->draw();
     library_->draw();
     sampler_->drawEditor();
@@ -1709,7 +2033,8 @@ juce::String AppUi::injectInput(const juce::var& events)
         return "the window is not ready";
     for (const auto& event : *list) {
         const auto type = event.getProperty("type", juce::var()).toString();
-        if (type != "move" && type != "down" && type != "up" && type != "wheel" && type != "wait" && type != "release")
+        if (type != "move" && type != "down" && type != "up" && type != "wheel" && type != "wait" && type != "release"
+            && type != "text" && type != "key")
             return "unknown event type \"" + type + "\"";
     }
     for (const auto& event : *list) {
@@ -1733,6 +2058,8 @@ juce::String AppUi::injectInput(const juce::var& events)
 
 void AppUi::applyScriptedInput()
 {
+    // Knobs follow the scripted pointer's moves rather than the system's.
+    ui::setScriptedPointer(scriptedMouse_);
     if (!scriptedMouse_)
         return;
     auto& io = ImGui::GetIO();
@@ -1762,6 +2089,37 @@ void AppUi::applyScriptedInput()
     else if (type == "wheel")
         io.AddMouseWheelEvent(static_cast<float>(static_cast<double>(event.getProperty("dx", 0.0))),
                               static_cast<float>(static_cast<double>(event.getProperty("dy", 0.0))));
+    // Typing: {"type":"text","text":"1.5k"}; a key pressed and let go:
+    // {"type":"key","key":"enter"} (enter, escape, tab, backspace, ctrl, shift
+    // down with "down": true, up with false).
+    else if (type == "text")
+        io.AddInputCharactersUTF8(event.getProperty("text", juce::var()).toString().toRawUTF8());
+    else if (type == "key") {
+        const auto name = event.getProperty("key", juce::var()).toString().toLowerCase();
+        const auto key = name == "enter"       ? ImGuiKey_Enter
+                         : name == "escape"    ? ImGuiKey_Escape
+                         : name == "tab"       ? ImGuiKey_Tab
+                         : name == "backspace" ? ImGuiKey_Backspace
+                         : name == "ctrl"      ? ImGuiMod_Ctrl
+                         : name == "shift"     ? ImGuiMod_Shift
+                         : name.length() == 1 && name[0] >= 'a' && name[0] <= 'z'
+                             ? static_cast<ImGuiKey>(ImGuiKey_A + (name[0] - 'a'))
+                         : name.length() == 1 && name[0] >= '0' && name[0] <= '9'
+                             ? static_cast<ImGuiKey>(ImGuiKey_0 + (name[0] - '0'))
+                         : name == ";"         ? ImGuiKey_Semicolon
+                                               : ImGuiKey_None;
+        if (key != ImGuiKey_None) {
+            if (event.getDynamicObject() != nullptr && event.getDynamicObject()->hasProperty("down"))
+                io.AddKeyEvent(key, static_cast<bool>(event.getProperty("down", true)));
+            else {
+                io.AddKeyEvent(key, true);
+                pendingKeyUp_ = static_cast<int>(key);
+            }
+        }
+    } else if (pendingKeyUp_ != 0) {
+        io.AddKeyEvent(static_cast<ImGuiKey>(pendingKeyUp_), false);
+        pendingKeyUp_ = 0;
+    }
 }
 
 bool AppUi::showDeviceEditor(const std::uint64_t nodeId, const int pane, const bool detached)
@@ -1772,7 +2130,7 @@ bool AppUi::showDeviceEditor(const std::uint64_t nodeId, const int pane, const b
         state_.expandedPanes.clear();
         return true;
     }
-    state_.openExpandedPane(ExpandedPane { *state_.selectedTrack, nodeId, std::max(0, pane) });
+    state_.openExpandedPane(ExpandedPane { *state_.selectedTrack, nodeId, std::max(-1, pane) });
     // Out of the studio's window, or back into it.
     ui::setDetached(DeviceEditorView::windowId(*state_.selectedTrack, nodeId).c_str(), detached);
     host_.wake();
@@ -1972,6 +2330,13 @@ void AppUi::handleShortcuts()
         whenSaved([this] { newProject(); });
     if (io.WantTextInput)
         return;
+    // Ctrl+K: the computer's keys as a MIDI keyboard, or not.
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_K, false)) {
+        computerKeyboard_->setEnabled(!computerKeyboard_->enabled());
+        notify(computerKeyboard_->enabled() ? ui::Ls("Clavier de l'ordinateur : il joue les notes", "Computer keyboard: it plays notes")
+                                            : ui::Ls("Clavier de l'ordinateur : éteint", "Computer keyboard: off"),
+               false);
+    }
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Z, true))
         io.KeyShift ? redo() : undo();
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Y, true))
@@ -2093,7 +2458,7 @@ void AppUi::drawMenuBar()
             if (const auto track = studio_.addAudioTrack())
                 state_.selectedTrack = track;
         if (ImGui::MenuItem(L("Nouvelle piste instrument", "New instrument track")))
-            if (const auto track = studio_.addMidiTrack({}, "synth-keys"))
+            if (const auto track = studio_.addMidiTrack({}, "opale-instrument"))
                 state_.selectedTrack = track;
         if (ImGui::MenuItem(L("Nouvelle piste bus", "New bus track")))
             if (const auto track = studio_.addBusTrack())
@@ -2241,6 +2606,12 @@ void AppUi::drawMenuBar()
             showAudioSettings_ = true;
         if (ImGui::MenuItem(L("Entrées et sorties de la carte son…", "Sound card inputs and outputs…")))
             showAudioSettings_ = showSoundCard_ = true;
+        if (ImGui::MenuItem(L("Entrées MIDI…", "MIDI inputs…")))
+            openMidiInputs();
+        ui::tooltip(L("Les claviers et contrôleurs MIDI branchés, et le clavier de l'ordinateur comme clavier MIDI.",
+                      "The MIDI keyboards and controllers plugged in, and the computer's keyboard as a MIDI keyboard."));
+        if (ImGui::MenuItem(L("Clavier de l'ordinateur (MIDI)", "Computer keyboard (MIDI)"), "Ctrl+K", computerKeyboard_->enabled()))
+            computerKeyboard_->setEnabled(!computerKeyboard_->enabled());
         ui::tooltip(L("Les canaux ouverts de la carte, les bus d'entrée que les pistes enregistrent et les bus de sortie "
                       "qui jouent le master et les pistes envoyées directement.",
                       "The card's open channels, the input buses tracks record and the output buses that play the master "
@@ -2266,6 +2637,33 @@ void AppUi::drawMenuBar()
                       "PyTorch (CPU ou CUDA) dans un environnement à part.",
                       "The Python that analyses the sounds to recreate: which one, what it has, and installing numpy "
                       "and PyTorch (CPU or CUDA) in an environment of its own."));
+        if (ImGui::BeginMenu(L("Thème", "Theme"))) {
+            // Colours only: the built-in ones, then the person's own.
+            auto own = false;
+            for (const auto& entry : themes_->themes()) {
+                if (!entry.builtIn && !own) {
+                    own = true;
+                    ImGui::Separator();
+                }
+                if (ImGui::MenuItem(entry.name.toRawUTF8(), nullptr, entry.key == themes_->currentKey()))
+                    (void) themes_->choose(entry.key);
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem(L("Thèmes et couleurs…", "Themes and colours…"), nullptr, state_.showThemes))
+                state_.showThemes = !state_.showThemes;
+            ui::tooltip(L("Choisir un thème, ou en faire un à soi à partir d'un autre et changer ses couleurs.",
+                          "Pick a theme, or make one of your own from another and change its colours."));
+            ImGui::EndMenu();
+        }
+        if (ImGui::MenuItem(L("Plusieurs fenêtres d'instrument", "Several instrument windows"), nullptr, state_.manyInstrumentWindows)) {
+            state_.manyInstrumentWindows = !state_.manyInstrumentWindows;
+            if (studio_.keepsSettings())
+                studio_.settings().setValue("manyInstrumentWindows", state_.manyInstrumentWindows);
+        }
+        ui::tooltip(L("Ouvrir la fenêtre d'un instrument garde celles des autres ouvertes (une chacun) ; décoché, elle "
+                      "remplace la dernière.",
+                      "Opening an instrument's window keeps the others' open (one each); unchecked, it replaces the "
+                      "last one."));
         if (ImGui::BeginMenu(L("Langue", "Language"))) {
             // The interface and the engine's texts (node names, messages)
             // change together.
@@ -2275,17 +2673,6 @@ void AppUi::drawMenuBar()
                     ui::setLanguage(language.code);
                     studio_.refreshTranslations();
                 }
-            ImGui::Separator();
-            auto& localization = app::Localization::instance();
-            if (ImGui::MenuItem(L("Noms des nœuds en anglais", "Node names in English"), nullptr, localization.nodeNamesInEnglish())) {
-                localization.setNodeNamesInEnglish(!localization.nodeNamesInEnglish());
-                ui::bumpLanguageRevision();
-                studio_.refreshTranslations();
-            }
-            ui::tooltip(L("Les cartes du graphe et la palette gardent leurs noms anglais (Chorus, Low-pass…) ; descriptions "
-                          "et réglages restent dans la langue choisie.",
-                          "Graph cards and the palette keep their English names; descriptions and settings follow the "
-                          "language."));
             ImGui::Separator();
             ImGui::TextDisabled("%s", L("Une langue de plus : i18n/<code>.json et i18n/v2/<code>.json",
                                         "One more language: i18n/<code>.json and i18n/v2/<code>.json"));
@@ -2436,6 +2823,32 @@ void AppUi::drawTransportBar()
                     }
                 }
                 ImGui::EndPopup();
+            }
+        }
+
+        // The computer's keys as a MIDI keyboard: on or off, its octave; a
+        // right click opens the MIDI inputs.
+        {
+            ui::toolbarSeparator();
+            auto& keyboard = *computerKeyboard_;
+            const auto& p = theme::palette();
+            if (ui::iconButton(icon::keyboard,
+                               keyboard.enabled() ? L("Clavier de l'ordinateur : il joue la piste instrument choisie (Ctrl+K). "
+                                                      "Clic droit : les entrées MIDI.",
+                                                      "Computer keyboard: it plays the picked instrument track (Ctrl+K). "
+                                                      "Right click: the MIDI inputs.")
+                                                  : L("Clavier de l'ordinateur éteint (Ctrl+K). Clic droit : les entrées MIDI.",
+                                                      "Computer keyboard off (Ctrl+K). Right click: the MIDI inputs."),
+                               keyboard.enabled(), p.accent))
+                keyboard.setEnabled(!keyboard.enabled());
+            if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+                openMidiInputs();
+            if (keyboard.enabled()) {
+                ImGui::SameLine(0.0f, dp(4.0f));
+                ImGui::AlignTextToFramePadding();
+                ImGui::TextColored(theme::vec(keyboard.active() ? p.text : p.textFaint), "Oct %d", keyboard.octave());
+                ui::tooltip(keyboard.active() ? L("L'octave de sa première touche", "Its first key's octave")
+                                              : L("Choisissez une piste instrument pour jouer", "Pick an instrument track to play"));
             }
         }
 

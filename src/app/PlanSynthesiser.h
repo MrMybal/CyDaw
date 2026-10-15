@@ -108,6 +108,11 @@ public:
     [[nodiscard]] static NoteInfo noteInfoOf(const engine::PolySynthGraphPlan& plan, const int note, const float velocity,
                                              const engine::SamplerPlaying& playing) noexcept
     {
+        // Silex: a closed or pedal hat cuts the open one.
+        if (plan.waveform == engine::PolyOscillatorWaveform::family && plan.synthModel == engine::synth::Model::silex) {
+            const auto transposed = std::clamp(note + plan.transposeSemitones, 0, 127);
+            return { transposed != engine::synth::silexOpenHat ? engine::synth::silexChokeGroupOf(transposed) : 0, -1 };
+        }
         if (plan.waveform != engine::PolyOscillatorWaveform::sampler || plan.sampler == nullptr)
             return {};
         const auto transposed = std::clamp(note + plan.transposeSemitones, 0, 127);

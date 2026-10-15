@@ -446,7 +446,7 @@ juce::String effectsTest()
                    + " gives " + juce::String(left) + " / " + juce::String(right);
     }
     for (const auto& effect : engine::effectCatalogue) {
-        if (effect.convertsChannels())
+        if (effect.convertsChannels() || effect.midi)
             continue;
         const auto typeKey = juce::String(std::string(effect.typeKey));
         const auto track = studio.addAudioTrack();

@@ -111,6 +111,10 @@ struct ModuleInterfaceState {
     // default. The controls keep their normalised places in it.
     std::uint16_t windowWidth {};
     std::uint16_t windowHeight {};
+    // Laid out by the person (the workshop's Interface tab), rather than the
+    // one made from the published settings: a plug-in made of the graph
+    // opens on it.
+    bool designed {};
     std::vector<ModulePublishedParameter> parameters;
     // Free-form controls rendered inside graph nodes and reusable sub-graphs.
     std::vector<ModuleInterfaceControl> controls;

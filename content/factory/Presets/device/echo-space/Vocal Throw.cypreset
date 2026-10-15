@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "echo-space",
+ "name": "Vocal Throw",
+ "state": {
+  "type": "echo-space",
+  "parameters": {
+   "node.15002.delay.time": 250.0,
+   "node.15002.delay.feedback": 0.5,
+   "node.15002.delay.mix": 0.32,
+   "node.15003.reverb.roomSize": 0.8,
+   "node.15003.reverb.mix": 0.28
+  }
+ }
+}

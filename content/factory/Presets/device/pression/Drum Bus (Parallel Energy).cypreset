@@ -1,0 +1,42 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "pression",
+ "name": "Drum Bus (Parallel Energy)",
+ "state": {
+  "type": "pression",
+  "parameters": {
+   "pression.depth": 0.35,
+   "pression.time": 0.3,
+   "pression.upward": 1.0,
+   "pression.downward": 1.0,
+   "pression.lowGain": 1.0,
+   "pression.midGain": 0.0,
+   "pression.highGain": 1.0,
+   "pression.output": 0.0,
+   "pression.input": 0.0,
+   "pression.crossLow": 100.0,
+   "pression.crossHigh": 3000.0,
+   "pression.lowDownThreshold": -30.0,
+   "pression.lowDownRatio": 20.0,
+   "pression.lowUpThreshold": -44.0,
+   "pression.lowUpRatio": 3.5,
+   "pression.lowAttack": 30.0,
+   "pression.lowRelease": 200.0,
+   "pression.midDownThreshold": -28.0,
+   "pression.midDownRatio": 20.0,
+   "pression.midUpThreshold": -44.0,
+   "pression.midUpRatio": 3.5,
+   "pression.midAttack": 15.0,
+   "pression.midRelease": 200.0,
+   "pression.highDownThreshold": -32.0,
+   "pression.highDownRatio": 20.0,
+   "pression.highUpThreshold": -42.0,
+   "pression.highUpRatio": 3.5,
+   "pression.highAttack": 8.0,
+   "pression.highRelease": 100.0,
+   "pression.solo": 0.0
+  }
+ }
+}

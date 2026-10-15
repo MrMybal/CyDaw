@@ -1,0 +1,23 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "empreinte",
+ "name": "Drum Room",
+ "state": {
+  "type": "empreinte",
+  "parameters": {
+   "empreinte.mix": 0.25,
+   "empreinte.predelay": 0.0,
+   "empreinte.lowCut": 80.0,
+   "empreinte.highCut": 20000.0,
+   "empreinte.width": 0.9,
+   "empreinte.early": 3.0,
+   "empreinte.tail": -4.0,
+   "empreinte.output": 0.0,
+   "empreinte.space": 1.0,
+   "empreinte.length": 1.0,
+   "empreinte.reverse": 0.0
+  }
+ }
+}

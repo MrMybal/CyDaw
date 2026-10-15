@@ -1,0 +1,30 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "halo",
+ "name": "Ambient Sanctuary Drone",
+ "state": {
+  "type": "halo",
+  "parameters": {
+   "halo.mix": 0.55,
+   "halo.decay": 18.0,
+   "halo.predelay": 120.0,
+   "halo.size": 1.0,
+   "halo.highCut": 9000.0,
+   "halo.lowCut": 150.0,
+   "halo.modDepth": 0.7,
+   "halo.modRate": 0.2,
+   "halo.mode": 8.0,
+   "halo.colour": 2.0,
+   "halo.attack": 1.0,
+   "halo.earlyDiffusion": 0.9,
+   "halo.lateDiffusion": 1.0,
+   "halo.bassMultiplier": 1.0,
+   "halo.bassCrossover": 250.0,
+   "halo.damping": 5000.0,
+   "halo.sync": 0.0,
+   "halo.width": 1.0
+  }
+ }
+}

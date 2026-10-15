@@ -268,6 +268,15 @@ private:
             set(entry, "devices", strings(deviceNames(ref, 16)));
             set(entry, "latencySamples", engine_.midiTrackLatencySamples(info.id));
             set(entry, "compensationSamples", engine_.midiTrackCompensationSamples(info.id));
+            // The MIDI effects its notes go through, by type, in order.
+            {
+                juce::Array<juce::var> effects;
+                if (const auto plan = engine_.midiTrackInstrumentGraph(info.id); plan.midiEffects != nullptr)
+                    for (std::size_t index = 0; index < plan.midiEffects->count; ++index)
+                        if (const auto* effect = engine::effectForKind(plan.midiEffects->effects[index].kind))
+                            effects.add(juce::String(std::string(effect->typeKey)));
+                set(entry, "midiEffects", effects);
+            }
             juce::Array<juce::var> clips;
             for (const auto& clip : info.clips) {
                 auto clipEntry = object();
@@ -276,7 +285,7 @@ private:
                 set(clipEntry, "startBeats", clip.startBeats);
                 set(clipEntry, "lengthBeats", clip.lengthBeats);
                 set(clipEntry, "looping", clip.looping);
-                set(clipEntry, "scene", juce::roundToInt(clip.startBeats / 16.0));
+                set(clipEntry, "scene", clip.launcherScene);
                 set(clipEntry, "colour", colourText(clip.colour));
                 set(clipEntry, "notes", static_cast<int>(clip.notes.size()));
                 clips.add(clipEntry);
@@ -387,7 +396,6 @@ private:
         // The latency compensation: the latest path into the master, in samples.
         set(result, "latencyCompensationSamples", engine_.mixLatencySamples());
         set(result, "language", ui::language());
-        set(result, "nodeNamesInEnglish", app::Localization::instance().nodeNamesInEnglish());
         set(result, "translatedTexts", ui::translationCount());
         juce::StringArray languages;
         for (const auto& language : app::Localization::availableLanguages())
@@ -650,6 +658,16 @@ private:
         auto result = object();
         set(result, "nodes", nodes);
         set(result, "connections", connections);
+        // The cards switched off, as the engine is told: the node whose
+        // output is replaced and the one whose input passes (0: silence).
+        juce::Array<juce::var> bypasses;
+        for (const auto& bypass : target.graph().nativeDspGraph().bypasses) {
+            juce::Array<juce::var> pair;
+            pair.add(static_cast<juce::int64>(bypass.node));
+            pair.add(static_cast<juce::int64>(bypass.from));
+            bypasses.add(pair);
+        }
+        set(result, "bypasses", bypasses);
         if (!target.track) {
             juce::StringArray names;
             for (const auto& node : nodes)
@@ -713,16 +731,6 @@ private:
         for (const auto& clip : info.clips)
             if (clip.name.equalsIgnoreCase(clipName))
                 return clip;
-        return std::nullopt;
-    }
-
-    // The MIDI clip a launcher scene plays: one scene per sixteen beats.
-    [[nodiscard]] std::optional<std::uint64_t> launcherMidiClip(const std::uint64_t trackId, const int scene) const
-    {
-        if (const auto* clips = engine_.midiClipsView(trackId))
-            for (const auto& clip : *clips)
-                if (juce::roundToInt(clip.startBeats / 16.0) == scene)
-                    return clip.id;
         return std::nullopt;
     }
 
@@ -809,6 +817,7 @@ private:
     juce::var onGroove();
     juce::var onLocations();
     juce::var onSlotStop();
+    juce::var onMasterClip();
     juce::var onRemoveDevice();
     juce::var onGraphDevices();
     juce::var onWorkshop();
@@ -823,6 +832,7 @@ private:
     juce::var onAutomation();
     juce::var onModulate();
     juce::var onLaunchScene();
+    juce::var onVoiceLive();
     juce::var onLaunchClip();
     juce::var onArm();
     juce::var onRecord();
@@ -917,6 +927,94 @@ juce::var Commands::run()
         return onSynth();
     if (command == "batterie")
         return onBatterie();
+    if (command == "rack") {
+        // {track, action: "list" | "add" | "instrument" | "mix" | "sample" | "remove" | "open" | "close", note, pad,
+        // instrument, file, name, playAs, gainDb, pan, mute, solo, choke}: a rack's pads. Answers them all.
+        std::optional<RemoteTrack> track;
+        if (auto error = trackOrFail(track); !error.isVoid())
+            return error;
+        const auto ref = track->ref();
+        if (!ref.midi)
+            return fail("a rack is an instrument track's");
+        const auto action = text("action").isNotEmpty() ? text("action") : juce::String("list");
+        const auto note = static_cast<int>(number("note", 36.0));
+        std::optional<std::size_t> pad;
+        if (has("pad"))
+            pad = static_cast<std::size_t>(number("pad", 0.0));
+        else
+            pad = studio_.rackPadOfNote(ref, note);
+        juce::String error;
+        if (action == "add") {
+            if (!studio_.addRackPad(ref, note, text("instrument"), error))
+                return fail(error);
+        } else if (action == "instrument") {
+            if (!pad || !studio_.setRackPadInstrument(ref, *pad, text("instrument"), error))
+                return fail(error.isNotEmpty() ? error : juce::String("no pad there"));
+        } else if (action == "sample") {
+            if (!studio_.loadRackPadSample(ref, note, fileFor(text("file")), error))
+                return fail(error);
+        } else if (action == "remove") {
+            if (!pad || !studio_.removeRackPad(ref, *pad))
+                return fail("no pad there");
+        } else if (action == "mix") {
+            const auto* current = pad ? studio_.rackPad(ref, *pad) : nullptr;
+            if (current == nullptr)
+                return fail("no pad there");
+            Studio::RackPadMix mix { current->note, current->name, current->playAs, current->gainDb, current->pan, current->muted,
+                                     current->solo, current->choke };
+            if (has("newNote"))
+                mix.note = static_cast<int>(number("newNote", mix.note));
+            if (has("name"))
+                mix.name = text("name");
+            if (has("playAs"))
+                mix.playAs = static_cast<int>(number("playAs", mix.playAs));
+            if (has("gainDb"))
+                mix.gainDb = static_cast<float>(number("gainDb", mix.gainDb));
+            if (has("pan"))
+                mix.pan = static_cast<float>(number("pan", mix.pan));
+            if (has("mute"))
+                mix.muted = flag("mute", mix.muted);
+            if (has("solo"))
+                mix.solo = flag("solo", mix.solo);
+            if (has("choke"))
+                mix.choke = static_cast<int>(number("choke", mix.choke));
+            (void) studio_.setRackPadMix(ref, *pad, mix);
+        } else if (action == "open") {
+            if (!pad || studio_.rackPad(ref, *pad) == nullptr)
+                return fail("no pad there");
+            ui_.selectTrack(ref);
+            ui_.openRackPad(std::make_pair(ref.owner(), static_cast<int>(*pad)));
+        } else if (action == "close") {
+            ui_.openRackPad(std::nullopt);
+        } else if (action != "list") {
+            return fail("action is list, add, instrument, mix, sample, remove, open or close");
+        }
+        auto result = object();
+        set(result, "rack", studio_.isRack(ref));
+        juce::Array<juce::var> pads;
+        for (std::size_t index = 0; index < studio_.rackPadCount(ref); ++index) {
+            const auto* item = studio_.rackPad(ref, index);
+            auto entry = object();
+            set(entry, "pad", static_cast<int>(index));
+            set(entry, "note", item->note);
+            set(entry, "name", item->name);
+            set(entry, "playAs", item->playAs);
+            set(entry, "gainDb", item->gainDb);
+            set(entry, "pan", item->pan);
+            set(entry, "mute", item->muted);
+            set(entry, "solo", item->solo);
+            set(entry, "choke", item->choke);
+            juce::Array<juce::var> devices;
+            for (const auto& node : item->graph->graph().editorNodes())
+                if (!node.boundary)
+                    devices.add(node.typeKey);
+            set(entry, "devices", devices);
+            set(entry, "peak", studio_.rackPadPeak(ref, index));
+            pads.add(juce::var(entry));
+        }
+        set(result, "pads", pads);
+        return ok(result);
+    }
     if (command == "groove")
         return onGroove();
     if (command == "locations")
@@ -1117,7 +1215,8 @@ juce::var Commands::run()
     }
     if (command == "cab_impulse") {
         // {track, nodeId?, file | clear: true}: a "Baffle et micro" card's
-        // impulse response loaded from a sound file, or taken out. Answers
+        // impulse response (or an Empreinte's, a place's) loaded from a sound
+        // file, or taken out. Answers
         // what it holds: {name, channels, frames, sampleRate} or nothing.
         std::optional<RemoteTrack> track;
         if (auto error = trackOrFail(track); !error.isVoid())
@@ -1128,12 +1227,12 @@ juce::var Commands::run()
         auto nodeId = static_cast<std::uint64_t>(static_cast<juce::int64>(request_.getProperty("nodeId", 0)));
         if (nodeId == 0)
             for (const auto& node : slot->graph().editorNodes())
-                if (node.typeKey == "cab-sim") {
+                if (node.typeKey == "cab-sim" || node.typeKey == "empreinte") {
                     nodeId = node.id;
                     break;
                 }
         if (nodeId == 0)
-            return fail("no Baffle et micro card on that track");
+            return fail("no Baffle et micro or Empreinte card on that track");
         if (has("file")) {
             juce::String error;
             if (!studio_.loadCabImpulse(track->ref(), nodeId, fileFor(text("file")), error))
@@ -1416,9 +1515,6 @@ juce::var Commands::run()
         if (code.isEmpty() || !app::Localization::instance().setLanguage(code))
             return fail("no language \"" + code + "\"; status lists them");
         ui::setLanguage(code);
-        // Node names in English or in the language: {"nodeNamesInEnglish": bool}.
-        if (has("nodeNamesInEnglish"))
-            app::Localization::instance().setNodeNamesInEnglish(flag("nodeNamesInEnglish", true));
         studio_.refreshTranslations();
         return ok(status());
     }
@@ -1489,8 +1585,24 @@ juce::var Commands::run()
         return onModulate();
     if (command == "launch_scene" || command == "stop_launcher")
         return onLaunchScene();
+    if (command == "voice_live")
+        return onVoiceLive();
     if (command == "slot_stop")
         return onSlotStop();
+    if (command == "theme") {
+        const auto answer = ui_.themes(request_);
+        if (!answer.isObject())
+            return fail(answer.isString() ? answer.toString() : juce::String("no interface"));
+        return ok(answer);
+    }
+    if (command == "computer_keyboard" || command == "midi_inputs") {
+        const auto answer = ui_.midiInputs(command, request_);
+        if (!answer.isObject())
+            return fail(answer.isString() ? answer.toString() : juce::String("no interface"));
+        return ok(answer);
+    }
+    if (command == "master_clip")
+        return onMasterClip();
     if (command == "launch_clip" || command == "stop_track")
         return onLaunchClip();
     if (command == "arm")
@@ -1507,7 +1619,7 @@ juce::var Commands::run()
         return onDescribeNodeType();
     if (command == "describe_node" || command == "add_node" || command == "connect" || command == "disconnect"
         || command == "set_node" || command == "set_node_parameter" || command == "expose_parameter"
-        || command == "add_comment" || command == "remove_comment")
+        || command == "add_comment" || command == "remove_comment" || command == "move_device")
         return onNodes();
     if (command == "list_plugins")
         return onListPlugins();
@@ -1643,6 +1755,15 @@ juce::var Commands::onImportProject()
         return fail("no project file at " + file.getFullPathName());
     if (studio_.isRecording() || engine_.isRecording() || engine_.isMidiRecording())
         return fail("a recording is running");
+    // "background": as the person imports it, the interface drawing its bar;
+    // status says how far it is ("opening").
+    if (flag("background", false)) {
+        if (!ui_.importProjectInSteps(file))
+            return fail("could not start importing " + file.getFullPathName());
+        auto result = object();
+        set(result, "opening", true);
+        return ok(result);
+    }
     // Read once here for the report; the studio reads it again to build the
     // session.
     importer::ImportedProject project;
@@ -1757,7 +1878,7 @@ juce::var Commands::onSetView()
                      face == "takes" ? 1 : face == "stretch" ? 2 : face == "events" ? 3 : 0);
     }
     if (has("device") && !ui_.showDeviceEditor(static_cast<std::uint64_t>(number("device", 0.0)),
-                                                static_cast<int>(number("pane", 0.0)), flag("detached", false)))
+                                                static_cast<int>(number("pane", -1.0)), flag("detached", false)))
         return fail("no track selected to show that device for");
     auto result = object();
     set(result, "editorMode", ui_.currentView());
@@ -1814,11 +1935,11 @@ juce::var Commands::onTransport()
     const auto action = text("action");
     if (action == "play" || (action == "toggle" && !engine_.isPlaying())) {
         if (!engine_.isPlaying())
-            engine_.play();
+            studio_.play();
     } else if (action == "stop" || action == "toggle") {
         if (studio_.isRecording())
             (void) studio_.stopRecording(true);
-        engine_.stop();
+        studio_.stopPlayback();
     } else if (action == "rewind") {
         engine_.setPosition(0.0);
     } else if (action.isNotEmpty()) {
@@ -2237,7 +2358,17 @@ juce::var Commands::onEditNotes()
                         + (clipName.isNotEmpty() ? " named \"" + clipName + "\"" : juce::String()));
         const auto looping = has("looping") ? flag("looping", false) : clip->looping;
         auto applied = true;
-        if (has("startBeats"))
+        // {scene}: into that launcher slot (-1: back into the arrangement,
+        // at startBeats).
+        if (has("scene")) {
+            const auto scene = static_cast<int>(number("scene", -1.0));
+            if (scene >= Engine::maximumLauncherScenes)
+                return fail("scene is 0 to " + juce::String(Engine::maximumLauncherScenes - 1));
+            if (scene >= 0 && scene != clip->launcherScene && studio_.slotHasClip(TrackRef { true, 0, track->id }, scene))
+                return fail("that launcher slot holds a clip already");
+            applied = engine_.setMidiClipLauncherScene(track->id, clip->id, std::max(-1, scene));
+        }
+        if (applied && has("startBeats"))
             applied = engine_.setMidiClipStartBeats(track->id, clip->id, number("startBeats", clip->startBeats));
         if (applied && (has("name") || has("colour")))
             applied = engine_.setMidiClipPresentation(track->id, clip->id, text("name"), colourFrom(text("colour")));
@@ -2258,7 +2389,7 @@ juce::var Commands::onEditNotes()
                 if (candidate.id == clip->id) {
                     set(result, "name", candidate.name);
                     set(result, "startBeats", candidate.startBeats);
-                    set(result, "scene", juce::roundToInt(candidate.startBeats / 16.0));
+                    set(result, "scene", candidate.launcherScene);
                     set(result, "lengthBeats", candidate.lengthBeats);
                     set(result, "looping", candidate.looping);
                     set(result, "colour", colourText(candidate.colour));
@@ -2326,17 +2457,23 @@ juce::var Commands::onAddMidiClip()
         return error;
     if (!track->midi)
         return fail("MIDI clips go on MIDI tracks");
+    // {scene}: in that launcher slot; else in the arrangement at startBeats.
     const auto colour = colourFrom(text("colour"));
+    const auto scene = has("scene") ? static_cast<int>(number("scene", -1.0)) : -1;
+    if (scene >= Engine::maximumLauncherScenes)
+        return fail("scene is 0 to " + juce::String(Engine::maximumLauncherScenes - 1));
+    if (scene >= 0 && studio_.slotHasClip(TrackRef { true, 0, track->id }, scene))
+        return fail("that launcher slot holds a clip already");
     const auto clipId = engine_.addMidiClip(track->id, text("name").isNotEmpty() ? text("name") : app::tr("midi.clip"),
                                             std::max(0.0, number("startBeats", 0.0)),
                                             std::max(0.25, number("lengthBeats", 16.0)), flag("looping", false),
-                                            colour != 0 ? colour : 0xff4fd3aeu);
+                                            colour != 0 ? colour : 0xff4fd3aeu, std::max(-1, scene));
     if (clipId == 0)
         return fail("the clip could not be created");
     studio_.markDirty();
     auto result = object();
     set(result, "clipId", idOf(clipId));
-    set(result, "scene", juce::roundToInt(number("startBeats", 0.0) / 16.0));
+    set(result, "scene", std::max(-1, scene));
     return ok(result);
 }
 
@@ -2395,7 +2532,7 @@ juce::var Commands::onImportMidi()
     // The new tracks get a graph and an instrument, as the File menu does.
     for (const auto id : summary.trackIds) {
         (void) studio_.adoptMidiTrack(id, {});
-        (void) studio_.insertDevice(TrackRef { true, 0, id }, "synth-keys");
+        (void) studio_.insertDevice(TrackRef { true, 0, id }, "opale-instrument");
     }
     studio_.markDirty();
     if (!summary.trackIds.empty())
@@ -2448,10 +2585,18 @@ juce::var Commands::onInsertDevice()
         return fail("\"" + key + "\" is an instrument; put it on a MIDI track");
     if (track->bus && device->kind == "preset" && device->input != "audio")
         return fail("\"" + key + "\" does not process audio; a bus takes effects");
-    // A preset is the whole graph; a card with an input is spliced before
-    // the output; a source — an LFO, an oscillator — is placed free, to be
-    // cabled by modulate.
-    auto applied = device->kind == "preset"   ? graph.insertFactoryDevice(key)
+    // A preset is the whole graph (an instrument's, on an instrument track,
+    // takes the place of the one it plays, the effects after it kept); a
+    // card with an input is spliced before the output; a source — an LFO,
+    // an oscillator — is placed free, to be cabled by modulate.
+    // A MIDI card (an arpeggiator, chords…) goes before the instrument,
+    // after the MIDI cards already there.
+    const auto notes = device->input == "midi" && device->output == "midi";
+    if (notes && !track->midi)
+        return fail("\"" + key + "\" works on notes; put it on a MIDI track");
+    auto applied = device->kind == "preset"   ? (track->midi && device->soundSource ? graph.replaceInstrument(key)
+                                                                                    : graph.insertFactoryDevice(key))
+                   : notes                   ? graph.insertNodeBeforeInstrument(key)
                    : device->input == "none" ? graph.insertNode(key)
                                              : graph.insertNodeBeforeOutput(key);
     if (applied.failed() && device->kind != "preset")
@@ -2564,15 +2709,26 @@ juce::var Commands::onSampler()
         return ok(result);
     }
     if (command_ == "add_factory_instrument") {
-        // {key, model, download}: a new instrument track playing it (its samples, or
-        // its sound model); with `download`, its samples still missing fetched too.
+        // {key, model, download, track}: a new instrument track playing it (its
+        // samples, or its sound model), or on `track` in place of its
+        // instrument (its effects kept); with `download`, its samples still
+        // missing fetched too.
         juce::String error;
         const auto model = static_cast<bool>(request_.getProperty("model", false));
         if (!model && flag("download", false)) {
             juce::String ignored;
             (void) studio_.downloadFactoryInstrument(text("key"), ignored);
         }
-        const auto track = studio_.addFactoryInstrument(text("key"), error, model);
+        std::optional<TrackRef> onto;
+        if (has("track")) {
+            std::optional<RemoteTrack> target;
+            if (auto problem = trackOrFail(target); !problem.isVoid())
+                return problem;
+            if (!target->midi)
+                return fail("an instrument goes on an instrument (MIDI) track");
+            onto = target->ref();
+        }
+        const auto track = studio_.addFactoryInstrument(text("key"), error, model, onto);
         if (!track)
             return fail(error);
         auto result = trackResult(*track);
@@ -2612,7 +2768,8 @@ juce::var Commands::onSampler()
         return ok(trackResult(*track));
     }
     if (command_ == "load_sampler") {
-        // {file: .sfz | .cysampler, track}: on that track's sampler, else a new track.
+        // {file: .sfz | .cysampler, track}: on that track's sampler, else a new track;
+        // {file: a sound, track}: the one sample of that track's simple sampler.
         std::optional<TrackRef> on;
         if (has("track")) {
             std::optional<RemoteTrack> track;
@@ -4152,6 +4309,18 @@ juce::var Commands::onNodes()
         commitGraph(*target, true);
         return ok(graphSummary(*target));
     }
+    if (command_ == "move_device") {
+        // move_device {track, nodeId, before}: the device moved along its
+        // chain, just before the card `before` (0 or none: last), as a drag
+        // in the device panel does.
+        const auto before = static_cast<std::uint64_t>(number("before", 0.0));
+        if (!graph.editorMoveInChain(nodeId, before))
+            return fail("that device cannot move there (an instrument's voice, a card the signal does not go through, or it is "
+                        "already there)");
+        graph_layout::arrange(graph);
+        commitGraph(*target, true);
+        return ok(graphSummary(*target));
+    }
     if (command_ == "set_node") {
         std::optional<juce::Point<float>> position;
         if (has("x") && has("y"))
@@ -4161,6 +4330,9 @@ juce::var Commands::onNodes()
         // Folded to its title in the device panel and the graph.
         if (has("collapsed"))
             (void) graph.editorSetCollapsed(nodeId, flag("collapsed", false));
+        // Switched off: the sound goes past it (an instrument falls silent).
+        if (has("bypassed"))
+            (void) graph.editorSetBypassed(nodeId, flag("bypassed", false));
         commitGraph(*target, true);
         return ok(graph.describeNodeForRemote(nodeId));
     }
@@ -4781,14 +4953,18 @@ juce::var Commands::onAutomation()
 juce::var Commands::onLaunchScene()
 {
     // launch_scene {scene}: as the launcher does it (an empty slot stops its
-    // track unless its stop was taken off). stop_launcher: every clip.
+    // track unless its stop was taken off); {query:true} only reads what
+    // plays, and where (seconds into each clip). stop_launcher: every clip.
     const auto scene = static_cast<int>(number("scene", 0.0));
     auto launched = false;
-    if (command_ == "launch_scene") {
+    if (command_ == "launch_scene" && has("query")) {
+        // Read only.
+    } else if (command_ == "launch_scene") {
         if (scene < 0)
             return fail("scene is 0 or more");
         for (const auto& track : studio_.tracks())
             launched = studio_.slotHasClip(track, scene) || launched;
+        launched = studio_.masterClip(scene) != nullptr || launched;
         studio_.launchScene(scene);
     } else {
         studio_.stopAllClips();
@@ -4802,9 +4978,65 @@ juce::var Commands::onLaunchScene()
         set(entry, "track", studio_.trackName(track));
         set(entry, "scene", studio_.playingScene(track));
         set(entry, "pending", studio_.pendingScene(track));
+        set(entry, "position", track.midi ? engine_.midiLauncherClipPositionSeconds(track.midiId)
+                                          : engine_.launcherClipPositionSeconds(track.audioIndex));
         playing.add(entry);
     }
     set(result, "tracks", playing);
+    set(result, "masterScene", studio_.playingMasterScene());
+    set(result, "masterPendingScene", studio_.pendingMasterScene());
+    return ok(result);
+}
+
+juce::var Commands::onVoiceLive()
+{
+    // voice_live {track}: what the track's newest voice plays now (a
+    // Prisme's, a synth's of the family): the settings its own modulations
+    // move, by key, where they put them; its LFOs and envelopes.
+    std::optional<RemoteTrack> track;
+    if (auto error = trackOrFail(track); !error.isVoid())
+        return error;
+    engine::VoiceLive live;
+    const auto playing = studio_.voiceLive(track->ref(), live);
+    auto result = object();
+    set(result, "playing", playing);
+    if (!playing)
+        return ok(result);
+    // The keys: the instrument card's model names its settings.
+    std::function<juce::String(int)> keyOf = [](const int index) { return juce::String(index); };
+    if (const auto* slot = studio_.graphFor(track->ref())) {
+        for (const auto& card : slot->graph().editorNodes()) {
+            if (const auto synth = slot->graph().editorSynthValues(card.id); synth && synth->first != engine::synth::Model::none) {
+                const auto model = synth->first;
+                keyOf = [model](const int index) {
+                    return index < engine::synth::parameterCount(model) ? juce::String(engine::synth::parameter(model, index).key)
+                                                                         : juce::String(index);
+                };
+                break;
+            }
+            if (slot->graph().editorPrismValues(card.id)) {
+                keyOf = [](const int index) {
+                    return index < engine::prism::parameterCount ? juce::String(engine::prism::parameter(index).key) : juce::String(index);
+                };
+                break;
+            }
+        }
+    }
+    auto moved = object();
+    for (std::size_t index = 0; index < live.values.size(); ++index)
+        if (std::isfinite(live.values[index]))
+            if (auto* object = moved.getDynamicObject())
+                object->setProperty(keyOf(static_cast<int>(index)), live.values[index]);
+    set(result, "modulated", moved);
+    const auto numbers = [](const auto& values) {
+        juce::Array<juce::var> list;
+        for (const auto value : values)
+            list.add(std::isfinite(value) ? juce::var(value) : juce::var());
+        return list;
+    };
+    set(result, "lfos", numbers(live.lfos));
+    set(result, "lfoPhases", numbers(live.lfoPhases));
+    set(result, "envelopes", numbers(live.envelopes));
     return ok(result);
 }
 
@@ -4816,14 +5048,10 @@ juce::var Commands::onLaunchClip()
     auto done = false;
     if (command_ == "launch_clip") {
         const auto scene = static_cast<int>(number("scene", 0.0));
-        if (track->midi) {
-            const auto clip = launcherMidiClip(track->id, scene);
-            done = clip.has_value() && engine_.startMidiClipPreview(track->id, *clip, scene);
-        } else {
-            done = engine_.launchClip(track->index, scene);
-        }
+        done = studio_.launchSlot(track->ref(), scene);
     } else {
-        done = track->midi ? engine_.stopMidiClipPreview(track->id) : engine_.stopLauncherTrack(track->index, true);
+        studio_.stopTrackClips(track->ref());
+        done = true;
     }
     auto result = object();
     set(result, command_ == "launch_clip" ? "launched" : "stopped", done);
@@ -4840,12 +5068,110 @@ juce::var Commands::onSlotStop()
         return error;
     const auto scene = static_cast<int>(number("scene", 0.0));
     if (scene < 0 || scene >= Engine::maximumLauncherScenes)
-        return fail("scene is 0 to 7");
+        return fail("scene is 0 to " + juce::String(Engine::maximumLauncherScenes - 1));
     if (has("stops"))
         studio_.setSlotStops(track->ref(), scene, flag("stops", true));
     auto result = object();
     set(result, "stops", studio_.slotStops(track->ref(), scene));
     set(result, "hasClip", studio_.slotHasClip(track->ref(), scene));
+    return ok(result);
+}
+
+juce::var Commands::onMasterClip()
+{
+    // master_clip {scene, action}: the master's launcher clip of a scene,
+    // its automation. action "set" (the default when anything is given to
+    // set) makes it or changes it: name, lengthBeats, looping, and a lane's
+    // points {lane, points:[[beats, value]...]} (none: the lane removed;
+    // lane "master.gain" is its level in dB). "remove", "launch", "stop";
+    // "lanes" lists what a lane can automate. Without any: read.
+    const auto scene = static_cast<int>(number("scene", 0.0));
+    if (scene < 0 || scene >= Engine::maximumLauncherScenes)
+        return fail("scene is 0 to " + juce::String(Engine::maximumLauncherScenes - 1));
+    auto action = text("action");
+    if (action.isEmpty())
+        action = has("name") || has("lengthBeats") || has("looping") || has("lane") ? "set" : "read";
+    if (action == "set") {
+        auto clip = studio_.masterClip(scene) != nullptr ? *studio_.masterClip(scene) : studio_.createMasterClip(scene);
+        if (has("name"))
+            clip.name = text("name");
+        if (has("lengthBeats"))
+            clip.lengthBeats = number("lengthBeats", clip.lengthBeats);
+        if (has("looping"))
+            clip.looping = flag("looping", clip.looping);
+        if (has("lane")) {
+            const auto lane = text("lane");
+            const auto choices = studio_.masterLaneChoices();
+            if (std::none_of(choices.begin(), choices.end(), [&lane](const auto& choice) { return choice.binding == lane; }))
+                return fail("no such lane (action lanes lists them): " + lane);
+            std::vector<MasterClip::Point> points;
+            if (const auto* list = request_.getProperty("points", juce::var()).getArray())
+                for (const auto& entry : *list) {
+                    if (const auto* pair = entry.getArray(); pair != nullptr && pair->size() >= 2)
+                        points.push_back({ static_cast<double>((*pair)[0]), static_cast<float>(static_cast<double>((*pair)[1])) });
+                    else if (entry.isObject())
+                        points.push_back({ numberOf(entry, "beats", 0.0), static_cast<float>(numberOf(entry, "value", 0.0)) });
+                }
+            if (points.empty())
+                clip.lanes.erase(lane);
+            else
+                clip.lanes[lane] = std::move(points);
+        }
+        studio_.setMasterClip(scene, std::move(clip));
+    } else if (action == "remove") {
+        studio_.removeMasterClip(scene);
+    } else if (action == "launch") {
+        if (!studio_.launchMasterClip(scene))
+            return fail("scene " + juce::String(scene) + " has no master clip");
+    } else if (action == "stop") {
+        studio_.stopMasterClip();
+    } else if (action != "read" && action != "lanes") {
+        return fail("action is set, remove, launch, stop, lanes or read");
+    }
+    auto result = object();
+    set(result, "scene", scene);
+    if (const auto* clip = studio_.masterClip(scene)) {
+        set(result, "exists", true);
+        set(result, "name", clip->name);
+        set(result, "lengthBeats", clip->lengthBeats);
+        set(result, "looping", clip->looping);
+        juce::Array<juce::var> lanes;
+        for (const auto& [binding, points] : clip->lanes) {
+            auto lane = object();
+            set(lane, "lane", binding);
+            juce::Array<juce::var> list;
+            for (const auto& point : points) {
+                juce::Array<juce::var> pair;
+                pair.add(point.beats);
+                pair.add(static_cast<double>(point.value));
+                list.add(pair);
+            }
+            set(lane, "points", list);
+            lanes.add(lane);
+        }
+        set(result, "lanes", lanes);
+    } else {
+        set(result, "exists", false);
+    }
+    set(result, "playingScene", studio_.playingMasterScene());
+    set(result, "pendingScene", studio_.pendingMasterScene());
+    set(result, "progress", static_cast<double>(studio_.masterClipProgress()));
+    set(result, "masterGainDb", static_cast<double>(engine_.masterGainDb()));
+    set(result, "masterClockSeconds", engine_.masterClockSeconds());
+    if (action == "lanes") {
+        juce::Array<juce::var> choices;
+        for (const auto& choice : studio_.masterLaneChoices()) {
+            auto entry = object();
+            set(entry, "lane", choice.binding);
+            set(entry, "label", choice.label);
+            set(entry, "unit", choice.unit);
+            set(entry, "minimum", choice.minimum);
+            set(entry, "maximum", choice.maximum);
+            set(entry, "value", choice.value);
+            choices.add(entry);
+        }
+        set(result, "choices", choices);
+    }
     return ok(result);
 }
 
@@ -5566,6 +5892,19 @@ juce::var Commands::onSamples()
         ui_.browseSamples(text("query"), flag("semantic", false), text("family"), text("category"), text("source"));
         return ok(statusOf());
     }
+    if (command_ == "preview_sample" && flag("query", false)) {
+        // What is heard: the loop's place (0..1 of it) and the transport's,
+        // of the same block.
+        auto result = object();
+        set(result, "previewing", engine_.isSamplePreviewing());
+        set(result, "position", engine_.samplePreviewPositionSeconds());
+        set(result, "loopBeats", engine_.samplePreviewLoopBeats());
+        set(result, "transportPosition", engine_.position());
+        set(result, "transportPlaying", engine_.isPlaying());
+        set(result, "latencySeconds", static_cast<double>(engine_.mixLatencySamples()) / std::max(1.0, engine_.auditionSampleRate()));
+        set(result, "tempo", engine_.tempo());
+        return ok(result);
+    }
     if (command_ == "select_sample" || command_ == "preview_sample") {
         const auto path = fileFor(text("path")).getFullPathName();
         const auto* record = library.find(path);
@@ -5582,13 +5921,17 @@ juce::var Commands::onSamples()
                 return fail("no file at " + path);
             if (has("gainDb"))
                 engine_.setSamplePreviewGainDb(static_cast<float>(juce::jlimit(-60.0, 6.0, number("gainDb", -6.0))));
-            if (const auto started = engine_.startSamplePreview(juce::File(path), std::max(0.0, number("start", 0.0)));
+            // atTempo: a loop with a tempo at the project's (as the library's switch).
+            if (const auto started = studio_.auditionSample(path, std::max(0.0, number("start", 0.0)), flag("atTempo", false));
                 started.failed())
                 return fail(started.getErrorMessage());
         }
         auto result = object();
         set(result, "previewing", engine_.isSamplePreviewing());
         set(result, "position", engine_.samplePreviewPositionSeconds());
+        set(result, "loopBeats", engine_.samplePreviewLoopBeats());
+        set(result, "fromBpm", studio_.auditionTempoOf(path));
+        set(result, "tempo", engine_.tempo());
         return ok(result);
     }
     if (command_ == "search_samples" && (has("semantic") || has("similar"))) {

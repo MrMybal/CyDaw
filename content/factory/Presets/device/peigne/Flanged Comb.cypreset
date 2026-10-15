@@ -1,0 +1,22 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "peigne",
+ "name": "Flanged Comb",
+ "state": {
+  "type": "peigne",
+  "parameters": {
+   "peigne.frequency": 800.0,
+   "peigne.feedback": 0.7,
+   "peigne.damping": 9000.0,
+   "peigne.spread": 0.3,
+   "peigne.lfoDepth": 0.6,
+   "peigne.lfoRate": 0.2,
+   "peigne.mix": 0.5,
+   "peigne.output": 0.0,
+   "peigne.mode": 0.0,
+   "peigne.sync": 0.0
+  }
+ }
+}

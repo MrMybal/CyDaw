@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "sonometre",
+ "name": "Mixing in Progress (Short History)",
+ "state": {
+  "type": "sonometre",
+  "parameters": {
+   "sonometre.target": 0.0,
+   "sonometre.history": 15.0,
+   "sonometre.truePeak": -1.0
+  }
+ }
+}

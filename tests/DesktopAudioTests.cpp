@@ -558,6 +558,14 @@ bool runProjectImportTests(const juce::File& tempRoot, const juce::File& toneFil
                           << " start " << clip.startSeconds << " dur " << clip.durationSeconds
                           << " src " << clip.sourceOffsetSeconds << "+" << clip.sourceDurationSeconds
                           << " " << clip.file.getFullPathName() << std::endl;
+        for (const auto& track : project.tracks)
+            for (const auto& device : track.chain) {
+                std::cout << "  device " << track.name << ": " << device.name << " [" << device.type << "]"
+                          << (device.plugin ? " plugin" : "") << (device.instrument ? " instrument" : "")
+                          << (device.noteEffect ? " note-effect" : "") << std::endl;
+                for (const auto& [key, value] : device.settings)
+                    std::cout << "    " << key << " = " << value << std::endl;
+            }
     }
     const auto near = [](const double a, const double b, const double tolerance = 0.02) {
         return std::abs(a - b) <= tolerance;
@@ -717,8 +725,9 @@ bool runProjectImportTests(const juce::File& tempRoot, const juce::File& toneFil
                                 && near(lead.midiClips[0].notes[3].startBeats, 3.0),
                             "bitwig: looped note clip unrolled, named velocity") && passed;
             const auto& audio = project.tracks[1];
-            passed = expect(!audio.midi && audio.name == "Hit" && near(audio.gainDb, -10.0, 0.05),
-                            "bitwig: audio track named after its clip, -10 dB default") && passed;
+            // Unnamed, it is named as Bitwig shows it: its kind and its place.
+            passed = expect(!audio.midi && audio.name == "Audio 2" && near(audio.gainDb, -10.0, 0.05),
+                            "bitwig: an unnamed audio track named as Bitwig shows it, -10 dB default") && passed;
             passed = expect(audio.audioClips.size() == 1 && audio.audioClips[0].launcherScene == 0
                                 && audio.audioClips[0].file.existsAsFile()
                                 && near(audio.audioClips[0].durationSeconds, 1.0),
@@ -6455,8 +6464,11 @@ int main(const int argc, char* argv[])
 
         // 52: the sound model synth (a recorded note made playable), then the
         // sampler, joined; 54: Kick, after Prisme; 58: the synth family's
-        // four (Ambre, Colosse, Mosaïque, Nébuleuse); 59: Batterie.
-        passed = expect(graph.factoryPresetCount() == 59,
+        // four (Ambre, Colosse, Mosaïque, Nébuleuse); 59: Batterie; 60: the
+        // simple sampler; 69: Opale, Onyx, Tirette, Alliage, Quartz, Argile,
+        // Saphir, Dérive, Bronze; 72: Nuée, Silex, the pad rack and Jade, the
+        // de-esser chain gone (the De-esseur is an effect of its own).
+        passed = expect(graph.factoryPresetCount() == 72,
                         "factory node-graph preset catalogue") && passed;
         cydaw::app::NodeGraphComponent emptyInstrumentGraph;
         emptyInstrumentGraph.initialiseEmptyMidiTrackGraph();

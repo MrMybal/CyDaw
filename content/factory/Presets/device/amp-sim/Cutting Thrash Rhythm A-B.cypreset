@@ -1,0 +1,41 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "amp-sim",
+ "name": "Cutting Thrash Rhythm A-B",
+ "state": {
+  "type": "amp-sim",
+  "parameters": {
+   "amp.gain": 8.0,
+   "amp.bass": 5.5,
+   "amp.middle": 5.0,
+   "amp.treble": 7.0,
+   "amp.presence": 7.0,
+   "amp.master": 6.0,
+   "amp.output": -1.0,
+   "amp.mix": 1.0,
+   "amp.model": 2.0,
+   "amp.bright": 1.0,
+   "amp.depth": 6.0,
+   "amp.sag": 0.15,
+   "amp.tight": 130.0,
+   "amp.gate": -58.0,
+   "amp.pedal": 2.0,
+   "amp.pedalDrive": 0.0,
+   "amp.pedalTone": 0.7,
+   "amp.pedalLevel": 8.0,
+   "amp.oversampling": 2.0,
+   "amp.channel": 0.0,
+   "amp.modelB": 3.0,
+   "amp.gainB": 8.0,
+   "amp.bassB": 5.0,
+   "amp.middleB": 6.5,
+   "amp.trebleB": 6.5,
+   "amp.presenceB": 6.5,
+   "amp.masterB": 6.0,
+   "amp.brightB": 0.0,
+   "amp.depthB": 5.5
+  }
+ }
+}

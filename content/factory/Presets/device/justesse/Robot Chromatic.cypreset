@@ -1,0 +1,23 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "justesse",
+ "name": "Robot Chromatic",
+ "state": {
+  "type": "justesse",
+  "parameters": {
+   "justesse.speed": 0.0,
+   "justesse.amount": 1.0,
+   "justesse.humanize": 0.0,
+   "justesse.transpose": 0.0,
+   "justesse.mix": 1.0,
+   "justesse.output": 0.0,
+   "justesse.key": 0.0,
+   "justesse.scale": 0.0,
+   "justesse.lowPitch": 70.0,
+   "justesse.highPitch": 1000.0,
+   "justesse.sensitivity": 0.5
+  }
+ }
+}

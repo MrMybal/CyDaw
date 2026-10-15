@@ -1,0 +1,16 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "roulement",
+ "name": "Rising Hat Roll",
+ "state": {
+  "type": "roulement",
+  "parameters": {
+   "roulement.rate": 8.0,
+   "roulement.gate": 0.4,
+   "roulement.ramp": 0.4,
+   "roulement.sync": 2.0
+  }
+ }
+}

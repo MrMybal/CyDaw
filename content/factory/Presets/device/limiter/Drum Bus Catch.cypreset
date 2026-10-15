@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "limiter",
+ "name": "Drum Bus Catch",
+ "state": {
+  "type": "limiter",
+  "parameters": {
+   "limiter.gain": 2.0,
+   "limiter.ceiling": -2.0,
+   "limiter.release": 20.0
+  }
+ }
+}

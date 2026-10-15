@@ -1,0 +1,21 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "arpege",
+ "name": "Latched Pad Arp",
+ "state": {
+  "type": "arpege",
+  "parameters": {
+   "arpege.gate": 1.2,
+   "arpege.swing": 0.0,
+   "arpege.velocity": 100.0,
+   "arpege.rate": 6.0,
+   "arpege.mode": 4.0,
+   "arpege.octaves": 1.0,
+   "arpege.velocityMode": 0.0,
+   "arpege.latch": 1.0,
+   "arpege.retrigger": 1.0
+  }
+ }
+}

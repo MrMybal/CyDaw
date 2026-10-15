@@ -1,0 +1,35 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "reverb-pro",
+ "name": "Cinematic Trailer Hall",
+ "state": {
+  "type": "reverb-pro",
+  "parameters": {
+   "revpro.space": 1.0,
+   "revpro.decay": 6.5,
+   "revpro.predelay": 60.0,
+   "revpro.distance": 0.65,
+   "revpro.brightness": -0.25,
+   "revpro.character": 0.45,
+   "revpro.width": 1.5,
+   "revpro.mix": 0.38,
+   "revpro.lowDecay": 1.6,
+   "revpro.lowFrequency": 180.0,
+   "revpro.midDecay": 1.1,
+   "revpro.midFrequency": 900.0,
+   "revpro.highDecay": 0.45,
+   "revpro.highFrequency": 4000.0,
+   "revpro.lowCut": 40.0,
+   "revpro.highCut": 9000.0,
+   "revpro.ducking": 0.0,
+   "revpro.duckRelease": 300.0,
+   "revpro.freeze": 0.0,
+   "revpro.sync": 0.0,
+   "revpro.diffusion": 0.9,
+   "revpro.output": 0.0,
+   "revpro.early": -8.0
+  }
+ }
+}

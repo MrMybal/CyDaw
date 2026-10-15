@@ -1,0 +1,25 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "echo-bande",
+ "name": "Trap Vocal Dotted Throw",
+ "state": {
+  "type": "echo-bande",
+  "parameters": {
+   "echoband.time": 150.0,
+   "echoband.intensity": 0.5,
+   "echoband.echo": 0.7,
+   "echoband.reverb": 0.0,
+   "echoband.bass": -8.0,
+   "echoband.treble": 2.0,
+   "echoband.wow": 0.05,
+   "echoband.mix": 0.3,
+   "echoband.mode": 1.0,
+   "echoband.sync": 5.0,
+   "echoband.drive": 0.0,
+   "echoband.age": 0.1,
+   "echoband.width": 0.5
+  }
+ }
+}

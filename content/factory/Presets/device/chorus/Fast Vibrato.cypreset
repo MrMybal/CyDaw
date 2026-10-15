@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "chorus",
+ "name": "Fast Vibrato",
+ "state": {
+  "type": "chorus",
+  "parameters": {
+   "chorus.rate": 5.5,
+   "chorus.depth": 0.4,
+   "chorus.delay": 6.0,
+   "chorus.width": 0.5,
+   "chorus.mix": 1.0
+  }
+ }
+}

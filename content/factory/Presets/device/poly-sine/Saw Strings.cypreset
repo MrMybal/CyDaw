@@ -1,0 +1,23 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "poly-sine",
+ "name": "Saw Strings",
+ "state": {
+  "type": "poly-sine",
+  "parameters": {
+   "node.10002.voice.mode": 0.0,
+   "node.10002.voice.glide": 0.0,
+   "node.10003.polyOscillator.waveform": 2.0,
+   "node.10003.polyOscillator.level": 0.1,
+   "node.10004.envelope.attack": 380.0,
+   "node.10004.envelope.decay": 900.0,
+   "node.10004.envelope.sustain": 0.8,
+   "node.10004.envelope.release": 900.0,
+   "node.10007.gain.db": 0.0,
+   "node.10005.voiceFilter.cutoff": 3800.0,
+   "node.10005.voiceFilter.resonance": 0.75
+  }
+ }
+}

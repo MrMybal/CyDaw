@@ -1,0 +1,16 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "stereoscope",
+ "name": "Mastering Watch",
+ "state": {
+  "type": "stereoscope",
+  "parameters": {
+   "stereoscope.zoom": 1.0,
+   "stereoscope.persistence": 0.7,
+   "stereoscope.history": 30.0,
+   "stereoscope.displayMode": 0.0
+  }
+ }
+}

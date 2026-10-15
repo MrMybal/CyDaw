@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "echo-space",
+ "name": "Dotted Eighth",
+ "state": {
+  "type": "echo-space",
+  "parameters": {
+   "node.15002.delay.time": 375.0,
+   "node.15002.delay.feedback": 0.42,
+   "node.15002.delay.mix": 0.3,
+   "node.15003.reverb.roomSize": 0.72,
+   "node.15003.reverb.mix": 0.22
+  }
+ }
+}

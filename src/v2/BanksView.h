@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Studio.h"
 #include "UiState.h"
 
 // The sound banks' window (Options › Banques de sons, or the instruments'

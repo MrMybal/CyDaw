@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "auto-filter",
+ "name": "Eighth Wobble",
+ "state": {
+  "type": "auto-filter",
+  "parameters": {
+   "autofilter.cutoff": 500.0,
+   "autofilter.resonance": 5.0,
+   "autofilter.rate": 4.0,
+   "autofilter.depth": 0.85,
+   "autofilter.sync": 6.0
+  }
+ }
+}

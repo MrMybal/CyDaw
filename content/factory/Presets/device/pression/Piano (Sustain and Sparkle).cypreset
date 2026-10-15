@@ -1,0 +1,42 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "pression",
+ "name": "Piano (Sustain and Sparkle)",
+ "state": {
+  "type": "pression",
+  "parameters": {
+   "pression.depth": 0.3,
+   "pression.time": 0.75,
+   "pression.upward": 0.9,
+   "pression.downward": 0.5,
+   "pression.lowGain": 0.0,
+   "pression.midGain": 0.0,
+   "pression.highGain": 1.0,
+   "pression.output": 0.0,
+   "pression.input": 0.0,
+   "pression.crossLow": 200.0,
+   "pression.crossHigh": 3500.0,
+   "pression.lowDownThreshold": -28.0,
+   "pression.lowDownRatio": 4.0,
+   "pression.lowUpThreshold": -50.0,
+   "pression.lowUpRatio": 2.5,
+   "pression.lowAttack": 40.0,
+   "pression.lowRelease": 300.0,
+   "pression.midDownThreshold": -26.0,
+   "pression.midDownRatio": 4.0,
+   "pression.midUpThreshold": -50.0,
+   "pression.midUpRatio": 2.5,
+   "pression.midAttack": 25.0,
+   "pression.midRelease": 300.0,
+   "pression.highDownThreshold": -28.0,
+   "pression.highDownRatio": 4.0,
+   "pression.highUpThreshold": -50.0,
+   "pression.highUpRatio": 2.5,
+   "pression.highAttack": 15.0,
+   "pression.highRelease": 200.0,
+   "pression.solo": 0.0
+  }
+ }
+}

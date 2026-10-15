@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "mic-sim",
+ "name": "Ambient Mic at the Back of the Hall",
+ "state": {
+  "type": "mic-sim",
+  "parameters": {
+   "micsim.distance": 200.0,
+   "micsim.angle": 0.0,
+   "micsim.drive": 0.0,
+   "micsim.lowCut": 60.0,
+   "micsim.highCut": 16000.0,
+   "micsim.room": 0.9,
+   "micsim.output": 0.0,
+   "micsim.mix": 1.0,
+   "micsim.model": 4.0,
+   "micsim.pattern": 1.0,
+   "micsim.preamp": 0.0,
+   "micsim.noise": -80.0,
+   "micsim.roomSize": 1.0,
+   "micsim.roomTone": 6000.0
+  }
+ }
+}

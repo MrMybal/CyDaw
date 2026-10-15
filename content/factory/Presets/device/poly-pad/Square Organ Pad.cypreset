@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "poly-pad",
+ "name": "Square Organ Pad",
+ "state": {
+  "type": "poly-pad",
+  "parameters": {
+   "node.18002.voice.mode": 0.0,
+   "node.18002.voice.glide": 0.0,
+   "node.18003.polyOscillator.waveform": 3.0,
+   "node.18003.polyOscillator.level": 0.08,
+   "node.18004.envelope.attack": 300.0,
+   "node.18004.envelope.decay": 1200.0,
+   "node.18004.envelope.sustain": 0.85,
+   "node.18004.envelope.release": 2200.0,
+   "node.18005.gain.db": 0.0,
+   "node.18006.voiceFilter.cutoff": 2600.0,
+   "node.18006.voiceFilter.resonance": 0.8,
+   "node.18007.stereo.width": 1.2,
+   "node.18008.reverb.roomSize": 0.7,
+   "node.18008.reverb.mix": 0.25
+  }
+ }
+}

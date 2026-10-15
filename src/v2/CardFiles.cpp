@@ -55,19 +55,21 @@ const std::vector<float>& curveOf(const engine::ImpulseResponseRef& response)
 
 } // namespace
 
-CardFileScope::CardFileScope(Studio& studio, UiState& state, const TrackRef& track, app::NodeGraphComponent& graph,
+CardFileScope::CardFileScope(DeviceHost& studio, UiState& state, const TrackRef& track, app::NodeGraphComponent& graph,
                              const std::uint64_t nodeId, const juce::String& typeKey)
 {
-    if (typeKey != "cab-sim")
+    if (typeKey != "cab-sim" && typeKey != "empreinte")
         return;
+    const auto room = typeKey == "empreinte";
     if (const auto response = graph.nodeImpulse(nodeId); response != nullptr && !response->channels.empty()) {
         file_.name = juce::String(response->name);
         file_.curveDb = &curveOf(response);
     }
     auto* studioPointer = &studio;
     auto* statePointer = &state;
-    file_.load = [studioPointer, statePointer, track, nodeId] {
-        chooser = std::make_unique<juce::FileChooser>(ui::Ls("Une réponse impulsionnelle de baffle", "A cabinet impulse response"),
+    file_.load = [studioPointer, statePointer, track, nodeId, room] {
+        chooser = std::make_unique<juce::FileChooser>(room ? ui::Ls("La réponse impulsionnelle d'un lieu", "A place's impulse response")
+                                                           : ui::Ls("Une réponse impulsionnelle de baffle", "A cabinet impulse response"),
                                                       juce::File(), "*.wav;*.wave;*.aif;*.aiff;*.flac");
         chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                              [studioPointer, statePointer, track, nodeId](const juce::FileChooser& picked) {

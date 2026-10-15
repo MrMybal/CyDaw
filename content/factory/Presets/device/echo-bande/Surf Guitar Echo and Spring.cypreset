@@ -1,0 +1,25 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "echo-bande",
+ "name": "Surf Guitar Echo and Spring",
+ "state": {
+  "type": "echo-bande",
+  "parameters": {
+   "echoband.time": 160.0,
+   "echoband.intensity": 0.3,
+   "echoband.echo": 0.55,
+   "echoband.reverb": 0.75,
+   "echoband.bass": -2.0,
+   "echoband.treble": 2.0,
+   "echoband.wow": 0.15,
+   "echoband.mix": 0.5,
+   "echoband.mode": 4.0,
+   "echoband.sync": 0.0,
+   "echoband.drive": 2.0,
+   "echoband.age": 0.2,
+   "echoband.width": 0.5
+  }
+ }
+}

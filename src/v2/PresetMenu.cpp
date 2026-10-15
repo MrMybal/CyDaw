@@ -13,7 +13,7 @@ namespace cydaw::v2 {
 using ui::dp;
 using ui::L;
 
-PresetMenu::PresetMenu(Studio& studio, UiState& state) : studio_(studio), state_(state) {}
+PresetMenu::PresetMenu(DeviceHost& studio, UiState& state) : studio_(studio), state_(state) {}
 
 void PresetMenu::report(const juce::String& text, const bool error)
 {
@@ -24,7 +24,7 @@ void PresetMenu::report(const juce::String& text, const bool error)
     state_.statusTime = ImGui::GetTime();
 }
 
-void PresetMenu::open(const char* id, const Studio::PresetHolder& holder, const Programs* programs)
+void PresetMenu::open(const char* id, const PresetHolder& holder, const Programs* programs)
 {
     programNames_.clear();
     programCurrent_ = -1;
@@ -42,7 +42,7 @@ void PresetMenu::open(const char* id, const Studio::PresetHolder& holder, const 
     ImGui::OpenPopup(id);
 }
 
-bool PresetMenu::load(const presets::Entry& entry, const Studio::PresetHolder& holder, const Apply& apply)
+bool PresetMenu::load(const presets::Entry& entry, const PresetHolder& holder, const Apply& apply)
 {
     juce::String error;
     const auto state = presets::read(entry, holder.kind, error);
@@ -55,7 +55,7 @@ bool PresetMenu::load(const presets::Entry& entry, const Studio::PresetHolder& h
     return true;
 }
 
-void PresetMenu::step(const int direction, const Studio::PresetHolder& holder, const Apply& apply)
+void PresetMenu::step(const int direction, const PresetHolder& holder, const Apply& apply)
 {
     const auto entries = presets::list(holder.kind, holder.target);
     if (entries.empty()) {
@@ -72,7 +72,7 @@ void PresetMenu::step(const int direction, const Studio::PresetHolder& holder, c
     (void) load(entries[static_cast<std::size_t>(index)], holder, apply);
 }
 
-void PresetMenu::button(const char* id, const Studio::PresetHolder& holder, const Capture& capture, const Apply& apply,
+void PresetMenu::button(const char* id, const PresetHolder& holder, const Capture& capture, const Apply& apply,
                         const ImVec2 size, const Programs* programs)
 {
     const auto current = studio_.presetName(holder.key);
@@ -85,7 +85,7 @@ void PresetMenu::button(const char* id, const Studio::PresetHolder& holder, cons
     ImGui::PopID();
 }
 
-void PresetMenu::bar(const char* id, const Studio::PresetHolder& holder, const Capture& capture, const Apply& apply,
+void PresetMenu::bar(const char* id, const PresetHolder& holder, const Capture& capture, const Apply& apply,
                      const float width, const Programs* programs)
 {
     ImGui::PushID(id);
@@ -114,7 +114,7 @@ void PresetMenu::bar(const char* id, const Studio::PresetHolder& holder, const C
     ImGui::PopID();
 }
 
-void PresetMenu::popup(const char* id, const Studio::PresetHolder& holder, const Capture& capture, const Apply& apply,
+void PresetMenu::popup(const char* id, const PresetHolder& holder, const Capture& capture, const Apply& apply,
                        const Programs* programs)
 {
     ImGui::SetNextWindowSizeConstraints(ImVec2(dp(280.0f), 0.0f), ImVec2(dp(420.0f), dp(520.0f)));

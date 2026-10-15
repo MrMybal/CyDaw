@@ -1,0 +1,15 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "tuner",
+ "name": "Baroque 415",
+ "state": {
+  "type": "tuner",
+  "parameters": {
+   "tuner.reference": 415.0,
+   "tuner.mute": 0.0,
+   "tuner.displayMode": 0.0
+  }
+ }
+}

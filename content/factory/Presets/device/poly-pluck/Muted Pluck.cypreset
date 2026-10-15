@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "poly-pluck",
+ "name": "Muted Pluck",
+ "state": {
+  "type": "poly-pluck",
+  "parameters": {
+   "node.35002.voice.mode": 0.0,
+   "node.35002.voice.glide": 0.0,
+   "node.35003.polyOscillator.waveform": 2.0,
+   "node.35003.polyOscillator.level": 0.16,
+   "node.35004.envelope.attack": 1.0,
+   "node.35004.envelope.decay": 150.0,
+   "node.35004.envelope.sustain": 0.0,
+   "node.35004.envelope.release": 110.0,
+   "node.35005.gain.db": 0.0,
+   "node.35006.voiceFilter.cutoff": 1600.0,
+   "node.35006.voiceFilter.resonance": 1.0,
+   "node.35007.delay.time": 250.0,
+   "node.35007.delay.feedback": 0.2,
+   "node.35007.delay.mix": 0.12
+  }
+ }
+}

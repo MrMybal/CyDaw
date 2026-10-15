@@ -1,0 +1,22 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "corps",
+ "name": "Metal Plate Hit",
+ "state": {
+  "type": "corps",
+  "parameters": {
+   "corps.tune": 140.0,
+   "corps.decay": 0.75,
+   "corps.material": 0.95,
+   "corps.inharmonic": 0.0,
+   "corps.position": 0.6,
+   "corps.mix": 0.45,
+   "corps.output": 0.0,
+   "corps.width": 0.8,
+   "corps.type": 4.0,
+   "corps.lowCut": 80.0
+  }
+ }
+}

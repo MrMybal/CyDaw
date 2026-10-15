@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "poly-bass",
+ "name": "Soft Upright",
+ "state": {
+  "type": "poly-bass",
+  "parameters": {
+   "node.19002.voice.mode": 1.0,
+   "node.19002.voice.glide": 0.0,
+   "node.19003.polyOscillator.waveform": 1.0,
+   "node.19003.polyOscillator.level": 0.2,
+   "node.19004.envelope.attack": 6.0,
+   "node.19004.envelope.decay": 600.0,
+   "node.19004.envelope.sustain": 0.0,
+   "node.19004.envelope.release": 220.0,
+   "node.19005.gain.db": 0.0,
+   "node.19006.voiceFilter.cutoff": 700.0,
+   "node.19006.voiceFilter.resonance": 0.8,
+   "node.19007.drive.db": 0.0,
+   "node.19008.compressor.threshold": -12.0,
+   "node.19008.compressor.ratio": 2.0
+  }
+ }
+}

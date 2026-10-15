@@ -8,6 +8,12 @@
 // one note through processBlock, offline. Prints one JSON line:
 // {"loaded": true, "rms": ..., "peak": ..., "name": ...}. Nothing reaches a
 // sound device.
+//
+//     cydaw_graph_runtime_host <plugin.vst3> <state.json> <note> editor <frame.png>
+//
+// Its window instead, off the screen, while the note (an instrument) or a
+// sine (an effect) goes through it for its displays: the plug-in writes one
+// frame of it (CYDAW_PLUGIN_SNAPSHOT, which the caller sets to <frame.png>).
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_events/juce_events.h>
@@ -44,8 +50,10 @@ int main(int argc, char* argv[])
     const auto mode = argc > 4 ? juce::String(argv[4]) : juce::String("early");
     // Restored as a host restores it: before it is activated ("early"), or
     // after ("late"); "passthrough" gives it no state and a sine to pass.
-    const auto state = stateFile.loadFileAsString();
-    if (state.isEmpty() && mode != "passthrough")
+    // "editor" with no state file ("-"): the plug-in as built (an export's own
+    // embedded state).
+    const auto state = stateFile.existsAsFile() ? stateFile.loadFileAsString() : juce::String();
+    if (state.isEmpty() && mode != "passthrough" && mode != "editor")
         return report("no state in " + stateFile.getFullPathName());
     // A hosted VST3's state is its component's bytes in JUCE's container (as
     // getStateInformation gives it): the plug-in itself receives the bytes
@@ -60,7 +68,7 @@ int main(int argc, char* argv[])
     const auto restore = [&plugin, &wrapped] {
         plugin->setStateInformation(wrapped.getData(), static_cast<int>(wrapped.getSize()));
     };
-    if (mode == "early")
+    if (mode == "early" || (mode == "editor" && state.isNotEmpty()))
         restore();
     // "set:<name>[|<other name>]=<0..1>" after the mode: a parameter the
     // host shows, by its name, moved as a host moves it (before the note).
@@ -92,6 +100,48 @@ int main(int argc, char* argv[])
         restore();
     const auto channels = std::max(2, std::max(plugin->getTotalNumInputChannels(), plugin->getTotalNumOutputChannels()));
     juce::AudioBuffer<float> buffer(channels, block);
+    if (mode == "editor") {
+        const juce::File frame(argc > 5 ? juce::String::fromUTF8(argv[5]) : juce::String());
+        std::unique_ptr<juce::AudioProcessorEditor> editor(plugin->createEditorIfNeeded());
+        if (editor == nullptr)
+            return report("the plug-in has no window");
+        // Off the screen: nothing shows, nothing takes the focus.
+        editor->setTopLeftPosition(-8'000, -8'000);
+        editor->addToDesktop(0);
+        editor->setVisible(true);
+        const auto started = juce::Time::getMillisecondCounterHiRes();
+        auto written = false;
+        auto played = 0;
+        while (juce::Time::getMillisecondCounterHiRes() - started < 20'000.0) {
+            // Its sound for its displays: a sine in, and the note held.
+            buffer.clear();
+            for (auto index = 0; index < block; ++index)
+                for (auto channel = 0; channel < channels; ++channel)
+                    buffer.setSample(channel, index, 0.25f * std::sin(6.2831853f * 440.0f * static_cast<float>(played + index) / 48'000.0f));
+            juce::MidiBuffer midi;
+            if (played == 0)
+                midi.addEvent(juce::MidiMessage::noteOn(1, note, 0.8f), 0);
+            plugin->processBlock(buffer, midi);
+            played += block;
+            juce::MessageManager::getInstance()->runDispatchLoopUntil(10);
+            if (frame != juce::File() && frame.existsAsFile() && frame.getSize() > 0) {
+                // Its writer done with it.
+                juce::MessageManager::getInstance()->runDispatchLoopUntil(200);
+                written = true;
+                break;
+            }
+        }
+        editor->setVisible(false);
+        editor.reset();
+        plugin->releaseResources();
+        auto* result = new juce::DynamicObject();
+        result->setProperty("loaded", true);
+        result->setProperty("name", plugin->getName());
+        result->setProperty("frame", written);
+        std::cout << juce::JSON::toString(juce::var(result), true).toStdString() << std::endl;
+        plugin.reset();
+        return written ? 0 : 1;
+    }
     const auto total = static_cast<int>(rate);
     auto energy = 0.0;
     auto counted = 0;

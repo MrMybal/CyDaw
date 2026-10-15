@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "saccade",
+ "name": "Lo-Fi Stammer",
+ "state": {
+  "type": "saccade",
+  "parameters": {
+   "saccade.chance": 0.6,
+   "saccade.variation": 0.4,
+   "saccade.decay": 0.0,
+   "saccade.pitchDecay": 0.0,
+   "saccade.filter": 1800.0,
+   "saccade.mix": 1.0,
+   "saccade.output": 0.0,
+   "saccade.interval": 11.0,
+   "saccade.offset": 4.0,
+   "saccade.gate": 2.0,
+   "saccade.grid": 3.0,
+   "saccade.mode": 1.0,
+   "saccade.reverseChance": 0.0,
+   "saccade.repeat": 0.0
+  }
+ }
+}

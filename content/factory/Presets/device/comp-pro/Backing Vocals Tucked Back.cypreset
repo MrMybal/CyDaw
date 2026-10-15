@@ -1,0 +1,30 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "comp-pro",
+ "name": "Backing Vocals Tucked Back",
+ "state": {
+  "type": "comp-pro",
+  "parameters": {
+   "comppro.threshold": -28.0,
+   "comppro.ratio": 4.0,
+   "comppro.knee": 10.0,
+   "comppro.attack": 20.0,
+   "comppro.release": 300.0,
+   "comppro.makeup": 4.0,
+   "comppro.mix": 1.0,
+   "comppro.sidechain": 150.0,
+   "comppro.style": 2.0,
+   "comppro.range": 10.0,
+   "comppro.hold": 0.0,
+   "comppro.lookahead": 0.0,
+   "comppro.autoRelease": 1.0,
+   "comppro.autoGain": 0.0,
+   "comppro.sidechainLow": 8000.0,
+   "comppro.link": 1.0,
+   "comppro.channels": 0.0,
+   "comppro.audition": 0.0
+  }
+ }
+}

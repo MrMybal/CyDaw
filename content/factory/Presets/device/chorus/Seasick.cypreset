@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "chorus",
+ "name": "Seasick",
+ "state": {
+  "type": "chorus",
+  "parameters": {
+   "chorus.rate": 2.5,
+   "chorus.depth": 1.0,
+   "chorus.delay": 30.0,
+   "chorus.width": 0.9,
+   "chorus.mix": 0.7
+  }
+ }
+}

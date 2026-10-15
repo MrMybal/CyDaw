@@ -1,0 +1,18 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "wide-echo",
+ "name": "Huge Stereo Space",
+ "state": {
+  "type": "wide-echo",
+  "parameters": {
+   "node.26002.delay.time": 900.0,
+   "node.26002.delay.feedback": 0.6,
+   "node.26002.delay.mix": 0.38,
+   "node.26003.stereo.width": 2.0,
+   "node.26004.lowpass.cutoff": 6000.0,
+   "node.26004.lowpass.resonance": 0.8
+  }
+ }
+}

@@ -1,0 +1,30 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "halo",
+ "name": "Lo-Fi Hip-Hop Room",
+ "state": {
+  "type": "halo",
+  "parameters": {
+   "halo.mix": 0.3,
+   "halo.decay": 1.1,
+   "halo.predelay": 15.0,
+   "halo.size": 0.45,
+   "halo.highCut": 5000.0,
+   "halo.lowCut": 200.0,
+   "halo.modDepth": 0.6,
+   "halo.modRate": 0.8,
+   "halo.mode": 4.0,
+   "halo.colour": 0.0,
+   "halo.attack": 0.4,
+   "halo.earlyDiffusion": 0.6,
+   "halo.lateDiffusion": 0.6,
+   "halo.bassMultiplier": 0.8,
+   "halo.bassCrossover": 300.0,
+   "halo.damping": 4000.0,
+   "halo.sync": 0.0,
+   "halo.width": 0.7
+  }
+ }
+}

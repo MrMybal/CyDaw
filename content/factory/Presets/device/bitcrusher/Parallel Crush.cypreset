@@ -1,0 +1,16 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "bitcrusher",
+ "name": "Parallel Crush",
+ "state": {
+  "type": "bitcrusher",
+  "parameters": {
+   "crusher.bits": 5.0,
+   "crusher.downsample": 6.0,
+   "crusher.drive": 8.0,
+   "crusher.mix": 0.3
+  }
+ }
+}

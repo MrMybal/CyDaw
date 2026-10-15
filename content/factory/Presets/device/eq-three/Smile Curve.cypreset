@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "eq-three",
+ "name": "Smile Curve",
+ "state": {
+  "type": "eq-three",
+  "parameters": {
+   "eq3.low": 4.0,
+   "eq3.mid": -3.0,
+   "eq3.high": 4.0,
+   "eq3.lowFrequency": 200.0,
+   "eq3.highFrequency": 4000.0
+  }
+ }
+}

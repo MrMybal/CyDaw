@@ -1,0 +1,28 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "patine",
+ "name": "Vocal Vintage Parallel Warmth",
+ "state": {
+  "type": "patine",
+  "parameters": {
+   "patine.noise": 0.15,
+   "patine.wobble": 0.1,
+   "patine.distort": 0.3,
+   "patine.digital": 0.0,
+   "patine.space": 0.1,
+   "patine.magnetic": 0.25,
+   "patine.magnitude": 1.0,
+   "patine.mix": 0.45,
+   "patine.noiseType": 1.0,
+   "patine.wobbleRate": 0.3,
+   "patine.distortType": 0.0,
+   "patine.spaceSize": 0.3,
+   "patine.tone": 0.15,
+   "patine.width": 1.0,
+   "patine.output": 0.0,
+   "patine.noiseFollow": 1.0
+  }
+ }
+}

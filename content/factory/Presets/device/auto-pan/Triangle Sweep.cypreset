@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "auto-pan",
+ "name": "Triangle Sweep",
+ "state": {
+  "type": "auto-pan",
+  "parameters": {
+   "node.31002.lfo.rate": 1.0,
+   "node.31002.lfo.depth": 0.9,
+   "node.31002.lfo.offset": 0.0,
+   "node.31002.lfo.shape": 1.0,
+   "node.31003.pan.value": 0.0
+  }
+ }
+}

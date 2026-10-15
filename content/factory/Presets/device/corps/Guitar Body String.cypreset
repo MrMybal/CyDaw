@@ -1,0 +1,22 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "corps",
+ "name": "Guitar Body String",
+ "state": {
+  "type": "corps",
+  "parameters": {
+   "corps.tune": 110.0,
+   "corps.decay": 0.55,
+   "corps.material": 0.3,
+   "corps.inharmonic": 0.0,
+   "corps.position": 0.8,
+   "corps.mix": 0.35,
+   "corps.output": 0.0,
+   "corps.width": 0.5,
+   "corps.type": 2.0,
+   "corps.lowCut": 80.0
+  }
+ }
+}

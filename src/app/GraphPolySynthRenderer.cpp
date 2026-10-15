@@ -1,3 +1,4 @@
+#include "MidiEffectsHost.h"
 #include "GraphPolySynthRenderer.h"
 #include "NativeDspRuntime.h"
 #include "PlanSynthesiser.h"
@@ -218,6 +219,22 @@ struct GraphPolySynthRenderer::Impl {
 
     PlanProvider plan;
     PlanSynthesiser synthesiser;
+    // The plan's MIDI effects, free-running at the session's tempo.
+    MidiEffectsHost midiEffects;
+    juce::MidiBuffer notes;
+
+    // The block's notes through the plan's MIDI effects.
+    const juce::MidiBuffer& throughEffects(const juce::MidiBuffer& midi, const int startSample, const int numSamples,
+                                           const cydaw::engine::PolySynthGraphPlan* current) noexcept
+    {
+        notes.clear();
+        notes.addEvents(midi, 0, -1, 0);
+        cydaw::engine::MidiEffectClock clock;
+        clock.sampleRate = std::max(1.0, synthesiser.getSampleRate());
+        clock.beatsPerMinute = NativeDspRuntime::sessionTempo();
+        midiEffects.apply(notes, startSample, numSamples, current != nullptr ? current->midiEffects.get() : nullptr, clock);
+        return notes;
+    }
 };
 
 GraphPolySynthRenderer::GraphPolySynthRenderer()
@@ -227,6 +244,8 @@ GraphPolySynthRenderer::~GraphPolySynthRenderer() = default;
 void GraphPolySynthRenderer::prepare(const double sampleRate)
 {
     impl_->synthesiser.setCurrentPlaybackSampleRate(std::max(1.0, sampleRate));
+    impl_->midiEffects.prepare(std::max(1.0, sampleRate));
+    impl_->notes.ensureSize(4'096);
 }
 
 void GraphPolySynthRenderer::release()
@@ -262,7 +281,8 @@ void GraphPolySynthRenderer::render(juce::AudioBuffer<float>& output,
     const auto current = impl_->plan.borrowPlan();
     impl_->synthesiser.advance(static_cast<double>(numSamples) / std::max(1.0, impl_->synthesiser.getSampleRate()),
                                NativeDspRuntime::sessionTempo(), current.get());
-    impl_->synthesiser.renderNextBlock(output, midi, startSample, numSamples);
+    impl_->synthesiser.renderNextBlock(output, impl_->throughEffects(midi, startSample, numSamples, current.get()), startSample,
+                                       numSamples);
 }
 
 void GraphPolySynthRenderer::renderWithPlan(
@@ -274,7 +294,8 @@ void GraphPolySynthRenderer::renderWithPlan(
     impl_->plan.realtimeOverride = &sanitised;
     impl_->synthesiser.advance(static_cast<double>(numSamples) / std::max(1.0, impl_->synthesiser.getSampleRate()),
                                NativeDspRuntime::sessionTempo(), &sanitised);
-    impl_->synthesiser.renderNextBlock(output, midi, startSample, numSamples);
+    impl_->synthesiser.renderNextBlock(output, impl_->throughEffects(midi, startSample, numSamples, &sanitised), startSample,
+                                       numSamples);
     impl_->plan.realtimeOverride = nullptr;
 }
 
@@ -324,6 +345,21 @@ juce::var serialisePolySynthGraphPlan(
                 controllers->setProperty(juce::Identifier(juce::String(static_cast<int>(number))), plan.samplerControllers[number]);
         if (!controllers->getProperties().isEmpty())
             root->setProperty("samplerControllers", controllersVar);
+    }
+    // The MIDI effects: each its kind and its values.
+    if (plan.midiEffects != nullptr && plan.midiEffects->count > 0) {
+        juce::Array<juce::var> effects;
+        for (std::size_t index = 0; index < plan.midiEffects->count; ++index) {
+            const auto& effect = plan.midiEffects->effects[index];
+            auto* item = new juce::DynamicObject();
+            item->setProperty("kind", static_cast<int>(effect.kind));
+            juce::Array<juce::var> values;
+            for (const auto value : effect.values)
+                values.add(value);
+            item->setProperty("values", values);
+            effects.add(juce::var(item));
+        }
+        root->setProperty("midiEffects", effects);
     }
     if (plan.drumKit) {
         root->setProperty("drumKit", true);
@@ -412,6 +448,26 @@ restorePolySynthGraphPlan(const juce::var& state, juce::String& error)
             if (std::isfinite(value))
                 plan.kickValues[static_cast<std::size_t>(index)] = cydaw::engine::kick::clampValue(index, value);
         }
+    }
+    if (const auto* effects = root->getProperty("midiEffects").getArray(); effects != nullptr && !effects->isEmpty()) {
+        auto read = std::make_shared<cydaw::engine::MidiEffectsPlan>();
+        for (const auto& item : *effects) {
+            const auto kind = static_cast<int>(item.getProperty("kind", 0));
+            if (read->count >= cydaw::engine::midiEffectMost || kind < 0
+                || kind > static_cast<int>(cydaw::engine::lastNativeDspNodeKind))
+                continue;
+            auto& effect = read->effects[read->count];
+            effect.kind = static_cast<cydaw::engine::NativeDspNodeKind>(kind);
+            const auto* descriptor = cydaw::engine::effectForKind(effect.kind);
+            if (descriptor == nullptr || !descriptor->midi)
+                continue;
+            if (const auto* values = item.getProperty("values", {}).getArray())
+                for (int index = 0; index < values->size() && index < static_cast<int>(effect.values.size()); ++index)
+                    effect.values[static_cast<std::size_t>(index)] = static_cast<float>(static_cast<double>((*values)[index]));
+            ++read->count;
+        }
+        if (read->count > 0)
+            plan.midiEffects = std::move(read);
     }
     plan.drumKit = static_cast<bool>(root->getProperty("drumKit"));
     if (plan.drumKit) {

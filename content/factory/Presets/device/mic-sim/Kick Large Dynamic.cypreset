@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "mic-sim",
+ "name": "Kick Large Dynamic",
+ "state": {
+  "type": "mic-sim",
+  "parameters": {
+   "micsim.distance": 20.0,
+   "micsim.angle": 0.0,
+   "micsim.drive": 3.0,
+   "micsim.lowCut": 30.0,
+   "micsim.highCut": 9000.0,
+   "micsim.room": 0.1,
+   "micsim.output": 0.0,
+   "micsim.mix": 1.0,
+   "micsim.model": 1.0,
+   "micsim.pattern": 2.0,
+   "micsim.preamp": 2.0,
+   "micsim.noise": -90.0,
+   "micsim.roomSize": 0.2,
+   "micsim.roomTone": 3000.0
+  }
+ }
+}

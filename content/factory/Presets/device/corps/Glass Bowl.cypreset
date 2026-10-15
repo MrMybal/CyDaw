@@ -1,0 +1,22 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "corps",
+ "name": "Glass Bowl",
+ "state": {
+  "type": "corps",
+  "parameters": {
+   "corps.tune": 520.0,
+   "corps.decay": 0.9,
+   "corps.material": 1.0,
+   "corps.inharmonic": 0.2,
+   "corps.position": 0.2,
+   "corps.mix": 0.4,
+   "corps.output": 0.0,
+   "corps.width": 0.5,
+   "corps.type": 4.0,
+   "corps.lowCut": 80.0
+  }
+ }
+}

@@ -11,10 +11,53 @@
 
 namespace cydaw::engine {
 
+namespace {
+
+// What jumps when it is set rather than glides: a choice (a type, a mode, a
+// tempo division...) would play every choice between; a switch is on or
+// off; a look-ahead or an oversampling moves the latency, which the mix
+// follows in steps.
+bool jumps(const EffectParameter& parameter) noexcept
+{
+    const auto key = parameter.key;
+    if (key.find("lookahead") != std::string_view::npos || key.find("oversampling") != std::string_view::npos)
+        return true;
+    if (!parameter.unit.empty())
+        return false;
+    for (const auto whole : { "pedal", "mic-a", "mic-b", "auto", "delta", "target", "steep", "punish", "thump", "true-peak",
+                              "dc-filter", "unity", "align", "noise-follow", "channels", "channel", "routing", "pattern",
+                              "preamp", "dither", "shaping", "link", "audition", "freeze", "auto-release", "auto-gain",
+                              "listen", "bands", "key", "scale", "reverse", "ir-length", "state", "bars", "quantize",
+                              "clear", "repeat", "mute", "offset", "gate-length", "invert-left", "invert-right" })
+        if (key == whole)
+            return true;
+    for (std::size_t start = 0; start <= key.size();) {
+        auto end = key.find('-', start);
+        if (end == std::string_view::npos)
+            end = key.size();
+        const auto word = key.substr(start, end - start);
+        for (const auto choice : { "type", "mode", "style", "sync", "shape", "model", "slope", "source", "destination", "solo",
+                                   "on", "enabled", "polarity", "link", "dynamic", "detector" })
+            if (word == choice)
+                return true;
+        start = end + 1;
+    }
+    return false;
+}
+
+// How fast what is heard follows a value set: short enough not to soften a
+// modulation, long enough that a knob's jumps (one a screen frame) join.
+constexpr double kGlideSeconds = 0.006;
+
+} // namespace
+
 EffectProcessor::EffectProcessor(const EffectDescriptor& descriptor) noexcept : descriptor_(descriptor)
 {
-    for (std::size_t index = 0; index < descriptor.parameters.size() && index < values_.size(); ++index)
+    for (std::size_t index = 0; index < descriptor.parameters.size() && index < values_.size(); ++index) {
         values_[index].store(descriptor.parameters[index].defaultValue, std::memory_order_relaxed);
+        heard_[index].store(descriptor.parameters[index].defaultValue, std::memory_order_relaxed);
+        jumps_[index] = jumps(descriptor.parameters[index]);
+    }
 }
 
 void EffectProcessor::setParameters(const NativeDspNodeParameters& parameters) noexcept
@@ -26,8 +69,56 @@ void EffectProcessor::setParameters(const NativeDspNodeParameters& parameters) n
         auto next = effectValue(parameters, parameter);
         if (!std::isfinite(next))
             next = parameter.defaultValue;
-        values_[index].store(std::clamp(next, parameter.minimum, parameter.maximum), std::memory_order_relaxed);
+        next = std::clamp(next, parameter.minimum, parameter.maximum);
+        values_[index].store(next, std::memory_order_relaxed);
+        if (jumps_[index] || !primed_.load(std::memory_order_acquire))
+            heard_[index].store(next, std::memory_order_relaxed);
     }
+    setCount_.fetch_add(1, std::memory_order_release);
+}
+
+bool EffectProcessor::valuesGliding() noexcept
+{
+    const auto primed = primed_.load(std::memory_order_relaxed);
+    const auto count = setCount_.load(std::memory_order_acquire);
+    if (count == seenCount_ && primed)
+        return gliding_;
+    seenCount_ = count;
+    const auto size = std::min(descriptor_.parameters.size(), values_.size());
+    gliding_ = false;
+    for (std::size_t index = 0; index < size; ++index) {
+        const auto target = values_[index].load(std::memory_order_relaxed);
+        if (!primed || jumps_[index]) {
+            heard_[index].store(target, std::memory_order_relaxed);
+        } else if (heard_[index].load(std::memory_order_relaxed) != target) {
+            gliding_ = true;
+        }
+    }
+    primed_.store(true, std::memory_order_release);
+    return gliding_;
+}
+
+void EffectProcessor::glideValues(const std::uint32_t frames, const double sampleRate) noexcept
+{
+    if (!gliding_)
+        return;
+    const auto step = static_cast<float>(1.0 - std::exp(-static_cast<double>(frames) / (kGlideSeconds * std::max(1.0, sampleRate))));
+    const auto size = std::min(descriptor_.parameters.size(), values_.size());
+    auto moving = false;
+    for (std::size_t index = 0; index < size; ++index) {
+        const auto target = values_[index].load(std::memory_order_relaxed);
+        auto heard = heard_[index].load(std::memory_order_relaxed);
+        if (heard == target)
+            continue;
+        const auto& parameter = descriptor_.parameters[index];
+        heard += (target - heard) * step;
+        if (std::abs(target - heard) <= (parameter.maximum - parameter.minimum) * 1.0e-5f)
+            heard = target;
+        else
+            moving = true;
+        heard_[index].store(heard, std::memory_order_relaxed);
+    }
+    gliding_ = moving;
 }
 
 namespace {
@@ -594,26 +685,75 @@ private:
 
 // Eight bands of the shapes BiquadDesign.h draws, the cuts up to 48 dB per
 // octave, then the output gain. Values: per band enabled, type, frequency,
-// gain, Q and slope (eqProSlot), then the output. A moved frequency, gain or
-// Q glides there over a few milliseconds so a dragged band does not click.
-class ParametricEq final : public EffectProcessor {
+// gain, Q and slope (eqProSlot), then the output, the band heard alone and
+// each band's dynamics (eqProDynamicIndex). A moved frequency, gain or Q
+// glides there over a few milliseconds so a dragged band does not click.
+//
+// A dynamic band (a bell, a shelf, a tilt) moves its gain with what its
+// detector hears: its own band of the sound — a band-pass at its frequency
+// and Q for a bell, a low-pass under a low shelf, a high-pass over a high
+// shelf, all of it for a tilt — or that band of the sidechain, when one is
+// wired in and the band asks for it. Over its threshold the gain goes three
+// quarters of a dB per dB (a 6 dB soft knee) toward its range, never past it.
+class ParametricEq final : public EffectProcessor, public MultiBusAudioProcessor {
 public:
     using EffectProcessor::EffectProcessor;
     void prepare(const ProcessSpec& spec) override
     {
         sampleRate_ = std::max(1.0, spec.sampleRate);
         states_.assign(spec.channelCount, {});
+        listenStates_.assign(spec.channelCount, {});
+        detectStates_.assign(spec.channelCount, {});
+        main_.prepare(std::max<std::uint32_t>(1, spec.channelCount), std::max<std::uint32_t>(1, spec.maximumBlockSize));
         glide_ = 1.0 - std::exp(-static_cast<double>(kStep) / (0.015 * sampleRate_));
         reset();
+    }
+    // Its sound on its main input, the dynamic bands' key on the sidechain.
+    void processAudioBuses(const std::span<const AudioInputBusView> inputs, const AudioBlockView output,
+                           const ProcessContext& context) noexcept override
+    {
+        auto main = main_.view(std::min(output.frameCount, main_.maximumFrameCount()));
+        clearAudio(main);
+        key_ = {};
+        for (const auto& bus : inputs) {
+            if (bus.portId == effectSidechainPortId)
+                key_ = bus.audio;
+            else
+                addAudio(main, bus.audio);
+        }
+        process(main, { output.data, output.channelCount, main.frameCount, output.channelStride }, context);
+        key_ = {};
     }
     void reset() noexcept override
     {
         for (auto& channel : states_)
             for (auto& band : channel)
                 band = {};
-        for (auto& band : bands_)
+        for (auto& channel : detectStates_)
+            channel = {};
+        for (auto& band : bands_) {
             band.primed = false;
+            band.dynamic = false;
+            band.envelope = 0.0;
+            band.dynamicDb = 0.0;
+            band.levelDb = -120.0;
+        }
+        for (auto& state : listenStates_)
+            state = {};
+        listenBand_ = -1;
+        listenMix_ = 0.0;
         outputGain_ = -1.0;
+        for (auto index = 0; index < eqProBands; ++index) {
+            readings_[static_cast<std::size_t>(index)].store(0.0f, std::memory_order_relaxed);
+            readings_[static_cast<std::size_t>(eqProBands + index)].store(-120.0f, std::memory_order_relaxed);
+        }
+    }
+    [[nodiscard]] std::size_t readings(float* into, const std::size_t count) const noexcept override
+    {
+        const auto shown = std::min(count, readings_.size());
+        for (std::size_t index = 0; index < shown; ++index)
+            into[index] = readings_[index].load(std::memory_order_relaxed);
+        return shown;
     }
     void process(const AudioBlockView input, const AudioBlockView output, const ProcessContext&) noexcept override
     {
@@ -623,18 +763,50 @@ public:
         const auto targetGain = static_cast<double>(dbToGain(value(static_cast<std::size_t>(eqProBands * eqProValuesPerBand))));
         if (outputGain_ < 0.0)
             outputGain_ = targetGain;
+        // A band heard alone: what a band-pass at its frequency and Q keeps
+        // of the input, crossfaded in and out.
+        const auto wantedBand = static_cast<int>(std::lround(value(static_cast<std::size_t>(eqProBands * eqProValuesPerBand + 1)))) - 1;
+        const auto mixStep = 1.0 / (0.01 * sampleRate_);
+        const auto keyed = key_.data != nullptr && key_.channelCount > 0 && key_.frameCount >= frames;
         for (std::uint32_t start = 0; start < frames; start += kStep) {
             const auto count = std::min(kStep, frames - start);
-            refresh();
+            follow();
+            detect(input, start, count, channels, keyed);
+            design();
+            const auto listening = wantedBand >= 0 && wantedBand < eqProBands && bands_[static_cast<std::size_t>(wantedBand)].enabled;
+            if (listening && wantedBand != listenBand_) {
+                if (listenBand_ < 0)
+                    for (auto& state : listenStates_)
+                        state = {};
+                listenBand_ = wantedBand;
+            }
+            const auto listenTarget = listening ? 1.0 : 0.0;
+            const auto heardAlone = listenBand_ >= 0 && (listening || listenMix_ > 0.0);
+            if (heardAlone) {
+                const auto& band = bands_[static_cast<std::size_t>(listenBand_)];
+                listen_ = designEqBand(EqBandType::bandPass, std::exp(band.logFrequency), 0.0, std::exp(band.logQ), 0, 0, sampleRate_);
+            }
             const auto fromGain = outputGain_;
             outputGain_ += (targetGain - outputGain_) * glide_;
             const auto gainStep = (outputGain_ - fromGain) / static_cast<double>(count);
+            auto mixAfter = listenMix_;
             for (std::uint32_t channel = 0; channel < channels; ++channel) {
                 auto& state = states_[channel];
+                auto& alone = listenStates_[channel];
                 const auto* source = input.channel(channel) + start;
                 auto* target = output.channel(channel) + start;
                 auto gain = fromGain;
+                auto mix = listenMix_;
                 for (std::uint32_t frame = 0; frame < count; ++frame) {
+                    if (heardAlone) {
+                        const auto x = static_cast<double>(source[frame]);
+                        const auto y = listen_.b0 * x + alone.z1;
+                        alone.z1 = listen_.b1 * x - listen_.a1 * y + alone.z2;
+                        alone.z2 = listen_.b2 * x - listen_.a2 * y;
+                        mix = listenTarget > mix ? std::min(listenTarget, mix + mixStep) : std::max(listenTarget, mix - mixStep);
+                        bandAlone_[frame] = y;
+                        mixes_[frame] = mix;
+                    }
                     auto x = static_cast<double>(source[frame]);
                     for (std::size_t band = 0; band < bands_.size(); ++band) {
                         const auto& design = bands_[band];
@@ -650,12 +822,26 @@ public:
                         }
                     }
                     gain += gainStep;
-                    target[frame] = static_cast<float>(x * gain);
+                    auto heard = x * gain;
+                    if (heardAlone)
+                        heard += (bandAlone_[frame] - heard) * mixes_[frame];
+                    target[frame] = static_cast<float>(heard);
                 }
+                mixAfter = mix;
             }
+            listenMix_ = mixAfter;
+            if (listenMix_ <= 0.0 && !listening)
+                listenBand_ = -1;
         }
         for (std::uint32_t channel = channels; channel < std::min(input.channelCount, output.channelCount); ++channel)
             std::copy_n(input.channel(channel), frames, output.channel(channel));
+        for (auto index = 0; index < eqProBands; ++index) {
+            const auto& band = bands_[static_cast<std::size_t>(index)];
+            readings_[static_cast<std::size_t>(index)].store(band.dynamic ? static_cast<float>(band.dynamicDb) : 0.0f,
+                                                            std::memory_order_relaxed);
+            readings_[static_cast<std::size_t>(eqProBands + index)].store(band.dynamic ? static_cast<float>(band.levelDb) : -120.0f,
+                                                                         std::memory_order_relaxed);
+        }
     }
 
 private:
@@ -672,6 +858,18 @@ private:
         double gainDb {};
         double logQ {};
         std::array<BiquadCoefficients, eqMaximumStages> sections {};
+        // Something it is designed from moved: design it again.
+        bool redesign {};
+        // Its dynamics: on, what its detector hears through, how loud that
+        // is (linear, then dB), how far its gain has moved for it, and how
+        // far it had when it was last designed.
+        bool dynamic {};
+        bool detectorReady {};
+        BiquadCoefficients detector {};
+        double envelope {};
+        double levelDb { -120.0 };
+        double dynamicDb {};
+        double designedDynamicDb {};
     };
     struct State {
         double z1 {};
@@ -682,9 +880,38 @@ private:
     {
         return value(static_cast<std::size_t>(eqProSlot(band, which)));
     }
+    float dynamicValue(const int band, const EqProDynamic which) const noexcept
+    {
+        return value(static_cast<std::size_t>(eqProDynamicIndex(band, which)));
+    }
+    static bool hasGain(const EqBandType type) noexcept
+    {
+        return type == EqBandType::bell || type == EqBandType::lowShelf || type == EqBandType::highShelf || type == EqBandType::tilt;
+    }
+    // What a band's detector hears its band through.
+    BiquadCoefficients detectorFor(const EqBandType type, const double frequency, const double q) const noexcept
+    {
+        switch (type) {
+        case EqBandType::lowShelf: return designEqBand(EqBandType::highCut, std::min(frequency, sampleRate_ * 0.45), 0.0, 0.71, 0, 0, sampleRate_);
+        case EqBandType::highShelf: return designEqBand(EqBandType::lowCut, frequency, 0.0, 0.71, 0, 0, sampleRate_);
+        case EqBandType::tilt: return {};
+        default: return designEqBand(EqBandType::bandPass, frequency, 0.0, q, 0, 0, sampleRate_);
+        }
+    }
+    // How far a dynamic band's gain moves for a level its detector hears.
+    static double dynamicGainDb(const double levelDb, const double threshold, const double range) noexcept
+    {
+        constexpr auto knee = 6.0;
+        const auto over = levelDb - threshold;
+        if (over <= -knee * 0.5)
+            return 0.0;
+        const auto amount = 0.75 * (over < knee * 0.5 ? (over + knee * 0.5) * (over + knee * 0.5) / (2.0 * knee) : over);
+        return range < 0.0 ? -std::min(-range, amount) : std::min(range, amount);
+    }
 
-    // Follows the values set, designing again each band that moved.
-    void refresh() noexcept
+    // Follows the values set; marks each band that moved to be designed
+    // again.
+    void follow() noexcept
     {
         for (auto index = 0; index < eqProBands; ++index) {
             auto& band = bands_[static_cast<std::size_t>(index)];
@@ -709,6 +936,7 @@ private:
                 band.logQ = logQ;
                 for (auto& channel : states_)
                     channel[static_cast<std::size_t>(index)] = {};
+                band.detectorReady = false;
                 moved = true;
             } else if (enabled) {
                 const auto approach = [this, &moved](double& current, const double wanted, const double close) {
@@ -723,13 +951,81 @@ private:
                 approach(band.gainDb, gainDb, 1.0e-3);
                 approach(band.logQ, logQ, 1.0e-4);
             }
-            if (!moved || !enabled)
+            band.redesign = band.redesign || moved;
+            // Its dynamics: off for a band that is off or has no gain; a
+            // detector that starts quiet, its filter following the band.
+            const auto dynamic = enabled && hasGain(type) && dynamicValue(index, EqProDynamic::on) >= 0.5f;
+            if (dynamic != band.dynamic) {
+                band.dynamic = dynamic;
+                band.envelope = 0.0;
+                band.levelDb = -120.0;
+                band.dynamicDb = 0.0;
+                band.detectorReady = false;
+                for (auto& channel : detectStates_)
+                    channel[static_cast<std::size_t>(index)] = {};
+            }
+            if (dynamic && (moved || !band.detectorReady)) {
+                band.detector = detectorFor(type, std::exp(band.logFrequency), std::exp(band.logQ));
+                band.detectorReady = true;
+            }
+        }
+    }
+
+    // The dynamic bands' detectors over a piece of the block, then how far
+    // each band's gain moves for what they heard.
+    void detect(const AudioBlockView input, const std::uint32_t start, const std::uint32_t count, const std::uint32_t channels,
+                const bool keyed) noexcept
+    {
+        for (auto index = 0; index < eqProBands; ++index) {
+            auto& band = bands_[static_cast<std::size_t>(index)];
+            if (!band.dynamic)
                 continue;
+            const auto fromKey = keyed && dynamicValue(index, EqProDynamic::detector) >= 0.5f;
+            const auto sources = std::min(fromKey ? key_.channelCount : channels, static_cast<std::uint32_t>(detectStates_.size()));
+            std::fill_n(peaks_.begin(), count, 0.0);
+            const auto& c = band.detector;
+            for (std::uint32_t channel = 0; channel < sources; ++channel) {
+                const auto* source = (fromKey ? key_.channel(channel) : input.channel(channel)) + start;
+                auto& s = detectStates_[channel][static_cast<std::size_t>(index)];
+                for (std::uint32_t frame = 0; frame < count; ++frame) {
+                    const auto x = static_cast<double>(source[frame]);
+                    const auto y = c.b0 * x + s.z1;
+                    s.z1 = c.b1 * x - c.a1 * y + s.z2;
+                    s.z2 = c.b2 * x - c.a2 * y;
+                    peaks_[frame] = std::max(peaks_[frame], std::abs(y));
+                }
+            }
+            const auto attack = std::exp(-1.0 / (std::max(0.1, static_cast<double>(dynamicValue(index, EqProDynamic::attack))) * 0.001 * sampleRate_));
+            const auto release = std::exp(-1.0 / (std::max(1.0, static_cast<double>(dynamicValue(index, EqProDynamic::release))) * 0.001 * sampleRate_));
+            auto envelope = band.envelope;
+            for (std::uint32_t frame = 0; frame < count; ++frame) {
+                const auto peak = peaks_[frame];
+                envelope = peak + (envelope - peak) * (peak > envelope ? attack : release);
+            }
+            band.envelope = std::isfinite(envelope) ? envelope : 0.0;
+            band.levelDb = 20.0 * std::log10(std::max(band.envelope, 1.0e-6));
+            band.dynamicDb = dynamicGainDb(band.levelDb, static_cast<double>(dynamicValue(index, EqProDynamic::threshold)),
+                                           static_cast<double>(dynamicValue(index, EqProDynamic::range)));
+        }
+    }
+
+    // Designs again each band that moved, a dynamic one at its gain moved.
+    void design() noexcept
+    {
+        for (auto index = 0; index < eqProBands; ++index) {
+            auto& band = bands_[static_cast<std::size_t>(index)];
+            const auto moved = band.dynamic ? band.dynamicDb : 0.0;
+            if (std::abs(moved - band.designedDynamicDb) > 0.01)
+                band.redesign = true;
+            if (!band.redesign || !band.enabled)
+                continue;
+            band.redesign = false;
+            band.designedDynamicDb = moved;
             const auto frequency = std::exp(band.logFrequency);
             const auto q = std::exp(band.logQ);
             for (auto stage = 0; stage < band.stages; ++stage)
                 band.sections[static_cast<std::size_t>(stage)]
-                    = designEqBand(type, frequency, band.gainDb, q, slope, stage, sampleRate_);
+                    = designEqBand(band.type, frequency, band.gainDb + moved, q, band.slope, stage, sampleRate_);
         }
     }
 
@@ -738,6 +1034,23 @@ private:
     double outputGain_ { -1.0 };
     std::array<Band, eqProBands> bands_ {};
     std::vector<std::array<std::array<State, eqMaximumStages>, eqProBands>> states_;
+    // The dynamic bands' detectors, a state per channel, and the loudest a
+    // piece's frame was across them.
+    std::vector<std::array<State, eqProBands>> detectStates_;
+    std::array<double, kStep> peaks_ {};
+    // Its main input's buses summed, and the sidechain while a block runs.
+    AudioBuffer main_;
+    AudioBlockView key_ {};
+    // What it shows (eqProReadingCount): each band's gain moved, then its
+    // detector's level.
+    std::array<std::atomic<float>, eqProReadingCount> readings_ {};
+    // The band heard alone (-1: none), how far it has faded in, its filter.
+    int listenBand_ { -1 };
+    double listenMix_ {};
+    BiquadCoefficients listen_ {};
+    std::vector<State> listenStates_;
+    std::array<double, kStep> bandAlone_ {};
+    std::array<double, kStep> mixes_ {};
 };
 
 // ---- Dynamics -----------------------------------------------------------------------------------

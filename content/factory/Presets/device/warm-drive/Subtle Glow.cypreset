@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "warm-drive",
+ "name": "Subtle Glow",
+ "state": {
+  "type": "warm-drive",
+  "parameters": {
+   "node.14002.drive.db": 2.5,
+   "node.14003.lowpass.cutoff": 16000.0,
+   "node.14003.lowpass.resonance": 0.6,
+   "node.14004.clip.threshold": 0.98,
+   "node.14005.gain.db": -0.5
+  }
+ }
+}

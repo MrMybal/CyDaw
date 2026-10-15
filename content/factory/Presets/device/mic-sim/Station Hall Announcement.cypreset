@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "mic-sim",
+ "name": "Station Hall Announcement",
+ "state": {
+  "type": "mic-sim",
+  "parameters": {
+   "micsim.distance": 10.0,
+   "micsim.angle": 0.0,
+   "micsim.drive": 8.0,
+   "micsim.lowCut": 400.0,
+   "micsim.highCut": 5000.0,
+   "micsim.room": 0.7,
+   "micsim.output": 0.0,
+   "micsim.mix": 1.0,
+   "micsim.model": 9.0,
+   "micsim.pattern": 1.0,
+   "micsim.preamp": 0.0,
+   "micsim.noise": -70.0,
+   "micsim.roomSize": 1.0,
+   "micsim.roomTone": 7000.0
+  }
+ }
+}

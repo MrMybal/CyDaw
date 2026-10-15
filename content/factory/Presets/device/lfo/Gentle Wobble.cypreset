@@ -1,0 +1,16 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "lfo",
+ "name": "Gentle Wobble",
+ "state": {
+  "type": "lfo",
+  "parameters": {
+   "node.9001.lfo.rate": 1.5,
+   "node.9001.lfo.depth": 0.5,
+   "node.9001.lfo.offset": 0.0,
+   "node.9001.lfo.shape": 0.0
+  }
+ }
+}

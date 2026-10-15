@@ -1,0 +1,41 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "pompe",
+ "name": "Fast Key Duck",
+ "state": {
+  "type": "pompe",
+  "parameters": {
+   "pompe.depth": 1.0,
+   "pompe.rate": 2.0,
+   "pompe.curve": 0.0,
+   "pompe.hold": 0.0,
+   "pompe.phase": 0.0,
+   "pompe.stereoOffset": 0.0,
+   "pompe.mix": 1.0,
+   "pompe.output": 0.0,
+   "pompe.shape": 2.0,
+   "pompe.sync": 6.0,
+   "pompe.trigger": 1.0,
+   "pompe.threshold": -20.0,
+   "pompe.smoothing": 1.5,
+   "pompe.point1": 0.0,
+   "pompe.point2": 0.219999998807907,
+   "pompe.point3": 0.419999986886978,
+   "pompe.point4": 0.579999983310699,
+   "pompe.point5": 0.699999988079071,
+   "pompe.point6": 0.790000021457672,
+   "pompe.point7": 0.860000014305115,
+   "pompe.point8": 0.910000026226044,
+   "pompe.point9": 0.939999997615814,
+   "pompe.point10": 0.964999973773956,
+   "pompe.point11": 0.980000019073486,
+   "pompe.point12": 0.990000009536743,
+   "pompe.point13": 1.0,
+   "pompe.point14": 1.0,
+   "pompe.point15": 1.0,
+   "pompe.point16": 1.0
+  }
+ }
+}

@@ -1,0 +1,21 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "tremolo",
+ "name": "Gentle Wobble",
+ "state": {
+  "type": "tremolo",
+  "parameters": {
+   "node.30002.lfo.rate": 3.0,
+   "node.30002.lfo.depth": 0.6,
+   "node.30002.lfo.offset": 0.0,
+   "node.30002.lfo.shape": 0.0,
+   "node.30003.map.inputMinimum": -1.0,
+   "node.30003.map.inputMaximum": 1.0,
+   "node.30003.map.outputMinimum": -6.0,
+   "node.30003.map.outputMaximum": 0.0,
+   "node.30004.gain.db": 0.0
+  }
+ }
+}

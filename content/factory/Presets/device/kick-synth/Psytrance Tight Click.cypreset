@@ -1,0 +1,40 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "kick-synth",
+ "name": "Psytrance Tight Click",
+ "state": {
+  "type": "kick-synth",
+  "parameters": {
+   "kick.bodyShape": 0.0,
+   "kick.bodyPhase": 0.0,
+   "kick.pitchStart": 1600.0,
+   "kick.pitchEnd": 46.25,
+   "kick.pitchTime": 28.0,
+   "kick.pitchCurve": 2.200000047683716,
+   "kick.bodyLevel": 0.0,
+   "kick.attack": 0.0,
+   "kick.hold": 15.0,
+   "kick.decay": 190.0,
+   "kick.decayCurve": 2.599999904632568,
+   "kick.length": 320.0,
+   "kick.clickType": 2.0,
+   "kick.clickLevel": -5.0,
+   "kick.clickDecay": 1.5,
+   "kick.clickTone": 6000.0,
+   "kick.subLevel": -60.0,
+   "kick.subDecay": 600.0,
+   "kick.subOctave": 0.0,
+   "kick.driveType": 0.0,
+   "kick.drive": 2.0,
+   "kick.driveTone": 16000.0,
+   "kick.lowCut": 32.0,
+   "kick.highCut": 18000.0,
+   "kick.lowBoost": 1.0,
+   "kick.keyTrack": 1.0,
+   "kick.velocity": 0.100000001490116,
+   "kick.output": -2.099999904632568
+  }
+ }
+}

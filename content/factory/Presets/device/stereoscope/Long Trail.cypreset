@@ -1,0 +1,16 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "stereoscope",
+ "name": "Long Trail",
+ "state": {
+  "type": "stereoscope",
+  "parameters": {
+   "stereoscope.zoom": 1.0,
+   "stereoscope.persistence": 0.95,
+   "stereoscope.history": 20.0,
+   "stereoscope.displayMode": 0.0
+  }
+ }
+}

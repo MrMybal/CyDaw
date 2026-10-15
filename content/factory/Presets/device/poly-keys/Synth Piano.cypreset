@@ -1,0 +1,26 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "poly-keys",
+ "name": "Synth Piano",
+ "state": {
+  "type": "poly-keys",
+  "parameters": {
+   "node.37002.voice.mode": 0.0,
+   "node.37002.voice.glide": 0.0,
+   "node.37003.polyOscillator.waveform": 2.0,
+   "node.37003.polyOscillator.level": 0.11,
+   "node.37004.envelope.attack": 2.0,
+   "node.37004.envelope.decay": 700.0,
+   "node.37004.envelope.sustain": 0.25,
+   "node.37004.envelope.release": 420.0,
+   "node.37005.gain.db": 0.0,
+   "node.37006.voiceFilter.cutoff": 3600.0,
+   "node.37006.voiceFilter.resonance": 1.2,
+   "node.37007.compressor.threshold": -16.0,
+   "node.37007.compressor.ratio": 3.0,
+   "node.37008.stereo.width": 1.3
+  }
+ }
+}

@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "phaser",
+ "name": "Subtle Motion",
+ "state": {
+  "type": "phaser",
+  "parameters": {
+   "phaser.rate": 0.2,
+   "phaser.depth": 0.4,
+   "phaser.frequency": 600.0,
+   "phaser.feedback": 0.2,
+   "phaser.mix": 0.3
+  }
+ }
+}

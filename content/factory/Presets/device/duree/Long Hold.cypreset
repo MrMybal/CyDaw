@@ -1,0 +1,16 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "duree",
+ "name": "Long Hold",
+ "state": {
+  "type": "duree",
+  "parameters": {
+   "duree.length": 1500.0,
+   "duree.factor": 1.5,
+   "duree.mode": 0.0,
+   "duree.sync": 6.0
+  }
+ }
+}

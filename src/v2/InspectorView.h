@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Studio.h"
 #include "UiState.h"
 
 namespace cydaw::v2 {

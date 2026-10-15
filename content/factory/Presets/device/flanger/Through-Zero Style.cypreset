@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "flanger",
+ "name": "Through-Zero Style",
+ "state": {
+  "type": "flanger",
+  "parameters": {
+   "flanger.rate": 0.1,
+   "flanger.depth": 1.0,
+   "flanger.delay": 0.3,
+   "flanger.feedback": 0.5,
+   "flanger.mix": 0.5
+  }
+ }
+}

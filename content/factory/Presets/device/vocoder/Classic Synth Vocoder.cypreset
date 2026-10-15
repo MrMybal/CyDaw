@@ -1,0 +1,28 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "vocoder",
+ "name": "Classic Synth Vocoder",
+ "state": {
+  "type": "vocoder",
+  "parameters": {
+   "vocoder.mix": 1.0,
+   "vocoder.formant": 0.0,
+   "vocoder.attack": 4.0,
+   "vocoder.release": 60.0,
+   "vocoder.pitch": 48.0,
+   "vocoder.unvoiced": 0.4,
+   "vocoder.tone": 0.0,
+   "vocoder.output": 0.0,
+   "vocoder.carrier": 2.0,
+   "vocoder.bands": 20.0,
+   "vocoder.lowBand": 100.0,
+   "vocoder.highBand": 10000.0,
+   "vocoder.bandwidth": 1.0,
+   "vocoder.gate": -70.0,
+   "vocoder.stereo": 0.5,
+   "vocoder.detune": 0.35
+  }
+ }
+}

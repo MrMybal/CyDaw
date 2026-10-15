@@ -1,0 +1,21 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "givre",
+ "name": "Endless Pad Freeze",
+ "state": {
+  "type": "givre",
+  "parameters": {
+   "givre.blur": 0.6,
+   "givre.smear": 0.15,
+   "givre.shift": 0.0,
+   "givre.tone": 0.0,
+   "givre.scatter": 0.35,
+   "givre.mix": 0.7,
+   "givre.output": 0.0,
+   "givre.freeze": 1.0,
+   "givre.sync": 0.0
+  }
+ }
+}

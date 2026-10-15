@@ -1,0 +1,24 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "decaleur",
+ "name": "Wobbling Shift",
+ "state": {
+  "type": "decaleur",
+  "parameters": {
+   "decaleur.shift": 0.0,
+   "decaleur.fine": 0.0,
+   "decaleur.spread": 0.0,
+   "decaleur.feedback": 0.0,
+   "decaleur.lfoRate": 0.3,
+   "decaleur.lfoDepth": 60.0,
+   "decaleur.mix": 0.6,
+   "decaleur.output": 0.0,
+   "decaleur.mode": 0.0,
+   "decaleur.sync": 0.0,
+   "decaleur.lfoShape": 0.0,
+   "decaleur.delay": 0.0
+  }
+ }
+}

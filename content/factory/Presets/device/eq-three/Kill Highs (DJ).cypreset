@@ -1,0 +1,17 @@
+{
+ "format": "cydaw-preset",
+ "version": 1,
+ "kind": "device",
+ "target": "eq-three",
+ "name": "Kill Highs (DJ)",
+ "state": {
+  "type": "eq-three",
+  "parameters": {
+   "eq3.low": 0.0,
+   "eq3.mid": 0.0,
+   "eq3.high": -24.0,
+   "eq3.lowFrequency": 250.0,
+   "eq3.highFrequency": 3000.0
+  }
+ }
+}

@@ -457,6 +457,10 @@ void BrowserView::drawSamples()
         if (ImGui::Selectable(L("Analyser à nouveau", "Rescan")))
             library.rescan(false);
         ImGui::Checkbox(L("Écoute au clic", "Preview on click"), &autoPreview_);
+        ImGui::SameLine();
+        ImGui::Checkbox(L("Au tempo", "At tempo"), &state_.auditionAtTempo);
+        ui::tooltip(L("Les boucles au tempo du projet, calées sur la mesure quand le transport tourne.",
+                      "Loops at the project's tempo, in step with the bar while the transport runs."));
         ImGui::Checkbox(L("Arbre des catégories", "Category tree"), &showTree_);
         ImGui::Separator();
         if (ImGui::Selectable(L("Recherche sémantique (IA)…", "Semantic search (AI)…")))
@@ -580,7 +584,7 @@ void BrowserView::drawSamples()
                                           | ImGuiSelectableFlags_AllowDoubleClick)) {
                     selectedPath_ = item.path;
                     if (autoPreview_)
-                        (void) engine.startSamplePreview(juce::File(item.path));
+                        (void) studio_.auditionSample(item.path, 0.0, state_.auditionAtTempo);
                     if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
                         // Into the selected audio track at the playhead, or a new one.
                         const juce::File file(item.path);
@@ -641,7 +645,7 @@ void BrowserView::drawSamples()
             if (engine.isSamplePreviewing())
                 engine.stopSamplePreview();
             else
-                (void) engine.startSamplePreview(record->file());
+                (void) studio_.auditionSample(record->path, 0.0, state_.auditionAtTempo);
         }
         ImGui::SameLine();
         ImGui::TextUnformatted(record->name.toRawUTF8());
@@ -685,7 +689,7 @@ void BrowserView::drawSamples()
         ImGui::InvisibleButton("##overview", size);
         if (ImGui::IsItemClicked() && record->length > 0.0) {
             const auto t = (ImGui::GetIO().MousePos.x - origin.x) / size.x * record->length;
-            (void) engine.startSamplePreview(record->file(), std::max(0.0, t));
+            (void) studio_.auditionSample(record->path, std::max(0.0, t), state_.auditionAtTempo);
         }
         if (ImGui::BeginDragDropSource()) {
             const auto path = record->path.toStdString();
@@ -762,10 +766,22 @@ void BrowserView::drawInstruments()
                                    "No factory instrument: the Factory folder is not beside CyDAW."));
         return;
     }
+    // The instrument track picked: a double click puts it there, in place of
+    // its instrument (its effects kept); without one, a new track.
+    std::optional<TrackRef> onto;
+    if (state_.selectedTrack && state_.selectedTrack->midi && !state_.selectedTrack->master && studio_.isValid(*state_.selectedTrack))
+        onto = state_.selectedTrack;
     ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-    ImGui::TextWrapped("%s", L("Double-clic : une nouvelle piste (ses échantillons téléchargés s'il le faut). Clic droit : "
-                               "le modèle de son.",
-                               "Double click: a new track (its samples downloaded if need be). Right click: the sound model."));
+    if (onto)
+        ImGui::TextWrapped("%s", (ui::Ls("Double-clic : il remplace l'instrument de « ", "Double click: it replaces the instrument of \"")
+                                  + studio_.trackName(*onto)
+                                  + ui::Ls(" » (ses effets restent). Clic droit : une nouvelle piste, le modèle de son.",
+                                           "\" (its effects stay). Right click: a new track, the sound model."))
+                                     .toRawUTF8());
+    else
+        ImGui::TextWrapped("%s", L("Double-clic : une nouvelle piste (ses échantillons téléchargés s'il le faut). Clic droit : "
+                                   "le modèle de son.",
+                                   "Double click: a new track (its samples downloaded if need be). Right click: the sound model."));
     ImGui::PopStyleColor();
     ImGui::BeginChild("##instrumentList");
     juce::StringArray categories;
@@ -801,7 +817,7 @@ void BrowserView::drawInstruments()
                 juce::String error;
                 if (missing && !fetching)
                     startDownload();
-                if (const auto track = studio_.addFactoryInstrument(instrument.key, error)) {
+                if (const auto track = studio_.addFactoryInstrument(instrument.key, error, false, onto)) {
                     state_.selectTrack(*track);
                     if (!missing)
                         report(studio_.trackName(*track));
@@ -832,19 +848,30 @@ void BrowserView::drawInstruments()
                 ImGui::SetTooltip("%s", text.toRawUTF8());
             }
             if (ImGui::BeginPopupContextItem("##instrumentMenu")) {
-                const auto add = [&](const bool model) {
+                const auto add = [&](const bool model, const std::optional<TrackRef> on) {
                     juce::String error;
-                    if (const auto track = studio_.addFactoryInstrument(instrument.key, error, model)) {
+                    if (const auto track = studio_.addFactoryInstrument(instrument.key, error, model, on)) {
                         state_.selectTrack(*track);
                         report(studio_.trackName(*track));
                     } else {
                         report(error, true);
                     }
                 };
-                if (ImGui::MenuItem(L("Échantillons (sampler)", "Samples (sampler)")))
-                    add(false);
-                if (ImGui::MenuItem(L("Modèle de son", "Sound model"), nullptr, false, instrument.model != juce::File()))
-                    add(true);
+                if (onto) {
+                    const auto label = ui::Ls("Remplacer l'instrument de « ", "Replace the instrument of \"") + studio_.trackName(*onto)
+                                       + ui::Ls(" »", "\"");
+                    if (ImGui::MenuItem(label.toRawUTF8()))
+                        add(false, onto);
+                    if (ImGui::MenuItem(L("Le remplacer par son modèle de son", "Replace it with its sound model"), nullptr, false,
+                                        instrument.model != juce::File()))
+                        add(true, onto);
+                    ImGui::Separator();
+                }
+                if (ImGui::MenuItem(L("Nouvelle piste : échantillons (sampler)", "New track: samples (sampler)")))
+                    add(false, std::nullopt);
+                if (ImGui::MenuItem(L("Nouvelle piste : modèle de son", "New track: sound model"), nullptr, false,
+                                    instrument.model != juce::File()))
+                    add(true, std::nullopt);
                 if (missing) {
                     ImGui::Separator();
                     const auto label = (studio_.banks().generatedOnly(instrument.banks)

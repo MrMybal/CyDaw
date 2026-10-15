@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Studio.h"
+#include "StudioTypes.h"
 
 #include <juce_audio_utils/juce_audio_utils.h>
 
@@ -48,6 +48,8 @@ struct WorkshopRequest {
 struct ExpandedPane {
     TrackRef track;
     std::uint64_t nodeId {};
+    // The display shown large; -1: all of them at once (a device with
+    // several opens on that).
     int pane {};
     // Asked once: out of the studio's window, a window of its own on the
     // desktop (as a plug-in's).
@@ -87,6 +89,9 @@ struct SlotRef {
 };
 
 struct UiState {
+    // The library's loops heard at the project's tempo (stretched, in step
+    // with the transport), not as they are.
+    bool auditionAtTempo { true };
     std::optional<TrackRef> selectedTrack;
     std::vector<ClipRef> selectedClips;
     // The launcher's slots picked (a click; Ctrl or Shift adds): what its
@@ -97,6 +102,9 @@ struct UiState {
         return std::find(selectedSlots.begin(), selectedSlots.end(), slot) != selectedSlots.end();
     }
     std::optional<ClipRef> editedClip;
+    // The master's launcher clip open in the editor (its scene), when no
+    // track's clip is: the one opened last wins.
+    std::optional<int> editedMasterScene;
     // The audio editor's face asked for (0 sample, 1 takes, 2 stretch; -1
     // none): taken by the editor at its next frame.
     int audioEditorFace { -1 };
@@ -115,6 +123,14 @@ struct UiState {
     bool closeAudioSettings {};
     // The sound banks' window shown; the locations asked open.
     bool showBanks {};
+    // The colour themes' window.
+    bool showThemes {};
+    // Several instruments' windows open at once (one each), or one at a
+    // time (opening another closes the last): Options, kept in the settings.
+    bool manyInstrumentWindows { true };
+    // A rack's pad opened in the device panel (its instrument and effects):
+    // its track, its index.
+    std::optional<std::pair<TrackRef, int>> openRackPad;
     bool openLocations {};
     // The semantic sound search's window (its models, licences, index).
     bool showSemantic {};
