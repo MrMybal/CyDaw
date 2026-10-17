@@ -19,6 +19,8 @@ public:
     JUCE_DECLARE_SINGLETON(Localization, false)
 
     [[nodiscard]] juce::String text(juce::StringRef key) const;
+    // The same in English, whatever the language (what a module shows).
+    [[nodiscard]] juce::String englishText(juce::StringRef key) const;
     [[nodiscard]] juce::String languageCode() const;
     [[nodiscard]] bool setLanguage(const juce::String& languageCode);
     // The languages there are: English and French built in, then every

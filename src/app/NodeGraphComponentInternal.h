@@ -40,6 +40,8 @@ namespace cydaw::app::detail {
     if (key == "sampler") return "core.sampler";
     if (key == "batterie") return "core.batterie";
     if (key == "drum-rack") return "core.drum-rack";
+    if (key == "instrument-layer") return "core.instrument-layer";
+    if (key == "instrument-selector") return "core.instrument-selector";
     if (key == "prism-synth") return "core.prism-synth";
     if (key == "kick-synth") return "core.kick-synth";
     if (const auto model = cydaw::engine::synth::modelForType(key.toStdString()); model != cydaw::engine::synth::Model::none)

@@ -82,6 +82,12 @@ private:
                     const CardPlace& place);
     // A container's own panel on its card: its branches, its mix.
     void drawContainerPanel(Strip& strip, const app::NodeGraphComponent::EditorNode& head, ImVec2 at, ImVec2 size, ImU32 colour);
+    // A branch named by hand: the popup that asks (opened by
+    // startBranchRename in the same ID scope as drawBranchRename).
+    void startBranchRename(const app::NodeGraphComponent& graph, std::uint64_t head, int branch);
+    void drawBranchRename(app::NodeGraphComponent& graph);
+    std::optional<std::pair<std::uint64_t, int>> renamedBranch_;
+    char branchNameBuffer_[72] {};
     void drawCatalogue(const TrackRef& track);
     // The catalogue as a tree (nothing searched): My devices, the graphs by
     // their category, whole chains, the nodes.
@@ -105,6 +111,14 @@ private:
     void drawValueList(const TrackRef& track, app::NodeGraphComponent& graph, const app::NodeGraphComponent::EditorNode& node,
                        ImVec2 at, ImVec2 size, ImU32 colour, const std::map<juce::String, float>& modulated);
     std::map<std::pair<std::uint64_t, std::uint64_t>, std::array<char, 64>> valueSearch_;
+    // A plug-in card's list of values: every parameter, searched, the last
+    // touched first (a value that moved, from its own window too, is a touch).
+    struct PluginParameters;
+    void drawPluginValueList(const TrackRef& track, std::size_t plugin, const juce::String& pluginName, PluginParameters& parameters,
+                             ImVec2 at, ImVec2 size);
+    std::map<std::pair<std::size_t, std::size_t>, std::array<char, 64>> pluginListSearch_;
+    std::map<std::pair<std::size_t, std::size_t>, std::map<std::uint32_t, std::pair<float, std::uint64_t>>> pluginTouches_;
+    std::uint64_t pluginTouchCount_ {};
     // Each card's modulators (a column at its left) and the knobs' rings.
     std::unique_ptr<ModulatorsView> modulators_;
     // The quick catalogue opened from a container's branch: where its device

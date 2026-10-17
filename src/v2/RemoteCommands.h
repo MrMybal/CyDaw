@@ -159,6 +159,14 @@ public:
         (void) open;
         return false;
     }
+    // The same for a plug-in's card (its place on the audio track).
+    virtual bool showPluginValueList(const TrackRef& track, std::size_t plugin, bool open)
+    {
+        (void) track;
+        (void) plugin;
+        (void) open;
+        return false;
+    }
     // modulator: a card's column of modulators shown (the one whose settings
     // show, 0 to keep), and the modulator armed (0: none).
     virtual bool showModulators(const TrackRef& track, std::uint64_t nodeId, bool open, std::uint64_t shown)

@@ -72,6 +72,15 @@ juce::String Localization::text(const juce::StringRef key) const
     return keyText;
 }
 
+juce::String Localization::englishText(const juce::StringRef key) const
+{
+    const juce::String keyText(key.text);
+    const juce::ScopedReadLock lock(mappingsLock_);
+    if (const auto english = english_.find(keyText); english != english_.end() && english->second.isNotEmpty())
+        return english->second;
+    return keyText;
+}
+
 juce::String Localization::languageCode() const
 {
     const juce::ScopedReadLock lock(mappingsLock_);

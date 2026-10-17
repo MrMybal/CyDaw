@@ -311,11 +311,12 @@ TOOLS = [
         "description": ("La liste des valeurs d'une carte de peripherique (le bouton liste de son en-tete) : "
                         "toutes ses valeurs brutes, la derniere touchee en haut. track, nodeId (get_track_graph), "
                         "open (defaut true), filter : la recherche. Rend values [{binding, label, value, unit, "
-                        "touched}] dans l'ordre affiche."),
+                        "touched}] dans l'ordre affiche. Avec plugin (son index) a la place de nodeId : la liste "
+                        "d'une carte de plug-in VST3/CLAP d'une piste audio (rend open)."),
         "inputSchema": {"type": "object",
-                        "properties": {"track": {}, "nodeId": {"type": "integer"}, "open": {"type": "boolean"},
-                                       "filter": {"type": "string"}},
-                        "required": ["track", "nodeId"]},
+                        "properties": {"track": {}, "nodeId": {"type": "integer"}, "plugin": {"type": "integer"},
+                                       "open": {"type": "boolean"}, "filter": {"type": "string"}},
+                        "required": ["track"]},
     },
     {
         "name": "modulator",
@@ -348,16 +349,53 @@ TOOLS = [
                         "mid-side-split|stereo-split|multiband-2|multiband-3|xy-fx|replacer, before (0 : fin de "
                         "chaine)} ; add_device {head, branch, key, before} : un peripherique dans une branche ; move "
                         "{nodeId, head (0 : la chaine principale), branch, before} ; add_branch {head} ; remove_branch "
-                        "{head, branch} ; remove {head} (avec tout ce qu'il tient) ; show {head, branch} : la branche "
-                        "affichee ; list : chaque conteneur, ses branches et leurs cartes. Ses reglages "
+                        "{head, branch} ; remove {head} (avec tout ce qu'il tient) ; rename {head, branch, name} : "
+                        "le nom d'une branche (vide : son nom habituel) ; show {head, branch} : la branche "
+                        "affichee ; instrument {head, key} : l'instrument d'un Replacer (cle du catalogue ou "
+                        "factory:<cle>, voir instrument_choices) ; list : chaque conteneur, ses branches, leurs "
+                        "cartes et leurs noms (names). Le prereglage de la carte (outil presets) garde tout ce "
+                        "qu'il tient. Ses reglages "
                         "(fxLayer.mix, fxLayer.wetGain, fxLayer.volume1, mute1, solo1, pan1, fxSelector.selected, "
                         "multiband3.crossoverLow, xyFx.x, replacer.threshold...) passent par set_node_parameter."),
         "inputSchema": {"type": "object",
                         "properties": {"track": {}, "action": {"type": "string"}, "type": {"type": "string"},
                                        "head": {"type": "integer"}, "branch": {"type": "integer"},
                                        "key": {"type": "string"}, "nodeId": {"type": "integer"},
-                                       "before": {"type": "integer"}},
+                                       "before": {"type": "integer"}, "name": {"type": "string"}},
                         "required": ["track", "action"]},
+    },
+    {
+        "name": "rack",
+        "description": ("Les conteneurs d'instruments d'une piste instrument (son instrument) : Drum Machine "
+                        "(un pad par touche, 128 touches), Instrument Layer (des couches qui jouent ensemble, "
+                        "chacune dans ses touches et velocites), Instrument Selector (une couche par note, "
+                        "choisie par selector.mode 0 manuel, 1 a tour de role, 2 au hasard, 3 keyswitch, "
+                        "4 CC, 5 changement de programme ; selector.layer, selector.controller, "
+                        "selector.keyswitch via set_node_parameter). action list (defaut : kind, padsKind, "
+                        "selected, pads [{pad, note, name, playAs, gainDb, pan, mute, solo, choke, keyLow, "
+                        "keyHigh, velocityLow, velocityHigh, devices, cards}]), add {note, instrument}, "
+                        "instrument {pad|note, instrument}, mix {pad|note, newNote, name, playAs, gainDb, pan, "
+                        "mute, solo, choke, keyLow, keyHigh, velocityLow, velocityHigh}, sample {note, file}, "
+                        "remove {pad|note}, open {pad|note}, close. Un instrument : cle du catalogue ou "
+                        "factory:<cle> (instrument_choices)."),
+        "inputSchema": {"type": "object",
+                        "properties": {"track": {}, "action": {"type": "string"}, "pad": {"type": "integer"},
+                                       "note": {"type": "integer"}, "newNote": {"type": "integer"},
+                                       "instrument": {"type": "string"}, "file": {"type": "string"},
+                                       "name": {"type": "string"}, "playAs": {"type": "integer"},
+                                       "gainDb": {"type": "number"}, "pan": {"type": "number"},
+                                       "mute": {"type": "boolean"}, "solo": {"type": "boolean"},
+                                       "choke": {"type": "integer"}, "keyLow": {"type": "integer"},
+                                       "keyHigh": {"type": "integer"}, "velocityLow": {"type": "integer"},
+                                       "velocityHigh": {"type": "integer"}},
+                        "required": ["track"]},
+    },
+    {
+        "name": "instrument_choices",
+        "description": ("Ce que peut jouer un pad, une couche ou un Replacer : les instruments de CyDAW (cle du "
+                        "catalogue) et ceux d'usine echantillonnes (factory:<cle>, avec leur categorie, missing "
+                        "quand leurs echantillons sont encore a telecharger), noms en anglais."),
+        "inputSchema": {"type": "object", "properties": {}},
     },
     {
         "name": "controllers",
@@ -679,7 +717,8 @@ TOOLS = [
     {
         "name": "presets",
         "description": ("Les prereglages d'une carte de la chaine d'une piste "
-                        "(nodeId, de get_track_graph), d'un plug-in heberge "
+                        "(nodeId, de get_track_graph ; avec pad : d'une carte de la "
+                        "chaine d'un pad ou d'une couche, voir rack cards), d'un plug-in heberge "
                         "(plugin : son index) ou de toute la chaine de la piste "
                         "(ni l'un ni l'autre). action : list (defaut), save "
                         "(name : enregistre les reglages actuels), load (name), "
@@ -689,7 +728,7 @@ TOOLS = [
                         "action program (index) en choisit un."),
         "inputSchema": {"type": "object",
                         "properties": {"track": TRACK, "nodeId": {"type": "integer"},
-                                       "plugin": {"type": "integer"},
+                                       "plugin": {"type": "integer"}, "pad": {"type": "integer"},
                                        "action": {"type": "string",
                                                   "enum": ["list", "save", "load", "rename", "delete", "program"]},
                                        "name": {"type": "string"}, "newName": {"type": "string"},

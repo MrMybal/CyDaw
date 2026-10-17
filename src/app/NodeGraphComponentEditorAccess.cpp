@@ -11,10 +11,13 @@
 #include "Localization.h"
 
 #include <cydaw/engine/Containers.h>
+#include <cydaw/engine/EffectCatalogue.h>
+#include <cydaw/engine/Modulators.h>
 #include <cydaw/engine/NativeDspParameters.h>
 
 #include <algorithm>
 #include <cmath>
+#include <map>
 #include <set>
 #include <tuple>
 
@@ -1671,6 +1674,9 @@ bool NodeGraphComponent::editorRemoveBranch(const std::uint64_t head, const int 
             const auto value = from != nullptr ? cydaw::engine::effectValue(node->parameters, *from) : to->defaultValue;
             (void) setGraphInterfaceParameter(prefix + juce::String(std::string(to->suffix)), value);
         }
+    // Its name goes, the next ones' move down.
+    if (auto* named = findNode(head); named != nullptr && branch < named->branchNames.size())
+        named->branchNames.remove(branch);
     if (const auto* chains = cydaw::engine::effectParameter(*effect, "chains"))
         (void) setGraphInterfaceParameter(prefix + juce::String(std::string(chains->suffix)), count - 1);
     if (const auto* selected = cydaw::engine::effectParameter(*effect, "selected"))
@@ -1682,6 +1688,275 @@ bool NodeGraphComponent::editorRemoveBranch(const std::uint64_t head, const int 
     synchroniseGraphInterface();
     rebuildEmbeddedSliders();
     notifyLayoutChanged("v2-remove-branch");
+    return true;
+}
+
+namespace {
+
+// A graph state's keys (as NodeGraphComponent.cpp writes them).
+namespace jsonKeys {
+const juce::Identifier audioChannels("audioChannels");
+const juce::Identifier connections("connections");
+const juce::Identifier destination("destination");
+const juce::Identifier destinationPort("destinationPort");
+const juce::Identifier id("id");
+const juce::Identifier kind("kind");
+const juce::Identifier nextNodeId("nextNodeId");
+const juce::Identifier nodes("nodes");
+const juce::Identifier parameters("parameters");
+const juce::Identifier source("source");
+const juce::Identifier sourcePort("sourcePort");
+const juce::Identifier type("type");
+const juce::Identifier x("x");
+const juce::Identifier y("y");
+} // namespace jsonKeys
+
+// The whole of a container: its head, every card it holds (nested
+// containers' too), its ends.
+std::set<std::uint64_t> containerFamily(const NodeGraphComponent& graph, const std::uint64_t head)
+{
+    std::set<std::uint64_t> family { head };
+    std::vector<std::uint64_t> pending { head };
+    while (!pending.empty()) {
+        const auto current = pending.back();
+        pending.pop_back();
+        if (const auto inner = graph.editorContainer(current)) {
+            if (inner->end != 0)
+                family.insert(inner->end);
+            if (inner->blend != 0)
+                family.insert(inner->blend);
+            for (const auto& cards : inner->branches)
+                for (const auto card : cards)
+                    if (family.insert(card).second)
+                        pending.push_back(card);
+        }
+    }
+    return family;
+}
+
+// A copy of a JSON value that shares nothing with it.
+juce::var deepCopy(const juce::var& value)
+{
+    return juce::JSON::parse(juce::JSON::toString(value, true));
+}
+
+// Every "node.<id>." in a value's strings for its new id.
+juce::var renumbered(const juce::var& value, const std::map<std::uint64_t, std::uint64_t>& ids)
+{
+    if (value.isString()) {
+        const auto text = value.toString();
+        if (!text.startsWith("node."))
+            return value;
+        const auto number = text.fromFirstOccurrenceOf("node.", false, false).upToFirstOccurrenceOf(".", false, false);
+        if (number.isEmpty() || !number.containsOnly("0123456789"))
+            return value;
+        const auto found = ids.find(static_cast<std::uint64_t>(number.getLargeIntValue()));
+        if (found == ids.end())
+            return value;
+        return "node." + juce::String(static_cast<juce::int64>(found->second)) + text.substring(5 + number.length());
+    }
+    if (const auto* array = value.getArray()) {
+        juce::Array<juce::var> items;
+        for (const auto& item : *array)
+            items.add(renumbered(item, ids));
+        return items;
+    }
+    if (const auto* object = value.getDynamicObject()) {
+        auto copy = juce::DynamicObject::Ptr(new juce::DynamicObject());
+        for (const auto& property : object->getProperties())
+            copy->setProperty(property.name, renumbered(property.value, ids));
+        return juce::var(copy.get());
+    }
+    return value;
+}
+
+} // namespace
+
+juce::var NodeGraphComponent::editorContainerState(const std::uint64_t head) const
+{
+    const auto container = editorContainer(head);
+    if (!container || container->end == 0)
+        return {};
+    auto family = containerFamily(*this, head);
+    for (const auto& candidate : nodes_)
+        if (const auto owner = editorModulatorOwner(candidate.id); owner != 0 && family.contains(owner))
+            family.insert(candidate.id);
+    const auto whole = serialise();
+    juce::Array<juce::var> nodes;
+    if (const auto* values = whole.getProperty(jsonKeys::nodes, {}).getArray())
+        for (const auto& value : *values)
+            if (family.contains(static_cast<std::uint64_t>(static_cast<juce::int64>(value.getProperty(jsonKeys::id, 0)))))
+                nodes.add(deepCopy(value));
+    juce::Array<juce::var> links;
+    if (const auto* values = whole.getProperty(jsonKeys::connections, {}).getArray())
+        for (const auto& value : *values)
+            if (family.contains(static_cast<std::uint64_t>(static_cast<juce::int64>(value.getProperty(jsonKeys::source, 0))))
+                && family.contains(static_cast<std::uint64_t>(static_cast<juce::int64>(value.getProperty(jsonKeys::destination, 0)))))
+                links.add(deepCopy(value));
+    auto state = juce::DynamicObject::Ptr(new juce::DynamicObject());
+    state->setProperty("format", "CyDAW Container");
+    state->setProperty("type", container->typeKey);
+    state->setProperty("head", static_cast<juce::int64>(head));
+    state->setProperty("end", static_cast<juce::int64>(container->end));
+    state->setProperty(jsonKeys::nodes, nodes);
+    state->setProperty(jsonKeys::connections, links);
+    return juce::var(state.get());
+}
+
+bool NodeGraphComponent::editorApplyContainerState(const std::uint64_t head, const juce::var& state)
+{
+    const auto container = editorContainer(head);
+    const auto* headNode = readNode(static_cast<NodeId>(head));
+    const auto* savedNodes = state.getProperty(jsonKeys::nodes, {}).getArray();
+    const auto* savedLinks = state.getProperty(jsonKeys::connections, {}).getArray();
+    const auto savedHead = static_cast<std::uint64_t>(static_cast<juce::int64>(state.getProperty("head", 0)));
+    const auto savedEnd = static_cast<std::uint64_t>(static_cast<juce::int64>(state.getProperty("end", 0)));
+    if (editingLocked_ || !container || container->end == 0 || headNode == nullptr || savedNodes == nullptr || savedLinks == nullptr
+        || savedHead == 0 || savedEnd == 0 || state.getProperty("type", {}).toString() != headNode->typeKey)
+        return false;
+    const juce::var* savedHeadValue {};
+    auto endSaved = false;
+    for (const auto& value : *savedNodes) {
+        const auto id = static_cast<std::uint64_t>(static_cast<juce::int64>(value.getProperty(jsonKeys::id, 0)));
+        if (id == savedHead)
+            savedHeadValue = &value;
+        endSaved = endSaved || id == savedEnd;
+    }
+    if (savedHeadValue == nullptr || !endSaved)
+        return false;
+    // What it holds now goes (its head comes back as saved, keeping its id).
+    auto family = containerFamily(*this, head);
+    for (const auto& candidate : nodes_)
+        if (const auto owner = editorModulatorOwner(candidate.id); owner != 0 && family.contains(owner))
+            family.insert(candidate.id);
+    // Where its sound goes on, from its last end.
+    std::vector<Connection> onward;
+    for (const auto& connection : connections_)
+        if (connection.source == container->end && connection.sourcePort == containers::endOutputPort && !family.contains(connection.destination))
+            onward.push_back(connection);
+    auto whole = deepCopy(serialise());
+    auto* root = whole.getDynamicObject();
+    auto* nodes = root != nullptr ? root->getProperty(jsonKeys::nodes).getArray() : nullptr;
+    auto* links = root != nullptr ? root->getProperty(jsonKeys::connections).getArray() : nullptr;
+    if (nodes == nullptr || links == nullptr)
+        return false;
+    const auto idOf = [](const juce::var& value, const juce::Identifier& key) {
+        return static_cast<std::uint64_t>(static_cast<juce::int64>(value.getProperty(key, 0)));
+    };
+    for (int index = nodes->size(); --index >= 0;)
+        if (family.contains(idOf((*nodes)[index], jsonKeys::id)))
+            nodes->remove(index);
+    // What fed its head (its input, a cable to one of its knobs) stays.
+    for (int index = links->size(); --index >= 0;) {
+        const auto source = idOf((*links)[index], jsonKeys::source);
+        const auto destination = idOf((*links)[index], jsonKeys::destination);
+        const auto intoHead = destination == head && !family.contains(source);
+        if (!intoHead && (family.contains(source) || family.contains(destination)))
+            links->remove(index);
+    }
+    // New ids for the saved cards, the head's its own.
+    std::uint64_t next = std::max<std::uint64_t>(nextNodeId_, idOf(whole, jsonKeys::nextNodeId));
+    for (const auto& value : *nodes)
+        next = std::max(next, idOf(value, jsonKeys::id) + 1);
+    std::map<std::uint64_t, std::uint64_t> ids { { savedHead, head } };
+    for (const auto& value : *savedNodes)
+        if (const auto id = idOf(value, jsonKeys::id); id != 0 && id != savedHead)
+            ids[id] = next++;
+    // Laid where the head is.
+    const auto dx = static_cast<double>(headNode->position.x) - static_cast<double>(savedHeadValue->getProperty(jsonKeys::x, 0.0));
+    const auto dy = static_cast<double>(headNode->position.y) - static_cast<double>(savedHeadValue->getProperty(jsonKeys::y, 0.0));
+    namespace modulators = cydaw::engine::modulator;
+    for (const auto& value : *savedNodes) {
+        const auto found = ids.find(idOf(value, jsonKeys::id));
+        if (found == ids.end())
+            continue;
+        auto copy = renumbered(deepCopy(value), ids);
+        auto* object = copy.getDynamicObject();
+        if (object == nullptr)
+            continue;
+        object->setProperty(jsonKeys::id, static_cast<juce::int64>(found->second));
+        object->setProperty(jsonKeys::x, juce::jlimit(0.0, 1.0, static_cast<double>(object->getProperty(jsonKeys::x)) + dx));
+        object->setProperty(jsonKeys::y, juce::jlimit(0.0, 1.0, static_cast<double>(object->getProperty(jsonKeys::y)) + dy));
+        // A modulator: the card it belongs to, by its new id.
+        if (const auto* effect = cydaw::engine::effectForType(object->getProperty(jsonKeys::type).toString().toStdString());
+            effect != nullptr && effect->control)
+            if (auto* bands = object->getProperty(jsonKeys::parameters).getProperty("eqBands", {}).getArray();
+                bands != nullptr && bands->size() > modulators::ownerHighSlot) {
+                const auto owner = modulators::ownerOf(static_cast<float>(static_cast<double>((*bands)[modulators::ownerLowSlot])),
+                                                       static_cast<float>(static_cast<double>((*bands)[modulators::ownerHighSlot])));
+                if (const auto moved = ids.find(owner); moved != ids.end()) {
+                    bands->set(modulators::ownerLowSlot, modulators::ownerLowOf(moved->second));
+                    bands->set(modulators::ownerHighSlot, modulators::ownerHighOf(moved->second));
+                }
+            }
+        nodes->add(copy);
+    }
+    for (const auto& value : *savedLinks) {
+        const auto source = ids.find(idOf(value, jsonKeys::source));
+        const auto destination = ids.find(idOf(value, jsonKeys::destination));
+        if (source == ids.end() || destination == ids.end())
+            continue;
+        auto copy = deepCopy(value);
+        if (auto* object = copy.getDynamicObject()) {
+            object->setProperty(jsonKeys::source, static_cast<juce::int64>(source->second));
+            object->setProperty(jsonKeys::destination, static_cast<juce::int64>(destination->second));
+            links->add(copy);
+        }
+    }
+    // Its sound on, from its new last end.
+    for (const auto& connection : onward) {
+        auto link = juce::DynamicObject::Ptr(new juce::DynamicObject());
+        link->setProperty(jsonKeys::source, static_cast<juce::int64>(ids[savedEnd]));
+        link->setProperty(jsonKeys::destination, static_cast<juce::int64>(connection.destination));
+        link->setProperty(jsonKeys::kind, static_cast<int>(connection.kind));
+        link->setProperty(jsonKeys::audioChannels, static_cast<int>(connection.audioChannels));
+        link->setProperty(jsonKeys::sourcePort, static_cast<juce::int64>(containers::endOutputPort));
+        link->setProperty(jsonKeys::destinationPort, static_cast<juce::int64>(connection.destinationPort));
+        links->add(juce::var(link.get()));
+    }
+    root->setProperty(jsonKeys::nextNodeId, static_cast<juce::int64>(next));
+    return editorApplyState(whole);
+}
+
+bool NodeGraphComponent::editorApplyState(const juce::var& state)
+{
+    if (editingLocked_ || state.getDynamicObject() == nullptr)
+        return false;
+    flushParameterNotification();
+    {
+        // Restored as an undo would, the history kept: this is one step of it.
+        const juce::ScopedValueSetter<bool> restoring(restoringHistory_, true);
+        restore(state);
+    }
+    for (auto& item : nodes_)
+        item.serialised = juce::var();
+    notifyLayoutChanged("v2-apply-state");
+    return true;
+}
+
+juce::String NodeGraphComponent::editorBranchName(const std::uint64_t head, const int branch) const
+{
+    const auto* node = readNode(static_cast<NodeId>(head));
+    return node != nullptr && branch >= 0 && branch < node->branchNames.size() ? node->branchNames[branch] : juce::String();
+}
+
+bool NodeGraphComponent::editorRenameBranch(const std::uint64_t head, const int branch, const juce::String& name)
+{
+    const auto container = editorContainer(head);
+    auto* node = findNode(head);
+    if (editingLocked_ || !container || node == nullptr || branch < 0 || branch >= static_cast<int>(container->branches.size()))
+        return false;
+    const auto named = name.trim().substring(0, 64);
+    while (node->branchNames.size() <= branch)
+        node->branchNames.add({});
+    if (node->branchNames[branch] == named)
+        return true;
+    node->branchNames.set(branch, named);
+    // Only names given are kept.
+    while (!node->branchNames.isEmpty() && node->branchNames[node->branchNames.size() - 1].isEmpty())
+        node->branchNames.remove(node->branchNames.size() - 1);
+    node->serialised = juce::var();
+    notifyLayoutChanged("v2-rename-branch");
     return true;
 }
 

@@ -6472,8 +6472,9 @@ int main(const int argc, char* argv[])
         // four (Ambre, Colosse, Mosaïque, Nébuleuse); 59: Batterie; 60: the
         // simple sampler; 69: Opale, Onyx, Tirette, Alliage, Quartz, Argile,
         // Saphir, Dérive, Bronze; 72: Nuée, Silex, the pad rack and Jade, the
-        // de-esser chain gone (the De-esseur is an effect of its own).
-        passed = expect(graph.factoryPresetCount() == 72,
+        // de-esser chain gone (the De-esseur is an effect of its own); 74:
+        // the Drum Machine's kin, Instrument Layer and Instrument Selector.
+        passed = expect(graph.factoryPresetCount() == 74,
                         "factory node-graph preset catalogue") && passed;
         cydaw::app::NodeGraphComponent emptyInstrumentGraph;
         emptyInstrumentGraph.initialiseEmptyMidiTrackGraph();

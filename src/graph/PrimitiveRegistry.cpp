@@ -4,6 +4,7 @@
 
 #include <cydaw/engine/Containers.h>
 #include <cydaw/engine/EffectCatalogue.h>
+#include <cydaw/engine/InstrumentContainers.h>
 
 #include <algorithm>
 #include <cmath>
@@ -457,11 +458,28 @@ PrimitiveRegistry createFactoryPrimitiveRegistry()
             std::move(samplerParameters), true, true, false, true)));
         // A rack of pads: each pad an instrument and its effects of its own
         // (the track's engine plays them); its own voices are silent.
-        add(primitive("core.drum-rack", "Pad Rack", Category::generator,
+        add(primitive("core.drum-rack", "Drum Machine", Category::generator,
             { port(1, "audio-out", Type::audio, Direction::output, Rate::audio, 2),
               port(2, "frequency", Type::value, Direction::input, Rate::control),
               port(3, "level", Type::value, Direction::input, Rate::control) },
             {}, true, true, false, true));
+        // Its kin (InstrumentContainers.h): layers that all play, or one
+        // chosen at a time, each an instrument and its effects of its own.
+        add(primitive("core.instrument-layer", "Instrument Layer", Category::generator,
+            { port(1, "audio-out", Type::audio, Direction::output, Rate::audio, 2),
+              port(2, "frequency", Type::value, Direction::input, Rate::control),
+              port(3, "level", Type::value, Direction::input, Rate::control) },
+            {}, true, true, false, true));
+        {
+            std::vector<NodeParameter> selectorParameters;
+            for (const auto& setting : cydaw::engine::instrument_container::settings)
+                selectorParameters.push_back(parameter(std::string(setting.key), setting.minimum, setting.maximum, setting.defaultValue));
+            add(primitive("core.instrument-selector", "Instrument Selector", Category::generator,
+                { port(1, "audio-out", Type::audio, Direction::output, Rate::audio, 2),
+                  port(2, "frequency", Type::value, Direction::input, Rate::control),
+                  port(3, "level", Type::value, Direction::input, Rate::control) },
+                std::move(selectorParameters), true, true, false, true));
+        }
         add(withSettingSockets(primitive("core.batterie", "Batterie", Category::generator,
             { port(1, "audio-out", Type::audio, Direction::output, Rate::audio, 2),
               port(2, "frequency", Type::value, Direction::input, Rate::control),

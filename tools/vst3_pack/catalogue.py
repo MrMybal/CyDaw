@@ -16,8 +16,8 @@ GUITAR={'amp-sim','cab-sim','mic-sim'}
 CREATIVE={'vocoder','harmonie','justesse','de-esser','pompe','empreinte','givre','grains','saccade','boucleur','decaleur','anneau','rotor','resonateurs','corps','peigne'}
 UTIL={'utilitaire','tuner','stereoscope'}
 BASIC={'chorus','flanger','phaser','tremolo-pan','bitcrusher','multimode-filter','auto-filter','eq-three','limiter','gate','transient-shaper','ping-pong','mono-to-stereo','stereo-to-mono','spectrometer'}
-ADVANCED={'sound-model-synth','batterie-instrument','sampler-instrument','simple-sampler-instrument','nuee-instrument','prism-instrument','ambre-instrument','colosse-instrument','mosaique-instrument','nebuleuse-instrument','opale-instrument','onyx-instrument','tirette-instrument','alliage-instrument','quartz-instrument','argile-instrument','saphir-instrument','derive-instrument','bronze-instrument','silex-instrument','rack-instrument','jade-instrument','kick-instrument'}
-EXCLUDED={'sound-model-synth','batterie-instrument','sampler-instrument','simple-sampler-instrument','nuee-instrument','rack-instrument','sound-model','sampler','batterie','drum-rack'}
+ADVANCED={'sound-model-synth','batterie-instrument','sampler-instrument','simple-sampler-instrument','nuee-instrument','prism-instrument','ambre-instrument','colosse-instrument','mosaique-instrument','nebuleuse-instrument','opale-instrument','onyx-instrument','tirette-instrument','alliage-instrument','quartz-instrument','argile-instrument','saphir-instrument','derive-instrument','bronze-instrument','silex-instrument','rack-instrument','layer-instrument','selector-instrument','jade-instrument','kick-instrument'}
+EXCLUDED={'sound-model-synth','batterie-instrument','sampler-instrument','simple-sampler-instrument','nuee-instrument','rack-instrument','layer-instrument','selector-instrument','sound-model','sampler','batterie','drum-rack','instrument-layer','instrument-selector'}
 
 def category(d):
     key=d['key']
@@ -47,7 +47,7 @@ def prepare():
             j.update(status='alias',alias=d['key'][:-6]+'-instrument',reason='Meme moteur que l\'instrument avance ; conserve comme source de construction.')
         if d['kind']=='node' and d['key'] in ['sampler','batterie','sound-model']:
             j.update(status='alias',alias={'sampler':'sampler-instrument','batterie':'batterie-instrument','sound-model':'sound-model-synth'}[d['key']])
-        if d['key'] in ['drum-rack','rack-instrument']:
+        if d['key'] in ['drum-rack','rack-instrument','instrument-layer','layer-instrument','instrument-selector','selector-instrument']:
             j.update(status='unavailable',reason='Le moteur des pads appartient au DAW et ne joue pas dans le VST3 actuel.')
         if j['category'].startswith('Construction'):
             j.update(status='construction-source',reason='Bloc de controle pour construire un graphe ; pas un effet audio ou MIDI autonome.')

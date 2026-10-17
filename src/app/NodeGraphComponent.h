@@ -405,6 +405,8 @@ public:
         juce::String input;  // "audio", "midi", "control", "transport" or "none"
         juce::String output;
         juce::String categoryKey; // a node's catalogue category key
+        // Its name in English, whatever the language (inside a module).
+        juce::String englishName;
     };
     [[nodiscard]] std::vector<DeviceCatalogueEntry> deviceCatalogue() const;
     // Removes one card — by id, or the last one of a type — the way the
@@ -849,6 +851,19 @@ public:
     // A layer, a selector's chain: one more, or one gone with its cards.
     bool editorAddBranch(std::uint64_t head);
     bool editorRemoveBranch(std::uint64_t head, int branch);
+    // A branch's name given by hand (empty: none); naming it (one undo step).
+    [[nodiscard]] juce::String editorBranchName(std::uint64_t head, int branch) const;
+    bool editorRenameBranch(std::uint64_t head, int branch, const juce::String& name);
+    // A whole container, as a preset keeps it: its head, every card it holds
+    // (nested containers' too), its ends, their modulators and the cables
+    // between them ({format, type, head, end, nodes, connections}); void
+    // for none.
+    [[nodiscard]] juce::var editorContainerState(std::uint64_t head) const;
+    // Such a state in place of what the container holds (the head keeps its
+    // id, its place and what feeds it; one undo step).
+    bool editorApplyContainerState(std::uint64_t head, const juce::var& state);
+    // A whole graph state in place of this one, as one undo step.
+    bool editorApplyState(const juce::var& state);
     // A container and all it holds, its signal joined around it.
     bool editorRemoveContainer(std::uint64_t head);
     // When a parameter was last set through editorSetParameter (a knob
@@ -1070,6 +1085,9 @@ private:
         // A Replacer's instrument (Containers.h): its own graph, as the
         // studio keeps it ({name, graph}); saved as is.
         juce::var instrumentJson;
+        // A container's branches named by hand (by their place; an empty one
+        // keeps its usual name).
+        juce::StringArray branchNames;
         // What this node last serialised to. A node is a pure function of
         // itself, so the answer only changes when the node does, and finding
         // out costs about forty microseconds — three hundred of those is what

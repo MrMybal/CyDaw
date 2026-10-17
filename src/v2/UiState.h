@@ -104,6 +104,8 @@ struct UiState {
     // The cards whose list of values is open (the track's routing key, the
     // card's node id).
     std::set<std::pair<std::uint64_t, std::uint64_t>> valueLists;
+    // The same for a plug-in's card (the track's routing key, its place).
+    std::set<std::pair<std::uint64_t, std::size_t>> pluginValueLists;
     // The cards whose modulators show, a column at their left (the same
     // keys), each one's modulator whose settings show, and the modulator
     // whose arrow is armed (the track's key, its node): a knob's drag then

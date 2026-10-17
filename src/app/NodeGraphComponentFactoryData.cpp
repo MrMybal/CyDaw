@@ -887,6 +887,34 @@ void NodeGraphComponent::initialiseFactoryPresets()
               { { 0, 1 }, { 1, 2, 2, 2 }, { 1, 3, 3, 1 }, { 2, 4, 1, 1 },
                 { 3, 4, 2, 2 }, { 4, 5, 3, 1 }, { 5, 6 } } });
     });
+    // Its kin: layers that all play (Instrument Layer), one at a time
+    // (Instrument Selector), each an instrument and its effects of its own.
+    struct Held {
+        const char* key;
+        const char* translation;
+        const char* card;
+    };
+    for (const auto& item : { Held { "layer-instrument", "nodes.preset.layerInstrument", "instrument-layer" },
+                              Held { "selector-instrument", "nodes.preset.selectorInstrument", "instrument-selector" } }) {
+        const auto key = item.key;
+        const auto translation = item.translation;
+        const auto card = item.card;
+        buildApart([&] {
+            Parameters held;
+            held.oscillatorFrequencyHz = 220.0f;
+            held.oscillatorLevel = 1.0f;
+            factoryPresets_.push_back({ key, translation,
+                  { { "midi-input", { 0.03f, 0.42f } },
+                    { "voice-allocator", { 0.18f, 0.42f } },
+                    { card, { 0.36f, 0.20f }, held },
+                    { "envelope", { 0.36f, 0.72f }, shaped(0.1f, 1.0f, 1.0f, 50.0f) },
+                    { "gain", { 0.56f, 0.42f } },
+                    { "voice-filter", { 0.74f, 0.42f }, filtered(20'000.0f) },
+                    { "master", { 0.94f, 0.42f } } },
+                  { { 0, 1 }, { 1, 2, 2, 2 }, { 1, 3, 3, 1 }, { 2, 4, 1, 1 },
+                    { 3, 4, 2, 2 }, { 4, 5, 3, 1 }, { 5, 6 } } });
+        });
+    }
     buildApart([&] {
         factoryPresets_.push_back({ "jade-instrument", "nodes.preset.jadeInstrument",
               { { "midi-input", { 0.03f, 0.42f } },
@@ -1154,7 +1182,9 @@ void NodeGraphComponent::initialiseCatalog()
         { "sound-model", "node.soundModel", {}, "nodes.category.generators", juce::Colour(0xffc49cff), false, audio, true, audio, false, false },
         { "sampler", "node.sampler", {}, "nodes.category.generators", juce::Colour(0xff8fc8ff), false, audio, true, audio, false, false },
         { "batterie", "node.batterie", {}, "nodes.category.generators", juce::Colour(0xffe8c06a), false, audio, true, audio, false, false },
-        { "drum-rack", "node.drumRack", {}, "nodes.category.generators", juce::Colour(0xffe86a8c), false, audio, true, audio, false, false },
+        { "drum-rack", "node.drumRack", {}, "nodes.category.containers", juce::Colour(0xffe86a8c), false, audio, true, audio, false, false },
+        { "instrument-layer", "node.instrumentLayer", {}, "nodes.category.containers", juce::Colour(0xffe8a06a), false, audio, true, audio, false, false },
+        { "instrument-selector", "node.instrumentSelector", {}, "nodes.category.containers", juce::Colour(0xffd8b45c), false, audio, true, audio, false, false },
         { "prism-synth", "node.prismSynth", {}, "nodes.category.generators", juce::Colour(0xffff8a3d), false, audio, true, audio, false, false },
         { "kick-synth", "node.kickSynth", {}, "nodes.category.generators", juce::Colour(0xffff5a5a), false, audio, true, audio, false, false },
         { "ambre-synth", "node.ambreSynth", {}, "nodes.category.generators", juce::Colour(0xffffb04a), false, audio, true, audio, false, false },

@@ -934,9 +934,29 @@ juce::var Commands::run()
         return onSynth();
     if (command == "batterie")
         return onBatterie();
+    if (command == "instrument_choices") {
+        // What a pad, a layer or a Replacer can play: CyDAW's instruments
+        // (catalogue keys), the factory's ("factory:<key>", with their
+        // category, and whether their samples are still to download).
+        juce::Array<juce::var> listed;
+        for (const auto& choice : studio_.instrumentChoices()) {
+            auto entry = object();
+            set(entry, "key", choice.key);
+            set(entry, "name", choice.name);
+            set(entry, "category", choice.category);
+            set(entry, "missing", choice.missing);
+            listed.add(entry);
+        }
+        auto result = object();
+        set(result, "instruments", listed);
+        return ok(result);
+    }
     if (command == "rack") {
         // {track, action: "list" | "add" | "instrument" | "mix" | "sample" | "remove" | "open" | "close", note, pad,
-        // instrument, file, name, playAs, gainDb, pan, mute, solo, choke}: a rack's pads. Answers them all.
+        // instrument, file, name, playAs, gainDb, pan, mute, solo, choke, keyLow, keyHigh, velocityLow,
+        // velocityHigh}: an instrument container's pads (Drum Machine) or layers (Instrument Layer,
+        // Selector: by "pad", their place; "add" makes the next). An instrument is a catalogue key or
+        // "factory:<key>". Answers them all, the container's kind and the layer a selector plays.
         std::optional<RemoteTrack> track;
         if (auto error = trackOrFail(track); !error.isVoid())
             return error;
@@ -967,8 +987,7 @@ juce::var Commands::run()
             const auto* current = pad ? studio_.rackPad(ref, *pad) : nullptr;
             if (current == nullptr)
                 return fail("no pad there");
-            Studio::RackPadMix mix { current->note, current->name, current->playAs, current->gainDb, current->pan, current->muted,
-                                     current->solo, current->choke };
+            auto mix = Studio::mixOf(*current);
             if (has("newNote"))
                 mix.note = static_cast<int>(number("newNote", mix.note));
             if (has("name"))
@@ -985,6 +1004,14 @@ juce::var Commands::run()
                 mix.solo = flag("solo", mix.solo);
             if (has("choke"))
                 mix.choke = static_cast<int>(number("choke", mix.choke));
+            if (has("keyLow"))
+                mix.keyLow = static_cast<int>(number("keyLow", mix.keyLow));
+            if (has("keyHigh"))
+                mix.keyHigh = static_cast<int>(number("keyHigh", mix.keyHigh));
+            if (has("velocityLow"))
+                mix.velocityLow = static_cast<int>(number("velocityLow", mix.velocityLow));
+            if (has("velocityHigh"))
+                mix.velocityHigh = static_cast<int>(number("velocityHigh", mix.velocityHigh));
             (void) studio_.setRackPadMix(ref, *pad, mix);
         } else if (action == "open") {
             if (!pad || studio_.rackPad(ref, *pad) == nullptr)
@@ -998,6 +1025,9 @@ juce::var Commands::run()
         }
         auto result = object();
         set(result, "rack", studio_.isRack(ref));
+        set(result, "kind", juce::String(engine::instrument_container::name(studio_.containerKind(ref))));
+        set(result, "padsKind", studio_.padsKindName(ref));
+        set(result, "selected", studio_.selectedLayer(ref));
         juce::Array<juce::var> pads;
         for (std::size_t index = 0; index < studio_.rackPadCount(ref); ++index) {
             const auto* item = studio_.rackPad(ref, index);
@@ -1011,11 +1041,22 @@ juce::var Commands::run()
             set(entry, "mute", item->muted);
             set(entry, "solo", item->solo);
             set(entry, "choke", item->choke);
+            set(entry, "keyLow", item->keyLow);
+            set(entry, "keyHigh", item->keyHigh);
+            set(entry, "velocityLow", item->velocityLow);
+            set(entry, "velocityHigh", item->velocityHigh);
             juce::Array<juce::var> devices;
+            juce::Array<juce::var> cards;
             for (const auto& node : item->graph->graph().editorNodes())
-                if (!node.boundary)
+                if (!node.boundary) {
                     devices.add(node.typeKey);
+                    auto card = object();
+                    set(card, "id", static_cast<juce::int64>(node.id));
+                    set(card, "type", node.typeKey);
+                    cards.add(card);
+                }
             set(entry, "devices", devices);
+            set(entry, "cards", cards);
             set(entry, "peak", studio_.rackPadPeak(ref, index));
             pads.add(juce::var(entry));
         }
@@ -1539,8 +1580,25 @@ juce::var Commands::run()
         studio_.refreshTranslations();
         return ok(status());
     }
+    if (command == "value_list" && has("plugin")) {
+        // {track, plugin, open}: a plug-in card's list of values (every
+        // parameter, searched, the last touched first).
+        std::optional<RemoteTrack> track;
+        if (auto error = trackOrFail(track); !error.isVoid())
+            return error;
+        const auto ref = track->ref();
+        const auto plugin = static_cast<std::size_t>(number("plugin", 0.0));
+        if (ref.midi || ref.master || plugin >= studio_.engine().trackPlugins(ref.audioIndex).size())
+            return fail("no plug-in " + juce::String(static_cast<int>(plugin)) + " on that audio track");
+        if (!ui_.showPluginValueList(ref, plugin, flag("open", true)))
+            return fail("this interface shows no lists of values");
+        auto result = object();
+        set(result, "open", flag("open", true));
+        return ok(result);
+    }
     if (command == "value_list") {
-        // {track, nodeId, open}: a card's list of values in the devices' strip.
+        // {track, nodeId, open}: a card's list of values in the devices' strip
+        // (with "plugin" in place of nodeId: a plug-in card's).
         std::optional<GraphTarget> target;
         if (auto error = targetOrFail(target); !error.isVoid())
             return error;
@@ -3582,7 +3640,10 @@ juce::var Commands::onPresets()
     std::optional<RemoteTrack> track;
     if (auto error = trackOrFail(track, true); !error.isVoid())
         return error;
-    const auto ref = track->ref();
+    // "pad": a pad's or a layer's chain (an instrument container's).
+    auto ref = track->ref();
+    if (has("pad"))
+        ref.pad = static_cast<int>(number("pad", -1.0));
     std::optional<Studio::PresetHolder> holder;
     std::optional<int> pluginIndex;
     PresetMenuCapture capture;
@@ -4647,8 +4708,9 @@ juce::var Commands::onContainer()
     //   move {nodeId, head (0: the main chain), branch, before}: a card (a
     //     container with all it holds) moved;
     //   add_branch {head}; remove_branch {head, branch}; remove {head};
+    //   rename {head, branch, name}: a branch named by hand (empty: its usual name);
     //   show {head, branch}: the branch shown after the card;
-    //   list: every container, its branches' cards.
+    //   list: every container, its branches' cards (and the names given them).
     std::optional<GraphTarget> target;
     if (auto error = targetOrFail(target); !error.isVoid())
         return error;
@@ -4686,6 +4748,10 @@ juce::var Commands::onContainer()
             branches.add(listed);
         }
         set(entry, "branches", branches);
+        juce::Array<juce::var> names;
+        for (int index = 0; index < static_cast<int>(container->branches.size()); ++index)
+            names.add(graph.editorBranchName(id, index));
+        set(entry, "names", names);
         if (container->typeKey == "replacer")
             set(entry, "instrument", studio_.replacerInstrumentName(*target->track, id));
         return entry;
@@ -4738,6 +4804,11 @@ juce::var Commands::onContainer()
             return fail("that branch cannot be removed");
         return done(head, true);
     }
+    if (action == "rename") {
+        if (!graph.editorRenameBranch(head, branch, text("name")))
+            return fail("no such branch");
+        return done(head, false);
+    }
     if (action == "remove") {
         if (!graph.editorRemoveContainer(head))
             return fail("the container was not removed");
@@ -4770,7 +4841,8 @@ juce::var Commands::onContainer()
         set(result, "instrument", studio_.replacerInstrumentName(*target->track, head));
         return ok(result);
     }
-    return fail("action: list, insert, add_device, move, add_branch, remove_branch, remove or show");
+    return fail("action: list, insert, add_device, move, add_branch, remove_branch, rename, remove, show, instrument or "
+                "open_instrument");
 }
 
 juce::var Commands::onDescribeNodeType()

@@ -4411,8 +4411,8 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
                 midiEffects.apply(midi, 0, output.numSamples, published != nullptr ? published->midiEffects.get() : nullptr, clock);
             }
             renderVoices(published.get(), *output.buffer, midi, output.startSample, output.numSamples);
-            // A rack's pads: each its instrument and its effects.
-            renderPads(midi, output, automationSeconds);
+            // An instrument container's pads: each its instrument and its effects.
+            renderPads(published.get(), midi, output, automationSeconds);
             // What the notes say, for the modulators (as the voices heard them).
             followNotes(midi);
         }
@@ -4720,9 +4720,28 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
         std::atomic<bool> muted {};
         std::atomic<bool> solo {};
         std::atomic<int> choke {};      // pads of one group cut each other; 0: none
+        // A layer's keys and velocities.
+        std::atomic<int> keyLow {};
+        std::atomic<int> keyHigh { 127 };
+        std::atomic<int> velocityLow { 1 };
+        std::atomic<int> velocityHigh { 127 };
         std::atomic<float> peak {};     // for its meter
     };
-    static constexpr std::size_t maximumPads = 16;
+    static constexpr std::size_t maximumPads = AudioTrackController::maximumRackPads;
+    // An Instrument Selector's choice (audio thread): the layer a new note
+    // goes to, where each sounding note began, the turn and the dice.
+    int selectorLayer {};
+    int selectorManual { -1 };
+    int selectorTurn {};
+    std::uint32_t selectorDice { 0x9e3779b9u };
+    std::array<std::array<std::int8_t, 128>, 16> noteLayers = [] {
+        std::array<std::array<std::int8_t, 128>, 16> layers {};
+        for (auto& channel : layers)
+            channel.fill(-1);
+        return layers;
+    }();
+    // The layer it plays now, for the interface.
+    std::atomic<int> selectedLayer { -1 };
     std::array<std::atomic<RackPad*>, maximumPads> pads {};
     std::array<std::unique_ptr<RackPad>, maximumPads> padStore;
 
@@ -4740,25 +4759,136 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
         return padStore[index].get();
     }
 
-    // The pads' sound, added into the block (before the track's effects).
-    void renderPads(const juce::MidiBuffer& midi, const juce::AudioSourceChannelInfo& output, const double timelineSeconds) noexcept
+    // The pads' sound, added into the block (before the track's effects):
+    // as the track's instrument card has them hear its notes (`trackPlan`).
+    void renderPads(const cydaw::engine::PolySynthGraphPlan* trackPlan, const juce::MidiBuffer& midi, const juce::AudioSourceChannelInfo& output,
+                    const double timelineSeconds) noexcept
     {
+        namespace container = cydaw::engine::instrument_container;
         std::array<RackPad*, maximumPads> playing {};
+        // Each pad by its place (a layer's number), null when it is silent.
+        std::array<RackPad*, maximumPads> byPlace {};
         std::size_t count = 0;
+        auto layers = 0;
         auto soloed = false;
-        for (auto& slot : pads)
-            if (auto* pad = slot.load(std::memory_order_acquire); pad != nullptr && pad->note.load(std::memory_order_relaxed) >= 0) {
+        for (std::size_t place = 0; place < maximumPads; ++place)
+            if (auto* pad = pads[place].load(std::memory_order_acquire); pad != nullptr && pad->note.load(std::memory_order_relaxed) >= 0) {
                 playing[count++] = pad;
+                byPlace[place] = pad;
+                layers = static_cast<int>(place) + 1;
                 soloed = soloed || pad->solo.load(std::memory_order_relaxed);
             }
+        const auto kind = trackPlan != nullptr && trackPlan->containerKind != container::Kind::none ? trackPlan->containerKind
+                                                                                                    : container::Kind::drum;
+        if (count == 0 || kind != container::Kind::selector)
+            selectedLayer.store(-1, std::memory_order_relaxed);
         if (count == 0)
             return;
         const auto frames = output.numSamples;
         for (std::size_t index = 0; index < count; ++index)
             playing[index]->notes.clear();
-        // Each pad its key's notes (as its own note, or the one it plays),
-        // the controllers to all; a pad's note cuts the others of its group.
+        // An Instrument Layer: every layer each note in its keys and
+        // velocities (the note's end to every layer of its keys), the
+        // controllers to all.
+        // An Instrument Selector: each note to one layer (its end where it
+        // began), the controllers to all.
+        if (kind == container::Kind::layer || kind == container::Kind::selector) {
+            const auto& values = trackPlan->containerValues;
+            const auto mode = static_cast<container::Selection>(std::clamp(static_cast<int>(values[container::mode]), 0,
+                                                                            container::selectionCount - 1));
+            const auto manual = std::clamp(static_cast<int>(values[container::layer]) - 1, 0, layers - 1);
+            // The knob turned: it chooses (and is where a switch starts from).
+            if (manual != selectorManual) {
+                selectorManual = manual;
+                selectorLayer = manual;
+            }
+            selectorLayer = std::clamp(selectorLayer, 0, layers - 1);
+            const auto controllerNumber = static_cast<int>(values[container::controller]);
+            const auto lowestSwitch = static_cast<int>(values[container::keyswitch]);
+            const auto send = [](RackPad* pad, const std::uint8_t* data, const int size, const int at) {
+                if (pad != nullptr)
+                    pad->notes.addEvent(data, size, at);
+            };
+            for (const auto metadata : midi) {
+                const auto* data = metadata.data;
+                const auto size = metadata.numBytes;
+                if (size < 1)
+                    continue;
+                const auto type = data[0] & 0xF0;
+                const auto channel = data[0] & 0x0F;
+                const auto isNote = (type == 0x90 || type == 0x80) && size >= 3;
+                if (!isNote) {
+                    if (kind == container::Kind::selector) {
+                        if (mode == container::Selection::controller && type == 0xB0 && size >= 3 && data[1] == controllerNumber)
+                            selectorLayer = std::min(layers - 1, data[2] * layers / 128);
+                        if (mode == container::Selection::program && type == 0xC0 && size >= 2)
+                            selectorLayer = data[1] % layers;
+                        // Every note let go: none sounds anywhere any more.
+                        if (type == 0xB0 && size >= 3 && (data[1] == 120 || data[1] == 123))
+                            noteLayers[static_cast<std::size_t>(channel)].fill(-1);
+                    }
+                    for (std::size_t index = 0; index < count; ++index)
+                        send(playing[index], data, size, metadata.samplePosition);
+                    continue;
+                }
+                const auto key = static_cast<int>(data[1]);
+                const auto on = type == 0x90 && data[2] > 0;
+                if (kind == container::Kind::layer) {
+                    for (std::size_t index = 0; index < count; ++index) {
+                        auto* pad = playing[index];
+                        if (key < pad->keyLow.load(std::memory_order_relaxed) || key > pad->keyHigh.load(std::memory_order_relaxed))
+                            continue;
+                        if (on && (data[2] < pad->velocityLow.load(std::memory_order_relaxed)
+                                   || data[2] > pad->velocityHigh.load(std::memory_order_relaxed)))
+                            continue;
+                        send(pad, data, 3, metadata.samplePosition);
+                    }
+                    continue;
+                }
+                // A key switch chooses and plays nothing.
+                if (mode == container::Selection::keyswitch && key >= lowestSwitch && key < lowestSwitch + layers) {
+                    if (on)
+                        selectorLayer = key - lowestSwitch;
+                    continue;
+                }
+                auto& began = noteLayers[static_cast<std::size_t>(channel)][static_cast<std::size_t>(key)];
+                if (!on) {
+                    if (began >= 0)
+                        send(byPlace[static_cast<std::size_t>(began)], data, 3, metadata.samplePosition);
+                    began = -1;
+                    continue;
+                }
+                auto chosen = selectorLayer;
+                if (mode == container::Selection::manual)
+                    chosen = manual;
+                else if (mode == container::Selection::roundRobin) {
+                    chosen = selectorTurn % layers;
+                    selectorTurn = (selectorTurn + 1) % layers;
+                } else if (mode == container::Selection::random && layers > 1) {
+                    // Another layer than the last, at random.
+                    selectorDice ^= selectorDice << 13;
+                    selectorDice ^= selectorDice >> 17;
+                    selectorDice ^= selectorDice << 5;
+                    chosen = (selectorLayer + 1 + static_cast<int>(selectorDice % static_cast<std::uint32_t>(layers - 1))) % layers;
+                }
+                selectorLayer = chosen;
+                // The same key still sounding elsewhere ends there first.
+                if (began >= 0 && began != chosen) {
+                    const std::uint8_t off[3] { static_cast<std::uint8_t>(0x80 | channel), data[1], 0 };
+                    send(byPlace[static_cast<std::size_t>(began)], off, 3, metadata.samplePosition);
+                }
+                began = static_cast<std::int8_t>(chosen);
+                send(byPlace[static_cast<std::size_t>(chosen)], data, 3, metadata.samplePosition);
+            }
+            if (kind == container::Kind::selector)
+                selectedLayer.store(mode == container::Selection::manual ? manual : selectorLayer, std::memory_order_relaxed);
+        }
+        // A Drum Machine: each pad its key's notes (as its own note, or the
+        // one it plays), the controllers to all; a pad's note cuts the others
+        // of its group.
         for (const auto metadata : midi) {
+            if (kind != container::Kind::drum)
+                break;
             const auto* data = metadata.data;
             const auto size = metadata.numBytes;
             if (size < 1)
@@ -13418,22 +13548,32 @@ juce::Result AudioTrackController::setMidiTrackRackPad(const std::uint64_t track
     return slot->effects.setGraph(effects);
 }
 
-void AudioTrackController::setMidiTrackRackPadMix(const std::uint64_t trackId, const std::size_t pad, const int note, const int playAs,
-                                                  const float gainDb, const float pan, const bool muted, const bool solo, const int choke)
+void AudioTrackController::setMidiTrackRackPadMix(const std::uint64_t trackId, const std::size_t pad, const PadMix& mix)
 {
     auto* track = findMidiTrack(trackId);
     if (track == nullptr)
         return;
-    auto* slot = note >= 0 ? track->synth.padAt(pad) : (pad < MidiSynthEngine::maximumPads ? track->synth.padStore[pad].get() : nullptr);
+    auto* slot = mix.note >= 0 ? track->synth.padAt(pad)
+                               : (pad < MidiSynthEngine::maximumPads ? track->synth.padStore[pad].get() : nullptr);
     if (slot == nullptr)
         return;
-    slot->playAs.store(playAs, std::memory_order_relaxed);
-    slot->gain.store(juce::Decibels::decibelsToGain(gainDb, -96.0f), std::memory_order_relaxed);
-    slot->pan.store(juce::jlimit(-1.0f, 1.0f, pan), std::memory_order_relaxed);
-    slot->muted.store(muted, std::memory_order_relaxed);
-    slot->solo.store(solo, std::memory_order_relaxed);
-    slot->choke.store(choke, std::memory_order_relaxed);
-    slot->note.store(note >= 0 && note < 128 ? note : -1, std::memory_order_release);
+    slot->playAs.store(mix.playAs, std::memory_order_relaxed);
+    slot->gain.store(juce::Decibels::decibelsToGain(mix.gainDb, -96.0f), std::memory_order_relaxed);
+    slot->pan.store(juce::jlimit(-1.0f, 1.0f, mix.pan), std::memory_order_relaxed);
+    slot->muted.store(mix.muted, std::memory_order_relaxed);
+    slot->solo.store(mix.solo, std::memory_order_relaxed);
+    slot->choke.store(mix.choke, std::memory_order_relaxed);
+    slot->keyLow.store(juce::jlimit(0, 127, mix.keyLow), std::memory_order_relaxed);
+    slot->keyHigh.store(juce::jlimit(0, 127, mix.keyHigh), std::memory_order_relaxed);
+    slot->velocityLow.store(juce::jlimit(1, 127, mix.velocityLow), std::memory_order_relaxed);
+    slot->velocityHigh.store(juce::jlimit(1, 127, mix.velocityHigh), std::memory_order_relaxed);
+    slot->note.store(mix.note >= 0 && mix.note < 128 ? mix.note : -1, std::memory_order_release);
+}
+
+int AudioTrackController::midiTrackSelectedLayer(const std::uint64_t trackId) const
+{
+    const auto* track = findMidiTrack(trackId);
+    return track != nullptr ? track->synth.selectedLayer.load(std::memory_order_relaxed) : -1;
 }
 
 float AudioTrackController::midiTrackRackPadPeak(const std::uint64_t trackId, const std::size_t pad) const

@@ -1494,6 +1494,13 @@ if(CYDAW_BUILD_DESKTOP)
                              COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/v2_containers_check.py"
                                      --port 47859 --exe "$<TARGET_FILE:CyDAW2>")
                     set_tests_properties(cydaw2_containers_check PROPERTIES TIMEOUT 300)
+                    # Instrument containers (Drum Machine, Instrument Layer,
+                    # Instrument Selector), branch names, container presets,
+                    # plug-in value lists. Silent (offline exports).
+                    add_test(NAME cydaw2_instrument_containers_check
+                             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/v2_instrument_containers_check.py"
+                                     --port 47863 --exe "$<TARGET_FILE:CyDAW2>")
+                    set_tests_properties(cydaw2_instrument_containers_check PROPERTIES TIMEOUT 600)
                     # Batterie: its kits (the banks downloaded on this computer;
                     # skipped without them), its pieces' mix, grooves, presets.
                     add_test(NAME cydaw2_batterie_check

@@ -57,9 +57,15 @@ void items(Studio& studio, UiState& state)
         ImGui::Separator();
         instrument(studio, state, "Prisme", "Prisme", "prism-instrument", L("Le synthé à tables d'ondes.", "The wavetable synth."));
         instrument(studio, state, "Kick", "Kick", "kick-instrument", L("Le synthé de grosse caisse.", "The kick drum synth."));
-        instrument(studio, state, "Rack de pads", "Pad rack", "rack-instrument",
-                   L("Seize pads, chacun son instrument et ses effets : boîte à rythmes, kits, sons à soi.",
-                     "Sixteen pads, each its instrument and effects: drum machine, kits, sounds of your own."));
+        instrument(studio, state, "Drum Machine", "Drum Machine", "rack-instrument",
+                   L("Un pad par touche, chacun son instrument et ses effets : boîte à rythmes, kits, sons à soi.",
+                     "A pad per key, each its instrument and effects: drum machine, kits, sounds of your own."));
+        instrument(studio, state, "Instrument Layer", "Instrument Layer", "layer-instrument",
+                   L("Des couches qui jouent ensemble, chacune son instrument, ses effets, ses touches et vélocités.",
+                     "Layers that play together, each its instrument, effects, keys and velocities."));
+        instrument(studio, state, "Instrument Selector", "Instrument Selector", "selector-instrument",
+                   L("Des couches dont une seule joue : choisie, à tour de rôle, au hasard, par keyswitch ou contrôleur.",
+                     "Layers of which one plays: chosen, in turn, at random, by key switch or controller."));
         if (ImGui::MenuItem("Batterie")) {
             juce::String error;
             made(state, studio.addBatterieTrack(0, error));

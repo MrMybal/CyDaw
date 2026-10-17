@@ -678,12 +678,15 @@ sens de la lecture, 0 : figé), taille (10 ms à 1 s), densité (1 à 120 grains
 autour de la position, hauteur aléatoire, largeur stéréo, chance à l'envers et forme des grains
 (`SamplerSetting::grains` et suivants).
 
-## Rack de pads
+## Drum Machine (ex-rack de pads)
 
-Piste › Nouvelle piste › **Rack de pads** (`rack-instrument`) : seize pads, quatre par quatre, le plus grave
-(do 2, note 36) en bas à gauche. Chaque pad joue **n'importe quel instrument avec ses propres effets** quand
-sa touche arrive ; le rack neuf contient un kit (grosse caisse Kick, caisse claire et clap Silex,
-charlestons fermé et ouvert Silex dans le même groupe de coupure).
+Piste › Nouvelle piste › **Drum Machine** (`rack-instrument`, carte `drum-rack`) : un pad par touche sur les
+128 touches. La grille en montre seize, quatre par quatre, la plus grave en bas à gauche (do 2, note 36, au
+départ). La molette, ou la bande des 128 touches à droite de la grille, montre les autres. Chaque pad joue
+**n'importe quel instrument avec ses propres effets** quand sa touche arrive ; la Drum Machine neuve contient
+un kit (grosse caisse Kick, caisse claire et clap Silex, charlestons fermé et ouvert Silex dans le même groupe
+de coupure). Ses cousins **Instrument Layer** et **Instrument Selector**, les presets de kits et le reste :
+voir `docs/CONTENEURS.md`.
 
 - Un clic choisit un pad : à droite, son nom, sa touche, « Ouvrir sa chaîne », son volume, son
   panoramique, muet, solo, son groupe de coupure (les pads d'un même groupe se coupent) et la note que son

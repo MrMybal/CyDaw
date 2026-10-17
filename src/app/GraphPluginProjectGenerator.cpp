@@ -127,9 +127,9 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
         for (const auto &n : *list)
         {
             const auto type = n.getProperty("type", {}).toString();
-            if (type == "drum-rack")
-                return juce::Result::fail("Pad racks are excluded from native export: their pads are instruments of "
-                                          "the track");
+            if (type == "drum-rack" || type == "instrument-layer" || type == "instrument-selector")
+                return juce::Result::fail("Instrument containers (Drum Machine, Instrument Layer, Instrument Selector) are "
+                                          "excluded from native export: their pads and layers are instruments of the track");
             if (n.hasProperty("prismTables") || n.hasProperty("wavetableShape") || n.hasProperty("impulse"))
                 return juce::Result::fail(
                     "Imported wavetable/impulse assets must be embedded before this device can use native export");

@@ -6,6 +6,7 @@
 #include <cydaw/engine/Sampler.h>
 #include <cydaw/engine/SoundModel.h>
 #include <cydaw/engine/DrumKit.h>
+#include <cydaw/engine/InstrumentContainers.h>
 #include <cydaw/engine/SynthFamily.h>
 #include <cydaw/engine/WavetableShape.h>
 
@@ -39,8 +40,10 @@ enum class PolyOscillatorWaveform : std::uint8_t {
     // A synth of the family (SynthFamily.h): Ambre and the others, a whole
     // synthesiser per voice, in stereo.
     family,
-    // A rack of pads: its voices are silent, each pad an instrument of its
-    // own that the track's engine plays (the "drum-rack" card).
+    // An instrument container (InstrumentContainers.h): its voices are
+    // silent, each pad or layer an instrument of its own that the track's
+    // engine plays (the "drum-rack", "instrument-layer" and
+    // "instrument-selector" cards).
     rack
 };
 
@@ -109,6 +112,10 @@ struct PolySynthGraphPlan final {
     // A sampler playing a drum kit (Batterie): its mix, piece by piece.
     bool drumKit {};
     drum::Values drumValues { drum::neutralValues() };
+    // An instrument container (InstrumentContainers.h, waveform rack): how
+    // the track's pads hear its notes, and a selector's settings.
+    instrument_container::Kind containerKind { instrument_container::Kind::none };
+    instrument_container::Values containerValues { instrument_container::defaultValues() };
     // The MIDI effects the notes go through before the voices (an
     // arpeggiator, chords…), in order; null for none. A pointer: the plan is
     // copied once per voice per block.

@@ -1131,10 +1131,8 @@ juce::Result Studio::publishGraph(const TrackRef& track, const bool structural)
         const auto compiled = graph.compilePolySynthGraph(plan);
         if (compiled.wasOk())
             (void) engine_.setMidiTrackInstrumentGraph(track.midiId, plan);
-        // Its rack's pads sound only while its instrument is the rack.
-        if (const auto found = midiTracks_.find(track.midiId); found != midiTracks_.end())
-            for (std::size_t pad = 0; pad < found->second.pads.size(); ++pad)
-                publishRackPadMix(track, pad);
+        // Its pads or layers sound only while its instrument is their container.
+        publishPadMixes(track);
         engine_.setMidiTrackVoiceModulations(track.midiId, graph.editorVoiceModulations());
         auto chain = graph.nativeDspGraph();
         attachReplacerInstruments(track, chain);
@@ -1271,24 +1269,19 @@ juce::Result Studio::setReplacerInstrument(const TrackRef& owner, const std::uin
         replacerSlots_.push_back(std::move(made));
         slot = &replacerSlots_.back();
     }
-    auto& graph = slot->graph->graph();
-    const auto catalogue = graph.deviceCatalogue();
-    const auto device = std::find_if(catalogue.begin(), catalogue.end(), [&](const auto& entry) { return entry.key == instrumentKey; });
-    if (device == catalogue.end() || !device->soundSource)
-        return juce::Result::fail("no instrument \"" + instrumentKey + "\"");
-    if (const auto applied = graph.replaceInstrument(instrumentKey); applied.failed())
-        return applied;
-    graph_layout::arrange(graph);
-    slot->name = device->name;
-    // A kit for a Batterie, as a track's gets.
     auto ref = owner;
     ref.pad = replacerPadBase + static_cast<int>(slot - replacerSlots_.data());
-    for (const auto& card : graph.editorNodes())
-        if (card.typeKey == "batterie" && !graph.nodeSamplerJson(card.id).isObject()) {
-            juce::String error;
-            if (!setBatterieKit(ref, card.id, 0, error))
-                return juce::Result::fail(error);
-        }
+    // An instrument of CyDAW's or of the factory's (its kit for a Batterie,
+    // its samples for a sampler), named in English (the card's).
+    juce::String error;
+    const auto name = applyInstrument(ref, instrumentKey, error);
+    if (!name)
+        return juce::Result::fail(error);
+    // The slots may have moved (made again from their cards).
+    slot = replacerSlotFor(owner, head, true);
+    if (slot == nullptr)
+        return juce::Result::fail("no such Replacer");
+    slot->name = *name;
     // Its sound is now the instrument.
     if (const auto* effect = engine::effectForType("replacer"))
         if (const auto* generator = engine::effectParameter(*effect, "generator"))
@@ -1341,6 +1334,10 @@ juce::Result Studio::insertDevice(const TrackRef& track, const juce::String& key
         return juce::Result::fail("no device \"" + key + "\"");
     if (!track.midi && device->soundSource)
         return juce::Result::fail("\"" + device->name + "\" is an instrument");
+    // An instrument container's card: the instrument that is it (its pads or layers made).
+    if (const auto kind = engine::instrument_container::kindOfType(key.toStdString());
+        track.midi && track.pad < 0 && kind != engine::instrument_container::Kind::none)
+        return replaceInstrument(track, engine::instrument_container::instrumentOf(kind), engine::instrument_container::name(kind));
     // An instrument on an instrument track: in place of the one it plays,
     // the effects after it kept.
     if (track.midi && device->kind == "preset" && device->soundSource)
@@ -1436,7 +1433,8 @@ int Studio::setSynthSettings(const TrackRef& track, const std::vector<std::pair<
 juce::Result Studio::replaceInstrument(const TrackRef& track, const juce::String& key, const juce::String& name)
 {
     auto* slot = graphFor(track);
-    if (slot == nullptr || !track.midi)
+    // An instrument track's, a pad's, a Replacer's (on any track).
+    if (slot == nullptr || (!track.midi && !isReplacerPad(track)))
         return juce::Result::fail(ui::Ls("Piste instrument introuvable", "No such instrument track"));
     auto& graph = slot->graph();
     // Its name, when it was what it played (or the default one), follows.
@@ -1467,10 +1465,22 @@ juce::Result Studio::replaceInstrument(const TrackRef& track, const juce::String
         }
     if (replacing && namedAfterInstrument && name.isNotEmpty() && track.pad < 0)
         setTrackName(track, name);
-    // A rack made: its first pads, when it has none.
-    if (track.pad < 0 && key == "rack-instrument" && rackPadCount(track) == 0) {
+    // An instrument container made: its first pads or layers, when it has
+    // none of its kind (a drum machine's pads are no layers).
+    if (const auto kind = engine::instrument_container::kindOfInstrument(key.toStdString());
+        track.pad < 0 && kind != engine::instrument_container::Kind::none) {
+        if (const auto found = midiTracks_.find(track.midiId); found != midiTracks_.end()) {
+            if (found->second.padsKind != kind && !found->second.pads.empty())
+                clearPads(track);
+            found->second.padsKind = kind;
+        }
         const auto published = publishGraph(track, true);
-        fillDefaultRack(track);
+        if (rackPadCount(track) == 0) {
+            if (kind == engine::instrument_container::Kind::drum)
+                fillDefaultRack(track);
+            else
+                fillDefaultLayers(track);
+        }
         return published;
     }
     return publishGraph(track, true);
@@ -3758,7 +3768,24 @@ std::optional<Studio::PresetHolder> Studio::chainPresetHolder(const TrackRef& tr
 juce::var Studio::devicePresetState(const TrackRef& track, const std::uint64_t nodeId) const
 {
     const auto* slot = graphFor(track);
-    return slot != nullptr ? device_ops::presetState(slot->graph(), nodeId) : juce::var();
+    if (slot == nullptr)
+        return {};
+    auto state = device_ops::presetState(slot->graph(), nodeId);
+    auto* object = state.getDynamicObject();
+    if (object == nullptr)
+        return state;
+    // A container: all it holds (its branches' cards, their modulators).
+    if (slot->graph().editorIsContainer(nodeId))
+        if (const auto whole = slot->graph().editorContainerState(nodeId); whole.isObject())
+            object->setProperty("container", whole);
+    // An instrument container: its pads or layers, each its instrument and effects.
+    if (track.midi && track.pad < 0 && rackPadCount(track) > 0)
+        for (const auto& node : slot->graph().editorNodes())
+            if (node.id == nodeId && engine::instrument_container::isContainerType(node.typeKey.toStdString())) {
+                object->setProperty("pads", rackPadsState(track));
+                object->setProperty("padsKind", padsKindName(track));
+            }
+    return state;
 }
 
 bool Studio::applyDevicePreset(const TrackRef& track, const std::uint64_t nodeId, const juce::var& state,
@@ -3769,12 +3796,28 @@ bool Studio::applyDevicePreset(const TrackRef& track, const std::uint64_t nodeId
         error = ui::Ls("Piste introuvable", "No such track");
         return false;
     }
+    // A container's: all it holds, in place of what it holds (its knobs with them).
+    if (const auto whole = state.getProperty("container", {}); whole.isObject() && slot->graph().editorIsContainer(nodeId)) {
+        // Laid where its head is (one undo step: no tidying after it).
+        if (!slot->graph().editorApplyContainerState(nodeId, whole)) {
+            error = ui::Ls("Ce préréglage est celui d'un autre conteneur", "This preset is another container's");
+            return false;
+        }
+        dirty_ = true;
+        return publishGraph(track, true).wasOk();
+    }
     const auto kit = [this, &track, nodeId](const int number, juce::String& problem) {
         return setBatterieKit(track, nodeId, number, problem);
     };
     if (!device_ops::applyPreset(slot->graph(), nodeId, state, error, kit))
         return false;
     dirty_ = true;
+    // An instrument container's pads or layers.
+    if (const auto pads = state.getProperty("pads", {}); pads.isArray() && track.midi && track.pad < 0 && isRack(track)) {
+        (void) publishGraph(track, true);
+        restoreRackPads(track, pads, state.getProperty("padsKind", {}).toString());
+        return true;
+    }
     return publishGraph(track, true).wasOk();
 }
 
@@ -3983,6 +4026,11 @@ juce::var Studio::chainPresetState(const TrackRef& track) const
         return {};
     auto* state = new juce::DynamicObject();
     state->setProperty("graph", withoutSharedModules(slot->serialise()));
+    // An instrument container's pads or layers go with it.
+    if (track.midi && track.pad < 0 && isRack(track) && rackPadCount(track) > 0) {
+        state->setProperty("pads", rackPadsState(track));
+        state->setProperty("padsKind", padsKindName(track));
+    }
     return juce::var(state);
 }
 
@@ -4001,6 +4049,25 @@ bool Studio::applyChainPreset(const TrackRef& track, const juce::var& state, juc
     if (const auto result = publishGraph(track, true); result.failed()) {
         error = result.getErrorMessage();
         return false;
+    }
+    // An instrument container's pads or layers came with it; a container
+    // without (a chain saved empty) starts with its first ones.
+    if (track.midi && track.pad < 0) {
+        if (const auto pads = state.getProperty("pads", {}); pads.isArray())
+            restoreRackPads(track, pads, state.getProperty("padsKind", {}).toString());
+        else if (const auto kind = containerKind(track); kind != engine::instrument_container::Kind::none) {
+            if (const auto found = midiTracks_.find(track.midiId); found != midiTracks_.end() && found->second.padsKind != kind) {
+                clearPads(track);
+                found->second.padsKind = kind;
+            }
+            if (rackPadCount(track) == 0) {
+                if (kind == engine::instrument_container::Kind::drum)
+                    fillDefaultRack(track);
+                else
+                    fillDefaultLayers(track);
+            }
+            publishPadMixes(track);
+        }
     }
     return true;
 }
@@ -4156,6 +4223,8 @@ std::vector<Studio::FactoryInstrument> Studio::factoryInstruments() const
             instrument.category = item.getProperty("category", {}).toString();
             const auto category = categories.getProperty(instrument.category, {});
             instrument.categoryName = category.getProperty(language, category.getProperty("en", instrument.category)).toString();
+            instrument.englishName = names.getProperty("en", instrument.key).toString();
+            instrument.englishCategory = category.getProperty("en", instrument.category).toString();
             instrument.map = folder.getChildFile(item.getProperty("map", {}).toString());
             instrument.settings = item.getProperty("settings", {});
             instrument.envelope = item.getProperty("envelope", {});
@@ -4436,25 +4505,31 @@ std::optional<TrackRef> Studio::addFactoryInstrument(const juce::String& key, ju
             }
         return track;
     }
-    auto json = app::loadSamplerMapFile(found->map, error);
-    if (!json.isObject())
-        return std::nullopt;
-    if (auto* object = json.getDynamicObject())
-        object->setProperty("name", found->name);
-    std::optional<TrackRef> track;
-    if (onto) {
-        if (const auto replaced = replaceInstrument(*onto, "sampler-instrument", found->name); replaced.failed()) {
-            error = replaced.getErrorMessage();
-            return std::nullopt;
-        }
-        track = onto;
-    } else {
+    std::optional<TrackRef> track = onto;
+    if (!track)
         track = addMidiTrack(found->name, "sampler-instrument");
-    }
     if (!track) {
         error = ui::Ls("La piste instrument n'a pas pu être créée", "The instrument track could not be made");
         return std::nullopt;
     }
+    if (!applyFactoryInstrument(*track, *found, error))
+        return std::nullopt;
+    return track;
+}
+
+bool Studio::applyFactoryInstrument(const TrackRef& target, const FactoryInstrument& instrument, juce::String& error)
+{
+    const auto* found = &instrument;
+    auto json = app::loadSamplerMapFile(found->map, error);
+    if (!json.isObject())
+        return false;
+    if (auto* object = json.getDynamicObject())
+        object->setProperty("name", found->name);
+    if (const auto replaced = replaceInstrument(target, "sampler-instrument", found->name); replaced.failed()) {
+        error = replaced.getErrorMessage();
+        return false;
+    }
+    const auto* track = &target;
     // The envelope it was made for: its attack, and the release a key lets go with.
     if (auto* slot = graphFor(*track)) {
         auto& graph = slot->graph();
@@ -4477,10 +4552,61 @@ std::optional<TrackRef> Studio::addFactoryInstrument(const juce::String& key, ju
             }
     }
     if (!setSamplerMap(*track, samplerCardOf(*track), json, true, error))
-        return std::nullopt;
+        return false;
     // A kit of sounds CyDAW makes: made now if they are not here.
     (void) generateMissingSounds(*track);
-    return track;
+    return true;
+}
+
+std::vector<Studio::InstrumentChoice> Studio::instrumentChoices()
+{
+    std::vector<InstrumentChoice> choices;
+    for (const auto& entry : deviceCatalogue())
+        if (entry.soundSource && entry.kind == "preset"
+            && engine::instrument_container::kindOfInstrument(entry.key.toStdString()) == engine::instrument_container::Kind::none)
+            choices.push_back({ entry.key, entry.englishName.isNotEmpty() ? entry.englishName : entry.name, {}, false });
+    std::sort(choices.begin(), choices.end(), [](const auto& a, const auto& b) { return a.name.compareNatural(b.name) < 0; });
+    for (const auto& instrument : factoryInstruments())
+        choices.push_back({ "factory:" + instrument.key, instrument.englishName, instrument.englishCategory, instrument.missingFiles > 0 });
+    return choices;
+}
+
+std::optional<juce::String> Studio::applyInstrument(const TrackRef& target, const juce::String& key, juce::String& error)
+{
+    if (key.startsWith("factory:")) {
+        const auto wanted = key.fromFirstOccurrenceOf("factory:", false, false);
+        const auto instruments = factoryInstruments();
+        const auto found = std::ranges::find_if(instruments, [&wanted](const FactoryInstrument& item) { return item.key == wanted; });
+        if (found == instruments.end()) {
+            error = "no factory instrument \"" + wanted + "\"";
+            return std::nullopt;
+        }
+        // Its samples fetched when they are not here: it plays once they are.
+        if (found->missingFiles > 0) {
+            juce::String ignored;
+            (void) downloadFactoryInstrument(found->key, ignored);
+        }
+        if (!applyFactoryInstrument(target, *found, error))
+            return std::nullopt;
+        return found->englishName;
+    }
+    const auto& catalogue = deviceCatalogue();
+    const auto device = std::find_if(catalogue.begin(), catalogue.end(), [&key](const auto& entry) { return entry.key == key; });
+    if (device == catalogue.end() || !device->soundSource) {
+        error = "no instrument \"" + key + "\"";
+        return std::nullopt;
+    }
+    // A pad holds no container of its own.
+    if (target.pad >= 0 && engine::instrument_container::kindOfInstrument(key.toStdString()) != engine::instrument_container::Kind::none) {
+        error = "a pad or a layer holds no instrument container";
+        return std::nullopt;
+    }
+    const auto name = device->englishName.isNotEmpty() ? device->englishName : device->name;
+    if (const auto replaced = replaceInstrument(target, key, name); replaced.failed()) {
+        error = replaced.getErrorMessage();
+        return std::nullopt;
+    }
+    return name;
 }
 
 juce::File Studio::deviceLibraryFolder()
@@ -6157,15 +6283,32 @@ double Studio::auditionTempoOf(const juce::String& path) const
 
 // ---- A rack of pads ----------------------------------------------------------------------
 
-bool Studio::isRack(const TrackRef& track) const
+engine::instrument_container::Kind Studio::containerKind(const TrackRef& track) const
 {
     const auto* slot = track.midi ? graphFor(track.owner()) : nullptr;
     if (slot == nullptr)
-        return false;
+        return engine::instrument_container::Kind::none;
     for (const auto& node : slot->graph().editorNodes())
-        if (node.typeKey == "drum-rack")
-            return true;
-    return false;
+        if (const auto kind = engine::instrument_container::kindOfType(node.typeKey.toStdString());
+            kind != engine::instrument_container::Kind::none)
+            return kind;
+    return engine::instrument_container::Kind::none;
+}
+
+bool Studio::isRack(const TrackRef& track) const
+{
+    return containerKind(track) != engine::instrument_container::Kind::none;
+}
+
+int Studio::selectedLayer(const TrackRef& track) const
+{
+    return track.midi ? engine_.midiTrackSelectedLayer(track.midiId) : -1;
+}
+
+Studio::RackPadMix Studio::mixOf(const RackPadState& pad)
+{
+    return { pad.note,   pad.name,   pad.playAs,      pad.gainDb,      pad.pan,          pad.muted,
+             pad.solo,   pad.choke,  pad.keyLow,      pad.keyHigh,     pad.velocityLow,  pad.velocityHigh };
 }
 
 std::size_t Studio::rackPadCount(const TrackRef& track) const
@@ -6198,13 +6341,52 @@ std::optional<std::size_t> Studio::rackPadOfNote(const TrackRef& track, const in
 
 void Studio::publishRackPadMix(const TrackRef& track, const std::size_t pad)
 {
+    publishRackPadMix(track, pad, containerKind(track));
+}
+
+void Studio::publishRackPadMix(const TrackRef& track, const std::size_t pad, const engine::instrument_container::Kind kind)
+{
+    using Kind = engine::instrument_container::Kind;
     const auto* state = rackPad(track, pad);
-    if (state == nullptr)
+    const auto found = track.midi ? midiTracks_.find(track.midiId) : midiTracks_.end();
+    if (state == nullptr || found == midiTracks_.end())
         return;
-    // A pad sounds only while its track plays the rack.
-    const auto playing = isRack(track);
-    engine_.setMidiTrackRackPadMix(track.midiId, pad, playing ? state->note : -1, state->playAs, state->gainDb, state->pan, state->muted,
-                                   state->solo, state->choke);
+    // A pad sounds only while its track's instrument is the container it was made for.
+    const auto playing = kind != Kind::none && kind == found->second.padsKind;
+    const auto drum = kind == Kind::drum;
+    app::AudioTrackController::PadMix mix;
+    mix.note = !playing ? -1 : drum ? state->note : 0;
+    mix.playAs = drum ? state->playAs : -1;
+    mix.gainDb = state->gainDb;
+    mix.pan = state->pan;
+    mix.muted = state->muted;
+    mix.solo = state->solo;
+    mix.choke = drum ? state->choke : 0;
+    if (!drum) {
+        mix.keyLow = state->keyLow;
+        mix.keyHigh = state->keyHigh;
+        mix.velocityLow = state->velocityLow;
+        mix.velocityHigh = state->velocityHigh;
+    }
+    engine_.setMidiTrackRackPadMix(track.midiId, pad, mix);
+}
+
+void Studio::publishPadMixes(const TrackRef& track)
+{
+    const auto kind = containerKind(track);
+    for (std::size_t pad = 0; pad < rackPadCount(track); ++pad)
+        publishRackPadMix(track.owner(), pad, kind);
+}
+
+void Studio::clearPads(const TrackRef& track)
+{
+    const auto found = track.midi ? midiTracks_.find(track.midiId) : midiTracks_.end();
+    if (found == midiTracks_.end())
+        return;
+    for (std::size_t pad = 0; pad < found->second.pads.size(); ++pad)
+        engine_.setMidiTrackRackPadMix(track.midiId, pad, {});
+    found->second.pads.clear();
+    dirty_ = true;
 }
 
 std::optional<std::size_t> Studio::addRackPad(const TrackRef& track, const int note, const juce::String& instrumentKey, juce::String& error)
@@ -6215,8 +6397,13 @@ std::optional<std::size_t> Studio::addRackPad(const TrackRef& track, const int n
         return std::nullopt;
     }
     auto& pads = found->second.pads;
-    if (pads.size() >= app::AudioTrackController::maximumRackPads) {
-        error = ui::Ls("Le rack a déjà tous ses pads", "The rack has all its pads already");
+    // The first ones are made for the track's container.
+    if (const auto kind = containerKind(track); pads.empty() && kind != engine::instrument_container::Kind::none)
+        found->second.padsKind = kind;
+    const auto layers = found->second.padsKind != engine::instrument_container::Kind::drum;
+    if (pads.size() >= (layers ? static_cast<std::size_t>(engine::instrument_container::maximumLayers) : app::AudioTrackController::maximumRackPads)) {
+        error = layers ? ui::Ls("Le conteneur a déjà toutes ses couches", "The container has all its layers already")
+                       : ui::Ls("La Drum Machine a déjà tous ses pads", "The Drum Machine has all its pads already");
         return std::nullopt;
     }
     RackPadState pad;
@@ -6225,38 +6412,41 @@ std::optional<std::size_t> Studio::addRackPad(const TrackRef& track, const int n
     pad.graph->restore(withLibrary(juce::var(), factoryMidiGraph_));
     pads.push_back(std::move(pad));
     const auto index = pads.size() - 1;
-    if (!setRackPadInstrument(track.owner(), index, instrumentKey.isNotEmpty() ? instrumentKey : juce::String("kick-instrument"), error)) {
-        pads.pop_back();
-        engine_.setMidiTrackRackPadMix(track.midiId, index, -1, -1, 0.0f, 0.0f, false, false, 0);
+    const auto fallback = layers ? juce::String("opale-instrument") : juce::String("kick-instrument");
+    if (!setRackPadInstrument(track.owner(), index, instrumentKey.isNotEmpty() ? instrumentKey : fallback, error)) {
+        // The slots of the pads may have moved: looked for again.
+        if (const auto again = midiTracks_.find(track.midiId); again != midiTracks_.end() && again->second.pads.size() == index + 1)
+            again->second.pads.pop_back();
+        engine_.setMidiTrackRackPadMix(track.midiId, index, {});
         return std::nullopt;
     }
     dirty_ = true;
     return index;
 }
 
+std::optional<std::size_t> Studio::addLayer(const TrackRef& track, const juce::String& instrumentKey, juce::String& error)
+{
+    return addRackPad(track, 0, instrumentKey, error);
+}
+
 bool Studio::setRackPadInstrument(const TrackRef& track, const std::size_t pad, const juce::String& instrumentKey, juce::String& error)
 {
     auto ref = track.owner();
     ref.pad = static_cast<int>(pad);
-    auto* state = rackPadState(ref);
-    if (state == nullptr) {
+    if (rackPadState(ref) == nullptr) {
         error = ui::Ls("Pad introuvable", "No such pad");
         return false;
     }
-    const auto catalogue = state->graph->graph().deviceCatalogue();
-    const auto device = std::find_if(catalogue.begin(), catalogue.end(), [&](const auto& entry) { return entry.key == instrumentKey; });
-    if (device == catalogue.end() || !device->soundSource) {
-        error = "no instrument \"" + instrumentKey + "\"";
+    const auto name = applyInstrument(ref, instrumentKey, error);
+    if (!name)
         return false;
-    }
+    auto* state = rackPadState(ref);
+    if (state == nullptr)
+        return false;
     // Drums play the key they are given; a pitched instrument plays C4.
     state->playAs = instrumentKey == "silex-instrument" || instrumentKey == "kick-instrument" || instrumentKey == "batterie-instrument" ? -1 : 60;
-    state->name = device->name;
-    const auto replaced = replaceInstrument(ref, instrumentKey, device->name);
-    if (replaced.failed()) {
-        error = replaced.getErrorMessage();
-        return false;
-    }
+    state->name = *name;
+    publishRackPadMix(track.owner(), pad);
     dirty_ = true;
     return true;
 }
@@ -6274,7 +6464,7 @@ bool Studio::removeRackPad(const TrackRef& track, const std::size_t pad)
         ref.pad = static_cast<int>(index);
         (void) publishGraph(ref, true);
     }
-    engine_.setMidiTrackRackPadMix(track.midiId, pads.size(), -1, -1, 0.0f, 0.0f, false, false, 0);
+    engine_.setMidiTrackRackPadMix(track.midiId, pads.size(), {});
     dirty_ = true;
     return true;
 }
@@ -6295,6 +6485,10 @@ bool Studio::setRackPadMix(const TrackRef& track, const std::size_t pad, const R
     state->muted = mix.muted;
     state->solo = mix.solo;
     state->choke = std::clamp(mix.choke, 0, 8);
+    state->keyLow = std::clamp(mix.keyLow, 0, 127);
+    state->keyHigh = std::clamp(mix.keyHigh, state->keyLow, 127);
+    state->velocityLow = std::clamp(mix.velocityLow, 1, 127);
+    state->velocityHigh = std::clamp(mix.velocityHigh, state->velocityLow, 127);
     publishRackPadMix(track.owner(), pad);
     dirty_ = true;
     return true;
@@ -6344,19 +6538,52 @@ void Studio::fillDefaultRack(const TrackRef& track)
         { 36, "Grosse caisse", "Kick", "kick-instrument", 0 },
         { 38, "Caisse claire", "Snare", "silex-instrument", 0 },
         { 39, "Clap", "Clap", "silex-instrument", 0 },
-        { 42, "Charleston fermé", "Closed hat", "silex-instrument", 1 },
-        { 46, "Charleston ouvert", "Open hat", "silex-instrument", 1 },
+        { 42, "Charleston fermé", "Closed Hat", "silex-instrument", 1 },
+        { 46, "Charleston ouvert", "Open Hat", "silex-instrument", 1 },
     };
     for (const auto& piece : pieces) {
         juce::String error;
         if (const auto pad = addRackPad(track, piece.note, piece.instrument, error)) {
             RackPadMix mix;
             mix.note = piece.note;
-            mix.name = ui::Ls(piece.french, piece.english);
+            // Inside a module: English.
+            mix.name = piece.english;
             mix.playAs = -1;
             mix.choke = piece.choke;
             (void) setRackPadMix(track, *pad, mix);
         }
+    }
+}
+
+void Studio::fillDefaultLayers(const TrackRef& track)
+{
+    // A layer: an electric piano over a pad; a selector: three synths to
+    // choose from.
+    const auto selector = containerKind(track) == engine::instrument_container::Kind::selector;
+    const auto keys = selector ? std::vector<juce::String> { "opale-instrument", "jade-instrument", "ambre-instrument" }
+                               : std::vector<juce::String> { "jade-instrument", "nebuleuse-instrument" };
+    for (const auto& key : keys) {
+        juce::String error;
+        if (const auto layer = addLayer(track, key, error); layer && !selector && key == "nebuleuse-instrument") {
+            // The pad under the piano.
+            if (const auto* state = rackPad(track, *layer)) {
+                auto mix = mixOf(*state);
+                mix.gainDb = -6.0f;
+                (void) setRackPadMix(track, *layer, mix);
+            }
+        }
+    }
+}
+
+juce::String Studio::padsKindName(const TrackRef& track) const
+{
+    const auto found = track.midi ? midiTracks_.find(track.midiId) : midiTracks_.end();
+    if (found == midiTracks_.end())
+        return {};
+    switch (found->second.padsKind) {
+    case engine::instrument_container::Kind::layer: return "layer";
+    case engine::instrument_container::Kind::selector: return "selector";
+    default: return "drum";
     }
 }
 
@@ -6374,22 +6601,35 @@ juce::var Studio::rackPadsState(const TrackRef& track) const
         item->setProperty("muted", pad->muted);
         item->setProperty("solo", pad->solo);
         item->setProperty("choke", pad->choke);
+        item->setProperty("keyLow", pad->keyLow);
+        item->setProperty("keyHigh", pad->keyHigh);
+        item->setProperty("velocityLow", pad->velocityLow);
+        item->setProperty("velocityHigh", pad->velocityHigh);
         item->setProperty("graph", withoutSharedModules(pad->graph->serialise()));
         pads.add(juce::var(item));
     }
     return pads;
 }
 
-void Studio::restoreRackPads(const TrackRef& track, const juce::var& state)
+void Studio::restoreRackPads(const TrackRef& track, const juce::var& state, const juce::String& kind)
 {
     const auto found = track.midi ? midiTracks_.find(track.midiId) : midiTracks_.end();
     const auto* items = state.getArray();
     if (found == midiTracks_.end() || items == nullptr)
         return;
+    // What they were made for: as written, else the track's container, else a drum machine's.
+    using Kind = engine::instrument_container::Kind;
+    const auto made = kind == "layer" ? Kind::layer : kind == "selector" ? Kind::selector : kind == "drum" ? Kind::drum : containerKind(track);
+    // The ones there before go (silenced).
+    for (std::size_t pad = items->size(); pad < found->second.pads.size(); ++pad)
+        engine_.setMidiTrackRackPadMix(track.midiId, pad, {});
+    found->second.padsKind = made != Kind::none ? made : Kind::drum;
+    const auto limit = found->second.padsKind == Kind::drum ? app::AudioTrackController::maximumRackPads
+                                                            : static_cast<std::size_t>(engine::instrument_container::maximumLayers);
     auto& pads = found->second.pads;
     pads.clear();
     for (const auto& item : *items) {
-        if (pads.size() >= app::AudioTrackController::maximumRackPads)
+        if (pads.size() >= limit)
             break;
         RackPadState pad;
         pad.note = std::clamp(static_cast<int>(item.getProperty("note", 36)), 0, 127);
@@ -6400,6 +6640,10 @@ void Studio::restoreRackPads(const TrackRef& track, const juce::var& state)
         pad.muted = static_cast<bool>(item.getProperty("muted", false));
         pad.solo = static_cast<bool>(item.getProperty("solo", false));
         pad.choke = std::clamp(static_cast<int>(item.getProperty("choke", 0)), 0, 8);
+        pad.keyLow = std::clamp(static_cast<int>(item.getProperty("keyLow", 0)), 0, 127);
+        pad.keyHigh = std::clamp(static_cast<int>(item.getProperty("keyHigh", 127)), pad.keyLow, 127);
+        pad.velocityLow = std::clamp(static_cast<int>(item.getProperty("velocityLow", 1)), 1, 127);
+        pad.velocityHigh = std::clamp(static_cast<int>(item.getProperty("velocityHigh", 127)), pad.velocityLow, 127);
         pad.graph = makeSlot(GraphSlot::Owner::midiTrack);
         const auto graphState = item.getProperty("graph", {});
         if (isGraphState(graphState))

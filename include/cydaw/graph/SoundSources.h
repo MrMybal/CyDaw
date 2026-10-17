@@ -46,7 +46,9 @@ namespace cydaw::graph {
            || processorKey == "core.bronze-synth"
            || processorKey == "core.silex-synth"
            || processorKey == "core.jade-synth"
-           || processorKey == "core.drum-rack";
+           || processorKey == "core.drum-rack"
+           || processorKey == "core.instrument-layer"
+           || processorKey == "core.instrument-selector";
 }
 
 // Of those, the ones a voice allocator can drive per note: the allocator
@@ -77,7 +79,9 @@ namespace cydaw::graph {
            || processorKey == "core.bronze-synth"
            || processorKey == "core.silex-synth"
            || processorKey == "core.jade-synth"
-           || processorKey == "core.drum-rack";
+           || processorKey == "core.drum-rack"
+           || processorKey == "core.instrument-layer"
+           || processorKey == "core.instrument-selector";
 }
 
 // Narrower still: a node whose presence on its own says the graph is meant to

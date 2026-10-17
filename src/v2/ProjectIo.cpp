@@ -1502,7 +1502,7 @@ std::uint64_t restoreMidiTrack(Studio& studio, const juce::DynamicObject& saved,
     state.automationVisible = static_cast<bool>(saved.getProperty(keys::automationVisible));
     readParameterLanes(saved, state.parameterLanes);
     if (const auto pads = saved.getProperty("rackPads"); pads.isArray())
-        studio.restoreRackPads(TrackRef { true, 0, trackId }, pads);
+        studio.restoreRackPads(TrackRef { true, 0, trackId }, pads, saved.getProperty("padsKind").toString());
     // Every armed track armed again (CyDAW 2 arms several).
     if (static_cast<bool>(saved.getProperty(keys::armed))) {
         (void) studio.engine().setMidiTrackArmed(trackId, true);
@@ -1712,8 +1712,11 @@ juce::var buildDocument(Studio& studio, const juce::File& projectFile, const boo
         track->setProperty(keys::nodeGraph,
                            Studio::withoutSharedModules(graphOr(midiGraphs, info.id, studio.factoryMidiGraph())));
         track->setProperty(keys::gainAutomation, automationPointsToVar(engine.midiAutomationPoints(info.id)));
-        if (studio.rackPadCount(TrackRef { true, 0, info.id }) > 0)
+        if (studio.rackPadCount(TrackRef { true, 0, info.id }) > 0) {
             track->setProperty("rackPads", studio.rackPadsState(TrackRef { true, 0, info.id }));
+            // The container they were made for (a drum machine, layers).
+            track->setProperty("padsKind", studio.padsKindName(TrackRef { true, 0, info.id }));
+        }
         if (state != nullptr) {
             track->setProperty(keys::parameterAutomation, parameterLanesToVar(state->parameterLanes));
             track->setProperty(keys::shownAutomation, state->parameterLanes.shown);

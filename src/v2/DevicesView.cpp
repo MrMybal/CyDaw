@@ -1104,6 +1104,14 @@ juce::String branchName(const engine::NativeDspNodeKind kind, const int branch)
     return "Chain " + juce::String(branch + 1);
 }
 
+// Its name given by hand, else its usual one.
+juce::String branchName(const app::NodeGraphComponent& graph, const std::uint64_t head, const engine::NativeDspNodeKind kind,
+                        const int branch)
+{
+    const auto named = graph.editorBranchName(head, branch);
+    return named.isNotEmpty() ? named : branchName(kind, branch);
+}
+
 } // namespace
 
 void DevicesView::drawContainerPanel(Strip& strip, const app::NodeGraphComponent::EditorNode& head, const ImVec2 at, const ImVec2 size,
@@ -1234,7 +1242,7 @@ void DevicesView::drawContainerPanel(Strip& strip, const app::NodeGraphComponent
             const auto right = band < static_cast<int>(crossovers.size()) ? xOf(crossovers[static_cast<std::size_t>(band)]->value) : max.x;
             list->AddRectFilled(ImVec2(left, min.y), ImVec2(right, max.y), theme::alpha(colour, band == shown ? 0.38f : 0.14f));
             ui::centredText(list, ImVec2(left, min.y), ImVec2(right, max.y), band == shown ? p.text : p.textDim,
-                            branchName(kind, band).toRawUTF8());
+                            branchName(graph, head.id, kind, band).toRawUTF8());
             left = right;
         }
         for (std::size_t index = 0; index < crossovers.size(); ++index) {
@@ -1307,7 +1315,7 @@ void DevicesView::drawContainerPanel(Strip& strip, const app::NodeGraphComponent
             if (ImGui::Selectable(name.toRawUTF8(), shown == corner, ImGuiSelectableFlags_None, ImVec2(dp(16.0f), dp(16.0f))))
                 shown = corner;
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("%s", "Show this corner's chain");
+                ImGui::SetTooltip("%s", (branchName(graph, head.id, kind, corner) + ": show this corner's chain").toRawUTF8());
             ImGui::PopID();
         }
         y = max.y + dp(4.0f);
@@ -1350,17 +1358,15 @@ void DevicesView::drawContainerPanel(Strip& strip, const app::NodeGraphComponent
             const auto name = studio_.replacerInstrumentName(owner, head.id);
             ImGui::SetCursorScreenPos(ImVec2(at.x + dp(6.0f), y));
             ImGui::SetNextItemWidth(size.x - dp(66.0f));
+            // CyDAW's instruments, then the factory's (English names).
             if (ImGui::BeginCombo("##instrument", name.isNotEmpty() ? name.toRawUTF8() : "Choose an instrument...",
                                   ImGuiComboFlags_HeightLarge)) {
-                for (const auto& entry : strip.graph.deviceCatalogue())
-                    if (entry.soundSource && entry.kind == "preset" && entry.key != "rack-instrument")
-                        if (ImGui::Selectable(entry.name.toRawUTF8(), entry.name == name)) {
-                            if (const auto chosen = studio_.setReplacerInstrument(owner, head.id, entry.key); chosen.failed()) {
-                                state_.status = chosen.getErrorMessage();
-                                state_.statusIsError = true;
-                                state_.statusTime = ImGui::GetTime();
-                            }
-                        }
+                if (const auto key = RackView::instrumentItems(studio_); key.isNotEmpty())
+                    if (const auto chosen = studio_.setReplacerInstrument(owner, head.id, key); chosen.failed()) {
+                        state_.status = chosen.getErrorMessage();
+                        state_.statusIsError = true;
+                        state_.statusTime = ImGui::GetTime();
+                    }
                 ImGui::EndCombo();
             }
             ImGui::SetCursorScreenPos(ImVec2(at.x + size.x - dp(56.0f), y));
@@ -1425,16 +1431,18 @@ void DevicesView::drawContainerPanel(Strip& strip, const app::NodeGraphComponent
                         ImGui::SetTooltip("%s", "Play this chain");
                     x += dp(16.0f);
                 }
-                // Its name: shows its chain after the container.
-                const auto name = branchName(kind, branch);
+                // Its name: shows its chain after the container; a double
+                // click renames it.
+                const auto name = branchName(graph, head.id, kind, branch);
                 const auto controls = layered ? dp(kind == engine::NativeDspNodeKind::fxLayer ? 94.0f : 70.0f) : dp(28.0f);
                 ImGui::SetCursorScreenPos(ImVec2(x, rowTop.y));
                 if (ImGui::InvisibleButton("##name", ImVec2(std::max(1.0f, rowEnd.x - controls - x), rowHeight)))
                     shown = branch;
-                if (ImGui::IsItemClicked(ImGuiMouseButton_Right) && engine::container::variableBranches(kind) && count > 1)
+                auto rename = ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
+                if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
                     ImGui::OpenPopup("##branchMenu");
                 if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("%s", "Show its chain (right click: remove it)");
+                    ImGui::SetTooltip("%s", "Show its chain (double click: rename it; right click: its menu)");
                 ui::clippedText(rows, ImVec2(x, rowTop.y + (rowHeight - ImGui::GetFontSize()) * 0.5f), rowEnd.x - controls - x,
                                 branch == shown ? p.text : p.textDim, name.toRawUTF8());
                 // How many cards it holds.
@@ -1463,10 +1471,20 @@ void DevicesView::drawContainerPanel(Strip& strip, const app::NodeGraphComponent
                 if (ImGui::BeginPopup("##branchMenu")) {
                     ImGui::TextDisabled("%s", name.toRawUTF8());
                     ImGui::Separator();
-                    if (ImGui::MenuItem("Remove, with its devices"))
-                        removeBranch = branch;
+                    if (ImGui::MenuItem("Rename\xe2\x80\xa6"))
+                        rename = true;
+                    if (graph.editorBranchName(head.id, branch).isNotEmpty() && ImGui::MenuItem("Usual name"))
+                        (void) graph.editorRenameBranch(head.id, branch, {});
+                    if (engine::container::variableBranches(kind) && count > 1) {
+                        ImGui::Separator();
+                        if (ImGui::MenuItem("Remove, with its devices"))
+                            removeBranch = branch;
+                    }
                     ImGui::EndPopup();
                 }
+                if (rename)
+                    startBranchRename(graph, head.id, branch);
+                drawBranchRename(graph);
                 ImGui::SetCursorScreenPos(ImVec2(rowTop.x, rowEnd.y + dp(1.0f)));
                 ImGui::PopID();
             }
@@ -1573,14 +1591,50 @@ void DevicesView::drawBranch(Strip& strip, const app::NodeGraphComponent::Editor
     list->AddRect(ImVec2(headOrigin.x - dp(2.0f), headOrigin.y - dp(2.0f)), ImVec2(innerRight + dp(4.0f), headOrigin.y + height + dp(2.0f)),
                   theme::alpha(colour, 0.75f), dp(6.0f), dp(1.5f));
     if (effect != nullptr) {
-        const auto label = branchName(effect->kind, branch).toUpperCase();
+        const auto label = branchName(graph, head.id, effect->kind, branch).toUpperCase();
         ImGui::PushFont(theme::boldFont(), ui::currentFontBase() * 0.68f);
         list->AddText(ImVec2(innerLeft, headOrigin.y + dp(0.5f)), theme::alpha(colour, 0.9f), label.toRawUTF8());
+        const auto labelSize = ImGui::CalcTextSize(label.toRawUTF8());
         ImGui::PopFont();
+        ImGui::PushID(static_cast<int>(head.id));
+        ImGui::SetCursorScreenPos(ImVec2(innerLeft, headOrigin.y));
+        ImGui::InvisibleButton("##frameName", ImVec2(std::max(dp(20.0f), labelSize.x), std::max(dp(6.0f), inset)));
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", "Double click: rename this chain");
+        if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+            startBranchRename(graph, head.id, branch);
+        drawBranchRename(graph);
+        ImGui::PopID();
     }
     ImGui::SetCursorScreenPos(ImVec2(innerRight + dp(4.0f), headOrigin.y));
     ImGui::Dummy(ImVec2(dp(1.0f), height));
     ImGui::SameLine(0.0f, dp(6.0f));
+}
+
+void DevicesView::startBranchRename(const app::NodeGraphComponent& graph, const std::uint64_t head, const int branch)
+{
+    renamedBranch_ = std::make_pair(head, branch);
+    graph.editorBranchName(head, branch).copyToUTF8(branchNameBuffer_, sizeof(branchNameBuffer_));
+    ImGui::OpenPopup("##renameBranch");
+}
+
+void DevicesView::drawBranchRename(app::NodeGraphComponent& graph)
+{
+    if (!ImGui::BeginPopup("##renameBranch"))
+        return;
+    // Inside a module: English.
+    ImGui::TextDisabled("%s", "Its name (empty: the usual one)");
+    if (ImGui::IsWindowAppearing())
+        ImGui::SetKeyboardFocusHere();
+    ImGui::SetNextItemWidth(dp(200.0f));
+    if (ImGui::InputText("##branchName", branchNameBuffer_, sizeof(branchNameBuffer_), ImGuiInputTextFlags_EnterReturnsTrue)) {
+        if (renamedBranch_)
+            (void) graph.editorRenameBranch(renamedBranch_->first, renamedBranch_->second, juce::String::fromUTF8(branchNameBuffer_));
+        renamedBranch_.reset();
+        state_.focused = Panel::devices;
+        ImGui::CloseCurrentPopup();
+    }
+    ImGui::EndPopup();
 }
 
 void DevicesView::drawValueList(const TrackRef& track, app::NodeGraphComponent& graph, const app::NodeGraphComponent::EditorNode& node,
@@ -1682,6 +1736,106 @@ void DevicesView::drawValueList(const TrackRef& track, app::NodeGraphComponent& 
         ImGui::Dummy(ImVec2(0.0f, 0.0f));
     }
     ImGui::EndChild();
+}
+
+void DevicesView::drawPluginValueList(const TrackRef& track, const std::size_t plugin, const juce::String& pluginName,
+                                      PluginParameters& parameters, const ImVec2 at, const ImVec2 size)
+{
+    const auto& p = theme::palette();
+    auto* list = ImGui::GetWindowDrawList();
+    list->AddRectFilled(at, ImVec2(at.x + size.x, at.y + size.y), p.bg1, dp(4.0f));
+    const auto key = std::make_pair(track.audioIndex, plugin);
+    // A value that moved since it was last seen: a touch (the knob here,
+    // the plug-in's own window, a controller).
+    auto& touches = pluginTouches_[key];
+    for (const auto& parameter : parameters.values) {
+        const auto [found, made] = touches.try_emplace(parameter.index, parameter.value, 0);
+        if (!made && found->second.first != parameter.value) {
+            found->second.first = parameter.value;
+            found->second.second = ++pluginTouchCount_;
+        }
+    }
+    auto& search = pluginListSearch_[key];
+    ImGui::SetCursorScreenPos(ImVec2(at.x + dp(4.0f), at.y + dp(4.0f)));
+    ImGui::SetNextItemWidth(size.x - dp(8.0f));
+    ImGui::PushID(static_cast<int>(plugin));
+    ImGui::InputTextWithHint("##pluginSearch", L("Chercher une valeur…", "Find a value…"), search.data(), search.size());
+    const auto filter = juce::String::fromUTF8(search.data()).trim();
+    std::vector<std::pair<std::uint64_t, app::IsolatedPluginHost::ParameterSnapshot*>> order;
+    for (auto& parameter : parameters.values)
+        if (filter.isEmpty() || parameter.name.containsIgnoreCase(filter))
+            order.emplace_back(touches[parameter.index].second, &parameter);
+    std::stable_sort(order.begin(), order.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
+    const auto top = ImGui::GetCursorScreenPos().y + dp(2.0f);
+    ImGui::SetCursorScreenPos(ImVec2(at.x, top));
+    if (ImGui::BeginChild("##pluginValues", ImVec2(size.x, at.y + size.y - top - dp(2.0f)), ImGuiChildFlags_None)) {
+        auto* rows = ImGui::GetWindowDrawList();
+        const auto rowHeight = dp(30.0f);
+        const auto latest = order.empty() ? 0 : order.front().first;
+        auto touchedShown = false;
+        for (const auto& [touch, parameter] : order) {
+            if (touch == 0 && touchedShown) {
+                const auto y = ImGui::GetCursorScreenPos().y;
+                rows->AddLine(ImVec2(at.x + dp(6.0f), y), ImVec2(at.x + size.x - dp(6.0f), y), p.line, dp(1.0f));
+                ImGui::Dummy(ImVec2(0.0f, dp(3.0f)));
+                touchedShown = false;
+            }
+            touchedShown = touchedShown || touch != 0;
+            ImGui::PushID(static_cast<int>(parameter->index));
+            const auto rowTop = ImGui::GetCursorScreenPos();
+            const ImVec2 rowEnd(rowTop.x + size.x - dp(4.0f), rowTop.y + rowHeight);
+            if (touch != 0 && touch == latest)
+                rows->AddRectFilled(rowTop, rowEnd, theme::alpha(p.audio, 0.22f), dp(3.0f));
+            ui::KnobStyle style;
+            style.diameter = 22.0f;
+            style.flags = ui::knobNoLabel | (parameter->boolean ? ui::knobInteger : 0);
+            style.colour = p.audio;
+            ImGui::SetCursorScreenPos(ImVec2(rowTop.x + dp(2.0f), rowTop.y + dp(2.0f)));
+            auto value = parameter->value;
+            if (ui::knob("##knob", &value, 0.0f, 1.0f, parameter->value, style)) {
+                if (const auto set = studio_.engine().setTrackPluginParameter(track.audioIndex, plugin, parameter->index, value); set.wasOk()) {
+                    parameter->value = value;
+                    parameter->text = {};
+                    studio_.markDirty();
+                } else {
+                    state_.status = set.getErrorMessage();
+                }
+            }
+            const auto lane = Studio::pluginLaneName(plugin, parameter->index);
+            const auto menu = [&] {
+                studio_.rememberPluginParameterName(lane, parameter->name);
+                openParameterMenu(track, lane, pluginName + juce::String::fromUTF8(" \xc2\xb7 ") + parameter->name);
+            };
+            if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+                menu();
+            // Its name, its value as the plug-in writes it.
+            const auto textX = rowTop.x + dp(40.0f);
+            const auto textWidth = rowEnd.x - textX - dp(4.0f);
+            ui::clippedText(rows, ImVec2(textX, rowTop.y + dp(1.0f)), textWidth, p.text, parameter->name.toRawUTF8());
+            auto text = parameter->text.trim();
+            if (text.isEmpty())
+                text = juce::String(parameter->value, 3);
+            if (parameter->label.isNotEmpty() && !text.endsWithIgnoreCase(parameter->label))
+                text << " " << parameter->label;
+            ImGui::PushFont(nullptr, ui::currentFontBase() * 0.85f);
+            ui::clippedText(rows, ImVec2(textX, rowTop.y + dp(15.0f)), textWidth, p.textDim, text.toRawUTF8());
+            ImGui::PopFont();
+            ImGui::SetCursorScreenPos(ImVec2(textX, rowTop.y));
+            ImGui::InvisibleButton("##name", ImVec2(std::max(1.0f, textWidth), rowHeight));
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s\n#%u = %.4f\n%s", parameter->name.toRawUTF8(), parameter->index, parameter->value,
+                                  L("Clic droit : automatiser", "Right click: automate"));
+            if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+                menu();
+            ImGui::SetCursorScreenPos(ImVec2(rowTop.x, rowEnd.y + dp(2.0f)));
+            ImGui::PopID();
+        }
+        if (order.empty())
+            ImGui::TextDisabled("  %s", parameters.values.empty() ? L("Ses valeurs arrivent…", "Its values are coming…") : L("Aucune valeur", "No value"));
+        ImGui::Dummy(ImVec2(0.0f, 0.0f));
+    }
+    ImGui::EndChild();
+    ImGui::PopID();
 }
 
 void DevicesView::drawSoundModelPane(const TrackRef& track, app::NodeGraphComponent& graph, const std::uint64_t nodeId,
@@ -1966,7 +2120,11 @@ void DevicesView::drawPlugins(const TrackRef& track, const float height)
         const auto count = static_cast<int>(shown.size());
         const auto columns = std::max(1, (count + rows - 1) / rows);
         const auto meterWidth = dp(9.0f);
-        const auto width = std::max(dp(260.0f), columns * dp(kCell) + dp(18.0f)) + meterWidth + dp(4.0f);
+        const auto listKey = std::make_pair(studio_.routingKey(track), index);
+        const auto listOpen = state_.pluginValueLists.contains(listKey);
+        const auto knobsWidth = std::max(dp(282.0f), columns * dp(kCell) + dp(18.0f));
+        const auto listWidth = listOpen ? dp(240.0f) : 0.0f;
+        const auto width = knobsWidth + listWidth + meterWidth + dp(4.0f);
         const auto origin = ImGui::GetCursorScreenPos();
         auto* list = ImGui::GetWindowDrawList();
         list->AddRectFilled(origin, ImVec2(origin.x + width, origin.y + height), p.bg2, dp(5.0f));
@@ -1985,7 +2143,7 @@ void DevicesView::drawPlugins(const TrackRef& track, const float height)
         // Running or not, its switch, then the name.
         list->AddCircleFilled(ImVec2(origin.x + dp(11.0f), origin.y + dp(13.0f)), dp(3.5f), plugin.running ? p.play : p.record);
         ImGui::PushFont(theme::boldFont(), ui::currentFontBase() * 0.9f);
-        ui::clippedText(list, ImVec2(origin.x + dp(20.0f) + bypassWidth, origin.y + dp(5.0f)), width - dp(158.0f) - bypassWidth, p.text,
+        ui::clippedText(list, ImVec2(origin.x + dp(20.0f) + bypassWidth, origin.y + dp(5.0f)), width - dp(180.0f) - bypassWidth, p.text,
                         plugin.name.toRawUTF8());
         ImGui::PopFont();
         const ImVec2 button(dp(20.0f), dp(20.0f));
@@ -2002,7 +2160,17 @@ void DevicesView::drawPlugins(const TrackRef& track, const float height)
                 && engine.setTrackPluginParameter(track.audioIndex, index, bypass->index, off ? 0.0f : 1.0f).wasOk())
                 bypass->value = off ? 0.0f : 1.0f;
         }
-        ImGui::SetCursorScreenPos(ImVec2(origin.x + width - dp(136.0f), origin.y + dp(3.0f)));
+        ImGui::SetCursorScreenPos(ImVec2(origin.x + width - dp(158.0f), origin.y + dp(3.0f)));
+        // Its list of values: every parameter, searched, the last touched first.
+        if (ui::iconButton(icon::list, L("Toutes ses valeurs en liste (recherche ; la dernière touchée en haut)",
+                                         "Every value as a list (searched; the last touched at the top)"),
+                           listOpen, p.accent, button)) {
+            if (listOpen)
+                state_.pluginValueLists.erase(listKey);
+            else
+                state_.pluginValueLists.insert(listKey);
+        }
+        ImGui::SameLine(0.0f, dp(2.0f));
         // Its place in the chain.
         ImGui::BeginDisabled(index == 0);
         if (ui::iconButton(icon::back, L("Avancer dans la chaîne (avant le précédent)", "Earlier in the chain"), false, 0, button))
@@ -2080,6 +2248,9 @@ void DevicesView::drawPlugins(const TrackRef& track, const float height)
                 pluginKnob(track, index, plugin.name, *found, kKnob, 10);
             }
         }
+        if (listOpen && plugin.running)
+            drawPluginValueList(track, index, plugin.name, parameters, ImVec2(origin.x + knobsWidth, origin.y + dp(30.0f)),
+                                ImVec2(listWidth - dp(4.0f), height - dp(34.0f)));
         if (plugin.latencySamples > 0) {
             ImGui::PushFont(nullptr, ui::currentFontBase() * 0.78f);
             char latency[48];
@@ -2109,6 +2280,7 @@ void DevicesView::drawPlugins(const TrackRef& track, const float height)
             (void) studio_.movePlugin(track, move->first, move->second);
         // The indices moved: their cached parameters are stale.
         pluginParameters_.clear();
+        pluginTouches_.clear();
         pluginWindowOpen_ = false;
     }
 }

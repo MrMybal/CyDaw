@@ -467,9 +467,17 @@ GraphInstrumentCompileResult compileGraphInstrument(
             result.plan.synthValues[static_cast<std::size_t>(index)]
                 = synth::clampValue(model, index, static_cast<float>(value(*oscillator, setting.key, setting.defaultValue)));
         }
-    } else if (oscillator->processorKey == "core.drum-rack") {
-        // A rack: its pads play (the track's engine), its voices nothing.
+    } else if (const auto container = instrument_container::kindOfProcessor(oscillator->processorKey);
+               container != instrument_container::Kind::none) {
+        // An instrument container: its pads or layers play (the track's
+        // engine), its voices nothing.
         result.plan.waveform = PolyOscillatorWaveform::rack;
+        result.plan.containerKind = container;
+        for (const auto& setting : instrument_container::settings) {
+            const auto index = instrument_container::settingIndex(setting.key);
+            result.plan.containerValues[static_cast<std::size_t>(index)]
+                = instrument_container::clampValue(index, static_cast<float>(value(*oscillator, std::string(setting.key), setting.defaultValue)));
+        }
     } else if (oscillator == stringVoice && stringVoice != nullptr) {
         result.plan.waveform = PolyOscillatorWaveform::string;
         result.plan.stringDamping = static_cast<float>(std::clamp(

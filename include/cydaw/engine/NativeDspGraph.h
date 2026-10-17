@@ -6,6 +6,7 @@
 #include <cydaw/engine/Sampler.h>
 #include <cydaw/engine/SoundModel.h>
 #include <cydaw/engine/DrumKit.h>
+#include <cydaw/engine/InstrumentContainers.h>
 #include <cydaw/engine/SynthFamily.h>
 #include <cydaw/engine/WavetableShape.h>
 
@@ -283,6 +284,8 @@ struct NativeDspNodeParameters {
     synth::Values synth {};
     // A Batterie card's mix, piece by piece (DrumKit.h).
     drum::Values drum { drum::neutralValues() };
+    // An Instrument Selector card's settings (InstrumentContainers.h).
+    instrument_container::Values selector { instrument_container::defaultValues() };
 
     [[nodiscard]] bool operator==(const NativeDspNodeParameters&) const = default;
 };

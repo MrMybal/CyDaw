@@ -135,9 +135,10 @@ struct AudioTrackState {
     std::map<juce::String, float> pluginModulationSent;
 };
 
-// A pad of a rack: the key that plays it, its name, the note it plays (-1:
-// its key's own), its level, pan, mute, solo and choke group, and its graph
-// (an instrument and its effects).
+// A pad of a Drum Machine, a layer of an Instrument Layer or Selector
+// (InstrumentContainers.h): the key that plays a pad, its name, the note it
+// plays (-1: its key's own), its level, pan, mute, solo and choke group, a
+// layer's keys and velocities, and its graph (an instrument and its effects).
 struct RackPadState {
     int note { 36 };
     juce::String name;
@@ -147,13 +148,19 @@ struct RackPadState {
     bool muted {};
     bool solo {};
     int choke {};
+    int keyLow {};
+    int keyHigh { 127 };
+    int velocityLow { 1 };
+    int velocityHigh { 127 };
     std::unique_ptr<GraphSlot> graph;
 };
 
 struct MidiTrackState {
     std::uint64_t id {};
-    // Its rack's pads (when its instrument is the "drum-rack" card).
+    // Its instrument container's pads or layers, and the container they were
+    // made for (they sound while the track's instrument is that one).
     std::vector<RackPadState> pads;
+    engine::instrument_container::Kind padsKind { engine::instrument_container::Kind::drum };
     std::bitset<app::AudioTrackController::maximumLauncherScenes> launcherStopOff;
     juce::uint32 colour {};
     std::vector<TrackOutput> outputs;
@@ -705,6 +712,8 @@ public:
         juce::String name;         // in the interface's language
         juce::String category;     // its key ("pianos")
         juce::String categoryName; // in the interface's language
+        juce::String englishName;  // inside a module
+        juce::String englishCategory;
         juce::File map;
         juce::var settings;        // the sampler card's knobs it was made for
         juce::var envelope;        // attack and release, ms
@@ -757,15 +766,37 @@ public:
     // Each replacer's instrument into a graph being published.
     void attachReplacerInstruments(const TrackRef& track, engine::NativeDspGraph& native);
 
-    // ---- A rack of pads (an instrument track playing the "drum-rack" card) ----
-    // Each pad an instrument and its effects of their own (its graph: the
-    // track's TrackRef with `pad` set), played by its key.
+    // ---- Instruments a pad, a layer or a Replacer plays -------------------------
+    // CyDAW's instruments (catalogue keys) and the factory's sampled ones
+    // ("factory:<key>", by their category), named in English (a module's).
+    struct InstrumentChoice {
+        juce::String key;
+        juce::String name;
+        juce::String category; // empty: CyDAW's own
+        bool missing {};       // a factory instrument whose samples are not here yet
+    };
+    [[nodiscard]] std::vector<InstrumentChoice> instrumentChoices();
+    // One of them onto a graph: a track's, a pad's, a layer's, a
+    // Replacer's (its samples fetched when they are not here). Its name.
+    std::optional<juce::String> applyInstrument(const TrackRef& target, const juce::String& key, juce::String& error);
+
+    // ---- Instrument containers (InstrumentContainers.h) ---------------------------------
+    // A Drum Machine ("drum-rack" card), an Instrument Layer, an Instrument
+    // Selector: the track's instrument card; each pad or layer an instrument
+    // and its effects of their own (its graph: the track's TrackRef with
+    // `pad` set), the card saying how they hear the track's notes.
+    [[nodiscard]] engine::instrument_container::Kind containerKind(const TrackRef& track) const;
     [[nodiscard]] bool isRack(const TrackRef& track) const;
+    // The layer an Instrument Selector plays now (0-based; -1: none).
+    [[nodiscard]] int selectedLayer(const TrackRef& track) const;
     [[nodiscard]] std::size_t rackPadCount(const TrackRef& track) const;
     [[nodiscard]] const RackPadState* rackPad(const TrackRef& track, std::size_t pad) const;
     [[nodiscard]] std::optional<std::size_t> rackPadOfNote(const TrackRef& track, int note) const;
-    // A pad on `note` playing a factory instrument ("silex-instrument"…): its index.
+    // A pad on `note` playing an instrument ("silex-instrument"…, or
+    // "factory:<key>"): its index. A layer's `note` is not used.
     std::optional<std::size_t> addRackPad(const TrackRef& track, int note, const juce::String& instrumentKey, juce::String& error);
+    // A layer playing an instrument (Instrument Layer or Selector): its index.
+    std::optional<std::size_t> addLayer(const TrackRef& track, const juce::String& instrumentKey, juce::String& error);
     bool removeRackPad(const TrackRef& track, std::size_t pad);
     bool setRackPadInstrument(const TrackRef& track, std::size_t pad, const juce::String& instrumentKey, juce::String& error);
     struct RackPadMix {
@@ -777,7 +808,12 @@ public:
         bool muted {};
         bool solo {};
         int choke {};
+        int keyLow {};
+        int keyHigh { 127 };
+        int velocityLow { 1 };
+        int velocityHigh { 127 };
     };
+    [[nodiscard]] static RackPadMix mixOf(const RackPadState& pad);
     bool setRackPadMix(const TrackRef& track, std::size_t pad, const RackPadMix& mix);
     // A sound onto the pad of `note` (made when there is none): a simple
     // sampler playing it at its own pitch.
@@ -785,9 +821,13 @@ public:
     [[nodiscard]] float rackPadPeak(const TrackRef& track, std::size_t pad) const;
     // The rack a new one starts with: a kick, a snare, a clap, two hats.
     void fillDefaultRack(const TrackRef& track);
-    // Its pads as a project keeps them, and back.
+    // The layers a new Instrument Layer or Selector starts with.
+    void fillDefaultLayers(const TrackRef& track);
+    // Its pads as a project keeps them, and back; the container they were
+    // made for, by name ("drum", "layer", "selector").
     [[nodiscard]] juce::var rackPadsState(const TrackRef& track) const;
-    void restoreRackPads(const TrackRef& track, const juce::var& state);
+    [[nodiscard]] juce::String padsKindName(const TrackRef& track) const;
+    void restoreRackPads(const TrackRef& track, const juce::var& state, const juce::String& kind = {});
     // A plug-in that is not here, its place kept on the track: a card that
     // says so (its name, its maker, its format); an instrument's is silent,
     // an effect's lets the sound through. Its card.
@@ -1025,8 +1065,15 @@ public:
     // Graph slots for an engine track that already exists.
     AudioTrackState& adoptAudioTrack(std::size_t index, const juce::var& graphState);
     MidiTrackState& adoptMidiTrack(std::uint64_t id, const juce::var& graphState);
-    // A pad's mix sent to the engine (silent when its track is no rack).
+    // A pad's mix sent to the engine (silent when its track's instrument is
+    // not the container it was made for); every pad's at once.
     void publishRackPadMix(const TrackRef& track, std::size_t pad);
+    void publishRackPadMix(const TrackRef& track, std::size_t pad, engine::instrument_container::Kind kind);
+    void publishPadMixes(const TrackRef& track);
+    // Its pads gone (the engine's silenced).
+    void clearPads(const TrackRef& track);
+    // A factory instrument's samples onto a graph (a track's, a pad's, a Replacer's).
+    bool applyFactoryInstrument(const TrackRef& target, const FactoryInstrument& instrument, juce::String& error);
     [[nodiscard]] RackPadState* rackPadState(const TrackRef& track);
     BusState& adoptBus(std::uint64_t id, const juce::var& graphState);
 

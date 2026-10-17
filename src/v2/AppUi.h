@@ -216,6 +216,16 @@ public:
         state_.selectedTrack = track;
         return true;
     }
+    bool showPluginValueList(const TrackRef& track, std::size_t plugin, bool open) override
+    {
+        const auto key = std::make_pair(studio_.routingKey(track), plugin);
+        if (open)
+            state_.pluginValueLists.insert(key);
+        else
+            state_.pluginValueLists.erase(key);
+        state_.selectedTrack = track;
+        return true;
+    }
     bool showModulators(const TrackRef& track, std::uint64_t nodeId, bool open, std::uint64_t shown) override
     {
         const auto key = std::make_pair(studio_.routingKey(track) + (track.pad >= 0 ? static_cast<std::uint64_t>(track.pad + 1) << 48 : 0),

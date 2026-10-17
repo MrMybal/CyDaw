@@ -1,8 +1,8 @@
 # Conteneurs
 
-Un conteneur est un périphérique qui tient des chaînes de périphériques et les remélange, comme dans Bitwig. On l'ajoute avec le **+** de la bande des périphériques, catégorie **Conteneurs**, comme n'importe quel effet.
+Un conteneur est un périphérique qui tient des chaînes de périphériques et les remélange, comme dans Bitwig. On l'ajoute avec le **+** de la bande des périphériques, catégorie **Conteneurs**, comme n'importe quel effet. Il y en a douze : neuf d'effets et trois d'instruments.
 
-## Les neuf conteneurs
+## Les neuf conteneurs d'effets
 
 | Conteneur | Ses chaînes | Ce que chacune entend | Réglages propres |
 |---|---|---|---|
@@ -17,6 +17,60 @@ Un conteneur est un périphérique qui tient des chaînes de périphériques et 
 | **Replacer** | une | un son joué à chaque transitoire de l'entrée : grosse caisse, note, bruit, clic, ou un **instrument** de CyDAW | seuil, sensibilité, maintien, son, vélocité ; hauteur et déclin des sons intégrés ; note et durée pour un instrument |
 
 Tous ont **Mix** (le son d'entrée mêlé à celui des chaînes) et **Wet Gain** (le gain des chaînes).
+
+## Les trois conteneurs d'instruments
+
+Sur une piste instrument, ils sont **l'instrument** de la piste. Chacune de leurs chaînes (un pad, une couche) est un instrument avec ses propres effets. Ces chaînes sont jouées par la piste, puis passent dans les effets de la piste.
+
+| Conteneur | Ses chaînes | Ce que chacune joue | Réglages |
+|---|---|---|---|
+| **Drum Machine** | un pad par touche, sur les 128 touches | les notes de sa touche (ou une autre note, pour un instrument accordé) | volume, pan, muet, solo et groupe de coupure par pad |
+| **Instrument Layer** | 1 à 16 couches | toutes les notes, dans ses touches et ses vélocités | volume, pan, muet, solo, touches et vélocités par couche |
+| **Instrument Selector** | 1 à 16 couches | une seule couche reçoit chaque note ; une note finit là où elle a commencé | le mode de choix, la couche, le CC, la première touche de keyswitch |
+
+Le mode de choix de l'Instrument Selector :
+- **Manual** : la couche allumée ; un clic sur un voyant en choisit une autre ;
+- **Round Robin** : chaque note sur la couche suivante ;
+- **Random** : une autre couche que la dernière, au hasard ;
+- **Keyswitch** : les touches à partir de *Keyswitch* (note 24, do 1, par défaut) choisissent la couche et ne jouent rien ;
+- **CC** : la valeur d'un contrôleur répartit les couches de 0 à 127 ;
+- **Program Change** : le numéro de programme choisit la couche.
+
+Ces réglages sont ceux de la carte : on peut les assigner à un contrôleur et ils sont dans la liste des valeurs.
+
+- **Drum Machine** : la grille montre seize touches. La molette, ou la bande à droite de la grille (les 128 touches, les pads marqués, les seize visibles encadrés), montre les autres. C'est l'ancien rack de pads : les projets qui en ont un l'ouvrent tel quel.
+- **Instrument Layer** et **Instrument Selector** : la carte montre les couches en liste, avec pour chacune muet, solo, volume, un indicateur de niveau et l'ouverture de sa chaîne. Les réglages de la couche choisie sont à droite : son instrument, sa chaîne, pan, volume, touches et vélocités (Layer seulement). **+ Layer** en ajoute une. Un double-clic sur un nom le renomme. Le clic droit propose : changer d'instrument, ouvrir la chaîne, renommer, retirer.
+- Un pad ou une couche peut jouer un instrument de CyDAW (Kick, Silex, Prisme, les synthés, Batterie, les échantillonneurs) ou un **instrument d'usine** échantillonné, rangé par catégorie dans *Factory Instruments*. Les échantillons d'un instrument d'usine qui ne sont pas encore là sont téléchargés au moment du choix. Les noms sont en anglais, comme dans tout module.
+- Un pad ou une couche ne tient pas de conteneur d'instruments. Changer l'instrument d'une piste pour un autre conteneur repart de ses pads ou couches par défaut ; les garder demande de rester sur le même conteneur.
+- Les conteneurs d'instruments ne partent pas dans les plugins exportés (leurs chaînes sont des instruments de la piste).
+
+## Noms des branches
+
+Une branche se renomme par un double-clic sur son nom (dans la liste du conteneur, ou en haut du cadre de sa chaîne), ou par son clic droit › *Rename…*. Un nom vide redonne le nom habituel (*Layer 2*, *Mid*, *Low*, *A*…). Le nom est gardé sur la carte du conteneur, suit sa branche quand une branche avant elle est retirée, et se sauvegarde avec le projet. Les couches d'un Instrument Layer ou Selector se renomment de la même façon.
+
+## Presets de conteneurs
+
+Le preset de la carte d'un conteneur garde **tout ce qu'il contient** :
+- pour un conteneur d'effets : ses réglages, chaque branche avec ses périphériques et leurs réglages, leurs modulateurs, les noms des branches ;
+- pour un conteneur d'instruments : ses pads ou couches, chacun avec son instrument, ses effets, son mixage, ses touches et vélocités.
+
+Charger un preset remplace le contenu du conteneur. La carte garde sa place et ce qui l'alimente. C'est une seule étape d'annulation. Le preset de toute la chaîne d'une piste garde aussi les pads ou couches de son conteneur d'instruments.
+
+Presets d'usine (43, `tools/factory_content/build_container_presets.py`, données dans `studio_presets/containers.py`) :
+- Chain : Warm Tape Chain, Lo-Fi Chain, Vocal Polish Chain, Drum Bus Chain ;
+- FX Layer : Parallel Saturation, Parallel Crush, Wide Doubler, Shimmer Send ;
+- FX Selector : Three Colours, Delay Choices, Filter Moves ;
+- Mid-Side Split : Wide Reverb Sides, Solid Mid, Air on the Sides ;
+- Stereo Split : Split Tape Echoes, Split Detune, Left Right Motion ;
+- Multiband FX-2 : Saturated Highs, Tight Lows, Air Shimmer ;
+- Multiband FX-3 : Three Band Glue, Warm Lows Bright Tops, Mid Focus ;
+- XY FX : Four Spaces, Texture Pad, Drive Corners ;
+- Replacer : Kick Reinforce, Sub Thump, Snare Crack, Click Attack ;
+- Drum Machine (huit pads, un preset de Kick et un de Silex) : Techno Kit, House Kit, Trap Kit, Lo-fi Kit, Electro Kit, Minimal Kit ;
+- Instrument Layer : Piano and Pad, Bass and Keys Split, Velocity Layers, Organ and Strings ;
+- Instrument Selector : Synth Choices, Keyswitch Keys, Round Robin Kicks, Mod Wheel Pads.
+
+Chaque périphérique d'une branche y est réglé par l'un de ses propres presets d'usine. Le générateur fabrique les presets par le port de contrôle, dans une instance silencieuse.
 
 ## Dans la bande des périphériques
 
@@ -51,13 +105,24 @@ Tous ont **Mix** (le son d'entrée mêlé à celui des chaînes) et **Wet Gain**
 - `move {nodeId, head, branch, before}`. Avec `head` à 0, le périphérique va dans la chaîne principale.
 - `add_branch {head}`, `remove_branch {head, branch}`, `remove {head}`.
 - `show {head, branch}` : choisit la branche montrée dans la bande.
-- `instrument {head, key}` donne un instrument du catalogue à un Replacer ; `open_instrument {head, open}` ouvre ou ferme sa chaîne dans la bande.
-- `list` : chaque conteneur, ses branches et leurs cartes.
+- `rename {head, branch, name}` : nomme une branche (vide : son nom habituel).
+- `instrument {head, key}` donne un instrument à un Replacer : une clé du catalogue, ou `factory:<clé>` pour un instrument d'usine. `open_instrument {head, open}` ouvre ou ferme sa chaîne dans la bande.
+- `list` : chaque conteneur, ses branches, leurs cartes et les noms donnés (`names`).
+
+`instrument_choices` : ce que peut jouer un pad, une couche ou un Replacer (`key`, `name` en anglais, `category` pour un instrument d'usine, `missing` quand ses échantillons sont encore à télécharger).
+
+`rack {track, action, …}` pour les conteneurs d'instruments :
+- `list` donne `kind` (Drum Machine, Instrument Layer, Instrument Selector), `padsKind`, `selected` (la couche que joue un Selector) et chaque pad ou couche : touche, nom, mixage, `keyLow`, `keyHigh`, `velocityLow`, `velocityHigh`, ses cartes ;
+- `add {note, instrument}` ajoute un pad (sur sa touche) ou une couche (à la fin) ;
+- `instrument`, `mix`, `sample`, `remove`, `open` et `close` agissent sur un pad ou une couche, désigné par `pad` (sa place) ou par `note`.
+
+`presets` prend `pad` pour la chaîne d'un pad ou d'une couche. Les réglages d'un Selector passent par `set_node_parameter` : `selector.mode`, `selector.layer`, `selector.controller`, `selector.keyswitch`. `value_list {track, plugin, open}` ouvre la liste des valeurs d'une carte de plugin.
 
 Les réglages passent par `set_node_parameter`, par exemple `fxLayer.mute2`, `multiband3.crossoverLow` ou `xyFx.x`. L'outil MCP `container` prend les mêmes champs.
 
 Tests :
 - `tests/ContainerTests.inc`, dans les tests du cœur : le son de chaque conteneur ;
-- `tests/v2_containers_check.py` (ctest `cydaw2_containers_check`, en silence) : l'édition, le glisser-déposer, l'imbrication, la sauvegarde.
+- `tests/v2_containers_check.py` (ctest `cydaw2_containers_check`, en silence) : l'édition, le glisser-déposer, l'imbrication, la sauvegarde ;
+- `tests/v2_instrument_containers_check.py` (ctest `cydaw2_instrument_containers_check`, en silence, mixages exportés hors ligne) : couches, touches, vélocités, les modes du Selector, les pads sur toutes les touches, les instruments proposés, les noms de branches, les presets (et ceux d'usine), la liste des valeurs d'un plugin, la sauvegarde.
 
 `effect_chain_check` prend `"live": true` (le graphe tel que la piste le joue, plutôt que tel qu'un plugin exporté le restaure) et `"signal": "clicks"` (un clic tous les quarts de seconde).

@@ -1562,19 +1562,39 @@ public:
     // The control cables of an instrument's graph that move its voices.
     void setMidiTrackVoiceModulations(std::uint64_t trackId,
                                       std::vector<cydaw::engine::PolyVoiceModulation> modulations);
-    // ---- A rack's pads (an instrument track's "drum-rack" card) ----
-    // Pad `pad` (0..15): its instrument's plan and the effects after it
-    // (values only when its chain keeps its shape; else compiled again).
-    static constexpr std::size_t maximumRackPads = 16;
+    // ---- An instrument container's pads (InstrumentContainers.h) ----
+    // A Drum Machine's pads, an Instrument Layer's or Selector's layers: the
+    // track's instrument card says how they hear its notes.
+    // Pad `pad`: its instrument's plan and the effects after it (values only
+    // when its chain keeps its shape; else compiled again).
+    static constexpr std::size_t maximumRackPads = 128;
     [[nodiscard]] juce::Result setMidiTrackRackPad(std::uint64_t trackId, std::size_t pad,
                                                    const cydaw::engine::PolySynthGraphPlan& plan,
                                                    const cydaw::engine::NativeDspGraph& effects);
-    // Its key (-1: the pad is empty), the note it plays (-1: its key), its
-    // level, pan, mute, solo and choke group.
-    void setMidiTrackRackPadMix(std::uint64_t trackId, std::size_t pad, int note, int playAs, float gainDb, float pan,
-                                bool muted, bool solo, int choke);
+    struct PadMix {
+        // Its key on a drum machine; on a layer, any key (0): whether it
+        // sounds at all (-1: the pad is empty, or its container is not the
+        // track's instrument).
+        int note { -1 };
+        // The note a drum pad plays (-1: its key).
+        int playAs { -1 };
+        float gainDb {};
+        float pan {};
+        bool muted {};
+        bool solo {};
+        // Pads of one group cut each other; 0: none.
+        int choke {};
+        // A layer's keys and velocities (the notes it plays).
+        int keyLow {};
+        int keyHigh { 127 };
+        int velocityLow { 1 };
+        int velocityHigh { 127 };
+    };
+    void setMidiTrackRackPadMix(std::uint64_t trackId, std::size_t pad, const PadMix& mix);
     // How loud it sounds now (linear, falling).
     [[nodiscard]] float midiTrackRackPadPeak(std::uint64_t trackId, std::size_t pad) const;
+    // The layer an Instrument Selector plays now (0-based; -1: none).
+    [[nodiscard]] int midiTrackSelectedLayer(std::uint64_t trackId) const;
     [[nodiscard]] bool readMidiTrackNodeTap(std::uint64_t trackId, std::uint64_t nodeId, bool input,
                                             cydaw::engine::AudioAnalysisFrame& frame) const;
     [[nodiscard]] bool setLiveMidiTrack(std::uint64_t trackId) noexcept;

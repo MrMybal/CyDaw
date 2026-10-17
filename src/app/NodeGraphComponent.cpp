@@ -769,6 +769,9 @@ std::optional<double> primitiveParameterValueForType(
     if (typeKey == "batterie")
         if (const auto index = cydaw::engine::drum::parameterIndex(parameterKey.toStdString()); index >= 0)
             return static_cast<double>(parameters.drum[static_cast<std::size_t>(index)]);
+    if (typeKey == "instrument-selector")
+        if (const auto index = cydaw::engine::instrument_container::settingIndex(parameterKey.toStdString()); index >= 0)
+            return static_cast<double>(parameters.selector[static_cast<std::size_t>(index)]);
     if (typeKey == "prism-synth")
         if (const auto index = cydaw::engine::prism::parameterIndex(parameterKey.toStdString()); index >= 0)
             return static_cast<double>(parameters.prism[static_cast<std::size_t>(index)]);
@@ -973,6 +976,18 @@ juce::var serialiseNativeParameters(
                 drums->setProperty(juce::Identifier(cydaw::engine::drum::parameter(index).key), parameters.drum[static_cast<std::size_t>(index)]);
         if (!drums->getProperties().isEmpty())
             value->setProperty("drumValues", juce::var(drums.get()));
+    }
+    // An Instrument Selector's settings: by their keys, what differs from at rest.
+    {
+        namespace container = cydaw::engine::instrument_container;
+        const auto rest = container::defaultValues();
+        auto selector = juce::DynamicObject::Ptr(new juce::DynamicObject());
+        for (int index = 0; index < container::valueCount; ++index)
+            if (parameters.selector[static_cast<std::size_t>(index)] != rest[static_cast<std::size_t>(index)])
+                selector->setProperty(juce::Identifier(juce::String(std::string(container::settings[static_cast<std::size_t>(index)].key))),
+                                      parameters.selector[static_cast<std::size_t>(index)]);
+        if (!selector->getProperties().isEmpty())
+            value->setProperty("selectorValues", juce::var(selector.get()));
     }
     // A synth of the family's: its model, then its settings by their keys
     // (without a model, as they lie).
@@ -1205,6 +1220,17 @@ cydaw::engine::NativeDspNodeParameters restoreNativeParameters(
                 parameters.drum[static_cast<std::size_t>(index)] = stored;
         }
     }
+    if (const auto* selector = object->getProperty("selectorValues").getDynamicObject()) {
+        namespace container = cydaw::engine::instrument_container;
+        parameters.selector = container::defaultValues();
+        for (const auto& property : selector->getProperties()) {
+            const auto index = container::settingIndex(property.name.toString().toStdString());
+            const auto stored = static_cast<float>(static_cast<double>(property.value));
+            // As written: a plan compiled from it keeps each in its range.
+            if (index >= 0 && std::isfinite(stored))
+                parameters.selector[static_cast<std::size_t>(index)] = stored;
+        }
+    }
     if (object->hasProperty("synthModel"))
         parameters.synthModel = static_cast<float>(static_cast<double>(object->getProperty("synthModel")));
     if (const auto model = cydaw::engine::synth::modelOf(parameters.synthModel); model != cydaw::engine::synth::Model::none) {
@@ -1278,6 +1304,8 @@ bool bindingMatchesType(const juce::String& typeKey, const juce::String& binding
                    || samplerControllerOfBinding(suffix) >= 0))
            || (typeKey == "batterie" && suffix.startsWith("batterie.")
                && cydaw::engine::drum::parameterIndex(suffix.substring(9).toStdString()) >= 0)
+           || (typeKey == "instrument-selector" && suffix.startsWith("selector.")
+               && cydaw::engine::instrument_container::settingIndex(suffix.substring(9).toStdString()) >= 0)
            || (typeKey == "prism-synth"
                && (suffix == "prism.level"
                    || (suffix.startsWith("prism.")
@@ -1358,6 +1386,12 @@ bool setNativeParameter(cydaw::engine::NativeDspNodeParameters& parameters,
     if (suffix.startsWith("batterie."))
         if (const auto index = cydaw::engine::drum::parameterIndex(suffix.substring(9).toStdString()); index >= 0) {
             parameters.drum[static_cast<std::size_t>(index)] = cydaw::engine::drum::clampValue(index, static_cast<float>(value));
+            return true;
+        }
+    if (suffix.startsWith("selector."))
+        if (const auto index = cydaw::engine::instrument_container::settingIndex(suffix.substring(9).toStdString()); index >= 0) {
+            parameters.selector[static_cast<std::size_t>(index)]
+                = cydaw::engine::instrument_container::clampValue(index, static_cast<float>(value));
             return true;
         }
     // A synth of the family: "<prefix>.level" or "<prefix>.<key>".
@@ -1583,6 +1617,9 @@ double nativeParameterValue(const cydaw::engine::NativeDspNodeParameters& parame
     if (suffix.startsWith("batterie."))
         if (const auto index = cydaw::engine::drum::parameterIndex(suffix.substring(9).toStdString()); index >= 0)
             return parameters.drum[static_cast<std::size_t>(index)];
+    if (suffix.startsWith("selector."))
+        if (const auto index = cydaw::engine::instrument_container::settingIndex(suffix.substring(9).toStdString()); index >= 0)
+            return parameters.selector[static_cast<std::size_t>(index)];
     if (const auto model = cydaw::engine::synth::modelForPrefix(suffix.upToFirstOccurrenceOf(".", false, false).toStdString());
         model != cydaw::engine::synth::Model::none) {
         const auto key = suffix.fromFirstOccurrenceOf(".", false, false);
@@ -1821,6 +1858,14 @@ void appendPublishedParameters(
             const auto offered = performed.contains(setting.key);
             state.parameters.back().publishToHost = offered;
             state.parameters.back().showInDevice = offered;
+        }
+    }
+    else if (typeKey == "instrument-selector") {
+        // How it chooses its layer (InstrumentContainers.h), in English.
+        for (const auto& setting : cydaw::engine::instrument_container::settings) {
+            const auto index = cydaw::engine::instrument_container::settingIndex(setting.key);
+            add("selector." + juce::String(std::string(setting.key)), juce::String(setting.label), {}, setting.minimum, setting.maximum,
+                parameters.selector[static_cast<std::size_t>(index)]);
         }
     }
     else if (typeKey == "sampler" || typeKey == "batterie") {
@@ -4926,6 +4971,12 @@ juce::var NodeGraphComponent::serialise() const
             value->setProperty("impulse", node.impulseJson);
         if (node.instrumentJson.isObject())
             value->setProperty("instrument", node.instrumentJson);
+        if (std::any_of(node.branchNames.begin(), node.branchNames.end(), [](const auto& name) { return name.isNotEmpty(); })) {
+            juce::Array<juce::var> names;
+            for (const auto& name : node.branchNames)
+                names.add(name);
+            value->setProperty("branchNames", names);
+        }
         node.serialised = juce::var(value.get());
         nodeValues.add(node.serialised);
     }
@@ -6198,9 +6249,15 @@ juce::Result NodeGraphComponent::compilePolySynthGraph(
         for (int index = 0; index < cydaw::engine::synth::parameterCount(familyModel); ++index)
             destination.synthValues[static_cast<std::size_t>(index)] = cydaw::engine::synth::clampValue(
                 familyModel, index, oscillator->parameters.synth[static_cast<std::size_t>(index)]);
-    } else if (oscillator->typeKey == "drum-rack") {
-        // A rack: its pads play (the track's engine), its voices nothing.
+    } else if (const auto container = cydaw::engine::instrument_container::kindOfType(oscillator->typeKey.toStdString());
+               container != cydaw::engine::instrument_container::Kind::none) {
+        // An instrument container: its pads or its layers play (the track's
+        // engine), its voices nothing.
         destination.waveform = Waveform::rack;
+        destination.containerKind = container;
+        for (int index = 0; index < cydaw::engine::instrument_container::valueCount; ++index)
+            destination.containerValues[static_cast<std::size_t>(index)] = cydaw::engine::instrument_container::clampValue(
+                index, oscillator->parameters.selector[static_cast<std::size_t>(index)]);
     } else if (oscillator == stringVoice && stringVoice != nullptr) {
         destination.waveform = Waveform::string;
         destination.stringDamping = juce::jlimit(
@@ -7059,6 +7116,9 @@ void NodeGraphComponent::restore(const juce::var& state)
             }
             if (const auto instrument = object->getProperty("instrument"); instrument.isObject())
                 restoredNode.instrumentJson = instrument;
+            if (const auto* names = object->getProperty("branchNames").getArray())
+                for (const auto& name : *names)
+                    restoredNode.branchNames.add(name.toString().substring(0, 64));
             if (const auto tables = object->getProperty("prismTables"); tables.isObject())
                 if (auto built = prismTablesFromVar(tables)) {
                     restoredNode.prismTables = std::move(built);
@@ -25864,11 +25924,13 @@ NodeGraphComponent::deviceCatalogue() const
         }
     };
     std::vector<DeviceCatalogueEntry> entries;
-    for (const auto& preset : factoryPresetSummaries())
+    for (const auto& preset : factoryPresetSummaries()) {
         entries.push_back({ preset.key, tr(preset.translationKey), "preset",
                             preset.soundSource ? "instrument" : "effect",
                             {}, preset.soundSource,
                             preset.soundSource ? "midi" : "audio", "audio" });
+        entries.back().englishName = Localization::instance().englishText(preset.translationKey);
+    }
     for (const auto& module : savedModules_) {
         if (!module.factoryModule || !module.hasOutput)
             continue;
@@ -25902,7 +25964,11 @@ NodeGraphComponent::deviceCatalogue() const
                             portKindName(type.hasInput, type.inputKind),
                             portKindName(type.hasOutput, type.outputKind) });
         entries.back().categoryKey = type.categoryKey;
+        entries.back().englishName = type.title.isNotEmpty() ? type.title : Localization::instance().englishText(type.translationKey);
     }
+    for (auto& entry : entries)
+        if (entry.englishName.isEmpty())
+            entry.englishName = entry.name;
     return entries;
 }
 
