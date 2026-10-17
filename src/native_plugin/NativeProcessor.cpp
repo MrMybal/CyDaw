@@ -1,9 +1,35 @@
 #include "NativeProcessor.h"
+#include "NativeResources.h"
 #include "ParameterBindings.h"
 #include <cmath>
 #include <cstring>
+#include <fstream>
+#include <map>
+#include <mutex>
 namespace cydaw::native
 {
+namespace
+{
+// A bundle's voice data is read once per process, whatever instances play it.
+std::shared_ptr<const engine::VoiceAssets> sharedVoiceAssets(const std::filesystem::path &file)
+{
+    if (file.empty())
+        return {};
+    static std::mutex lock;
+    static std::map<std::filesystem::path, std::weak_ptr<const engine::VoiceAssets>> read;
+    const std::scoped_lock guard(lock);
+    if (auto known = read[file].lock())
+        return known;
+    std::ifstream in(file, std::ios::binary);
+    std::string error;
+    auto assets = engine::readVoiceAssets(in, error);
+    if (assets.empty())
+        return {};
+    auto shared = std::make_shared<const engine::VoiceAssets>(std::move(assets));
+    read[file] = shared;
+    return shared;
+}
+} // namespace
 struct NativeProcessor::Target
 {
     int node{-1};
@@ -122,6 +148,7 @@ bool NativeProcessor::prepare(double rate, int maximumBlock)
     scratch_.assign(static_cast<std::size_t>(channels * maximumBlock_), 0);
     for (int c = 0; c < channels; ++c)
         pointers_[c] = scratch_.data() + c * maximumBlock_;
+    loadVoice();
     runtime_.prepare(rate_, maximumBlock_, channels);
     const auto result = runtime_.setGraph(graph_);
     if (result.failed())
@@ -166,6 +193,20 @@ bool NativeProcessor::prepare(double rate, int maximumBlock)
     reset();
     return true;
 }
+void NativeProcessor::loadVoice()
+{
+    // Once, before the first block: a sampler's samples, a sound model.
+    if (voiceTried_ || definition_.voiceAssets.empty())
+        return;
+    voiceTried_ = true;
+    voice_ = sharedVoiceAssets(findResource(definition_.voiceAssets));
+    if (voice_ == nullptr)
+        return;
+    if (voice_->sampler != nullptr)
+        instrument_.sampler = voice_->sampler;
+    if (voice_->soundModel != nullptr)
+        instrument_.soundModel = voice_->soundModel;
+}
 void NativeProcessor::reset()
 {
     runtime_.resetRealtime();
@@ -176,12 +217,106 @@ void NativeProcessor::reset()
     std::fill(std::begin(bends_), std::end(bends_), 0);
     std::memset(sustain_, 0, sizeof(sustain_));
     std::memset(deferred_, 0, sizeof(deferred_));
+    down_.fill(false);
+    downCount_ = 0;
 }
 void NativeProcessor::midi(const engine::MidiEffectEvent &e)
 {
     const auto channel = e.channel(), note = static_cast<int>(e.data1);
     const auto type = e.status & 0xf0;
     if (e.isNoteOn())
+    {
+        noteOn(channel, note, e.data2 / 127.0f);
+    }
+    else if (e.isNoteOff())
+    {
+        if (note >= 0 && note < 128 && down_[note])
+        {
+            down_[note] = false;
+            --downCount_;
+        }
+        if (sustain_[channel])
+            deferred_[note][channel] = true;
+        else
+            for (std::size_t i = 0; i < voices_.size(); ++i)
+                if (notes_[i] == note && channels_[i] == channel)
+                    voices_[i]->stopNote(true);
+    }
+    else if (e.isAllNotesOff())
+    {
+        down_.fill(false);
+        downCount_ = 0;
+        for (std::size_t i = 0; i < voices_.size(); ++i)
+            if (channels_[i] == channel)
+                voices_[i]->stopNote(e.data1 != 120);
+    }
+    else if (type == 0xb0)
+    {
+        // A sampler's SFZ reads every controller, but a note's own
+        // expression (11 and 43 on the channels after the first).
+        if (channel == 0 || (e.data1 != 11 && e.data1 != 43))
+            prismContext_.sampler.controllerMoved(e.data1, e.data2);
+        if (e.data1 == 64)
+        {
+            sustain_[channel] = e.data2 >= 64;
+            if (!sustain_[channel])
+                for (std::size_t i = 0; i < voices_.size(); ++i)
+                    if (channels_[i] == channel && notes_[i] >= 0 && deferred_[notes_[i]][channel])
+                    {
+                        voices_[i]->stopNote(true);
+                        deferred_[notes_[i]][channel] = false;
+                    }
+        }
+        else if (e.data1 == 1)
+            prismContext_.modWheel = e.data2 / 127.0f;
+    }
+    else if (type == 0xe0)
+    {
+        bends_[channel] = ((e.data1 | (e.data2 << 7)) - 8192) / 8192.0f * 2;
+        for (std::size_t i = 0; i < voices_.size(); ++i)
+            if (channels_[i] == channel)
+                voices_[i]->setExpression(bends_[channel], 0);
+    }
+    else if (type == 0xd0)
+        prismContext_.aftertouch = e.data1 / 127.0f;
+}
+void NativeProcessor::noteOn(const int channel, const int note, const float velocity)
+{
+    const auto transposed = std::clamp(note + instrument_.transposeSemitones, 0, 127);
+    const auto *sampler =
+        instrument_.waveform == engine::PolyOscillatorWaveform::sampler ? instrument_.sampler.get() : nullptr;
+    // A keyswitch: it plays nothing, the next notes play its articulation.
+    if (sampler != nullptr && engine::samplerKeyswitch(*sampler, transposed))
+    {
+        prismContext_.sampler.keyswitch = transposed;
+        return;
+    }
+    // The keys held as it starts (a sampler's first and legato zones).
+    prismContext_.sampler.heldKeys = downCount_;
+    if (note >= 0 && note < 128 && !down_[note])
+    {
+        down_[note] = true;
+        ++downCount_;
+    }
+    // A closed hat cuts the open one: the voices its group chokes go first.
+    auto group = 0;
+    if (sampler != nullptr)
+    {
+        const auto crossfade =
+            engine::samplerValue(instrument_.samplerValues, engine::SamplerSetting::velocityCrossfade) >= 0.5f;
+        const engine::SamplerCues cues{&instrument_.samplerControllers, &prismContext_.sampler,
+                                       engine::samplerValue(instrument_.samplerValues, engine::SamplerSetting::articulation)};
+        group = engine::samplerGroupOf(*sampler, transposed,
+                                       std::clamp(static_cast<double>(velocity) * instrument_.velocityScale, 0.0, 1.0),
+                                       crossfade, cues);
+    }
+    else if (instrument_.waveform == engine::PolyOscillatorWaveform::family &&
+             instrument_.synthModel == engine::synth::Model::silex && transposed != engine::synth::silexOpenHat)
+        group = engine::synth::silexChokeGroupOf(transposed);
+    if (group != 0)
+        for (auto &voice : voices_)
+            if (voice->isActive() && voice->chokedBy(instrument_) == group)
+                voice->fadeOut(0.006);
     {
         std::size_t chosen = 0;
         bool found = false;
@@ -204,7 +339,7 @@ void NativeProcessor::midi(const engine::MidiEffectEvent &e)
             return;
         const auto previous = notes_[chosen];
         const auto legato = instrument_.voiceMode == 2 && voices_[chosen]->isActive();
-        voices_[chosen]->startNote(instrument_, note, e.data2 / 127.0f, rate_,
+        voices_[chosen]->startNote(instrument_, note, velocity, rate_,
                                    instrument_.glideSeconds > 0 ? previous : -1, legato);
         voices_[chosen]->setExpression(bends_[channel], 0);
         notes_[chosen] = note;
@@ -212,43 +347,6 @@ void NativeProcessor::midi(const engine::MidiEffectEvent &e)
         ages_[chosen] = ++age_;
         deferred_[note][channel] = false;
     }
-    else if (e.isNoteOff())
-    {
-        if (sustain_[channel])
-            deferred_[note][channel] = true;
-        else
-            for (std::size_t i = 0; i < voices_.size(); ++i)
-                if (notes_[i] == note && channels_[i] == channel)
-                    voices_[i]->stopNote(true);
-    }
-    else if (type == 0xb0 && e.data1 == 64)
-    {
-        sustain_[channel] = e.data2 >= 64;
-        if (!sustain_[channel])
-            for (std::size_t i = 0; i < voices_.size(); ++i)
-                if (channels_[i] == channel && notes_[i] >= 0 && deferred_[notes_[i]][channel])
-                {
-                    voices_[i]->stopNote(true);
-                    deferred_[notes_[i]][channel] = false;
-                }
-    }
-    else if (e.isAllNotesOff())
-    {
-        for (std::size_t i = 0; i < voices_.size(); ++i)
-            if (channels_[i] == channel)
-                voices_[i]->stopNote(e.data1 != 120);
-    }
-    else if (type == 0xe0)
-    {
-        bends_[channel] = ((e.data1 | (e.data2 << 7)) - 8192) / 8192.0f * 2;
-        for (std::size_t i = 0; i < voices_.size(); ++i)
-            if (channels_[i] == channel)
-                voices_[i]->setExpression(bends_[channel], 0);
-    }
-    else if (type == 0xb0 && e.data1 == 1)
-        prismContext_.modWheel = e.data2 / 127.0f;
-    else if (type == 0xd0)
-        prismContext_.aftertouch = e.data1 / 127.0f;
 }
 void NativeProcessor::renderVoices(float *const *channels, int count, int start, int frames)
 {
@@ -297,6 +395,10 @@ bool NativeProcessor::process(NativeBlock &data)
     prismContext_.tempo = clock.beatsPerMinute;
     NativeDspRuntime::setSessionTempo(clock.beatsPerMinute);
     NativeDspRuntime::setSessionPlaying(clock.playing);
+    // A sampler's controllers and articulation follow its card, once a block.
+    if (instrument_.enabled && instrument_.waveform == engine::PolyOscillatorWaveform::sampler)
+        prismContext_.sampler.follow(instrument_.sampler.get(), instrument_.samplerControllers,
+                                     engine::samplerValue(instrument_.samplerValues, engine::SamplerSetting::articulation));
     const auto count = midiEffects_.process(midiIn_.data(), incoming, midiOut_.data(), midiOut_.size(),
                                             frames, clock, instrument_.midiEffects.get());
     int position = 0;

@@ -26,7 +26,7 @@ else()
     set(adapter "${native}/Lv2Export.cpp" "${native}/Lv2Metadata.cpp")
 endif()
 add_library(${target} MODULE "${CMAKE_CURRENT_SOURCE_DIR}/generated/Definition.cpp" ${CYDAW_CUSTOM_SOURCES}
-    "${native}/NativeProcessor.cpp" "${native}/NativeFonts.cpp" ${adapter} ${native_visual_sources}
+    "${native}/NativeProcessor.cpp" "${native}/NativeResources.cpp" "${native}/NativeFonts.cpp" ${adapter} ${native_visual_sources}
     "${imgui}/imgui.cpp" "${imgui}/imgui_draw.cpp" "${imgui}/imgui_tables.cpp" "${imgui}/imgui_widgets.cpp"
    )
 target_compile_features(${target} PRIVATE cxx_std_20)
@@ -42,6 +42,7 @@ if(CYDAW_EXPORT_FORMAT STREQUAL "CLAP")
     set_target_properties(${target} PROPERTIES PREFIX "" SUFFIX ".clap" OUTPUT_NAME "${CYDAW_PRODUCT_NAME}"
         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/CLAP/$<CONFIG>" RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/CLAP/$<CONFIG>")
     set(licenseDir "$<TARGET_FILE_DIR:${target}>/${CYDAW_PRODUCT_NAME}.clap.Licenses")
+    set(resourceDir "$<TARGET_FILE_DIR:${target}>/${CYDAW_PRODUCT_NAME}.clap.Resources")
 else()
     set(bundle "${CMAKE_BINARY_DIR}/LV2/$<CONFIG>/${CYDAW_PRODUCT_NAME}.lv2")
     set_target_properties(${target} PROPERTIES PREFIX "" OUTPUT_NAME "cydaw_native" LIBRARY_OUTPUT_DIRECTORY "${bundle}" RUNTIME_OUTPUT_DIRECTORY "${bundle}")
@@ -64,6 +65,17 @@ else()
             COMMAND "$<TARGET_FILE:CyDAWLv2Metadata>" "$<TARGET_FILE:${target}>" "${bundle}/plugin.ttl")
     endif()
     set(licenseDir "${bundle}/Licenses")
+    set(resourceDir "${bundle}/Resources")
+endif()
+# The instrument's voice data (a sampler's samples, a sound model), where the
+# plug-in looks for it: beside a CLAP file, inside an LV2 bundle. A build
+# without any takes away one an earlier export of the same name left.
+if(CYDAW_VOICE_ASSETS)
+    add_custom_command(TARGET ${target} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${resourceDir}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CYDAW_VOICE_ASSETS}" "${resourceDir}/Voice.cyvoice")
+else()
+    add_custom_command(TARGET ${target} POST_BUILD COMMAND ${CMAKE_COMMAND} -E rm -f "${resourceDir}/Voice.cyvoice")
 endif()
 add_custom_command(TARGET ${target} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "${licenseDir}"

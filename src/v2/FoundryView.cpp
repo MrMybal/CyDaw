@@ -1550,23 +1550,32 @@ void FoundryView::drawTrackHeader(Tab& tab, const int index, const ImVec2 origin
         }
         ImGui::EndPopup();
     }
-    ImGui::SetCursorScreenPos(ImVec2(end.x-dp(48),origin.y+dp(2)));
+    // The name has the whole width when the row under it holds the
+    // automation and remove buttons; a short track keeps them beside it.
+    const auto x = origin.x + dp(10.0f);
+    const auto row = origin.y + dp(4.0f) + ImGui::GetFontSize() + dp(6.0f);
+    const auto roomy = row + ImGui::GetFrameHeight() <= end.y;
+    const auto buttonsY = roomy ? row + (ImGui::GetFrameHeight() - dp(18.0f)) * 0.5f : origin.y + dp(2.0f);
+    ImGui::SetCursorScreenPos(ImVec2(end.x - dp(48.0f), buttonsY));
     bool automation=tab.automationRows.contains(track.id);
     if(ui::toggle("A",&automation,p.accent,ImVec2(dp(20),dp(18)),L("Afficher l'automation","Show automation"))) {
         if(automation)tab.automationRows.insert(track.id);else tab.automationRows.erase(track.id);
     }
-    const auto x = origin.x + dp(10.0f);
+    const auto nameWidth = size.x - (roomy ? dp(16.0f) : dp(60.0f));
     ImGui::PushFont(theme::boldFont(), 0.0f);
-    ui::clippedText(list, ImVec2(x, origin.y + dp(4.0f)), size.x - dp(60.0f), p.text, track.name.c_str());
+    ui::clippedText(list, ImVec2(x, origin.y + dp(4.0f)), nameWidth, p.text, track.name.c_str());
+    const auto nameCut = ImGui::CalcTextSize(track.name.c_str()).x > nameWidth;
     ImGui::PopFont();
-    ImGui::SetCursorScreenPos(ImVec2(end.x - dp(24.0f), origin.y + dp(2.0f)));
+    // A name cut short is read whole under the pointer.
+    if (nameCut && ImGui::IsMouseHoveringRect(ImVec2(x, origin.y), ImVec2(x + nameWidth, row)) && !ImGui::IsAnyItemActive())
+        ImGui::SetTooltip("%s", track.name.c_str());
+    ImGui::SetCursorScreenPos(ImVec2(end.x - dp(24.0f), buttonsY));
     if (ui::iconButton(icon::close, L("Retirer la piste", "Remove the track"), false, 0, ImVec2(dp(20.0f), dp(18.0f)))) {
         edit(tab, engine::foundry::withoutTrack(session, index), ui::Ls("Retirer la piste", "Remove the track"));
         ImGui::PopID();
         return;
     }
-    const auto row = origin.y + dp(4.0f) + ImGui::GetFontSize() + dp(6.0f);
-    if (row + ImGui::GetFrameHeight() > end.y) {
+    if (!roomy) {
         ImGui::PopID();
         return;
     }
@@ -1589,29 +1598,37 @@ void FoundryView::drawTrackHeader(Tab& tab, const int index, const ImVec2 origin
     ImGui::SameLine(0.0f, dp(6.0f));
     ImGui::AlignTextToFramePadding();
     ImGui::TextColored(theme::vec(p.textFaint), "%s",track.bus?"BUS":track.midi?"MIDI":"AUDIO");
-    const auto second = row + ImGui::GetFrameHeight() + dp(4.0f);
-    if (second + ImGui::GetFrameHeight() > end.y) {
+    // Gain and pan: two knobs, each value beside its knob, never under a
+    // handle.
+    constexpr auto knobDiameter = 24.0f;
+    const auto knobs = row + ImGui::GetFrameHeight() + dp(6.0f);
+    if (knobs + dp(knobDiameter) > end.y) {
         ImGui::PopID();
         return;
     }
     auto gain = tab.document->session().tracks[static_cast<std::size_t>(index)].gainDb;
     auto pan = tab.document->session().tracks[static_cast<std::size_t>(index)].pan;
-    ImGui::SetCursorScreenPos(ImVec2(x, second));
-    ImGui::SetNextItemWidth((size.x - dp(20.0f)) * 0.58f);
-    auto changed = ImGui::SliderFloat("##gain", &gain, -48.0f, 12.0f, "%.1f dB");
-    if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
-        gain = 0.0f;
-        changed = true;
-    }
+    ui::KnobStyle style;
+    style.diameter = knobDiameter;
+    style.colour = colour;
+    const auto knobWidth = dp(knobDiameter + 12.0f);
+    const auto half = (size.x - dp(14.0f)) * 0.5f;
+    const auto valueBeside = [&](const float left, const juce::String& text) {
+        const auto height = ImGui::GetFontSize();
+        list->AddText(ImVec2(left + knobWidth + dp(1.0f), knobs + (dp(knobDiameter) - height) * 0.5f), p.textDim, text.toRawUTF8());
+    };
+    style.flags = ui::knobNoLabel;
+    ImGui::SetCursorScreenPos(ImVec2(x - dp(6.0f), knobs));
+    auto changed = ui::knob("##gain", &gain, -48.0f, 12.0f, 0.0f, style);
     ui::tooltip(L("Volume de la piste (double-clic : 0 dB)", "The track's gain (double click: 0 dB)"));
-    ImGui::SameLine(0.0f, dp(4.0f));
-    ImGui::SetNextItemWidth((size.x - dp(20.0f)) * 0.42f - dp(4.0f));
-    changed = ImGui::SliderFloat("##pan", &pan, -1.0f, 1.0f, pan < -0.005f ? "G %.2f" : pan > 0.005f ? "D %.2f" : "C") || changed;
-    if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
-        pan = 0.0f;
-        changed = true;
-    }
+    valueBeside(x - dp(6.0f), juce::String(gain, 1) + " dB");
+    style.flags = ui::knobNoLabel | ui::knobBipolar;
+    ImGui::SetCursorScreenPos(ImVec2(x - dp(6.0f) + half, knobs));
+    changed = ui::knob("##pan", &pan, -1.0f, 1.0f, 0.0f, style) || changed;
     ui::tooltip(L("Panoramique (double-clic : au centre)", "Pan (double click: centred)"));
+    const auto percent = juce::roundToInt(std::abs(pan) * 100.0f);
+    valueBeside(x - dp(6.0f) + half, percent == 0 ? juce::String("C")
+                                     : juce::String(pan < 0.0f ? L("G ", "L ") : L("D ", "R ")) + juce::String(percent));
     if (changed)
         change([gain, pan](Track& t) {
             t.gainDb = gain;

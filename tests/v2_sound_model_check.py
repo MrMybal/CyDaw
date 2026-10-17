@@ -22,9 +22,9 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import shutil
 import socket
+import struct
 import subprocess
 import sys
 import tempfile
@@ -137,26 +137,40 @@ def nodes(track: str) -> list[dict]:
     return need({"cmd": "get_track_graph", "track": track}, "graph")["nodes"]
 
 
-def embedded_state(header: Path) -> dict:
-    """The JSON a generated plug-in project carries (its C string chunks)."""
-    text = header.read_text(encoding="utf-8")
-    block = text[text.index("embeddedStateJsonChunks"):]
-    chunks = re.findall(r'^\s*"((?:[^"\\]|\\.)*)",$', block, re.MULTILINE)
-    escapes = {"n": "\n", "r": "\r", '"': '"', "\\": "\\"}
-    joined = re.sub(r"\\(.)", lambda match: escapes.get(match.group(1), match.group(1)), "".join(chunks))
-    return json.loads(joined)
+def read_voice(path: Path) -> dict:
+    """What an exported plug-in's voice data (.cyvoice) holds: the sampler's
+    samples and zones, the sound model's zones."""
+    data = path.read_bytes()
+    at = 0
 
+    def take(fmt: str):
+        nonlocal at
+        values = struct.unpack_from("<" + fmt, data, at)
+        at += struct.calcsize("<" + fmt)
+        return values if len(values) > 1 else values[0]
 
-def has_model(graph: dict) -> bool:
-    for node in graph.get("nodes", []):
-        if node.get("type") == "sound-model" and isinstance(node.get("soundModel"), dict):
-            return True
-    for module in graph.get("modules", []):
-        for node in module.get("nodes", []):
-            if node.get("type") == "sound-model" and isinstance(node.get("soundModel"), dict):
-                return True
-    return False
+    def text() -> str:
+        nonlocal at
+        size = take("I")
+        at += size
+        return data[at - size:at].decode("utf-8")
 
+    magic, version, parts = take("III")
+    voice = {"magic": magic == 0x41565943, "version": version}
+    if parts & 1:
+        voice["sampler"] = text()
+        samples = []
+        for _ in range(take("I")):
+            name = text()
+            channels, frames, rate, _scale, _loop_start, _loop_end, count = take("iqdfqqQ")
+            at += 2 * count
+            samples.append({"name": name, "channels": channels, "frames": frames, "rate": rate, "pcm": count})
+        voice["samples"] = samples
+        voice["zones"] = take("I")
+    elif parts & 2:
+        voice["model"] = text()
+        voice["modelZones"] = take("I")
+    return voice
 
 def scenario(scratch: Path) -> None:
     need({"cmd": "set_master_gain", "gainDb": -60}, "master")
@@ -228,16 +242,19 @@ def scenario(scratch: Path) -> None:
         if written.is_file():
             written.unlink()
 
-    # Exported as a VST3 project (generated only, not built).
+    # Exported as a native project (generated only, not built): the plan in
+    # its sources, the model in its voice data.
     need({"cmd": "workshop", "action": "open_track", "track": track, "nodeId": 0}, "workshop instrument")
     folder = scratch / "export"
     answer = need({"cmd": "workshop", "action": "vst3_export", "folder": str(folder).replace(os.sep, "/")}, "vst3 project")
-    header = Path(answer["project"]) / "generated" / "CyDawGeneratedGraphConfig.h"
-    state = embedded_state(header)
-    plan = state.get("polySynth", {})
-    check(plan.get("waveform") == 6 and len(plan.get("soundModelValues", [])) >= 13,
-          f"the plug-in's plan says sound model ({plan.get('waveform')})")
-    check(has_model(state.get("editor", {})), "the plug-in's state carries the model (inside its device)")
+    project = Path(answer["project"])
+    definition = (project / "generated" / "Definition.cpp").read_text(encoding="utf-8")
+    check("PolyOscillatorWaveform>(6)" in definition and definition.count("p.soundModelValues[") >= 13,
+          "the plug-in's plan says sound model")
+    voice_file = project / "generated" / "Voice.cyvoice"
+    voice = read_voice(voice_file) if voice_file.is_file() else {}
+    check('d.voiceAssets="Voice.cyvoice"' in definition and voice.get("magic") and voice.get("modelZones", 0) >= 1,
+          f"the voice data carries the model (inside its device; {voice.get('modelZones')} zone(s))")
     need({"cmd": "workshop", "action": "close"}, "workshop close")
 
 

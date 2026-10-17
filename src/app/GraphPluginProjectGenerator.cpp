@@ -1,7 +1,12 @@
 #include "GraphPluginProjectGenerator.h"
+#include "SamplerMapFile.h"
+#include "SoundModelFile.h"
 
 #include <algorithm>
 #include <cydaw/engine/PolySynthGraph.h>
+#include <cydaw/engine/VoiceAssetsFile.h>
+#include <filesystem>
+#include <fstream>
 
 namespace cydaw::app
 {
@@ -39,6 +44,53 @@ bool writeText(const juce::File &file, const juce::String &text)
     return file.replaceWithText(text, false, false, "\n");
 }
 
+// The plug-in's voice data, read from its bundle (NativeResources.cpp).
+constexpr auto voiceAssetsName = "Voice.cyvoice";
+
+// What the instrument plays beyond its numbers, written beside its sources:
+// the sampler's zones with every sample whole (one held only in part, or
+// not decoded yet, is decoded again from its file), the sound model.
+// Nothing to write: ok, `written` false.
+juce::Result writeVoiceAssetsFile(const juce::File &file, const juce::var &editor,
+                                  const cydaw::engine::PolyOscillatorWaveform waveform, bool &written)
+{
+    using cydaw::engine::PolyOscillatorWaveform;
+    written = false;
+    (void)file.deleteFile();
+    const auto sampler = waveform == PolyOscillatorWaveform::sampler;
+    const auto model = waveform == PolyOscillatorWaveform::soundModel;
+    if (!sampler && !model)
+        return juce::Result::ok();
+    const auto assets = voiceAssetsFromGraphState(editor);
+    if (sampler && (assets.sampler == nullptr || assets.sampler->zones.empty()))
+        return juce::Result::fail("The sampler has no zone to export");
+    if (model && assets.soundModel == nullptr)
+        return juce::Result::fail("The sound model card has no model to export");
+    const auto whole = [](const cydaw::engine::SampleDataRef &sample) -> cydaw::engine::SampleDataRef {
+        if (sample->playable() && !sample->streamed &&
+            sample->pcm.size() == static_cast<std::size_t>(sample->frames) * static_cast<std::size_t>(sample->channels))
+            return sample;
+        auto decoded = std::make_shared<cydaw::engine::SampleData>();
+        juce::String error;
+        if (!decodeSampleFile(juce::File(juce::String::fromUTF8(sample->path.c_str())), *decoded, error))
+            return {};
+        return decoded;
+    };
+    std::string error;
+    {
+        std::ofstream out(std::filesystem::path(file.getFullPathName().toWideCharPointer()), std::ios::binary);
+        if (!cydaw::engine::writeVoiceAssets(out, sampler ? assets.sampler.get() : nullptr, whole,
+                                             model ? assets.soundModel.get() : nullptr, error))
+        {
+            out.close();
+            (void)file.deleteFile();
+            return juce::Result::fail("The instrument's voice data cannot be exported: " + juce::String(error));
+        }
+    }
+    written = true;
+    return juce::Result::ok();
+}
+
 } // namespace
 
 juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw::graph::PluginExportPlan &plan,
@@ -54,11 +106,10 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
         return juce::Result::fail("The native audio plan is missing");
     const auto waveform =
         static_cast<cydaw::engine::PolyOscillatorWaveform>(static_cast<int>(poly.getProperty("waveform", 0)));
-    if (static_cast<bool>(poly.getProperty("enabled", false)) &&
-        (waveform == cydaw::engine::PolyOscillatorWaveform::sampler ||
-         waveform == cydaw::engine::PolyOscillatorWaveform::soundModel ||
-         waveform == cydaw::engine::PolyOscillatorWaveform::rack))
-        return juce::Result::fail("Sample players, recorded models and pad racks are excluded from native export");
+    const auto instrument = static_cast<bool>(poly.getProperty("enabled", false));
+    // A rack's pads are instruments of the track, outside the device.
+    if (instrument && waveform == cydaw::engine::PolyOscillatorWaveform::rack)
+        return juce::Result::fail("Pad racks are excluded from native export: their pads are instruments of the track");
     int outputs = 0, inputs = 0;
     for (const auto &b : plan.buses)
         if (b.mediaType == cydaw::graph::PluginBusMediaType::audio)
@@ -70,15 +121,15 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
         }
     if (outputs != 1 || inputs > 4)
         return juce::Result::fail("Native export requires one audio output and up to four audio inputs");
-    // Samples and recorded models are deliberately outside this exporter.
+    // Samples and recorded models travel in the bundle's voice data; a
+    // rack's pads cannot.
     if (const auto *list = editor.getProperty("nodes", {}).getArray())
         for (const auto &n : *list)
         {
             const auto type = n.getProperty("type", {}).toString();
-            if (type.containsIgnoreCase("sampler") || type == "drum-kit" || type == "drum-rack" ||
-                type == "sound-model")
-                return juce::Result::fail("Native export supports synthesis and effects; sample players, recorded "
-                                          "models and pad racks are excluded");
+            if (type == "drum-rack")
+                return juce::Result::fail("Pad racks are excluded from native export: their pads are instruments of "
+                                          "the track");
             if (n.hasProperty("prismTables") || n.hasProperty("wavetableShape") || n.hasProperty("impulse"))
                 return juce::Result::fail(
                     "Imported wavetable/impulse assets must be embedded before this device can use native export");
@@ -88,6 +139,12 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
     const auto generated = destination.getChildFile("generated");
     if (generated.createDirectory().failed())
         return juce::Result::fail("Cannot create the generated source directory");
+    auto voiceAssets = false;
+    if (const auto voice = writeVoiceAssetsFile(generated.getChildFile(voiceAssetsName), editor,
+                                            instrument ? waveform : cydaw::engine::PolyOscillatorWaveform::sine,
+                                            voiceAssets);
+        voice.failed())
+        return voice;
     const auto prop = [](const juce::var &v, const char *key) { return v.getProperty(key, {}); };
     const auto number = [](const juce::var &value) { return juce::String(static_cast<double>(value), 12); };
     const auto integer = [](const juce::var &value) { return juce::String(static_cast<juce::int64>(value)); };
@@ -116,6 +173,8 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
     cpp += "d.synth=" + juce::String(plan.isSynth ? "true" : "false") +
            ";d.acceptsMidi=" + (plan.acceptsMidi ? "true" : "false") +
            ";d.producesMidi=" + (plan.producesMidi ? "true" : "false") + ";\n";
+    if (voiceAssets)
+        cpp += "d.voiceAssets=" + cppString(voiceAssetsName) + ";\n";
     cpp += "d.width=" + integer(presentation.getProperty("windowWidth", 720)) +
            ";d.height=" + integer(presentation.getProperty("windowHeight", 420)) + ";\n";
     const auto surface=prop(presentation,"windowDesign");
@@ -328,10 +387,22 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
     cpp += "p.wavetableDetuneCents=" + number(prop(poly, "wavetableDetune")) +
            "f;p.stringDecaySeconds=" + number(prop(poly, "stringDecay")) + "f;\n";
     cpp += "p.synthModel=static_cast<engine::synth::Model>(" + integer(prop(poly, "synthModel")) + ");\n";
-    for (const auto *key : {"prismValues", "kickValues", "synthValues"})
+    for (const auto *key : {"prismValues", "kickValues", "synthValues", "samplerValues", "soundModelValues"})
         if (const auto *a = prop(poly, key).getArray())
             for (int i = 0; i < a->size(); ++i)
                 cpp += "p." + juce::String(key) + "[" + juce::String(i) + "]=" + number((*a)[i]) + "f;\n";
+    // A sampler's card controllers (those it sets), a Batterie's mix.
+    if (const auto *controllers = prop(poly, "samplerControllers").getDynamicObject())
+        for (const auto &controller : controllers->getProperties())
+            if (const auto number_ = controller.name.toString().getIntValue(); number_ >= 0 && number_ < 128)
+                cpp += "p.samplerControllers[" + juce::String(number_) + "]=" + number(controller.value) + "f;\n";
+    if (static_cast<bool>(prop(poly, "drumKit")))
+    {
+        cpp += "p.drumKit=true;\n";
+        if (const auto *a = prop(poly, "drumValues").getArray())
+            for (int i = 0; i < a->size(); ++i)
+                cpp += "p.drumValues[" + juce::String(i) + "]=" + number((*a)[i]) + "f;\n";
+    }
     if (const auto *effects = prop(poly, "midiEffects").getArray())
     {
         cpp += "{auto effects=std::make_shared<engine::MidiEffectsPlan>();effects->count=" +
@@ -364,8 +435,11 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
     cmake += "set(CYDAW_PRODUCT_NAME " + cmakeString(plan.identity.productName) + ")\nset(CYDAW_COMPANY_NAME " +
              cmakeString(plan.identity.companyName) + ")\nset(CYDAW_CATEGORY " + cmakeString(plan.vst3Category) +
              ")\nset(CYDAW_VENDOR_ID " + code(plan.identity.manufacturerCode) + ")\nset(CYDAW_PRODUCT_ID " +
-             code(plan.identity.pluginCode) + ")\nset(CYDAW_CUSTOM_SOURCES\n" + customSources +
-             ")\ninclude(\"${CYDAW_SOURCE_ROOT}/src/native_plugin/NativeFormats.cmake\")\n";
+             code(plan.identity.pluginCode) + ")\nset(CYDAW_CUSTOM_SOURCES\n" + customSources + ")\n" +
+             (voiceAssets ? "set(CYDAW_VOICE_ASSETS \"${CMAKE_CURRENT_SOURCE_DIR}/generated/" + juce::String(voiceAssetsName) +
+                                "\")\n"
+                          : juce::String()) +
+             "include(\"${CYDAW_SOURCE_ROOT}/src/native_plugin/NativeFormats.cmake\")\n";
     cmake = cmake.replace("include(\"${CYDAW_SOURCE_ROOT}/src/native_plugin/NativeFormats.cmake\")", "set(CYDAW_EXPORT_FORMAT " + format + " CACHE STRING \"VST3, CLAP or LV2\")\ninclude(\"${CYDAW_SOURCE_ROOT}/src/native_plugin/NativeFormats.cmake\")");
     const auto sdkLicense = format == "VST3" ? juce::String("VST3 SDK (MIT)") : format == "CLAP" ? juce::String("CLAP SDK (MIT)") : juce::String("LV2 headers (ISC)");
     const auto readme = "# " + juce::String(plan.identity.productName) +

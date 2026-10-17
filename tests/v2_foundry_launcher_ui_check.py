@@ -31,7 +31,7 @@ before_curve=curve
 events(dict(type="move",x=700,y=700),dict(type="down"),dict(type="move",x=850,y=685),dict(type="up"))
 assert tab()["masterAutomation"]!=before_curve,"dragging master automation"
 undo();assert tab()["masterAutomation"]==before_curve,"one undo step per curve drag"
-click(151,308);click(800,390,True)
+click(151,331);click(800,390,True)
 assert len(tab()["tracks"][1]["automation"][0]["points"])==1,"A shows an editable track curve"
 snapshot("foundry-gestures")
 # Same real desktop-drop entry point as the browser payload's handler.

@@ -1592,9 +1592,10 @@ juce::var Commands::run()
         return onVoiceLive();
     if (command == "slot_stop")
         return onSlotStop();
-    if (command == "jsfx" || command == "dj" || command == "foundry" || command == "cinema" || command == "transport_sync") {
+    if (command == "jsfx" || command == "dj" || command == "foundry" || command == "cinema" || command == "transport_sync"
+        || command == "controllers") {
         // Their own actions ({"action": ...}); app_mode shows them.
-        const auto answer = command == "jsfx" ? ui_.jsfx(request_) : command == "cinema" ? ui_.cinema(request_) : command == "transport_sync" ? ui_.transportSync(request_) : command == "dj" ? ui_.dj(request_) : ui_.foundry(request_);
+        const auto answer = command == "jsfx" ? ui_.jsfx(request_) : command == "cinema" ? ui_.cinema(request_) : command == "transport_sync" ? ui_.transportSync(request_) : command == "controllers" ? ui_.controllers(request_) : command == "dj" ? ui_.dj(request_) : ui_.foundry(request_);
         if (!answer.isObject())
             return fail(answer.isString() ? answer.toString() : juce::String("no interface"));
         return ok(answer);

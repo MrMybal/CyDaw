@@ -5587,12 +5587,18 @@ int main(const int argc, char* argv[])
             "Generated Graph VST3 Project");
         const auto projectResult = restored.generateVst3Project(
             generatedProject);
-        const auto generatedHeader = generatedProject.getChildFile(
-            "generated/CyDawGeneratedGraphConfig.h");
+        // The native project: the fixed plan as sources, its metadata, the
+        // build that picks a format, the editable graph in the manifest.
+        const auto generatedDefinition = generatedProject.getChildFile(
+            "generated/Definition.cpp");
+        const auto generatedMetadata = generatedProject.getChildFile(
+            "generated/Metadata.json");
         const auto generatedCmake = generatedProject.getChildFile(
             "CMakeLists.txt");
         const auto generatedManifest = generatedProject.getChildFile(
             "GraphManifest.cydawvst3.json");
+        const auto definitionText = generatedDefinition.loadFileAsString();
+        const auto metadata = juce::JSON::parse(generatedMetadata.loadFileAsString());
         passed = expect(
                      runtimeRoot != nullptr
                          && static_cast<int>(runtimeRoot->getProperty("schema"))
@@ -5602,21 +5608,20 @@ int main(const int argc, char* argv[])
                          && runtimeRoot->getProperty("editor")
                                 .getDynamicObject() != nullptr
                          && projectResult.wasOk()
-                         && generatedHeader.existsAsFile()
+                         && generatedDefinition.existsAsFile()
                          && generatedCmake.existsAsFile()
                          && generatedManifest.existsAsFile()
-                           && generatedHeader.loadFileAsString().contains(
-                              "embeddedStateJsonChunks")
-                         && generatedHeader.loadFileAsString().contains(
-                              "mainInputName")
-                         && generatedHeader.loadFileAsString().contains(
-                              "mainOutputName")
+                         && definitionText.contains("Definition makeDefinition()")
+                         && definitionText.contains("engine::NativeDspGraph makeAudioGraph()")
+                         && definitionText.contains("engine::PolySynthGraphPlan makeInstrumentPlan()")
+                         && metadata.getProperty("parameters", {}).isArray()
+                         && metadata.getProperty("buses", {}).isArray()
                          && generatedCmake.loadFileAsString().contains(
-                             "cydaw_add_graph_runtime_plugin")
+                             "src/native_plugin/NativeFormats.cmake")
                          && juce::JSON::parse(
                                 generatedManifest.loadFileAsString())
                                 .getDynamicObject() != nullptr,
-                     "Graph export generates a reproducible VST3 project with embedded editable runtime state")
+                     "Graph export generates a reproducible native project: its plan as sources, the editable graph in its manifest")
                  && passed;
 
         cydaw::app::NodeGraphComponent browserInsertGraph;

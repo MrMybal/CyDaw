@@ -1,4 +1,5 @@
 #include "ArrangementView.h"
+#include "ControlTargets.h"
 #include "AddTrackMenu.h"
 
 #include "Icons.h"
@@ -952,13 +953,25 @@ void ArrangementView::drawHeader(const TrackRef& track, const ImVec2 min, const 
         ImGui::SetCursorScreenPos(ImVec2(min.x + padding, max.y - size.y - dp(6.0f)));
         ImGui::PushFont(theme::boldFont(), ImGui::GetStyle().FontSizeBase * 0.78f);
         auto changed = false;
-        changed |= ui::toggle("M", &mix.muted, p.mute, size, L("Muet", "Mute"));
+        {
+            const auto [key, name] = control_targets::forTrackLearn(studio_, track, "mute", ui::Ls("Muet", "Mute"));
+            const ui::LearnScope learn(key, name);
+            changed |= ui::toggle("M", &mix.muted, p.mute, size, L("Muet", "Mute"));
+        }
         ImGui::SameLine(0.0f, dp(3.0f));
-        changed |= ui::toggle("S", &mix.solo, p.solo, size, L("Solo", "Solo"));
+        {
+            const auto [key, name] = control_targets::forTrackLearn(studio_, track, "solo", "Solo");
+            const ui::LearnScope learn(key, name);
+            changed |= ui::toggle("S", &mix.solo, p.solo, size, L("Solo", "Solo"));
+        }
         ImGui::SameLine(0.0f, dp(3.0f));
-        changed |= ui::toggle("R", &mix.armed, p.record, size,
-                              track.midi ? L("Armer : le clavier joue cette piste", "Arm: the keyboard plays this track")
-                                         : L("Armer pour l'enregistrement", "Arm for recording"));
+        {
+            const auto [key, name] = control_targets::forTrackLearn(studio_, track, "arm", ui::Ls("Armer", "Arm"));
+            const ui::LearnScope learn(key, name);
+            changed |= ui::toggle("R", &mix.armed, p.record, size,
+                                  track.midi ? L("Armer : le clavier joue cette piste", "Arm: the keyboard plays this track")
+                                             : L("Armer pour l'enregistrement", "Arm for recording"));
+        }
         ImGui::SameLine(0.0f, dp(3.0f));
         auto automation = studio_.automationVisible(track);
         if (ui::toggle("A", &automation, p.control, size,

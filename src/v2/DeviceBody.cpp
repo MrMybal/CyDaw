@@ -35,6 +35,7 @@ void drawDeviceBody(DeviceBody& body, int& pane, DeviceHost& host, UiState& stat
                     const visual::Live& live, const char* detachId)
 {
     auto& surface = body.surface;
+    const ui::LearnTrackScope learnTrack(host.learnPrefix(track), host.trackName(track).toStdString());
     // What its card shows, all at once (-1, every setting under them), or one
     // display large (0…); its drawn interface (-2). A device of one display
     // shows it large with all its controls.

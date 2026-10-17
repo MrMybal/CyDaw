@@ -67,7 +67,7 @@ set(imgui "${CYDAW_SOURCE_ROOT}/third_party/imgui")
 set(native "${CYDAW_SOURCE_ROOT}/src/native_plugin")
 smtg_add_vst3plugin(CyDAWGeneratedGraphPlugin_VST3 PACKAGE_NAME "${CYDAW_PRODUCT_NAME}" SOURCES_LIST
     "${CMAKE_CURRENT_SOURCE_DIR}/generated/Definition.cpp" ${CYDAW_CUSTOM_SOURCES}
-    "${native}/NativePlugin.cpp" "${native}/NativeEditor.cpp" "${native}/NativeProcessor.cpp" "${native}/NativeFonts.cpp" ${native_visual_sources}
+    "${native}/NativePlugin.cpp" "${native}/NativeEditor.cpp" "${native}/NativeProcessor.cpp" "${native}/NativeResources.cpp" "${native}/NativeFonts.cpp" ${native_visual_sources}
     "${CYDAW_VST3_SDK_DIR}/public.sdk/source/vst/vstsinglecomponenteffect.cpp"
     "${imgui}/imgui.cpp" "${imgui}/imgui_draw.cpp" "${imgui}/imgui_tables.cpp" "${imgui}/imgui_widgets.cpp"
    )
@@ -91,3 +91,12 @@ add_custom_command(TARGET CyDAWGeneratedGraphPlugin_VST3 POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CYDAW_VST3_SDK_DIR}/LICENSE.txt" "$<TARGET_FILE_DIR:CyDAWGeneratedGraphPlugin_VST3>/../Resources/Licenses/VST3-SDK.txt"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${imgui}/LICENSE.txt" "$<TARGET_FILE_DIR:CyDAWGeneratedGraphPlugin_VST3>/../Resources/Licenses/Dear-ImGui.txt"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CYDAW_SOURCE_ROOT}/LICENSE" "$<TARGET_FILE_DIR:CyDAWGeneratedGraphPlugin_VST3>/../Resources/Licenses/CyDAW-Engine.txt")
+# The instrument's voice data (a sampler's samples, a sound model), in the
+# bundle's Resources where the plug-in looks for it.
+if(CYDAW_VOICE_ASSETS)
+    add_custom_command(TARGET CyDAWGeneratedGraphPlugin_VST3 POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CYDAW_VOICE_ASSETS}" "$<TARGET_FILE_DIR:CyDAWGeneratedGraphPlugin_VST3>/../Resources/Voice.cyvoice")
+else()
+    add_custom_command(TARGET CyDAWGeneratedGraphPlugin_VST3 POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E rm -f "$<TARGET_FILE_DIR:CyDAWGeneratedGraphPlugin_VST3>/../Resources/Voice.cyvoice")
+endif()

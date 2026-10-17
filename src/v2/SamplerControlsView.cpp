@@ -242,9 +242,15 @@ void draw(Studio& studio, UiState& state, const TrackRef& track, app::NodeGraphC
                 style.flags = ui::knobNoLabel;
                 style.colour = colour;
                 auto normalised = value / 127.0f;
-                const auto changed = ui::knob("##knob", &normalised, 0.0f, 1.0f, start / 127.0f, style);
-                const auto hovered = ImGui::IsItemHovered();
-                const auto active = ImGui::IsItemActive();
+                bool changed {};
+                bool hovered {};
+                bool active {};
+                {
+                    const ui::LearnParameterScope learn(prefix + suffix, name);
+                    changed = ui::knob("##knob", &normalised, 0.0f, 1.0f, start / 127.0f, style);
+                    hovered = ImGui::IsItemHovered();
+                    active = ImGui::IsItemActive();
+                }
                 if (changed)
                     set(suffix, std::clamp(normalised, 0.0f, 1.0f) * 127.0);
                 const auto binding = prefix + suffix;

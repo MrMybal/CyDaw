@@ -340,6 +340,98 @@ bool valueEntryButton(const char* id, const ImVec2 size, double& value, const do
     return valueEntry(key, min, ImVec2(min.x + size.x, min.y + size.y), value, minimum, maximum, open, scale, unit);
 }
 
+// ---- Controllers: learning ------------------------------------------------------------------
+
+namespace {
+struct LearnState {
+    bool mode {};
+    std::vector<std::pair<std::string, std::string>> scopes;
+    std::vector<std::pair<std::string, std::string>> tracks;
+    std::vector<LearnSpot> spots;
+};
+LearnState& learnState()
+{
+    static LearnState state;
+    return state;
+}
+} // namespace
+
+LearnScope::LearnScope(std::string key, std::string label)
+{
+    learnState().scopes.emplace_back(std::move(key), std::move(label));
+}
+
+LearnScope::~LearnScope()
+{
+    learnState().scopes.pop_back();
+}
+
+LearnTrackScope::LearnTrackScope(std::string prefix, std::string trackName)
+{
+    learnState().tracks.emplace_back(std::move(prefix), std::move(trackName));
+}
+
+LearnTrackScope::~LearnTrackScope()
+{
+    learnState().tracks.pop_back();
+}
+
+LearnParameterScope::LearnParameterScope(const juce::String& binding, const juce::String& label, const std::string& prefix,
+                                         const juce::String& trackName)
+{
+    auto& state = learnState();
+    std::string key;
+    std::string name;
+    if (state.mode) {
+        const auto* track = state.tracks.empty() ? nullptr : &state.tracks.back();
+        const auto& base = prefix.empty() && track != nullptr ? track->first : prefix;
+        if (!base.empty() && binding.isNotEmpty()) {
+            key = base + binding.toStdString();
+            const auto owner = trackName.isNotEmpty() ? trackName.toStdString() : track != nullptr ? track->second : std::string();
+            name = (owner.empty() ? std::string() : owner + " \xc2\xb7 ") + label.toStdString();
+        }
+    }
+    state.scopes.emplace_back(std::move(key), std::move(name));
+}
+
+LearnParameterScope::~LearnParameterScope()
+{
+    learnState().scopes.pop_back();
+}
+
+void learnItem()
+{
+    auto& state = learnState();
+    if (state.mode && !state.scopes.empty())
+        learnItem(state.scopes.back().first, state.scopes.back().second);
+}
+
+void learnItem(const std::string& key, const std::string& label)
+{
+    auto& state = learnState();
+    if (!state.mode || key.empty())
+        return;
+    const auto* viewport = ImGui::GetWindowViewport();
+    state.spots.push_back({ key, label, ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), viewport != nullptr ? viewport->ID : 0 });
+}
+
+void setLearnMode(const bool on)
+{
+    learnState().mode = on;
+}
+
+bool learnMode()
+{
+    return learnState().mode;
+}
+
+std::vector<LearnSpot> takeLearnSpots()
+{
+    auto spots = std::move(learnState().spots);
+    learnState().spots.clear();
+    return spots;
+}
+
 bool knob(const char* id, float* value, const float minimum, const float maximum, const float defaultValue,
           const KnobStyle& style)
 {
@@ -351,6 +443,7 @@ bool knob(const char* id, float* value, const float minimum, const float maximum
     const auto origin = ImGui::GetCursorScreenPos();
     ImGui::PushID(id);
     ImGui::InvisibleButton("##knob", ImVec2(width, diameter + labelHeight));
+    learnItem();
     const auto hovered = ImGui::IsItemHovered();
     const auto active = ImGui::IsItemActive();
     const auto logarithmic = (style.flags & knobLogarithmic) != 0;
@@ -491,6 +584,7 @@ bool fader(const char* id, float* gainDb, const float minimumDb, const float max
     const auto origin = ImGui::GetCursorScreenPos();
     ImGui::PushID(id);
     ImGui::InvisibleButton("##fader", size);
+    learnItem();
     const auto hovered = ImGui::IsItemHovered();
     const auto active = ImGui::IsItemActive();
     auto changed = false;
@@ -618,6 +712,7 @@ bool toggle(const char* label, bool* value, const ImU32 onColour, ImVec2 size, c
         size.y = ImGui::GetFrameHeight();
     const auto origin = ImGui::GetCursorScreenPos();
     const auto clicked = ImGui::InvisibleButton(label, size);
+    learnItem();
     if (clicked)
         *value = !*value;
     const auto hovered = ImGui::IsItemHovered();
@@ -645,6 +740,7 @@ bool iconButton(const char* icon, const char* tip, const bool active, const ImU3
     ImGui::PushID(icon);
     ImGui::PushID(tip != nullptr ? tip : "");
     const auto clicked = ImGui::InvisibleButton("##icon", size);
+    learnItem();
     const auto hovered = ImGui::IsItemHovered();
     const auto held = ImGui::IsItemActive();
     ImGui::PopID();

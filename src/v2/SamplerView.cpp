@@ -489,6 +489,7 @@ void SamplerView::drawSimplePane(const TrackRef& track, app::NodeGraphComponent&
                 style.flags |= ui::knobBipolar;
             ImGui::SetCursorScreenPos(ImVec2(at.x + dp(4.0f) + cell * static_cast<float>(index) + (cell - dp(34.0f)) * 0.5f, top));
             ImGui::PushID(static_cast<int>(index));
+            const ui::LearnParameterScope learn(parameter.binding, parameter.label);
             if (ui::knob("##grain", &value, static_cast<float>(parameter.minimum), static_cast<float>(parameter.maximum),
                          static_cast<float>(parameter.defaultValue), style))
                 (void) graph.editorSetParameter(parameter.binding, value);

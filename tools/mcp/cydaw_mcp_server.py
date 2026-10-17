@@ -307,6 +307,41 @@ TOOLS = [
                                        "show": {"type": "boolean"}}},
     },
     {
+        "name": "controllers",
+        "description": ("Les controleurs MIDI / OSC : appareils RAW (ports MIDI, points OSC "
+                        "local/reseau, appareils des plug-ins d'application .cyctl), appareils "
+                        "virtuels faits depuis eux (chaque controle : une source RAW, une chaine de "
+                        "modifications range|invert|curve|relative|toggle|threshold|deadzone|steps|"
+                        "scale {kind, a, b}, un retour), et leurs assignations aux cibles de CyDAW "
+                        "(transport/play|stop|record|loop|tempo, track/<cle>/volume|pan|mute|solo|arm, "
+                        "track/selected/..., master/volume, param/<cle>/<binding>, dj/A..D/play|cue|"
+                        "sync|gain|high|mid|low|filter|fader|killHigh|killMid|killLow|pfl, "
+                        "dj/crossfader, dj/master). action : status (defaut), scan, add_osc {name, "
+                        "port, host, sendPort}, set_raw {device, enabled, notes, port, host, sendPort, "
+                        "cydawAddresses}, remove_raw, inject {device, address, value} (comme recu), "
+                        "add_virtual {name}, add_control {device, name, kind knob|fader|encoder|button|"
+                        "toggle|pad|axis, sourceDevice, sourceAddress, feedbackDevice, "
+                        "feedbackAddress, chain}, set_control, remove_control, remove_virtual, assign "
+                        "{device, control, target, minimum, maximum, takeover, replace}, unassign "
+                        "{target}, learn {on, target}, targets {filter}, value {target}, apply "
+                        "{target, value 0..1}, feedback, monitor {count}, show. OSC : "
+                        "/cydaw/<cible> valeur bouge la cible directement."),
+        "inputSchema": {"type": "object",
+                        "properties": {"action": {"type": "string"}, "device": {"type": "string"},
+                                       "control": {"type": "string"}, "target": {"type": "string"},
+                                       "name": {"type": "string"}, "kind": {"type": "string"},
+                                       "address": {"type": "string"}, "value": {"type": "number"},
+                                       "port": {"type": "integer"}, "host": {"type": "string"},
+                                       "sendPort": {"type": "integer"}, "enabled": {"type": "boolean"},
+                                       "notes": {"type": "boolean"}, "on": {"type": "boolean"},
+                                       "sourceDevice": {"type": "string"}, "sourceAddress": {"type": "string"},
+                                       "feedbackDevice": {"type": "string"}, "feedbackAddress": {"type": "string"},
+                                       "chain": {"type": "array"}, "minimum": {"type": "number"},
+                                       "maximum": {"type": "number"}, "takeover": {"type": "boolean"},
+                                       "replace": {"type": "boolean"}, "filter": {"type": "string"},
+                                       "count": {"type": "integer"}, "cydawAddresses": {"type": "boolean"}}},
+    },
+    {
         "name": "foundry",
         "description": ("La Fonderie, editeur de sons multipiste (comme un Sound Forge) : des "
                         "sessions en onglets (tab : l'index), des pistes (track : l'index) avec des "

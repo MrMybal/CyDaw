@@ -1,4 +1,5 @@
 #include "InspectorView.h"
+#include "ControlTargets.h"
 
 #include "RoutingUi.h"
 
@@ -120,25 +121,45 @@ void InspectorView::draw()
         auto mix = studio_.trackMix(track);
         auto changed = false;
         row(L("Volume", "Volume"));
+        // A controller can move each of them (learn mode).
+        const auto learn = [&](const char* what, const juce::String& label) {
+            return control_targets::forTrackLearn(studio_, track, what, label);
+        };
         changed |= ImGui::SliderFloat("##gain", &mix.gainDb, -60.0f, 12.0f, "%.1f dB");
         if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
             mix.gainDb = 0.0f;
             changed = true;
         }
+        if (const auto [key, name] = learn("volume", ui::Ls("Volume", "Volume")); !key.empty())
+            ui::learnItem(key, name);
         row(L("Panoramique", "Pan"));
         changed |= ImGui::SliderFloat("##pan", &mix.pan, -1.0f, 1.0f, "%+.2f");
         if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
             mix.pan = 0.0f;
             changed = true;
         }
+        if (const auto [key, name] = learn("pan", ui::Ls("Panoramique", "Pan")); !key.empty())
+            ui::learnItem(key, name);
         ImGui::Dummy(ImVec2(dp(74.0f), 0.0f));
         ImGui::SameLine();
         ImGui::PushFont(theme::boldFont(), ui::currentFontBase() * 0.85f);
-        changed |= ui::toggle(L("MUET", "MUTE"), &mix.muted, p.mute);
+        {
+            const auto [key, name] = learn("mute", ui::Ls("Muet", "Mute"));
+            const ui::LearnScope scope(key, name);
+            changed |= ui::toggle(L("MUET", "MUTE"), &mix.muted, p.mute);
+        }
         ImGui::SameLine(0.0f, dp(3.0f));
-        changed |= ui::toggle("SOLO", &mix.solo, p.solo);
+        {
+            const auto [key, name] = learn("solo", "Solo");
+            const ui::LearnScope scope(key, name);
+            changed |= ui::toggle("SOLO", &mix.solo, p.solo);
+        }
         ImGui::SameLine(0.0f, dp(3.0f));
-        changed |= ui::toggle(L("ARMER", "ARM"), &mix.armed, p.record);
+        {
+            const auto [key, name] = learn("arm", ui::Ls("Armer", "Arm"));
+            const ui::LearnScope scope(key, name);
+            changed |= ui::toggle(L("ARMER", "ARM"), &mix.armed, p.record);
+        }
         ImGui::PopFont();
         if (changed)
             studio_.setTrackMix(track, mix);

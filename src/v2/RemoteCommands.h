@@ -81,6 +81,7 @@ public:
     virtual juce::var jsfx(const juce::var&) { return {}; }
     virtual juce::var cinema(const juce::var&) { return {}; }
     virtual juce::var transportSync(const juce::var&) { return {}; }
+    virtual juce::var controllers(const juce::var&) { return {}; }
     virtual juce::var dj(const juce::var& request)
     {
         juce::ignoreUnused(request);

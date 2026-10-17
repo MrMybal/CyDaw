@@ -820,6 +820,26 @@ public:
     // its chain, a knob inside a module there, or a setting of its
     // instrument's voice (Prisme's, Kick's, a sampler's...).
     [[nodiscard]] bool canAutomate(const TrackRef& track, const juce::String& binding) const override;
+    [[nodiscard]] std::string learnPrefix(const TrackRef& track) const override;
+    // Whether its knob turns on a logarithmic scale (a frequency, a time):
+    // a controller turns it the same way.
+    [[nodiscard]] bool parameterIsLogarithmic(const TrackRef& track, const juce::String& binding) const
+    {
+        return logarithmicParameter(track, binding);
+    }
+    // The controllers' assignments kept with the project (Controllers.cpp
+    // reads and writes them, ProjectIo saves them); the revision moves when
+    // a project is opened or made.
+    [[nodiscard]] const juce::var& controllerAssignments() const noexcept { return controllerAssignments_; }
+    void setControllerAssignments(const juce::var& assignments, bool fromProject)
+    {
+        controllerAssignments_ = assignments;
+        if (fromProject)
+            ++controllerAssignmentsRevision_;
+        else
+            markDirty();
+    }
+    [[nodiscard]] std::uint64_t controllerAssignmentsRevision() const noexcept { return controllerAssignmentsRevision_; }
     // The binding as the native graph names it: a module's inner knob
     // ("node.12.node.4.lowpass.cutoff") on the node the compiler made for it
     // ("node.31.lowpass.cutoff"); any other binding as it is.
@@ -1017,6 +1037,8 @@ private:
     // Whether a parameter of a track's graph glides on a logarithmic scale
     // (a frequency, a time), as its knob does.
     [[nodiscard]] bool logarithmicParameter(const TrackRef& track, const juce::String& binding) const;
+    juce::var controllerAssignments_;
+    std::uint64_t controllerAssignmentsRevision_ { 1 };
     std::map<juce::String, juce::String> pluginParameterNames_;
     struct ModuleEdit {
         juce::String key;

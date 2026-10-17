@@ -162,6 +162,8 @@ add_library(cydaw_core STATIC
     src/engine/SynthTables.cpp
     src/engine/DrumKit.cpp
     src/engine/Sampler.cpp
+    src/engine/VoiceAssetsFile.cpp
+    src/control/Control.cpp
     src/engine/AudioAnalysis.cpp
     src/engine/GraphDefinitionCompiler.cpp
     src/engine/GraphInstrumentCompiler.cpp
@@ -1044,6 +1046,12 @@ if(CYDAW_BUILD_DESKTOP)
                 src/v2/CinemaTimeline.inc
                 src/v2/TransportSync.cpp
                 src/v2/TransportSync.h
+                src/v2/ControlTargets.cpp
+                src/v2/ControlTargets.h
+                src/v2/Controllers.cpp
+                src/v2/Controllers.h
+                src/v2/ControllersImpl.h
+                src/v2/ControllersView.cpp
                 src/v2/AppUi.cpp
                 src/v2/AppUi.h
                 src/v2/ImGuiHost.cpp
@@ -1231,6 +1239,7 @@ if(CYDAW_BUILD_DESKTOP)
                 juce::juce_audio_utils
                 juce::juce_dsp
                 juce::juce_gui_extra
+                juce::juce_osc
                 juce::juce_recommended_config_flags
                 ${CYDAW_LTO_FLAGS}
                 juce::juce_recommended_warning_flags
@@ -1241,6 +1250,22 @@ if(CYDAW_BUILD_DESKTOP)
                     COMMAND ${CMAKE_COMMAND} -E copy_if_different
                         "$<TARGET_FILE:CyDAWPluginWorker>"
                         "$<TARGET_FILE_DIR:CyDAW2>"
+                    VERBATIM
+                )
+            endif()
+            # An application plug-in for the controllers tool (gamepads read
+            # through XInput), beside CyDAW 2 in ControlPlugins: the
+            # interface's example as much as a device.
+            if(WIN32)
+                add_library(CyDAWControlGamepad SHARED tools/control_plugins/gamepad/Gamepad.cpp)
+                target_include_directories(CyDAWControlGamepad PRIVATE include)
+                target_compile_features(CyDAWControlGamepad PRIVATE cxx_std_20)
+                target_link_libraries(CyDAWControlGamepad PRIVATE xinput)
+                add_dependencies(CyDAW2 CyDAWControlGamepad)
+                add_custom_command(TARGET CyDAW2 POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:CyDAW2>/ControlPlugins"
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:CyDAWControlGamepad>"
+                        "$<TARGET_FILE_DIR:CyDAW2>/ControlPlugins/Gamepads.cyctl"
                     VERBATIM
                 )
             endif()
@@ -1440,6 +1465,13 @@ if(CYDAW_BUILD_DESKTOP)
                              COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/v2_foundry_check.py"
                                      --port 47855 --exe "$<TARGET_FILE:CyDAW2>")
                     set_tests_properties(cydaw2_foundry_check PROPERTIES TIMEOUT 300)
+                    # The controllers: an OSC endpoint in and back on this
+                    # machine's sockets, virtual controls through modifiers,
+                    # learning, a project's assignments. Silent.
+                    add_test(NAME cydaw2_controllers_check
+                             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/v2_controllers_check.py"
+                                     --port 47856 --exe "$<TARGET_FILE:CyDAW2>")
+                    set_tests_properties(cydaw2_controllers_check PROPERTIES TIMEOUT 300)
                     # Batterie: its kits (the banks downloaded on this computer;
                     # skipped without them), its pieces' mix, grooves, presets.
                     add_test(NAME cydaw2_batterie_check

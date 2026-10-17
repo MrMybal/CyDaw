@@ -5305,6 +5305,25 @@ void AudioTrackController::refreshMidiInputs() noexcept
         track->synth.setLiveInput(!takes && track->id == target);
 }
 
+void AudioTrackController::setMidiInputGate(MidiInputGate gate)
+{
+    auto shared = gate ? std::make_shared<const MidiInputGate>(std::move(gate)) : nullptr;
+    const juce::SpinLock::ScopedLockType hold(midiGateLock_);
+    midiGate_.swap(shared);
+}
+
+void AudioTrackController::GatedMidiInput::handleIncomingMidiMessage(juce::MidiInput* source, const juce::MidiMessage& message)
+{
+    std::shared_ptr<const MidiInputGate> gate;
+    {
+        const juce::SpinLock::ScopedLockType hold(owner_.midiGateLock_);
+        gate = owner_.midiGate_;
+    }
+    if (gate != nullptr && *gate && !(*gate)(source != nullptr ? source->getIdentifier() : juce::String(), message))
+        return;
+    owner_.midiCollector_.handleIncomingMidiMessage(source, message);
+}
+
 void AudioTrackController::setArmFollowsMidiInput(const bool follows) noexcept
 {
     armFollowsMidiInput_ = follows;
@@ -5851,7 +5870,7 @@ AudioTrackController::~AudioTrackController()
     stopMidiRecording(false);
     recorder_.stop();
     masterOutput_.stopCapture();
-    deviceManager_.removeMidiInputDeviceCallback({}, &midiCollector_);
+    deviceManager_.removeMidiInputDeviceCallback({}, &gatedMidiInput_);
     deviceManager_.removeAudioCallback(&recorder_);
     deviceManager_.removeAudioCallback(&virtualBusRouter_);
     deviceManager_.removeAudioCallback(&sourcePlayer_);
@@ -5884,7 +5903,7 @@ juce::String AudioTrackController::initialiseAudio(
     deviceManager_.addAudioCallback(&sourcePlayer_);
     deviceManager_.addAudioCallback(&virtualBusRouter_);
     deviceManager_.addAudioCallback(&recorder_);
-    deviceManager_.addMidiInputDeviceCallback({}, &midiCollector_);
+    deviceManager_.addMidiInputDeviceCallback({}, &gatedMidiInput_);
     return error;
 }
 

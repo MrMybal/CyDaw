@@ -15,6 +15,8 @@
 #include "DjView.h"
 #include "FoundryView.h"
 #include "TransportSync.h"
+#include "Controllers.h"
+#include "ControlTargets.h"
 #include "../app/DjEngine.h"
 #include "../app/FoundryPlayer.h"
 #include "PluginWindows.h"
@@ -230,6 +232,7 @@ AppUi::AppUi(Studio& studio, ImGuiHost& host)
             }
             host_.wake();
         });
+    controllers_ = std::make_unique<Controllers>(studio_, state_, host_, studio_.keepsSettings());
     pluginWindows_ = std::make_unique<PluginWindows>(studio_, state_);
     jsfx_ = std::make_unique<JsfxView>(studio_, state_);
     clipEditor_ = std::make_unique<ClipEditorView>(studio_, state_, waveforms_, host_);
@@ -242,6 +245,7 @@ AppUi::AppUi(Studio& studio, ImGuiHost& host)
 
 AppUi::~AppUi()
 {
+    controllers_.reset();
     transportSync_.reset();
     if (studio_.keepsSettings()) {
         for (int i = 0; i < 5; ++i)
@@ -1170,6 +1174,8 @@ void AppUi::frame()
 
     if (showDemo_)
         ImGui::ShowDemoWindow(&showDemo_);
+    // Learn mode: over every window, last.
+    controllers_->drawLearnOverlay();
     // The workshop's device plays in the simulator while the workshop shows it.
     studio_.setSimulatorActive(state_.inWorkshop() && studio_.workshopRoot() != nullptr);
     host_.setAnimating(studio_.engine().isPlaying() || studio_.engine().isSamplePreviewing() || studio_.simulating()
@@ -1264,6 +1270,13 @@ void AppUi::resolveMode()
     } else if (state_.mode != AppMode::studio && state_.bringToFront != Panel::none) {
         state_.mode = AppMode::studio;
     }
+}
+
+juce::var AppUi::controllers(const juce::var& request)
+{
+    if (request.getProperty("action", "").toString() == "show" || static_cast<bool>(request.getProperty("show", false)))
+        showControllers_ = true;
+    return controllers_->command(request);
 }
 
 juce::var AppUi::transportSync(const juce::var& request)
@@ -2083,6 +2096,7 @@ void AppUi::drawDialogs()
 {
     drawAudioSettings();
     transportSync_->draw(showTransportSync_);
+    controllers_->draw(showControllers_);
     drawCompanionWindow();
     locations_->draw();
     banks_->draw();
@@ -2641,6 +2655,9 @@ void AppUi::handleShortcuts()
     // The DJ mix and the Foundry have their own keys (the Foundry's view
     // reads them); the studio's transport keys stay out of them.
     const auto ownKeys = state_.mode == AppMode::dj || foundry;
+    // Ctrl+M: learn a controller's assignment (click a control, move one).
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_M, false))
+        controllers_->setLearning(!controllers_->learning());
     // Ctrl+K: the computer's keys as a MIDI keyboard, or not.
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_K, false)) {
         computerKeyboard_->setEnabled(!computerKeyboard_->enabled());
@@ -2942,6 +2959,12 @@ void AppUi::drawMenuBar()
             showAudioSettings_ = showSoundCard_ = true;
         if (ImGui::MenuItem(L("Synchronisation du transport…", "Transport synchronization…")))
             showTransportSync_ = true;
+        if (ImGui::MenuItem(L("Contrôleurs MIDI / OSC…", "MIDI / OSC controllers…")))
+            showControllers_ = true;
+        ui::tooltip(L("Appareils MIDI, OSC et plug-ins d'application ; appareils virtuels ; assignations et apprentissage.",
+                      "MIDI, OSC and application plug-in devices; virtual devices; assignments and learning."));
+        if (ImGui::MenuItem(L("Apprendre une assignation", "Learn an assignment"), "Ctrl+M", controllers_->learning()))
+            controllers_->setLearning(!controllers_->learning());
         if (ImGui::MenuItem(L("Entrées MIDI…", "MIDI inputs…")))
             openMidiInputs();
         ui::tooltip(L("Les claviers et contrôleurs MIDI branchés, et le clavier de l'ordinateur comme clavier MIDI.",
@@ -3063,6 +3086,10 @@ void AppUi::drawTransportBar()
                     studio_.rewind();
             }
             ImGui::SameLine(0.0f, dp(2.0f));
+            // What a controller can move (learn mode), not in the workshop's simulation.
+            const auto learnKey = [simulation](const char* what) { return simulation ? std::string() : control_targets::forTransport(what); };
+            {
+            const ui::LearnScope learnPlay(learnKey("play"), ui::Ls("Transport · Lecture / pause", "Transport · Play / pause").toStdString());
             if (ui::iconButton(playing ? icon::pause : icon::play,
                                simulation ? L("Lancer la simulation : le périphérique seul, avec les sources de test (Espace)",
                                               "Run the simulation: the device on its own, with the test sources (Space)")
@@ -3073,22 +3100,28 @@ void AppUi::drawTransportBar()
                 else
                     studio_.togglePlay();
             }
+            }
             ImGui::SameLine(0.0f, dp(2.0f));
+            {
+            const ui::LearnScope learnStop(learnKey("stop"), "Transport · Stop");
             if (ui::iconButton(icon::stop, L("Stop (deux fois : retour au début)", "Stop (twice: back to the start)"))) {
                 if (simulation)
                     studio_.setSimulating(false);
                 else
                     studio_.stop();
             }
+            }
             const auto recording = studio_.isRecording();
             if (!state_.inWorkshop() || recording) {
                 ImGui::SameLine(0.0f, dp(2.0f));
+                const ui::LearnScope learnRecord(learnKey("record"), ui::Ls("Transport · Enregistrer", "Transport · Record").toStdString());
                 if (ui::iconButton(icon::record, L("Enregistrer la piste armée ou sélectionnée (R)", "Record the armed or selected track (R)"),
                                    recording, p.record))
                     toggleRecording();
             }
             if (!simulation) {
                 ImGui::SameLine(0.0f, dp(2.0f));
+                const ui::LearnScope learnLoop(learnKey("loop"), ui::Ls("Transport · Boucle", "Transport · Loop").toStdString());
                 if (ui::iconButton(icon::loop, L("Boucle (L)", "Loop (L)"), studio_.loopEnabled()))
                     studio_.setLoopEnabled(!studio_.loopEnabled());
             }
@@ -3126,6 +3159,7 @@ void AppUi::drawTransportBar()
                 engine.setTempo(bpm);
                 studio_.markDirty();
             }
+            ui::learnItem(learnKey("tempo"), "Transport · Tempo");
             ui::tooltip(L("Tempo : glisser, ou double-clic pour taper une valeur", "Tempo: drag, or double click to type"));
             ImGui::SameLine();
             {
@@ -3201,6 +3235,8 @@ void AppUi::drawTransportBar()
         }
         ui::toolbarSeparator();
         transportSync_->drawButton(showTransportSync_);
+        ImGui::SameLine();
+        controllers_->drawButton(showControllers_);
         const auto right = ImGui::GetWindowWidth() - ImGui::GetStyle().WindowPadding.x;
         ImGui::SameLine(right - dp(262.0f));
         const auto& meter = studio_.masterMeter();

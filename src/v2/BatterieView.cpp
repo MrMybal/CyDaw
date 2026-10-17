@@ -119,7 +119,13 @@ bool BatterieView::knob(const int index, const char* label, const float diameter
         style.flags |= ui::knobBipolar;
     style.colour = batterieGold;
     const auto origin = ImGui::GetCursorScreenPos();
-    const auto changed = ui::knob("##knob", &normalised, 0.0f, 1.0f, defaultNormalised, style);
+    bool changed {};
+    {
+        const ui::LearnParameterScope learn("node." + juce::String(static_cast<juce::int64>(card_.nodeId)) + ".batterie."
+                                                + juce::String(parameter.key),
+                                            juce::String::fromUTF8(label), studio_.learnPrefix(card_.track), studio_.trackName(card_.track));
+        changed = ui::knob("##knob", &normalised, 0.0f, 1.0f, defaultNormalised, style);
+    }
     const auto hovered = ImGui::IsItemHovered();
     const auto active = ImGui::IsItemActive();
     if (changed)

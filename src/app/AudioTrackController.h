@@ -1584,6 +1584,11 @@ public:
     // tracks are armed by hand, several at once; the keyboard plays the
     // selected track, or the armed ones' when some are armed).
     void setArmFollowsMidiInput(bool follows) noexcept;
+    // Which messages of the MIDI inputs reach the instruments: the
+    // controllers keep those they map, and a device set to control only.
+    // Called on the MIDI thread; null lets everything through.
+    using MidiInputGate = std::function<bool(const juce::String& identifier, const juce::MidiMessage& message)>;
+    void setMidiInputGate(MidiInputGate gate);
     // The track the keyboard and the MIDI input play now.
     [[nodiscard]] std::uint64_t midiInputTrackId() const noexcept;
     [[nodiscard]] bool startMidiClipPreview(std::uint64_t trackId,
@@ -2115,6 +2120,14 @@ private:
     juce::MixerAudioSource auditionMixer_;
     VirtualBusRouter virtualBusRouter_ { auditionMixer_ };
     juce::MidiMessageCollector midiCollector_;
+    // The inputs' messages through the gate, then into the collector.
+    struct GatedMidiInput final : juce::MidiInputCallback {
+        explicit GatedMidiInput(AudioTrackController& owner) : owner_(owner) {}
+        void handleIncomingMidiMessage(juce::MidiInput* source, const juce::MidiMessage& message) override;
+        AudioTrackController& owner_;
+    } gatedMidiInput_ { *this };
+    juce::SpinLock midiGateLock_;
+    std::shared_ptr<const MidiInputGate> midiGate_;
     juce::MidiKeyboardState midiKeyboardState_;
     juce::AudioSourcePlayer sourcePlayer_;
     InputRecorder recorder_;

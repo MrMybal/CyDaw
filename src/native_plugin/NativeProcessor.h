@@ -5,6 +5,7 @@
 #include <atomic>
 #include <cydaw/engine/MidiEffects.h>
 #include <cydaw/engine/PolyVoice.h>
+#include <cydaw/engine/VoiceAssetsFile.h>
 #include <functional>
 #include <span>
 namespace cydaw::native
@@ -64,6 +65,8 @@ class NativeProcessor final : public EditorModel
     void applyValues();
     void renderVoices(float *const *, int, int, int);
     void midi(const engine::MidiEffectEvent &);
+    void noteOn(int channel, int note, float velocity);
+    void loadVoice();
     std::atomic<int> program_{};
     struct Target;
     Definition definition_;
@@ -86,6 +89,13 @@ class NativeProcessor final : public EditorModel
     int preparedChannels_{2};
     std::array<float, 16> bends_{};
     bool sustain_[16]{}, deferred_[128][16]{};
+    // The bundle's voice data (a sampler's samples, a sound model), shared
+    // with the other instances that read the same file.
+    std::shared_ptr<const engine::VoiceAssets> voice_;
+    bool voiceTried_{};
+    // Every key down now (a sampler's first and legato zones).
+    std::array<bool, 128> down_{};
+    int downCount_{};
 };
 class EditorSurface
 {

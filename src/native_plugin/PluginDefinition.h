@@ -54,6 +54,9 @@ struct Definition
     int width{1000}, height{700};
     std::uint32_t background{0xff252525}, accent{0xfff28a2e}, text{0xffdadada};
     bool acceptsMidi{}, producesMidi{}, synth{};
+    // The voice data in the bundle (a sampler's samples, a sound model), by
+    // file name; empty: none.
+    std::string voiceAssets;
 };
 Definition makeDefinition();
 engine::NativeDspGraph makeAudioGraph();

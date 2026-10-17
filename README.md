@@ -67,9 +67,16 @@ sons intégrée.
   routage et automations. La bande son
   d’une vidéo devient automatiquement un clip audio éditable dans son propre bus.
 
+**Piloter avec du matériel**
+- Les **contrôleurs MIDI / OSC** : ports MIDI, points OSC (local ou réseau) et appareils apportés par
+  des plug-ins d'application (une manette). Des appareils virtuels faits à partir d'eux, avec une
+  chaîne de modifications dans les deux sens (plage, courbe, encodeur, bascule, zone morte), et le
+  mode **Apprendre** : cliquer une commande de CyDAW, bouger un contrôle.
+
 **Créer ses périphériques**
 - L'**Atelier Plugin** assemble des périphériques à partir de graphes de modules, leur dessine une
-  interface, et les exporte en plug-ins **VST3**.
+  interface, et les exporte en plug-ins **VST3, CLAP et LV2** (Windows et Linux), samplers compris :
+  leurs échantillons voyagent dans le plug-in.
 
 **Trouver ses sons**
 - Une bibliothèque qui réunit les banques et les dossiers de l'utilisateur : catégories, tonalité,
@@ -118,6 +125,7 @@ Les tests se lancent avec `ctest -C Release` dans le dossier de compilation.
 - [Édition audio](docs/EDITION_AUDIO.md) · [Architecture](docs/ARCHITECTURE.md)
 - [Cinéma : vidéo, montage audio et bus](docs/CINEMA.md)
 - [Synchronisation du transport : MIDI, JACK, Link](docs/TRANSPORT_SYNC.md)
+- [Contrôleurs MIDI / OSC : appareils RAW, virtuels, apprentissage](docs/CONTROLEURS.md)
 - [Serveur MCP](tools/mcp/README.md)
 
 ## Licence

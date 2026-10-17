@@ -42,7 +42,17 @@ La compilation locale depuis Windows cible **Windows x64** (Visual Studio 2022, 
 
 La première compilation Linux prépare automatiquement la chaîne dans le cache `plugin-toolchains/linux`, sans runner ni WSL. Il faut Python 3 et Ninja (fourni avec les outils CMake de Visual Studio). La préparation utilise `tools/setup_plugin_toolchains.py`, vérifie le SHA256 de Zig et les paquets du sysroot Debian. On peut aussi lancer ce script avec `--output <cache>/plugin-toolchains/linux`. `CYDAW_PLUGIN_TOOLCHAINS` permet de choisir une racine déjà préparée. Les métadonnées LV2 sont générées côté Windows à partir des valeurs exportées, sans exécuter le binaire Linux. Les binaires doivent ensuite être validés dans leurs hôtes cibles ; une compilation croisée réussie ne valide pas le fonctionnement audio ou graphique sous Linux.
 
-**macOS est reporté** ; aucun SDK Apple n'est installé ou téléchargé. Les limites DSP existantes restent communes : une sortie audio, au plus quatre entrées, jusqu'à huit canaux, mêmes restrictions sur les nœuds exportables et les racks de pads. Changer de SDK ne change pas la licence du moteur CyDAW embarqué.
+**macOS est reporté** ; aucun SDK Apple n'est installé ou téléchargé. Les limites DSP existantes restent communes : une sortie audio, au plus quatre entrées, jusqu'à huit canaux, mêmes restrictions sur les nœuds exportables. Les racks de pads restent exclus : leurs pads sont des instruments de la piste, pas du périphérique. Changer de SDK ne change pas la licence du moteur CyDAW embarqué.
+
+### Samplers et modèles de son
+
+Un instrument joué par un sampler (zones, SFZ, Batterie, instruments d'usine) ou par un modèle de son s'exporte avec ce qu'il joue. À la génération du projet, CyDAW décode chaque échantillon en entier et écrit `generated/Voice.cyvoice` : les zones, leurs règles de contrôleurs, courbes, keyswitches, zones de relâchement, et l'audio en 16 bits (le nom de chaque fichier, jamais son chemin) ; ou les tables du modèle de son. La compilation place ce fichier dans le plug-in :
+
+- VST3 : `Contents/Resources/Voice.cyvoice` dans le bundle ;
+- CLAP : `<nom>.clap.Resources/Voice.cyvoice` à côté du fichier `.clap` (à copier avec lui) ;
+- LV2 : `Resources/Voice.cyvoice` dans le dossier `.lv2`.
+
+Le plug-in lit ce fichier une fois à son activation (partagé entre ses instances) et garde tout en mémoire ; il ne dépend plus des banques ni des dossiers de la machine qui l'a exporté. Il joue les keyswitches, groupes d'exclusion (charley), contrôleurs MIDI des SFZ et zones de relâchement comme la piste. Un échantillon illisible arrête la génération en le nommant. Le fichier est aussi gros que l'audio non compressé : quelques Mo pour un instrument simple, plusieurs centaines pour un grand instrument d'usine.
 
 ## Vérification
 

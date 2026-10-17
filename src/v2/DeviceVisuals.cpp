@@ -2813,9 +2813,12 @@ bool eqDynamicsRow(const ImVec2 origin, const float width, Eq& eq, const int ind
         style.flags = flags;
         ImGui::PushID(label);
         ImGui::BeginDisabled(!dynamic);
-        if (ui::knob("##knob", &value, static_cast<float>(parameter.minimum), static_cast<float>(parameter.maximum),
-                     static_cast<float>(parameter.defaultValue), style))
-            changed |= apply(parameter, value, set);
+        {
+            const ui::LearnParameterScope learn(parameter.binding, parameter.label);
+            if (ui::knob("##knob", &value, static_cast<float>(parameter.minimum), static_cast<float>(parameter.maximum),
+                         static_cast<float>(parameter.defaultValue), style))
+                changed |= apply(parameter, value, set);
+        }
         ImGui::EndDisabled();
         ImGui::PopID();
         const auto text = dynamic ? formatValue(parameter, parameter.value) : juce::String::fromUTF8("\xe2\x80\x94");
@@ -3017,9 +3020,12 @@ bool eqBandPanel(const ImVec2 origin, const float width, Eq& eq, EqView& view, c
             style.flags = flags;
             ImGui::PushID(label);
             ImGui::BeginDisabled(!enabled);
-            if (ui::knob("##knob", &value, static_cast<float>(parameter.minimum), static_cast<float>(parameter.maximum),
-                         static_cast<float>(parameter.defaultValue), style))
-                changed |= apply(parameter, value, set);
+            {
+                const ui::LearnParameterScope learn(parameter.binding, parameter.label);
+                if (ui::knob("##knob", &value, static_cast<float>(parameter.minimum), static_cast<float>(parameter.maximum),
+                             static_cast<float>(parameter.defaultValue), style))
+                    changed |= apply(parameter, value, set);
+            }
             ImGui::EndDisabled();
             ImGui::PopID();
             // The value under the name, always; a click on it types it in.
@@ -3096,9 +3102,12 @@ bool eqBandPanel(const ImVec2 origin, const float width, Eq& eq, EqView& view, c
         style.format = "%.1f";
         style.unit = "dB";
         style.flags = ui::knobBipolar;
-        if (ui::knob("##output", &value, static_cast<float>(eq.output->minimum), static_cast<float>(eq.output->maximum),
-                     static_cast<float>(eq.output->defaultValue), style))
-            changed |= apply(*eq.output, value, set);
+        {
+            const ui::LearnParameterScope learn(eq.output->binding, eq.output->label);
+            if (ui::knob("##output", &value, static_cast<float>(eq.output->minimum), static_cast<float>(eq.output->maximum),
+                         static_cast<float>(eq.output->defaultValue), style))
+                changed |= apply(*eq.output, value, set);
+        }
         valueUnder(right - dp(170.0f), dp(58.0f), formatValue(*eq.output, eq.output->value), 0);
     }
     static constexpr float ranges[] { 3.0f, 6.0f, 12.0f, 30.0f };
@@ -3485,6 +3494,11 @@ bool valueField(const char* id, Param& parameter, const float width, const ImU32
     const auto origin = ImGui::GetCursorScreenPos();
     ImGui::PushID(id);
     ImGui::InvisibleButton("##field", ImVec2(std::max(1.0f, width), height));
+    {
+        // A controller can turn it (learn mode).
+        const ui::LearnParameterScope learn(parameter.binding, parameter.label);
+        ui::learnItem();
+    }
     const auto hovered = ImGui::IsItemHovered();
     const auto active = ImGui::IsItemActive();
     auto changed = false;

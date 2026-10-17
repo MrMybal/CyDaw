@@ -357,7 +357,13 @@ bool SynthView::knob(const int index, const char* label, const float diameter)
     // In a cell as wide as its name (on the card), the knob in its middle.
     const auto width = std::max(dp(diameter + 14.0f), knobCell_);
     ImGui::SetCursorScreenPos(ImVec2(origin.x + (width - dp(diameter + 14.0f)) * 0.5f, origin.y));
-    const auto changed = ui::knob("##knob", &normalised, 0.0f, 1.0f, defaultNormalised, style);
+    bool changed {};
+    {
+        const ui::LearnParameterScope learn(bindingOf(index),
+                                            juce::String::fromUTF8((ui::french() ? parameter.french : parameter.english).c_str()),
+                                            studio_.learnPrefix(card_.track), studio_.trackName(card_.track));
+        changed = ui::knob("##knob", &normalised, 0.0f, 1.0f, defaultNormalised, style);
+    }
     markGreyed(true);
     const auto hovered = ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled);
     const auto active = ImGui::IsItemActive();

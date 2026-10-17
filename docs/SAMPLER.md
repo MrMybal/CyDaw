@@ -153,7 +153,7 @@ les voix qui jouent des zones dont `offBy` vaut *n* : le charley fermé coupe l'
 
 `factory:` désigne le dossier des instruments d'usine (`Factory` à côté de CyDAW ; `content/factory` dans les
 sources) ; `bank:` le dossier des banques téléchargées (`bank:vcsl/Chordophones/…/A0_vl2_rr1.wav` : la banque
-puis le chemin dans son dépôt). Un plug-in exporté reçoit les deux dossiers dans son état. `start` / `end` :
+puis le chemin dans son dépôt). Un plug-in exporté emporte ses échantillons (voir les limites). `start` / `end` :
 la partie du fichier jouée (une note coupée dans un enregistrement plus long) ; `endFade` : les trames fondues
 avant `end`. `settings` (facultatif) : les réglages de la carte pour lesquels la carte a été faite. Un fichier
 `.cysampler` peut donner des chemins relatifs à son dossier.
@@ -298,7 +298,8 @@ automatisées lisent ces choix sans les changer, sauf avec un fichier à elles (
   modèles déplacé avec ses modèles et sans le reste.
 - `cydaw2_sampler_check` (ctest, silencieux) : des notes de test placées par leur nom, jouées sur la piste, dans
   un périphérique, annulées et rétablies, après réouverture du projet, après l'atelier, depuis Mes
-  périphériques, depuis un SFZ, par le plug-in exporté et par le plug-in « CyDAW Graph Runtime » compilé ; les
+  périphériques, depuis un SFZ, par le plug-in exporté et par le plug-in « CyDAW Graph Runtime » compilé, puis
+  le projet natif généré (son plan, ses zones et chaque échantillon dans `Voice.cyvoice`) ; les
   instruments d'usine (tous les fichiers trouvés, un clavecin, le violon tenu 20 s grâce à sa boucle, les
   modèles de son).
 
@@ -314,6 +315,8 @@ automatisées lisent ces choix sans les changer, sauf avec un fichier à elles (
   (sautereau du clavecin, étouffoir du piano) ni résonance par sympathie ; ceux des banques SFZ ont ceux de
   leur SFZ.
 - Le violon n'a ni legato ni changement d'archet (une note à la fois, par zone).
-- L'export VST3 d'un sampler garde les chemins des fichiers : ils doivent être sur la machine qui l'ouvre
-  (les instruments d'usine : leurs banques téléchargées là où CyDAW les range).
+- L'export natif (VST3, CLAP, LV2) d'un sampler copie chaque échantillon décodé (16 bits) dans le fichier
+  `Voice.cyvoice` du plug-in : il s'ouvre sur n'importe quelle machine, mais pèse le poids de l'audio non
+  compressé, et le plug-in le charge en entier en mémoire à son activation (pas de lecture continue depuis le
+  disque). Détails dans [PLUGIN_FORMATS.md](PLUGIN_FORMATS.md).
 - Un enregistrement court est décodé en entier, même quand la zone n'en joue qu'une partie.

@@ -8,6 +8,8 @@
 #include <cydaw/engine/PolyVoiceFilter.h>
 #include <cydaw/engine/PolyVoiceOscillator.h>
 #include <cydaw/engine/SoundModel.h>
+#include <cydaw/engine/VoiceAssetsFile.h>
+#include <cydaw/control/Control.h>
 #include <cydaw/engine/PrismSynth.h>
 #include <cydaw/engine/EffectProcessors.h>
 #include <cydaw/engine/ProEffectsDesign.h>
@@ -53,6 +55,7 @@
 #include <iostream>
 #include <memory>
 #include <new>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -4586,6 +4589,8 @@ void convolverMatchesDirectConvolution()
 #include "GrainTests.inc"
 #include "SilexTests.inc"
 #include "DjFoundryTests.inc"
+#include "VoiceAssetsTests.inc"
+#include "ControlTests.inc"
 
 } // namespace
 
@@ -4668,6 +4673,10 @@ int main()
     pitchTrackerReadsInTune();
     samplerPlaysGrains();
     silexPlaysItsPieces();
+    voiceAssetsTravelWithTheirSound();
+    controlMidiAddressesGoBothWays();
+    controlModifiersShapeAndGiveBack();
+    controlRouterMovesTargetsAndFeedsBack();
     djDeckPlaysAtItsTempo();
     djChannelKillsItsBands();
     djEffectsPlayInTime();

@@ -1,5 +1,6 @@
 #include "MixerView.h"
 #include "AddTrackMenu.h"
+#include "ControlTargets.h"
 
 #include "RoutingUi.h"
 
@@ -149,6 +150,12 @@ void mixer_strip::track(Studio& studio_, UiState& state_, const TrackRef& track,
     ImGui::PopFont();
     auto mix = studio_.trackMix(track);
     auto changed = false;
+    // What a controller can move here (learn mode): a track's own, not a
+    // bus of the software or a rack's pad.
+    const auto learnable = !track.master && track.bus == 0 && track.pad < 0;
+    const auto learnKey = learnable ? studio_.routingKey(track) : 0;
+    const auto learnTarget = [&](const char* what) { return learnable ? control_targets::forTrack(learnKey, what) : std::string(); };
+    const auto learnLabel = [&](const juce::String& what) { return (studio_.trackName(track) + juce::String::fromUTF8(" \xc2\xb7 ") + what).toStdString(); };
     // Pan: its own row under the name, a knob big enough to take, its value
     // beside it ("C", "L 30"), which a click types in; the track's kind on
     // the right.
@@ -159,7 +166,10 @@ void mixer_strip::track(Studio& studio_, UiState& state_, const TrackRef& track,
     panStyle.format = "%+.2f";
     panStyle.flags = ui::knobBipolar | ui::knobNoLabel;
     panStyle.colour = colour;
-    changed |= ui::knob("##pan", &mix.pan, -1.0f, 1.0f, 0.0f, panStyle);
+    {
+        const ui::LearnScope learn(learnTarget("pan"), learnLabel(ui::Ls("Panoramique", "Pan")));
+        changed |= ui::knob("##pan", &mix.pan, -1.0f, 1.0f, 0.0f, panStyle);
+    }
     if (ImGui::IsItemHovered() && !ImGui::IsItemActive())
         ImGui::SetTooltip("%s", (L("Panoramique ", "Pan ") + panText(mix.pan) + L(" · double-clic : centre", " · double click: centre"))
                                     .c_str());
@@ -195,7 +205,10 @@ void mixer_strip::track(Studio& studio_, UiState& state_, const TrackRef& track,
     const auto faderHeight = std::max(dp(40.0f), height - (faderTop - origin.y) - buttonsHeight);
     const auto left = origin.x + inset + std::max(dp(4.0f), (dp(kStripWidth) - dp(kFaderBlock)) * 0.5f);
     ImGui::SetCursorScreenPos(ImVec2(left, faderTop));
-    changed |= ui::fader("##fader", &mix.gainDb, -60.0f, 12.0f, ImVec2(dp(kFaderWidth), faderHeight), colour);
+    {
+        const ui::LearnScope learn(learnTarget("volume"), learnLabel(ui::Ls("Volume", "Volume")));
+        changed |= ui::fader("##fader", &mix.gainDb, -60.0f, 12.0f, ImVec2(dp(kFaderWidth), faderHeight), colour);
+    }
     const auto meterState = studio_.trackMeter(track);
     ImGui::SetCursorScreenPos(ImVec2(left + dp(kFaderWidth + 6.0f), faderTop + dp(7.0f)));
     ui::meter("##meter", ImVec2(dp(kMeterWidth), faderHeight - dp(14.0f)), meterState.peak[0], meterState.peak[1],
@@ -226,11 +239,20 @@ void mixer_strip::track(Studio& studio_, UiState& state_, const TrackRef& track,
     const ImVec2 size((width - dp(16.0f)) / 3.0f, dp(18.0f));
     ImGui::SetCursorScreenPos(ImVec2(origin.x + dp(5.0f), buttonY));
     ImGui::PushFont(theme::boldFont(), ImGui::GetStyle().FontSizeBase * 0.78f);
-    changed |= ui::toggle("M", &mix.muted, p.mute, size, L("Muet", "Mute"));
+    {
+        const ui::LearnScope learn(learnTarget("mute"), learnLabel(ui::Ls("Muet", "Mute")));
+        changed |= ui::toggle("M", &mix.muted, p.mute, size, L("Muet", "Mute"));
+    }
     ImGui::SameLine(0.0f, dp(3.0f));
-    changed |= ui::toggle("S", &mix.solo, p.solo, size, L("Solo", "Solo"));
+    {
+        const ui::LearnScope learn(learnTarget("solo"), learnLabel("Solo"));
+        changed |= ui::toggle("S", &mix.solo, p.solo, size, L("Solo", "Solo"));
+    }
     ImGui::SameLine(0.0f, dp(3.0f));
-    changed |= ui::toggle("R", &mix.armed, p.record, size, L("Armer", "Arm"));
+    {
+        const ui::LearnScope learn(learnTarget("arm"), learnLabel(ui::Ls("Armer", "Arm")));
+        changed |= ui::toggle("R", &mix.armed, p.record, size, L("Armer", "Arm"));
+    }
     ImGui::PopFont();
     if (changed)
         studio_.setTrackMix(track, mix);
@@ -284,8 +306,11 @@ void mixer_strip::master(Studio& studio_, UiState& state_, const float width, co
     const auto left = origin.x + inset + std::max(dp(4.0f), (dp(kStripWidth) - dp(kFaderBlock)) * 0.5f);
     ImGui::SetCursorScreenPos(ImVec2(left, faderTop));
     auto gain = engine.masterGainDb();
-    if (ui::fader("##masterFader", &gain, -60.0f, 12.0f, ImVec2(dp(kFaderWidth), faderHeight), p.accent))
-        engine.setMasterGain(gain);
+    {
+        const ui::LearnScope learn(control_targets::forMaster("volume"), "Master \xc2\xb7 Volume");
+        if (ui::fader("##masterFader", &gain, -60.0f, 12.0f, ImVec2(dp(kFaderWidth), faderHeight), p.accent))
+            engine.setMasterGain(gain);
+    }
     const auto& meter = studio_.masterMeter();
     ImGui::SetCursorScreenPos(ImVec2(left + dp(kFaderWidth + 6.0f), faderTop + dp(7.0f)));
     ui::meter("##masterMeter", ImVec2(dp(kMeterWidth), faderHeight - dp(14.0f)), meter.peak[0], meter.peak[1], meter.rms[0],

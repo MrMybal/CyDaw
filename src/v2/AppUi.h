@@ -50,6 +50,7 @@ class ContextMenus;
 class ComputerKeyboard;
 class ThemesView;
 class TransportSync;
+class Controllers;
 class JsfxView;
 
 class AppUi final : public RemoteUi {
@@ -187,6 +188,7 @@ public:
     juce::var themes(const juce::var& request) override;
     juce::var jsfx(const juce::var&) override;
     juce::var transportSync(const juce::var& request) override;
+    juce::var controllers(const juce::var& request) override;
     juce::var dj(const juce::var& request) override;
     juce::var foundry(const juce::var& request) override;
     juce::var cinema(const juce::var& request) override;
@@ -301,6 +303,8 @@ private:
     std::unique_ptr<FoundryView> foundry_;
     std::unique_ptr<FoundryView> cinema_;
     std::unique_ptr<TransportSync> transportSync_;
+    std::unique_ptr<Controllers> controllers_;
+    bool showControllers_{};
     std::unique_ptr<JsfxView> jsfx_;
     bool showTransportSync_{};
     // The devices' windows, as plugins' (their designed interfaces).

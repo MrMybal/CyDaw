@@ -190,9 +190,12 @@ bool knobCell(const ImVec2 origin, const float width, Param* parameter, const ch
             style.modulation = static_cast<float>(positionOf(*parameter, found->second));
     ImGui::PushID(parameter->binding.toRawUTF8());
     auto changed = false;
-    if (ui::knob("##knob", &value, static_cast<float>(parameter->minimum), static_cast<float>(parameter->maximum),
-                 static_cast<float>(parameter->defaultValue), style))
-        changed = apply(parameter, value, set);
+    {
+        const ui::LearnParameterScope learn(parameter->binding, parameter->label);
+        if (ui::knob("##knob", &value, static_cast<float>(parameter->minimum), static_cast<float>(parameter->maximum),
+                     static_cast<float>(parameter->defaultValue), style))
+            changed = apply(parameter, value, set);
+    }
     if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
         openParameterMenu(*parameter);
     ImGui::PopID();

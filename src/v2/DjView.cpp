@@ -1,6 +1,7 @@
 #include "DjView.h"
 #include "ModeProcessing.h"
 
+#include "ControlTargets.h"
 #include "Icons.h"
 #include "ImGuiHost.h"
 #include "Locations.h"
@@ -84,6 +85,7 @@ bool pad(const char* label, const ImVec2 size, const bool on, const ImU32 colour
     const auto& p = theme::palette();
     const auto origin = ImGui::GetCursorScreenPos();
     const auto clicked = ImGui::InvisibleButton(label, size);
+    ui::learnItem();
     const auto hovered = ImGui::IsItemHovered();
     auto* list = ImGui::GetWindowDrawList();
     const auto fill = on ? colour : (hovered ? p.bg4 : p.bg3);
@@ -343,7 +345,8 @@ void DjView::draw()
     const auto spacing = dp(6.0f);
     const auto browserHeight = std::max(dp(150.0f), avail.y * browserShare_);
     const auto topHeight = std::max(dp(240.0f), avail.y - browserHeight - spacing);
-    const auto mixerWidth = count == 2 ? dp(260.0f) : dp(440.0f);
+    // Four channels need the room of three 22-point knobs each.
+    const auto mixerWidth = count == 2 ? dp(260.0f) : dp(470.0f);
     const auto deckWidth = std::max(dp(320.0f), (avail.x - mixerWidth - spacing * 2.0f) * 0.5f);
     const auto deckHeight = count == 2 ? topHeight : (topHeight - spacing) * 0.5f;
 
@@ -773,6 +776,7 @@ void DjView::drawDeckButtons(const int index, const float width)
     {
         const auto origin = ImGui::GetCursorScreenPos();
         ImGui::InvisibleButton("##cue", ImVec2(unit * 1.2f, height));
+        ui::learnItem(control_targets::forDeck(index, "cue"), "DJ " + std::string(deckLetter(index)) + " \xc2\xb7 CUE");
         const auto active = ImGui::IsItemActive();
         if (ImGui::IsItemActivated())
             dj.cue(index, true);
@@ -787,13 +791,20 @@ void DjView::drawDeckButtons(const int index, const float width)
                       "CUE: playing, back to the cue point and stopped; stopped, sets the cue point here and plays while held"));
     }
     ImGui::SameLine();
-    if (pad((juce::String::fromUTF8(deck.playing ? icon::pause : icon::play) + "##play").toRawUTF8(), ImVec2(unit * 1.2f, height),
-            deck.playing, IM_COL32(90, 200, 100, 255), L("Lecture / pause", "Play / pause")))
-        dj.setPlaying(index, !deck.playing);
+    {
+        const ui::LearnScope learn(control_targets::forDeck(index, "play"),
+                                   "DJ " + std::string(deckLetter(index)) + " \xc2\xb7 " + ui::Ls("Lecture", "Play").toStdString());
+        if (pad((juce::String::fromUTF8(deck.playing ? icon::pause : icon::play) + "##play").toRawUTF8(), ImVec2(unit * 1.2f, height),
+                deck.playing, IM_COL32(90, 200, 100, 255), L("Lecture / pause", "Play / pause")))
+            dj.setPlaying(index, !deck.playing);
+    }
     ImGui::SameLine();
-    if (pad("SYNC", ImVec2(unit, height), deck.sync, colour,
-            L("SYNC : suit le tempo de la platine maître, temps calés", "SYNC: follows the master deck's tempo, beats aligned")))
-        dj.setSync(index, !deck.sync);
+    {
+        const ui::LearnScope learn(control_targets::forDeck(index, "sync"), "DJ " + std::string(deckLetter(index)) + " \xc2\xb7 SYNC");
+        if (pad("SYNC", ImVec2(unit, height), deck.sync, colour,
+                L("SYNC : suit le tempo de la platine maître, temps calés", "SYNC: follows the master deck's tempo, beats aligned")))
+            dj.setSync(index, !deck.sync);
+    }
     ImGui::SameLine();
     if (pad("MASTER", ImVec2(unit * 1.15f, height), deck.master, colour,
             L("MASTER : le tempo que les autres suivent (automatique sinon)", "MASTER: the tempo the others follow (automatic otherwise)")))
@@ -1004,6 +1015,7 @@ void DjView::drawMixer(const ImVec2 size)
         ImGui::PushStyleColor(ImGuiCol_SliderGrab, p.text);
         if (ImGui::SliderFloat("##crossfader", &crossfader, 0.0f, 1.0f, ""))
             dj.setCrossfader(crossfader);
+        ui::learnItem(control_targets::forDj("crossfader"), "DJ \xc2\xb7 Crossfader");
         if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
             dj.setCrossfader(0.5f);
         ImGui::PopStyleColor();
@@ -1015,8 +1027,11 @@ void DjView::drawMixer(const ImVec2 size)
         auto master = dj.masterGainDb();
         style.label = "MASTER";
         style.unit = "dB";
-        if (ui::knob("##master", &master, -24.0f, 6.0f, 0.0f, style))
-            dj.setMasterGainDb(master);
+        {
+            const ui::LearnScope learn(control_targets::forDj("master"), "DJ \xc2\xb7 Master");
+            if (ui::knob("##master", &master, -24.0f, 6.0f, 0.0f, style))
+                dj.setMasterGainDb(master);
+        }
         ImGui::SameLine();
         {
             const auto peak = dj.masterPeak();
@@ -1075,43 +1090,92 @@ void DjView::drawChannel(const int index, const ImVec2 size)
     ImGui::SetCursorScreenPos(origin);
     if(ImGui::InvisibleButton("##selectDeckChain",ImVec2(size.x,dp(18))))processing_->selectInput(static_cast<std::uint64_t>(index+1));
     ui::tooltip(L("Sélectionner les effets de cette platine","Select this deck's effects"));
+    // The knobs are played live: never under 22. Five in a column when the
+    // channel is tall enough for them and a fader worth moving; else GAIN and
+    // FILTER side by side over the three bands, each band's kill under it.
     ui::KnobStyle style;
-    style.diameter = std::min({30.0f, size.x / ImGui::GetStyle().FontScaleDpi * 0.42f, std::clamp((size.y / ImGui::GetStyle().FontScaleDpi-145.0f)/5.0f-18.0f,14.0f,30.0f)});
     style.colour = deckColour(index);
-    style.format = "%.1f";
-    const auto knobRow = [&](const char* id, const char* label, float* value, const float minimum, const float maximum,
-                             const float initial, const int flags, bool* kill) {
+    const auto scale = std::max(0.5f, ImGui::GetStyle().FontScaleDpi);
+    const auto spacing = ImGui::GetStyle().ItemSpacing.y;
+    const auto labelHeight = ImGui::GetFontSize() * 0.86f;
+    const auto header = dp(18.0f) + spacing;
+    const auto tail = ImGui::GetFrameHeight() + spacing + dp(90.0f) + spacing + ImGui::GetFrameHeight() * 0.8f;
+    const auto columnDiameter = std::min({30.0f, size.x / scale * 0.42f,
+                                          ((size.y - header - tail) / 5.0f - labelHeight - spacing) / scale});
+    const auto learnLabel = [&](const char* what) { return "DJ " + std::string(deckLetter(index)) + " \xc2\xb7 " + what; };
+    const auto turn = [&](const char* id, const char* label, float* value, const float minimum, const float maximum,
+                          const float initial, const char* unit, const char* format) {
+        // Its id names its target ("##high": dj/<deck>/high).
+        const ui::LearnScope learn(control_targets::forDeck(index, id + 2), learnLabel(label));
         style.label = label;
-        style.flags = flags;
-        const auto knobWidth = dp(style.diameter + 12.0f);
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, (size.x - knobWidth - (kill != nullptr ? dp(22.0f) : 0.0f)) * 0.5f));
+        style.flags = ui::knobBipolar;
+        style.unit = unit;
+        style.format = format;
         if (ui::knob(id, value, minimum, maximum, initial, style))
             changed = true;
-        if (kill != nullptr) {
-            ImGui::SameLine(0.0f, dp(2.0f));
-            ImGui::PushID(id);
-            if (pad("K", ImVec2(dp(18.0f), dp(18.0f)), *kill, IM_COL32(232, 70, 70, 255),
-                    L("Coupe la bande (kill)", "Cuts the band (kill)"))) {
-                *kill = !*kill;
-                changed = true;
-            }
-            ImGui::PopID();
-        }
     };
-    style.unit = "dB";
-    knobRow("##gain", "GAIN", &channel.trimDb, -24.0f, 12.0f, 0.0f, ui::knobBipolar, nullptr);
-    style.unit = nullptr;
-    style.format = "%.2f";
-    knobRow("##high", "HI", &channel.high, 0.0f, 1.0f, 0.5f, ui::knobBipolar, &channel.killHigh);
-    knobRow("##mid", "MID", &channel.mid, 0.0f, 1.0f, 0.5f, ui::knobBipolar, &channel.killMid);
-    knobRow("##low", "LOW", &channel.low, 0.0f, 1.0f, 0.5f, ui::knobBipolar, &channel.killLow);
-    knobRow("##filter", "FILTER", &channel.filter, -1.0f, 1.0f, 0.0f, ui::knobBipolar, nullptr);
+    const auto kill = [&](const char* id, bool* on, const ImVec2 cell) {
+        const auto* target = on == &channel.killHigh ? "killHigh" : on == &channel.killMid ? "killMid" : "killLow";
+        const ui::LearnScope learn(control_targets::forDeck(index, target), learnLabel(target));
+        ImGui::PushID(id);
+        if (pad("K", cell, *on, IM_COL32(232, 70, 70, 255), L("Coupe la bande (kill)", "Cuts the band (kill)"))) {
+            *on = !*on;
+            changed = true;
+        }
+        ImGui::PopID();
+    };
+    if (columnDiameter >= 24.0f) {
+        style.diameter = columnDiameter;
+        const auto knobRow = [&](const char* id, const char* label, float* value, const float minimum, const float maximum,
+                                 const float initial, const char* unit, const char* format, bool* killed) {
+            const auto knobWidth = dp(style.diameter + 12.0f);
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX()
+                                 + std::max(0.0f, (size.x - knobWidth - (killed != nullptr ? dp(22.0f) : 0.0f)) * 0.5f));
+            turn(id, label, value, minimum, maximum, initial, unit, format);
+            if (killed != nullptr) {
+                ImGui::SameLine(0.0f, dp(2.0f));
+                kill(id, killed, ImVec2(dp(18.0f), dp(18.0f)));
+            }
+        };
+        knobRow("##gain", "GAIN", &channel.trimDb, -24.0f, 12.0f, 0.0f, "dB", "%.1f", nullptr);
+        knobRow("##high", "HI", &channel.high, 0.0f, 1.0f, 0.5f, nullptr, "%.2f", &channel.killHigh);
+        knobRow("##mid", "MID", &channel.mid, 0.0f, 1.0f, 0.5f, nullptr, "%.2f", &channel.killMid);
+        knobRow("##low", "LOW", &channel.low, 0.0f, 1.0f, 0.5f, nullptr, "%.2f", &channel.killLow);
+        knobRow("##filter", "FILTER", &channel.filter, -1.0f, 1.0f, 0.0f, nullptr, "%.2f", nullptr);
+    } else {
+        const auto gap = dp(2.0f);
+        style.diameter = std::clamp((size.x - 2.0f * gap) / scale / 3.0f - 12.0f, 22.0f, 30.0f);
+        const auto cell = dp(style.diameter + 12.0f);
+        const auto centred = [&](const int cells) {
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX()
+                                 + std::max(0.0f, (size.x - static_cast<float>(cells) * cell - static_cast<float>(cells - 1) * gap) * 0.5f));
+        };
+        centred(2);
+        turn("##gain", "GAIN", &channel.trimDb, -24.0f, 12.0f, 0.0f, "dB", "%.1f");
+        ImGui::SameLine(0.0f, gap);
+        turn("##filter", "FILTER", &channel.filter, -1.0f, 1.0f, 0.0f, nullptr, "%.2f");
+        centred(3);
+        turn("##high", "HI", &channel.high, 0.0f, 1.0f, 0.5f, nullptr, "%.2f");
+        ImGui::SameLine(0.0f, gap);
+        turn("##mid", "MID", &channel.mid, 0.0f, 1.0f, 0.5f, nullptr, "%.2f");
+        ImGui::SameLine(0.0f, gap);
+        turn("##low", "LOW", &channel.low, 0.0f, 1.0f, 0.5f, nullptr, "%.2f");
+        centred(3);
+        kill("##killHigh", &channel.killHigh, ImVec2(cell, dp(16.0f)));
+        ImGui::SameLine(0.0f, gap);
+        kill("##killMid", &channel.killMid, ImVec2(cell, dp(16.0f)));
+        ImGui::SameLine(0.0f, gap);
+        kill("##killLow", &channel.killLow, ImVec2(cell, dp(16.0f)));
+    }
     // CUE in the headphones.
     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, (size.x - dp(40.0f)) * 0.5f));
-    if (pad("CUE##pfl", ImVec2(dp(40.0f), ImGui::GetFrameHeight()), channel.cue, IM_COL32(240, 150, 40, 255),
-            L("Pré-écoute au casque (mode SPLIT)", "Heard in the headphones (SPLIT mode)"))) {
-        channel.cue = !channel.cue;
-        changed = true;
+    {
+        const ui::LearnScope learn(control_targets::forDeck(index, "pfl"), learnLabel("CUE (casque)"));
+        if (pad("CUE##pfl", ImVec2(dp(40.0f), ImGui::GetFrameHeight()), channel.cue, IM_COL32(240, 150, 40, 255),
+                L("Pré-écoute au casque (mode SPLIT)", "Heard in the headphones (SPLIT mode)"))) {
+            channel.cue = !channel.cue;
+            changed = true;
+        }
     }
     // The fader and the meter, down to its crossfader side.
     const auto faderHeight = std::max(dp(50.0f), bottom - ImGui::GetCursorScreenPos().y - ImGui::GetFrameHeight() - dp(8.0f));
@@ -1119,6 +1183,7 @@ void DjView::drawChannel(const int index, const ImVec2 size)
     ImGui::PushStyleColor(ImGuiCol_SliderGrab, p.text);
     if (ImGui::VSliderFloat("##fader", ImVec2(dp(26.0f), faderHeight), &channel.fader, 0.0f, 1.0f, ""))
         changed = true;
+    ui::learnItem(control_targets::forDeck(index, "fader"), learnLabel("Fader"));
     if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
         channel.fader = 1.0f;
         changed = true;

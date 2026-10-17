@@ -171,6 +171,8 @@ void DevicesView::draw()
         else
             state_.openRackPad.reset();
     }
+    // Its cards' knobs are controllers' targets (learn mode).
+    const ui::LearnTrackScope learnTrack(studio_.learnPrefix(track), studio_.trackName(track).toStdString());
     auto* slot = studio_.graphFor(track);
     if (slot == nullptr)
         return;

@@ -409,6 +409,62 @@ BusIds mapProjectBuses(const Studio& studio, const juce::DynamicObject& root)
 }
 
 // The routing read back once every track is there.
+// The controllers' assignments name a track by its key ("track/<key>/volume",
+// "param/<key>/<binding>"), which an opened project gives anew: saved, a
+// track is named by where it is ("@midi:2", "@audio:0"), as routing does.
+juce::var portableAssignments(Studio& studio, const juce::var& assignments)
+{
+    const auto summaries = studio.engine().midiTrackSummaries();
+    juce::Array<juce::var> out;
+    if (const auto* list = assignments.getArray())
+        for (const auto& item : *list) {
+            auto parts = juce::StringArray::fromTokens(item.getProperty("target", {}).toString(), "/", "");
+            if (parts.size() >= 3 && (parts[0] == "track" || parts[0] == "param") && parts[1].containsOnly("0123456789")) {
+                const auto track = studio.trackForKey(static_cast<std::uint64_t>(parts[1].getLargeIntValue()));
+                if (!track)
+                    continue;
+                if (track->midi) {
+                    const auto found = std::find_if(summaries.begin(), summaries.end(),
+                                                    [&track](const auto& summary) { return summary.id == track->midiId; });
+                    if (found == summaries.end())
+                        continue;
+                    parts.set(1, "@midi:" + juce::String(static_cast<int>(found - summaries.begin())));
+                } else {
+                    parts.set(1, "@audio:" + juce::String(static_cast<int>(track->audioIndex)));
+                }
+            }
+            auto copy = juce::var(item.getDynamicObject() != nullptr ? item.getDynamicObject()->clone().release() : new juce::DynamicObject());
+            copy.getDynamicObject()->setProperty("target", parts.joinIntoString("/"));
+            out.add(copy);
+        }
+    return out;
+}
+
+juce::var localAssignments(Studio& studio, const juce::var& saved)
+{
+    const auto summaries = studio.engine().midiTrackSummaries();
+    juce::Array<juce::var> out;
+    if (const auto* list = saved.getArray())
+        for (const auto& item : *list) {
+            auto parts = juce::StringArray::fromTokens(item.getProperty("target", {}).toString(), "/", "");
+            if (parts.size() >= 3 && parts[1].startsWithChar('@')) {
+                const auto position = parts[1].fromFirstOccurrenceOf(":", false, false).getIntValue();
+                std::optional<TrackRef> track;
+                if (parts[1].startsWith("@midi:") && position >= 0 && position < static_cast<int>(summaries.size()))
+                    track = TrackRef { true, 0, summaries[static_cast<std::size_t>(position)].id };
+                else if (parts[1].startsWith("@audio:") && position >= 0 && position < static_cast<int>(studio.engine().trackCount()))
+                    track = TrackRef { false, static_cast<std::size_t>(position), 0 };
+                if (!track)
+                    continue;
+                parts.set(1, juce::String(static_cast<juce::int64>(studio.routingKey(*track))));
+            }
+            auto copy = juce::var(item.getDynamicObject() != nullptr ? item.getDynamicObject()->clone().release() : new juce::DynamicObject());
+            copy.getDynamicObject()->setProperty("target", parts.joinIntoString("/"));
+            out.add(copy);
+        }
+    return out;
+}
+
 void restoreRouting(Studio& studio, const juce::DynamicObject& root, const BusIds& busIds)
 {
     auto& engine = studio.engine();
@@ -1693,6 +1749,9 @@ juce::var buildDocument(Studio& studio, const juce::File& projectFile, const boo
     document->setProperty(keys::masterGainDb, engine.masterGainDb());
     if (masterGraph.getDynamicObject() != nullptr)
         document->setProperty("masterGraph", Studio::withoutSharedModules(masterGraph));
+    // The controllers' assignments that belong to this project.
+    if (const auto* assignments = studio.controllerAssignments().getArray(); assignments != nullptr && !assignments->isEmpty())
+        document->setProperty("controllerAssignments", portableAssignments(studio, studio.controllerAssignments()));
     document->setProperty(keys::arrangementSnapMode,
                           static_cast<int>(interfaceValue(studio, keys::arrangementSnapMode, 4)));
     document->setProperty(keys::arrangementSnapType,
@@ -2018,6 +2077,8 @@ bool DocumentLoad::next()
     }
     case Stage::routing: {
         restoreRouting(studio, *s.root, s.busIds);
+        // The controllers' assignments, the tracks they name there now.
+        studio.setControllerAssignments(localAssignments(studio, s.root->getProperty("controllerAssignments")), true);
         // Every graph published once, now that all are restored.
         for (std::size_t index = 0; index < engine.trackCount(); ++index)
             s.toPublish.push_back(TrackRef { false, index, 0 });

@@ -371,6 +371,13 @@ bool Vst3Build::runJob(const Job& job)
         if (licenses.isDirectory() && !licenses.copyDirectoryTo(target.getSiblingFile(target.getFileName() + ".Licenses"))) {
             jobFailed(Phase::failed, "Cannot copy CLAP licenses"); return false;
         }
+        // Its voice data (a sampler's samples), beside it under its new name.
+        const auto resources = made.getSiblingFile(made.getFileName() + ".Resources");
+        const auto placed = target.getSiblingFile(target.getFileName() + ".Resources");
+        (void) placed.deleteRecursively();
+        if (resources.isDirectory() && !resources.copyDirectoryTo(placed)) {
+            jobFailed(Phase::failed, "Cannot copy the CLAP's voice data"); return false;
+        }
     }
     addLine(format + ": " + target.getFullPathName());
     return true;

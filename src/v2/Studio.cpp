@@ -1799,6 +1799,15 @@ std::optional<float> Studio::laneValueNow(const TrackRef& track, const juce::Str
                                                         && logarithmicParameter(track, lane));
 }
 
+std::string Studio::learnPrefix(const TrackRef& track) const
+{
+    // A bus of the software or a rack's pad: not a target (yet).
+    if (track.bus != 0 || track.pad >= 0 || (!track.master && !isValid(track)))
+        return {};
+    const auto key = routingKey(track);
+    return "param/" + (track.master ? std::string("master") : std::to_string(key)) + "/";
+}
+
 bool Studio::canAutomate(const TrackRef& track, const juce::String& binding) const
 {
     if (track.master)
@@ -4546,6 +4555,7 @@ void Studio::newProject()
 {
     clearSession();
     resetMasterGraph();
+    setControllerAssignments({}, true);
     if (const auto* factory = factoryAudioGraph_.getDynamicObject())
         sharedNodeModules_ = app::cloneJsonValue(factory->getProperty("modules"));
     engine_.setTempo(120.0);

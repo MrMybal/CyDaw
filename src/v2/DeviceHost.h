@@ -7,6 +7,7 @@
 #include <juce_core/juce_core.h>
 
 #include <optional>
+#include <string>
 #include <vector>
 
 // What the views of a device (Prisme's, the synths', Kick's, the presets
@@ -37,6 +38,9 @@ public:
 
     // The automation lanes of a track's settings (a knob's right click).
     [[nodiscard]] virtual bool canAutomate(const TrackRef& track, const juce::String& binding) const = 0;
+    // What names its knobs as controllers' targets ("param/<track>/"); empty
+    // where they are none (a plug-in's window).
+    [[nodiscard]] virtual std::string learnPrefix(const TrackRef&) const { return {}; }
     [[nodiscard]] virtual bool hasLane(const TrackRef& track, const juce::String& lane) const = 0;
     virtual void clearLane(const TrackRef& track, const juce::String& lane) = 0;
     [[nodiscard]] virtual std::vector<juce::String> automatedParameters(const TrackRef& track) const = 0;

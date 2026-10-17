@@ -24,7 +24,6 @@ import argparse
 import json
 import math
 import os
-import re
 import shutil
 import socket
 import struct
@@ -142,21 +141,49 @@ def nodes(track: str) -> list[dict]:
     return need({"cmd": "get_track_graph", "track": track}, "graph")["nodes"]
 
 
-def embedded_state(header: Path) -> dict:
-    text = header.read_text(encoding="utf-8")
-    block = text[text.index("embeddedStateJsonChunks"):]
-    chunks = re.findall(r'^\s*"((?:[^"\\]|\\.)*)",$', block, re.MULTILINE)
-    escapes = {"n": "\n", "r": "\r", '"': '"', "\\": "\\"}
-    joined = re.sub(r"\\(.)", lambda match: escapes.get(match.group(1), match.group(1)), "".join(chunks))
-    return json.loads(joined)
+def plan_value(definition: str, key: str) -> float | None:
+    """A value the generated sources set ("p.samplerValues[3]=12.000000000000f;")."""
+    at = definition.find(key + "=")
+    if at < 0:
+        return None
+    start = at + len(key) + 1
+    return float(definition[start:definition.index("f;", start)])
 
 
-def has_map(graph: dict) -> bool:
-    for container in [graph] + list(graph.get("modules", [])):
-        for node in container.get("nodes", []):
-            if node.get("type") == "sampler" and isinstance(node.get("sampler"), dict):
-                return True
-    return False
+def read_voice(path: Path) -> dict:
+    """What an exported plug-in's voice data (.cyvoice) holds: the sampler's
+    samples and zones, the sound model's zones."""
+    data = path.read_bytes()
+    at = 0
+
+    def take(fmt: str):
+        nonlocal at
+        values = struct.unpack_from("<" + fmt, data, at)
+        at += struct.calcsize("<" + fmt)
+        return values if len(values) > 1 else values[0]
+
+    def text() -> str:
+        nonlocal at
+        size = take("I")
+        at += size
+        return data[at - size:at].decode("utf-8")
+
+    magic, version, parts = take("III")
+    voice = {"magic": magic == 0x41565943, "version": version}
+    if parts & 1:
+        voice["sampler"] = text()
+        samples = []
+        for _ in range(take("I")):
+            name = text()
+            channels, frames, rate, _scale, _loop_start, _loop_end, count = take("iqdfqqQ")
+            at += 2 * count
+            samples.append({"name": name, "channels": channels, "frames": frames, "rate": rate, "pcm": count})
+        voice["samples"] = samples
+        voice["zones"] = take("I")
+    elif parts & 2:
+        voice["model"] = text()
+        voice["modelZones"] = take("I")
+    return voice
 
 
 def scenario(scratch: Path) -> None:
@@ -265,16 +292,28 @@ def scenario(scratch: Path) -> None:
     need({"cmd": "sampler_status", "track": loaded["track"], "wait": 30}, "sfz status")
     exported(loaded["track"], "an SFZ", note=69, velocity=0.9, expected=loud * 10 ** (-6 / 20))
 
-    # Exported as a VST3 project (generated only, not built).
+    # Exported as a native project (generated only, not built): the plan in
+    # its sources, the zones and every sample whole in its voice data.
     need({"cmd": "workshop", "action": "open_track", "track": track, "nodeId": 0}, "workshop instrument")
     folder = scratch / "export"
     answer = need({"cmd": "workshop", "action": "vst3_export", "folder": str(folder).replace(os.sep, "/")}, "vst3 project")
-    header = Path(answer["project"]) / "generated" / "CyDawGeneratedGraphConfig.h"
-    state = embedded_state(header)
-    plan = state.get("polySynth", {})
-    check(plan.get("waveform") == 7 and len(plan.get("samplerValues", [])) >= 10,
-          f"the plug-in's plan says sampler ({plan.get('waveform')})")
-    check(has_map(state.get("editor", {})), "the plug-in's state carries the zones (inside its device)")
+    project = Path(answer["project"])
+    definition = (project / "generated" / "Definition.cpp").read_text(encoding="utf-8")
+    velocity_range = plan_value(definition, "p.samplerValues[3]")
+    check("PolyOscillatorWaveform>(7)" in definition and definition.count("p.samplerValues[") >= 10
+          and velocity_range is not None and abs(velocity_range - 12.0) < 1e-6,
+          f"the plug-in's plan says sampler, with the knob turned in the workshop ({velocity_range})")
+    check('d.voiceAssets="Voice.cyvoice"' in definition
+          and "CYDAW_VOICE_ASSETS" in (project / "CMakeLists.txt").read_text(encoding="utf-8"),
+          "the plug-in looks for its voice data, and its build puts it in the bundle")
+    voice_file = project / "generated" / "Voice.cyvoice"
+    voice = read_voice(voice_file) if voice_file.is_file() else {}
+    samples = voice.get("samples", [])
+    check(voice.get("magic") and voice.get("zones") == 4 and len(samples) == 4
+          and all(s["channels"] == 2 and s["frames"] == 88_200 and s["pcm"] == 2 * 88_200 for s in samples)
+          and sorted(s["name"] for s in samples) == sorted(f"{n}.wav" for n in ("Test_A3_v1", "Test_A3_v2", "Test_A4_v1", "Test_A4_v2")),
+          f"the voice data carries the zones and every sample whole, by file name (inside its device; {voice.get('zones')} zones, "
+          f"{[(s['name'], s['frames']) for s in samples]})")
     need({"cmd": "workshop", "action": "close"}, "workshop close")
 
     # The factory instruments, when built.

@@ -4,6 +4,7 @@
 #include <juce_core/juce_core.h>
 
 #include <string>
+#include <vector>
 
 // Compact controls drawn for CyDAW 2: knobs, faders, meters, toggles and icon
 // buttons. Each one behaves the same everywhere — drag vertically to change,
@@ -128,6 +129,52 @@ void meter(const char* id, ImVec2 size, float peakLeft, float peakRight, float r
 // A small rounded toggle: M, S, R, an icon, a word.
 bool toggle(const char* label, bool* value, ImU32 onColour, ImVec2 size = ImVec2(0.0f, 0.0f),
             const char* tooltip = nullptr);
+
+// ---- Controllers: learning ------------------------------------------------------------------
+// What a controller can move, drawn this frame: a target (ControlTargets.h),
+// its name, where it is on screen. In learn mode the controllers tool shows
+// them all over the interface; a click picks one.
+struct LearnSpot {
+    std::string key;
+    std::string label;
+    ImVec2 min;
+    ImVec2 max;
+    ImGuiID viewport {};
+};
+// The target the knobs, faders and toggles drawn inside it drive: they add
+// themselves. Anything else adds itself with learnItem() right after it.
+class LearnScope {
+public:
+    LearnScope(std::string key, std::string label);
+    ~LearnScope();
+    LearnScope(const LearnScope&) = delete;
+    LearnScope& operator=(const LearnScope&) = delete;
+};
+// The last item drawn, for the scope's target or the one given.
+void learnItem();
+void learnItem(const std::string& key, const std::string& label);
+// The track whose cards are drawn now: `prefix` names its knobs' targets
+// ("param/<track>/"), empty where nothing can be learnt (a plug-in's window).
+class LearnTrackScope {
+public:
+    LearnTrackScope(std::string prefix, std::string trackName);
+    ~LearnTrackScope();
+    LearnTrackScope(const LearnTrackScope&) = delete;
+    LearnTrackScope& operator=(const LearnTrackScope&) = delete;
+};
+// A card's knob, by its binding, on the track being drawn (or `prefix`'s).
+class LearnParameterScope {
+public:
+    LearnParameterScope(const juce::String& binding, const juce::String& label, const std::string& prefix = {},
+                        const juce::String& trackName = {});
+    ~LearnParameterScope();
+    LearnParameterScope(const LearnParameterScope&) = delete;
+    LearnParameterScope& operator=(const LearnParameterScope&) = delete;
+};
+void setLearnMode(bool on);
+[[nodiscard]] bool learnMode();
+// The frame's spots, for the overlay (taken: the next frame starts empty).
+[[nodiscard]] std::vector<LearnSpot> takeLearnSpots();
 // A flat icon button, highlighted when active.
 bool iconButton(const char* icon, const char* tooltip, bool active = false, ImU32 activeColour = 0,
                 ImVec2 size = ImVec2(0.0f, 0.0f));

@@ -79,6 +79,7 @@ void draw(DeviceHost& studio, UiState& state, const TrackRef& track, const juce:
             style.colour = colour;
             if (parameter.minimum > 0.0 && (parameter.unit == "Hz" || parameter.unit == "ms"))
                 style.flags |= ui::knobLogarithmic;
+            const ui::LearnParameterScope learn(parameter.binding, parameter.label);
             if (ui::knob("##k", &current, static_cast<float>(parameter.minimum), static_cast<float>(parameter.maximum),
                          static_cast<float>(parameter.defaultValue), style))
                 (void) graph.editorSetParameter(parameter.binding, current);
