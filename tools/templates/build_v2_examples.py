@@ -1476,7 +1476,10 @@ def example_catalogue():
         elif kind in ("simple", "nuee"):
             instrument = "simple-sampler-instrument" if kind == "simple" else "nuee-instrument"
             track = request({"cmd": "add_midi_track", "name": name, "instrument": instrument})["name"]
-            sample = pathlib.Path("D:/CyDAW/Banks/bear-sax/Samples/ab3_vl3_rr2.wav")
+            # A saxophone note of the factory banks, where CyDAW keeps them here.
+            banks = next((item["folder"] for item in request({"cmd": "locations"}).get("locations", [])
+                          if item.get("key") == "banks"), "")
+            sample = pathlib.Path(banks) / "bear-sax" / "Samples" / "ab3_vl3_rr2.wav"
             if sample.exists():
                 request({"cmd": "load_sampler", "track": track, "file": str(sample).replace(os.sep, "/")})
         elif kind == "factory":

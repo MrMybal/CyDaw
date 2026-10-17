@@ -1,12 +1,14 @@
 """Current full catalogue; the original V2 source tree is never rewritten."""
 import argparse
 import json
+import os
 import re
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[2]
 WORK=ROOT/'output/vst3-catalogue-2026-10-15'
-DEST=Path('D:/_Project/CyDaw_VST')
+# Where the pack goes: CYDAW_VST_PACK_DEST, else CyDaw_VST beside the project.
+DEST=Path(os.environ.get('CYDAW_VST_PACK_DEST', str(ROOT.parent/'CyDaw_VST')))
 
 STUDIO={'eq-pro','comp-pro','reverb-pro','limiter-pro','filter-pro'}
 MIX={'pression','fournaise','echo-bande','multibande-pro','velours','patine','sonometre','tranche','finition','halo'}
@@ -64,7 +66,7 @@ def prepare():
     sources.append('src/app/NodeGraphComponentEditorAccess.cpp')
     cmake='''cmake_minimum_required(VERSION 3.24)
 project(CyDAWFullCatalogue VERSION 0.1.0 LANGUAGES C CXX)
-set(CYDAW_SOURCE_ROOT "D:/_Project/CyDAW_Project" CACHE PATH "CyDAW")
+set(CYDAW_SOURCE_ROOT "'''+ROOT.as_posix()+'''" CACHE PATH "CyDAW")
 set(CYDAW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(CYDAW_BUILD_GRAPH_EDITOR OFF CACHE BOOL "" FORCE)
 set(CYDAW_BUILD_GRAPH_RUNTIME_PLUGIN OFF CACHE BOOL "" FORCE)

@@ -41,7 +41,7 @@ def main():
     for d in entries:
         r=next(r for r in rows if r['deviceKey']==d['key'] and r['blockSize']==128)
         report.append(f'| {d["name"]} | {d["parameters"]} | {r["audioThreadPercent"]:.2f} % | {r["p99BudgetPercent"]:.2f} % | {r["declaredLatencySamples"]} éch. ({r["declaredLatencySamples"]/48:.2f} ms) | {d["sizeMiB"]:.2f} Mio |')
-    report+=['', 'Les 18 essais (6 modules × blocs de 64, 128 et 512) chargent les classes VST3, contrôlent les bus, modifient un paramètre, sauvegardent l’état et le restaurent dans une nouvelle instance, puis vérifient un signal non silencieux et fini. Les six identifiants VST3 sont distincts. Les interfaces réelles du moteur exporté sont construites et rendues séparément. Les six essais à 128 échantillons et les six interfaces ont ensuite été revérifiés depuis le dossier de destination D:/_Project/CyDaw_VST, avec les chemins des banques et du contenu externe dirigés vers des dossiers absents.', '',
+    report+=['', 'Les 18 essais (6 modules × blocs de 64, 128 et 512) chargent les classes VST3, contrôlent les bus, modifient un paramètre, sauvegardent l’état et le restaurent dans une nouvelle instance, puis vérifient un signal non silencieux et fini. Les six identifiants VST3 sont distincts. Les interfaces réelles du moteur exporté sont construites et rendues séparément. Les six essais à 128 échantillons et les six interfaces ont ensuite été revérifiés depuis le dossier de destination, avec les chemins des banques et du contenu externe dirigés vers des dossiers absents.', '',
         'La mémoire privée du processus de mesure est d’environ '+f'{min(r["hostPrivateMiB"] for r in rows):.1f} à {max(r["hostPrivateMiB"] for r in rows):.1f}'+' Mio ; elle comprend l’hôte et ses bibliothèques, donc ne mesure pas la mémoire d’une instance seule.', '',
         'Givre déclare 2048 échantillons de latence à 48 kHz, soit 42,67 ms. Le signal direct peut apparaître avant la partie spectrale traitée. Le moteur de jeu ou l’hôte doit gérer la latence déclarée et l’alignement des voies.', '',
         'Les chiffres dépendent de la machine, du preset, du nombre de voix et de la charge. Aucun test Unreal ou jeu commercial n’a été effectué. Le prochain test utile est la même scène Unreal avec plusieurs instances, en observant les pics de callback, les sous-alimentations audio, les voix actives et la latence totale. Un budget de thread se cumule entre toutes les instances.']
@@ -89,7 +89,7 @@ Le cas visé (middleware Unreal vendu puis incorporé dans les jeux des acheteur
 ''',encoding='utf-8')
     source_zip=PACK/'Sources/CyDAW-Advanced-Tests-0.2.0-sources.zip'
     source_zip.parent.mkdir(exist_ok=True)
-    cmake=(WORK/'CMakeLists.txt').read_text(encoding='utf-8').replace('"D:/_Project/CyDAW_Project" CACHE PATH','"${CMAKE_CURRENT_LIST_DIR}/../CyDAW" CACHE PATH')
+    cmake=(WORK/'CMakeLists.txt').read_text(encoding='utf-8').replace('"'+ROOT.as_posix()+'" CACHE PATH','"${CMAKE_CURRENT_LIST_DIR}/../CyDAW" CACHE PATH')
     rebuild='''# Recompiler
 
 Extraire l’archive en conservant CyDAW/ et Export/ côte à côte. Installer Visual Studio 2022 avec C++, CMake et le SDK Windows. Obtenir JUCE 8.0.15 depuis https://github.com/juce-framework/JUCE/tree/8.0.15 ; il garde sa propre licence.
