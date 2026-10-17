@@ -46,6 +46,11 @@ sons intégrée.
   pas, roulement.
 - Utilitaires : accordeur, stéréoscope (goniomètre, corrélation de phase), polarité et graves en mono.
 
+**Moduler**
+- Sur chaque périphérique, des **modulateurs** comme dans Bitwig : LFO, Steps, Random, ADSR, Keytrack,
+  Expressions, Macro, Button, Math, Envelope Follower. On glisse leur flèche sur n'importe quel potard,
+  effets et instruments compris ; un anneau montre de combien il bouge, réglable pendant que ça joue.
+
 **Mixer et router**
 - Mixeur avec bus, envois, side-chain, compensation de latence.
 - Pistes de mono à 7.1, entrées et sorties virtuelles avec leurs propres effets.
@@ -126,6 +131,7 @@ Les tests se lancent avec `ctest -C Release` dans le dossier de compilation.
 - [Cinéma : vidéo, montage audio et bus](docs/CINEMA.md)
 - [Synchronisation du transport : MIDI, JACK, Link](docs/TRANSPORT_SYNC.md)
 - [Contrôleurs MIDI / OSC : appareils RAW, virtuels, apprentissage](docs/CONTROLEURS.md)
+- [Modulateurs : LFO, pas, enveloppes, macros sur chaque périphérique](docs/MODULATEURS.md)
 - [Serveur MCP](tools/mcp/README.md)
 
 ## Licence

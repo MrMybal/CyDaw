@@ -453,7 +453,9 @@ std::vector<std::string> ControlTargets::list() const
             for (const auto& node : slot->graph().editorNodes())
                 if (!node.boundary)
                     for (const auto& parameter : node.parameters)
-                        out.push_back(forParameter(key, parameter.binding));
+                        // The card a modulator belongs to is no setting.
+                        if (!parameter.binding.endsWith(".ownerLow") && !parameter.binding.endsWith(".ownerHigh"))
+                            out.push_back(forParameter(key, parameter.binding));
     }
     for (int deck = 0; deck < app::DjEngine::deckCount; ++deck)
         for (const auto* what : { "play", "cue", "sync", "gain", "high", "mid", "low", "filter", "fader", "killHigh", "killMid",

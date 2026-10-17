@@ -318,6 +318,30 @@ TOOLS = [
                         "required": ["track", "nodeId"]},
     },
     {
+        "name": "modulator",
+        "description": ("Les modulateurs des cartes, comme dans Bitwig (une colonne a gauche de la carte) : "
+                        "action add {nodeId (la carte), type: lfo|steps|random|adsr|keytrack|expressions|macro|"
+                        "button|math|follower} ; set {id, settings: {cle: valeur}} (un choix par numero ou par "
+                        "nom : sync \"1/8\", shape \"Triangle\", mode \"Add\") ; modulate {id, binding | nodeId + "
+                        "parameter (suffixe), amount -1..1 de la plage du potard, defaut 0.25 ; deja la : sa "
+                        "quantite} ; unmodulate {id, binding | nodeId + parameter} ; remove {id} ; arm {id} "
+                        "(0 : aucun ; arme, tirer un potard regle sa quantite) ; column {nodeId, open} ; "
+                        "list {nodeId?} : les modulateurs (type, name, owner, settings, value maintenant) et "
+                        "leurs modulations [{binding, nodeId, amount, mode}]. Cles des reglages : lfo rate sync "
+                        "shape phase retrigger bipolar smooth ; steps steps sync rate smooth bipolar retrigger "
+                        "step1..16 ; random rate sync smooth bipolar chance retrigger ; adsr attack decay "
+                        "sustain release velocity legato ; keytrack source root range ; expressions source "
+                        "controller smooth ; macro value bipolar ; button on ; math mode blend a b ; follower "
+                        "attack release gain."),
+        "inputSchema": {"type": "object",
+                        "properties": {"track": {}, "action": {"type": "string"}, "id": {"type": "integer"},
+                                       "nodeId": {"type": "integer"}, "type": {"type": "string"},
+                                       "settings": {"type": "object"}, "binding": {"type": "string"},
+                                       "parameter": {"type": "string"}, "amount": {"type": "number"},
+                                       "open": {"type": "boolean"}},
+                        "required": ["track", "action"]},
+    },
+    {
         "name": "controllers",
         "description": ("Les controleurs MIDI / OSC : appareils RAW (ports MIDI, points OSC "
                         "local/reseau, appareils des plug-ins d'application .cyctl), appareils "

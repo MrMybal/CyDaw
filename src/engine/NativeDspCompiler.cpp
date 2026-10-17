@@ -13,7 +13,8 @@ bool isControlOnly(const NativeDspNodeKind kind) noexcept
     return (kind >= NativeDspNodeKind::controlConstant
             && kind <= NativeDspNodeKind::controlNot)
            || (kind >= NativeDspNodeKind::controlModulo
-               && kind <= NativeDspNodeKind::controlRound);
+               && kind <= NativeDspNodeKind::controlRound)
+           || isModulatorKind(kind);
 }
 
 } // namespace
@@ -21,6 +22,8 @@ bool isControlOnly(const NativeDspNodeKind kind) noexcept
 std::unique_ptr<AudioProcessor> makeNativeDspProcessor(
     const NativeDspNode& node)
 {
+    if (isModulatorKind(node.kind))
+        return {};
     if (effectForKind(node.kind) != nullptr) {
         auto effect = makeEffectProcessor(node);
         if (auto* typed = dynamic_cast<EffectProcessor*>(effect.get()); typed != nullptr && node.impulse != nullptr)

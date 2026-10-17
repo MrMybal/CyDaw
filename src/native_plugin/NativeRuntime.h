@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cydaw/engine/AudioAnalysis.h>
+#include <cydaw/engine/Modulators.h>
 #include <cydaw/engine/NativeDspGraph.h>
 #include <cydaw/realtime/RtPublisher.h>
 
@@ -80,7 +81,7 @@ struct PlanarBuffer
 {
     using Kind = cydaw::engine::NativeDspNodeKind;
     return (kind >= Kind::controlConstant && kind <= Kind::controlNot) ||
-           (kind >= Kind::controlModulo && kind <= Kind::controlRound);
+           (kind >= Kind::controlModulo && kind <= Kind::controlRound) || cydaw::engine::isModulatorKind(kind);
 }
 
 class NativeDspRuntime
@@ -177,6 +178,11 @@ class NativeDspRuntime
     static void setSessionPlaying(bool playing) noexcept;
     [[nodiscard]] static bool sessionPlaying() noexcept;
 
+    // What the notes and controllers that play the graph say now, for its
+    // modulators (an envelope, keytrack, expressions). Audio thread, before
+    // the block it is for; a graph nobody plays notes into leaves it at rest.
+    void setControlNotes(const cydaw::engine::modulator::ControlNotes &notes) noexcept { notes_ = notes; }
+
     // ---- Signal taps -----------------------------------------------------
     // What a node received or produced, kept for the interface's displays
     // (spectra before and after a device, a compressor's levels). Chosen on
@@ -197,6 +203,7 @@ class NativeDspRuntime
                                cydaw::engine::AudioAnalysisFrame &frame) const noexcept;
 
   private:
+    cydaw::engine::modulator::ControlNotes notes_;
     // The graph's cards switched off, into its compiled plan.
     static void applyBypasses(cydaw::engine::AudioRenderPlan &plan, const cydaw::engine::NativeDspGraph &graph);
     std::array<const PlanarBuffer *, maximumExtraInputs> extraInputs_{};
@@ -215,7 +222,7 @@ class NativeDspRuntime
     struct RuntimeState;
     [[nodiscard]] std::shared_ptr<RuntimeState> compile(const cydaw::engine::NativeDspGraph &graph,
                                                         std::string &error) const;
-    void evaluateControls(const RuntimeState &runtime, int numSamples) noexcept;
+    void evaluateControls(const RuntimeState &runtime, int numSamples, double timelineSeconds) noexcept;
     // The cables' values and the automation's written into the parameters
     // they drive, each touched node updated once.
     void applyParameters(const RuntimeState &runtime, double timelineSeconds) noexcept;

@@ -1,6 +1,7 @@
 #include "NativeRuntime.h"
 
 #include <cydaw/engine/BuiltinProcessors.h>
+#include <cydaw/engine/Modulators.h>
 #include <cydaw/engine/NativeDspCompiler.h>
 #include <cydaw/engine/NativeDspParameters.h>
 
@@ -26,8 +27,15 @@ struct NativeDspRuntime::RuntimeState
 {
     struct ControlNode
     {
-        explicit ControlNode(const cydaw::engine::NativeDspNode &node) : id(node.id), kind(node.kind)
+        explicit ControlNode(const cydaw::engine::NativeDspNode &node)
+            : id(node.id), kind(node.kind),
+              owner(cydaw::engine::modulator::ownerOf(
+                  node.parameters.eqBands[cydaw::engine::modulator::ownerLowSlot],
+                  node.parameters.eqBands[cydaw::engine::modulator::ownerHighSlot])),
+              seed(0x9e3779b9u ^ static_cast<std::uint32_t>(node.id * 2654435761ull))
         {
+            if (seed == 0)
+                seed = 1;
             update(node.parameters);
         }
 
@@ -46,6 +54,19 @@ struct NativeDspRuntime::RuntimeState
             mapInputMaximum.store(parameters.mapInputMaximum, std::memory_order_relaxed);
             mapOutputMinimum.store(parameters.mapOutputMinimum, std::memory_order_relaxed);
             mapOutputMaximum.store(parameters.mapOutputMaximum, std::memory_order_relaxed);
+            const float effects[8]{parameters.effect1, parameters.effect2, parameters.effect3, parameters.effect4,
+                                   parameters.effect5, parameters.effect6, parameters.effect7, parameters.effect8};
+            for (std::size_t index = 0; index < settings.size(); ++index)
+                settings[index].store(effects[index], std::memory_order_relaxed);
+            for (std::size_t index = 0; index < steps.size(); ++index)
+                steps[index].store(parameters.eqBands[static_cast<std::size_t>(cydaw::engine::modulator::stepSlot) + index],
+                                   std::memory_order_relaxed);
+        }
+
+        // A modulator's setting (effect1..8, from 0).
+        [[nodiscard]] float setting(const std::size_t index) const noexcept
+        {
+            return settings[index].load(std::memory_order_relaxed);
         }
 
         std::uint64_t id{};
@@ -63,6 +84,29 @@ struct NativeDspRuntime::RuntimeState
         std::atomic<float> mapInputMaximum{};
         std::atomic<float> mapOutputMinimum{};
         std::atomic<float> mapOutputMaximum{};
+        // A modulator's settings (effect1..8) and steps.
+        std::array<std::atomic<float>, 8> settings{};
+        std::array<std::atomic<float>, cydaw::engine::modulator::stepCount> steps{};
+        // The card a modulator belongs to (0: none).
+        std::uint64_t owner{};
+        // A modulator's own state, the audio thread's: its random values (this
+        // cycle's, the next one's) and the cycle they are for, its smoothed
+        // output, the note-ons it last saw, an envelope's stage (0 rest,
+        // 1 attack, 2 decay, 3 sustain, 4 release), level and gate, a steps
+        // modulator's step, its random generator.
+        float held{};
+        float next{};
+        std::int64_t cycle{std::numeric_limits<std::int64_t>::min()};
+        float smoothed{};
+        bool started{};
+        std::uint32_t noteOns{};
+        int stage{};
+        float level{};
+        float releaseFrom{};
+        bool gate{};
+        std::uint32_t seed{1};
+        // A follower's card in the plan (its output's when it has none).
+        int levelIndex{-1};
         // Resolved once at compile time so the callback never searches the
         // modulation list: index into RuntimeState::controls, or -1 when the
         // socket is unconnected and keeps its authored fallback.
@@ -92,7 +136,9 @@ struct NativeDspRuntime::RuntimeState
         // Modulate rather than set: the cable moves the value it finds
         // (knob, automation) by amount x range per unit.
         bool modulate{};
-        float amount{};
+        // Its cable in RuntimeState::modulations, whose amount it reads
+        // (turned while it plays: no recompilation).
+        std::size_t modulation{};
         float minimum{};
         float maximum{1.0f};
         bool logarithmic{};
@@ -128,6 +174,8 @@ struct NativeDspRuntime::RuntimeState
     std::vector<std::unique_ptr<ControlNode>> controls;
     std::unordered_map<std::uint64_t, std::size_t> controlIndices;
     std::vector<cydaw::engine::NativeDspModulationConnection> modulations;
+    // Each cable's amount, as updateParameters() last set it.
+    std::unique_ptr<std::atomic<float>[]> amounts;
     std::unordered_map<std::uint64_t, cydaw::engine::NativeDspNode> audioDefinitions;
     std::vector<ParameterBinding> parameterBindings;
     mutable std::atomic<std::uint64_t> controlSequence{};
@@ -143,7 +191,23 @@ bool isControlNode(const Kind kind) noexcept
 {
     return kind == Kind::envelopeFollower || kind == Kind::compressor ||
            (kind >= Kind::controlConstant && kind <= Kind::controlNot) ||
-           (kind >= Kind::controlModulo && kind <= Kind::controlRound);
+           (kind >= Kind::controlModulo && kind <= Kind::controlRound) || cydaw::engine::isModulatorKind(kind);
+}
+
+// The same cables, their amounts aside (an amount is turned live).
+bool sameCables(const std::vector<cydaw::engine::NativeDspModulationConnection> &first,
+                const std::vector<cydaw::engine::NativeDspModulationConnection> &second) noexcept
+{
+    if (first.size() != second.size())
+        return false;
+    for (std::size_t index = 0; index < first.size(); ++index)
+    {
+        auto cable = first[index];
+        cable.amount = second[index].amount;
+        if (!(cable == second[index]))
+            return false;
+    }
+    return true;
 }
 
 bool isControlOnly(const Kind kind) noexcept
@@ -241,7 +305,7 @@ Result NativeDspRuntime::updateParameters(const cydaw::engine::NativeDspGraph &g
         return Result::fail("The native DSP runtime is not prepared");
 
     if (graph.outputNodeId != graph_.outputNodeId || graph.connections != graph_.connections ||
-        graph.modulations != graph_.modulations || graph.nodes.size() != graph_.nodes.size())
+        !sameCables(graph.modulations, graph_.modulations) || graph.nodes.size() != graph_.nodes.size())
         return Result::fail("The native DSP topology changed and must be recompiled");
     for (std::size_t index = 0; index < graph.nodes.size(); ++index)
         if (graph.nodes[index].id != graph_.nodes[index].id || graph.nodes[index].kind != graph_.nodes[index].kind)
@@ -277,6 +341,9 @@ Result NativeDspRuntime::updateParameters(const cydaw::engine::NativeDspGraph &g
     }
     if (current->plan != nullptr)
         applyBypasses(*current->plan, graph);
+    if (current->amounts != nullptr)
+        for (std::size_t index = 0; index < graph.modulations.size(); ++index)
+            current->amounts[index].store(graph.modulations[index].amount, std::memory_order_relaxed);
     graph_ = graph;
     return Result::ok();
 }
@@ -286,7 +353,8 @@ void NativeDspRuntime::resetRealtime() noexcept
     const auto current=runtime_.read();
     if(current==nullptr)return;
     if(current->plan)current->plan->reset();
-    for(const auto& control:current->controls){control->phase=0;control->value.store(0,std::memory_order_relaxed);}
+    for(const auto& control:current->controls){control->phase=0;control->value.store(0,std::memory_order_relaxed);
+        control->cycle=std::numeric_limits<std::int64_t>::min();control->started=false;control->stage=0;control->level=0;}
 }
 
 bool NativeDspRuntime::updateNodeParametersRealtime(const cydaw::engine::NativeDspNode &node) noexcept
@@ -389,6 +457,9 @@ std::shared_ptr<NativeDspRuntime::RuntimeState> NativeDspRuntime::compile(const 
     applyBypasses(*runtime->plan, graph);
     runtime->sampleRate = sampleRate;
     runtime->modulations = graph.modulations;
+    runtime->amounts = std::make_unique<std::atomic<float>[]>(std::max<std::size_t>(1, graph.modulations.size()));
+    for (std::size_t index = 0; index < graph.modulations.size(); ++index)
+        runtime->amounts[index].store(graph.modulations[index].amount, std::memory_order_relaxed);
     for (const auto &node : graph.nodes)
         if (!isControlOnly(node.kind))
             runtime->audioDefinitions.emplace(node.id, node);
@@ -490,6 +561,13 @@ std::shared_ptr<NativeDspRuntime::RuntimeState> NativeDspRuntime::compile(const 
         auto &control = *storage;
         control.valueSourceA = sourceFeeding(control.id, 1);
         control.valueSourceB = sourceFeeding(control.id, 2);
+        // A follower hears its card (the graph's output when it has none).
+        if (control.kind == Kind::modFollower && runtime->plan != nullptr)
+        {
+            control.levelIndex = control.owner != 0 ? runtime->plan->nodeIndex(control.owner) : -1;
+            if (control.levelIndex < 0)
+                control.levelIndex = runtime->plan->nodeIndex(graph.outputNodeId);
+        }
         if (control.kind == Kind::envelopeFollower || control.kind == Kind::compressor)
         {
             const auto processor = runtime->processors.find(control.id);
@@ -500,8 +578,9 @@ std::shared_ptr<NativeDspRuntime::RuntimeState> NativeDspRuntime::compile(const 
             }
         }
     }
-    for (const auto &connection : graph.modulations)
+    for (std::size_t cable = 0; cable < graph.modulations.size(); ++cable)
     {
+        const auto &connection = graph.modulations[cable];
         if (connection.destinationParameterKey.empty())
             continue;
         const auto processor = runtime->processors.find(connection.destination);
@@ -518,7 +597,7 @@ std::shared_ptr<NativeDspRuntime::RuntimeState> NativeDspRuntime::compile(const 
         const auto low = std::min(connection.minimum, connection.maximum);
         const auto high = std::max(connection.minimum, connection.maximum);
         runtime->parameterBindings.push_back({slotOf(connection.source), live->second, field, parameterSlot,
-                                              connection.mode == 1, connection.amount, low, high,
+                                              connection.mode == 1, cable, low, high,
                                               low > 0.0f && high / low >= 100.0f});
     }
 
@@ -529,9 +608,222 @@ std::shared_ptr<NativeDspRuntime::RuntimeState> NativeDspRuntime::compile(const 
     return runtime;
 }
 
-void NativeDspRuntime::evaluateControls(const RuntimeState &runtime, const int numSamples) noexcept
+void NativeDspRuntime::evaluateControls(const RuntimeState &runtime, const int numSamples,
+                                        const double timelineSeconds) noexcept
 {
+    namespace modulator = cydaw::engine::modulator;
+    using ControlNode = RuntimeState::ControlNode;
     runtime.controlSequence.fetch_add(1, std::memory_order_acq_rel);
+    // The modulators': how long this block lasts, where the song is.
+    const auto seconds = static_cast<double>(numSamples) / std::max(1.0, runtime.sampleRate);
+    const auto tempo = std::max(1.0, sessionTempo());
+    const auto locked = sessionPlaying() && std::isfinite(timelineSeconds);
+    const auto beats = locked ? std::max(0.0, timelineSeconds) * tempo / 60.0 : 0.0;
+    const auto &notes = notes_;
+    const auto random = [](ControlNode &control) {
+        auto &seed = control.seed;
+        seed ^= seed << 13;
+        seed ^= seed >> 17;
+        seed ^= seed << 5;
+        return static_cast<float>(static_cast<double>(seed) / 2147483648.0 - 1.0);
+    };
+    // Where a cyclic modulator stands, in cycles: on the song's beat when it
+    // is synced and the transport plays, unless notes restart it; on its own
+    // otherwise, at its rate or the tempo's.
+    const auto position = [&](ControlNode &control, const float division, const float rate, const bool restart,
+                              const bool struck) {
+        const auto length = modulator::divisionBeats(static_cast<int>(std::lround(division)));
+        if (length > 0.0 && locked && !restart)
+        {
+            control.phase = beats / length;
+            return control.phase;
+        }
+        if (restart && struck)
+            control.phase = 0.0;
+        const auto now = control.phase;
+        control.phase += (length > 0.0 ? tempo / 60.0 / length : std::max(0.0, static_cast<double>(rate))) * seconds;
+        return now;
+    };
+    // A new cycle: the random values move on.
+    const auto newCycle = [&](ControlNode &control, const double at) {
+        const auto cycle = static_cast<std::int64_t>(std::floor(at));
+        if (cycle == control.cycle)
+            return false;
+        if (control.cycle != std::numeric_limits<std::int64_t>::min() && cycle == control.cycle + 1)
+            control.held = control.next;
+        else
+            control.held = random(control);
+        control.next = random(control);
+        control.cycle = cycle;
+        return true;
+    };
+    // Its output eased over `amount` (0 none .. 1 half a second).
+    const auto smoothed = [&](ControlNode &control, const float target, const float amount) {
+        if (amount <= 0.0f || !control.started)
+            control.smoothed = target;
+        else
+            control.smoothed += (target - control.smoothed)
+                                * static_cast<float>(1.0 - std::exp(-seconds / (0.5 * static_cast<double>(amount))));
+        return control.smoothed;
+    };
+    const auto polar = [](const float bipolar, const float value) {
+        return bipolar > 0.5f ? value : 0.5f * (value + 1.0f);
+    };
+    const auto modulate = [&](ControlNode &control, const float a, const float b) -> float {
+        const auto struck = control.started && notes.noteOns != control.noteOns;
+        switch (control.kind)
+        {
+        case Kind::modLfo: {
+            const auto at = position(control, control.setting(1), control.setting(0), control.setting(4) > 0.5f, struck)
+                            + static_cast<double>(control.setting(3));
+            (void)newCycle(control, at);
+            const auto shape = static_cast<modulator::Shape>(
+                std::clamp(static_cast<int>(std::lround(control.setting(2))), 0, modulator::shapeCount - 1));
+            return smoothed(control, polar(control.setting(5), modulator::shapeAt(shape, at, control.held, control.next)),
+                            control.setting(6));
+        }
+        case Kind::modSteps: {
+            const auto count = std::clamp(static_cast<int>(std::lround(control.setting(0))), 1, modulator::stepCount);
+            const auto at = position(control, control.setting(1), control.setting(2), control.setting(5) > 0.5f, struck);
+            const auto whole = static_cast<std::int64_t>(std::floor(at));
+            control.stage = static_cast<int>(((whole % count) + count) % count);
+            const auto step = std::clamp(control.steps[static_cast<std::size_t>(control.stage)].load(std::memory_order_relaxed),
+                                         0.0f, 1.0f);
+            return smoothed(control, control.setting(4) > 0.5f ? 2.0f * step - 1.0f : step, control.setting(3));
+        }
+        case Kind::modRandom: {
+            const auto restart = control.setting(5) > 0.5f;
+            const auto at = position(control, control.setting(1), control.setting(0), restart, struck);
+            const auto first = control.cycle == std::numeric_limits<std::int64_t>::min();
+            const auto kept = control.held;
+            if (newCycle(control, at) && !first && 0.5f * (random(control) + 1.0f) > control.setting(4))
+                control.held = kept; // this time, no new value
+            return smoothed(control, polar(control.setting(3), control.held), control.setting(2));
+        }
+        case Kind::modAdsr: {
+            const auto gate = notes.held > 0;
+            const auto legato = control.setting(5) > 0.5f;
+            if ((struck && (!legato || !control.gate)) || (gate && control.stage == 0))
+                control.stage = 1; // from where it is
+            if (!gate && !struck && control.stage >= 1 && control.stage <= 3)
+            {
+                control.stage = 4;
+                control.releaseFrom = std::max(control.level, 1.0e-3f);
+            }
+            control.gate = gate;
+            const auto step = [seconds](const float time) {
+                return time > 1.0e-4f ? static_cast<float>(seconds / static_cast<double>(time)) : 1.0f;
+            };
+            const auto sustain = std::clamp(control.setting(2), 0.0f, 1.0f);
+            switch (control.stage)
+            {
+            case 1:
+                control.level += step(control.setting(0));
+                if (control.level >= 1.0f)
+                {
+                    control.level = 1.0f;
+                    control.stage = 2;
+                }
+                break;
+            case 2:
+                control.level -= step(control.setting(1)) * (1.0f - sustain);
+                if (control.level <= sustain)
+                {
+                    control.level = sustain;
+                    control.stage = 3;
+                }
+                break;
+            case 3:
+                control.level = sustain;
+                break;
+            case 4:
+                control.level -= step(control.setting(3)) * control.releaseFrom;
+                if (control.level <= 0.0f)
+                {
+                    control.level = 0.0f;
+                    control.stage = 0;
+                }
+                break;
+            default:
+                control.level = 0.0f;
+                break;
+            }
+            const auto velocity = std::clamp(control.setting(4), 0.0f, 1.0f);
+            return control.level * (1.0f - velocity + velocity * std::clamp(notes.velocity, 0.0f, 1.0f));
+        }
+        case Kind::modNote:
+            switch (static_cast<int>(std::lround(control.setting(0))))
+            {
+            case 1:
+                return std::clamp(notes.velocity, 0.0f, 1.0f);
+            case 2:
+                return notes.held > 0 ? 1.0f : 0.0f;
+            default:
+                return std::clamp((notes.note - control.setting(1)) / std::max(1.0f, 0.5f * control.setting(2)), -1.0f,
+                                  1.0f);
+            }
+        case Kind::modExpression: {
+            float target;
+            switch (static_cast<int>(std::lround(control.setting(0))))
+            {
+            case 1:
+                target = notes.aftertouch;
+                break;
+            case 2:
+                target = notes.pitchBend;
+                break;
+            case 3:
+                target = notes.controllers[static_cast<std::size_t>(
+                    std::clamp(static_cast<int>(std::lround(control.setting(1))), 0, 127))];
+                break;
+            default:
+                target = notes.modWheel;
+                break;
+            }
+            return smoothed(control, target, control.setting(2));
+        }
+        case Kind::modMacro: {
+            const auto value = std::clamp(control.setting(0), 0.0f, 1.0f);
+            return control.setting(1) > 0.5f ? 2.0f * value - 1.0f : value;
+        }
+        case Kind::modButton:
+            return control.setting(0) > 0.5f ? 1.0f : 0.0f;
+        case Kind::modMath: {
+            // Its inputs: the modulators plugged in, else its own knobs.
+            const auto x = control.valueSourceA >= 0 ? a : control.setting(2);
+            const auto y = control.valueSourceB >= 0 ? b : control.setting(3);
+            switch (static_cast<modulator::MathMode>(
+                std::clamp(static_cast<int>(std::lround(control.setting(0))), 0, modulator::mathModeCount - 1)))
+            {
+            case modulator::MathMode::add:
+                return x + y;
+            case modulator::MathMode::multiply:
+                return x * y;
+            case modulator::MathMode::minimum:
+                return std::min(x, y);
+            case modulator::MathMode::maximum:
+                return std::max(x, y);
+            case modulator::MathMode::difference:
+                return x - y;
+            case modulator::MathMode::average:
+                return 0.5f * (x + y);
+            case modulator::MathMode::mix:
+                break;
+            }
+            return x + (y - x) * std::clamp(control.setting(1), 0.0f, 1.0f);
+        }
+        case Kind::modFollower: {
+            const auto heard = runtime.plan != nullptr ? runtime.plan->lastLevel(control.levelIndex) : 0.0f;
+            const auto target = heard * std::pow(10.0f, control.setting(2) / 20.0f);
+            const auto time = std::max(1.0e-4, 0.001 * static_cast<double>(target > control.level ? control.setting(0)
+                                                                                                   : control.setting(1)));
+            control.level += (target - control.level) * static_cast<float>(1.0 - std::exp(-seconds / time));
+            return std::clamp(control.level, 0.0f, 1.0f);
+        }
+        default:
+            return 0.0f;
+        }
+    };
     // Slots were resolved during compilation, so a socket is either a direct
     // index into the topologically ordered control list or its authored
     // fallback. Sources always precede their destinations, which is what lets
@@ -666,7 +958,15 @@ void NativeDspRuntime::evaluateControls(const RuntimeState &runtime, const int n
                                 std::memory_order_relaxed);
             break;
         default:
-            control.value.store(0.0f, std::memory_order_relaxed);
+            if (cydaw::engine::isModulatorKind(control.kind))
+            {
+                const auto value = modulate(control, a, b);
+                control.value.store(std::isfinite(value) ? value : 0.0f, std::memory_order_relaxed);
+                control.noteOns = notes.noteOns;
+                control.started = true;
+            }
+            else
+                control.value.store(0.0f, std::memory_order_relaxed);
             break;
         }
     }
@@ -773,6 +1073,7 @@ void NativeDspRuntime::applyParameters(const RuntimeState &runtime, const double
         }
     for (const auto &binding : runtime.parameterBindings)
     {
+        const auto amount = runtime.amounts[binding.modulation].load(std::memory_order_relaxed);
         const auto slot = binding.sourceControlIndex;
         const auto control =
             slot < 0 ? 0.0f : runtime.controls[static_cast<std::size_t>(slot)]->value.load(std::memory_order_relaxed);
@@ -785,12 +1086,12 @@ void NativeDspRuntime::applyParameters(const RuntimeState &runtime, const double
         else if (binding.logarithmic && value > 0.0f)
         {
             // Around the knob, on its own scale: +-amount of the decades.
-            value = std::clamp(value * std::pow(binding.maximum / binding.minimum, control * binding.amount),
+            value = std::clamp(value * std::pow(binding.maximum / binding.minimum, control * amount),
                                binding.minimum, binding.maximum);
         }
         else if (binding.maximum > binding.minimum)
         {
-            value = std::clamp(value + control * binding.amount * (binding.maximum - binding.minimum), binding.minimum,
+            value = std::clamp(value + control * amount * (binding.maximum - binding.minimum), binding.minimum,
                                binding.maximum);
         }
     }
@@ -823,7 +1124,7 @@ bool NativeDspRuntime::process(PlanarBuffer &buffer, const int startSample, cons
         static_cast<std::uint32_t>(std::min(buffer.getNumChannels(), static_cast<int>(runtime->input.channelCount())));
     auto input = runtime->input.view(frames);
     auto output = runtime->output.view(frames);
-    evaluateControls(*runtime, numSamples);
+    evaluateControls(*runtime, numSamples, timelineSeconds);
     applyParameters(*runtime, timelineSeconds);
     cydaw::engine::clearAudio(input);
     for (std::uint32_t channel = 0; channel < channels; ++channel)

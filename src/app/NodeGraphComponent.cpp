@@ -1,6 +1,7 @@
 #include "NodeGraphComponent.h"
 
 #include <cydaw/engine/EffectCatalogue.h>
+#include <cydaw/engine/Modulators.h>
 #include "PaintProfile.h"
 #include <cydaw/graph/SoundSources.h>
 #include <cydaw/engine/NativeDspParameters.h>
@@ -1717,6 +1718,12 @@ void appendPublishedParameters(
                                    : tr(juce::String(std::string(item.labelKey))),
                     juce::String(std::string(item.unit)), item.minimum, item.maximum,
                     cydaw::engine::effectValue(parameters, item));
+        // A modulator's card it belongs to is no knob.
+        for (auto& parameter : state.parameters)
+            if (parameter.key.endsWith(".ownerLow") || parameter.key.endsWith(".ownerHigh")) {
+                parameter.showInDevice = false;
+                parameter.publishToHost = false;
+            }
     } else if (typeKey == "drive")
         add("drive.db", tr("node.drive"), "dB", 0.0, 36.0, parameters.driveDb);
     else if (typeKey == "gain")
@@ -5243,11 +5250,11 @@ std::uint64_t NodeGraphComponent::structuralSignature() const
         mix(static_cast<std::uint64_t>(connection.kind));
         mix(connection.sourcePort);
         mix(connection.destinationPort);
-        // A control cable's set/modulate and depth become the compiled
-        // modulation itself, which the parameter patch does not refresh: a
-        // cable switched to modulate after it was made stayed "set".
+        // A control cable's set/modulate becomes the compiled modulation
+        // itself: a cable switched to modulate after it was made stayed
+        // "set". Its depth is not shape: the patch refreshes it, the engine
+        // takes it live (a ring turned while it plays).
         mix(static_cast<std::uint64_t>(connection.mode));
-        mix(static_cast<std::uint64_t>(std::llround(static_cast<double>(connection.amount) * 1.0e6)));
     }
     mix(savedModules_.size());
     for (const auto& module : savedModules_) {
@@ -5308,6 +5315,27 @@ bool NodeGraphComponent::patchNativeGraphParameters(
         }
         native.wavetable = node->wavetableBank;
         native.impulse = node->impulse;
+    }
+    // The cables' depths, each from the editor's cable it was compiled
+    // from (same source and sockets; the same card first, a module's inner
+    // node otherwise).
+    std::vector<bool> used(connections_.size());
+    for (auto& modulation : graph.modulations) {
+        auto best = connections_.size();
+        for (std::size_t index = 0; index < connections_.size(); ++index) {
+            const auto& connection = connections_[index];
+            if (used[index] || connection.kind != PortKind::control || connection.source != modulation.source
+                || connection.sourcePort != modulation.sourcePort
+                || connection.destinationPort != modulation.destinationPort)
+                continue;
+            best = index;
+            if (connection.destination == modulation.destination)
+                break;
+        }
+        if (best < connections_.size()) {
+            used[best] = true;
+            modulation.amount = connections_[best].amount;
+        }
     }
     return true;
 }
@@ -9282,6 +9310,8 @@ juce::var NodeGraphComponent::createVst3RuntimeState() const
     for(const auto& modulation:editorVoiceModulations()) {
         auto* value=new juce::DynamicObject();value->setProperty("source",static_cast<juce::int64>(modulation.controlNodeId));
         value->setProperty("target",static_cast<int>(modulation.target));value->setProperty("depth",modulation.depth);
+        value->setProperty("index",static_cast<int>(modulation.index));value->setProperty("minimum",modulation.minimum);
+        value->setProperty("maximum",modulation.maximum);value->setProperty("logarithmic",modulation.logarithmic);
         voiceModulations.add(juce::var(value));
     }
     root->setProperty("voiceModulations",voiceModulations);
@@ -17766,6 +17796,171 @@ void NodeGraphComponent::applyDefaultCableMode(const std::uint64_t source, const
         }
 }
 
+juce::String NodeGraphComponent::knobOfSocket(const Node& node, const juce::String& portKey) const
+{
+    const auto prefix = nodeParameterBinding(node.id, {});
+    juce::String found;
+    for (const auto& parameter : presentationForNode(node).parameters) {
+        if (!parameter.key.startsWith(prefix))
+            continue;
+        const auto suffix = parameter.key.substring(prefix.length());
+        // "opale.osc1.level" for "osc1.level", not the "level" of "opale.level".
+        if (suffix == portKey || suffix.fromFirstOccurrenceOf(".", false, false) == portKey)
+            return parameter.key;
+        if (found.isEmpty() && valuePortKeyForBinding(suffix) == portKey)
+            found = parameter.key;
+    }
+    return found;
+}
+
+std::vector<NodeGraphComponent::EditorModulation> NodeGraphComponent::editorModulations() const
+{
+    std::vector<EditorModulation> out;
+    for (const auto& connection : connections_) {
+        if (connection.kind != PortKind::control)
+            continue;
+        const auto target = controlCableTarget(connection);
+        if (!target || target->binding.isEmpty())
+            continue;
+        out.push_back({ connection.source, connection.sourcePort, connection.destination, connection.destinationPort,
+                        target->binding, static_cast<int>(connection.mode), connection.amount });
+    }
+    return out;
+}
+
+std::uint64_t NodeGraphComponent::editorModulatorOwner(const std::uint64_t modulator) const
+{
+    const auto* node = readNode(modulator);
+    if (node == nullptr)
+        return 0;
+    const auto* effect = cydaw::engine::effectForType(node->typeKey.toStdString());
+    if (effect == nullptr || !effect->control)
+        return 0;
+    namespace modulators = cydaw::engine::modulator;
+    return modulators::ownerOf(node->parameters.eqBands[modulators::ownerLowSlot],
+                               node->parameters.eqBands[modulators::ownerHighSlot]);
+}
+
+std::uint64_t NodeGraphComponent::editorAddModulator(const std::uint64_t owner, const juce::String& typeKey)
+{
+    const auto* effect = cydaw::engine::effectForType(typeKey.toStdString());
+    const auto* card = readNode(owner);
+    if (editingLocked_ || effect == nullptr || !effect->control || card == nullptr)
+        return 0;
+    // Under its card in the graph, after the modulators it has.
+    auto count = 0;
+    for (const auto& node : nodes_)
+        if (editorModulatorOwner(node.id) == owner)
+            ++count;
+    const auto position = card->position + juce::Point<float>(0.0f, 0.14f + 0.07f * static_cast<float>(count));
+    const auto id = editorAddNode(typeKey, position);
+    auto* made = findNode(id);
+    if (made == nullptr)
+        return 0;
+    namespace modulators = cydaw::engine::modulator;
+    made->parameters.eqBands[modulators::ownerLowSlot] = modulators::ownerLowOf(owner);
+    made->parameters.eqBands[modulators::ownerHighSlot] = modulators::ownerHighOf(owner);
+    for (auto& parameter : made->interfaceState.parameters)
+        if (parameter.key.endsWith(".ownerLow"))
+            parameter.value = parameter.defaultValue = modulators::ownerLowOf(owner);
+        else if (parameter.key.endsWith(".ownerHigh"))
+            parameter.value = parameter.defaultValue = modulators::ownerHighOf(owner);
+    made->serialised = juce::var();
+    notifyLayoutChanged("v2-modulator");
+    return id;
+}
+
+std::uint64_t NodeGraphComponent::editorParameterSocket(const std::uint64_t id, const juce::String& binding) const
+{
+    const auto* node = readNode(id);
+    if (node == nullptr)
+        return 0;
+    const auto suffix = parameterSuffix(binding);
+    const auto portKey = valuePortKeyForBinding(suffix);
+    const auto feeds = [](const NodePort& port) {
+        return port.input && (port.type == cydaw::graph::PortType::value || port.type == cydaw::graph::PortType::trigger);
+    };
+    // A module's knob socket, the primitive's port of its name, the socket
+    // whose knob it is.
+    for (const auto& port : node->ports)
+        if (feeds(port) && port.key == "knob." + suffix)
+            return port.id;
+    for (const auto& port : node->ports)
+        if (feeds(port) && portKey.isNotEmpty() && port.key == portKey && knobOfSocket(*node, port.key) == binding)
+            return port.id;
+    for (const auto& port : node->ports)
+        if (feeds(port) && knobOfSocket(*node, port.key) == binding)
+            return port.id;
+    return 0;
+}
+
+juce::String NodeGraphComponent::editorModulate(const std::uint64_t modulator, const juce::String& binding, const float amount)
+{
+    if (editingLocked_)
+        return "locked";
+    const auto* source = readNode(modulator);
+    if (source == nullptr || binding.length() < 6 || !binding.startsWith("node."))
+        return "no such modulator or knob";
+    const auto separator = binding.indexOfChar(5, '.');
+    const auto destination = static_cast<std::uint64_t>(binding.substring(5, separator).getLargeIntValue());
+    const auto socket = editorParameterSocket(destination, binding);
+    if (socket == 0)
+        return "this knob has no socket a modulator can drive";
+    const auto output = std::ranges::find_if(source->ports, [](const NodePort& port) {
+        return !port.input && port.type == cydaw::graph::PortType::value;
+    });
+    if (output == source->ports.end())
+        return "the modulator gives no value";
+    const auto already = std::ranges::find_if(connections_, [&](const Connection& connection) {
+        return connection.source == modulator && connection.destination == destination && connection.destinationPort == socket;
+    });
+    if (already != connections_.end() && already->mode == 1) {
+        (void) editorSetModulationAmount(modulator, already->sourcePort, destination, socket, amount);
+        return {};
+    }
+    if (already == connections_.end())
+        if (const auto refused = editorConnect(modulator, output->id, destination, socket); refused.isNotEmpty())
+            return refused;
+    (void) editorSetConnectionMode(modulator, output->id, destination, socket, 1, amount);
+    return {};
+}
+
+bool NodeGraphComponent::editorSetModulationAmount(const std::uint64_t source, const std::uint64_t sourcePort,
+                                                   const std::uint64_t destination, const std::uint64_t destinationPort,
+                                                   const float amount)
+{
+    if (editingLocked_)
+        return false;
+    const auto found = std::ranges::find_if(connections_, [&](const Connection& connection) {
+        return connection.source == source && connection.destination == destination
+               && connection.sourcePort == sourcePort && connection.destinationPort == destinationPort;
+    });
+    if (found == connections_.end() || found->kind != PortKind::control)
+        return false;
+    const auto next = std::isfinite(amount) ? juce::jlimit(-1.0f, 1.0f, amount) : 0.0f;
+    if (std::abs(found->amount - next) < 1.0e-6f)
+        return true;
+    found->amount = next;
+    for (auto& node : nodes_)
+        if (node.id == source || node.id == destination)
+            node.serialised = juce::var();
+    // As a knob: heard at once, the undo step once it rests.
+    parameterHistoryPending_ = true;
+    lastParameterUiChangeTimeMs_ = juce::Time::currentTimeMillis();
+    dispatchParameterNotification();
+    if (!isTimerRunning())
+        startTimerHz(30);
+    return true;
+}
+
+bool NodeGraphComponent::editorUnmodulate(const std::uint64_t modulator, const juce::String& binding)
+{
+    for (const auto& modulation : editorModulations())
+        if (modulation.source == modulator && modulation.binding == binding)
+            return editorDisconnect(modulation.source, modulation.sourcePort, modulation.node, modulation.port);
+    return false;
+}
+
 std::optional<NodeGraphComponent::ControlCableTarget> NodeGraphComponent::controlCableTarget(
     const Connection& connection) const
 {
@@ -17791,8 +17986,14 @@ std::optional<NodeGraphComponent::ControlCableTarget> NodeGraphComponent::contro
     }
     const auto processor = primitiveProcessorKeyForType(destination->typeKey).toStdString();
     const auto parameterKey = std::string(cydaw::engine::nativeDspParameterKeyForPort(processor, port->key.toStdString()));
-    if (parameterKey.empty())
+    if (parameterKey.empty()) {
+        // An instrument's setting socket: the knob it names.
+        const auto binding = knobOfSocket(*destination, port->key);
+        for (const auto& parameter : parameters)
+            if (binding.isNotEmpty() && parameter.key == binding)
+                return ControlCableTarget { parameter.key, parameter.minimum, parameter.maximum };
         return std::nullopt;
+    }
     ControlCableTarget target;
     const auto range = primitiveParameterRange(processor, parameterKey);
     target.minimum = range.first;

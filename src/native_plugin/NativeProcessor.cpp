@@ -219,6 +219,7 @@ void NativeProcessor::reset()
     std::memset(deferred_, 0, sizeof(deferred_));
     down_.fill(false);
     downCount_ = 0;
+    controlNotes_.held = 0;
 }
 void NativeProcessor::midi(const engine::MidiEffectEvent &e)
 {
@@ -227,6 +228,9 @@ void NativeProcessor::midi(const engine::MidiEffectEvent &e)
     if (e.isNoteOn())
     {
         noteOn(channel, note, e.data2 / 127.0f);
+        ++controlNotes_.noteOns;
+        controlNotes_.note = static_cast<float>(note);
+        controlNotes_.velocity = e.data2 / 127.0f;
     }
     else if (e.isNoteOff())
     {
@@ -256,6 +260,9 @@ void NativeProcessor::midi(const engine::MidiEffectEvent &e)
         // expression (11 and 43 on the channels after the first).
         if (channel == 0 || (e.data1 != 11 && e.data1 != 43))
             prismContext_.sampler.controllerMoved(e.data1, e.data2);
+        controlNotes_.controllers[e.data1 & 127] = e.data2 / 127.0f;
+        if (e.data1 == 1)
+            controlNotes_.modWheel = e.data2 / 127.0f;
         if (e.data1 == 64)
         {
             sustain_[channel] = e.data2 >= 64;
@@ -273,12 +280,17 @@ void NativeProcessor::midi(const engine::MidiEffectEvent &e)
     else if (type == 0xe0)
     {
         bends_[channel] = ((e.data1 | (e.data2 << 7)) - 8192) / 8192.0f * 2;
+        controlNotes_.pitchBend = bends_[channel] * 0.5f;
         for (std::size_t i = 0; i < voices_.size(); ++i)
             if (channels_[i] == channel)
                 voices_[i]->setExpression(bends_[channel], 0);
     }
     else if (type == 0xd0)
+    {
         prismContext_.aftertouch = e.data1 / 127.0f;
+        controlNotes_.aftertouch = e.data1 / 127.0f;
+    }
+    controlNotes_.held = downCount_;
 }
 void NativeProcessor::noteOn(const int channel, const int note, const float velocity)
 {
@@ -359,10 +371,11 @@ void NativeProcessor::renderVoices(float *const *channels, int count, int start,
         runtime_.controlValuesNow(&route.controlNodeId, &value, 1);
         if (!std::isfinite(value))
             continue;
-        if (route.depth > 0)
-            engine::modulatePolyVoice(plan, route.target, value, route.depth);
+        if (route.depth != 0.0f)
+            engine::modulatePolyVoice(plan, route.target, value, route.depth, route.index, route.minimum,
+                                      route.maximum, route.logarithmic);
         else
-            engine::applyPolyVoiceModulation(plan, route.target, value);
+            engine::applyPolyVoiceModulation(plan, route.target, value, route.index);
     }
     for (auto &v : voices_)
         if (v->isActive())
@@ -427,6 +440,7 @@ bool NativeProcessor::process(NativeBlock &data)
             ptrs[i - 1] = &extra[i - 1];
         }
     runtime_.setExtraInputs(ptrs.data(), ptrs.size());
+    runtime_.setControlNotes(controlNotes_);
     PlanarBuffer buffer{output, nc, frames};
     if (!runtime_.process(buffer, 0, frames, data.seconds))
         for (int c = 0; c < nc; ++c)

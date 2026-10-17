@@ -11,6 +11,7 @@
 #include "BatterieView.h"
 #include "RackView.h"
 #include "DeviceEditorView.h"
+#include "ModulatorsView.h"
 #include "PluginWindows.h"
 #include "SoundModelFile.h"
 #include "Icons.h"
@@ -147,7 +148,7 @@ std::vector<FacePart> cardFace(const visual::Surface& surface, std::vector<visua
 
 DevicesView::DevicesView(Studio& studio, UiState& state, DeviceSignals& signals)
     : studio_(studio), state_(state), signals_(signals), presets_(studio, state),
-      designed_(std::make_unique<InterfaceEditor>(studio, state))
+      designed_(std::make_unique<InterfaceEditor>(studio, state)), modulators_(std::make_unique<ModulatorsView>(studio, state))
 {
 }
 
@@ -190,8 +191,14 @@ void DevicesView::draw()
                || RackView::handles(typeKey);
     };
     const auto prismVoice = std::any_of(nodes.begin(), nodes.end(), [&](const auto& node) { return wholeVoice(node.typeKey); });
+    // The cards' modulators, and their modulations for the knobs: each in its
+    // card's column, out of the chain.
+    const auto trackKey = studio_.routingKey(track) + (track.pad >= 0 ? static_cast<std::uint64_t>(track.pad + 1) << 48 : 0);
+    modulators_->begin(track, trackKey, graph, nodes);
+    const ui::ModulationHostScope modulationScope(modulators_->host());
     for (const auto& node : nodes)
-        if (!node.boundary && !(prismVoice && !wholeVoice(node.typeKey) && graph.editorIsVoiceNode(node.id)))
+        if (!node.boundary && !(prismVoice && !wholeVoice(node.typeKey) && graph.editorIsVoiceNode(node.id))
+            && !modulators_->owned(node.id))
             chain.push_back(&node);
     std::stable_sort(chain.begin(), chain.end(), [](const auto* a, const auto* b) {
         if (std::abs(a->position.x - b->position.x) > 0.02f)
@@ -502,6 +509,11 @@ void DevicesView::draw()
         const auto listWidth = dp(232.0f);
         if (listOpen)
             panesWidth += listWidth + dp(6.0f);
+        // Its modulators, a column at its left.
+        const auto modulatorCount = modulators_->countFor(node->id);
+        const auto columnOpen = !collapsed && modulators_->open(node->id);
+        if (columnOpen)
+            panesWidth += ModulatorsView::width() + dp(6.0f);
         // Its output's meter, along its right edge (an instrument's cards:
         // what its voices give out).
         auto level = signals_.outputLevel(node->id);
@@ -536,7 +548,7 @@ void DevicesView::draw()
         const auto bypassable = std::any_of(node->ports.begin(), node->ports.end(), [](const auto& port) {
             return !port.input && port.kind == 0;
         });
-        const auto separateWidth = (separable ? dp(22.0f) : 0.0f) + (sidechained ? dp(22.0f) : 0.0f) + (collapsed ? 0.0f : dp(22.0f));
+        const auto separateWidth = (separable ? dp(22.0f) : 0.0f) + (sidechained ? dp(22.0f) : 0.0f) + (collapsed ? 0.0f : dp(44.0f));
         // The on/off switch comes first, at the left of the title.
         const auto switchWidth = bypassable && !collapsed ? dp(22.0f) : 0.0f;
         if (!collapsed) {
@@ -600,6 +612,14 @@ void DevicesView::draw()
                 else
                     state_.valueLists.insert(listKey);
             }
+            ImGui::SameLine(0.0f, dp(2.0f));
+            // Its modulators: an LFO, steps, an envelope... dragged onto knobs.
+            const auto modulatorTip = modulatorCount > 0
+                                          ? juce::String(columnOpen ? "Hide" : "Show") + " its modulators ("
+                                                + juce::String(static_cast<int>(modulatorCount)) + ")"
+                                          : juce::String("Modulators: an LFO, steps, an envelope, a macro... moving its knobs");
+            if (ui::iconButton(icon::modulation, modulatorTip.toRawUTF8(), columnOpen || modulatorCount > 0, p.modulation, button))
+                modulators_->setOpen(node->id, !columnOpen);
             ImGui::SameLine(0.0f, dp(2.0f));
         }
         if (separable) {
@@ -754,6 +774,10 @@ void DevicesView::draw()
                 live.running = live.running || studio_.engine().isPlaying();
             }
             auto x = origin.x + dp(8.0f);
+            if (columnOpen) {
+                modulators_->draw(node->id, ImVec2(x, origin.y + bodyTop), ImVec2(ModulatorsView::width(), bodyHeight), colour);
+                x += ModulatorsView::width() + dp(6.0f);
+            }
             if (modelCard) {
                 drawSoundModelPane(track, graph, node->id, ImVec2(x, origin.y + bodyTop), ImVec2(modelPaneWidth, bodyHeight), colour);
                 x += modelPaneWidth + dp(6.0f);
@@ -917,8 +941,11 @@ void DevicesView::draw()
         ImGui::PopID();
         ImGui::SameLine(0.0f, dp(5.0f));
     }
-    if (removeNode)
+    if (removeNode) {
+        // Its modulators go with it.
+        modulators_->removeWith(*removeNode);
         graph.editorRemoveFromChain(*removeNode);
+    }
     // A card dropped elsewhere in the chain: moved there, the cards laid out
     // again in the order the signal now takes.
     if (moveCard && graph.editorMoveInChain(moveCard->first, moveCard->second)) {
@@ -986,6 +1013,7 @@ void DevicesView::draw()
     }
     if (std::exchange(openCatalogue_, false))
         ImGui::OpenPopup(cataloguePopup_);
+    modulators_->end();
     visual::setParameterMenu({});
     drawCatalogue(track);
     drawPluginParameters();
@@ -1008,7 +1036,8 @@ void DevicesView::drawValueList(const TrackRef& track, app::NodeGraphComponent& 
     // then the others as the card lists them.
     std::vector<std::pair<std::uint64_t, const app::NodeGraphComponent::EditorParameter*>> order;
     for (const auto& parameter : node.parameters)
-        if (filter.isEmpty() || parameter.label.containsIgnoreCase(filter) || parameter.binding.containsIgnoreCase(filter))
+        if ((filter.isEmpty() || parameter.label.containsIgnoreCase(filter) || parameter.binding.containsIgnoreCase(filter))
+            && !parameter.binding.endsWith(".ownerLow") && !parameter.binding.endsWith(".ownerHigh"))
             order.emplace_back(graph.editorParameterTouch(parameter.binding), &parameter);
     std::stable_sort(order.begin(), order.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
     const auto top = ImGui::GetCursorScreenPos().y + dp(2.0f);
@@ -1061,9 +1090,17 @@ void DevicesView::drawValueList(const TrackRef& track, app::NodeGraphComponent& 
             const auto textX = rowTop.x + dp(40.0f);
             const auto textWidth = rowEnd.x - textX - dp(4.0f);
             ui::clippedText(rows, ImVec2(textX, rowTop.y + dp(1.0f)), textWidth, p.text, parameter->label.toRawUTF8());
-            const auto text = visual::formatValue(shown, parameter->value);
+            auto text = visual::formatValue(shown, parameter->value);
+            // What moves it: each modulator and its amount.
+            std::vector<ui::KnobModulation> moving;
+            if (auto* host = ui::modulationHost())
+                host->modulationsOf(parameter->binding.toStdString(), moving);
+            for (const auto& modulation : moving)
+                text << juce::String::fromUTF8("  \xe2\x86\x9d ") << juce::String(modulation.name)
+                     << juce::String::formatted(" %+.2f", modulation.amount);
             ImGui::PushFont(nullptr, ui::currentFontBase() * 0.85f);
-            ui::clippedText(rows, ImVec2(textX, rowTop.y + dp(15.0f)), textWidth, p.textDim, text.toRawUTF8());
+            ui::clippedText(rows, ImVec2(textX, rowTop.y + dp(15.0f)), textWidth, moving.empty() ? p.textDim : p.modulation,
+                            text.toRawUTF8());
             ImGui::PopFont();
             ImGui::SetCursorScreenPos(ImVec2(textX, rowTop.y));
             ImGui::InvisibleButton("##name", ImVec2(std::max(1.0f, textWidth), rowHeight));

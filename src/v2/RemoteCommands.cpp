@@ -24,6 +24,8 @@
 
 #include <cydaw/engine/ChannelLayout.h>
 #include <cydaw/engine/KickSynth.h>
+#include <cydaw/engine/EffectCatalogue.h>
+#include <cydaw/engine/Modulators.h>
 #include <cydaw/engine/DrumKit.h>
 #include <cydaw/engine/SynthFamily.h>
 
@@ -843,6 +845,7 @@ private:
     juce::var onMoveTrack();
     juce::var onAddMidiClip();
     juce::var onDescribeNodeType();
+    juce::var onModulator();
     juce::var onNodes();
     juce::var onListPlugins();
     juce::var onPlugins();
@@ -1541,7 +1544,8 @@ juce::var Commands::run()
         const auto filter = text("filter").trim();
         std::vector<std::pair<std::uint64_t, const app::NodeGraphComponent::EditorParameter*>> order;
         for (const auto& parameter : node->parameters)
-            if (filter.isEmpty() || parameter.label.containsIgnoreCase(filter) || parameter.binding.containsIgnoreCase(filter))
+            if ((filter.isEmpty() || parameter.label.containsIgnoreCase(filter) || parameter.binding.containsIgnoreCase(filter))
+                && !parameter.binding.endsWith(".ownerLow") && !parameter.binding.endsWith(".ownerHigh"))
                 order.emplace_back(graph.editorParameterTouch(parameter.binding), &parameter);
         std::stable_sort(order.begin(), order.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
         juce::Array<juce::var> values;
@@ -1556,6 +1560,30 @@ juce::var Commands::run()
         }
         auto result = object();
         set(result, "values", values);
+        return ok(result);
+    }
+    if (command == "modulator")
+        return onModulator();
+    if (command == "ui_spots") {
+        // {record, filter}: where the knobs (knob:<binding>) and the
+        // modulators' arrows (modulator-arrow:<id>) were last drawn, in the
+        // coordinates ui_input takes; record false stops recording.
+        ui::setSpotRecording(flag("record", true));
+        const auto filter = text("filter");
+        juce::Array<juce::var> spots;
+        for (const auto& spot : ui::recordedSpots()) {
+            if (filter.isNotEmpty() && !juce::String(spot.key).contains(filter))
+                continue;
+            auto entry = object();
+            set(entry, "key", juce::String(spot.key));
+            set(entry, "x", (spot.min.x + spot.max.x) * 0.5f);
+            set(entry, "y", (spot.min.y + spot.max.y) * 0.5f);
+            set(entry, "width", spot.max.x - spot.min.x);
+            set(entry, "height", spot.max.y - spot.min.y);
+            spots.add(entry);
+        }
+        auto result = object();
+        set(result, "spots", spots);
         return ok(result);
     }
     if (command == "device_window") {
@@ -4415,6 +4443,181 @@ juce::var Commands::onModulate()
         commitGraph(*target, false);
     set(result, "graph", graphSummary(*target));
     return ok(result);
+}
+
+juce::var Commands::onModulator()
+{
+    // {track, action, ...}: the modulators of a track's cards (Modulators.h).
+    //   add {nodeId, type}: one for the card nodeId ("lfo", "steps", "random",
+    //     "adsr", "keytrack", "expressions", "macro", "button", "math",
+    //     "follower"), its column shown;
+    //   set {id, settings: {key: value}}: its settings (a choice by number or
+    //     name: "sync": "1/8", "shape": "Triangle");
+    //   modulate {id, binding | nodeId + parameter, amount}: it moves that knob
+    //     (again: its amount); unmodulate {id, binding | nodeId + parameter};
+    //   remove {id}; arm {id} (0: none); column {nodeId, open};
+    //   list {nodeId?}: the modulators (their value now) and the modulations.
+    std::optional<GraphTarget> target;
+    if (auto error = targetOrFail(target); !error.isVoid())
+        return error;
+    if (!target->track)
+        return fail("modulators belong to a track's cards");
+    auto& graph = target->graph();
+    const auto action = text("action").trim().toLowerCase();
+    const auto id = static_cast<std::uint64_t>(number("id", 0.0));
+    const auto nodeId = static_cast<std::uint64_t>(number("nodeId", 0.0));
+    const auto nodes = graph.editorNodes();
+    const auto isModulator = [&graph, &nodes](const std::uint64_t node) {
+        const auto found = std::find_if(nodes.begin(), nodes.end(), [node](const auto& item) { return item.id == node; });
+        if (found == nodes.end())
+            return false;
+        const auto* effect = engine::effectForType(found->typeKey.toStdString());
+        return effect != nullptr && effect->control;
+    };
+    const auto bindingOf = [this]() -> juce::String {
+        auto binding = text("binding").trim();
+        if (binding.isEmpty() && has("nodeId"))
+            binding = "node." + juce::String(static_cast<juce::int64>(number("nodeId", 0.0))) + "." + text("parameter").trim();
+        return binding;
+    };
+    const auto describe = [&](const std::uint64_t modulator) {
+        auto entry = object();
+        // As the graph is now (it may have just been made).
+        const auto now = graph.editorNodes();
+        const auto found = std::find_if(now.begin(), now.end(), [modulator](const auto& item) { return item.id == modulator; });
+        set(entry, "id", static_cast<juce::int64>(modulator));
+        set(entry, "owner", static_cast<juce::int64>(graph.editorModulatorOwner(modulator)));
+        if (found != now.end()) {
+            set(entry, "type", found->typeKey);
+            set(entry, "name", found->title);
+            auto settings = object();
+            for (const auto& parameter : found->parameters)
+                if (!parameter.binding.endsWith(".ownerLow") && !parameter.binding.endsWith(".ownerHigh"))
+                    if (const auto* setting = engine::effectParameterForSuffix(
+                            parameter.binding.fromFirstOccurrenceOf(".", false, false).fromFirstOccurrenceOf(".", false, false).toStdString()))
+                        set(settings, std::string(setting->key).c_str(), parameter.value);
+            set(entry, "settings", settings);
+        }
+        if (const auto value = graph.editorControlValue(modulator))
+            set(entry, "value", *value);
+        juce::Array<juce::var> moves;
+        for (const auto& modulation : graph.editorModulations())
+            if (modulation.source == modulator) {
+                auto move = object();
+                set(move, "binding", modulation.binding);
+                set(move, "nodeId", static_cast<juce::int64>(modulation.node));
+                set(move, "amount", modulation.amount);
+                set(move, "mode", modulation.mode == 1 ? "modulate" : "set");
+                moves.add(move);
+            }
+        set(entry, "modulations", moves);
+        return entry;
+    };
+    if (action == "add") {
+        auto type = text("type").trim().toLowerCase().replaceCharacter(' ', '-');
+        if (type == "keytrack" || type == "note")
+            type = "mod-note";
+        else if (type == "expressions" || type == "expression")
+            type = "mod-expression";
+        else if (type == "envelope-follower" || type == "follower")
+            type = "mod-follower";
+        else if (type == "mix")
+            type = "mod-math";
+        else if (!type.startsWith("mod-"))
+            type = "mod-" + type;
+        const auto* effect = engine::effectForType(type.toStdString());
+        if (effect == nullptr || !effect->control)
+            return fail("no modulator \"" + text("type") + "\": lfo, steps, random, adsr, keytrack, expressions, macro, button, "
+                        "math, follower");
+        const auto made = graph.editorAddModulator(nodeId, type);
+        if (made == 0)
+            return fail("no card " + juce::String(static_cast<juce::int64>(nodeId)) + " to add it to");
+        commitGraph(*target, true);
+        (void) ui_.showModulators(*target->track, nodeId, true, made);
+        return ok(describe(made));
+    }
+    if (action == "column") {
+        if (!ui_.showModulators(*target->track, nodeId, flag("open", true), 0))
+            return fail("this interface shows no modulators");
+        return ok(object());
+    }
+    if (action == "list") {
+        juce::Array<juce::var> listed;
+        for (const auto& node : nodes)
+            if (isModulator(node.id) && (nodeId == 0 || graph.editorModulatorOwner(node.id) == nodeId))
+                listed.add(describe(node.id));
+        auto result = object();
+        set(result, "modulators", listed);
+        return ok(result);
+    }
+    if (!isModulator(id) && !(action == "arm" && id == 0))
+        return fail("no modulator " + juce::String(static_cast<juce::int64>(id)) + " on that track; list gives them");
+    if (action == "set") {
+        const auto found = std::find_if(nodes.begin(), nodes.end(), [id](const auto& item) { return item.id == id; });
+        const auto* effect = engine::effectForType(found->typeKey.toStdString());
+        juce::StringArray problems;
+        if (const auto* settings = request_.getProperty("settings", {}).getDynamicObject())
+            for (const auto& property : settings->getProperties()) {
+                const auto key = property.name.toString();
+                const auto* setting = engine::effectParameter(*effect, key.toStdString());
+                if (setting == nullptr) {
+                    problems.add("no setting \"" + key + "\"");
+                    continue;
+                }
+                auto value = static_cast<double>(property.value);
+                if (property.value.isString()) {
+                    // A choice by its name.
+                    const auto wanted = property.value.toString().trim();
+                    auto index = -1;
+                    for (auto choice = 0; choice < 16 && index < 0; ++choice) {
+                        const char* name = key == "sync" && choice < engine::modulator::divisionCount ? engine::modulator::divisionName(choice)
+                                           : key == "shape" && choice < engine::modulator::shapeCount ? engine::modulator::shapeName(choice)
+                                           : key == "mode" && choice < engine::modulator::mathModeCount ? engine::modulator::mathModeName(choice)
+                                                                                                         : nullptr;
+                        if (name != nullptr && wanted.equalsIgnoreCase(name))
+                            index = choice;
+                    }
+                    if (index < 0) {
+                        problems.add("no choice \"" + wanted + "\" for " + key);
+                        continue;
+                    }
+                    value = index;
+                }
+                const auto binding = "node." + juce::String(static_cast<juce::int64>(id)) + "." + juce::String(std::string(setting->suffix));
+                if (!graph.editorSetParameter(binding, value))
+                    problems.add("\"" + key + "\" was refused");
+            }
+        commitGraph(*target, false);
+        if (!problems.isEmpty())
+            return fail(problems.joinIntoString("; "));
+        return ok(describe(id));
+    }
+    if (action == "modulate" || action == "unmodulate") {
+        const auto binding = bindingOf();
+        if (binding.isEmpty())
+            return fail("which knob: binding, or nodeId and parameter (its suffix, as list_parameters gives it)");
+        if (action == "unmodulate") {
+            if (!graph.editorUnmodulate(id, binding))
+                return fail("that modulator does not move " + binding);
+        } else if (const auto problem = graph.editorModulate(id, binding, static_cast<float>(number("amount", 0.25)));
+                   problem.isNotEmpty()) {
+            return fail(problem);
+        }
+        commitGraph(*target, action == "unmodulate");
+        return ok(describe(id));
+    }
+    if (action == "remove") {
+        if (!graph.editorRemoveNodes({ id }))
+            return fail("the modulator was not removed");
+        commitGraph(*target, true);
+        return ok(object());
+    }
+    if (action == "arm") {
+        if (!ui_.armModulator(*target->track, id))
+            return fail("this interface arms no modulators");
+        return ok(object());
+    }
+    return fail("action: add, set, modulate, unmodulate, remove, arm, column or list");
 }
 
 juce::var Commands::onDescribeNodeType()

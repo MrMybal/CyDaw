@@ -3,7 +3,6 @@
 #include "PlanSynthesiser.h"
 #include "Localization.h"
 
-#include <bitset>
 #include <cydaw/engine/TimeStretch.h>
 #include <cydaw/engine/PolyVoice.h>
 #include <cydaw/engine/BuiltinProcessors.h>
@@ -11,6 +10,7 @@
 #include <cydaw/engine/NativeDspCompiler.h>
 
 #include <algorithm>
+#include <bitset>
 #include <cmath>
 #include <limits>
 #include <thread>
@@ -3629,8 +3629,12 @@ struct VoiceModulationState {
     std::array<cydaw::engine::PolyVoiceTarget, capacity> targets {};
     std::array<std::uint16_t, capacity> indices {};
     std::array<float, capacity> values {};
-    // 0: the value is set; above: it modulates the voice's own by that much.
+    // 0: the value is set; otherwise it modulates the voice's own by that much.
     std::array<float, capacity> depths {};
+    // An instrument setting's knob: its range, its scale.
+    std::array<float, capacity> minimums {};
+    std::array<float, capacity> maximums {};
+    std::array<bool, capacity> logarithmic {};
 };
 
 namespace {
@@ -4027,7 +4031,9 @@ private:
                 continue;
             if (modulation_.depths[index] != 0.0f)
                 cydaw::engine::modulatePolyVoice(modulated, modulation_.targets[index], modulation_.values[index],
-                                                 modulation_.depths[index]);
+                                                 modulation_.depths[index], modulation_.indices[index],
+                                                 modulation_.minimums[index], modulation_.maximums[index],
+                                                 modulation_.logarithmic[index]);
             else
                 cydaw::engine::applyPolyVoiceModulation(modulated, modulation_.targets[index], modulation_.values[index],
                                                         modulation_.indices[index]);
@@ -4407,6 +4413,8 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
             renderVoices(published.get(), *output.buffer, midi, output.startSample, output.numSamples);
             // A rack's pads: each its instrument and its effects.
             renderPads(midi, output, automationSeconds);
+            // What the notes say, for the modulators (as the voices heard them).
+            followNotes(midi);
         }
         publishVoiceLive(output.numSamples);
         voicesDelay.process(*output.buffer, output.startSample, output.numSamples);
@@ -4417,6 +4425,7 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
                 output.buffer->addFrom(channel, output.startSample, *main, std::min(channel, sourceChannels - 1), 0, count);
         }
         effects.setExtraInputs(routedInputs.data() + 1, RoutedInputReceiver::maximumBuses - 1);
+        effects.setControlNotes(controlNotes);
         // The region was cleared at the top of this block and only this
         // track's voices have written to it, so what follows the instrument
         // can be processed in place. No scratch buffer, no allocation.
@@ -4585,6 +4594,38 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
         heardPlan = nullptr;
     }
 
+    // The block's notes and controllers into what the modulators read: the
+    // keys held, the last note struck, the wheels, every controller.
+    void followNotes(const juce::MidiBuffer& midi) noexcept
+    {
+        for (const auto metadata : midi) {
+            const auto message = metadata.getMessage();
+            if (message.isNoteOn()) {
+                ++controlNotes.noteOns;
+                keysDown.set(static_cast<std::size_t>(message.getNoteNumber() & 127));
+                controlNotes.note = static_cast<float>(message.getNoteNumber());
+                controlNotes.velocity = message.getFloatVelocity();
+            } else if (message.isNoteOff()) {
+                keysDown.reset(static_cast<std::size_t>(message.getNoteNumber() & 127));
+            } else if (message.isAllNotesOff() || message.isAllSoundOff()) {
+                keysDown.reset();
+            } else if (message.isController()) {
+                const auto number = message.getControllerNumber() & 127;
+                const auto value = static_cast<float>(message.getControllerValue()) / 127.0f;
+                controlNotes.controllers[static_cast<std::size_t>(number)] = value;
+                if (number == 1)
+                    controlNotes.modWheel = value;
+            } else if (message.isChannelPressure()) {
+                controlNotes.aftertouch = static_cast<float>(message.getChannelPressureValue()) / 127.0f;
+            } else if (message.isAftertouch()) {
+                controlNotes.aftertouch = static_cast<float>(message.getAfterTouchValue()) / 127.0f;
+            } else if (message.isPitchWheel()) {
+                controlNotes.pitchBend = static_cast<float>(message.getPitchWheelValue() - 8'192) / 8'192.0f;
+            }
+        }
+        controlNotes.held = static_cast<int>(keysDown.count());
+    }
+
     void readVoiceModulations(const double seconds) noexcept
     {
         voiceModulation.count = 0;
@@ -4606,10 +4647,14 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
         std::array<std::uint64_t, VoiceModulationState::capacity> ids {};
         const auto count = std::min(routes->size(), VoiceModulationState::capacity - first);
         for (std::size_t index = 0; index < count; ++index) {
-            ids[index] = (*routes)[index].controlNodeId;
-            voiceModulation.targets[first + index] = (*routes)[index].target;
-            voiceModulation.indices[first + index] = 0;
-            voiceModulation.depths[first + index] = (*routes)[index].depth;
+            const auto& route = (*routes)[index];
+            ids[index] = route.controlNodeId;
+            voiceModulation.targets[first + index] = route.target;
+            voiceModulation.indices[first + index] = route.index;
+            voiceModulation.depths[first + index] = route.depth;
+            voiceModulation.minimums[first + index] = route.minimum;
+            voiceModulation.maximums[first + index] = route.maximum;
+            voiceModulation.logarithmic[first + index] = route.logarithmic;
         }
         effects.controlValuesNow(ids.data(), voiceModulation.values.data() + first, count);
         voiceModulation.count = first + count;
@@ -4628,6 +4673,9 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
     VoiceModulationState voiceModulation;
     NativeDspRuntime effects;
     MidiEffectsHost midiEffects;
+    // The notes as the modulators hear them (audio thread).
+    cydaw::engine::modulator::ControlNotes controlNotes;
+    std::bitset<128> keysDown;
 
     // ---- A rack of pads (the "drum-rack" card) ----
     // A pad: an instrument and its effects of their own, played by the

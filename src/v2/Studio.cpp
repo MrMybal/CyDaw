@@ -5160,8 +5160,9 @@ void Studio::tick()
             if (auto* root = workshopRoot())
                 root->graph().setControlValues(engine_.simulationControlValues());
     }
-    // Live values (LFOs, envelopes) for the graph on screen.
-    if (watched_ && engine_.isPlaying())
+    // Live values (LFOs, envelopes, the modulators) for the graph on screen:
+    // they run with the transport stopped too (notes played live).
+    if (watched_)
         if (auto* slot = graphFor(*watched_))
             slot->graph().setControlValues(watched_->master ? engine_.masterControlValues()
                                            : watched_->midi ? engine_.midiTrackControlValues(watched_->midiId)
@@ -5185,8 +5186,9 @@ std::vector<modulation::Assignment> Studio::syncModulationTargets(AudioTrackStat
     // its range and threshold while they are on: eight bands would
     // otherwise bury the list under 96 rows.
     const auto sweepable = [&parameters](const juce::String& binding) {
-        // Which band is heard alone is a held button's, not a modulator's.
-        if (binding.endsWith("eqpro.listen"))
+        // Which band is heard alone is a held button's, not a modulator's;
+        // the card a modulator belongs to is no setting.
+        if (binding.endsWith("eqpro.listen") || binding.endsWith(".ownerLow") || binding.endsWith(".ownerHigh"))
             return false;
         const auto at = binding.lastIndexOf("eqpro.b");
         if (at < 0)

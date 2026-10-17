@@ -131,6 +131,7 @@ void AudioRenderPlan::process(const AudioBlockView input, const AudioBlockView* 
         // How loud it came out, for the meters.
         if (peaks_ != nullptr) {
             const auto produced = nodes_[index].outputBuffer.view(frames);
+            auto block = 0.0f;
             for (std::uint32_t channel = 0; channel < std::min<std::uint32_t>(2, produced.channelCount); ++channel) {
                 const auto* samples = produced.channel(channel);
                 auto loudest = 0.0f;
@@ -139,7 +140,10 @@ void AudioRenderPlan::process(const AudioBlockView input, const AudioBlockView* 
                 auto& kept = peaks_[index * 2 + channel];
                 if (loudest > kept.load(std::memory_order_relaxed))
                     kept.store(loudest, std::memory_order_relaxed);
+                block = std::max(block, loudest);
             }
+            if (levels_ != nullptr)
+                levels_[index].store(block, std::memory_order_relaxed);
         }
     }
 
@@ -238,6 +242,21 @@ void AudioRenderPlan::takePeaks(const NodeId* nodes, const std::size_t count, fl
             break;
         }
     }
+}
+
+int AudioRenderPlan::nodeIndex(const NodeId node) const noexcept
+{
+    for (std::size_t index = 0; index < nodes_.size(); ++index)
+        if (nodes_[index].id == node)
+            return static_cast<int>(index);
+    return -1;
+}
+
+float AudioRenderPlan::lastLevel(const int index) const noexcept
+{
+    return levels_ != nullptr && index >= 0 && static_cast<std::size_t>(index) < nodes_.size()
+               ? levels_[static_cast<std::size_t>(index)].load(std::memory_order_relaxed)
+               : 0.0f;
 }
 
 std::size_t AudioRenderPlan::readings(const NodeId node, float* into, const std::size_t count) const noexcept
@@ -501,6 +520,7 @@ RenderPlanResult AudioRenderPlanBuilder::compile(const ProcessSpec spec, const N
             plan->bypasses_[index].ring = AudioBuffer(spec.channelCount, std::min<std::uint32_t>(latency, 1u << 17) + 1);
     plan->bypassScratch_ = AudioBuffer(spec.channelCount, spec.maximumBlockSize);
     plan->peaks_ = std::make_unique<std::atomic<float>[]>(plan->nodes_.size() * 2);
+    plan->levels_ = std::make_unique<std::atomic<float>[]>(plan->nodes_.size());
     return { RenderPlanError::none, {}, std::move(plan) };
 }
 

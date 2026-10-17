@@ -3,6 +3,7 @@
 #include <imgui.h>
 #include <juce_core/juce_core.h>
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -173,6 +174,52 @@ public:
 };
 void setLearnMode(bool on);
 [[nodiscard]] bool learnMode();
+
+// ---- Modulators: dropped on knobs, drawn around them ------------------------------------------
+// A modulator dragged by its arrow carries its node id under this name.
+inline constexpr const char* modulatorPayload = "CYDAW_MODULATOR";
+// What moves a knob: a modulator, by how much of the knob's range (-1..1).
+struct KnobModulation {
+    std::uint64_t source {};
+    float amount {};
+    ImU32 colour {};
+    std::string name;
+};
+// The modulations of the cards being drawn, for the knobs drawn inside a
+// LearnParameterScope: a modulator dropped on one, the rings around them, a
+// drag that sets the armed modulator's amount. Set by the device panel
+// around what it draws (ModulationHostScope); none elsewhere.
+class ModulationHost {
+public:
+    virtual ~ModulationHost() = default;
+    virtual void modulationsOf(const std::string& binding, std::vector<KnobModulation>& into) = 0;
+    // The modulator a knob's drag sets the amount of; 0: the drag turns the knob.
+    [[nodiscard]] virtual std::uint64_t armed() const = 0;
+    virtual void dropped(const std::string& binding, std::uint64_t source) = 0;
+    // 0 takes the modulation away.
+    virtual void setAmount(const std::string& binding, std::uint64_t source, float amount) = 0;
+};
+class ModulationHostScope {
+public:
+    explicit ModulationHostScope(ModulationHost* host);
+    ~ModulationHostScope();
+    ModulationHostScope(const ModulationHostScope&) = delete;
+    ModulationHostScope& operator=(const ModulationHostScope&) = delete;
+
+private:
+    ModulationHost* previous_ {};
+};
+[[nodiscard]] ModulationHost* modulationHost();
+// The knob being drawn's binding (LearnParameterScope), empty outside one.
+[[nodiscard]] const std::string& scopedBinding();
+
+// ---- Where things are drawn, for tests driving the pointer ------------------------------------
+// While on, each knob drawn records where it is ("knob:<binding>"), and what
+// calls recordSpot() the item just drawn, in the main window's coordinates
+// (those ui_input takes); the latest drawing wins.
+void setSpotRecording(bool on);
+void recordSpot(const std::string& key);
+[[nodiscard]] std::vector<LearnSpot> recordedSpots();
 // The frame's spots, for the overlay (taken: the next frame starts empty).
 [[nodiscard]] std::vector<LearnSpot> takeLearnSpots();
 // A flat icon button, highlighted when active.

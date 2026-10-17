@@ -33,6 +33,7 @@ class SynthView;
 class BatterieView;
 class RackView;
 class InterfaceEditor;
+class ModulatorsView;
 
 class DevicesView final {
 public:
@@ -71,6 +72,8 @@ private:
     void drawValueList(const TrackRef& track, app::NodeGraphComponent& graph, const app::NodeGraphComponent::EditorNode& node,
                        ImVec2 at, ImVec2 size, ImU32 colour, const std::map<juce::String, float>& modulated);
     std::map<std::pair<std::uint64_t, std::uint64_t>, std::array<char, 64>> valueSearch_;
+    // Each card's modulators (a column at its left) and the knobs' rings.
+    std::unique_ptr<ModulatorsView> modulators_;
 
 
     // A plugin's parameters as its worker last reported them, refreshed a

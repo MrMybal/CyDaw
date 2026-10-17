@@ -216,6 +216,29 @@ public:
         state_.selectedTrack = track;
         return true;
     }
+    bool showModulators(const TrackRef& track, std::uint64_t nodeId, bool open, std::uint64_t shown) override
+    {
+        const auto key = std::make_pair(studio_.routingKey(track) + (track.pad >= 0 ? static_cast<std::uint64_t>(track.pad + 1) << 48 : 0),
+                                        nodeId);
+        if (open)
+            state_.modulatorColumns.insert(key);
+        else
+            state_.modulatorColumns.erase(key);
+        if (shown != 0)
+            state_.shownModulator[key] = shown;
+        state_.selectedTrack = track;
+        return true;
+    }
+    bool armModulator(const TrackRef& track, std::uint64_t modulator) override
+    {
+        if (modulator == 0)
+            state_.armedModulator.reset();
+        else
+            state_.armedModulator = std::make_pair(
+                studio_.routingKey(track) + (track.pad >= 0 ? static_cast<std::uint64_t>(track.pad + 1) << 48 : 0), modulator);
+        state_.selectedTrack = track;
+        return true;
+    }
     bool showDeviceWindow(const TrackRef& track, std::uint64_t nodeId, bool open) override
     {
         const PluginWindow window { track, nodeId };

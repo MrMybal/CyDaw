@@ -1149,6 +1149,24 @@ std::vector<cydaw::engine::PolyVoiceModulation> NodeGraphComponent::editorVoiceM
             target = T::wavetableDetune;
         else if (processor == "core.string" && port->key == "damping")
             target = T::stringDamping;
+        if (!target) {
+            // A setting of the instrument's own, by its socket: the knob whose
+            // binding names it, moved around its value on its own range.
+            const auto binding = knobOfSocket(*destination, port->key);
+            for (const auto& parameter : presentationForNode(*destination).parameters) {
+                if (binding.isEmpty() || parameter.key != binding)
+                    continue;
+                if (const auto voice = editorVoiceParameterFor(parameter.key)) {
+                    const auto low = static_cast<float>(std::min(parameter.minimum, parameter.maximum));
+                    const auto high = static_cast<float>(std::max(parameter.minimum, parameter.maximum));
+                    const auto depth = connection.mode == 1 ? (connection.amount != 0.0f ? connection.amount : 1.0e-6f) : 0.0f;
+                    modulations.push_back({ connection.source, voice->target, depth, voice->index, low, high,
+                                            low > 0.0f && high / low >= 100.0f });
+                }
+                break;
+            }
+            continue;
+        }
         if (target) {
             // A modulating cable of no depth still modulates: by nothing.
             const auto depth = connection.mode == 1 ? (connection.amount != 0.0f ? connection.amount : 1.0e-6f) : 0.0f;

@@ -88,6 +88,22 @@ PrimitiveDescriptor primitive(std::string key, std::string name,
              variableAudioChannels };
 }
 
+// An instrument's settings past its frequency and level (its first two
+// parameters) each get a socket of their own, optional (hidden in the graph
+// until shown), from a high id in their order: a modulator plugged there
+// moves that knob.
+PrimitiveDescriptor withSettingSockets(PrimitiveDescriptor descriptor)
+{
+    for (std::size_t index = 2; index < descriptor.parameters.size(); ++index) {
+        auto socket = port(static_cast<PortId>(2'048 + index - 2), descriptor.parameters[index].key, PortType::value,
+                           PortDirection::input, PortRate::control, 1, true);
+        socket.defaultValue = descriptor.parameters[index].defaultValue;
+        socket.optional = true;
+        descriptor.ports.push_back(std::move(socket));
+    }
+    return descriptor;
+}
+
 } // namespace
 
 ValidationResult PrimitiveRegistry::install(PrimitiveDescriptor descriptor,
@@ -414,11 +430,11 @@ PrimitiveRegistry createFactoryPrimitiveRegistry()
         for (const auto& setting : cydaw::engine::soundModelSettings)
             modelParameters.push_back(parameter(std::string(setting.key), setting.minimum, setting.maximum,
                                                 setting.defaultValue));
-        add(primitive("core.sound-model", "Sound Model", Category::generator,
+        add(withSettingSockets(primitive("core.sound-model", "Sound Model", Category::generator,
             { port(1, "audio-out", Type::audio, Direction::output, Rate::audio, 2),
               port(2, "frequency", Type::value, Direction::input, Rate::control),
               port(3, "level", Type::value, Direction::input, Rate::control) },
-            std::move(modelParameters), true, true, false, true));
+            std::move(modelParameters), true, true, false, true)));
     }
     // Recorded notes played back as they are (Sampler.h): the sample map is
     // the card's, these are how it plays.
@@ -432,11 +448,11 @@ PrimitiveRegistry createFactoryPrimitiveRegistry()
         auto drumParameters = samplerParameters;
         for (const auto& setting : cydaw::engine::drum::parameters())
             drumParameters.push_back(parameter(setting.key, setting.minimum, setting.maximum, setting.defaultValue));
-        add(primitive("core.sampler", "Sampler", Category::generator,
+        add(withSettingSockets(primitive("core.sampler", "Sampler", Category::generator,
             { port(1, "audio-out", Type::audio, Direction::output, Rate::audio, 2),
               port(2, "frequency", Type::value, Direction::input, Rate::control),
               port(3, "level", Type::value, Direction::input, Rate::control) },
-            std::move(samplerParameters), true, true, false, true));
+            std::move(samplerParameters), true, true, false, true)));
         // A rack of pads: each pad an instrument and its effects of its own
         // (the track's engine plays them); its own voices are silent.
         add(primitive("core.drum-rack", "Pad Rack", Category::generator,
@@ -444,11 +460,11 @@ PrimitiveRegistry createFactoryPrimitiveRegistry()
               port(2, "frequency", Type::value, Direction::input, Rate::control),
               port(3, "level", Type::value, Direction::input, Rate::control) },
             {}, true, true, false, true));
-        add(primitive("core.batterie", "Batterie", Category::generator,
+        add(withSettingSockets(primitive("core.batterie", "Batterie", Category::generator,
             { port(1, "audio-out", Type::audio, Direction::output, Rate::audio, 2),
               port(2, "frequency", Type::value, Direction::input, Rate::control),
               port(3, "level", Type::value, Direction::input, Rate::control) },
-            std::move(drumParameters), true, true, false, true));
+            std::move(drumParameters), true, true, false, true)));
     }
     // Prisme (PrismSynth.h): a whole wavetable synthesiser per voice, its
     // settings by their keys ("a.position", "env2.decay").
@@ -459,11 +475,11 @@ PrimitiveRegistry createFactoryPrimitiveRegistry()
             const auto& setting = cydaw::engine::prism::parameter(index);
             prismParameters.push_back(parameter(setting.key, setting.minimum, setting.maximum, setting.defaultValue));
         }
-        add(primitive("core.prism-synth", "Prisme", Category::generator,
+        add(withSettingSockets(primitive("core.prism-synth", "Prisme", Category::generator,
             { port(1, "audio-out", Type::audio, Direction::output, Rate::audio, 2),
               port(2, "frequency", Type::value, Direction::input, Rate::control),
               port(3, "level", Type::value, Direction::input, Rate::control) },
-            std::move(prismParameters), true, true, false, true));
+            std::move(prismParameters), true, true, false, true)));
     }
     // Kick (KickSynth.h): a kick drum per note, its settings by their keys
     // ("pitchStart", "decay").
@@ -474,11 +490,11 @@ PrimitiveRegistry createFactoryPrimitiveRegistry()
             const auto& setting = cydaw::engine::kick::parameter(index);
             kickParameters.push_back(parameter(setting.key, setting.minimum, setting.maximum, setting.defaultValue));
         }
-        add(primitive("core.kick-synth", "Kick", Category::generator,
+        add(withSettingSockets(primitive("core.kick-synth", "Kick", Category::generator,
             { port(1, "audio-out", Type::audio, Direction::output, Rate::audio, 2),
               port(2, "frequency", Type::value, Direction::input, Rate::control),
               port(3, "level", Type::value, Direction::input, Rate::control) },
-            std::move(kickParameters), true, true, false, true));
+            std::move(kickParameters), true, true, false, true)));
     }
     // The synth family (SynthFamily.h): each model a primitive, its settings
     // by their keys ("osc1.wave", "filter.cutoff").
@@ -490,11 +506,11 @@ PrimitiveRegistry createFactoryPrimitiveRegistry()
         std::vector<NodeParameter> settings { parameter("frequency", 20.0, 8'000.0, 220.0), parameter("level", 0.0, 1.0, 1.0) };
         for (const auto& setting : info.parameters)
             settings.push_back(parameter(setting.key, setting.minimum, setting.maximum, setting.defaultValue));
-        add(primitive(info.processorKey, info.english, Category::generator,
+        add(withSettingSockets(primitive(info.processorKey, info.english, Category::generator,
             { port(1, "audio-out", Type::audio, Direction::output, Rate::audio, 2),
               port(2, "frequency", Type::value, Direction::input, Rate::control),
               port(3, "level", Type::value, Direction::input, Rate::control) },
-            std::move(settings), true, true, false, true));
+            std::move(settings), true, true, false, true)));
     }
     add(primitive("core.fixed-oscillator", "Fixed Oscillator", Category::generator,
         { port(1, "audio", Type::audio, Direction::output, Rate::audio, 2),
@@ -703,6 +719,22 @@ PrimitiveRegistry createFactoryPrimitiveRegistry()
                           std::move(values), true));
             continue;
         }
+        // A modulator: a value out, two values in (what a math modulator
+        // combines; the others leave them unplugged), its settings knobs.
+        if (effect.control) {
+            std::vector<NodeParameter> values;
+            for (const auto& item : effect.parameters)
+                if (!item.key.empty())
+                    values.push_back(parameter(std::string(item.key), item.minimum, item.maximum, item.defaultValue));
+            auto a = port(1, "a", Type::value, Direction::input, Rate::control);
+            auto b = port(2, "b", Type::value, Direction::input, Rate::control);
+            a.optional = true;
+            b.optional = true;
+            add(primitive(std::string(effect.processorKey), std::string(effect.displayName), Category::modulation,
+                          { std::move(a), std::move(b), port(3, "value", Type::value, Direction::output, Rate::control) },
+                          std::move(values), true));
+            continue;
+        }
         std::vector<GraphPort> ports {
             port(1, "audio-in", Type::audio, Direction::input, Rate::audio, effect.inputChannels),
             port(2, "audio-out", Type::audio, Direction::output, Rate::audio, effect.outputChannels)
@@ -713,7 +745,8 @@ PrimitiveRegistry createFactoryPrimitiveRegistry()
             if (item.key.empty())
                 continue;
             if (item.modulatable())
-                ports.push_back(port(next++, std::string(item.key), Type::value, Direction::input, Rate::control));
+                // Several modulators can move one knob.
+                ports.push_back(port(next++, std::string(item.key), Type::value, Direction::input, Rate::control, 1, true));
             parameters.push_back(parameter(std::string(item.key), item.minimum, item.maximum, item.defaultValue));
         }
         // Additional settings keep deterministic high IDs, so extending the
@@ -721,7 +754,7 @@ PrimitiveRegistry createFactoryPrimitiveRegistry()
         for(std::size_t i=0;i<effect.parameters.size();++i) {
             const auto& item=effect.parameters[i];
             if(item.key.empty()||item.modulatable())continue;
-            auto extra=port(1024+i,std::string(item.key),Type::value,Direction::input,Rate::control,1,false,item.defaultValue);
+            auto extra=port(1024+i,std::string(item.key),Type::value,Direction::input,Rate::control,1,true,item.defaultValue);
             extra.optional=true;ports.push_back(std::move(extra));
         }
         // Its own key: "sidechain" is already the compressor's detector

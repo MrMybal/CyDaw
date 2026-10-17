@@ -1179,6 +1179,8 @@ void dockingLayoutsSupportTabsSplitsAndWindows()
     expect(static_cast<bool>(layout.validate()), "docking layout and detached module editor validate");
 }
 
+#include "ModulatorTests.inc"
+
 } // namespace
 
 int main()
@@ -1198,6 +1200,7 @@ int main()
     typedInstrumentGraphCompilesThroughNestedBoundaries();
     dockingLayoutsSupportTabsSplitsAndWindows();
     nativeRuntimeRetainsRealtimeBaselinesAndExtendedSockets();
+    modulatorsMoveAsTheyAreSet();
 
     if (failures != 0) {
         std::cerr << failures << " test(s) failed\n";

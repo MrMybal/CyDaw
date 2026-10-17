@@ -120,6 +120,11 @@ public:
     // (its first two channels; the second as the first for a mono one), for
     // an interface's meters; 0 for a node the plan has not. Any thread.
     void takePeaks(const NodeId* nodes, std::size_t count, float* left, float* right) noexcept;
+    // A node's place in the plan (-1: not in it), and how loud it came out
+    // in the last block (its channels' loudest); reading it leaves it: a
+    // modulator follows it.
+    [[nodiscard]] int nodeIndex(NodeId node) const noexcept;
+    [[nodiscard]] float lastLevel(int index) const noexcept;
     // What a node's processor shows of its work now (AudioProcessor::
     // readings): up to `count` values, how many; none for a node the plan
     // has not. Any thread.
@@ -148,6 +153,8 @@ private:
     AudioBuffer bypassScratch_;
     // Two a node: its channels' loudest since takePeaks().
     std::unique_ptr<std::atomic<float>[]> peaks_;
+    // One a node: its loudest in the last block.
+    std::unique_ptr<std::atomic<float>[]> levels_;
     // Whether any node may be switched off: nothing to look at otherwise.
     std::atomic<bool> anyBypass_ {};
     std::size_t outputNodeIndex_ {};

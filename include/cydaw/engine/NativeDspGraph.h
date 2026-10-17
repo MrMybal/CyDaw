@@ -147,10 +147,28 @@ enum class NativeDspNodeKind : std::uint8_t {
     alea,
     duree,
     sequenceur,
-    roulement
+    roulement,
+    // The modulators (Modulators.h): control sources a card carries, as on
+    // every device of Bitwig's.
+    modLfo,
+    modSteps,
+    modRandom,
+    modAdsr,
+    modNote,
+    modExpression,
+    modMacro,
+    modButton,
+    modMath,
+    modFollower
 };
 // The last kind: what a stored graph may name (a kind appended moves it).
-inline constexpr NativeDspNodeKind lastNativeDspNodeKind = NativeDspNodeKind::roulement;
+inline constexpr NativeDspNodeKind lastNativeDspNodeKind = NativeDspNodeKind::modFollower;
+
+// A modulator's kind.
+[[nodiscard]] constexpr bool isModulatorKind(const NativeDspNodeKind kind) noexcept
+{
+    return kind >= NativeDspNodeKind::modLfo && kind <= NativeDspNodeKind::modFollower;
+}
 
 // A compact, dependency-free parameter payload that travels with a graph node.
 // Fields that are not used by a given node kind keep their defaults. Keeping the

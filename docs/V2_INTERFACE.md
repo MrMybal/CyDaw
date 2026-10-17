@@ -794,6 +794,10 @@ Le bouton liste de l'en-tête de chaque carte (instrument, effet, périphérique
 
 La liste reste ouverte par carte pendant la session. Port de contrôle : `value_list {track, nodeId, open, filter}` l'ouvre ou la ferme et rend ses valeurs dans l'ordre affiché (`binding`, `label`, `value`, `unit`, `touched`). Test : `tests/v2_value_list_check.py` (ctest `cydaw2_value_list_check`).
 
+## Modulateurs d'une carte
+
+Le bouton **modulateurs** de l'en-tête d'une carte ouvre une colonne à sa gauche : **+** ajoute un LFO, des Steps, un Random, un ADSR, un Keytrack, des Expressions, une Macro, un Button, un Math ou un Envelope Follower. La flèche d'un modulateur se glisse sur n'importe quel potard de la piste. Cliquée, elle s'arme : tirer un potard règle alors la quantité (Échap désarme). Un anneau de la couleur du modulateur entoure chaque potard modulé, et la liste des valeurs montre les modulations. Détails : [MODULATEURS.md](MODULATEURS.md). Port de contrôle : `modulator {track, action, …}`. Test : `tests/v2_modulators_check.py` (ctest `cydaw2_modulators_check`).
+
 ## Allumer, éteindre, tourner sans claquer
 
 **Changer l'ordre** : on prend un effet par son nom (en tête de sa carte) et on le lâche sur une autre
@@ -1197,6 +1201,9 @@ l'export (qui joue le projet en temps réel par le master) continuent, la carte 
   Périphérique ; `0` la ferme. `ui_input` joue des évènements de souris dans l'interface, un par
   image, en pixels de la fenêtre (ceux d'une capture), sans toucher au vrai pointeur :
   `{"type": "move"|"down"|"up"|"wheel"|"wait"|"release", "x", "y", "button", "dy", "frames", "shift"}`.
+  `ui_spots {record, filter}` dit où ont été dessinés les potards (`knob:<binding>`) et les flèches
+  des modulateurs (`modulator-arrow:<id>`), dans ces mêmes pixels, pour qu'un test y porte le
+  pointeur ; `"record": false` arrête le relevé.
   `status` donne le niveau crête et RMS de chaque piste et du master (`meters`, `masterMeter`) ;
   `set_node` accepte `"collapsed"` ; `add_automation`, `list_automation` et `clear_automation`
   acceptent `"key"` (un paramètre de `list_parameters`, valeurs dans ses unités).

@@ -104,6 +104,13 @@ struct UiState {
     // The cards whose list of values is open (the track's routing key, the
     // card's node id).
     std::set<std::pair<std::uint64_t, std::uint64_t>> valueLists;
+    // The cards whose modulators show, a column at their left (the same
+    // keys), each one's modulator whose settings show, and the modulator
+    // whose arrow is armed (the track's key, its node): a knob's drag then
+    // sets its amount instead of turning the knob.
+    std::set<std::pair<std::uint64_t, std::uint64_t>> modulatorColumns;
+    std::map<std::pair<std::uint64_t, std::uint64_t>, std::uint64_t> shownModulator;
+    std::optional<std::pair<std::uint64_t, std::uint64_t>> armedModulator;
     std::vector<ClipRef> selectedClips;
     // The launcher's slots picked (a click; Ctrl or Shift adds): what its
     // menu and Ctrl+E act on.

@@ -96,6 +96,8 @@ class NativeProcessor final : public EditorModel
     // Every key down now (a sampler's first and legato zones).
     std::array<bool, 128> down_{};
     int downCount_{};
+    // The notes as the graph's modulators hear them.
+    engine::modulator::ControlNotes controlNotes_;
 };
 class EditorSurface
 {

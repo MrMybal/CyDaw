@@ -784,6 +784,33 @@ public:
     bool editorDisconnect(std::uint64_t source, std::uint64_t sourcePort,
                           std::uint64_t destination, std::uint64_t destinationPort);
     bool editorSetParameter(const juce::String& binding, double value);
+    // ---- Modulators (engine/Modulators.h) -------------------------------
+    // A control cable onto a knob: what moves it, by how much.
+    struct EditorModulation {
+        std::uint64_t source {};
+        std::uint64_t sourcePort {};
+        std::uint64_t node {};
+        std::uint64_t port {};
+        juce::String binding;
+        int mode {};          // 0 sets the knob, 1 moves it around its value
+        float amount {};
+    };
+    [[nodiscard]] std::vector<EditorModulation> editorModulations() const;
+    // A modulator of `typeKey` (a control entry of the effect catalogue) for
+    // the card `owner`, made beside it; its id, 0 when refused.
+    std::uint64_t editorAddModulator(std::uint64_t owner, const juce::String& typeKey);
+    // The card a modulator belongs to; 0 for none (or not a modulator).
+    [[nodiscard]] std::uint64_t editorModulatorOwner(std::uint64_t modulator) const;
+    // The socket of `node` that feeds its knob `binding`; 0 for none.
+    [[nodiscard]] std::uint64_t editorParameterSocket(std::uint64_t node, const juce::String& binding) const;
+    // A modulator onto the knob `binding`, moving it by `amount` (-1..1 of
+    // its range); already there, its amount set. Empty on success, else why not.
+    juce::String editorModulate(std::uint64_t modulator, const juce::String& binding, float amount);
+    bool editorUnmodulate(std::uint64_t modulator, const juce::String& binding);
+    // A cable's amount, turned as a knob is (heard at once, one undo step
+    // once it rests): no change of the graph's shape.
+    bool editorSetModulationAmount(std::uint64_t source, std::uint64_t sourcePort, std::uint64_t destination,
+                                   std::uint64_t destinationPort, float amount);
     // When a parameter was last set through editorSetParameter (a knob
     // turned anywhere, a controller): a count that only grows; 0 never.
     [[nodiscard]] std::uint64_t editorParameterTouch(const juce::String& binding) const;
@@ -1583,6 +1610,9 @@ private:
     [[nodiscard]] PortHit inputPortHit(juce::Point<float> position) const;
     [[nodiscard]] PortHit outputPortHit(juce::Point<float> position) const;
     [[nodiscard]] std::optional<ControlCableTarget> controlCableTarget(const Connection& connection) const;
+    // The knob a socket of `node` feeds (its binding), empty for none: an
+    // instrument's setting socket, a catalogue effect's.
+    [[nodiscard]] juce::String knobOfSocket(const Node& node, const juce::String& portKey) const;
     // The node inside a module that carries one of its knobs (its type key),
     // through the devices it sits in; and that parameter's native range, the
     // one a modulating cable moves it across.

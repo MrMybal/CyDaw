@@ -80,7 +80,7 @@ inline constexpr std::array<NoteDivision, 12> noteDivisions { {
 }
 
 // Where an effect sits in the primitive registry.
-enum class EffectGroup : std::uint8_t { modulation, delay, filter, dynamics, channels, analysis, midi };
+enum class EffectGroup : std::uint8_t { modulation, delay, filter, dynamics, channels, analysis, midi, control };
 
 // The sidechain input of an effect that has one ("sidechain-in"). Far above the value ports
 // (3, 4… one per parameter) so adding it moved none of them: saved cables
@@ -109,6 +109,9 @@ struct EffectDescriptor {
     // A MIDI effect (MidiEffects.h): notes in, notes out, before the
     // instrument; no sound of its own.
     bool midi {};
+    // A modulator (Modulators.h): no sound in or out, a control value that
+    // moves other cards' knobs.
+    bool control {};
 
     [[nodiscard]] constexpr std::size_t parameterCount() const noexcept { return parameters.size(); }
     [[nodiscard]] constexpr bool convertsChannels() const noexcept { return inputChannels != outputChannels; }
@@ -1210,12 +1213,108 @@ inline constexpr EffectParameter roulementParameters[] {
     { "sync", "roulement.sync", "effect.parameter.sync", "", 0.0f, 12.0f, 3.0f, nullptr, 0, -1 },
 };
 
+
+// The modulators (Modulators.h): their settings in effect1..8, the steps and
+// the card they belong to in slots (modulator::stepSlot, ownerLowSlot…).
+inline constexpr std::string_view modulators = "nodes.category.modulators";
+#define CYDAW_MODULATOR_OWNER(prefix)                                                                                  \
+    { "owner-low", prefix ".ownerLow", "modulator.parameter.owner", "", 0.0f, 16777215.0f, 0.0f, nullptr, 16, -1 },    \
+    { "owner-high", prefix ".ownerHigh", "modulator.parameter.owner", "", 0.0f, 16777215.0f, 0.0f, nullptr, 17, -1 }
+inline constexpr EffectParameter modLfoParameters[] {
+    { "rate", "modLfo.rate", "effect.parameter.rate", "Hz", 0.01f, 40.0f, 1.0f, &P::effect1 },
+    { "sync", "modLfo.sync", "effect.parameter.sync", "", 0.0f, 13.0f, 0.0f, &P::effect2 },
+    { "shape", "modLfo.shape", "effect.parameter.shape", "", 0.0f, 6.0f, 0.0f, &P::effect3 },
+    { "phase", "modLfo.phase", "effect.parameter.phase", "", 0.0f, 1.0f, 0.0f, &P::effect4 },
+    { "retrigger", "modLfo.retrigger", "modulator.parameter.retrigger", "", 0.0f, 1.0f, 0.0f, &P::effect5 },
+    { "bipolar", "modLfo.bipolar", "modulator.parameter.bipolar", "", 0.0f, 1.0f, 1.0f, &P::effect6 },
+    { "smooth", "modLfo.smooth", "modulator.parameter.smooth", "", 0.0f, 1.0f, 0.0f, &P::effect7 },
+    CYDAW_MODULATOR_OWNER("modLfo"),
+};
+inline constexpr EffectParameter modStepsParameters[] {
+    { "steps", "modSteps.steps", "modulator.parameter.steps", "", 1.0f, 16.0f, 8.0f, &P::effect1 },
+    { "sync", "modSteps.sync", "effect.parameter.sync", "", 0.0f, 13.0f, 6.0f, &P::effect2 },
+    { "rate", "modSteps.rate", "effect.parameter.rate", "Hz", 0.05f, 40.0f, 4.0f, &P::effect3 },
+    { "smooth", "modSteps.smooth", "modulator.parameter.smooth", "", 0.0f, 1.0f, 0.0f, &P::effect4 },
+    { "bipolar", "modSteps.bipolar", "modulator.parameter.bipolar", "", 0.0f, 1.0f, 0.0f, &P::effect5 },
+    { "retrigger", "modSteps.retrigger", "modulator.parameter.retrigger", "", 0.0f, 1.0f, 0.0f, &P::effect6 },
+    { "step1", "modSteps.step1", "modulator.parameter.step1", "", 0.0f, 1.0f, 1.0f, nullptr, 0, -1 },
+    { "step2", "modSteps.step2", "modulator.parameter.step2", "", 0.0f, 1.0f, 0.25f, nullptr, 1, -1 },
+    { "step3", "modSteps.step3", "modulator.parameter.step3", "", 0.0f, 1.0f, 0.75f, nullptr, 2, -1 },
+    { "step4", "modSteps.step4", "modulator.parameter.step4", "", 0.0f, 1.0f, 0.5f, nullptr, 3, -1 },
+    { "step5", "modSteps.step5", "modulator.parameter.step5", "", 0.0f, 1.0f, 1.0f, nullptr, 4, -1 },
+    { "step6", "modSteps.step6", "modulator.parameter.step6", "", 0.0f, 1.0f, 0.0f, nullptr, 5, -1 },
+    { "step7", "modSteps.step7", "modulator.parameter.step7", "", 0.0f, 1.0f, 0.6f, nullptr, 6, -1 },
+    { "step8", "modSteps.step8", "modulator.parameter.step8", "", 0.0f, 1.0f, 0.3f, nullptr, 7, -1 },
+    { "step9", "modSteps.step9", "modulator.parameter.step9", "", 0.0f, 1.0f, 0.9f, nullptr, 8, -1 },
+    { "step10", "modSteps.step10", "modulator.parameter.step10", "", 0.0f, 1.0f, 0.2f, nullptr, 9, -1 },
+    { "step11", "modSteps.step11", "modulator.parameter.step11", "", 0.0f, 1.0f, 0.7f, nullptr, 10, -1 },
+    { "step12", "modSteps.step12", "modulator.parameter.step12", "", 0.0f, 1.0f, 0.4f, nullptr, 11, -1 },
+    { "step13", "modSteps.step13", "modulator.parameter.step13", "", 0.0f, 1.0f, 0.8f, nullptr, 12, -1 },
+    { "step14", "modSteps.step14", "modulator.parameter.step14", "", 0.0f, 1.0f, 0.1f, nullptr, 13, -1 },
+    { "step15", "modSteps.step15", "modulator.parameter.step15", "", 0.0f, 1.0f, 0.5f, nullptr, 14, -1 },
+    { "step16", "modSteps.step16", "modulator.parameter.step16", "", 0.0f, 1.0f, 0.35f, nullptr, 15, -1 },
+    CYDAW_MODULATOR_OWNER("modSteps"),
+};
+inline constexpr EffectParameter modRandomParameters[] {
+    { "rate", "modRandom.rate", "effect.parameter.rate", "Hz", 0.05f, 40.0f, 4.0f, &P::effect1 },
+    { "sync", "modRandom.sync", "effect.parameter.sync", "", 0.0f, 13.0f, 6.0f, &P::effect2 },
+    { "smooth", "modRandom.smooth", "modulator.parameter.smooth", "", 0.0f, 1.0f, 0.0f, &P::effect3 },
+    { "bipolar", "modRandom.bipolar", "modulator.parameter.bipolar", "", 0.0f, 1.0f, 1.0f, &P::effect4 },
+    { "chance", "modRandom.chance", "modulator.parameter.chance", "", 0.0f, 1.0f, 1.0f, &P::effect5 },
+    { "retrigger", "modRandom.retrigger", "modulator.parameter.retrigger", "", 0.0f, 1.0f, 0.0f, &P::effect6 },
+    CYDAW_MODULATOR_OWNER("modRandom"),
+};
+inline constexpr EffectParameter modAdsrParameters[] {
+    { "attack", "modAdsr.attack", "effect.parameter.attack", "s", 0.001f, 10.0f, 0.01f, &P::effect1 },
+    { "decay", "modAdsr.decay", "effect.parameter.decay", "s", 0.001f, 10.0f, 0.3f, &P::effect2 },
+    { "sustain", "modAdsr.sustain", "effect.parameter.sustain", "", 0.0f, 1.0f, 0.6f, &P::effect3 },
+    { "release", "modAdsr.release", "effect.parameter.release", "s", 0.001f, 10.0f, 0.4f, &P::effect4 },
+    { "velocity", "modAdsr.velocity", "modulator.parameter.velocity", "", 0.0f, 1.0f, 0.0f, &P::effect5 },
+    { "legato", "modAdsr.legato", "modulator.parameter.legato", "", 0.0f, 1.0f, 0.0f, &P::effect6 },
+    CYDAW_MODULATOR_OWNER("modAdsr"),
+};
+inline constexpr EffectParameter modNoteParameters[] {
+    { "source", "modNote.source", "modulator.parameter.noteSource", "", 0.0f, 2.0f, 0.0f, &P::effect1 },
+    { "root", "modNote.root", "modulator.parameter.root", "", 0.0f, 127.0f, 60.0f, &P::effect2 },
+    { "range", "modNote.range", "modulator.parameter.range", "st", 1.0f, 127.0f, 48.0f, &P::effect3 },
+    CYDAW_MODULATOR_OWNER("modNote"),
+};
+inline constexpr EffectParameter modExpressionParameters[] {
+    { "source", "modExpression.source", "modulator.parameter.expressionSource", "", 0.0f, 3.0f, 0.0f, &P::effect1 },
+    { "controller", "modExpression.controller", "modulator.parameter.controller", "", 0.0f, 127.0f, 74.0f, &P::effect2 },
+    { "smooth", "modExpression.smooth", "modulator.parameter.smooth", "", 0.0f, 1.0f, 0.1f, &P::effect3 },
+    CYDAW_MODULATOR_OWNER("modExpression"),
+};
+inline constexpr EffectParameter modMacroParameters[] {
+    { "value", "modMacro.value", "modulator.parameter.value", "", 0.0f, 1.0f, 0.5f, &P::effect1 },
+    { "bipolar", "modMacro.bipolar", "modulator.parameter.bipolar", "", 0.0f, 1.0f, 0.0f, &P::effect2 },
+    CYDAW_MODULATOR_OWNER("modMacro"),
+};
+inline constexpr EffectParameter modButtonParameters[] {
+    { "on", "modButton.on", "modulator.parameter.on", "", 0.0f, 1.0f, 0.0f, &P::effect1 },
+    CYDAW_MODULATOR_OWNER("modButton"),
+};
+inline constexpr EffectParameter modMathParameters[] {
+    { "mode", "modMath.mode", "modulator.parameter.mode", "", 0.0f, 6.0f, 0.0f, &P::effect1 },
+    { "blend", "modMath.blend", "modulator.parameter.blend", "", 0.0f, 1.0f, 0.5f, &P::effect2 },
+    { "a", "modMath.a", "modulator.parameter.a", "", -1.0f, 1.0f, 0.0f, &P::effect3 },
+    { "b", "modMath.b", "modulator.parameter.b", "", -1.0f, 1.0f, 0.0f, &P::effect4 },
+    CYDAW_MODULATOR_OWNER("modMath"),
+};
+inline constexpr EffectParameter modFollowerParameters[] {
+    { "attack", "modFollower.attack", "effect.parameter.attack", "ms", 1.0f, 500.0f, 10.0f, &P::effect1 },
+    { "release", "modFollower.release", "effect.parameter.release", "ms", 5.0f, 2000.0f, 150.0f, &P::effect2 },
+    { "gain", "modFollower.gain", "modulator.parameter.gain", "dB", -24.0f, 24.0f, 0.0f, &P::effect3 },
+    CYDAW_MODULATOR_OWNER("modFollower"),
+};
+#undef CYDAW_MODULATOR_OWNER
+
 #undef CYDAW_EQ_DYNAMIC
 #undef CYDAW_EQ_BAND
 #undef CYDAW_SLOT
 } // namespace effect_detail
 
-inline constexpr std::array<EffectDescriptor, 60> effectCatalogue { {
+inline constexpr std::array<EffectDescriptor, 70> effectCatalogue { {
     { "chorus", "core.chorus", effect_detail::K::chorus, "node.chorus", "node.chorus.description", "Chorus",
       effect_detail::effects, EffectGroup::modulation, 0xff5fd0c4u, effect_detail::chorus },
     { "flanger", "core.flanger", effect_detail::K::flanger, "node.flanger", "node.flanger.description", "Flanger",
@@ -1317,6 +1416,17 @@ inline constexpr std::array<EffectDescriptor, 60> effectCatalogue { {
     { "duree", "core.duree", effect_detail::K::duree, "node.duree", "node.duree.description", "Note Length", "nodes.category.midi", EffectGroup::midi, 0xffcf78ddu, effect_detail::dureeParameters, 2, 2, false, true },
     { "sequenceur", "core.sequenceur", effect_detail::K::sequenceur, "node.sequenceur", "node.sequenceur.description", "Step Sequencer", "nodes.category.midi", EffectGroup::midi, 0xffd47be8u, effect_detail::sequenceurParameters, 2, 2, false, true },
     { "roulement", "core.roulement", effect_detail::K::roulement, "node.roulement", "node.roulement.description", "Note Repeat", "nodes.category.midi", EffectGroup::midi, 0xffcf78ddu, effect_detail::roulementParameters, 2, 2, false, true },
+    // The modulators.
+    { "mod-lfo", "core.mod-lfo", effect_detail::K::modLfo, "node.modLfo", "node.modLfo.description", "LFO", effect_detail::modulators, EffectGroup::control, 0xff5fb8ffu, effect_detail::modLfoParameters, 2, 2, false, false, true },
+    { "mod-steps", "core.mod-steps", effect_detail::K::modSteps, "node.modSteps", "node.modSteps.description", "Steps", effect_detail::modulators, EffectGroup::control, 0xff5fd0c4u, effect_detail::modStepsParameters, 2, 2, false, false, true },
+    { "mod-random", "core.mod-random", effect_detail::K::modRandom, "node.modRandom", "node.modRandom.description", "Random", effect_detail::modulators, EffectGroup::control, 0xff9b8cf2u, effect_detail::modRandomParameters, 2, 2, false, false, true },
+    { "mod-adsr", "core.mod-adsr", effect_detail::K::modAdsr, "node.modAdsr", "node.modAdsr.description", "ADSR", effect_detail::modulators, EffectGroup::control, 0xff65d6b1u, effect_detail::modAdsrParameters, 2, 2, false, false, true },
+    { "mod-note", "core.mod-note", effect_detail::K::modNote, "node.modNote", "node.modNote.description", "Keytrack", effect_detail::modulators, EffectGroup::control, 0xffd47be8u, effect_detail::modNoteParameters, 2, 2, false, false, true },
+    { "mod-expression", "core.mod-expression", effect_detail::K::modExpression, "node.modExpression", "node.modExpression.description", "Expressions", effect_detail::modulators, EffectGroup::control, 0xffcf78ddu, effect_detail::modExpressionParameters, 2, 2, false, false, true },
+    { "mod-macro", "core.mod-macro", effect_detail::K::modMacro, "node.modMacro", "node.modMacro.description", "Macro", effect_detail::modulators, EffectGroup::control, 0xfff2a33au, effect_detail::modMacroParameters, 2, 2, false, false, true },
+    { "mod-button", "core.mod-button", effect_detail::K::modButton, "node.modButton", "node.modButton.description", "Button", effect_detail::modulators, EffectGroup::control, 0xffff7f6bu, effect_detail::modButtonParameters, 2, 2, false, false, true },
+    { "mod-math", "core.mod-math", effect_detail::K::modMath, "node.modMath", "node.modMath.description", "Math", effect_detail::modulators, EffectGroup::control, 0xff9aa8b8u, effect_detail::modMathParameters, 2, 2, false, false, true },
+    { "mod-follower", "core.mod-follower", effect_detail::K::modFollower, "node.modFollower", "node.modFollower.description", "Envelope Follower", effect_detail::modulators, EffectGroup::control, 0xff7ed878u, effect_detail::modFollowerParameters, 2, 2, false, false, true },
 } };
 
 [[nodiscard]] constexpr const EffectDescriptor* effectForKind(const NativeDspNodeKind kind) noexcept

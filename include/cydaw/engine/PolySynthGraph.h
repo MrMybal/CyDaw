@@ -153,9 +153,15 @@ struct PolyVoiceParameter final {
 struct PolyVoiceModulation final {
     std::uint64_t controlNodeId {};
     PolyVoiceTarget target { PolyVoiceTarget::filterCutoff };
-    // 0: the cable sets the value; above, it modulates the voice's own value
-    // by that much of the range per unit.
+    // 0: the cable sets the value; otherwise it modulates the voice's own
+    // value by that much of the range per unit (below 0, the other way).
     float depth {};
+    // An instrument's own setting: which one, its knob's range, whether the
+    // knob turns on a logarithmic scale (a frequency, a time).
+    std::uint16_t index {};
+    float minimum {};
+    float maximum { 1.0f };
+    bool logarithmic {};
 
     [[nodiscard]] bool operator==(const PolyVoiceModulation&) const = default;
 };
@@ -189,10 +195,21 @@ inline void applyPolyVoiceModulation(PolySynthGraphPlan& plan, const PolyVoiceTa
 // A value a cable moves the voice's own by (depth > 0): the range of each
 // target, the frequency on its logarithmic scale.
 inline void modulatePolyVoice(PolySynthGraphPlan& plan, const PolyVoiceTarget target, const float control,
-                              const float depth) noexcept
+                              const float depth, const std::size_t index = 0, const float minimum = 0.0f,
+                              const float maximum = 1.0f, const bool logarithmic = false) noexcept
 {
     const auto linear = [control, depth](float& field, const float low, const float high) {
         field = std::clamp(field + control * depth * (high - low), low, high);
+    };
+    // An instrument's own setting, around its knob, on the knob's scale.
+    const auto setting = [&](auto& values) {
+        if (index >= values.size() || !(maximum > minimum))
+            return;
+        auto& field = values[index];
+        if (logarithmic && minimum > 0.0f && field > 0.0f)
+            field = std::clamp(field * std::pow(maximum / minimum, control * depth), minimum, maximum);
+        else
+            linear(field, minimum, maximum);
     };
     switch (target) {
     case PolyVoiceTarget::filterCutoff:
@@ -203,15 +220,13 @@ inline void modulatePolyVoice(PolySynthGraphPlan& plan, const PolyVoiceTarget ta
     case PolyVoiceTarget::wavetablePosition: linear(plan.wavetablePosition, 0.0f, 1.0f); break;
     case PolyVoiceTarget::wavetableDetune: linear(plan.wavetableDetuneCents, 0.0f, 50.0f); break;
     case PolyVoiceTarget::stringDamping: linear(plan.stringDamping, 0.0f, 1.0f); break;
-    // The instruments' own settings are moved by their own matrices, not by
-    // the graph's cables: only lanes set them.
-    case PolyVoiceTarget::prismValue:
-    case PolyVoiceTarget::kickValue:
-    case PolyVoiceTarget::samplerValue:
-    case PolyVoiceTarget::soundModelValue:
-    case PolyVoiceTarget::synthValue:
-    case PolyVoiceTarget::drumValue:
-    case PolyVoiceTarget::samplerController: break;
+    case PolyVoiceTarget::prismValue: setting(plan.prismValues); break;
+    case PolyVoiceTarget::kickValue: setting(plan.kickValues); break;
+    case PolyVoiceTarget::samplerValue: setting(plan.samplerValues); break;
+    case PolyVoiceTarget::soundModelValue: setting(plan.soundModelValues); break;
+    case PolyVoiceTarget::synthValue: setting(plan.synthValues); break;
+    case PolyVoiceTarget::drumValue: setting(plan.drumValues); break;
+    case PolyVoiceTarget::samplerController: setting(plan.samplerControllers); break;
     }
 }
 

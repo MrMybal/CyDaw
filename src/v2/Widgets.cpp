@@ -19,6 +19,8 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
+#include <map>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -348,22 +350,85 @@ struct LearnState {
     std::vector<std::pair<std::string, std::string>> scopes;
     std::vector<std::pair<std::string, std::string>> tracks;
     std::vector<LearnSpot> spots;
+    // The knobs' bindings and names, learn mode or not (modulators).
+    std::vector<std::pair<std::string, std::string>> bindings;
 };
 LearnState& learnState()
 {
     static LearnState state;
     return state;
 }
+struct SpotRecording {
+    bool on {};
+    std::map<std::string, LearnSpot> spots;
+};
+SpotRecording& spotRecording()
+{
+    static SpotRecording recording;
+    return recording;
+}
+ModulationHost*& hostSlot()
+{
+    static ModulationHost* host {};
+    return host;
+}
+const std::string& scopedLabel()
+{
+    static const std::string none;
+    const auto& bindings = learnState().bindings;
+    return bindings.empty() ? none : bindings.back().second;
+}
+// The item just drawn takes a modulator dropped on it, for its scope's knob.
+void modulationTarget()
+{
+    auto* host = hostSlot();
+    const auto& binding = scopedBinding();
+    if (host == nullptr || binding.empty() || ImGui::GetDragDropPayload() == nullptr)
+        return;
+    if (ImGui::BeginDragDropTarget()) {
+        if (const auto* payload = ImGui::AcceptDragDropPayload(modulatorPayload);
+            payload != nullptr && payload->DataSize == static_cast<int>(sizeof(std::uint64_t))) {
+            std::uint64_t source {};
+            std::memcpy(&source, payload->Data, sizeof(source));
+            host->dropped(binding, source);
+        }
+        ImGui::EndDragDropTarget();
+    }
+}
 } // namespace
+
+ModulationHostScope::ModulationHostScope(ModulationHost* host) : previous_(hostSlot())
+{
+    hostSlot() = host;
+}
+
+ModulationHostScope::~ModulationHostScope()
+{
+    hostSlot() = previous_;
+}
+
+ModulationHost* modulationHost()
+{
+    return hostSlot();
+}
+
+const std::string& scopedBinding()
+{
+    static const std::string none;
+    const auto& bindings = learnState().bindings;
+    return bindings.empty() ? none : bindings.back().first;
+}
 
 LearnScope::LearnScope(std::string key, std::string label)
 {
     learnState().scopes.emplace_back(std::move(key), std::move(label));
+    learnState().bindings.emplace_back();
 }
 
 LearnScope::~LearnScope()
 {
     learnState().scopes.pop_back();
+    learnState().bindings.pop_back();
 }
 
 LearnTrackScope::LearnTrackScope(std::string prefix, std::string trackName)
@@ -392,15 +457,46 @@ LearnParameterScope::LearnParameterScope(const juce::String& binding, const juce
         }
     }
     state.scopes.emplace_back(std::move(key), std::move(name));
+    state.bindings.emplace_back(binding.toStdString(), label.toStdString());
 }
 
 LearnParameterScope::~LearnParameterScope()
 {
     learnState().scopes.pop_back();
+    learnState().bindings.pop_back();
+}
+
+void setSpotRecording(const bool on)
+{
+    spotRecording().on = on;
+    if (!on)
+        spotRecording().spots.clear();
+}
+
+void recordSpot(const std::string& key)
+{
+    auto& recording = spotRecording();
+    if (!recording.on || key.empty())
+        return;
+    const auto origin = ImGui::GetMainViewport()->Pos;
+    const auto min = ImGui::GetItemRectMin();
+    const auto max = ImGui::GetItemRectMax();
+    recording.spots[key] = { key, {}, ImVec2(min.x - origin.x, min.y - origin.y), ImVec2(max.x - origin.x, max.y - origin.y), 0 };
+}
+
+std::vector<LearnSpot> recordedSpots()
+{
+    std::vector<LearnSpot> out;
+    for (const auto& [key, spot] : spotRecording().spots)
+        out.push_back(spot);
+    return out;
 }
 
 void learnItem()
 {
+    modulationTarget();
+    if (spotRecording().on && !scopedBinding().empty())
+        recordSpot("knob:" + scopedBinding());
     auto& state = learnState();
     if (state.mode && !state.scopes.empty())
         learnItem(state.scopes.back().first, state.scopes.back().second);
@@ -446,6 +542,16 @@ bool knob(const char* id, float* value, const float minimum, const float maximum
     learnItem();
     const auto hovered = ImGui::IsItemHovered();
     const auto active = ImGui::IsItemActive();
+    // What moves it (modulators), and the one its drag sets the amount of.
+    auto* host = modulationHost();
+    const auto& binding = scopedBinding();
+    static std::vector<KnobModulation> modulations;
+    modulations.clear();
+    std::uint64_t armed {};
+    if (host != nullptr && !binding.empty()) {
+        host->modulationsOf(binding, modulations);
+        armed = host->armed();
+    }
     const auto logarithmic = (style.flags & knobLogarithmic) != 0;
     auto changed = false;
     auto t = toNormalised(*value, minimum, maximum, logarithmic);
@@ -465,7 +571,32 @@ bool knob(const char* id, float* value, const float minimum, const float maximum
         storage->SetFloat(heldKey, t);
         storage->SetBool(movedKey, false);
     }
-    if (active && (movement.y != 0.0f || movement.x != 0.0f)) {
+    if (armed != 0) {
+        // A modulator armed: the drag, the wheel, a double click (none) set
+        // its amount here; the knob stays where it is.
+        auto amount = 0.0f;
+        for (const auto& modulation : modulations)
+            if (modulation.source == armed)
+                amount = modulation.amount;
+        const auto amountKey = ImGui::GetID("##amount");
+        if (ImGui::IsItemActivated())
+            storage->SetFloat(amountKey, amount);
+        auto next = amount;
+        if (active && (movement.y != 0.0f || movement.x != 0.0f)) {
+            storage->SetBool(movedKey, true);
+            const auto speed = 0.0055f * valueSpeed() / std::max(0.5f, ImGui::GetStyle().FontScaleDpi);
+            next = std::clamp(storage->GetFloat(amountKey, amount) + (-movement.y + movement.x * 0.35f) * speed, -1.0f, 1.0f);
+            storage->SetFloat(amountKey, next);
+        }
+        if (hovered && io.MouseWheel != 0.0f) {
+            next = std::clamp(amount + io.MouseWheel * 0.02f * valueSpeed(), -1.0f, 1.0f);
+            takeWheel();
+        }
+        if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+            next = 0.0f;
+        if (next != amount)
+            host->setAmount(binding, armed, std::abs(next) < 1.0e-4f ? 0.0f : next);
+    } else if (active && (movement.y != 0.0f || movement.x != 0.0f)) {
         storage->SetBool(movedKey, true);
         const auto speed = 0.0055f * valueSpeed() / std::max(0.5f, ImGui::GetStyle().FontScaleDpi);
         const auto held = std::clamp(storage->GetFloat(heldKey, t) + (-movement.y + movement.x * 0.35f) * speed, 0.0f, 1.0f);
@@ -473,14 +604,14 @@ bool knob(const char* id, float* value, const float minimum, const float maximum
         t = onStep(held);
         changed = true;
     }
-    if (hovered && io.MouseWheel != 0.0f) {
+    if (armed == 0 && hovered && io.MouseWheel != 0.0f) {
         // A notch: one step of a stepped setting, else a little.
         const auto notch = steps > 0 ? 1.0f / static_cast<float>(steps) : 0.02f * valueSpeed();
         t = onStep(std::clamp(t + io.MouseWheel * notch, 0.0f, 1.0f));
         changed = true;
         takeWheel();
     }
-    if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+    if (armed == 0 && hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
         t = toNormalised(defaultValue, minimum, maximum, logarithmic);
         storage->SetFloat(heldKey, t);
         changed = true;
@@ -525,10 +656,33 @@ bool knob(const char* id, float* value, const float minimum, const float maximum
                      centre.y + std::sin(angle) * (radius - thickness * 1.1f));
     const ImVec2 inner(centre.x + std::cos(angle) * radius * 0.25f, centre.y + std::sin(angle) * radius * 0.25f);
     list->AddLine(inner, tip, p.text, std::max(1.5f, thickness * 0.55f));
+    // Each modulator's ring, outside the arc: from where the knob is, as far
+    // as it can take it (its amount of the range, either way).
+    auto ring = radius + thickness * 0.95f;
+    for (const auto& modulation : modulations) {
+        const auto reach = std::clamp(t + modulation.amount, 0.0f, 1.0f);
+        const auto ringColour = modulation.colour != 0 ? modulation.colour : p.modulation;
+        const auto lit = armed == modulation.source;
+        arc(list, centre, ring, kArcStart + kArcSweep * std::min(t, reach), kArcStart + kArcSweep * std::max(t, reach),
+            lit ? theme::brighter(ringColour, 0.2f) : ringColour, std::max(1.5f, thickness * (lit ? 0.6f : 0.45f)));
+        ring += thickness * 0.6f;
+    }
+    // Armed and not on it yet: a faint ring says a drag puts it there.
+    if (armed != 0 && hovered && std::none_of(modulations.begin(), modulations.end(),
+                                              [armed](const auto& modulation) { return modulation.source == armed; }))
+        arc(list, centre, ring, kArcStart, kArcStart + kArcSweep, theme::alpha(p.modulation, 0.35f), std::max(1.0f, thickness * 0.3f));
     if (style.modulation >= 0.0f) {
         const auto m = kArcStart + kArcSweep * std::clamp(style.modulation, 0.0f, 1.0f);
         list->AddCircleFilled(ImVec2(centre.x + std::cos(m) * radius, centre.y + std::sin(m) * radius),
                               thickness * 0.7f, p.modulation, 12);
+    }
+    // What moves it, by how much: "LFO → Cutoff [0.425]".
+    if (hovered && !active && !modulations.empty() && ImGui::GetDragDropPayload() == nullptr) {
+        ImGui::BeginTooltip();
+        for (const auto& modulation : modulations)
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(modulation.colour != 0 ? modulation.colour : p.modulation),
+                               "%s \xe2\x86\x92 %s [%.3f]", modulation.name.c_str(), scopedLabel().c_str(), modulation.amount);
+        ImGui::EndTooltip();
     }
 
     if (labelHeight > 0.0f) {

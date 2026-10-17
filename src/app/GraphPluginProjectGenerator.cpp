@@ -284,7 +284,9 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
         for (const auto &route : *routes)
             cpp += "d.voiceModulations.push_back({" + integer(prop(route, "source")) +
                    "ull,static_cast<engine::PolyVoiceTarget>(" + integer(prop(route, "target")) + ")," +
-                   number(prop(route, "depth")) + "f});\n";
+                   number(prop(route, "depth")) + "f," + integer(prop(route, "index")) + "," +
+                   number(prop(route, "minimum")) + "f," + number(prop(route, "maximum").isVoid() ? juce::var(1.0) : prop(route, "maximum")) + "f," +
+                   (static_cast<bool>(prop(route, "logarithmic")) ? "true" : "false") + "});\n";
     cpp += "return d;}\nengine::NativeDspGraph makeAudioGraph(){engine::NativeDspGraph g;g.outputNodeId=" +
            integer(prop(native, "outputNodeId")) + "ull;\n";
     const juce::StringArray scalarFields{"driveDb",

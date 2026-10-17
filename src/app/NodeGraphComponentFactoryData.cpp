@@ -1225,8 +1225,8 @@ void NodeGraphComponent::initialiseCatalog()
     // The effect catalogue's cards; their sockets and schema come from the
     // primitive registry like everyone else's.
     for (const auto& effect : cydaw::engine::effectCatalogue) {
-        // The MIDI effects carry notes.
-        const auto carried = effect.midi ? midi : audio;
+        // The MIDI effects carry notes; the modulators values.
+        const auto carried = effect.midi ? midi : effect.control ? control : audio;
         NodeType type { juce::String(std::string(effect.typeKey)), juce::String(std::string(effect.titleKey)), {},
                         juce::String(std::string(effect.categoryKey)), juce::Colour(effect.colour),
                         true, carried, true, carried, false, false };

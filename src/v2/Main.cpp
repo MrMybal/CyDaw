@@ -446,7 +446,8 @@ juce::String effectsTest()
                    + " gives " + juce::String(left) + " / " + juce::String(right);
     }
     for (const auto& effect : engine::effectCatalogue) {
-        if (effect.convertsChannels() || effect.midi)
+        // A modulator is no device of the chain: the modulator check has it.
+        if (effect.convertsChannels() || effect.midi || effect.control)
             continue;
         const auto typeKey = juce::String(std::string(effect.typeKey));
         const auto track = studio.addAudioTrack();
