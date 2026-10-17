@@ -1,5 +1,6 @@
 #include "Studio.h"
 
+#include <cydaw/engine/Containers.h>
 #include <cydaw/engine/EffectCatalogue.h>
 
 #include "DeviceOps.h"
@@ -413,6 +414,10 @@ BusState& Studio::adoptBus(const std::uint64_t id, const juce::var& graphState)
 
 GraphSlot* Studio::graphFor(const TrackRef& track)
 {
+    if (track.pad >= replacerPadBase) {
+        auto* slot = replacerSlot(track);
+        return slot != nullptr ? slot->graph.get() : nullptr;
+    }
     if (track.isBus())
         return busGraph(track.bus);
     if (track.master)
@@ -454,6 +459,12 @@ std::optional<TrackRef> Studio::trackOf(const GraphSlot& slot) const
     for (std::size_t index = 0; index < audioTracks_.size(); ++index)
         if (audioTracks_[index].graph.get() == &slot)
             return TrackRef { false, index, 0 };
+    for (std::size_t index = 0; index < replacerSlots_.size(); ++index)
+        if (replacerSlots_[index].graph.get() == &slot) {
+            auto track = replacerSlots_[index].owner;
+            track.pad = replacerPadBase + static_cast<int>(index);
+            return track;
+        }
     for (const auto& [id, state] : midiTracks_) {
         if (state.graph.get() == &slot)
             return TrackRef { true, 0, id };
@@ -1054,6 +1065,16 @@ void Studio::publishRouting()
 
 juce::Result Studio::publishGraph(const TrackRef& track, const bool structural)
 {
+    // A replacer's instrument: compiled, kept on its card, its track's graph
+    // published again (the replacer plays the new plan at once).
+    if (track.pad >= replacerPadBase) {
+        auto* replacer = replacerSlot(track);
+        if (replacer == nullptr)
+            return juce::Result::fail(ui::Ls("Instrument introuvable", "No such instrument"));
+        compileReplacer(*replacer);
+        dirty_ = true;
+        return publishGraph(replacer->owner, false);
+    }
     auto* slot = graphFor(track);
     if (slot == nullptr)
         return juce::Result::fail(ui::Ls("Piste introuvable", "No such track"));
@@ -1061,7 +1082,8 @@ juce::Result Studio::publishGraph(const TrackRef& track, const bool structural)
     auto result = juce::Result::ok();
     if (track.isBus()) {
         // A virtual input's or output's effects.
-        const auto native = graph.nativeDspGraph();
+        auto native = graph.nativeDspGraph();
+        attachReplacerInstruments(track, native);
         result = engine_.updateVirtualBusGraphParameters(track.bus, native);
         if (result.failed())
             result = engine_.setVirtualBusGraph(track.bus, native);
@@ -1071,13 +1093,15 @@ juce::Result Studio::publishGraph(const TrackRef& track, const bool structural)
     }
     if (track.master) {
         // Into the master's output, before its fader.
-        const auto native = graph.nativeDspGraph();
+        auto native = graph.nativeDspGraph();
+        attachReplacerInstruments(track, native);
         result = engine_.updateMasterNativeDspParameters(native);
         if (result.failed())
             result = engine_.setMasterNativeDspGraph(native);
         graph.setDspCompilationStatus(result, native.nodes.size());
     } else if (!track.midi) {
         auto native = graph.nativeDspGraph();
+        attachReplacerInstruments(track, native);
         if (track.audioIndex < audioTracks_.size() && audioTracks_[track.audioIndex].modulationActive)
             modulateNativeGraph(audioTracks_[track.audioIndex], native);
         // Values only when the shape is the same; the engine refuses a
@@ -1093,7 +1117,8 @@ juce::Result Studio::publishGraph(const TrackRef& track, const bool structural)
         // A pad of a rack: its instrument and its effects, played by its key.
         engine::PolySynthGraphPlan plan;
         const auto compiled = graph.compilePolySynthGraph(plan);
-        const auto chain = graph.nativeDspGraph();
+        auto chain = graph.nativeDspGraph();
+        attachReplacerInstruments(track, chain);
         result = engine_.setMidiTrackRackPad(track.midiId, static_cast<std::size_t>(track.pad), plan, chain);
         if (compiled.failed())
             result = compiled;
@@ -1110,7 +1135,8 @@ juce::Result Studio::publishGraph(const TrackRef& track, const bool structural)
             for (std::size_t pad = 0; pad < found->second.pads.size(); ++pad)
                 publishRackPadMix(track, pad);
         engine_.setMidiTrackVoiceModulations(track.midiId, graph.editorVoiceModulations());
-        const auto chain = graph.nativeDspGraph();
+        auto chain = graph.nativeDspGraph();
+        attachReplacerInstruments(track, chain);
         result = engine_.updateMidiTrackEffectParameters(track.midiId, chain);
         if (result.failed())
             result = engine_.setMidiTrackEffectGraph(track.midiId, chain);
@@ -1134,6 +1160,147 @@ juce::Result Studio::publishGraph(const TrackRef& track, const bool structural)
             publishRouting();
     }
     return result;
+}
+
+// ---- A Replacer's instrument ------------------------------------------------------------------
+
+bool Studio::isReplacerPad(const TrackRef& track) const
+{
+    return track.pad >= replacerPadBase
+           && static_cast<std::size_t>(track.pad - replacerPadBase) < replacerSlots_.size();
+}
+
+Studio::ReplacerSlot* Studio::replacerSlot(const TrackRef& track)
+{
+    if (!isReplacerPad(track))
+        return nullptr;
+    return &replacerSlots_[static_cast<std::size_t>(track.pad - replacerPadBase)];
+}
+
+Studio::ReplacerSlot* Studio::replacerSlotFor(const TrackRef& owner, const std::uint64_t head, const bool make)
+{
+    for (auto& slot : replacerSlots_)
+        if (slot.head == head && slot.owner == owner && slot.owner.bus == owner.bus && slot.owner.master == owner.master)
+            return &slot;
+    if (!make)
+        return nullptr;
+    // Made from what its card keeps.
+    auto* ownerSlot = graphFor(owner);
+    if (ownerSlot == nullptr)
+        return nullptr;
+    const auto kept = ownerSlot->graph().nodeInstrumentJson(head);
+    if (!kept.getProperty("graph", juce::var()).isObject())
+        return nullptr;
+    ReplacerSlot slot;
+    slot.owner = owner;
+    slot.head = head;
+    slot.name = kept.getProperty("name", juce::var()).toString();
+    slot.graph = makeSlot(GraphSlot::Owner::midiTrack);
+    slot.graph->restore(withLibrary(kept.getProperty("graph", juce::var()), factoryMidiGraph_));
+    replacerSlots_.push_back(std::move(slot));
+    auto& made = replacerSlots_.back();
+    engine::PolySynthGraphPlan plan;
+    if (made.graph->graph().compilePolySynthGraph(plan).wasOk())
+        made.plan = std::make_shared<const engine::PolySynthGraphPlan>(std::move(plan));
+    return &made;
+}
+
+void Studio::compileReplacer(ReplacerSlot& slot)
+{
+    engine::PolySynthGraphPlan plan;
+    const auto compiled = slot.graph->graph().compilePolySynthGraph(plan);
+    slot.plan = compiled.wasOk() ? std::make_shared<const engine::PolySynthGraphPlan>(std::move(plan)) : nullptr;
+    slot.graph->setLastCompileError(compiled.failed() ? compiled.getErrorMessage() : juce::String());
+    // Kept on the card: saved with the track.
+    if (auto* ownerSlot = graphFor(slot.owner)) {
+        auto kept = juce::DynamicObject::Ptr(new juce::DynamicObject());
+        kept->setProperty("name", slot.name);
+        kept->setProperty("graph", withoutSharedModules(slot.graph->serialise()));
+        (void) ownerSlot->graph().setNodeInstrumentJson(slot.head, juce::var(kept.get()));
+    }
+}
+
+std::optional<TrackRef> Studio::replacerInstrument(const TrackRef& owner, const std::uint64_t head)
+{
+    auto* slot = replacerSlotFor(owner, head, true);
+    if (slot == nullptr)
+        return std::nullopt;
+    auto track = owner;
+    track.pad = replacerPadBase + static_cast<int>(slot - replacerSlots_.data());
+    return track;
+}
+
+juce::String Studio::replacerInstrumentName(const TrackRef& owner, const std::uint64_t head)
+{
+    const auto* slot = replacerSlotFor(owner, head, true);
+    return slot != nullptr ? slot->name : juce::String();
+}
+
+juce::String Studio::padName(const TrackRef& track) const
+{
+    if (track.pad >= replacerPadBase) {
+        if (!isReplacerPad(track))
+            return {};
+        const auto& slot = replacerSlots_[static_cast<std::size_t>(track.pad - replacerPadBase)];
+        return slot.name.isNotEmpty() ? slot.name : juce::String("Instrument");
+    }
+    if (const auto* pad = track.pad >= 0 ? rackPad(track.owner(), static_cast<std::size_t>(track.pad)) : nullptr)
+        return pad->name;
+    return trackName(track);
+}
+
+juce::Result Studio::setReplacerInstrument(const TrackRef& owner, const std::uint64_t head, const juce::String& instrumentKey)
+{
+    auto* ownerSlot = graphFor(owner);
+    if (ownerSlot == nullptr)
+        return juce::Result::fail(ui::Ls("Piste introuvable", "No such track"));
+    const auto container = ownerSlot->graph().editorContainer(head);
+    if (!container || container->typeKey != "replacer")
+        return juce::Result::fail("no Replacer " + juce::String(static_cast<juce::int64>(head)) + " on that track");
+    auto* slot = replacerSlotFor(owner, head, true);
+    if (slot == nullptr) {
+        ReplacerSlot made;
+        made.owner = owner;
+        made.head = head;
+        made.graph = makeSlot(GraphSlot::Owner::midiTrack);
+        made.graph->restore(withLibrary(juce::var(), factoryMidiGraph_));
+        replacerSlots_.push_back(std::move(made));
+        slot = &replacerSlots_.back();
+    }
+    auto& graph = slot->graph->graph();
+    const auto catalogue = graph.deviceCatalogue();
+    const auto device = std::find_if(catalogue.begin(), catalogue.end(), [&](const auto& entry) { return entry.key == instrumentKey; });
+    if (device == catalogue.end() || !device->soundSource)
+        return juce::Result::fail("no instrument \"" + instrumentKey + "\"");
+    if (const auto applied = graph.replaceInstrument(instrumentKey); applied.failed())
+        return applied;
+    graph_layout::arrange(graph);
+    slot->name = device->name;
+    // A kit for a Batterie, as a track's gets.
+    auto ref = owner;
+    ref.pad = replacerPadBase + static_cast<int>(slot - replacerSlots_.data());
+    for (const auto& card : graph.editorNodes())
+        if (card.typeKey == "batterie" && !graph.nodeSamplerJson(card.id).isObject()) {
+            juce::String error;
+            if (!setBatterieKit(ref, card.id, 0, error))
+                return juce::Result::fail(error);
+        }
+    // Its sound is now the instrument.
+    if (const auto* effect = engine::effectForType("replacer"))
+        if (const auto* generator = engine::effectParameter(*effect, "generator"))
+            (void) ownerSlot->graph().editorSetParameter(
+                "node." + juce::String(static_cast<juce::int64>(head)) + "." + juce::String(std::string(generator->suffix)),
+                engine::container::instrumentGenerator);
+    dirty_ = true;
+    return publishGraph(ref, true);
+}
+
+void Studio::attachReplacerInstruments(const TrackRef& track, engine::NativeDspGraph& native)
+{
+    for (auto& node : native.nodes)
+        if (node.kind == engine::NativeDspNodeKind::replacer)
+            if (const auto* slot = replacerSlotFor(track, node.id, true))
+                node.instrument = slot->plan;
 }
 
 juce::Result Studio::insertDeviceInBranch(const TrackRef& track, const juce::String& key, const std::uint64_t head, const int branch,
@@ -4479,6 +4646,9 @@ bool Studio::removeTrack(const TrackRef& track)
 {
     if (track.master)
         return false;
+    // The tracks after it move: the replacers' instruments are made again
+    // from their cards, by the tracks they are on now.
+    replacerSlots_.clear();
     // The indices of the tracks after it move.
     clipsAtStop_.clear();
     const auto removedKey = routingKey(track);
@@ -4576,6 +4746,7 @@ void Studio::clearSession()
     engine_.clearMidiTracks();
     audioTracks_.clear();
     midiTracks_.clear();
+    replacerSlots_.clear();
     // The virtual inputs and outputs stay: they are the software's.
     audioMeters_.clear();
     midiMeters_.clear();

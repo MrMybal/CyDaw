@@ -13,6 +13,8 @@ a sine through it offline).
 * A Multiband FX-3 with the high band at -36 dB: lows pass, highs are gone.
 * An XY FX's Post FX follows the corners' mix, before Mix; saved and opened
   again, it is there.
+* A Replacer plays an instrument (a kick, then a synth) at each click; its
+  instrument's chain opens as a pad's; saved and opened again, it plays.
 * The strip with a container open (a snapshot, for the eye).
 * Saved and opened again, the containers and their cards are there.
 * Removed, the sound is the dry sound again.
@@ -185,6 +187,45 @@ def scenario(scratch: Path) -> None:
     reopened = next(c for c in containers() if c["type"] == "xy-fx")
     check(reopened["postBranch"] == 4 and [c["type"] for c in reopened["branches"][4]] == ["utilitaire"]
           and abs(level() - dry + 12.0) < 0.3, "saved and opened again, its Post FX and its sound are there")
+
+    # A Replacer playing an instrument at each transient (the graph as the
+    # track plays it: the instrument goes with it, not with an export).
+    need({"cmd": "add_bus_track", "name": "Drums"}, "drums track")
+
+    def clicks() -> float:
+        return need({"cmd": "effect_chain_check", "track": "Drums", "live": True, "signal": "clicks", "amplitude": 0.8,
+                     "seconds": 1.5}, "clicks")["outputDb"]
+
+    bare = clicks()
+    replacer = need({"cmd": "container", "track": "Drums", "action": "insert", "type": "replacer"}, "replacer")["head"]
+    kick = need({"cmd": "container", "track": "Drums", "action": "instrument", "head": replacer, "key": "kick-instrument"},
+                "kick")
+    check(kick["instrument"] != "", f"a Replacer takes an instrument ({kick['instrument']})")
+    kicked = clicks()
+    check(kicked > bare + 20.0, f"the instrument plays at each click ({bare:.1f} dB of clicks, {kicked:.1f} dB replaced)")
+    need({"cmd": "set_node_parameter", "track": "Drums", "nodeId": replacer, "parameter": "replacer.mix", "value": 0}, "mix")
+    check(abs(clicks() - bare) < 1.0, "Mix 0: the clicks alone")
+    need({"cmd": "set_node_parameter", "track": "Drums", "nodeId": replacer, "parameter": "replacer.mix", "value": 1}, "mix back")
+    opened = need({"cmd": "container", "track": "Drums", "action": "open_instrument", "head": replacer}, "open")
+    check(opened["pad"] >= 1000, "its instrument's chain opens in the strip, as a pad's")
+    time.sleep(0.3)
+    shot = scratch / "replacer-instrument.png"
+    need({"cmd": "snapshot", "path": str(shot).replace(os.sep, "/")}, "snapshot")
+    check(shot.is_file() and shot.stat().st_size > 10_000, f"the Replacer's instrument is drawn ({shot})")
+    need({"cmd": "container", "track": "Drums", "action": "open_instrument", "head": replacer, "open": False}, "close")
+    synth = need({"cmd": "container", "track": "Drums", "action": "instrument", "head": replacer, "key": "opale-instrument"},
+                 "synth")
+    switched = clicks()
+    check(synth["instrument"] != kick["instrument"] and switched > bare + 10.0,
+          f"another instrument ({synth['instrument']}) plays in its place ({switched:.1f} dB)")
+    saved = scratch / "Replaced.cydaw"
+    need({"cmd": "save_project", "path": str(saved).replace(os.sep, "/")}, "save replacer")
+    need({"cmd": "open_project", "path": str(saved).replace(os.sep, "/")}, "open replacer")
+    after = next(c for c in need({"cmd": "container", "track": "Drums", "action": "list"}, "list")["containers"]
+                 if c["type"] == "replacer")
+    reloaded = clicks()
+    check(after["instrument"] == synth["instrument"] and reloaded > bare + 10.0,
+          f"saved and opened again, the Replacer keeps its instrument and plays it ({reloaded:.1f} dB)")
 
 
 def main() -> int:

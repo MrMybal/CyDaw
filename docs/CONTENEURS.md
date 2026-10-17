@@ -14,7 +14,7 @@ Un conteneur est un périphérique qui tient des chaînes de périphériques et 
 | **Multiband FX-2** | Low, High | une bande (Linkwitz-Riley 24 dB/oct) ; les bandes se recomposent | fréquence de coupure, niveau, solo et muet par bande |
 | **Multiband FX-3** | Low, Mid, High | une des trois bandes | deux fréquences de coupure, niveau, solo et muet |
 | **XY FX** | A, B, C, D, puis **Post FX** | tout le son ; le mélange suit la place du point sur le pavé ; la chaîne Post FX traite ce mélange, avant Mix | X et Y |
-| **Replacer** | une | un son joué à chaque transitoire de l'entrée : grosse caisse, note, bruit ou clic | seuil, sensibilité, maintien, son, hauteur, déclin, vélocité |
+| **Replacer** | une | un son joué à chaque transitoire de l'entrée : grosse caisse, note, bruit, clic, ou un **instrument** de CyDAW | seuil, sensibilité, maintien, son, vélocité ; hauteur et déclin des sons intégrés ; note et durée pour un instrument |
 
 Tous ont **Mix** (le son d'entrée mêlé à celui des chaînes) et **Wet Gain** (le gain des chaînes).
 
@@ -29,6 +29,7 @@ Tous ont **Mix** (le son d'entrée mêlé à celui des chaînes) et **Wet Gain**
 - Le **+** au bout de la branche ajoute un périphérique. On peut aussi y déposer une carte tirée par son nom, d'où qu'elle vienne. Tirée sur une carte de la branche, elle se place avant ou après elle.
 - **+ Layer** ou **+ Chain** ajoute une branche. Un clic droit sur une branche la retire, avec ses périphériques.
 - Un conteneur peut en tenir d'autres.
+- **Replacer avec un instrument** : choisir *Instrument* dans *Sound*, puis un instrument dans la liste (Kick, Opale et les autres synthés, Prisme, Batterie…). À chaque transitoire, il joue la note réglée (36 par défaut, la grosse caisse d'une Batterie), aussi fort que le coup, aussi longtemps que *Length*. **Open** montre ses cartes dans la bande, comme un pad de rack, pour régler l'instrument ; la flèche de la colonne revient à la piste. Ses effets sont la chaîne du Replacer, dans son cadre. L'instrument est gardé dans la carte du Replacer et se sauvegarde avec le projet.
 - Supprimer la carte d'un conteneur le supprime avec tout ce qu'il tient. L'éteindre (bypass) laisse passer le son sans lui.
 - Ses réglages sont des réglages comme les autres : automatisables, modulables (les modulateurs se glissent dessus), dans la liste des valeurs.
 
@@ -50,6 +51,7 @@ Tous ont **Mix** (le son d'entrée mêlé à celui des chaînes) et **Wet Gain**
 - `move {nodeId, head, branch, before}`. Avec `head` à 0, le périphérique va dans la chaîne principale.
 - `add_branch {head}`, `remove_branch {head, branch}`, `remove {head}`.
 - `show {head, branch}` : choisit la branche montrée dans la bande.
+- `instrument {head, key}` donne un instrument du catalogue à un Replacer ; `open_instrument {head, open}` ouvre ou ferme sa chaîne dans la bande.
 - `list` : chaque conteneur, ses branches et leurs cartes.
 
 Les réglages passent par `set_node_parameter`, par exemple `fxLayer.mute2`, `multiband3.crossoverLow` ou `xyFx.x`. L'outil MCP `container` prend les mêmes champs.
@@ -57,3 +59,5 @@ Les réglages passent par `set_node_parameter`, par exemple `fxLayer.mute2`, `mu
 Tests :
 - `tests/ContainerTests.inc`, dans les tests du cœur : le son de chaque conteneur ;
 - `tests/v2_containers_check.py` (ctest `cydaw2_containers_check`, en silence) : l'édition, le glisser-déposer, l'imbrication, la sauvegarde.
+
+`effect_chain_check` prend `"live": true` (le graphe tel que la piste le joue, avec l'instrument d'un Replacer, qu'un plugin exporté n'emporte pas encore) et `"signal": "clicks"` (un clic tous les quarts de seconde).

@@ -229,6 +229,15 @@ public:
         state_.selectedTrack = track;
         return true;
     }
+    bool openPadChain(const TrackRef& owner, int pad) override
+    {
+        if (pad < 0)
+            state_.openRackPad.reset();
+        else
+            state_.openRackPad = std::make_pair(owner.owner(), pad);
+        state_.selectedTrack = owner.owner();
+        return true;
+    }
     bool showContainerBranch(const TrackRef& track, std::uint64_t head, int branch) override
     {
         state_.containerBranch[{ studio_.routingKey(track) + (track.pad >= 0 ? static_cast<std::uint64_t>(track.pad + 1) << 48 : 0),

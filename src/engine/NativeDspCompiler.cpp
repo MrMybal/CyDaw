@@ -33,6 +33,9 @@ std::unique_ptr<AudioProcessor> makeNativeDspProcessor(
         auto effect = makeEffectProcessor(node);
         if (auto* typed = dynamic_cast<EffectProcessor*>(effect.get()); typed != nullptr && node.impulse != nullptr)
             typed->setImpulse(node.impulse);
+        // A replacer's instrument.
+        if (auto* head = dynamic_cast<ContainerHeadProcessor*>(effect.get()))
+            head->setInstrument(node.instrument);
         return effect;
     }
     switch (node.kind) {
@@ -148,6 +151,9 @@ std::unique_ptr<AudioProcessor> makeNativeDspProcessor(
 bool updateNativeDspProcessorParameters(
     AudioProcessor& processor, const NativeDspNode& node) noexcept
 {
+    // A replacer's instrument, changed (its card's knobs turned): swapped live.
+    if (auto* head = dynamic_cast<ContainerHeadProcessor*>(&processor))
+        head->setInstrument(node.instrument);
     if (effectForKind(node.kind) != nullptr) {
         // A changed response, like a changed table, is the full compiler's:
         // swapping it here would free the old one on the audio thread.

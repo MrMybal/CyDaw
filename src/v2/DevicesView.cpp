@@ -180,7 +180,12 @@ void DevicesView::draw()
     auto track = *state_.selectedTrack;
     // A rack's pad opened: its own chain (its instrument and effects).
     if (state_.openRackPad) {
-        if (state_.openRackPad->first == track && studio_.rackPad(track, static_cast<std::size_t>(state_.openRackPad->second)) != nullptr)
+        auto opened = track;
+        opened.pad = state_.openRackPad->second;
+        // A rack's pad, or a Replacer's instrument.
+        if (state_.openRackPad->first == track
+            && (studio_.rackPad(track, static_cast<std::size_t>(state_.openRackPad->second)) != nullptr
+                || (studio_.isReplacerPad(opened) && studio_.graphFor(opened) != nullptr)))
             track.pad = state_.openRackPad->second;
         else
             state_.openRackPad.reset();
@@ -233,12 +238,15 @@ void DevicesView::draw()
         // A pad's chain: back to its rack, at the top of the column.
         if (track.pad >= 0) {
             ImGui::SetCursorScreenPos(ImVec2(origin.x + dp(3.0f), origin.y + dp(4.0f)));
-            if (ui::iconButton(icon::back, L("Revenir au rack", "Back to the rack"), false, p.accent, ImVec2(dp(20.0f), dp(20.0f))))
+            if (ui::iconButton(icon::back,
+                               track.pad >= Studio::replacerPadBase ? L("Revenir à la piste (son Replacer)", "Back to the track (its Replacer)")
+                                                                     : L("Revenir au rack", "Back to the rack"),
+                               false, p.accent, ImVec2(dp(20.0f), dp(20.0f))))
                 state_.openRackPad.reset();
             ImGui::SetCursorScreenPos(origin);
         }
         // Vertical name.
-        const auto name = track.pad >= 0 ? studio_.rackPad(track.owner(), static_cast<std::size_t>(track.pad))->name : studio_.trackName(track);
+        const auto name = track.pad >= 0 ? studio_.padName(track) : studio_.trackName(track);
         ImGui::PushFont(theme::boldFont(), ui::currentFontBase() * 0.85f);
         auto y = origin.y + dp(8.0f);
         for (auto index = 0; index < name.length() && y < origin.y + size.y - dp(14.0f); ++index) {
@@ -360,11 +368,23 @@ void DevicesView::draw()
     }
 
     // VST3 plugins sit on audio tracks (the master has its graph's devices).
-    if (!track.midi && !track.master)
+    const auto replacerChain = track.pad >= Studio::replacerPadBase;
+    if (!track.midi && !track.master && !replacerChain)
         drawPlugins(track, height);
 
+    // A Replacer's instrument: its sound goes through the Replacer's chain.
+    if (replacerChain) {
+        ImGui::BeginGroup();
+        ImGui::Dummy(ImVec2(0.0f, height * 0.35f));
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + dp(220.0f));
+        ImGui::TextDisabled("%s", L("Ses effets : la chaîne du Replacer, dans son cadre.", "Its effects: the Replacer's chain, in its frame."));
+        ImGui::PopTextWrapPos();
+        ImGui::EndGroup();
+        ImGui::SameLine(0.0f, dp(10.0f));
+    }
+
     // Add a device.
-    {
+    if (!replacerChain) {
         const auto origin = ImGui::GetCursorScreenPos();
         const ImVec2 size(dp(56.0f), height);
         ImGui::InvisibleButton("##addDevice", size);
@@ -1307,11 +1327,13 @@ void DevicesView::drawContainerPanel(Strip& strip, const app::NodeGraphComponent
 
     // The replacer: what it listens for, what it plays.
     if (kind == engine::NativeDspNodeKind::replacer) {
+        auto instrument = false;
         if (const auto* generator = containerSetting(head, "generator")) {
             list->AddText(ImVec2(at.x + dp(6.0f), y + dp(3.0f)), p.textDim, "Sound");
             ImGui::SetCursorScreenPos(ImVec2(at.x + dp(52.0f), y));
             ImGui::SetNextItemWidth(size.x - dp(58.0f));
             const auto current = std::clamp(static_cast<int>(std::lround(generator->value)), 0, engine::container::generatorCount - 1);
+            instrument = current == engine::container::instrumentGenerator;
             const ui::LearnParameterScope learn(generator->binding, generator->label);
             if (ImGui::BeginCombo("##generator", engine::container::generatorName(current))) {
                 for (int index = 0; index < engine::container::generatorCount; ++index)
@@ -1322,11 +1344,47 @@ void DevicesView::drawContainerPanel(Strip& strip, const app::NodeGraphComponent
             ui::learnItem();
             y += dp(26.0f);
         }
-        const std::pair<std::string_view, const char*> knobs[] { { "threshold", "Threshold" }, { "sensitivity", "Sensitivity" },
-                                                                 { "hold", "Hold" },          { "pitch", "Pitch" },
-                                                                 { "decay", "Decay" },        { "velocity", "Velocity" } };
+        // An instrument of CyDAW's: chosen, opened (its chain, as a pad's).
+        if (instrument) {
+            const auto owner = strip.track;
+            const auto name = studio_.replacerInstrumentName(owner, head.id);
+            ImGui::SetCursorScreenPos(ImVec2(at.x + dp(6.0f), y));
+            ImGui::SetNextItemWidth(size.x - dp(66.0f));
+            if (ImGui::BeginCombo("##instrument", name.isNotEmpty() ? name.toRawUTF8() : "Choose an instrument...",
+                                  ImGuiComboFlags_HeightLarge)) {
+                for (const auto& entry : strip.graph.deviceCatalogue())
+                    if (entry.soundSource && entry.kind == "preset" && entry.key != "rack-instrument")
+                        if (ImGui::Selectable(entry.name.toRawUTF8(), entry.name == name)) {
+                            if (const auto chosen = studio_.setReplacerInstrument(owner, head.id, entry.key); chosen.failed()) {
+                                state_.status = chosen.getErrorMessage();
+                                state_.statusIsError = true;
+                                state_.statusTime = ImGui::GetTime();
+                            }
+                        }
+                ImGui::EndCombo();
+            }
+            ImGui::SetCursorScreenPos(ImVec2(at.x + size.x - dp(56.0f), y));
+            ImGui::BeginDisabled(name.isEmpty());
+            if (ImGui::SmallButton("Open"))
+                if (const auto opened = studio_.replacerInstrument(owner, head.id))
+                    state_.openRackPad = std::make_pair(owner, opened->pad);
+            ImGui::EndDisabled();
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                ImGui::SetTooltip("%s", "Its instrument's cards, in the strip");
+            y += dp(26.0f);
+        }
+        std::vector<std::pair<std::string_view, const char*>> knobs { { "threshold", "Threshold" }, { "sensitivity", "Sensitivity" },
+                                                                      { "hold", "Hold" } };
+        if (instrument) {
+            knobs.push_back({ "note", "Note" });
+            knobs.push_back({ "length", "Length" });
+        } else {
+            knobs.push_back({ "pitch", "Pitch" });
+            knobs.push_back({ "decay", "Decay" });
+        }
+        knobs.push_back({ "velocity", "Velocity" });
         const auto cell = (size.x - dp(8.0f)) / 3.0f;
-        for (std::size_t index = 0; index < std::size(knobs); ++index)
+        for (std::size_t index = 0; index < knobs.size(); ++index)
             knob(knobs[index].first, knobs[index].second,
                  ImVec2(at.x + dp(4.0f) + cell * static_cast<float>(index % 3) + (cell - dp(38.0f)) * 0.5f,
                         y + static_cast<float>(index / 3) * (dp(26.0f) + ImGui::GetFontSize() * 0.86f + dp(6.0f))),

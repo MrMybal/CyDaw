@@ -170,6 +170,13 @@ public:
         return false;
     }
     // container: which branch of a container shows after its card.
+    // A pad's chain (a rack's, a Replacer's instrument) shown in the strip.
+    virtual bool openPadChain(const TrackRef& owner, int pad)
+    {
+        (void) owner;
+        (void) pad;
+        return false;
+    }
     virtual bool showContainerBranch(const TrackRef& track, std::uint64_t head, int branch)
     {
         (void) track;

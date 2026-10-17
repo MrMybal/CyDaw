@@ -250,4 +250,53 @@ void containersSplitAndMixAsSet()
                "containers: the replacer finds each transient (" + std::to_string(readings[0]) + ")");
         expect(heard > 0.3, "containers: and plays its sound in their place");
     }
+    {
+        // A replacer playing an instrument (a kick): a note at each click;
+        // with none, silence.
+        const auto clicks = [](NativeDspRuntime& runtime, double& peak) {
+            constexpr int block = 256;
+            std::array<float, block> left {};
+            std::array<float, block> right {};
+            float* pointers[] { left.data(), right.data() };
+            cydaw::native::PlanarBuffer buffer { pointers, 2, block };
+            peak = 0.0;
+            for (int index = 0; index < 190; ++index) {
+                left.fill(0.0f);
+                right.fill(0.0f);
+                if (index % 19 == 0) {
+                    left[0] = 0.9f;
+                    right[0] = 0.9f;
+                }
+                (void) runtime.process(buffer, 0, block);
+                for (int frame = 8; frame < block; ++frame)
+                    peak = std::max(peak, static_cast<double>(std::abs(left[static_cast<std::size_t>(frame)])));
+            }
+        };
+        auto kick = std::make_shared<PolySynthGraphPlan>();
+        kick->enabled = true;
+        kick->waveform = PolyOscillatorWaveform::kick;
+        auto head = headNode(2, NativeDspNodeKind::replacer, { { "threshold", -30.0f }, { "generator", 4.0f } });
+        auto silent = containerGraph(head, { 0.0f });
+        NativeDspRuntime none;
+        expect(compiled(none, silent), "containers: a replacer set to an instrument compiles without one");
+        auto quiet = 0.0;
+        clicks(none, quiet);
+        expect(quiet < 1.0e-4, "containers: with no instrument, nothing replaces the clicks");
+        head.instrument = kick;
+        auto graph = containerGraph(head, { 0.0f });
+        NativeDspRuntime runtime;
+        expect(compiled(runtime, graph), "containers: a replacer with an instrument compiles");
+        auto peak = 0.0;
+        clicks(runtime, peak);
+        std::array<float, 2> readings {};
+        (void) runtime.nodeReadings(2, readings.data(), readings.size());
+        expect(peak > 0.1 && readings[0] >= 8.0f, "containers: the instrument plays at each transient (peak "
+                                                       + std::to_string(peak) + ", " + std::to_string(readings[0]) + " notes)");
+        // Its plan swapped while it plays (a knob of the instrument turned).
+        auto second = std::make_shared<PolySynthGraphPlan>(*kick);
+        graph.nodes[1].instrument = second;
+        expect(runtime.updateParameters(graph).wasOk(), "containers: a new instrument plan is a live update");
+        clicks(runtime, peak);
+        expect(peak > 0.1, "containers: and the new plan plays");
+    }
 }

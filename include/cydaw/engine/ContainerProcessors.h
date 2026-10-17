@@ -4,6 +4,8 @@
 #include <cydaw/engine/AudioProcessor.h>
 #include <cydaw/engine/Containers.h>
 #include <cydaw/engine/EffectProcessors.h>
+#include <cydaw/engine/PolyVoice.h>
+#include <cydaw/realtime/RtPublisher.h>
 
 #include <array>
 #include <atomic>
@@ -33,6 +35,10 @@ public:
     // A branch's own (its volume, pan, mute, solo), by number from 0.
     [[nodiscard]] float branchSetting(std::string_view prefix, int branch, float fallback = 0.0f) const noexcept;
     [[nodiscard]] int branchCount() const noexcept;
+    // The instrument a replacer plays (null: none). Off the audio thread, or
+    // on it with the one it has (a parameter update): what it held is
+    // retired, not freed there.
+    void setInstrument(std::shared_ptr<const PolySynthGraphPlan> plan);
     // A branch's part of the sound, `frames` from its reader's place on;
     // the head writes it as it processes, the reader follows block by block.
     void readPart(int branch, std::uint64_t& cursor, AudioBlockView into) const noexcept;
@@ -84,6 +90,19 @@ private:
     std::uint32_t noise_ { 0x12345678u };
     std::atomic<std::uint32_t> triggers_ {};
     std::atomic<float> lastStrength_ {};
+    // The replacer's instrument: its plan, its voices, what they read of the
+    // host (a sampler's place, the clock), how long each still holds its note.
+    cydaw::realtime::RtPublisher<PolySynthGraphPlan> instrument_;
+    std::atomic<const PolySynthGraphPlan*> instrumentHeld_ {};
+    static constexpr std::size_t voiceCount = 8;
+    std::array<PolyVoice, voiceCount> voices_ {};
+    std::array<double, voiceCount> holding_ {};
+    std::array<std::uint64_t, voiceCount> started_ {};
+    std::uint64_t starts_ {};
+    prism::Context context_ {};
+    AudioBuffer voiceScratch_;
+    bool instrumentStruck_ {};
+    float instrumentVelocity_ {};
 };
 
 class ContainerTapProcessor final : public AudioProcessor {

@@ -1305,16 +1305,24 @@ juce::var Commands::run()
         std::optional<RemoteTrack> track;
         if (auto error = trackOrFail(track); !error.isVoid())
             return error;
-        const auto* slot = studio_.graphFor(track->ref());
+        auto* slot = studio_.graphFor(track->ref());
         if (slot == nullptr)
             return fail("that track has no graph");
-        const auto state = slot->graph().createVst3RuntimeState();
-        juce::String error;
-        auto native = app::restoreNativeDspGraphState(state.getProperty("native", {}), error);
-        if (!native)
-            return fail("the chain does not restore: " + error);
-        // A cabinet's response, as the plug-in puts it back.
-        app::attachImpulses(*native, state.getProperty("editor", {}));
+        std::optional<engine::NativeDspGraph> native;
+        // "live": the graph as the track plays it (a Replacer's instrument
+        // with it), not as an exported plug-in restores it.
+        if (flag("live", false)) {
+            native = slot->graph().nativeDspGraph();
+            studio_.attachReplacerInstruments(track->ref(), *native);
+        } else {
+            const auto state = slot->graph().createVst3RuntimeState();
+            juce::String error;
+            native = app::restoreNativeDspGraphState(state.getProperty("native", {}), error);
+            if (!native)
+                return fail("the chain does not restore: " + error);
+            // A cabinet's response, as the plug-in puts it back.
+            app::attachImpulses(*native, state.getProperty("editor", {}));
+        }
         constexpr auto rate = 48'000.0;
         constexpr auto block = 512;
         app::NativeDspRuntime chain;
@@ -1323,6 +1331,9 @@ juce::var Commands::run()
             return fail("the chain does not compile: " + compiled.getErrorMessage());
         const auto hz = juce::jlimit(20.0, 20'000.0, number("hz", 220.0));
         const auto amplitude = juce::jlimit(0.0, 1.0, number("amplitude", 0.3));
+        // "clicks": a click of `amplitude` every quarter of a second instead
+        // of the sine (transients, for a Replacer).
+        const auto clicks = text("signal").trim() == "clicks";
         const auto samples = static_cast<int>(juce::jlimit(0.1, 10.0, number("seconds", 1.0)) * rate);
         std::vector<float> out;
         out.reserve(static_cast<std::size_t>(samples));
@@ -1330,8 +1341,9 @@ juce::var Commands::run()
         for (auto start = 0; start < samples; start += block) {
             const auto count = std::min(block, samples - start);
             for (auto i = 0; i < count; ++i) {
-                const auto value = static_cast<float>(
-                    amplitude * std::sin(2.0 * juce::MathConstants<double>::pi * hz * (start + i) / rate));
+                const auto value = clicks ? ((start + i) % static_cast<int>(rate / 4.0) < 4 ? static_cast<float>(amplitude) : 0.0f)
+                                          : static_cast<float>(
+                                                amplitude * std::sin(2.0 * juce::MathConstants<double>::pi * hz * (start + i) / rate));
                 buffer.setSample(0, i, value);
                 buffer.setSample(1, i, value);
             }
@@ -4672,6 +4684,8 @@ juce::var Commands::onContainer()
             branches.add(listed);
         }
         set(entry, "branches", branches);
+        if (container->typeKey == "replacer")
+            set(entry, "instrument", studio_.replacerInstrumentName(*target->track, id));
         return entry;
     };
     const auto done = [&](const std::uint64_t id, const bool structural) {
@@ -4733,6 +4747,26 @@ juce::var Commands::onContainer()
         if (!ui_.showContainerBranch(*target->track, head, branch))
             return fail("this interface shows no containers");
         return ok(describe(head));
+    }
+    // A Replacer's instrument: chosen (an instrument of the catalogue), its
+    // chain opened in the strip (as a pad's; "open": false closes it).
+    if (action == "instrument") {
+        if (const auto chosen = studio_.setReplacerInstrument(*target->track, head, text("key").trim()); chosen.failed())
+            return fail(chosen.getErrorMessage());
+        auto result = describe(head);
+        set(result, "instrument", studio_.replacerInstrumentName(*target->track, head));
+        return ok(result);
+    }
+    if (action == "open_instrument") {
+        const auto opened = studio_.replacerInstrument(*target->track, head);
+        if (!opened)
+            return fail("that Replacer has no instrument");
+        if (!ui_.openPadChain(*target->track, flag("open", true) ? opened->pad : -1))
+            return fail("this interface opens no chains");
+        auto result = object();
+        set(result, "pad", opened->pad);
+        set(result, "instrument", studio_.replacerInstrumentName(*target->track, head));
+        return ok(result);
     }
     return fail("action: list, insert, add_device, move, add_branch, remove_branch, remove or show");
 }

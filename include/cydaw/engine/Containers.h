@@ -116,10 +116,13 @@ inline constexpr int muteSlot = 16;
 inline constexpr int soloSlot = 24;
 
 // The replacer's sounds.
-inline constexpr int generatorCount = 4;
+inline constexpr int generatorCount = 5;
+// The last: an instrument of CyDAW's, the card's own (any: a synth, a
+// sampler, a kit), played on a note at each transient.
+inline constexpr int instrumentGenerator = 4;
 [[nodiscard]] constexpr const char* generatorName(const int generator) noexcept
 {
-    constexpr const char* names[generatorCount] { "Kick", "Tone", "Noise", "Click" };
+    constexpr const char* names[generatorCount] { "Kick", "Tone", "Noise", "Click", "Instrument" };
     return generator >= 0 && generator < generatorCount ? names[generator] : "?";
 }
 

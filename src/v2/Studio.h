@@ -740,6 +740,23 @@ public:
     // instrument's (or the default one).
     juce::Result replaceInstrument(const TrackRef& track, const juce::String& key, const juce::String& name = {});
 
+    // ---- A Replacer's instrument (Containers.h) ----------------------------------------------
+    // Its graph (an instrument, as a track's) is addressed as a pad of the
+    // track the Replacer is on: replacerPadBase and up. Kept on the card.
+    static constexpr int replacerPadBase = 1'000;
+    [[nodiscard]] bool isReplacerPad(const TrackRef& track) const;
+    // Where a replacer's instrument is (made from what its card keeps); none
+    // when the card holds no instrument.
+    [[nodiscard]] std::optional<TrackRef> replacerInstrument(const TrackRef& owner, std::uint64_t head);
+    [[nodiscard]] juce::String replacerInstrumentName(const TrackRef& owner, std::uint64_t head);
+    // An instrument of the catalogue for a replacer: made, kept on its card,
+    // played at each transient (its sound set to Instrument).
+    juce::Result setReplacerInstrument(const TrackRef& owner, std::uint64_t head, const juce::String& instrumentKey);
+    // The chain shown for a pad (a rack's, a replacer's): its name.
+    [[nodiscard]] juce::String padName(const TrackRef& track) const;
+    // Each replacer's instrument into a graph being published.
+    void attachReplacerInstruments(const TrackRef& track, engine::NativeDspGraph& native);
+
     // ---- A rack of pads (an instrument track playing the "drum-rack" card) ----
     // Each pad an instrument and its effects of their own (its graph: the
     // track's TrackRef with `pad` set), played by its key.
@@ -1131,6 +1148,18 @@ private:
     std::optional<AudioClipboard> audioClipboard_;
     bool recordTakesOnClips_ { true };
     std::map<std::uint64_t, MidiTrackState> midiTracks_;
+    // The replacers' instruments: whose card, its graph, what it plays.
+    struct ReplacerSlot {
+        TrackRef owner;
+        std::uint64_t head {};
+        std::unique_ptr<GraphSlot> graph;
+        std::shared_ptr<const engine::PolySynthGraphPlan> plan;
+        juce::String name;
+    };
+    std::vector<ReplacerSlot> replacerSlots_;
+    ReplacerSlot* replacerSlot(const TrackRef& track);
+    ReplacerSlot* replacerSlotFor(const TrackRef& owner, std::uint64_t head, bool make);
+    void compileReplacer(ReplacerSlot& slot);
     std::map<std::uint64_t, BusState> buses_;
 
     juce::var factoryAudioGraph_;

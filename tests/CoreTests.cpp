@@ -1,5 +1,6 @@
 #include <cydaw/engine/AudioGraph.h>
 #include <cydaw/engine/Containers.h>
+#include <cydaw/engine/PolySynthGraph.h>
 #include <cydaw/engine/EffectCatalogue.h>
 #include "../src/native_plugin/NativeRuntime.h"
 #include <cydaw/engine/GraphDefinitionCompiler.h>

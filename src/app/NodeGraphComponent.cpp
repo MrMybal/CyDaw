@@ -4924,6 +4924,8 @@ juce::var NodeGraphComponent::serialise() const
             value->setProperty("prismTables", node.prismTablesJson);
         if (node.impulseJson.isObject())
             value->setProperty("impulse", node.impulseJson);
+        if (node.instrumentJson.isObject())
+            value->setProperty("instrument", node.instrumentJson);
         node.serialised = juce::var(value.get());
         nodeValues.add(node.serialised);
     }
@@ -6444,6 +6446,22 @@ bool NodeGraphComponent::setNodeSampler(const std::uint64_t nodeId, const juce::
     return true;
 }
 
+juce::var NodeGraphComponent::nodeInstrumentJson(const std::uint64_t nodeId) const
+{
+    const auto* node = readNode(static_cast<NodeId>(nodeId));
+    return node != nullptr ? node->instrumentJson : juce::var();
+}
+
+bool NodeGraphComponent::setNodeInstrumentJson(const std::uint64_t nodeId, const juce::var& state)
+{
+    auto* node = findNode(static_cast<NodeId>(nodeId));
+    if (node == nullptr)
+        return false;
+    node->instrumentJson = state;
+    node->serialised = juce::var();
+    return true;
+}
+
 juce::var NodeGraphComponent::nodeSamplerJson(const std::uint64_t nodeId) const
 {
     const auto* node = findNode(nodeId);
@@ -7039,6 +7057,8 @@ void NodeGraphComponent::restore(const juce::var& state)
                     restoredNode.samplerJson = map;
                 }
             }
+            if (const auto instrument = object->getProperty("instrument"); instrument.isObject())
+                restoredNode.instrumentJson = instrument;
             if (const auto tables = object->getProperty("prismTables"); tables.isObject())
                 if (auto built = prismTablesFromVar(tables)) {
                     restoredNode.prismTables = std::move(built);

@@ -1377,10 +1377,13 @@ inline constexpr EffectParameter replacerParameters[] {
     { "threshold", "replacer.threshold", "effect.parameter.threshold", "dB", -60.0f, 0.0f, -24.0f, &P::effect3 },
     { "sensitivity", "replacer.sensitivity", "container.parameter.sensitivity", "dB", 1.0f, 24.0f, 6.0f, &P::effect4 },
     { "hold", "replacer.hold", "container.parameter.hold", "ms", 10.0f, 500.0f, 60.0f, &P::effect5 },
-    { "generator", "replacer.generator", "container.parameter.generator", "", 0.0f, 3.0f, 0.0f, &P::effect6 },
+    { "generator", "replacer.generator", "container.parameter.generator", "", 0.0f, 4.0f, 0.0f, &P::effect6 },
     { "pitch", "replacer.pitch", "container.parameter.pitch", "Hz", 20.0f, 2000.0f, 55.0f, &P::effect7 },
     { "decay", "replacer.decay", "effect.parameter.decay", "ms", 5.0f, 2000.0f, 250.0f, &P::effect8 },
     { "velocity", "replacer.velocity", "modulator.parameter.velocity", "", 0.0f, 1.0f, 0.5f, nullptr, 0, -1 },
+    // The instrument's: the note it plays, how long it holds it.
+    { "note", "replacer.note", "container.parameter.note", "", 0.0f, 127.0f, 36.0f, nullptr, 1, -1 },
+    { "length", "replacer.length", "container.parameter.length", "ms", 10.0f, 2000.0f, 120.0f, nullptr, 2, -1 },
 };
 #undef CYDAW_BAND
 #undef CYDAW_BRANCHES

@@ -95,9 +95,22 @@ void ContainerHeadProcessor::Crossover::clear() noexcept
         stage.clear();
 }
 
+void ContainerHeadProcessor::setInstrument(std::shared_ptr<const PolySynthGraphPlan> plan)
+{
+    if (plan.get() == instrumentHeld_.load(std::memory_order_acquire))
+        return;
+    instrumentHeld_.store(plan.get(), std::memory_order_release);
+    instrument_.store(std::move(plan));
+}
+
 void ContainerHeadProcessor::prepare(const ProcessSpec& spec)
 {
     sampleRate_ = std::max(1.0, spec.sampleRate);
+    voiceScratch_.prepare(2, std::max<std::uint32_t>(1, spec.maximumBlockSize));
+    for (auto& voice : voices_) {
+        voice.prepare(sampleRate_);
+        voice.setPrismContext(&context_);
+    }
     ringSize_ = std::max<std::uint32_t>(8'192, spec.maximumBlockSize * 4);
     // Three parts of two channels.
     ring_.prepare(6, ringSize_);
@@ -120,6 +133,9 @@ void ContainerHeadProcessor::reset() noexcept
     voiceTime_ = 1.0e9;
     voicePhase_ = 0.0;
     voiceLevel_ = 0.0f;
+    for (auto& voice : voices_)
+        voice.clear();
+    holding_.fill(0.0);
 }
 
 std::size_t ContainerHeadProcessor::readings(float* into, const std::size_t count) const noexcept
@@ -132,9 +148,10 @@ std::size_t ContainerHeadProcessor::readings(float* into, const std::size_t coun
     return std::min<std::size_t>(count, 2);
 }
 
-void ContainerHeadProcessor::process(const AudioBlockView input, const AudioBlockView output, const ProcessContext&) noexcept
+void ContainerHeadProcessor::process(const AudioBlockView input, const AudioBlockView output, const ProcessContext& context) noexcept
 {
     copyAudio(output, input);
+    context_.tempo = context.transport.beatsPerMinute > 0.0 ? context.transport.beatsPerMinute : 120.0;
     const auto at = static_cast<std::uint32_t>(written_ % ringSize_);
     switch (kind()) {
     case NativeDspNodeKind::midSideSplit:
@@ -242,7 +259,42 @@ void ContainerHeadProcessor::replace(const AudioBlockView input, const std::uint
     const auto slowDown = follow(0.1, sampleRate_);
     const auto step = 1.0 / sampleRate_;
     constexpr auto twoPi = 2.0 * std::numbers::pi;
-    for (std::uint32_t frame = 0; frame < frames; ++frame) {
+    // An instrument: its voices rendered piece by piece, each piece up to
+    // the next transient, where a note starts.
+    const auto played = generator == container::instrumentGenerator;
+    const auto plan = instrument_.read();
+    const auto instrumentReady = played && plan && plan->enabled;
+    auto pieceStart = std::uint32_t {};
+    const auto scratch = voiceScratch_.view(std::min(frames, voiceScratch_.maximumFrameCount()));
+    if (played)
+        clearAudio(scratch);
+    const auto renderVoices = [&](const std::uint32_t until) {
+        if (!instrumentReady || until <= pieceStart)
+            return;
+        float* channels[2] { scratch.channel(0), scratch.channel(1) };
+        for (std::size_t index = 0; index < voiceCount; ++index) {
+            auto& voice = voices_[index];
+            if (!voice.isActive())
+                continue;
+            // Held as long as the card says, then let go.
+            if (holding_[index] > 0.0) {
+                holding_[index] -= static_cast<double>(until - pieceStart) / sampleRate_;
+                if (holding_[index] <= 0.0)
+                    voice.stopNote(true);
+            }
+            (void) voice.render(*plan, channels, 2, static_cast<int>(pieceStart), static_cast<int>(until - pieceStart),
+                                sampleRate_);
+        }
+        pieceStart = until;
+    };
+    if (instrumentReady) {
+        // A sampler's controllers follow its card; the clock moves on.
+        if (plan->waveform == PolyOscillatorWaveform::sampler)
+            context_.sampler.follow(plan->sampler.get(), plan->samplerControllers,
+                                    samplerValue(plan->samplerValues, SamplerSetting::articulation));
+        context_.clockSeconds += static_cast<double>(frames) / sampleRate_;
+    }
+    for (std::uint32_t frame = 0; frame < frames && frame < scratch.frameCount; ++frame) {
         const auto level = left == nullptr ? 0.0f : std::max(std::abs(left[frame]), std::abs(right[frame]));
         fast_ += (level - fast_) * (level > fast_ ? fastUp : fastDown);
         slow_ += (level - slow_) * (level > slow_ ? slowUp : slowDown);
@@ -258,9 +310,30 @@ void ContainerHeadProcessor::replace(const AudioBlockView input, const std::uint
             sinceTrigger_ = 0.0;
             triggers_.fetch_add(1, std::memory_order_relaxed);
             lastStrength_.store(strength, std::memory_order_relaxed);
+            if (instrumentReady) {
+                // What sounded so far, then the note on the freest voice
+                // (one silent, else the oldest).
+                renderVoices(frame);
+                auto chosen = std::size_t {};
+                for (std::size_t index = 0; index < voiceCount; ++index) {
+                    if (!voices_[index].isActive()) {
+                        chosen = index;
+                        break;
+                    }
+                    if (started_[index] < started_[chosen])
+                        chosen = index;
+                }
+                const auto note = std::clamp(static_cast<int>(std::lround(setting("note", 36.0f))), 0, 127);
+                if (voices_[chosen].startNote(*plan, note, std::clamp(voiceLevel_, 0.05f, 1.0f), sampleRate_)) {
+                    holding_[chosen] = std::max(0.005, static_cast<double>(setting("length", 120.0f)) * 0.001);
+                    started_[chosen] = ++starts_;
+                }
+            }
         }
         auto sound = 0.0f;
-        if (voiceTime_ < decay * 8.0) {
+        if (played) {
+            // The instrument's sound, written below once rendered.
+        } else if (voiceTime_ < decay * 8.0) {
             const auto envelope = static_cast<float>(std::exp(-voiceTime_ / decay)) * voiceLevel_;
             switch (generator) {
             case 0: { // a kick: its pitch falls from four times to itself
@@ -291,9 +364,25 @@ void ContainerHeadProcessor::replace(const AudioBlockView input, const std::uint
             }
             voiceTime_ += step;
         }
-        const auto index = (at + frame) % ringSize_;
-        ring.channel(0)[index] = sound;
-        ring.channel(1)[index] = sound;
+        if (!played) {
+            const auto index = (at + frame) % ringSize_;
+            ring.channel(0)[index] = sound;
+            ring.channel(1)[index] = sound;
+        }
+    }
+    if (played) {
+        renderVoices(scratch.frameCount);
+        for (std::uint32_t frame = 0; frame < scratch.frameCount; ++frame) {
+            const auto index = (at + frame) % ringSize_;
+            ring.channel(0)[index] = scratch.channel(0)[frame];
+            ring.channel(1)[index] = scratch.channel(1)[frame];
+        }
+        // A block longer than the scratch (never, as prepared): silence.
+        for (std::uint32_t frame = scratch.frameCount; frame < frames; ++frame) {
+            const auto index = (at + frame) % ringSize_;
+            ring.channel(0)[index] = 0.0f;
+            ring.channel(1)[index] = 0.0f;
+        }
     }
 }
 

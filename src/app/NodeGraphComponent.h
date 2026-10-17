@@ -290,6 +290,9 @@ public:
     // not one.
     bool setNodeSampler(std::uint64_t nodeId, const juce::var& json, juce::String& error);
     [[nodiscard]] juce::var nodeSamplerJson(std::uint64_t nodeId) const;
+    // A Replacer card's instrument, as the studio keeps it; null for none.
+    [[nodiscard]] juce::var nodeInstrumentJson(std::uint64_t nodeId) const;
+    bool setNodeInstrumentJson(std::uint64_t nodeId, const juce::var& state);
     [[nodiscard]] cydaw::engine::SamplerMapRef nodeSampler(std::uint64_t nodeId) const;
     // The map the instrument plays: the first sampler card's, inside devices
     // too.
@@ -1064,6 +1067,9 @@ private:
         // An effect card's impulse response (a cabinet's, loaded), and its JSON.
         cydaw::engine::ImpulseResponseRef impulse;
         juce::var impulseJson;
+        // A Replacer's instrument (Containers.h): its own graph, as the
+        // studio keeps it ({name, graph}); saved as is.
+        juce::var instrumentJson;
         // What this node last serialised to. A node is a pure function of
         // itself, so the answer only changes when the node does, and finding
         // out costs about forty microseconds — three hundred of those is what

@@ -287,6 +287,9 @@ struct NativeDspNodeParameters {
     [[nodiscard]] bool operator==(const NativeDspNodeParameters&) const = default;
 };
 
+// An instrument as its voices play it (PolySynthGraph.h).
+struct PolySynthGraphPlan;
+
 struct NativeDspNode {
     std::uint64_t id {};
     NativeDspNodeKind kind { NativeDspNodeKind::passthrough };
@@ -303,6 +306,9 @@ struct NativeDspNode {
     // file), shared like the table above and beside the payload for the
     // same reason.
     ImpulseResponseRef impulse;
+    // The instrument a Replacer plays at each transient (Containers.h),
+    // compiled by the host from the instrument the card holds.
+    std::shared_ptr<const PolySynthGraphPlan> instrument;
 
     [[nodiscard]] bool operator==(const NativeDspNode&) const = default;
 };
