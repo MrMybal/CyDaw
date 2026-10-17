@@ -816,9 +816,15 @@ public:
     // signal's order (a container inside one appears as its head).
     struct EditorContainer {
         std::uint64_t head {};
+        // Where its sound leaves it (with a post chain: the last end).
         std::uint64_t end {};
+        // With a post chain (XY FX's Post FX): the first end, the branches'
+        // mix the post chain follows; 0 without.
+        std::uint64_t blend {};
         juce::String typeKey;
         std::vector<std::vector<std::uint64_t>> branches;
+        // Which of `branches` is the post chain; -1 for none.
+        int postBranch { -1 };
     };
     [[nodiscard]] bool editorIsContainer(std::uint64_t node) const;
     [[nodiscard]] std::optional<EditorContainer> editorContainer(std::uint64_t head) const;

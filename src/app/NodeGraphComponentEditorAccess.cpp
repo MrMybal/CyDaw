@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <cmath>
 #include <set>
+#include <tuple>
 
 namespace cydaw::app {
 namespace {
@@ -1251,12 +1252,23 @@ std::optional<NodeGraphComponent::EditorContainer> NodeGraphComponent::editorCon
                 return port.id;
         return std::nullopt;
     };
-    const auto endOf = [this](const NodeId id) -> NodeId {
+    // The ends its dry sound reaches: the last (its sound leaves by it) and,
+    // with a post chain, the first (the branches' mix).
+    const auto endsOf = [this](const NodeId id) -> std::pair<NodeId, NodeId> {
+        std::vector<NodeId> found;
         for (const auto& connection : connections_)
             if (connection.kind == PortKind::audio && connection.source == id && connection.sourcePort == containers::headDryPort)
                 if (const auto* end = readNode(connection.destination); end != nullptr && end->typeKey == "container-end")
-                    return end->id;
-        return 0;
+                    found.push_back(end->id);
+        if (found.size() < 2)
+            return { found.empty() ? NodeId {} : found.front(), NodeId {} };
+        for (const auto candidate : found)
+            if (std::ranges::any_of(connections_, [candidate](const Connection& connection) {
+                    return connection.kind == PortKind::audio && connection.destination == candidate
+                           && connection.destinationPort == containers::postPort;
+                }))
+                return { candidate, candidate == found.front() ? found.back() : found.front() };
+        return { found.front(), NodeId {} };
     };
     const auto after = [this](const NodeId id, const cydaw::graph::PortId port) -> NodeId {
         for (const auto& connection : connections_)
@@ -1266,34 +1278,42 @@ std::optional<NodeGraphComponent::EditorContainer> NodeGraphComponent::editorCon
     };
     EditorContainer out;
     out.head = head;
-    out.end = endOf(head);
+    std::tie(out.end, out.blend) = endsOf(head);
     out.typeKey = node->typeKey;
     if (out.end == 0)
         return out;
-    auto count = containers::fixedBranches(effect->kind);
-    if (containers::variableBranches(effect->kind))
-        if (const auto* chains = cydaw::engine::effectParameter(*effect, "chains"))
-            count = juce::jlimit(1, containers::maximumBranches,
-                                 static_cast<int>(std::lround(cydaw::engine::effectValue(node->parameters, *chains))));
-    for (auto branch = 0; branch < count; ++branch) {
+    // A chain's cards from where it starts to where it ends.
+    const auto follow = [&](NodeId at, const NodeId stop) {
         std::vector<std::uint64_t> cards;
         std::set<NodeId> seen;
-        auto at = after(head, containers::branchPort(branch));
-        while (at != 0 && at != out.end && seen.insert(at).second) {
+        while (at != 0 && at != stop && seen.insert(at).second) {
             const auto* card = readNode(at);
             if (card == nullptr)
                 break;
             cards.push_back(at);
-            // A container inside: on from its end.
+            // A container inside: on from its (last) end.
             if (containerHeadOf(card->typeKey) != nullptr) {
-                const auto innerEnd = endOf(at);
+                const auto innerEnd = endsOf(at).first;
                 at = innerEnd != 0 ? after(innerEnd, containers::endOutputPort) : 0;
                 continue;
             }
             const auto output = mainOutput(*card);
             at = output ? after(at, *output) : 0;
         }
-        out.branches.push_back(std::move(cards));
+        return cards;
+    };
+    const auto branchEnd = out.blend != 0 ? out.blend : out.end;
+    auto count = containers::fixedBranches(effect->kind);
+    if (containers::variableBranches(effect->kind))
+        if (const auto* chains = cydaw::engine::effectParameter(*effect, "chains"))
+            count = juce::jlimit(1, containers::maximumBranches,
+                                 static_cast<int>(std::lround(cydaw::engine::effectValue(node->parameters, *chains))));
+    for (auto branch = 0; branch < count; ++branch)
+        out.branches.push_back(follow(after(head, containers::branchPort(branch)), branchEnd));
+    // The post chain, from the first end to the last.
+    if (out.blend != 0) {
+        out.postBranch = static_cast<int>(out.branches.size());
+        out.branches.push_back(follow(after(out.blend, containers::endOutputPort), out.end));
     }
     return out;
 }
@@ -1305,6 +1325,8 @@ std::set<std::uint64_t> NodeGraphComponent::editorContainerMembers() const
         if (const auto container = containerHeadOf(node.typeKey) != nullptr ? editorContainer(node.id) : std::nullopt) {
             if (container->end != 0)
                 members.insert(container->end);
+            if (container->blend != 0)
+                members.insert(container->blend);
             for (const auto& branch : container->branches)
                 members.insert(branch.begin(), branch.end());
         }
@@ -1364,18 +1386,30 @@ std::uint64_t NodeGraphComponent::editorInsertContainer(const juce::String& type
     const auto position = target->position;
     const auto head = nextNodeId_;
     addNodeFromType(*headType, position - juce::Point<float>(0.1f, 0.0f));
+    // With a post chain: a first end mixes the branches, the post chain
+    // (empty) goes from it to the last.
+    NodeId blend {};
+    if (containers::hasPost(effect->kind)) {
+        blend = nextNodeId_;
+        addNodeFromType(*endType, position - juce::Point<float>(0.075f, 0.0f));
+    }
     const auto end = nextNodeId_;
     addNodeFromType(*endType, position - juce::Point<float>(0.05f, 0.0f));
-    if (findNode(head) == nullptr || findNode(end) == nullptr)
+    if (findNode(head) == nullptr || findNode(end) == nullptr || (blend != 0 && findNode(blend) == nullptr))
         return 0;
     // Inside: the dry sound, then each branch empty (head to end).
     (void) connectNodes(head, end, containers::headDryPort, containers::endDryPort);
+    const auto branchEnd = blend != 0 ? blend : end;
+    if (blend != 0) {
+        (void) connectNodes(head, blend, containers::headDryPort, containers::endDryPort);
+        (void) connectNodes(blend, end, containers::endOutputPort, containers::postPort);
+    }
     const auto* chains = cydaw::engine::effectParameter(*effect, "chains");
     const auto count = containers::variableBranches(effect->kind) && chains != nullptr
                            ? static_cast<int>(std::lround(chains->defaultValue))
                            : containers::fixedBranches(effect->kind);
     for (auto branch = 0; branch < count; ++branch)
-        (void) connectNodes(head, end, containers::branchPort(branch), containers::branchPort(branch));
+        (void) connectNodes(head, branchEnd, containers::branchPort(branch), containers::branchPort(branch));
     // In the chain, before the target.
     std::vector<Connection> feeding;
     for (const auto& connection : connections_)
@@ -1422,6 +1456,8 @@ bool NodeGraphComponent::editorMoveCard(const std::uint64_t id, const std::uint6
             pending.pop_back();
             if (const auto inner = editorContainer(current)) {
                 moving.insert(inner->end);
+                if (inner->blend != 0)
+                    moving.insert(inner->blend);
                 for (const auto& cards : inner->branches)
                     for (const auto card : cards) {
                         moving.insert(card);
@@ -1454,8 +1490,14 @@ bool NodeGraphComponent::editorMoveCard(const std::uint64_t id, const std::uint6
         if (!container || container->end == 0 || moving.contains(head) || branch < 0
             || branch >= static_cast<int>(container->branches.size()))
             return false;
-        targetId = container->end;
-        targetPort = containers::branchPort(branch);
+        // A branch ends at the (first) end; the post chain at the last.
+        if (branch == container->postBranch) {
+            targetId = container->end;
+            targetPort = containers::postPort;
+        } else {
+            targetId = container->blend != 0 ? container->blend : container->end;
+            targetPort = containers::branchPort(branch);
+        }
     } else {
         for (const auto& candidate : nodes_) {
             auto input = false;
@@ -1557,7 +1599,8 @@ bool NodeGraphComponent::editorAddBranch(const std::uint64_t head)
         || static_cast<int>(container->branches.size()) >= containers::maximumBranches)
         return false;
     const auto count = static_cast<int>(container->branches.size());
-    if (!connectNodes(head, container->end, containers::branchPort(count), containers::branchPort(count)))
+    if (!connectNodes(head, container->blend != 0 ? container->blend : container->end, containers::branchPort(count),
+                      containers::branchPort(count)))
         return false;
     const auto* chains = cydaw::engine::effectParameter(*effect, "chains");
     (void) setGraphInterfaceParameter("node." + juce::String(static_cast<juce::int64>(head)) + "." + juce::String(std::string(chains->suffix)),
@@ -1589,10 +1632,13 @@ bool NodeGraphComponent::editorRemoveBranch(const std::uint64_t head, const int 
         if (const auto inner = editorContainer(current)) {
             if (inner->end != 0)
                 going.insert(inner->end);
+            if (inner->blend != 0)
+                going.insert(inner->blend);
             for (const auto& cards : inner->branches)
                 pending.insert(pending.end(), cards.begin(), cards.end());
         }
     }
+    const auto branchEnd = container->blend != 0 ? container->blend : container->end;
     // Their modulators with them.
     for (const auto& candidate : nodes_)
         if (const auto owner = editorModulatorOwner(candidate.id); owner != 0 && going.contains(owner))
@@ -1600,7 +1646,7 @@ bool NodeGraphComponent::editorRemoveBranch(const std::uint64_t head, const int 
     std::erase_if(connections_, [&](const Connection& connection) {
         return going.contains(connection.source) || going.contains(connection.destination)
                || (connection.source == head && connection.sourcePort == containers::branchPort(branch))
-               || (connection.destination == container->end && connection.destinationPort == containers::branchPort(branch));
+               || (connection.destination == branchEnd && connection.destinationPort == containers::branchPort(branch));
     });
     std::erase_if(nodes_, [&](const Node& item) { return going.contains(item.id); });
     for (const auto id : going)
@@ -1609,7 +1655,7 @@ bool NodeGraphComponent::editorRemoveBranch(const std::uint64_t head, const int 
     for (auto& connection : connections_) {
         if (connection.source == head && containers::branchOfPort(connection.sourcePort) > branch)
             --connection.sourcePort;
-        if (connection.destination == container->end && containers::branchOfPort(connection.destinationPort) > branch)
+        if (connection.destination == branchEnd && containers::branchOfPort(connection.destinationPort) > branch)
             --connection.destinationPort;
     }
     const auto prefix = "node." + juce::String(static_cast<juce::int64>(head)) + ".";
@@ -1652,6 +1698,8 @@ bool NodeGraphComponent::editorRemoveContainer(const std::uint64_t head)
         if (const auto inner = editorContainer(current)) {
             if (inner->end != 0)
                 going.insert(inner->end);
+            if (inner->blend != 0)
+                going.insert(inner->blend);
             for (const auto& cards : inner->branches)
                 for (const auto card : cards)
                     if (going.insert(card).second)

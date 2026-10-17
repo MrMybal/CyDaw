@@ -4653,6 +4653,8 @@ juce::var Commands::onContainer()
         const auto nodes = graph.editorNodes();
         set(entry, "head", static_cast<juce::int64>(container->head));
         set(entry, "end", static_cast<juce::int64>(container->end));
+        set(entry, "blend", static_cast<juce::int64>(container->blend));
+        set(entry, "postBranch", container->postBranch);
         set(entry, "type", container->typeKey);
         juce::Array<juce::var> branches;
         for (const auto& cards : container->branches) {

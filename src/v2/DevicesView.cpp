@@ -1248,7 +1248,9 @@ void DevicesView::drawContainerPanel(Strip& strip, const app::NodeGraphComponent
 
     // XY: the pad, its point dragged; a corner's name shows its chain.
     if (kind == engine::NativeDspNodeKind::xyFx) {
-        const auto side = std::min(size.x - dp(40.0f), footTop - y - dp(6.0f));
+        // Room under the pad for its Post FX.
+        const auto postRow = container->postBranch >= 0 ? dp(26.0f) : 0.0f;
+        const auto side = std::min(size.x - dp(40.0f), footTop - y - dp(6.0f) - postRow);
         const ImVec2 min(at.x + (size.x - side) * 0.5f, y);
         const ImVec2 max(min.x + side, min.y + side);
         list->AddRectFilled(min, max, p.bg2, dp(3.0f));
@@ -1289,6 +1291,18 @@ void DevicesView::drawContainerPanel(Strip& strip, const app::NodeGraphComponent
             ImGui::PopID();
         }
         y = max.y + dp(4.0f);
+        // The chain after the corners' mix, before Mix.
+        if (container->postBranch >= 0) {
+            const auto post = container->postBranch;
+            const auto cards = container->branches[static_cast<std::size_t>(post)].size();
+            const auto label = juce::String("Post FX") + (cards > 0 ? "  (" + juce::String(static_cast<int>(cards)) + ")" : juce::String());
+            ImGui::SetCursorScreenPos(ImVec2(at.x + dp(6.0f), y));
+            if (ImGui::Selectable(label.toRawUTF8(), shown == post, ImGuiSelectableFlags_None, ImVec2(size.x - dp(12.0f), dp(20.0f))))
+                shown = post;
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", "The chain after the corners' mix: show it");
+            y += postRow;
+        }
     }
 
     // The replacer: what it listens for, what it plays.

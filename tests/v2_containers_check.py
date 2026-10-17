@@ -11,6 +11,8 @@ a sine through it offline).
   of its name onto the other layer's end.
 * A container inside a container, listed in its branch.
 * A Multiband FX-3 with the high band at -36 dB: lows pass, highs are gone.
+* An XY FX's Post FX follows the corners' mix, before Mix; saved and opened
+  again, it is there.
 * The strip with a container open (a snapshot, for the eye).
 * Saved and opened again, the containers and their cards are there.
 * Removed, the sound is the dry sound again.
@@ -157,6 +159,32 @@ def scenario(scratch: Path) -> None:
     need({"cmd": "set_node_parameter", "track": "Fx", "nodeId": high, "parameter": "utilitaire.gain", "value": -36}, "gain")
     check(abs(level(120.0) - dry) < 0.5, f"the lows pass ({level(120.0) - dry:+.2f} dB)")
     check(level(9_000.0) < dry - 25.0, f"the highs are turned down ({level(9_000.0) - dry:+.2f} dB)")
+    need({"cmd": "container", "track": "Fx", "action": "remove", "head": bands["head"]}, "remove bands")
+
+    # XY FX and its Post FX: the corners' mix, then the post chain, then Mix.
+    xy = need({"cmd": "container", "track": "Fx", "action": "insert", "type": "xy-fx"}, "xy")
+    check(len(xy["branches"]) == 5 and xy["postBranch"] == 4 and xy["blend"] != 0,
+          "an XY FX comes with its four corners and its Post FX")
+    check(abs(level() - dry) < 0.3, f"its corners, empty, give the sound back ({level() - dry:+.2f} dB)")
+    post = need({"cmd": "container", "track": "Fx", "action": "add_device", "head": xy["head"], "branch": 4, "key": "utilitaire"},
+                "post utility")
+    post_utility = post["branches"][4][0]["id"]
+    need({"cmd": "set_node_parameter", "track": "Fx", "nodeId": post_utility, "parameter": "utilitaire.gain", "value": -12}, "gain")
+    check(abs(level() - dry + 12.0) < 0.3, f"a utility in its Post FX at -12 dB ({level() - dry:+.2f} dB)")
+    need({"cmd": "set_node_parameter", "track": "Fx", "nodeId": xy["head"], "parameter": "xyFx.mix", "value": 0}, "mix")
+    check(abs(level() - dry) < 0.3, "Mix 0: the dry sound, the Post FX left out with the corners")
+    need({"cmd": "set_node_parameter", "track": "Fx", "nodeId": xy["head"], "parameter": "xyFx.mix", "value": 1}, "mix back")
+    need({"cmd": "container", "track": "Fx", "action": "show", "head": xy["head"], "branch": 4}, "show post")
+    time.sleep(0.3)
+    shot = scratch / "xy-post.png"
+    need({"cmd": "snapshot", "path": str(shot).replace(os.sep, "/")}, "snapshot")
+    check(shot.is_file() and shot.stat().st_size > 10_000, f"the XY FX with its Post FX shown is drawn ({shot})")
+    again = scratch / "Xy.cydaw"
+    need({"cmd": "save_project", "path": str(again).replace(os.sep, "/")}, "save xy")
+    need({"cmd": "open_project", "path": str(again).replace(os.sep, "/")}, "open xy")
+    reopened = next(c for c in containers() if c["type"] == "xy-fx")
+    check(reopened["postBranch"] == 4 and [c["type"] for c in reopened["branches"][4]] == ["utilitaire"]
+          and abs(level() - dry + 12.0) < 0.3, "saved and opened again, its Post FX and its sound are there")
 
 
 def main() -> int:

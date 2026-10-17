@@ -103,6 +103,9 @@ class ContainerEndProcessor final : public AudioProcessor, public MultiBusAudioP
 public:
     // The head whose settings it mixes by (the compiler binds it).
     void bind(const ContainerHeadProcessor* head) noexcept { head_ = head; }
+    // The first of two ends (a post chain follows it): the branches mixed,
+    // no dry sound, no Mix; the last end mixes.
+    void setBlendOnly(const bool blendOnly) noexcept { blendOnly_ = blendOnly; }
     [[nodiscard]] const ContainerHeadProcessor* head() const noexcept { return head_; }
     void prepare(const ProcessSpec& spec) override;
     void reset() noexcept override;
@@ -111,7 +114,10 @@ public:
                            const ProcessContext& context) noexcept override;
 
 private:
+    void mixDry(const AudioBlockView* dry, AudioBlockView output) noexcept;
+
     const ContainerHeadProcessor* head_ {};
+    bool blendOnly_ {};
     double sampleRate_ { 48'000.0 };
     // A selector's chain heard, the one it leaves, how far the fade is.
     int current_ { -1 };

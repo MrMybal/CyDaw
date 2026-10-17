@@ -360,10 +360,13 @@ void ContainerEndProcessor::processAudioBuses(const std::span<const AudioInputBu
 {
     clearAudio(output);
     const AudioBlockView* dry = nullptr;
+    const AudioBlockView* post = nullptr;
     std::array<const AudioBlockView*, container::maximumBranches> branches {};
     for (const auto& bus : inputs) {
         if (bus.portId == container::endDryPort)
             dry = &bus.audio;
+        else if (bus.portId == container::postPort)
+            post = &bus.audio;
         else if (const auto branch = container::branchOfPort(bus.portId); branch >= 0)
             branches[static_cast<std::size_t>(branch)] = &bus.audio;
     }
@@ -376,6 +379,12 @@ void ContainerEndProcessor::processAudioBuses(const std::span<const AudioInputBu
     const auto channels = output.channelCount;
     if (frames == 0 || channels == 0)
         return;
+    // The last of two ends: the post chain's sound, mixed with the dry.
+    if (post != nullptr) {
+        copyAudio(output, *post);
+        mixDry(dry, output);
+        return;
+    }
     const auto kind = head_->kind();
     const auto count = std::min(head_->branchCount(), container::maximumBranches);
     const auto sample = [](const AudioBlockView* view, const std::uint32_t channel, const std::uint32_t frame) {
@@ -501,14 +510,27 @@ void ContainerEndProcessor::processAudioBuses(const std::span<const AudioInputBu
         if (fade_ >= 1.0f)
             previous_ = -1;
     }
-    // Wet gain, then the dry sound under it by Mix.
-    const auto [mixFrom, mixStep] = ramp(mix_, std::clamp(head_->setting("mix", 1.0f), 0.0f, 1.0f));
+    // The first of two ends gives the branches' mix as it is: a post chain
+    // follows, the last end mixes.
+    if (!blendOnly_)
+        mixDry(dry, output);
+}
+
+void ContainerEndProcessor::mixDry(const AudioBlockView* dry, const AudioBlockView output) noexcept
+{
+    // Wet gain, then the dry sound under it by Mix, gliding across the block.
+    const auto frames = output.frameCount;
+    const auto target = std::clamp(head_->setting("mix", 1.0f), 0.0f, 1.0f);
+    const auto mixFrom = mix_ < -0.5f ? target : mix_;
+    const auto mixStep = (target - mixFrom) / static_cast<float>(std::max<std::uint32_t>(1, frames));
+    mix_ = target;
     const auto wetGain = decibels(head_->setting("wet-gain", 0.0f) <= -36.0f ? -60.0f : head_->setting("wet-gain", 0.0f));
-    for (std::uint32_t channel = 0; channel < channels; ++channel) {
+    for (std::uint32_t channel = 0; channel < output.channelCount; ++channel) {
         auto* out = output.channel(channel);
+        const auto* from = dry != nullptr && dry->channelCount > 0 ? dry->channel(std::min(channel, dry->channelCount - 1)) : nullptr;
         auto mix = mixFrom;
         for (std::uint32_t frame = 0; frame < frames; ++frame) {
-            out[frame] = out[frame] * wetGain * mix + sample(dry, channel, frame) * (1.0f - mix);
+            out[frame] = out[frame] * wetGain * mix + (from != nullptr ? from[frame] : 0.0f) * (1.0f - mix);
             mix += mixStep;
         }
     }

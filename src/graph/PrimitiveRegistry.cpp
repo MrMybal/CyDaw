@@ -716,6 +716,10 @@ PrimitiveRegistry createFactoryPrimitiveRegistry()
             in.optional = true;
             ports.push_back(std::move(in));
         }
+        // A post chain's sound, the last of two ends' (XY FX's Post FX).
+        auto post = port(static_cast<PortId>(engine::container::postPort), "post-in", Type::audio, Direction::input, Rate::audio, 2);
+        post.optional = true;
+        ports.push_back(std::move(post));
         ports.push_back(port(static_cast<PortId>(engine::container::endOutputPort), "audio-out", Type::audio, Direction::output,
                              Rate::audio, 2));
         add(primitive("core.container-end", "Container End", Category::utility, std::move(ports), {}, true, false, false, true));

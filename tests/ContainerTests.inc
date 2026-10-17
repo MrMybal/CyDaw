@@ -188,6 +188,30 @@ void containersSplitAndMixAsSet()
         expect(play(runtime, 440.0).left < steady * 0.01, "containers: XY at another corner, its (silent) chain");
     }
     {
+        // XY with its Post FX: the corners mixed, then the post chain (-6 dB),
+        // then the dry sound under it by Mix.
+        auto graph = containerGraph(headNode(2, NativeDspNodeKind::xyFx, { { "x", 0.0f }, { "y", 1.0f } }),
+                                    { 0.0f, -120.0f, -120.0f, -120.0f });
+        // The first end (3) mixes the corners; the post chain (20) follows;
+        // the last end (5) mixes it with the dry sound.
+        std::erase_if(graph.connections, [](const auto& connection) { return connection.source == 3; });
+        graph.nodes.push_back({ 5, NativeDspNodeKind::containerEnd });
+        graph.nodes.push_back(gainNode(20, -6.0206f));
+        graph.connections.push_back({ 2, 5, container::headDryPort, container::endDryPort });
+        graph.connections.push_back({ 3, 20, container::endOutputPort, 0 });
+        graph.connections.push_back({ 20, 5, 0, container::postPort });
+        graph.connections.push_back({ 5, 4, container::endOutputPort, 0 });
+        NativeDspRuntime runtime;
+        expect(compiled(runtime, graph), "containers: XY FX with its Post FX compiles");
+        expect(near(play(runtime, 440.0).left, steady * 0.5), "containers: the post chain follows the corners' mix");
+        graph.nodes[1] = headNode(2, NativeDspNodeKind::xyFx, { { "x", 0.0f }, { "y", 1.0f }, { "mix", 0.0f } });
+        (void) runtime.updateParameters(graph);
+        expect(near(play(runtime, 440.0).left, steady), "containers: Mix 0 past the post chain gives the dry sound");
+        graph.nodes[1] = headNode(2, NativeDspNodeKind::xyFx, { { "x", 0.0f }, { "y", 1.0f }, { "wet-gain", 6.0206f } });
+        (void) runtime.updateParameters(graph);
+        expect(near(play(runtime, 440.0).left, steady), "containers: the wet gain applies once, after the post chain");
+    }
+    {
         // A selector: the second chain chosen is heard, the first not.
         auto graph = containerGraph(headNode(2, NativeDspNodeKind::fxSelector, { { "selected", 1.0f } }), { -120.0f, -6.0206f });
         NativeDspRuntime runtime;

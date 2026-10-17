@@ -26,6 +26,14 @@ inline constexpr std::uint64_t endDryPort = 1;
 inline constexpr std::uint64_t endOutputPort = 2;
 inline constexpr std::uint64_t branchPortBase = 900;
 inline constexpr int maximumBranches = 8;
+// A container with a chain after its mix (XY FX's Post FX) has two ends: the
+// first mixes the branches (no dry sound, no Mix), the post chain follows,
+// and the last takes it on this port, the dry sound beside it, and mixes.
+inline constexpr std::uint64_t postPort = 950;
+[[nodiscard]] constexpr bool hasPost(const NativeDspNodeKind kind) noexcept
+{
+    return kind == NativeDspNodeKind::xyFx;
+}
 
 [[nodiscard]] constexpr std::uint64_t branchPort(const int branch) noexcept
 {
@@ -95,7 +103,7 @@ enum class Part : std::uint8_t { whole, mid, side, left, right, low, middle, hig
     case NativeDspNodeKind::stereoSplit: return branch == 0 ? "Left" : "Right";
     case NativeDspNodeKind::multiband2: return branch == 0 ? "Low" : "High";
     case NativeDspNodeKind::multiband3: return branch == 0 ? "Low" : branch == 1 ? "Mid" : "High";
-    case NativeDspNodeKind::xyFx: return branch >= 0 && branch < 4 ? corners[branch] : "?";
+    case NativeDspNodeKind::xyFx: return branch >= 0 && branch < 4 ? corners[branch] : branch == 4 ? "Post FX" : "?";
     default: return nullptr;
     }
 }

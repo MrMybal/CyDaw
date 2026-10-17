@@ -5,6 +5,7 @@
 #include <cydaw/engine/EffectProcessors.h>
 
 #include <algorithm>
+#include <vector>
 #include <unordered_map>
 
 #include <cmath>
@@ -359,13 +360,23 @@ RenderPlanResult compileNativeDspGraph(
         if (error != RenderPlanError::none)
             return { error, "Cannot add a node to the native DSP plan", {} };
     }
+    // A container with a post chain has two ends: the first only mixes the
+    // branches, the one the post chain ends in mixes with the dry sound.
+    std::unordered_map<std::uint64_t, std::vector<ContainerEndProcessor*>> endsOfHead;
+    std::vector<ContainerEndProcessor*> lastEnds;
+    for (const auto& connection : graph.connections) {
+        if (const auto end = ends.find(connection.destination); end != ends.end() && connection.destinationPort == container::postPort)
+            lastEnds.push_back(end->second);
+    }
     for (const auto& connection : graph.connections) {
         // A container's end mixes by the settings of the head whose dry
         // sound it is given.
         if (const auto end = ends.find(connection.destination);
             end != ends.end() && connection.destinationPort == container::endDryPort)
-            if (const auto head = heads.find(connection.source); head != heads.end())
+            if (const auto head = heads.find(connection.source); head != heads.end()) {
                 end->second->bind(head->second);
+                endsOfHead[connection.source].push_back(end->second);
+            }
         // A branch of a container: what it hears of the sound (the mid, a
         // band...), through a tap between the head and the branch.
         if (const auto head = heads.find(connection.source); head != heads.end()) {
@@ -387,6 +398,15 @@ RenderPlanResult compileNativeDspGraph(
                                            connection.destinationPort);
         if (error != RenderPlanError::none)
             return { error, "Cannot connect the native DSP plan", {} };
+    }
+    for (const auto& [head, endsOfIt] : endsOfHead) {
+        (void) head;
+        const auto hasLast = std::ranges::any_of(endsOfIt, [&lastEnds](const auto* end) {
+            return std::ranges::find(lastEnds, end) != lastEnds.end();
+        });
+        if (hasLast)
+            for (auto* end : endsOfIt)
+                end->setBlendOnly(std::ranges::find(lastEnds, end) == lastEnds.end());
     }
     return builder.compile(spec, graph.outputNodeId);
 }
