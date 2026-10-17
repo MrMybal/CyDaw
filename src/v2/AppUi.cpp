@@ -902,8 +902,8 @@ void AppUi::chooseSaveAsThen(std::function<void()> then)
 void AppUi::chooseImportProject()
 {
     chooser_ = std::make_unique<juce::FileChooser>(
-        L("Importer un projet Ableton, Bitwig, Studio One ou DAWproject",
-          "Import an Ableton, Bitwig, Studio One or DAWproject project"),
+        L("Importer un projet (Live, Bitwig, Studio One, Reaper, FL Studio, Ardour, LMMS, Zrythm, DAWproject, AAF, MIDI et pistes audio)",
+          "Import a project (Live, Bitwig, Studio One, Reaper, FL Studio, Ardour, LMMS, Zrythm, DAWproject, AAF, MIDI and stems)"),
         juce::File {}, app::project_import::supportedProjectWildcard());
     chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                           [this](const juce::FileChooser& chooser) {

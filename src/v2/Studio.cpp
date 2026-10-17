@@ -99,6 +99,9 @@ Studio::Studio(const bool auxiliary) : auxiliary_(auxiliary)
     properties_.setStorageParameters(options);
     // The engine starts with one MIDI track; a session starts empty.
     engine_.clearMidiTracks();
+    // Audio an import makes (two mono recordings made one stereo file), when
+    // the imported project's folder takes none.
+    app::project_import::setImportedAudioFolder(locations::folder(Location::cache).getChildFile("Imported Audio"));
     // Tracks are armed by hand, several at once; picking one arms nothing.
     engine_.setArmFollowsMidiInput(false);
     // Started once the banks' catalogue is read (startSamples).
@@ -5229,6 +5232,13 @@ bool Studio::importStep(ImportBuild& build)
                         (void) insertDevice(track, equivalent->fallback);
                     else if (!equivalent->settings.empty())
                         (void) setSynthSettings(track, equivalent->settings);
+                    // A sampler's sound, when the other application's played one.
+                    if (instrument->sample.existsAsFile()
+                        && (equivalent->instrument == "simple-sampler-instrument" || equivalent->instrument == "sampler-instrument")) {
+                        juce::String error;
+                        if (!loadSamplerFile(instrument->sample, track, error))
+                            project.warnings.add(trackName(track) + ": " + error);
+                    }
                 } else {
                     (void) insertDevice(track, "opale-instrument");
                 }

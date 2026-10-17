@@ -60,6 +60,8 @@ struct ImportedDevice {
     bool instrument {};
     bool noteEffect {};
     std::vector<std::pair<juce::String, double>> settings;
+    // A sampler's sound, when the other application's sampler played one.
+    juce::File sample;
 };
 
 struct ImportedTrack {
@@ -103,11 +105,27 @@ struct ImportedProject {
     }
 };
 
-// Reads a project by its extension: .dawproject (Bitwig, Studio One and
-// others export it), .als (Ableton Live), .song (Studio One), .bwproject
-// (Bitwig's own file). The result is what could be read; the warnings say
-// what could not.
+// Reads a project by its extension: .dawproject (Bitwig, Studio One, Cubase
+// and others export it), .als (Ableton Live), .song (Studio One), .bwproject
+// (Bitwig's own file), .rpp (Reaper), .flp (FL Studio), .ardour (Ardour),
+// .mmp/.mmpz (LMMS), .aaf (exported by Logic, Pro Tools, Cubase, Nuendo,
+// Studio One and others), .zpj (Zrythm), .mid (a MIDI file and the audio
+// files beside it, as any application exports them). The result is what could be read;
+// the warnings say what could not.
 [[nodiscard]] juce::Result importProjectFile(const juce::File& file, ImportedProject& out);
+[[nodiscard]] juce::Result importReaperProject(const juce::File& file, ImportedProject& out);
+[[nodiscard]] juce::Result importFlStudioProject(const juce::File& file, ImportedProject& out);
+[[nodiscard]] juce::Result importArdourSession(const juce::File& file, ImportedProject& out);
+[[nodiscard]] juce::Result importLmmsProject(const juce::File& file, ImportedProject& out);
+[[nodiscard]] juce::Result importAafComposition(const juce::File& file, ImportedProject& out);
+[[nodiscard]] juce::Result importZrythmProject(const juce::File& file, ImportedProject& out);
+// A standard MIDI file and the audio files beside it (stems): what any other
+// application exports (Reason…).
+[[nodiscard]] juce::Result importMidiAndStems(const juce::File& file, ImportedProject& out);
+// Where audio made by an import goes (two mono files made one stereo file):
+// the application's own folder for it; the system's temporary one until set.
+void setImportedAudioFolder(const juce::File& folder);
+[[nodiscard]] juce::File importedAudioFolder();
 [[nodiscard]] juce::Result importDawProject(const juce::File& file, ImportedProject& out);
 [[nodiscard]] juce::Result importAbletonLiveSet(const juce::File& file, ImportedProject& out);
 [[nodiscard]] juce::Result importStudioOneSong(const juce::File& file, ImportedProject& out);

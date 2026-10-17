@@ -14,6 +14,8 @@ sons intégrée.
   monophoniques.
 - Édition audio : étirement temporel sans changer la hauteur, prises et comping, versions de clip.
 - Automation de tous les réglages, modulations (LFO, macros), tempo et métrique.
+- Import des projets d'autres logiciels : Ableton Live, Bitwig, Studio One, Reaper, FL Studio, Ardour,
+  LMMS, Zrythm, DAWproject (Cubase…), AAF (Logic, Pro Tools…), et un fichier MIDI avec ses pistes audio.
 
 **Ses instruments**
 - **Prisme** (tables d'ondes), **Ambre** (analogique), **Colosse** (tables d'ondes modernes),
@@ -22,8 +24,9 @@ sons intégrée.
   **Onyx** (distorsion de phase), **Alliage** (modules), **Argile** et **Dérive** (analogiques),
   **Bronze** (objets résonants), **Jade** (piano électrique modélisé), **Silex** (boîte à rythmes
   synthétisée).
-- **Rack de pads** (sur chaque pad, un instrument et ses effets) et **Nuée** (granulaire sur ses
-  propres sons).
+- **Drum Machine** (un pad par touche, chacun un instrument et ses effets), **Instrument Layer** et
+  **Instrument Selector** (des couches d'instruments, ensemble ou une à la fois), et **Nuée**
+  (granulaire sur ses propres sons).
 - **Batterie** : six kits acoustiques, mixage élément par élément, réglages des micros, motifs
   rythmiques posés en clips MIDI.
 - **Sampler** : zones, couches de vélocité, round robin, import SFZ (contrôleurs, articulations,
@@ -52,7 +55,8 @@ sons intégrée.
   effets et instruments compris ; un anneau montre de combien il bouge, réglable pendant que ça joue.
 - Des **conteneurs** comme dans Bitwig : Chain, FX Layer, FX Selector, Mid-Side Split, Stereo Split,
   Multiband FX-2 et FX-3, XY FX et Replacer. Leurs chaînes s'affichent dans la bande, on y glisse des
-  périphériques, ils s'imbriquent.
+  périphériques, ils s'imbriquent, leurs branches se renomment, leurs presets gardent tout ce qu'ils
+  contiennent.
 
 **Mixer et router**
 - Mixeur avec bus, envois, side-chain, compensation de latence.

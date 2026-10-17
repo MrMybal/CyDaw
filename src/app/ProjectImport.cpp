@@ -2248,7 +2248,9 @@ private:
 
 juce::StringArray supportedProjectExtensions()
 {
-    return { ".dawproject", ".als", ".song", ".bwproject" };
+    // (A MIDI file is a project only when chosen as one: dropped, it is
+    // notes for a track.)
+    return { ".dawproject", ".als", ".song", ".bwproject", ".rpp", ".flp", ".ardour", ".mmp", ".mmpz", ".aaf", ".zpj" };
 }
 
 juce::String supportedProjectWildcard()
@@ -2256,6 +2258,8 @@ juce::String supportedProjectWildcard()
     juce::StringArray patterns;
     for (const auto& extension : supportedProjectExtensions())
         patterns.add("*" + extension);
+    patterns.add("*.mid");
+    patterns.add("*.midi");
     return patterns.joinIntoString(";");
 }
 
@@ -2337,6 +2341,20 @@ juce::Result importProjectFile(const juce::File& file, ImportedProject& out)
         result = importStudioOneSong(file, out);
     else if (extension == ".bwproject")
         result = importBitwigProject(file, out);
+    else if (extension == ".rpp")
+        result = importReaperProject(file, out);
+    else if (extension == ".flp")
+        result = importFlStudioProject(file, out);
+    else if (extension == ".ardour")
+        result = importArdourSession(file, out);
+    else if (extension == ".mmp" || extension == ".mmpz")
+        result = importLmmsProject(file, out);
+    else if (extension == ".aaf")
+        result = importAafComposition(file, out);
+    else if (extension == ".zpj")
+        result = importZrythmProject(file, out);
+    else if (extension == ".mid" || extension == ".midi")
+        result = importMidiAndStems(file, out);
     if (result.failed())
         return result;
     if (out.name.isEmpty())

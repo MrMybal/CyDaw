@@ -123,6 +123,50 @@ std::optional<Equivalent> equivalentOf(const ImportedDevice& device, const juce:
     if (device.plugin || !device.instrument)
         return std::nullopt;
     Equivalent equivalent;
+    equivalent.fallback = "opale-instrument";
+    // FL Studio's, LMMS's and Reaper's own instruments, by their names.
+    struct Own {
+        const char* format;
+        std::initializer_list<const char*> names;
+        const char* instrument;
+    };
+    static const Own own[] {
+        { "fl-studio", { "Sampler", "Audio Clip", "Slicex", "Fruity Slicer", "Fruity Granulizer", "DirectWave" }, "simple-sampler-instrument" },
+        { "fl-studio", { "FPC", "Drumaxx", "Drumpad" }, "batterie-instrument" },
+        { "fl-studio", { "FL Keys", "Fruity DX10" }, "jade-instrument" },
+        { "fl-studio", { "Sytrus" }, "saphir-instrument" },
+        { "fl-studio", { "Harmor", "Harmless", "Morphine" }, "colosse-instrument" },
+        { "fl-studio", { "Sakura" }, "bronze-instrument" },
+        { "fl-studio", { "BooBass", "Toxic Biohazard", "PoiZone", "Sawer", "Transistor Bass", "MiniSynth" }, "argile-instrument" },
+        { "fl-studio", { "Fruity Kick", "Kickbox" }, "kick-instrument" },
+        { "fl-studio", { "Flex", "GMS", "3x Osc", "Autogun" }, "opale-instrument" },
+        { "lmms", { "audiofileprocessor", "slicert" }, "simple-sampler-instrument" },
+        { "lmms", { "sf2player", "gigplayer" }, "sampler-instrument" },
+        { "lmms", { "kicker" }, "kick-instrument" },
+        { "lmms", { "lb302" }, "argile-instrument" },
+        { "lmms", { "opulenz" }, "quartz-instrument" },
+        { "lmms", { "organic" }, "tirette-instrument" },
+        { "lmms", { "malletsstk" }, "bronze-instrument" },
+        { "lmms", { "watsyn", "bitinvader" }, "prism-instrument" },
+        { "lmms", { "monstro" }, "colosse-instrument" },
+        { "reaper", { "ReaSamplOmatic5000" }, "simple-sampler-instrument" },
+        { "midi", { "Drums" }, "batterie-instrument" },
+        { "fl-studio", { "Fruit Kick" }, "kick-instrument" },
+        { "fl-studio", { "Plucked!" }, "bronze-instrument" },
+    };
+    for (const auto& entry : own)
+        if (format == entry.format)
+            for (const auto* name : entry.names)
+                if (device.type.equalsIgnoreCase(name) || device.name.equalsIgnoreCase(name)) {
+                    equivalent.instrument = entry.instrument;
+                    return equivalent;
+                }
+    if (format == "fl-studio" || format == "lmms" || format == "reaper" || format == "ardour" || format == "midi"
+        || format == "zrythm") {
+        // Another of its own: an everyday polysynth.
+        equivalent.instrument = "opale-instrument";
+        return equivalent;
+    }
     const Settings from(device);
     const auto ableton = format == "ableton";
     // The other application's own instruments, by their names or tags.

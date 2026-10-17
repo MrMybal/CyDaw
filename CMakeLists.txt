@@ -2,6 +2,22 @@ cmake_minimum_required(VERSION 3.24)
 
 project(CyDAW VERSION 0.77.0 LANGUAGES C CXX)
 
+# zstd's decoder (third_party/zstd, BSD): Zrythm's projects are compressed with it.
+add_library(cydaw_zstd STATIC
+    third_party/zstd/lib/common/debug.c
+    third_party/zstd/lib/common/entropy_common.c
+    third_party/zstd/lib/common/error_private.c
+    third_party/zstd/lib/common/fse_decompress.c
+    third_party/zstd/lib/common/xxhash.c
+    third_party/zstd/lib/common/zstd_common.c
+    third_party/zstd/lib/decompress/huf_decompress.c
+    third_party/zstd/lib/decompress/zstd_ddict.c
+    third_party/zstd/lib/decompress/zstd_decompress.c
+    third_party/zstd/lib/decompress/zstd_decompress_block.c)
+target_include_directories(cydaw_zstd PUBLIC third_party/zstd/lib)
+target_compile_definitions(cydaw_zstd PRIVATE ZSTD_DISABLE_ASM=1 ZSTD_LEGACY_SUPPORT=0 DEBUGLEVEL=0)
+set_target_properties(cydaw_zstd PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 option(CYDAW_BUILD_TESTS "Build the dependency-free core tests" ON)
 option(CYDAW_BUILD_DESKTOP "Build the JUCE desktop shell" ON)
 option(CYDAW_BUILD_GRAPH_EDITOR "Build the standalone CyDAW Graph Editor" ON)
@@ -312,7 +328,8 @@ if(CYDAW_BUILD_DESKTOP)
                 APPEND
                 DEPENDS "${CYDAW_JUCE_INFO_FILE}")
         endif()
-        target_sources(CyDAW PRIVATE
+        target_link_libraries(CyDAW PRIVATE cydaw_zstd)
+            target_sources(CyDAW PRIVATE
             src/app/Main.cpp
             src/app/AutomationEditorComponent.cpp
             src/app/AutomationEditorComponent.h
@@ -388,6 +405,14 @@ if(CYDAW_BUILD_DESKTOP)
             src/app/WorkspaceComponentRemote.cpp
             src/app/WorkspaceComponentImport.cpp
             src/app/ProjectImport.cpp
+            src/app/ProjectImportShared.cpp
+            src/app/ProjectImportReaper.cpp
+            src/app/ProjectImportFlStudio.cpp
+            src/app/ProjectImportArdour.cpp
+            src/app/ProjectImportLmms.cpp
+            src/app/ProjectImportAaf.cpp
+            src/app/ProjectImportZrythm.cpp
+            src/app/ProjectImportMidi.cpp
             src/app/ProjectImport.h
             src/app/WorkspaceComponentSelfTests.cpp
             src/app/WorkspaceComponent.h
@@ -749,6 +774,7 @@ if(CYDAW_BUILD_DESKTOP)
                 PRODUCT_NAME "CyDAW Desktop Tests"
                 VERSION "${PROJECT_VERSION}"
                 BUILD_VERSION "${PROJECT_VERSION}")
+            target_link_libraries(cydaw_desktop_tests PRIVATE cydaw_zstd)
             target_sources(cydaw_desktop_tests PRIVATE
                 tests/DesktopAudioTests.cpp
                 src/app/AudioTrackController.cpp
@@ -798,6 +824,14 @@ if(CYDAW_BUILD_DESKTOP)
                 src/app/ProjectRecovery.cpp
                 src/app/ProjectRecovery.h
                 src/app/ProjectImport.cpp
+                src/app/ProjectImportShared.cpp
+                src/app/ProjectImportReaper.cpp
+                src/app/ProjectImportFlStudio.cpp
+                src/app/ProjectImportArdour.cpp
+                src/app/ProjectImportLmms.cpp
+                src/app/ProjectImportAaf.cpp
+                src/app/ProjectImportZrythm.cpp
+                src/app/ProjectImportMidi.cpp
                 src/app/ProjectImport.h
             )
             target_include_directories(cydaw_desktop_tests PRIVATE src/app)
@@ -1039,6 +1073,7 @@ if(CYDAW_BUILD_DESKTOP)
                 OUTPUT "${CYDAW2_JUCE_GENERATED_DIR}/CyDAW2_resources.rc"
                 APPEND
                 DEPENDS "${CYDAW2_JUCE_INFO_FILE}")
+            target_link_libraries(CyDAW2 PRIVATE cydaw_zstd)
             target_sources(CyDAW2 PRIVATE
                 src/v2/Main.cpp
                 src/v2/CinemaVideo.cpp
@@ -1205,6 +1240,14 @@ if(CYDAW_BUILD_DESKTOP)
                 src/app/SampleLibrary.cpp
                 src/app/ProjectRecovery.cpp
                 src/app/ProjectImport.cpp
+                src/app/ProjectImportShared.cpp
+                src/app/ProjectImportReaper.cpp
+                src/app/ProjectImportFlStudio.cpp
+                src/app/ProjectImportArdour.cpp
+                src/app/ProjectImportLmms.cpp
+                src/app/ProjectImportAaf.cpp
+                src/app/ProjectImportZrythm.cpp
+                src/app/ProjectImportMidi.cpp
                 src/app/RemoteControlServer.cpp
                 # The graph model and compiler, used without being shown.
                 src/app/NodeGraphComponent.cpp
@@ -1501,6 +1544,14 @@ if(CYDAW_BUILD_DESKTOP)
                              COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/v2_instrument_containers_check.py"
                                      --port 47863 --exe "$<TARGET_FILE:CyDAW2>")
                     set_tests_properties(cydaw2_instrument_containers_check PROPERTIES TIMEOUT 600)
+                    # Projects of other applications imported (Reaper, FL
+                    # Studio, Ardour, LMMS, Zrythm, a MIDI file and its stems;
+                    # real AAF and other test projects when
+                    # CYDAW_IMPORT_SAMPLES names them). Silent.
+                    add_test(NAME cydaw2_project_import_check
+                             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/v2_project_import_check.py"
+                                     --port 47867 --exe "$<TARGET_FILE:CyDAW2>")
+                    set_tests_properties(cydaw2_project_import_check PROPERTIES TIMEOUT 600)
                     # Batterie: its kits (the banks downloaded on this computer;
                     # skipped without them), its pieces' mix, grooves, presets.
                     add_test(NAME cydaw2_batterie_check
