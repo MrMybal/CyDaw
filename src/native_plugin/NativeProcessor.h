@@ -92,6 +92,8 @@ class NativeProcessor final : public EditorModel
     // The bundle's voice data (a sampler's samples, a sound model), shared
     // with the other instances that read the same file.
     std::shared_ptr<const engine::VoiceAssets> voice_;
+    // The Replacers' instruments' voice data, kept as long as their plans.
+    std::vector<std::shared_ptr<const engine::VoiceAssets>> replacerVoices_;
     bool voiceTried_{};
     // Every key down now (a sampler's first and legato zones).
     std::array<bool, 128> down_{};

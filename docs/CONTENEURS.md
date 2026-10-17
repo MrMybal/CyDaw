@@ -29,7 +29,7 @@ Tous ont **Mix** (le son d'entrée mêlé à celui des chaînes) et **Wet Gain**
 - Le **+** au bout de la branche ajoute un périphérique. On peut aussi y déposer une carte tirée par son nom, d'où qu'elle vienne. Tirée sur une carte de la branche, elle se place avant ou après elle.
 - **+ Layer** ou **+ Chain** ajoute une branche. Un clic droit sur une branche la retire, avec ses périphériques.
 - Un conteneur peut en tenir d'autres.
-- **Replacer avec un instrument** : choisir *Instrument* dans *Sound*, puis un instrument dans la liste (Kick, Opale et les autres synthés, Prisme, Batterie…). À chaque transitoire, il joue la note réglée (36 par défaut, la grosse caisse d'une Batterie), aussi fort que le coup, aussi longtemps que *Length*. **Open** montre ses cartes dans la bande, comme un pad de rack, pour régler l'instrument ; la flèche de la colonne revient à la piste. Ses effets sont la chaîne du Replacer, dans son cadre. L'instrument est gardé dans la carte du Replacer et se sauvegarde avec le projet.
+- **Replacer avec un instrument** : choisir *Instrument* dans *Sound*, puis un instrument dans la liste (Kick, Opale et les autres synthés, Prisme, Batterie…). À chaque transitoire, il joue la note réglée (36 par défaut, la grosse caisse d'une Batterie), aussi fort que le coup, aussi longtemps que *Length*. **Open** montre ses cartes dans la bande, comme un pad de rack, pour régler l'instrument ; la flèche de la colonne revient à la piste. Ses effets sont la chaîne du Replacer, dans son cadre. L'instrument est gardé dans la carte du Replacer (son graphe et son plan compilé) et se sauvegarde avec le projet. Il part dans les plugins exportés (VST3, CLAP, LV2) : son plan dans le code généré, ses échantillons (une Batterie, un sampler) dans un fichier de voix à lui, `Voice1.cyvoice`, `Voice2.cyvoice`…, à côté de celui de l'instrument du plugin.
 - Supprimer la carte d'un conteneur le supprime avec tout ce qu'il tient. L'éteindre (bypass) laisse passer le son sans lui.
 - Ses réglages sont des réglages comme les autres : automatisables, modulables (les modulateurs se glissent dessus), dans la liste des valeurs.
 
@@ -60,4 +60,4 @@ Tests :
 - `tests/ContainerTests.inc`, dans les tests du cœur : le son de chaque conteneur ;
 - `tests/v2_containers_check.py` (ctest `cydaw2_containers_check`, en silence) : l'édition, le glisser-déposer, l'imbrication, la sauvegarde.
 
-`effect_chain_check` prend `"live": true` (le graphe tel que la piste le joue, avec l'instrument d'un Replacer, qu'un plugin exporté n'emporte pas encore) et `"signal": "clicks"` (un clic tous les quarts de seconde).
+`effect_chain_check` prend `"live": true` (le graphe tel que la piste le joue, plutôt que tel qu'un plugin exporté le restaure) et `"signal": "clicks"` (un clic tous les quarts de seconde).

@@ -4,6 +4,7 @@
 #include <cydaw/engine/EffectCatalogue.h>
 
 #include "DeviceOps.h"
+#include "GraphPolySynthRenderer.h"
 #include "DeviceTransfer.h"
 #include "GraphPresetFile.h"
 
@@ -1216,6 +1217,9 @@ void Studio::compileReplacer(ReplacerSlot& slot)
         auto kept = juce::DynamicObject::Ptr(new juce::DynamicObject());
         kept->setProperty("name", slot.name);
         kept->setProperty("graph", withoutSharedModules(slot.graph->serialise()));
+        // Its plan, compiled: what an exported plug-in plays.
+        if (slot.plan != nullptr)
+            kept->setProperty("plan", app::serialisePolySynthGraphPlan(*slot.plan));
         (void) ownerSlot->graph().setNodeInstrumentJson(slot.head, juce::var(kept.get()));
     }
 }

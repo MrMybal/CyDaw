@@ -13,8 +13,9 @@ a sine through it offline).
 * A Multiband FX-3 with the high band at -36 dB: lows pass, highs are gone.
 * An XY FX's Post FX follows the corners' mix, before Mix; saved and opened
   again, it is there.
-* A Replacer plays an instrument (a kick, then a synth) at each click; its
-  instrument's chain opens as a pad's; saved and opened again, it plays.
+* A Replacer plays an instrument (a kick, then a synth) at each click, the
+  same in an exported plug-in's state; its instrument's chain opens as a
+  pad's; saved and opened again, it plays; a native export carries it.
 * The strip with a container open (a snapshot, for the eye).
 * Saved and opened again, the containers and their cards are there.
 * Removed, the sound is the dry sound again.
@@ -203,6 +204,9 @@ def scenario(scratch: Path) -> None:
     check(kick["instrument"] != "", f"a Replacer takes an instrument ({kick['instrument']})")
     kicked = clicks()
     check(kicked > bare + 20.0, f"the instrument plays at each click ({bare:.1f} dB of clicks, {kicked:.1f} dB replaced)")
+    exported = need({"cmd": "effect_chain_check", "track": "Drums", "signal": "clicks", "amplitude": 0.8, "seconds": 1.5},
+                    "exported")["outputDb"]
+    check(abs(exported - kicked) < 1.0, f"an exported plug-in's state plays it the same ({exported:.1f} dB)")
     need({"cmd": "set_node_parameter", "track": "Drums", "nodeId": replacer, "parameter": "replacer.mix", "value": 0}, "mix")
     check(abs(clicks() - bare) < 1.0, "Mix 0: the clicks alone")
     need({"cmd": "set_node_parameter", "track": "Drums", "nodeId": replacer, "parameter": "replacer.mix", "value": 1}, "mix back")
@@ -226,6 +230,20 @@ def scenario(scratch: Path) -> None:
     reloaded = clicks()
     check(after["instrument"] == synth["instrument"] and reloaded > bare + 10.0,
           f"saved and opened again, the Replacer keeps its instrument and plays it ({reloaded:.1f} dB)")
+
+    # Exported as a native plug-in (an instrument track, the Replacer in its
+    # effects): the generated source plays the Replacer's own plan.
+    need({"cmd": "add_midi_track", "name": "Played", "instrument": "opale-instrument"}, "played track")
+    played = need({"cmd": "container", "track": "Played", "action": "insert", "type": "replacer"}, "played replacer")["head"]
+    need({"cmd": "container", "track": "Played", "action": "instrument", "head": played, "key": "kick-instrument"}, "played kick")
+    need({"cmd": "workshop", "action": "open_track", "track": "Played"}, "workshop")
+    project = Path(need({"cmd": "workshop", "action": "plugin_export", "format": "CLAP",
+                         "folder": str(scratch / "export").replace(os.sep, "/"), "productName": "CyReplacerCheck",
+                         "pluginCode": "RPLC"}, "export")["project"])
+    source = (project / "generated" / "Definition.cpp").read_text(encoding="utf-8")
+    check("makeReplacerPlan1" in source and "n.instrument=" in source,
+          "a native export carries the Replacer's instrument, on its node")
+    need({"cmd": "workshop", "action": "close"}, "close workshop")
 
 
 def main() -> int:

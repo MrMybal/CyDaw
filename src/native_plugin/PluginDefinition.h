@@ -57,6 +57,13 @@ struct Definition
     // The voice data in the bundle (a sampler's samples, a sound model), by
     // file name; empty: none.
     std::string voiceAssets;
+    // Each Replacer's instrument's own (Containers.h): its node, its file.
+    struct ReplacerVoice
+    {
+        std::uint64_t node{};
+        std::string assets;
+    };
+    std::vector<ReplacerVoice> replacerVoices;
 };
 Definition makeDefinition();
 engine::NativeDspGraph makeAudioGraph();

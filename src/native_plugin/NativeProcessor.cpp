@@ -196,16 +196,36 @@ bool NativeProcessor::prepare(double rate, int maximumBlock)
 void NativeProcessor::loadVoice()
 {
     // Once, before the first block: a sampler's samples, a sound model.
-    if (voiceTried_ || definition_.voiceAssets.empty())
+    if (voiceTried_)
         return;
     voiceTried_ = true;
-    voice_ = sharedVoiceAssets(findResource(definition_.voiceAssets));
-    if (voice_ == nullptr)
-        return;
-    if (voice_->sampler != nullptr)
-        instrument_.sampler = voice_->sampler;
-    if (voice_->soundModel != nullptr)
-        instrument_.soundModel = voice_->soundModel;
+    if (!definition_.voiceAssets.empty())
+        voice_ = sharedVoiceAssets(findResource(definition_.voiceAssets));
+    if (voice_ != nullptr)
+    {
+        if (voice_->sampler != nullptr)
+            instrument_.sampler = voice_->sampler;
+        if (voice_->soundModel != nullptr)
+            instrument_.soundModel = voice_->soundModel;
+    }
+    // Each Replacer's instrument: its own samples, onto its plan.
+    for (const auto &replacer : definition_.replacerVoices)
+    {
+        auto assets = sharedVoiceAssets(findResource(replacer.assets));
+        if (assets == nullptr)
+            continue;
+        for (auto &node : graph_.nodes)
+            if (node.id == replacer.node && node.instrument != nullptr)
+            {
+                auto plan = std::make_shared<engine::PolySynthGraphPlan>(*node.instrument);
+                if (assets->sampler != nullptr)
+                    plan->sampler = assets->sampler;
+                if (assets->soundModel != nullptr)
+                    plan->soundModel = assets->soundModel;
+                node.instrument = std::move(plan);
+            }
+        replacerVoices_.push_back(std::move(assets));
+    }
 }
 void NativeProcessor::reset()
 {

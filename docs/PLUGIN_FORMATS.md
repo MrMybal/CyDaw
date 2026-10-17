@@ -52,6 +52,8 @@ Un instrument joué par un sampler (zones, SFZ, Batterie, instruments d'usine) o
 - CLAP : `<nom>.clap.Resources/Voice.cyvoice` à côté du fichier `.clap` (à copier avec lui) ;
 - LV2 : `Resources/Voice.cyvoice` dans le dossier `.lv2`.
 
+Un **Replacer** qui joue un instrument (voir [CONTENEURS.md](CONTENEURS.md)) l'emporte aussi : son plan est écrit dans le code généré et attaché à son nœud, et ses échantillons éventuels dans un fichier à lui (`Voice1.cyvoice`, `Voice2.cyvoice`…), placé au même endroit que `Voice.cyvoice`. Le plug-in les charge à sa préparation.
+
 Le plug-in lit ce fichier une fois à son activation (partagé entre ses instances) et garde tout en mémoire ; il ne dépend plus des banques ni des dossiers de la machine qui l'a exporté. Il joue les keyswitches, groupes d'exclusion (charley), contrôleurs MIDI des SFZ et zones de relâchement comme la piste. Un échantillon illisible arrête la génération en le nommant. Le fichier est aussi gros que l'audio non compressé : quelques Mo pour un instrument simple, plusieurs centaines pour un grand instrument d'usine.
 
 ## Vérification

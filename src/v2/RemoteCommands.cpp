@@ -1320,8 +1320,10 @@ juce::var Commands::run()
             native = app::restoreNativeDspGraphState(state.getProperty("native", {}), error);
             if (!native)
                 return fail("the chain does not restore: " + error);
-            // A cabinet's response, as the plug-in puts it back.
+            // A cabinet's response, as the plug-in puts it back; each
+            // Replacer's instrument.
             app::attachImpulses(*native, state.getProperty("editor", {}));
+            app::attachReplacerInstruments(*native, state, true);
         }
         constexpr auto rate = 48'000.0;
         constexpr auto block = 512;

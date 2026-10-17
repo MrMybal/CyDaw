@@ -1287,6 +1287,12 @@ public:
         // A cabinet's response is not a number: it comes back from the graph
         // the state carries, onto the effect of the same card.
         cydaw::app::attachImpulses(*native, root->getProperty("editor"));
+        // Each Replacer's instrument, its samples decoded.
+        if (const auto factory = root->getProperty("factoryFolder").toString(); factory.isNotEmpty())
+            cydaw::app::setFactoryContentFolder(juce::File(factory));
+        if (const auto banks = root->getProperty("banksFolder").toString(); banks.isNotEmpty())
+            cydaw::app::setBanksFolder(juce::File(banks));
+        cydaw::app::attachReplacerInstruments(*native, parsed, true);
         if (runtime_.setGraph(*native).failed())
             return;
         reportLatency();

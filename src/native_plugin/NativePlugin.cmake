@@ -100,3 +100,10 @@ else()
     add_custom_command(TARGET CyDAWGeneratedGraphPlugin_VST3 POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E rm -f "$<TARGET_FILE_DIR:CyDAWGeneratedGraphPlugin_VST3>/../Resources/Voice.cyvoice")
 endif()
+# Each Replacer's instrument's voice data, by its own name.
+foreach(extraVoice IN LISTS CYDAW_EXTRA_VOICE_ASSETS)
+    get_filename_component(extraVoiceName "${extraVoice}" NAME)
+    add_custom_command(TARGET CyDAWGeneratedGraphPlugin_VST3 POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${extraVoice}"
+                "$<TARGET_FILE_DIR:CyDAWGeneratedGraphPlugin_VST3>/../Resources/${extraVoiceName}")
+endforeach()

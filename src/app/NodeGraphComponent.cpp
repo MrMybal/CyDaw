@@ -9304,6 +9304,25 @@ juce::var NodeGraphComponent::createVst3RuntimeState() const
     root->setProperty(jsonKeys::polySynth,
                       serialisePolySynthGraphPlan(
                           runtimeExport.instrumentPlan));
+    // Each Replacer's instrument: its plan and its graph, as its card keeps
+    // them (the studio compiles them), for the plug-in to play.
+    {
+        juce::Array<juce::var> replacers;
+        for (const auto& native : runtimeExport.nativeGraph.nodes) {
+            if (native.kind != cydaw::engine::NativeDspNodeKind::replacer)
+                continue;
+            const auto* node = readNode(native.id);
+            if (node == nullptr || !node->instrumentJson.getProperty("plan", juce::var()).isObject())
+                continue;
+            auto entry = juce::DynamicObject::Ptr(new juce::DynamicObject());
+            entry->setProperty("node", static_cast<juce::int64>(native.id));
+            entry->setProperty("polySynth", node->instrumentJson.getProperty("plan", juce::var()));
+            entry->setProperty("editor", node->instrumentJson.getProperty("graph", juce::var()));
+            replacers.add(juce::var(entry.get()));
+        }
+        if (!replacers.isEmpty())
+            root->setProperty("replacers", replacers);
+    }
 
     juce::Array<juce::var> publishedValues, allValues;
     juce::Array<juce::var> hostValues;

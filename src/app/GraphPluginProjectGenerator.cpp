@@ -145,6 +145,34 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
                                             voiceAssets);
         voice.failed())
         return voice;
+    // Each Replacer's instrument (Containers.h): its plan, and its voice data
+    // in a file of its own ("Voice1.cyvoice"...), beside the instrument's.
+    struct ReplacerExport {
+        juce::int64 node {};
+        juce::var poly;
+        juce::String assets;
+    };
+    std::vector<ReplacerExport> replacers;
+    if (const auto *list = runtimeState.getProperty("replacers", {}).getArray())
+        for (const auto &entry : *list)
+        {
+            ReplacerExport made;
+            made.node = static_cast<juce::int64>(entry.getProperty("node", 0));
+            made.poly = entry.getProperty("polySynth", {});
+            const auto replacerWaveform =
+                static_cast<cydaw::engine::PolyOscillatorWaveform>(static_cast<int>(made.poly.getProperty("waveform", 0)));
+            if (replacerWaveform == cydaw::engine::PolyOscillatorWaveform::rack)
+                return juce::Result::fail("A Replacer playing a pad rack cannot be exported");
+            const auto name = "Voice" + juce::String(static_cast<int>(replacers.size()) + 1) + ".cyvoice";
+            auto written = false;
+            if (const auto voice = writeVoiceAssetsFile(generated.getChildFile(name), entry.getProperty("editor", {}),
+                                                        replacerWaveform, written);
+                voice.failed())
+                return juce::Result::fail("A Replacer's instrument: " + voice.getErrorMessage());
+            if (written)
+                made.assets = name;
+            replacers.push_back(std::move(made));
+        }
     const auto prop = [](const juce::var &v, const char *key) { return v.getProperty(key, {}); };
     const auto number = [](const juce::var &value) { return juce::String(static_cast<double>(value), 12); };
     const auto integer = [](const juce::var &value) { return juce::String(static_cast<juce::int64>(value)); };
@@ -175,6 +203,9 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
            ";d.producesMidi=" + (plan.producesMidi ? "true" : "false") + ";\n";
     if (voiceAssets)
         cpp += "d.voiceAssets=" + cppString(voiceAssetsName) + ";\n";
+    for (const auto &replacer : replacers)
+        if (replacer.assets.isNotEmpty())
+            cpp += "d.replacerVoices.push_back({" + juce::String(replacer.node) + "ull," + cppString(replacer.assets) + "});\n";
     cpp += "d.width=" + integer(presentation.getProperty("windowWidth", 720)) +
            ";d.height=" + integer(presentation.getProperty("windowHeight", 420)) + ";\n";
     const auto surface=prop(presentation,"windowDesign");
@@ -287,7 +318,61 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
                    number(prop(route, "depth")) + "f," + integer(prop(route, "index")) + "," +
                    number(prop(route, "minimum")) + "f," + number(prop(route, "maximum").isVoid() ? juce::var(1.0) : prop(route, "maximum")) + "f," +
                    (static_cast<bool>(prop(route, "logarithmic")) ? "true" : "false") + "});\n";
-    cpp += "return d;}\nengine::NativeDspGraph makeAudioGraph(){engine::NativeDspGraph g;g.outputNodeId=" +
+    // An instrument's plan as a function of the source: the track's, each
+    // Replacer's.
+    const auto emitPlan = [&](const juce::var &poly, const juce::String &function) {
+        juce::String out = "engine::PolySynthGraphPlan " + function + "(){engine::PolySynthGraphPlan p;\n";
+        for (const auto *key :
+             {"graphNodeCount", "voiceCount", "voiceMode", "transposeSemitones", "minimumMidiNote", "maximumMidiNote"})
+            out += "p." + juce::String(key) + "=" + integer(prop(poly, key)) + ";\n";
+        out += "p.enabled=" + juce::String(static_cast<bool>(prop(poly, "enabled")) ? "true" : "false") +
+               ";p.waveform=static_cast<engine::PolyOscillatorWaveform>(" + integer(prop(poly, "waveform")) + ");\n";
+        for (const auto *key :
+             {"glideSeconds", "wavetablePosition", "stringDamping", "oscillatorLevel", "attackSeconds", "decaySeconds",
+              "sustainLevel", "releaseSeconds", "filterCutoffHz", "filterResonance", "velocityScale"})
+            out += "p." + juce::String(key) + "=" + number(prop(poly, key)) + "f;\n";
+        out += "p.wavetableDetuneCents=" + number(prop(poly, "wavetableDetune")) +
+               "f;p.stringDecaySeconds=" + number(prop(poly, "stringDecay")) + "f;\n";
+        out += "p.synthModel=static_cast<engine::synth::Model>(" + integer(prop(poly, "synthModel")) + ");\n";
+        for (const auto *key : {"prismValues", "kickValues", "synthValues", "samplerValues", "soundModelValues"})
+            if (const auto *a = prop(poly, key).getArray())
+                for (int i = 0; i < a->size(); ++i)
+                    out += "p." + juce::String(key) + "[" + juce::String(i) + "]=" + number((*a)[i]) + "f;\n";
+        // A sampler's card controllers (those it sets), a Batterie's mix.
+        if (const auto *controllers = prop(poly, "samplerControllers").getDynamicObject())
+            for (const auto &controller : controllers->getProperties())
+                if (const auto number_ = controller.name.toString().getIntValue(); number_ >= 0 && number_ < 128)
+                    out += "p.samplerControllers[" + juce::String(number_) + "]=" + number(controller.value) + "f;\n";
+        if (static_cast<bool>(prop(poly, "drumKit")))
+        {
+            out += "p.drumKit=true;\n";
+            if (const auto *a = prop(poly, "drumValues").getArray())
+                for (int i = 0; i < a->size(); ++i)
+                    out += "p.drumValues[" + juce::String(i) + "]=" + number((*a)[i]) + "f;\n";
+        }
+        if (const auto *effects = prop(poly, "midiEffects").getArray())
+        {
+            out += "{auto effects=std::make_shared<engine::MidiEffectsPlan>();effects->count=" +
+                   juce::String(effects->size()) + ";\n";
+            for (int i = 0; i < effects->size(); ++i)
+            {
+                const auto &e = (*effects)[i];
+                const auto target = "effects->effects[" + juce::String(i) + "]";
+                out += target + ".kind=static_cast<engine::NativeDspNodeKind>(" + integer(prop(e, "kind")) + ");\n";
+                if (const auto *a = prop(e, "values").getArray())
+                    for (int j = 0; j < a->size(); ++j)
+                        out += target + ".values[" + juce::String(j) + "]=" + number((*a)[j]) + "f;\n";
+            }
+            out += "p.midiEffects=effects;}\n";
+        }
+        out += "if(p.waveform==engine::PolyOscillatorWaveform::prism)p.prismTables=engine::prism::resolveTables(p.prismValues)"
+               ";if(p.synthModel!=engine::synth::Model::none)engine::synth::warmUp(p.synthModel);return p;}\n";
+        return out;
+    };
+    cpp += "return d;}\n";
+    for (std::size_t index = 0; index < replacers.size(); ++index)
+        cpp += "static " + emitPlan(replacers[index].poly, "makeReplacerPlan" + juce::String(static_cast<int>(index) + 1));
+    cpp += "engine::NativeDspGraph makeAudioGraph(){engine::NativeDspGraph g;g.outputNodeId=" +
            integer(prop(native, "outputNodeId")) + "ull;\n";
     const juce::StringArray scalarFields{"driveDb",
                                          "gainDb",
@@ -360,6 +445,11 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
                 for (int i = 0; i < a->size(); ++i)
                     cpp +=
                         "n.parameters." + juce::String(key) + "[" + juce::String(i) + "]=" + number((*a)[i]) + "f;\n";
+        // A Replacer's instrument.
+        for (std::size_t index = 0; index < replacers.size(); ++index)
+            if (replacers[index].node == static_cast<juce::int64>(prop(n, "id")))
+                cpp += "n.instrument=std::make_shared<const engine::PolySynthGraphPlan>(makeReplacerPlan" +
+                       juce::String(static_cast<int>(index) + 1) + "());\n";
         cpp += "g.nodes.push_back(std::move(n));}\n";
     }
     if (const auto *a = prop(native, "connections").getArray())
@@ -376,53 +466,7 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
     if (const auto *a = prop(native, "bypasses").getArray())
         for (const auto &b : *a)
             cpp += "g.bypasses.push_back({" + integer(prop(b, "node")) + "ull," + integer(prop(b, "from")) + "ull});\n";
-    cpp += "return g;}\nengine::PolySynthGraphPlan makeInstrumentPlan(){engine::PolySynthGraphPlan p;\n";
-    for (const auto *key :
-         {"graphNodeCount", "voiceCount", "voiceMode", "transposeSemitones", "minimumMidiNote", "maximumMidiNote"})
-        cpp += "p." + juce::String(key) + "=" + integer(prop(poly, key)) + ";\n";
-    cpp += "p.enabled=" + juce::String(static_cast<bool>(prop(poly, "enabled")) ? "true" : "false") +
-           ";p.waveform=static_cast<engine::PolyOscillatorWaveform>(" + integer(prop(poly, "waveform")) + ");\n";
-    for (const auto *key :
-         {"glideSeconds", "wavetablePosition", "stringDamping", "oscillatorLevel", "attackSeconds", "decaySeconds",
-          "sustainLevel", "releaseSeconds", "filterCutoffHz", "filterResonance", "velocityScale"})
-        cpp += "p." + juce::String(key) + "=" + number(prop(poly, key)) + "f;\n";
-    cpp += "p.wavetableDetuneCents=" + number(prop(poly, "wavetableDetune")) +
-           "f;p.stringDecaySeconds=" + number(prop(poly, "stringDecay")) + "f;\n";
-    cpp += "p.synthModel=static_cast<engine::synth::Model>(" + integer(prop(poly, "synthModel")) + ");\n";
-    for (const auto *key : {"prismValues", "kickValues", "synthValues", "samplerValues", "soundModelValues"})
-        if (const auto *a = prop(poly, key).getArray())
-            for (int i = 0; i < a->size(); ++i)
-                cpp += "p." + juce::String(key) + "[" + juce::String(i) + "]=" + number((*a)[i]) + "f;\n";
-    // A sampler's card controllers (those it sets), a Batterie's mix.
-    if (const auto *controllers = prop(poly, "samplerControllers").getDynamicObject())
-        for (const auto &controller : controllers->getProperties())
-            if (const auto number_ = controller.name.toString().getIntValue(); number_ >= 0 && number_ < 128)
-                cpp += "p.samplerControllers[" + juce::String(number_) + "]=" + number(controller.value) + "f;\n";
-    if (static_cast<bool>(prop(poly, "drumKit")))
-    {
-        cpp += "p.drumKit=true;\n";
-        if (const auto *a = prop(poly, "drumValues").getArray())
-            for (int i = 0; i < a->size(); ++i)
-                cpp += "p.drumValues[" + juce::String(i) + "]=" + number((*a)[i]) + "f;\n";
-    }
-    if (const auto *effects = prop(poly, "midiEffects").getArray())
-    {
-        cpp += "{auto effects=std::make_shared<engine::MidiEffectsPlan>();effects->count=" +
-               juce::String(effects->size()) + ";\n";
-        for (int i = 0; i < effects->size(); ++i)
-        {
-            const auto &e = (*effects)[i];
-            const auto target = "effects->effects[" + juce::String(i) + "]";
-            cpp += target + ".kind=static_cast<engine::NativeDspNodeKind>(" + integer(prop(e, "kind")) + ");\n";
-            if (const auto *a = prop(e, "values").getArray())
-                for (int j = 0; j < a->size(); ++j)
-                    cpp += target + ".values[" + juce::String(j) + "]=" + number((*a)[j]) + "f;\n";
-        }
-        cpp += "p.midiEffects=effects;}\n";
-    }
-    cpp +=
-        "if(p.waveform==engine::PolyOscillatorWaveform::prism)p.prismTables=engine::prism::resolveTables(p.prismValues)"
-        ";if(p.synthModel!=engine::synth::Model::none)engine::synth::warmUp(p.synthModel);return p;}\n}\n";
+    cpp += "return g;}\n" + emitPlan(poly, "makeInstrumentPlan") + "}\n";
     const auto code = [](const std::string &s) {
         juce::uint32 result = 0;
         for (auto c : s)
@@ -441,6 +485,14 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
              (voiceAssets ? "set(CYDAW_VOICE_ASSETS \"${CMAKE_CURRENT_SOURCE_DIR}/generated/" + juce::String(voiceAssetsName) +
                                 "\")\n"
                           : juce::String()) +
+             [&replacers] {
+                 // The Replacers' voice data, each copied by its own name.
+                 juce::String files;
+                 for (const auto &replacer : replacers)
+                     if (replacer.assets.isNotEmpty())
+                         files += " \"${CMAKE_CURRENT_SOURCE_DIR}/generated/" + replacer.assets + "\"";
+                 return files.isNotEmpty() ? "set(CYDAW_EXTRA_VOICE_ASSETS" + files + ")\n" : juce::String();
+             }() +
              "include(\"${CYDAW_SOURCE_ROOT}/src/native_plugin/NativeFormats.cmake\")\n";
     cmake = cmake.replace("include(\"${CYDAW_SOURCE_ROOT}/src/native_plugin/NativeFormats.cmake\")", "set(CYDAW_EXPORT_FORMAT " + format + " CACHE STRING \"VST3, CLAP or LV2\")\ninclude(\"${CYDAW_SOURCE_ROOT}/src/native_plugin/NativeFormats.cmake\")");
     const auto sdkLicense = format == "VST3" ? juce::String("VST3 SDK (MIT)") : format == "CLAP" ? juce::String("CLAP SDK (MIT)") : juce::String("LV2 headers (ISC)");

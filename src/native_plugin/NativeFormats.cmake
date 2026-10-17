@@ -77,6 +77,13 @@ if(CYDAW_VOICE_ASSETS)
 else()
     add_custom_command(TARGET ${target} POST_BUILD COMMAND ${CMAKE_COMMAND} -E rm -f "${resourceDir}/Voice.cyvoice")
 endif()
+# Each Replacer's instrument's voice data, by its own name.
+foreach(extraVoice IN LISTS CYDAW_EXTRA_VOICE_ASSETS)
+    get_filename_component(extraVoiceName "${extraVoice}" NAME)
+    add_custom_command(TARGET ${target} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${resourceDir}"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${extraVoice}" "${resourceDir}/${extraVoiceName}")
+endforeach()
 add_custom_command(TARGET ${target} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "${licenseDir}"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${imgui}/LICENSE.txt" "${licenseDir}/Dear-ImGui.txt"

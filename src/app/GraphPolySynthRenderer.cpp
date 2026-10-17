@@ -393,6 +393,26 @@ juce::var serialisePolySynthGraphPlan(
     return juce::var(root.get());
 }
 
+void attachReplacerInstruments(cydaw::engine::NativeDspGraph& graph, const juce::var& runtimeState, const bool waitForSamples)
+{
+    const auto* replacers = runtimeState.getProperty("replacers", juce::var()).getArray();
+    if (replacers == nullptr)
+        return;
+    for (const auto& entry : *replacers) {
+        const auto id = static_cast<std::uint64_t>(static_cast<juce::int64>(entry.getProperty("node", 0)));
+        juce::String error;
+        auto plan = restorePolySynthGraphPlan(entry.getProperty("polySynth", juce::var()), error);
+        if (!plan)
+            continue;
+        attachVoiceAssets(*plan, entry.getProperty("editor", juce::var()));
+        if (waitForSamples && plan->sampler != nullptr)
+            (void) SampleStore::instance().waitUntilReady(*plan->sampler, 60'000);
+        for (auto& node : graph.nodes)
+            if (node.id == id)
+                node.instrument = std::make_shared<const cydaw::engine::PolySynthGraphPlan>(*plan);
+    }
+}
+
 void attachVoiceAssets(cydaw::engine::PolySynthGraphPlan& plan, const juce::var& graphState)
 {
     const auto assets = voiceAssetsFromGraphState(graphState);
