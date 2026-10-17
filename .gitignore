@@ -36,3 +36,5 @@ __pycache__/
 
 # DJ example built on commercial songs, kept local.
 /Examples/2026-10-17/Mix DJ - Fugees/
+# Built from a commercial sound-effects pack (its samples are not ours to redistribute).
+/Examples/2026-10-17/Fonderie - Atelier des machines/

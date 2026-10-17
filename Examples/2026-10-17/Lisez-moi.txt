@@ -5,6 +5,7 @@ Deux exemples CyDAW :
    Garde en local seulement (morceaux du commerce), absent du depot.
 2. Fonderie - Atelier des machines
    Ouvrir la Fonderie.cmd / session .cyfoundry / rendu WAV.
+   Garde en local seulement (sons d'un pack commercial), absent du depot.
 
 Les deux utilisent les fichiers locaux indiques, copies dans leurs dossiers Sources.
 Les lanceurs utilisent la version compilee dans build/vst3-catalogue-2026-10-15.
