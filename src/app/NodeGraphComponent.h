@@ -811,6 +811,37 @@ public:
     // once it rests): no change of the graph's shape.
     bool editorSetModulationAmount(std::uint64_t source, std::uint64_t sourcePort, std::uint64_t destination,
                                    std::uint64_t destinationPort, float amount);
+    // ---- Containers (engine/Containers.h) -------------------------------
+    // A container: its head (the card), its end, each branch's cards in the
+    // signal's order (a container inside one appears as its head).
+    struct EditorContainer {
+        std::uint64_t head {};
+        std::uint64_t end {};
+        juce::String typeKey;
+        std::vector<std::vector<std::uint64_t>> branches;
+    };
+    [[nodiscard]] bool editorIsContainer(std::uint64_t node) const;
+    [[nodiscard]] std::optional<EditorContainer> editorContainer(std::uint64_t head) const;
+    // Every card inside a container (nested ones' too) and every end: what
+    // the chain shows inside its container rather than in its row.
+    [[nodiscard]] std::set<std::uint64_t> editorContainerMembers() const;
+    // The container a card sits in and which branch (0, -1: the main chain).
+    [[nodiscard]] std::pair<std::uint64_t, int> editorPlaceOf(std::uint64_t node) const;
+    // A container of `typeKey` before the card `before` (0: the chain's end);
+    // its head, 0 when refused.
+    std::uint64_t editorInsertContainer(const juce::String& typeKey, std::uint64_t before);
+    // A card (a container with all it holds) moved before `before`: in the
+    // main chain (`head` 0) or in a branch of a container (`before` 0: at
+    // the branch's end). One undo step.
+    bool editorMoveCard(std::uint64_t id, std::uint64_t head, int branch, std::uint64_t before);
+    // A new card of `typeKey` (a container too) in a branch, before `before`
+    // (0: at its end); its id, 0 when refused.
+    std::uint64_t editorInsertInBranch(std::uint64_t head, int branch, const juce::String& typeKey, std::uint64_t before);
+    // A layer, a selector's chain: one more, or one gone with its cards.
+    bool editorAddBranch(std::uint64_t head);
+    bool editorRemoveBranch(std::uint64_t head, int branch);
+    // A container and all it holds, its signal joined around it.
+    bool editorRemoveContainer(std::uint64_t head);
     // When a parameter was last set through editorSetParameter (a knob
     // turned anywhere, a controller): a count that only grows; 0 never.
     [[nodiscard]] std::uint64_t editorParameterTouch(const juce::String& binding) const;

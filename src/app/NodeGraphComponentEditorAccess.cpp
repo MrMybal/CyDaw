@@ -10,6 +10,7 @@
 
 #include "Localization.h"
 
+#include <cydaw/engine/Containers.h>
 #include <cydaw/engine/NativeDspParameters.h>
 
 #include <algorithm>
@@ -44,7 +45,7 @@ juce::String localText(const char* french, const char* english)
 bool hiddenTypeKey(const juce::String& key)
 {
     return key.startsWith("graph-") || key == "master" || key == "midi-input" || key == "audio-clips"
-           || key == "midi-output";
+           || key == "midi-output" || key == "container-end";
 }
 
 } // namespace
@@ -1215,6 +1216,481 @@ std::map<juce::String, float> NodeGraphComponent::editorModulatedParameters() co
         values[target->binding] = static_cast<float>(juce::jlimit(low, high, moved));
     }
     return values;
+}
+
+// ---- Containers --------------------------------------------------------------------------------
+
+namespace {
+
+namespace containers = cydaw::engine::container;
+
+const cydaw::engine::EffectDescriptor* containerHeadOf(const juce::String& typeKey)
+{
+    const auto* effect = cydaw::engine::effectForType(typeKey.toStdString());
+    return effect != nullptr && effect->container ? effect : nullptr;
+}
+
+} // namespace
+
+bool NodeGraphComponent::editorIsContainer(const std::uint64_t node) const
+{
+    const auto* found = readNode(node);
+    return found != nullptr && containerHeadOf(found->typeKey) != nullptr;
+}
+
+std::optional<NodeGraphComponent::EditorContainer> NodeGraphComponent::editorContainer(const std::uint64_t head) const
+{
+    const auto* node = readNode(head);
+    const auto* effect = node != nullptr ? containerHeadOf(node->typeKey) : nullptr;
+    if (effect == nullptr)
+        return std::nullopt;
+    // Where a card's sound leaves it; a container's leaves by its end.
+    const auto mainOutput = [](const Node& card) -> std::optional<cydaw::graph::PortId> {
+        for (const auto& port : card.ports)
+            if (!port.input && port.type == cydaw::graph::PortType::audio)
+                return port.id;
+        return std::nullopt;
+    };
+    const auto endOf = [this](const NodeId id) -> NodeId {
+        for (const auto& connection : connections_)
+            if (connection.kind == PortKind::audio && connection.source == id && connection.sourcePort == containers::headDryPort)
+                if (const auto* end = readNode(connection.destination); end != nullptr && end->typeKey == "container-end")
+                    return end->id;
+        return 0;
+    };
+    const auto after = [this](const NodeId id, const cydaw::graph::PortId port) -> NodeId {
+        for (const auto& connection : connections_)
+            if (connection.kind == PortKind::audio && connection.source == id && connection.sourcePort == port)
+                return connection.destination;
+        return 0;
+    };
+    EditorContainer out;
+    out.head = head;
+    out.end = endOf(head);
+    out.typeKey = node->typeKey;
+    if (out.end == 0)
+        return out;
+    auto count = containers::fixedBranches(effect->kind);
+    if (containers::variableBranches(effect->kind))
+        if (const auto* chains = cydaw::engine::effectParameter(*effect, "chains"))
+            count = juce::jlimit(1, containers::maximumBranches,
+                                 static_cast<int>(std::lround(cydaw::engine::effectValue(node->parameters, *chains))));
+    for (auto branch = 0; branch < count; ++branch) {
+        std::vector<std::uint64_t> cards;
+        std::set<NodeId> seen;
+        auto at = after(head, containers::branchPort(branch));
+        while (at != 0 && at != out.end && seen.insert(at).second) {
+            const auto* card = readNode(at);
+            if (card == nullptr)
+                break;
+            cards.push_back(at);
+            // A container inside: on from its end.
+            if (containerHeadOf(card->typeKey) != nullptr) {
+                const auto innerEnd = endOf(at);
+                at = innerEnd != 0 ? after(innerEnd, containers::endOutputPort) : 0;
+                continue;
+            }
+            const auto output = mainOutput(*card);
+            at = output ? after(at, *output) : 0;
+        }
+        out.branches.push_back(std::move(cards));
+    }
+    return out;
+}
+
+std::set<std::uint64_t> NodeGraphComponent::editorContainerMembers() const
+{
+    std::set<std::uint64_t> members;
+    for (const auto& node : nodes_)
+        if (const auto container = containerHeadOf(node.typeKey) != nullptr ? editorContainer(node.id) : std::nullopt) {
+            if (container->end != 0)
+                members.insert(container->end);
+            for (const auto& branch : container->branches)
+                members.insert(branch.begin(), branch.end());
+        }
+    return members;
+}
+
+std::pair<std::uint64_t, int> NodeGraphComponent::editorPlaceOf(const std::uint64_t node) const
+{
+    for (const auto& candidate : nodes_)
+        if (containerHeadOf(candidate.typeKey) != nullptr)
+            if (const auto container = editorContainer(candidate.id))
+                for (std::size_t branch = 0; branch < container->branches.size(); ++branch)
+                    if (std::ranges::find(container->branches[branch], node) != container->branches[branch].end())
+                        return { candidate.id, static_cast<int>(branch) };
+    return { 0, -1 };
+}
+
+namespace {
+
+// Where a card's sound goes in and comes out (a sidechain is not the way
+// through); a container's: its head's input, its end's output.
+struct CardSpan {
+    std::uint64_t first {};
+    cydaw::graph::PortId in {};
+    std::uint64_t last {};
+    cydaw::graph::PortId out {};
+};
+
+} // namespace
+
+std::uint64_t NodeGraphComponent::editorInsertContainer(const juce::String& typeKey, const std::uint64_t before)
+{
+    const auto* effect = containerHeadOf(typeKey);
+    const auto* headType = findType(typeKey);
+    const auto* endType = findType("container-end");
+    if (editingLocked_ || effect == nullptr || headType == nullptr || endType == nullptr)
+        return 0;
+    // Before what: the card named, else the chain's output.
+    const Node* target = before != 0 ? findNode(static_cast<NodeId>(before)) : nullptr;
+    if (before == 0)
+        for (const auto& candidate : nodes_) {
+            auto input = false;
+            if (candidate.typeKey == "master" || (isGraphAudioBoundaryKey(candidate.typeKey, &input) && !input)) {
+                target = &candidate;
+                break;
+            }
+        }
+    if (target == nullptr)
+        return 0;
+    const auto targetId = target->id;
+    const auto targetPort = [target]() -> cydaw::graph::PortId {
+        for (const auto& port : target->ports)
+            if (port.input && port.type == cydaw::graph::PortType::audio && port.key != "sidechain-in")
+                return port.id;
+        return 1;
+    }();
+    const auto position = target->position;
+    const auto head = nextNodeId_;
+    addNodeFromType(*headType, position - juce::Point<float>(0.1f, 0.0f));
+    const auto end = nextNodeId_;
+    addNodeFromType(*endType, position - juce::Point<float>(0.05f, 0.0f));
+    if (findNode(head) == nullptr || findNode(end) == nullptr)
+        return 0;
+    // Inside: the dry sound, then each branch empty (head to end).
+    (void) connectNodes(head, end, containers::headDryPort, containers::endDryPort);
+    const auto* chains = cydaw::engine::effectParameter(*effect, "chains");
+    const auto count = containers::variableBranches(effect->kind) && chains != nullptr
+                           ? static_cast<int>(std::lround(chains->defaultValue))
+                           : containers::fixedBranches(effect->kind);
+    for (auto branch = 0; branch < count; ++branch)
+        (void) connectNodes(head, end, containers::branchPort(branch), containers::branchPort(branch));
+    // In the chain, before the target.
+    std::vector<Connection> feeding;
+    for (const auto& connection : connections_)
+        if (connection.kind == PortKind::audio && connection.destination == targetId && connection.destinationPort == targetPort)
+            feeding.push_back(connection);
+    std::erase_if(connections_, [&](const Connection& connection) {
+        return connection.kind == PortKind::audio && connection.destination == targetId && connection.destinationPort == targetPort;
+    });
+    for (const auto& source : feeding)
+        (void) connectReplacingInput(source.source, head, source.sourcePort, containers::headInputPort);
+    (void) connectReplacingInput(end, targetId, containers::endOutputPort, targetPort);
+    for (auto& item : nodes_)
+        item.serialised = juce::var();
+    synchroniseGraphInterface();
+    rebuildEmbeddedSliders();
+    notifyLayoutChanged("v2-insert-container");
+    return head;
+}
+
+bool NodeGraphComponent::editorMoveCard(const std::uint64_t id, const std::uint64_t head, const int branch, const std::uint64_t before)
+{
+    auto* node = findNode(id);
+    if (editingLocked_ || node == nullptr || isBoundaryNode(*node) || id == before
+        || instrumentVoiceBoundary().voiceNodes.contains(id))
+        return false;
+    const auto mainPort = [](const Node& card, const bool input) -> std::optional<cydaw::graph::PortId> {
+        for (const auto& port : card.ports)
+            if (port.input == input && port.type == cydaw::graph::PortType::audio && port.key != "sidechain-in")
+                return port.id;
+        return std::nullopt;
+    };
+    // What moves: the card, or the container and all it holds.
+    CardSpan span;
+    std::set<std::uint64_t> moving { id };
+    if (containerHeadOf(node->typeKey) != nullptr) {
+        const auto container = editorContainer(id);
+        if (!container || container->end == 0)
+            return false;
+        span = { id, containers::headInputPort, container->end, containers::endOutputPort };
+        // Everything inside, nested containers too.
+        std::vector<std::uint64_t> pending { id };
+        while (!pending.empty()) {
+            const auto current = pending.back();
+            pending.pop_back();
+            if (const auto inner = editorContainer(current)) {
+                moving.insert(inner->end);
+                for (const auto& cards : inner->branches)
+                    for (const auto card : cards) {
+                        moving.insert(card);
+                        pending.push_back(card);
+                    }
+            }
+        }
+    } else {
+        const auto in = mainPort(*node, true);
+        const auto out = mainPort(*node, false);
+        if (!in || !out)
+            return false;
+        span = { id, *in, id, *out };
+    }
+    // Where: before the card named, else the branch's end, else the
+    // chain's output.
+    NodeId targetId {};
+    cydaw::graph::PortId targetPort {};
+    if (before != 0) {
+        const auto* target = findNode(static_cast<NodeId>(before));
+        if (target == nullptr || moving.contains(before) || instrumentVoiceBoundary().voiceNodes.contains(before))
+            return false;
+        const auto port = mainPort(*target, true);
+        if (!port)
+            return false;
+        targetId = target->id;
+        targetPort = *port;
+    } else if (head != 0) {
+        const auto container = editorContainer(head);
+        if (!container || container->end == 0 || moving.contains(head) || branch < 0
+            || branch >= static_cast<int>(container->branches.size()))
+            return false;
+        targetId = container->end;
+        targetPort = containers::branchPort(branch);
+    } else {
+        for (const auto& candidate : nodes_) {
+            auto input = false;
+            if (candidate.typeKey == "master" || (isGraphAudioBoundaryKey(candidate.typeKey, &input) && !input)) {
+                targetId = candidate.id;
+                targetPort = mainPort(candidate, true).value_or(1);
+                break;
+            }
+        }
+        if (targetId == 0)
+            return false;
+    }
+    // Already there: what feeds the target is what moves.
+    if (std::ranges::any_of(connections_, [&](const Connection& connection) {
+            return connection.kind == PortKind::audio && connection.destination == targetId && connection.destinationPort == targetPort
+                   && connection.source == span.last && connection.sourcePort == span.out;
+        }))
+        return false;
+    // Out: what fed it now feeds what it fed.
+    std::vector<Connection> into;
+    std::vector<Connection> onward;
+    for (const auto& connection : connections_) {
+        if (connection.kind != PortKind::audio)
+            continue;
+        if (connection.destination == span.first && connection.destinationPort == span.in && !moving.contains(connection.source))
+            into.push_back(connection);
+        if (connection.source == span.last && connection.sourcePort == span.out && !moving.contains(connection.destination))
+            onward.push_back(connection);
+    }
+    std::erase_if(connections_, [&](const Connection& connection) {
+        return connection.kind == PortKind::audio
+               && ((connection.destination == span.first && connection.destinationPort == span.in && !moving.contains(connection.source))
+                   || (connection.source == span.last && connection.sourcePort == span.out && !moving.contains(connection.destination)));
+    });
+    for (const auto& source : into)
+        for (const auto& destination : onward)
+            (void) connectReplacingInput(source.source, destination.destination, source.sourcePort, destination.destinationPort);
+    // In, before the target: what fed the target feeds it.
+    std::vector<Connection> feeding;
+    for (const auto& connection : connections_)
+        if (connection.kind == PortKind::audio && connection.destination == targetId && connection.destinationPort == targetPort)
+            feeding.push_back(connection);
+    std::erase_if(connections_, [&](const Connection& connection) {
+        return connection.kind == PortKind::audio && connection.destination == targetId && connection.destinationPort == targetPort;
+    });
+    for (const auto& source : feeding)
+        (void) connectReplacingInput(source.source, span.first, source.sourcePort, span.in);
+    (void) connectReplacingInput(span.last, targetId, span.out, targetPort);
+    selectedConnection_ = -1;
+    for (auto& item : nodes_)
+        item.serialised = juce::var();
+    synchroniseGraphInterface();
+    rebuildEmbeddedSliders();
+    notifyLayoutChanged("v2-move-card");
+    return true;
+}
+
+std::uint64_t NodeGraphComponent::editorInsertInBranch(const std::uint64_t head, const int branch, const juce::String& typeKey,
+                                                       const std::uint64_t before)
+{
+    const auto container = editorContainer(head);
+    if (editingLocked_ || !container || container->end == 0 || branch < 0 || branch >= static_cast<int>(container->branches.size()))
+        return 0;
+    // Made at the chain's end, then moved in: one way for a card and for a
+    // container (two undo steps, as two gestures).
+    std::uint64_t made {};
+    if (containerHeadOf(typeKey) != nullptr) {
+        made = editorInsertContainer(typeKey, 0);
+    } else {
+        const auto* type = findType(typeKey);
+        if (type == nullptr || !type->hasInput || type->inputKind != PortKind::audio || !type->hasOutput
+            || type->outputKind != PortKind::audio)
+            return 0;
+        made = nextNodeId_;
+        if (const auto inserted = insertNodeBeforeOutput(typeKey); inserted.failed())
+            return 0;
+        if (findNode(made) == nullptr)
+            return 0;
+        notifyLayoutChanged("v2-insert-in-branch");
+    }
+    if (made == 0)
+        return 0;
+    if (!editorMoveCard(made, head, branch, before)) {
+        if (containerHeadOf(typeKey) != nullptr)
+            (void) editorRemoveContainer(made);
+        else
+            (void) editorRemoveFromChain(made);
+        return 0;
+    }
+    return made;
+}
+
+bool NodeGraphComponent::editorAddBranch(const std::uint64_t head)
+{
+    const auto container = editorContainer(head);
+    const auto* node = findNode(head);
+    const auto* effect = node != nullptr ? containerHeadOf(node->typeKey) : nullptr;
+    if (editingLocked_ || !container || container->end == 0 || effect == nullptr || !containers::variableBranches(effect->kind)
+        || static_cast<int>(container->branches.size()) >= containers::maximumBranches)
+        return false;
+    const auto count = static_cast<int>(container->branches.size());
+    if (!connectNodes(head, container->end, containers::branchPort(count), containers::branchPort(count)))
+        return false;
+    const auto* chains = cydaw::engine::effectParameter(*effect, "chains");
+    (void) setGraphInterfaceParameter("node." + juce::String(static_cast<juce::int64>(head)) + "." + juce::String(std::string(chains->suffix)),
+                                      count + 1);
+    for (auto& item : nodes_)
+        item.serialised = juce::var();
+    notifyLayoutChanged("v2-add-branch");
+    return true;
+}
+
+bool NodeGraphComponent::editorRemoveBranch(const std::uint64_t head, const int branch)
+{
+    const auto container = editorContainer(head);
+    auto* node = findNode(head);
+    const auto* effect = node != nullptr ? containerHeadOf(node->typeKey) : nullptr;
+    const auto count = container ? static_cast<int>(container->branches.size()) : 0;
+    if (editingLocked_ || !container || container->end == 0 || effect == nullptr || !containers::variableBranches(effect->kind)
+        || count <= 1 || branch < 0 || branch >= count)
+        return false;
+    // Its cards, and all a container among them holds.
+    std::set<std::uint64_t> going;
+    std::vector<std::uint64_t> pending(container->branches[static_cast<std::size_t>(branch)].begin(),
+                                       container->branches[static_cast<std::size_t>(branch)].end());
+    while (!pending.empty()) {
+        const auto current = pending.back();
+        pending.pop_back();
+        if (!going.insert(current).second)
+            continue;
+        if (const auto inner = editorContainer(current)) {
+            if (inner->end != 0)
+                going.insert(inner->end);
+            for (const auto& cards : inner->branches)
+                pending.insert(pending.end(), cards.begin(), cards.end());
+        }
+    }
+    // Their modulators with them.
+    for (const auto& candidate : nodes_)
+        if (const auto owner = editorModulatorOwner(candidate.id); owner != 0 && going.contains(owner))
+            going.insert(candidate.id);
+    std::erase_if(connections_, [&](const Connection& connection) {
+        return going.contains(connection.source) || going.contains(connection.destination)
+               || (connection.source == head && connection.sourcePort == containers::branchPort(branch))
+               || (connection.destination == container->end && connection.destinationPort == containers::branchPort(branch));
+    });
+    std::erase_if(nodes_, [&](const Node& item) { return going.contains(item.id); });
+    for (const auto id : going)
+        selectedNodes_.erase(id);
+    // The branches after it move down one: their sockets, their settings.
+    for (auto& connection : connections_) {
+        if (connection.source == head && containers::branchOfPort(connection.sourcePort) > branch)
+            --connection.sourcePort;
+        if (connection.destination == container->end && containers::branchOfPort(connection.destinationPort) > branch)
+            --connection.destinationPort;
+    }
+    const auto prefix = "node." + juce::String(static_cast<juce::int64>(head)) + ".";
+    const auto settingOf = [&](const juce::String& word, const int index) -> const cydaw::engine::EffectParameter* {
+        return cydaw::engine::effectParameter(*effect, (word + juce::String(index + 1)).toStdString());
+    };
+    for (const auto* word : { "volume", "pan", "mute", "solo" })
+        for (auto index = branch; index < count; ++index) {
+            const auto* to = settingOf(word, index);
+            if (to == nullptr)
+                continue;
+            const auto* from = index + 1 < count ? settingOf(word, index + 1) : nullptr;
+            const auto value = from != nullptr ? cydaw::engine::effectValue(node->parameters, *from) : to->defaultValue;
+            (void) setGraphInterfaceParameter(prefix + juce::String(std::string(to->suffix)), value);
+        }
+    if (const auto* chains = cydaw::engine::effectParameter(*effect, "chains"))
+        (void) setGraphInterfaceParameter(prefix + juce::String(std::string(chains->suffix)), count - 1);
+    if (const auto* selected = cydaw::engine::effectParameter(*effect, "selected"))
+        if (const auto current = static_cast<int>(std::lround(cydaw::engine::effectValue(node->parameters, *selected))); current >= branch)
+            (void) setGraphInterfaceParameter(prefix + juce::String(std::string(selected->suffix)),
+                                              juce::jmax(0, current == branch ? juce::jmin(current, count - 2) : current - 1));
+    for (auto& item : nodes_)
+        item.serialised = juce::var();
+    synchroniseGraphInterface();
+    rebuildEmbeddedSliders();
+    notifyLayoutChanged("v2-remove-branch");
+    return true;
+}
+
+bool NodeGraphComponent::editorRemoveContainer(const std::uint64_t head)
+{
+    const auto container = editorContainer(head);
+    if (editingLocked_ || !container)
+        return false;
+    std::set<std::uint64_t> going { head };
+    std::vector<std::uint64_t> pending { head };
+    while (!pending.empty()) {
+        const auto current = pending.back();
+        pending.pop_back();
+        if (const auto inner = editorContainer(current)) {
+            if (inner->end != 0)
+                going.insert(inner->end);
+            for (const auto& cards : inner->branches)
+                for (const auto card : cards)
+                    if (going.insert(card).second)
+                        pending.push_back(card);
+        }
+    }
+    for (const auto& candidate : nodes_)
+        if (const auto owner = editorModulatorOwner(candidate.id); owner != 0 && going.contains(owner))
+            going.insert(candidate.id);
+    // The signal around it: what fed its head feeds what its end fed.
+    std::vector<Connection> into;
+    std::vector<Connection> onward;
+    const auto last = container->end != 0 ? container->end : head;
+    const auto lastPort = container->end != 0 ? containers::endOutputPort : containers::headDryPort;
+    for (const auto& connection : connections_) {
+        if (connection.kind != PortKind::audio)
+            continue;
+        if (connection.destination == head && !going.contains(connection.source))
+            into.push_back(connection);
+        if (connection.source == last && connection.sourcePort == lastPort && !going.contains(connection.destination))
+            onward.push_back(connection);
+    }
+    std::erase_if(connections_, [&](const Connection& connection) {
+        return going.contains(connection.source) || going.contains(connection.destination);
+    });
+    std::erase_if(nodes_, [&](const Node& item) { return going.contains(item.id); });
+    for (const auto id : going)
+        selectedNodes_.erase(id);
+    selectedConnection_ = -1;
+    selectedPortId_ = 0;
+    for (const auto& source : into)
+        for (const auto& destination : onward)
+            (void) connectReplacingInput(source.source, destination.destination, source.sourcePort, destination.destinationPort);
+    for (auto& item : nodes_)
+        item.serialised = juce::var();
+    synchroniseGraphInterface();
+    rebuildEmbeddedSliders();
+    notifyLayoutChanged("v2-remove-container");
+    return true;
 }
 
 bool NodeGraphComponent::editorSetParameter(const juce::String& binding, const double value)

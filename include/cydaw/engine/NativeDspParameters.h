@@ -129,6 +129,8 @@ nativeDspKindForProcessor(const std::string_view processorKey) noexcept
         return Kind::analyzer;
     if (processorKey == "core.envelope-follower")
         return Kind::envelopeFollower;
+    if (processorKey == "core.container-end")
+        return Kind::containerEnd;
     // A modulator is a control node: it has no sound to process.
     if (const auto* effect = effectForProcessor(processorKey); effect != nullptr && !effect->control)
         return effect->kind;

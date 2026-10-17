@@ -1,4 +1,6 @@
 #include <cydaw/engine/AudioGraph.h>
+#include <cydaw/engine/Containers.h>
+#include <cydaw/engine/EffectCatalogue.h>
 #include "../src/native_plugin/NativeRuntime.h"
 #include <cydaw/engine/GraphDefinitionCompiler.h>
 #include <cydaw/engine/GraphInstrumentCompiler.h>
@@ -13,6 +15,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <numbers>
 #include <ranges>
 #include <string_view>
 
@@ -1180,6 +1183,7 @@ void dockingLayoutsSupportTabsSplitsAndWindows()
 }
 
 #include "ModulatorTests.inc"
+#include "ContainerTests.inc"
 
 } // namespace
 
@@ -1201,6 +1205,7 @@ int main()
     dockingLayoutsSupportTabsSplitsAndWindows();
     nativeRuntimeRetainsRealtimeBaselinesAndExtendedSockets();
     modulatorsMoveAsTheyAreSet();
+    containersSplitAndMixAsSet();
 
     if (failures != 0) {
         std::cerr << failures << " test(s) failed\n";

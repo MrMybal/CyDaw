@@ -1,7 +1,11 @@
 #include <cydaw/engine/NativeDspCompiler.h>
 
 #include <cydaw/engine/BuiltinProcessors.h>
+#include <cydaw/engine/ContainerProcessors.h>
 #include <cydaw/engine/EffectProcessors.h>
+
+#include <algorithm>
+#include <unordered_map>
 
 #include <cmath>
 
@@ -31,6 +35,10 @@ std::unique_ptr<AudioProcessor> makeNativeDspProcessor(
         return effect;
     }
     switch (node.kind) {
+    // A container's end; the compiler binds it to its head. Its taps are the
+    // compiler's own (no node of a graph names one).
+    case NativeDspNodeKind::containerEnd:
+        return std::make_unique<ContainerEndProcessor>();
     case NativeDspNodeKind::mixer:
         return std::make_unique<MixerProcessor>();
     case NativeDspNodeKind::drive:
@@ -148,6 +156,8 @@ bool updateNativeDspProcessorParameters(
         return updateEffectProcessor(processor, node);
     }
     switch (node.kind) {
+    case NativeDspNodeKind::containerEnd:
+        return dynamic_cast<ContainerEndProcessor*>(&processor) != nullptr;
     case NativeDspNodeKind::mixer:
         return dynamic_cast<MixerProcessor*>(&processor) != nullptr;
     case NativeDspNodeKind::drive:
@@ -324,7 +334,12 @@ RenderPlanResult compileNativeDspGraph(
                  "The native DSP graph requires an audio output", {} };
 
     AudioRenderPlanBuilder builder;
+    // The containers' heads and ends, to bind and to tap.
+    std::unordered_map<std::uint64_t, ContainerHeadProcessor*> heads;
+    std::unordered_map<std::uint64_t, ContainerEndProcessor*> ends;
+    auto generatedId = std::uint64_t {};
     for (const auto& node : graph.nodes) {
+        generatedId = std::max(generatedId, node.id);
         if (isControlOnly(node.kind))
             continue;
         auto processor = makeNativeDspProcessor(node);
@@ -332,6 +347,10 @@ RenderPlanResult compileNativeDspGraph(
             return { RenderPlanError::invalidNode,
                      "The native DSP graph contains an unsupported processor",
                      {} };
+        if (auto* head = dynamic_cast<ContainerHeadProcessor*>(processor.get()))
+            heads.emplace(node.id, head);
+        if (auto* end = dynamic_cast<ContainerEndProcessor*>(processor.get()))
+            ends.emplace(node.id, end);
         if (observer)
             observer(node, processor.get());
         const auto error = builder.addNode(
@@ -341,6 +360,27 @@ RenderPlanResult compileNativeDspGraph(
             return { error, "Cannot add a node to the native DSP plan", {} };
     }
     for (const auto& connection : graph.connections) {
+        // A container's end mixes by the settings of the head whose dry
+        // sound it is given.
+        if (const auto end = ends.find(connection.destination);
+            end != ends.end() && connection.destinationPort == container::endDryPort)
+            if (const auto head = heads.find(connection.source); head != heads.end())
+                end->second->bind(head->second);
+        // A branch of a container: what it hears of the sound (the mid, a
+        // band...), through a tap between the head and the branch.
+        if (const auto head = heads.find(connection.source); head != heads.end()) {
+            if (const auto branch = container::branchOfPort(connection.sourcePort); branch >= 0) {
+                const auto tap = ++generatedId;
+                auto error = builder.addNode(tap, std::make_unique<ContainerTapProcessor>(head->second, branch));
+                if (error == RenderPlanError::none)
+                    error = builder.connect(connection.source, tap, connection.sourcePort, 1);
+                if (error == RenderPlanError::none)
+                    error = builder.connect(tap, connection.destination, 2, connection.destinationPort);
+                if (error != RenderPlanError::none)
+                    return { error, "Cannot tap a container's branch", {} };
+                continue;
+            }
+        }
         const auto error = builder.connect(connection.source,
                                            connection.destination,
                                            connection.sourcePort,

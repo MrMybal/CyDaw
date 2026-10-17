@@ -18,6 +18,8 @@
 #include "Theme.h"
 #include "Widgets.h"
 
+#include <cydaw/engine/Containers.h>
+#include <cydaw/engine/EffectCatalogue.h>
 #include <imgui_internal.h>
 
 #include <functional>
@@ -35,6 +37,17 @@ using ui::L;
 namespace {
 
 constexpr float kKnob = 32.0f;
+// A card dragged by its name carries its node id under this name.
+constexpr const char* cardPayload = "CYDAW_DEVICE_CARD";
+
+// Prisme plays the whole voice: the voice section's other cards (the
+// allocator, the envelope, the gain, the voice filter) do nothing it does
+// not, and stay out of sight. Kick and the synth family's models the same.
+bool wholeVoiceType(const juce::String& typeKey)
+{
+    return typeKey == "prism-synth" || typeKey == "kick-synth" || SynthView::handles(typeKey) || BatterieView::handles(typeKey)
+           || RackView::handles(typeKey);
+}
 constexpr float kCell = 54.0f;
 
 ImU32 toImColour(const juce::Colour colour)
@@ -186,19 +199,18 @@ void DevicesView::draw()
     // allocator, the envelope, the gain, the voice filter) do nothing it does
     // not, and stay out of sight.
     // Kick and the synth family's models the same.
-    const auto wholeVoice = [](const juce::String& typeKey) {
-        return typeKey == "prism-synth" || typeKey == "kick-synth" || SynthView::handles(typeKey) || BatterieView::handles(typeKey)
-               || RackView::handles(typeKey);
-    };
-    const auto prismVoice = std::any_of(nodes.begin(), nodes.end(), [&](const auto& node) { return wholeVoice(node.typeKey); });
+    const auto prismVoice = std::any_of(nodes.begin(), nodes.end(), [&](const auto& node) { return wholeVoiceType(node.typeKey); });
     // The cards' modulators, and their modulations for the knobs: each in its
     // card's column, out of the chain.
     const auto trackKey = studio_.routingKey(track) + (track.pad >= 0 ? static_cast<std::uint64_t>(track.pad + 1) << 48 : 0);
+    trackKey_ = trackKey;
     modulators_->begin(track, trackKey, graph, nodes);
     const ui::ModulationHostScope modulationScope(modulators_->host());
+    // Inside a container: in its frame, after it.
+    const auto inside = graph.editorContainerMembers();
     for (const auto& node : nodes)
-        if (!node.boundary && !(prismVoice && !wholeVoice(node.typeKey) && graph.editorIsVoiceNode(node.id))
-            && !modulators_->owned(node.id))
+        if (!node.boundary && !(prismVoice && !wholeVoiceType(node.typeKey) && graph.editorIsVoiceNode(node.id))
+            && !modulators_->owned(node.id) && !inside.contains(node.id))
             chain.push_back(&node);
     std::stable_sort(chain.begin(), chain.end(), [](const auto* a, const auto* b) {
         if (std::abs(a->position.x - b->position.x) > 0.02f)
@@ -323,632 +335,26 @@ void DevicesView::draw()
         state_.focused = Panel::devices;
     };
 
-    std::optional<std::uint64_t> removeNode;
-    // An effect moves along the chain, dragged by its name: the signal goes
-    // in and out of it (an instrument's voice stays first).
-    const auto movable = [&](const app::NodeGraphComponent::EditorNode& node) {
-        if (node.boundary || wholeVoice(node.typeKey) || (track.midi && graph.editorIsVoiceNode(node.id)))
-            return false;
-        const auto has = [&node](const bool input) {
-            return std::any_of(node.ports.begin(), node.ports.end(), [input](const auto& port) {
-                return port.input == input && port.kind == 0 && port.key != "sidechain-in";
-            });
-        };
-        return has(true) && has(false);
-    };
     // The card after `at` in the chain that the signal goes through (0: the
-    // chain's end).
+    // chain's end). An effect moves along the chain, dragged by its name.
     const auto nextMovable = [&](const std::size_t at) -> std::uint64_t {
         for (auto next = at + 1; next < chain.size(); ++next)
-            if (movable(*chain[next]))
+            if (movable(Strip { track, slot, graph, nodes, modulated, setParameter, {}, {} }, *chain[next]))
                 return chain[next]->id;
         return 0;
     };
-    std::optional<std::pair<std::uint64_t, std::uint64_t>> moveCard;
-    constexpr const char* cardPayload = "CYDAW_DEVICE_CARD";
-    for (std::size_t chainIndex = 0; chainIndex < chain.size(); ++chainIndex) {
-        // Inside a module: English, whatever the language.
-        const ui::ModuleText english;
-        const auto* node = chain[chainIndex];
-        // What the device shows: displays first, then the knobs left over.
-        std::vector<visual::Param> parameters;
-        parameters.reserve(node->parameters.size());
-        for (const auto& parameter : node->parameters)
-            // Not those kept off the card's face (an SFZ's dozens of
-            // controls, which have their own tab).
-            if (parameter.showInDevice)
-                parameters.push_back({ parameter.binding, parameter.label, parameter.unit, parameter.minimum, parameter.maximum,
-                                       parameter.value, parameter.defaultValue });
-        const auto* span = signals_.span(node->id);
-        const auto instrument = span != nullptr && span->instrument;
-        auto surface = visual::inferSurface(parameters, span != nullptr, instrument, node->typeKey);
-        // Prisme draws itself (its window has the rest).
-        const auto prismCard = node->typeKey == "prism-synth" && prism_ != nullptr;
-        const auto kickCard = node->typeKey == "kick-synth" && kick_ != nullptr;
-        const auto synthCard = synth_ != nullptr && SynthView::handles(node->typeKey);
-        const auto batterieCard = batterie_ != nullptr && BatterieView::handles(node->typeKey);
-        const auto rackCard = rack_ != nullptr && RackView::handles(node->typeKey);
-        // A device made in the workshop with an interface of its own shows
-        // that interface, played, as its plugin window does (scaled to the
-        // card's height), instead of a row of knobs.
-        // Only while it stays readable: at 60 % of its size at least (a
-        // taller panel shows it); smaller, the knobs, and its window.
-        std::optional<app::ModuleInterfaceState> designed;
-        if (node->composite && node->hasInterface && !node->collapsed) {
-            auto shownInterface = graph.editorNodeInterface(node->id);
-            if(shownInterface.deviceDesigned) {
-                shownInterface.controls=shownInterface.deviceControls;
-                shownInterface.windowWidth=shownInterface.deviceWidth; shownInterface.windowHeight=shownInterface.deviceHeight;
-                shownInterface.windowDesign=shownInterface.deviceDesign;
-            }
-            const auto designedHeight = dp(static_cast<float>(shownInterface.windowHeight != 0 ? shownInterface.windowHeight : 420));
-            const auto readable = (height - dp(43.0f)) / std::max(1.0f, designedHeight) >= 0.6f;
-            if ((readable || shownInterface.deviceDesigned) && std::any_of(shownInterface.controls.begin(), shownInterface.controls.end(), [](const auto& control) {
-                    return control.kind != app::ModuleControlKind::inputPort && control.kind != app::ModuleControlKind::outputPort;
-                }))
-                designed = std::move(shownInterface);
-        }
-        const auto missingPlugin = node->typeKey == "missing-plugin" || node->typeKey == "missing-instrument";
-        if (prismCard || kickCard || synthCard || batterieCard || rackCard || designed || missingPlugin) {
-            surface.knobs.clear();
-            surface.panes.clear();
-        }
-        // The sound's spectrum is its window's, when the card shows
-        // something else (the window has them all: its panes by this list).
-        const auto windowPanes = surface.panes;
-        if (surface.panes.size() > 1 || !surface.knobs.empty())
-            std::erase_if(surface.panes, [](const visual::Pane& pane) { return pane.kind == visual::PaneKind::spectrum; });
-        // At most three displays, those that tell most of the sound (its
-        // envelope, its filter, its source, its dynamics…); the others'
-        // settings join its other settings. The window shows them all.
-        if (surface.panes.size() > 3) {
-            const auto rank = [](const visual::PaneKind kind) {
-                using visual::PaneKind;
-                switch (kind) {
-                case PaneKind::envelope: return 0;
-                case PaneKind::filter:
-                case PaneKind::equalizer:
-                case PaneKind::multiFilter:
-                case PaneKind::autoFilter:
-                case PaneKind::eqThree:
-                case PaneKind::eqPro:
-                case PaneKind::filterPro: return 1;
-                case PaneKind::oscillator:
-                case PaneKind::wavetable: return 2;
-                case PaneKind::dynamics:
-                case PaneKind::compPro:
-                case PaneKind::limiter:
-                case PaneKind::limiterPro:
-                case PaneKind::gate:
-                case PaneKind::transient: return 3;
-                case PaneKind::saturation: return 5;
-                case PaneKind::width:
-                case PaneKind::level:
-                case PaneKind::spectrum: return 6;
-                default: return 4;
-                }
-            };
-            std::vector<std::size_t> order(surface.panes.size());
-            for (std::size_t index = 0; index < order.size(); ++index)
-                order[index] = index;
-            std::stable_sort(order.begin(), order.end(),
-                             [&](const std::size_t a, const std::size_t b) { return rank(surface.panes[a].kind) < rank(surface.panes[b].kind); });
-            std::vector<bool> kept(surface.panes.size(), false);
-            for (std::size_t at = 0; at < 3; ++at)
-                kept[order[at]] = true;
-            std::vector<visual::Pane> shown;
-            std::vector<int> moved;
-            for (std::size_t index = 0; index < surface.panes.size(); ++index) {
-                if (kept[index]) {
-                    shown.push_back(surface.panes[index]);
-                    continue;
-                }
-                for (const auto parameter : surface.panes[index].parameters)
-                    if (parameter >= 0)
-                        moved.push_back(parameter);
-            }
-            surface.panes = std::move(shown);
-            surface.knobs.insert(surface.knobs.begin(), moved.begin(), moved.end());
-        }
-        const auto count = static_cast<int>(surface.knobs.size());
-        const auto bodyTop = dp(32.0f);
-        const auto bodyHeight = height - bodyTop - dp(7.0f);
-        ImGui::PushID(static_cast<int>(node->id));
-        const auto faces = cardFace(surface, parameters, bodyHeight);
-        ImGui::PopID();
-        auto panesWidth = 0.0f;
-        for (const auto& face : faces)
-            panesWidth += face.width + dp(6.0f);
-        // A sound model shows itself: its partials over time, what it is.
-        const auto modelCard = node->typeKey == "sound-model";
-        const auto modelPaneWidth = dp(176.0f);
-        if (modelCard)
-            panesWidth += modelPaneWidth + dp(6.0f);
-        // A plug-in an imported project used that is not here: its place, its name.
-        const auto missingCard = node->typeKey == "missing-plugin" || node->typeKey == "missing-instrument";
-        const auto missingWidth = dp(210.0f);
-        if (missingCard)
-            panesWidth += missingWidth + dp(6.0f);
-        // A sampler shows its zones over the keys, and takes files.
-        const auto samplerCard = node->typeKey == "sampler" && sampler_ != nullptr;
-        const auto simpleSampler = samplerCard && [&] {
-            const auto controls = graph.editorSamplerControls(node->id);
-            return controls && controls->simple;
-        }();
-        // Granular (Nuée): its grains' knobs in a row under the waveform.
-        const auto granular = simpleSampler && std::any_of(node->parameters.begin(), node->parameters.end(), [](const auto& parameter) {
-            return parameter.binding.endsWith(".sampler.grains") && parameter.value >= 0.5;
-        });
-        const auto samplerPaneWidth = dp(granular ? 430.0f : simpleSampler ? 300.0f : 230.0f);
-        if (samplerCard)
-            panesWidth += samplerPaneWidth + dp(6.0f);
-        if (prismCard)
-            panesWidth += PrismView::paneWidth() + dp(6.0f);
-        if (kickCard)
-            panesWidth += KickView::paneWidth() + dp(6.0f);
-        const auto synthWidth = synthCard ? synth_->paneWidth(graph, node->id, bodyHeight) : 0.0f;
-        if (synthCard)
-            panesWidth += synthWidth + dp(6.0f);
-        if (batterieCard)
-            panesWidth += BatterieView::paneWidth() + dp(6.0f);
-        if (rackCard)
-            panesWidth += RackView::paneWidth() + dp(6.0f);
-        const auto designedWidth = designed ? std::clamp(
-                                                  (bodyHeight - dp(4.0f))
-                                                      * static_cast<float>(designed->windowWidth != 0 ? designed->windowWidth : 720)
-                                                      / static_cast<float>(designed->windowHeight != 0 ? designed->windowHeight : 420),
-                                                  dp(120.0f), dp(900.0f))
-                                            : 0.0f;
-        if (designed)
-            panesWidth += designedWidth + dp(6.0f);
-        const auto collapsed = node->collapsed;
-        // Its list of values, a column at its right.
-        const auto listKey = std::make_pair(studio_.routingKey(track) + (track.pad >= 0 ? static_cast<std::uint64_t>(track.pad + 1) << 48 : 0),
-                                            node->id);
-        const auto listOpen = !collapsed && state_.valueLists.contains(listKey);
-        const auto listWidth = dp(232.0f);
-        if (listOpen)
-            panesWidth += listWidth + dp(6.0f);
-        // Its modulators, a column at its left.
-        const auto modulatorCount = modulators_->countFor(node->id);
-        const auto columnOpen = !collapsed && modulators_->open(node->id);
-        if (columnOpen)
-            panesWidth += ModulatorsView::width() + dp(6.0f);
-        // Its output's meter, along its right edge (an instrument's cards:
-        // what its voices give out).
-        auto level = signals_.outputLevel(node->id);
-        if (!level && track.midi && (wholeVoice(node->typeKey) || graph.editorIsVoiceNode(node->id)))
-            level = signals_.instrumentLevel();
-        const auto meterWidth = level ? dp(9.0f) : 0.0f;
-        const auto width = collapsed ? dp(46.0f)
-                                     : std::max(dp(150.0f), dp(8.0f) + panesWidth + dp(2.0f)) + meterWidth
-                                           + (level ? dp(4.0f) : 0.0f);
-        const auto colour = toImColour(node->colour);
-        ImGui::PushID(static_cast<int>(node->id));
-        const auto origin = ImGui::GetCursorScreenPos();
-        auto* list = ImGui::GetWindowDrawList();
-        list->AddRectFilled(origin, ImVec2(origin.x + width, origin.y + height), p.bg2, dp(5.0f));
-        list->AddRectFilled(origin, ImVec2(origin.x + width, origin.y + dp(26.0f)), theme::mix(colour, p.bg2 | 0xff000000u, 0.5f),
-                            dp(5.0f), ImDrawFlags_RoundCornersTop);
-        list->AddRectFilled(ImVec2(origin.x, origin.y + dp(24.0f)), ImVec2(origin.x + width, origin.y + dp(26.0f)), colour);
-        list->AddRect(origin, ImVec2(origin.x + width, origin.y + height), p.line, dp(5.0f));
-
-        ImGui::BeginGroup();
-        const auto editable = node->composite && !collapsed;
-        const auto windowed = editable && node->hasInterface;
-        // A card with a window of its own (its display large, its editor,
-        // its designed interface): a button opens it out of the studio's.
-        const auto separable
-            = !collapsed && (windowed || prismCard || kickCard || synthCard || batterieCard || samplerCard || !surface.panes.empty());
-        // A compressor or a gate: what its detector listens to.
-        const auto sidechained = !collapsed && std::any_of(node->ports.begin(), node->ports.end(), [](const auto& port) {
-                                     return port.input && port.kind == 0 && port.key == "sidechain-in";
-                                 });
-        // What makes or carries sound can be switched off (bypassed).
-        const auto bypassable = std::any_of(node->ports.begin(), node->ports.end(), [](const auto& port) {
-            return !port.input && port.kind == 0;
-        });
-        const auto separateWidth = (separable ? dp(22.0f) : 0.0f) + (sidechained ? dp(22.0f) : 0.0f) + (collapsed ? 0.0f : dp(44.0f));
-        // The on/off switch comes first, at the left of the title.
-        const auto switchWidth = bypassable && !collapsed ? dp(22.0f) : 0.0f;
-        if (!collapsed) {
-            ImGui::PushFont(theme::boldFont(), ui::currentFontBase() * 0.9f);
-            ui::clippedText(list, ImVec2(origin.x + dp(8.0f) + switchWidth, origin.y + dp(5.0f)),
-                            width - dp(windowed ? 126.0f : editable ? 104.0f : 82.0f) - separateWidth - switchWidth, p.text,
-                            node->title.toRawUTF8());
-            ImGui::PopFont();
-        }
-        // Its name is where it is taken to move it along the chain.
-        if (movable(*node)) {
-            const auto gripTop = collapsed ? origin.y + dp(28.0f) : origin.y + dp(2.0f);
-            const auto gripLeft = collapsed ? origin.x + dp(4.0f) : origin.x + dp(6.0f) + switchWidth;
-            const auto gripWidth = collapsed ? width - dp(16.0f)
-                                             : std::max(dp(10.0f), width - dp(windowed ? 126.0f : editable ? 104.0f : 82.0f) - separateWidth
-                                                                       - switchWidth);
-            const auto gripHeight = collapsed ? std::max(dp(10.0f), height - dp(34.0f)) : dp(22.0f);
-            ImGui::SetCursorScreenPos(ImVec2(gripLeft, gripTop));
-            ImGui::InvisibleButton("##grip", ImVec2(gripWidth, gripHeight));
-            if (ImGui::IsItemHovered() && !ImGui::IsItemActive())
-                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-            if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoHoldToOpenOthers)) {
-                const auto id = node->id;
-                ImGui::SetDragDropPayload(cardPayload, &id, sizeof(id));
-                ImGui::TextUnformatted(node->title.toRawUTF8());
-                ImGui::TextDisabled("%s", L("Lâchez-le avant ou après un autre périphérique", "Drop it before or after another device"));
-                ImGui::EndDragDropSource();
-            } else if (ImGui::IsItemHovered()) {
-                ui::tooltip(L("Glissez son nom pour le déplacer dans la chaîne", "Drag its name to move it along the chain"));
-            }
-        }
-        // Header buttons.
-        const ImVec2 button(dp(20.0f), dp(20.0f));
-        ImGui::SetCursorScreenPos(collapsed ? ImVec2(origin.x + width - (bypassable ? dp(44.0f) : dp(33.0f)), origin.y + dp(3.0f))
-                                            : ImVec2(origin.x + dp(3.0f), origin.y + dp(3.0f)));
-        ImGui::PushFont(nullptr, ui::currentFontBase() * 0.8f);
-        if (bypassable) {
-            // On (lit) or switched off: what reaches it goes through, an
-            // instrument falls silent; it keeps its settings.
-            if (ui::iconButton(icon::power,
-                               node->bypassed ? L("Éteint : le son passe sans lui. Cliquez pour le rallumer.",
-                                                  "Off: the sound goes past it. Click to switch it back on.")
-                                              : L("Allumé. Cliquez pour l'éteindre (bypass) : le son passe sans lui.",
-                                                  "On. Click to switch it off (bypass): the sound goes past it."),
-                               !node->bypassed, p.play, button))
-                (void) graph.editorSetBypassed(node->id, !node->bypassed);
-            if (collapsed)
-                ImGui::SameLine(0.0f, dp(2.0f));
-        }
-        if (!collapsed)
-            ImGui::SetCursorScreenPos(ImVec2(origin.x + width - (windowed ? dp(112.0f) : editable ? dp(90.0f) : dp(68.0f)) - separateWidth,
-                                             origin.y + dp(3.0f)));
-        if (!collapsed) {
-            // All its values in a list: raw, searched, the last touched first.
-            if (ui::iconButton(icon::list,
-                               L("Toutes ses valeurs dans une liste : brutes, à chercher, la dernière touchée en haut",
-                                 "All its values in a list: raw, searchable, the last touched at the top"),
-                               listOpen, p.accent, button)) {
-                if (listOpen)
-                    state_.valueLists.erase(listKey);
-                else
-                    state_.valueLists.insert(listKey);
-            }
-            ImGui::SameLine(0.0f, dp(2.0f));
-            // Its modulators: an LFO, steps, an envelope... dragged onto knobs.
-            const auto modulatorTip = modulatorCount > 0
-                                          ? juce::String(columnOpen ? "Hide" : "Show") + " its modulators ("
-                                                + juce::String(static_cast<int>(modulatorCount)) + ")"
-                                          : juce::String("Modulators: an LFO, steps, an envelope, a macro... moving its knobs");
-            if (ui::iconButton(icon::modulation, modulatorTip.toRawUTF8(), columnOpen || modulatorCount > 0, p.modulation, button))
-                modulators_->setOpen(node->id, !columnOpen);
-            ImGui::SameLine(0.0f, dp(2.0f));
-        }
-        if (separable) {
-            const PluginWindow window { track, node->id };
-            const auto open = prismCard     ? prism_->showsEditor(track, node->id) && ui::isDetached(prism_->editorWindowId(track, node->id).c_str())
-                              : kickCard    ? kick_->showsEditor(track, node->id) && ui::isDetached(kick_->editorWindowId(track, node->id).c_str())
-                              : synthCard   ? synth_->showsEditor(track, node->id) && ui::isDetached(synth_->editorWindowId(track, node->id).c_str())
-                              : batterieCard ? batterie_->showsEditor(track, node->id) && ui::isDetached(batterie_->editorWindowId(track, node->id).c_str())
-                              : samplerCard ? sampler_->showsEditor(track, node->id) && ui::isDetached(sampler_->editorWindowId(track, node->id).c_str())
-                              : windowed && surface.panes.empty()
-                                  ? state_.pluginWindowOpen(window) && ui::isDetached(PluginWindows::windowId(window).c_str())
-                                            : state_.expandedPaneOpen(track, node->id)
-                                                  && ui::isDetached(DeviceEditorView::windowId(track, node->id).c_str());
-            if (ui::iconButton(icon::newWindow,
-                               L("Ouvrir dans une fenêtre séparée, hors du studio, comme un VST (sur un autre écran si vous voulez)",
-                                 "Open in a separate window, out of the studio, as a VST's (onto another screen if you like)"),
-                               open, p.accent, button)) {
-                if (prismCard)
-                    prism_->openEditor(track, node->id, true);
-                else if (kickCard)
-                    kick_->openEditor(track, node->id, true);
-                else if (synthCard)
-                    synth_->openEditor(track, node->id, true);
-                else if (batterieCard)
-                    batterie_->openEditor(track, node->id, true);
-                else if (samplerCard)
-                    sampler_->openEditor(track, node->id, true);
-                else if (windowed && surface.panes.empty()) {
-                    if (!state_.pluginWindowOpen(window))
-                        state_.togglePluginWindow(window);
-                    ui::setDetached(PluginWindows::windowId(window).c_str(), true);
-                } else {
-                    state_.openExpandedPane(ExpandedPane { track, node->id, -1, true });
-                }
-            }
-            ImGui::SameLine(0.0f, dp(2.0f));
-        }
-        if (sidechained) {
-            const auto source = studio_.sidechainSource(track, node->id);
-            const auto tip = (source ? ui::Ls("Sidechain : ", "Sidechain: ") + studio_.trackName(*source)
-                                     : ui::Ls("Sidechain : le détecteur écoute le son du périphérique. Cliquez pour qu'il écoute "
-                                              "une autre piste (un kick qui fait pomper une basse).",
-                                              "Sidechain: the detector listens to the device's own sound. Click to make it listen "
-                                              "to another track (a kick pumping a bass)."))
-                                 .toStdString();
-            if (ui::iconButton(icon::link, tip.c_str(), source.has_value(), p.accent, button))
-                ImGui::OpenPopup("##sidechain");
-            if (ImGui::BeginPopup("##sidechain")) {
-                ImGui::TextDisabled("%s", L("Ce que le détecteur écoute", "What the detector listens to"));
-                ImGui::Separator();
-                const auto report = [this](const juce::Result& result) {
-                    if (result.failed()) {
-                        state_.status = result.getErrorMessage();
-                        state_.statusIsError = true;
-                        state_.statusTime = ImGui::GetTime();
-                    }
-                };
-                if (ImGui::MenuItem(L("Son propre (pas de sidechain)", "Its own sound (no sidechain)"), nullptr, !source))
-                    report(studio_.setSidechainSource(track, node->id, std::nullopt));
-                for (const auto& candidate : studio_.tracks()) {
-                    if (candidate.master || candidate == track)
-                        continue;
-                    const auto name = studio_.trackName(candidate);
-                    const auto routable = studio_.canRoute(candidate, track);
-                    ImGui::PushID(static_cast<int>(studio_.routingKey(candidate)));
-                    if (ImGui::MenuItem(name.toRawUTF8(), nullptr, source && *source == candidate, routable))
-                        report(studio_.setSidechainSource(track, node->id, candidate));
-                    ImGui::PopID();
-                }
-                ImGui::EndPopup();
-            }
-            ImGui::SameLine(0.0f, dp(2.0f));
-        }
-        if (windowed) {
-            // Its large window: all its card shows (and the interface drawn
-            // for it, a tab); a card with no display, its drawn interface.
-            const PluginWindow window { track, node->id };
-            const auto large = !surface.panes.empty();
-            if (ui::iconButton(icon::view,
-                               large ? L("Ouvrir sa grande fenêtre : tout ce que montre la carte, en grand (et l'interface dessinée "
-                                         "dans l'atelier, un onglet)",
-                                         "Open its large window: all the card shows, large (and the interface designed in the "
-                                         "workshop, a tab)")
-                                     : L("Ouvrir sa fenêtre, comme un plugin (l'interface dessinée dans l'atelier)",
-                                         "Open its window, as a plugin's (the interface designed in the workshop)"),
-                               large ? state_.expandedPaneOpen(track, node->id) : state_.pluginWindowOpen(window), p.accent, button)) {
-                if (!large)
-                    state_.togglePluginWindow(window);
-                else if (state_.expandedPaneOpen(track, node->id))
-                    state_.closeExpandedPane(track, node->id);
-                else
-                    state_.openExpandedPane(ExpandedPane { track, node->id, -1 });
-            }
-            ImGui::SameLine(0.0f, dp(2.0f));
-        }
-        if (editable) {
-            if (ui::iconButton(icon::edit, L("Éditer dans l'atelier de périphériques", "Edit in the device workshop"), false, 0, button)) {
-                state_.workshopRequest = WorkshopRequest { WorkshopRequest::Kind::trackDevice, track, node->id, {} };
-                state_.bringToFront = Panel::workshop;
-            }
-            ImGui::SameLine(0.0f, dp(2.0f));
-        }
-        if (!collapsed)
-            if (const auto holder = studio_.devicePresetHolder(track, node->id)) {
-                const auto nodeId = node->id;
-                presets_.button("devicePresets", *holder, [this, track, nodeId] { return studio_.devicePresetState(track, nodeId); },
-                                [this, track, nodeId](const juce::var& preset, juce::String& error) {
-                                    return studio_.applyDevicePreset(track, nodeId, preset, error);
-                                },
-                                button);
-                ImGui::SameLine(0.0f, dp(2.0f));
-            }
-        if (ui::iconButton(collapsed ? icon::chevronRight : icon::chevronLeft,
-                           collapsed ? L("Déplier", "Expand") : L("Replier", "Collapse"), false, 0, button))
-            graph.editorSetCollapsed(node->id, !collapsed);
-        if (!collapsed) {
-            ImGui::SameLine(0.0f, dp(2.0f));
-            if (ui::iconButton(icon::close, L("Retirer de la chaîne", "Remove from the chain"), false, 0, button))
-                removeNode = node->id;
-        }
-        ImGui::PopFont();
-
-        if (collapsed) {
-            // Vertical title.
-            ImGui::PushFont(theme::boldFont(), ui::currentFontBase() * 0.8f);
-            auto y = origin.y + dp(30.0f);
-            for (auto index = 0; index < node->title.length() && y < origin.y + height - dp(14.0f); ++index) {
-                const auto glyph = juce::String::charToString(node->title[index]);
-                const auto glyphSize = ImGui::CalcTextSize(glyph.toRawUTF8());
-                list->AddText(ImVec2(origin.x + (width - glyphSize.x) * 0.5f, y), p.textDim, glyph.toRawUTF8());
-                y += glyphSize.y * 0.9f;
-            }
-            ImGui::PopFont();
-        } else {
-            if (const auto live = graph.editorControlValue(node->id)) {
-                const auto t = std::clamp((*live + 1.0f) * 0.5f, 0.0f, 1.0f);
-                list->AddRectFilled(ImVec2(origin.x, origin.y + dp(24.0f)), ImVec2(origin.x + width * t, origin.y + dp(26.0f)),
-                                    p.modulation);
-            }
-            if (count == 0 && surface.panes.empty() && !prismCard && !kickCard && !synthCard && !batterieCard && !samplerCard
-                && !modelCard && !designed) {
-                ImGui::SetCursorScreenPos(ImVec2(origin.x + dp(8.0f), origin.y + dp(36.0f)));
-                ImGui::TextDisabled("%s", node->category.isNotEmpty() ? node->category.toRawUTF8() : "");
-            }
-            // The displays, side by side.
-            DeviceSignals::Histories histories;
-            auto live = signals_.live(node->id, histories);
-            live.modulated = &modulated;
-            if (const auto control = graph.editorControlValue(node->id)) {
-                live.hasControl = true;
-                live.control = *control;
-                live.running = live.running || studio_.engine().isPlaying();
-            }
-            auto x = origin.x + dp(8.0f);
-            if (columnOpen) {
-                modulators_->draw(node->id, ImVec2(x, origin.y + bodyTop), ImVec2(ModulatorsView::width(), bodyHeight), colour);
-                x += ModulatorsView::width() + dp(6.0f);
-            }
-            if (modelCard) {
-                drawSoundModelPane(track, graph, node->id, ImVec2(x, origin.y + bodyTop), ImVec2(modelPaneWidth, bodyHeight), colour);
-                x += modelPaneWidth + dp(6.0f);
-            }
-            if (missingCard) {
-                // As another application shows it: a warning, the plug-in's
-                // name, its maker and format, what to do.
-                const ImVec2 min(x, origin.y + bodyTop);
-                const ImVec2 max(x + missingWidth, origin.y + bodyTop + bodyHeight);
-                list->AddRectFilled(min, max, p.bg1, dp(4.0f));
-                const auto about = juce::JSON::parse(node->description);
-                const auto vendor = about.getProperty("vendor", juce::var()).toString();
-                const auto format = about.getProperty("format", juce::var()).toString();
-                const auto missingInstrument = node->typeKey == "missing-instrument";
-                auto y = min.y + std::max(dp(8.0f), bodyHeight * 0.18f);
-                const auto centre = (min.x + max.x) * 0.5f;
-                // The warning sign.
-                const auto size = dp(15.0f);
-                list->AddTriangleFilled(ImVec2(centre, y), ImVec2(centre - size, y + size * 1.7f), ImVec2(centre + size, y + size * 1.7f),
-                                        p.warn);
-                list->AddRectFilled(ImVec2(centre - dp(1.5f), y + size * 0.55f), ImVec2(centre + dp(1.5f), y + size * 1.15f), p.bg0);
-                list->AddCircleFilled(ImVec2(centre, y + size * 1.38f), dp(1.8f), p.bg0);
-                y += size * 1.7f + dp(10.0f);
-                const auto line = [&](const juce::String& text, const ImU32 lineColour, const float scale, ImFont* font) {
-                    ImGui::PushFont(font, ui::currentFontBase() * scale);
-                    ui::centredText(list, ImVec2(min.x + dp(6.0f), y), ImVec2(max.x - dp(6.0f), y + ImGui::GetFontSize()), lineColour,
-                                    text.toRawUTF8());
-                    y += ImGui::GetFontSize() + dp(4.0f);
-                    ImGui::PopFont();
-                };
-                line(missingInstrument ? ui::Ls("Instrument manquant", "Missing instrument") : ui::Ls("Plugin manquant", "Missing plugin"), p.text, 1.0f,
-                     theme::boldFont());
-                line(node->title, p.textDim, 0.9f, nullptr);
-                if (vendor.isNotEmpty() || format.isNotEmpty())
-                    line(vendor + (vendor.isNotEmpty() && format.isNotEmpty() ? juce::String::fromUTF8(" · ") : juce::String()) + format,
-                         p.textFaint, 0.8f, nullptr);
-                ImGui::SetCursorScreenPos(min);
-                ImGui::InvisibleButton("##missing", ImVec2(missingWidth, bodyHeight));
-                if (ImGui::IsItemHovered())
-                    ImGui::SetTooltip("%s", missingInstrument ? L("Le projet importé jouait cet instrument (un plug-in qui n'est pas ici). "
-                                                           "Sa place est gardée, silencieuse : choisissez un instrument avec + "
-                                                           "pour le remplacer, ses effets restent.",
-                                                           "The imported project played this instrument (a plug-in that is not here). "
-                                                           "Its place is kept, silent: pick an instrument with + to replace it, its "
-                                                           "effects stay.")
-                                                       : L("Le projet importé avait cet effet (un plug-in qui n'est pas ici). Sa place est "
-                                                           "gardée et le son passe sans lui.",
-                                                           "The imported project had this effect (a plug-in that is not here). Its place "
-                                                           "is kept and the sound passes without it."));
-                x += missingWidth + dp(6.0f);
-            }
-            if (samplerCard) {
-                sampler_->drawPane(track, graph, node->id, ImVec2(x, origin.y + bodyTop), ImVec2(samplerPaneWidth, bodyHeight),
-                                   colour);
-                x += samplerPaneWidth + dp(6.0f);
-            }
-            if (prismCard) {
-                prism_->drawPane(track, graph, node->id, ImVec2(x, origin.y + bodyTop), ImVec2(PrismView::paneWidth(), bodyHeight),
-                                 colour);
-                x += PrismView::paneWidth() + dp(6.0f);
-            }
-            if (kickCard) {
-                kick_->drawPane(track, graph, node->id, ImVec2(x, origin.y + bodyTop), ImVec2(KickView::paneWidth(), bodyHeight),
-                                colour);
-                x += KickView::paneWidth() + dp(6.0f);
-            }
-            if (synthCard) {
-                synth_->drawPane(track, graph, node->id, ImVec2(x, origin.y + bodyTop), ImVec2(synthWidth, bodyHeight),
-                                 colour);
-                x += synthWidth + dp(6.0f);
-            }
-            if (batterieCard) {
-                batterie_->drawPane(track, graph, node->id, ImVec2(x, origin.y + bodyTop), ImVec2(BatterieView::paneWidth(), bodyHeight),
-                                    colour);
-                x += BatterieView::paneWidth() + dp(6.0f);
-            }
-            if (rackCard) {
-                rack_->drawPane(track, ImVec2(x, origin.y + bodyTop), ImVec2(RackView::paneWidth(), bodyHeight), colour);
-                x += RackView::paneWidth() + dp(6.0f);
-            }
-            if (designed) {
-                ImGui::SetCursorScreenPos(ImVec2(x, origin.y + bodyTop));
-                const auto playedId = "designed" + juce::String(static_cast<juce::int64>(node->id));
-                designed_->drawPlayed(playedId.toRawUTF8(), *designed, ImVec2(designedWidth, bodyHeight - dp(4.0f)),
-                                      [&graph, this](const juce::String& key, const double value) {
-                                          (void) graph.editorSetParameter(key, value);
-                                          state_.focused = Panel::devices;
-                                      }, &graph.editorAnalysis());
-                x += designedWidth + dp(6.0f);
-            }
-            const CardFileScope cardFile(studio_, state_, track, graph, node->id, node->typeKey);
-            for (const auto& face : faces) {
-                const auto top = origin.y + bodyTop;
-                if (face.pane >= 0) {
-                    // The display small, its corner opening it in its window;
-                    // its controls under it.
-                    const auto& pane = surface.panes[static_cast<std::size_t>(face.pane)];
-                    ImGui::PushID(face.pane);
-                    auto expand = false;
-                    (void) visual::drawPane("##pane", pane, parameters, ImVec2(x, top), ImVec2(face.width, face.pictureHeight), colour, live,
-                                            setParameter, false, &expand);
-                    if (expand) {
-                        const auto shown = std::find_if(windowPanes.begin(), windowPanes.end(), [&pane](const visual::Pane& other) {
-                            return other.kind == pane.kind && other.parameters == pane.parameters && other.variant == pane.variant;
-                        });
-                        state_.openExpandedPane(
-                            ExpandedPane { track, node->id, shown != windowPanes.end() ? static_cast<int>(shown - windowPanes.begin()) : 0 });
-                    }
-                    (void) flowControls(parameters, paneControls(pane, parameters, "##pane"), ImVec2(x, top + face.pictureHeight + dp(6.0f)),
-                                        face.width, true, colour, live, setParameter);
-                    ImGui::PopID();
-                } else {
-                    // Its other settings, in columns.
-                    ImGui::PushID("##others");
-                    (void) flowControls(parameters, face.others, ImVec2(x, top), face.width, true, colour, live, setParameter);
-                    ImGui::PopID();
-                }
-                x += face.width + dp(6.0f);
-            }
-            if (listOpen) {
-                ImGui::PushID("##valueList");
-                drawValueList(track, graph, *node, ImVec2(x, origin.y + bodyTop), ImVec2(listWidth, bodyHeight), colour, modulated);
-                ImGui::PopID();
-                x += listWidth + dp(6.0f);
-            }
-        }
-        if (node->bypassed)
-            // Switched off: the card greyed under its header.
-            list->AddRectFilled(ImVec2(origin.x + 1.0f, origin.y + dp(26.0f)), ImVec2(origin.x + width - 1.0f, origin.y + height - 1.0f),
-                                (p.bg0 & 0x00ffffffu) | 0x9a000000u, dp(5.0f), ImDrawFlags_RoundCornersBottom);
-        // What comes out of it: a meter down its right edge.
-        if (level) {
-            const auto meterTop = origin.y + dp(collapsed ? 50.0f : 30.0f);
-            const auto meterLeft = origin.x + width - (collapsed ? dp(8.0f) : meterWidth) - dp(3.0f);
-            ImGui::SetCursorScreenPos(ImVec2(meterLeft, meterTop));
-            ui::meter("##output", ImVec2(collapsed ? dp(6.0f) : meterWidth, std::max(dp(20.0f), origin.y + height - dp(6.0f) - meterTop)),
-                      level->left, level->right, level->left * 0.7f, level->right * 0.7f);
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("%s", L("Ce qui sort de ce périphérique", "What comes out of this device"));
-        }
-        ImGui::SetCursorScreenPos(origin);
-        ImGui::Dummy(ImVec2(width, height));
-        if (ImGui::BeginDragDropTarget()) {
-            if (const auto* payload = ImGui::AcceptDragDropPayload(cardPayload, ImGuiDragDropFlags_AcceptBeforeDelivery
-                                                                                    | ImGuiDragDropFlags_AcceptNoDrawDefaultRect)) {
-                const auto dragged = *static_cast<const std::uint64_t*>(payload->Data);
-                // Its left half: before it; its right half (or a card that
-                // stays first): after it.
-                const auto before = movable(*node) && ImGui::GetIO().MousePos.x < origin.x + width * 0.5f;
-                const auto target = before ? node->id : nextMovable(chainIndex);
-                const auto lineX = before ? origin.x - dp(3.0f) : origin.x + width + dp(2.0f);
-                if (dragged != node->id) {
-                    list->AddLine(ImVec2(lineX, origin.y), ImVec2(lineX, origin.y + height), p.accent, dp(3.0f));
-                    if (payload->IsDelivery())
-                        moveCard = std::make_pair(dragged, target);
-                }
-            }
-            ImGui::EndDragDropTarget();
-        }
-        ImGui::EndGroup();
-        ImGui::PopID();
-        ImGui::SameLine(0.0f, dp(5.0f));
+    Strip strip { track, slot, graph, nodes, modulated, setParameter, {}, {} };
+    for (std::size_t chainIndex = 0; chainIndex < chain.size(); ++chainIndex)
+        drawCard(strip, *chain[chainIndex], height, CardPlace { 0, -1, nextMovable(chainIndex), 0 });
+    if (strip.removeNode) {
+        // Its modulators go with it (a container's, with all it holds).
+        modulators_->removeWith(*strip.removeNode);
+        graph.editorRemoveFromChain(*strip.removeNode);
     }
-    if (removeNode) {
-        // Its modulators go with it.
-        modulators_->removeWith(*removeNode);
-        graph.editorRemoveFromChain(*removeNode);
-    }
-    // A card dropped elsewhere in the chain: moved there, the cards laid out
-    // again in the order the signal now takes.
-    if (moveCard && graph.editorMoveInChain(moveCard->first, moveCard->second)) {
+    // A card dropped elsewhere in the chain or into a container: moved
+    // there, the cards laid out again in the order the signal now takes.
+    if (strip.moveCard
+        && graph.editorMoveCard(strip.moveCard->card, strip.moveCard->head, strip.moveCard->branch, strip.moveCard->before)) {
         graph_layout::arrange(graph);
         state_.focused = Panel::devices;
     }
@@ -981,6 +387,8 @@ void DevicesView::draw()
         ImGui::PopFont();
         ui::tooltip(state_.inlineDeviceCatalogue ? L("Ajouter un effet dans le catalogue", "Add an effect from the catalogue") : L("Ajouter un périphérique : la bibliothèque en grand (clic droit : la liste rapide)",
                       "Add a device: the library, large (right click: the quick list)"));
+        if (ImGui::IsItemClicked() || ImGui::IsItemClicked(ImGuiMouseButton_Right))
+            catalogueBranch_.reset();
         if (ImGui::IsItemClicked()) {
             if(state_.inlineDeviceCatalogue) {
                 state_.openDeviceCatalogue=true;
@@ -1018,6 +426,1089 @@ void DevicesView::draw()
     drawCatalogue(track);
     drawPluginParameters();
     drawParameterMenu();
+}
+
+void DevicesView::drawCard(Strip& strip, const app::NodeGraphComponent::EditorNode& cardNode, const float height,
+                           const CardPlace& place)
+{
+    const auto& p = theme::palette();
+    const auto& track = strip.track;
+    auto& graph = strip.graph;
+    auto& modulated = strip.modulated;
+    const auto& setParameter = strip.setParameter;
+    // Inside a module: English, whatever the language.
+    const ui::ModuleText english;
+    const auto* node = &cardNode;
+    // What the device shows: displays first, then the knobs left over.
+    std::vector<visual::Param> parameters;
+    parameters.reserve(node->parameters.size());
+    for (const auto& parameter : node->parameters)
+        // Not those kept off the card's face (an SFZ's dozens of
+        // controls, which have their own tab).
+        if (parameter.showInDevice)
+            parameters.push_back({ parameter.binding, parameter.label, parameter.unit, parameter.minimum, parameter.maximum,
+                                   parameter.value, parameter.defaultValue });
+    const auto* span = signals_.span(node->id);
+    const auto instrument = span != nullptr && span->instrument;
+    auto surface = visual::inferSurface(parameters, span != nullptr, instrument, node->typeKey);
+    // Prisme draws itself (its window has the rest).
+    const auto prismCard = node->typeKey == "prism-synth" && prism_ != nullptr;
+    const auto kickCard = node->typeKey == "kick-synth" && kick_ != nullptr;
+    const auto synthCard = synth_ != nullptr && SynthView::handles(node->typeKey);
+    const auto batterieCard = batterie_ != nullptr && BatterieView::handles(node->typeKey);
+    const auto rackCard = rack_ != nullptr && RackView::handles(node->typeKey);
+    // A device made in the workshop with an interface of its own shows
+    // that interface, played, as its plugin window does (scaled to the
+    // card's height), instead of a row of knobs.
+    // Only while it stays readable: at 60 % of its size at least (a
+    // taller panel shows it); smaller, the knobs, and its window.
+    std::optional<app::ModuleInterfaceState> designed;
+    if (node->composite && node->hasInterface && !node->collapsed) {
+        auto shownInterface = graph.editorNodeInterface(node->id);
+        if(shownInterface.deviceDesigned) {
+            shownInterface.controls=shownInterface.deviceControls;
+            shownInterface.windowWidth=shownInterface.deviceWidth; shownInterface.windowHeight=shownInterface.deviceHeight;
+            shownInterface.windowDesign=shownInterface.deviceDesign;
+        }
+        const auto designedHeight = dp(static_cast<float>(shownInterface.windowHeight != 0 ? shownInterface.windowHeight : 420));
+        const auto readable = (height - dp(43.0f)) / std::max(1.0f, designedHeight) >= 0.6f;
+        if ((readable || shownInterface.deviceDesigned) && std::any_of(shownInterface.controls.begin(), shownInterface.controls.end(), [](const auto& control) {
+                return control.kind != app::ModuleControlKind::inputPort && control.kind != app::ModuleControlKind::outputPort;
+            }))
+            designed = std::move(shownInterface);
+    }
+    const auto missingPlugin = node->typeKey == "missing-plugin" || node->typeKey == "missing-instrument";
+    // A container draws its own panel: its branches, its mix.
+    const auto containerCard = graph.editorIsContainer(node->id);
+    if (prismCard || kickCard || synthCard || batterieCard || rackCard || designed || missingPlugin || containerCard) {
+        surface.knobs.clear();
+        surface.panes.clear();
+    }
+    // The sound's spectrum is its window's, when the card shows
+    // something else (the window has them all: its panes by this list).
+    const auto windowPanes = surface.panes;
+    if (surface.panes.size() > 1 || !surface.knobs.empty())
+        std::erase_if(surface.panes, [](const visual::Pane& pane) { return pane.kind == visual::PaneKind::spectrum; });
+    // At most three displays, those that tell most of the sound (its
+    // envelope, its filter, its source, its dynamics…); the others'
+    // settings join its other settings. The window shows them all.
+    if (surface.panes.size() > 3) {
+        const auto rank = [](const visual::PaneKind kind) {
+            using visual::PaneKind;
+            switch (kind) {
+            case PaneKind::envelope: return 0;
+            case PaneKind::filter:
+            case PaneKind::equalizer:
+            case PaneKind::multiFilter:
+            case PaneKind::autoFilter:
+            case PaneKind::eqThree:
+            case PaneKind::eqPro:
+            case PaneKind::filterPro: return 1;
+            case PaneKind::oscillator:
+            case PaneKind::wavetable: return 2;
+            case PaneKind::dynamics:
+            case PaneKind::compPro:
+            case PaneKind::limiter:
+            case PaneKind::limiterPro:
+            case PaneKind::gate:
+            case PaneKind::transient: return 3;
+            case PaneKind::saturation: return 5;
+            case PaneKind::width:
+            case PaneKind::level:
+            case PaneKind::spectrum: return 6;
+            default: return 4;
+            }
+        };
+        std::vector<std::size_t> order(surface.panes.size());
+        for (std::size_t index = 0; index < order.size(); ++index)
+            order[index] = index;
+        std::stable_sort(order.begin(), order.end(),
+                         [&](const std::size_t a, const std::size_t b) { return rank(surface.panes[a].kind) < rank(surface.panes[b].kind); });
+        std::vector<bool> kept(surface.panes.size(), false);
+        for (std::size_t at = 0; at < 3; ++at)
+            kept[order[at]] = true;
+        std::vector<visual::Pane> shown;
+        std::vector<int> moved;
+        for (std::size_t index = 0; index < surface.panes.size(); ++index) {
+            if (kept[index]) {
+                shown.push_back(surface.panes[index]);
+                continue;
+            }
+            for (const auto parameter : surface.panes[index].parameters)
+                if (parameter >= 0)
+                    moved.push_back(parameter);
+        }
+        surface.panes = std::move(shown);
+        surface.knobs.insert(surface.knobs.begin(), moved.begin(), moved.end());
+    }
+    const auto count = static_cast<int>(surface.knobs.size());
+    const auto bodyTop = dp(32.0f);
+    const auto bodyHeight = height - bodyTop - dp(7.0f);
+    ImGui::PushID(static_cast<int>(node->id));
+    const auto faces = cardFace(surface, parameters, bodyHeight);
+    ImGui::PopID();
+    auto panesWidth = 0.0f;
+    for (const auto& face : faces)
+        panesWidth += face.width + dp(6.0f);
+    // A sound model shows itself: its partials over time, what it is.
+    const auto modelCard = node->typeKey == "sound-model";
+    const auto modelPaneWidth = dp(176.0f);
+    if (modelCard)
+        panesWidth += modelPaneWidth + dp(6.0f);
+    // A plug-in an imported project used that is not here: its place, its name.
+    const auto missingCard = node->typeKey == "missing-plugin" || node->typeKey == "missing-instrument";
+    const auto missingWidth = dp(210.0f);
+    if (missingCard)
+        panesWidth += missingWidth + dp(6.0f);
+    // A sampler shows its zones over the keys, and takes files.
+    const auto samplerCard = node->typeKey == "sampler" && sampler_ != nullptr;
+    const auto simpleSampler = samplerCard && [&] {
+        const auto controls = graph.editorSamplerControls(node->id);
+        return controls && controls->simple;
+    }();
+    // Granular (Nuée): its grains' knobs in a row under the waveform.
+    const auto granular = simpleSampler && std::any_of(node->parameters.begin(), node->parameters.end(), [](const auto& parameter) {
+        return parameter.binding.endsWith(".sampler.grains") && parameter.value >= 0.5;
+    });
+    const auto samplerPaneWidth = dp(granular ? 430.0f : simpleSampler ? 300.0f : 230.0f);
+    if (samplerCard)
+        panesWidth += samplerPaneWidth + dp(6.0f);
+    if (prismCard)
+        panesWidth += PrismView::paneWidth() + dp(6.0f);
+    if (kickCard)
+        panesWidth += KickView::paneWidth() + dp(6.0f);
+    const auto synthWidth = synthCard ? synth_->paneWidth(graph, node->id, bodyHeight) : 0.0f;
+    if (synthCard)
+        panesWidth += synthWidth + dp(6.0f);
+    if (batterieCard)
+        panesWidth += BatterieView::paneWidth() + dp(6.0f);
+    if (rackCard)
+        panesWidth += RackView::paneWidth() + dp(6.0f);
+    const auto designedWidth = designed ? std::clamp(
+                                              (bodyHeight - dp(4.0f))
+                                                  * static_cast<float>(designed->windowWidth != 0 ? designed->windowWidth : 720)
+                                                  / static_cast<float>(designed->windowHeight != 0 ? designed->windowHeight : 420),
+                                              dp(120.0f), dp(900.0f))
+                                        : 0.0f;
+    if (designed)
+        panesWidth += designedWidth + dp(6.0f);
+    const auto collapsed = node->collapsed;
+    // Its list of values, a column at its right.
+    const auto listKey = std::make_pair(studio_.routingKey(track) + (track.pad >= 0 ? static_cast<std::uint64_t>(track.pad + 1) << 48 : 0),
+                                        node->id);
+    const auto listOpen = !collapsed && state_.valueLists.contains(listKey);
+    const auto listWidth = dp(232.0f);
+    if (listOpen)
+        panesWidth += listWidth + dp(6.0f);
+    // Its modulators, a column at its left.
+    const auto modulatorCount = modulators_->countFor(node->id);
+    const auto columnOpen = !collapsed && modulators_->open(node->id);
+    if (columnOpen)
+        panesWidth += ModulatorsView::width() + dp(6.0f);
+    const auto containerWidth = dp(216.0f);
+    if (containerCard && !collapsed)
+        panesWidth += containerWidth + dp(6.0f);
+    // Its output's meter, along its right edge (an instrument's cards:
+    // what its voices give out).
+    auto level = signals_.outputLevel(node->id);
+    if (!level && track.midi && (wholeVoiceType(node->typeKey) || graph.editorIsVoiceNode(node->id)))
+        level = signals_.instrumentLevel();
+    const auto meterWidth = level ? dp(9.0f) : 0.0f;
+    const auto width = collapsed ? dp(46.0f)
+                                 : std::max(dp(150.0f), dp(8.0f) + panesWidth + dp(2.0f)) + meterWidth
+                                       + (level ? dp(4.0f) : 0.0f);
+    const auto colour = toImColour(node->colour);
+    ImGui::PushID(static_cast<int>(node->id));
+    const auto origin = ImGui::GetCursorScreenPos();
+    auto* list = ImGui::GetWindowDrawList();
+    list->AddRectFilled(origin, ImVec2(origin.x + width, origin.y + height), p.bg2, dp(5.0f));
+    list->AddRectFilled(origin, ImVec2(origin.x + width, origin.y + dp(26.0f)), theme::mix(colour, p.bg2 | 0xff000000u, 0.5f),
+                        dp(5.0f), ImDrawFlags_RoundCornersTop);
+    list->AddRectFilled(ImVec2(origin.x, origin.y + dp(24.0f)), ImVec2(origin.x + width, origin.y + dp(26.0f)), colour);
+    list->AddRect(origin, ImVec2(origin.x + width, origin.y + height), p.line, dp(5.0f));
+
+    ImGui::BeginGroup();
+    const auto editable = node->composite && !collapsed;
+    const auto windowed = editable && node->hasInterface;
+    // A card with a window of its own (its display large, its editor,
+    // its designed interface): a button opens it out of the studio's.
+    const auto separable
+        = !collapsed && (windowed || prismCard || kickCard || synthCard || batterieCard || samplerCard || !surface.panes.empty());
+    // A compressor or a gate: what its detector listens to.
+    const auto sidechained = !collapsed && std::any_of(node->ports.begin(), node->ports.end(), [](const auto& port) {
+                                 return port.input && port.kind == 0 && port.key == "sidechain-in";
+                             });
+    // What makes or carries sound can be switched off (bypassed).
+    const auto bypassable = std::any_of(node->ports.begin(), node->ports.end(), [](const auto& port) {
+        return !port.input && port.kind == 0;
+    });
+    const auto separateWidth = (separable ? dp(22.0f) : 0.0f) + (sidechained ? dp(22.0f) : 0.0f) + (collapsed ? 0.0f : dp(44.0f));
+    // The on/off switch comes first, at the left of the title.
+    const auto switchWidth = bypassable && !collapsed ? dp(22.0f) : 0.0f;
+    if (!collapsed) {
+        ImGui::PushFont(theme::boldFont(), ui::currentFontBase() * 0.9f);
+        ui::clippedText(list, ImVec2(origin.x + dp(8.0f) + switchWidth, origin.y + dp(5.0f)),
+                        width - dp(windowed ? 126.0f : editable ? 104.0f : 82.0f) - separateWidth - switchWidth, p.text,
+                        node->title.toRawUTF8());
+        ImGui::PopFont();
+    }
+    // Its name is where it is taken to move it along the chain.
+    if (movable(strip, *node)) {
+        const auto gripTop = collapsed ? origin.y + dp(28.0f) : origin.y + dp(2.0f);
+        const auto gripLeft = collapsed ? origin.x + dp(4.0f) : origin.x + dp(6.0f) + switchWidth;
+        const auto gripWidth = collapsed ? width - dp(16.0f)
+                                         : std::max(dp(10.0f), width - dp(windowed ? 126.0f : editable ? 104.0f : 82.0f) - separateWidth
+                                                                   - switchWidth);
+        const auto gripHeight = collapsed ? std::max(dp(10.0f), height - dp(34.0f)) : dp(22.0f);
+        ImGui::SetCursorScreenPos(ImVec2(gripLeft, gripTop));
+        ImGui::InvisibleButton("##grip", ImVec2(gripWidth, gripHeight));
+        ui::recordSpot("card:" + std::to_string(node->id));
+        if (ImGui::IsItemHovered() && !ImGui::IsItemActive())
+            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+        if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoHoldToOpenOthers)) {
+            const auto id = node->id;
+            ImGui::SetDragDropPayload(cardPayload, &id, sizeof(id));
+            ImGui::TextUnformatted(node->title.toRawUTF8());
+            ImGui::TextDisabled("%s", L("Lâchez-le avant ou après un autre périphérique", "Drop it before or after another device"));
+            ImGui::EndDragDropSource();
+        } else if (ImGui::IsItemHovered()) {
+            ui::tooltip(L("Glissez son nom pour le déplacer dans la chaîne", "Drag its name to move it along the chain"));
+        }
+    }
+    // Header buttons.
+    const ImVec2 button(dp(20.0f), dp(20.0f));
+    ImGui::SetCursorScreenPos(collapsed ? ImVec2(origin.x + width - (bypassable ? dp(44.0f) : dp(33.0f)), origin.y + dp(3.0f))
+                                        : ImVec2(origin.x + dp(3.0f), origin.y + dp(3.0f)));
+    ImGui::PushFont(nullptr, ui::currentFontBase() * 0.8f);
+    if (bypassable) {
+        // On (lit) or switched off: what reaches it goes through, an
+        // instrument falls silent; it keeps its settings.
+        if (ui::iconButton(icon::power,
+                           node->bypassed ? L("Éteint : le son passe sans lui. Cliquez pour le rallumer.",
+                                              "Off: the sound goes past it. Click to switch it back on.")
+                                          : L("Allumé. Cliquez pour l'éteindre (bypass) : le son passe sans lui.",
+                                              "On. Click to switch it off (bypass): the sound goes past it."),
+                           !node->bypassed, p.play, button))
+            (void) graph.editorSetBypassed(node->id, !node->bypassed);
+        if (collapsed)
+            ImGui::SameLine(0.0f, dp(2.0f));
+    }
+    if (!collapsed)
+        ImGui::SetCursorScreenPos(ImVec2(origin.x + width - (windowed ? dp(112.0f) : editable ? dp(90.0f) : dp(68.0f)) - separateWidth,
+                                         origin.y + dp(3.0f)));
+    if (!collapsed) {
+        // All its values in a list: raw, searched, the last touched first.
+        if (ui::iconButton(icon::list,
+                           L("Toutes ses valeurs dans une liste : brutes, à chercher, la dernière touchée en haut",
+                             "All its values in a list: raw, searchable, the last touched at the top"),
+                           listOpen, p.accent, button)) {
+            if (listOpen)
+                state_.valueLists.erase(listKey);
+            else
+                state_.valueLists.insert(listKey);
+        }
+        ImGui::SameLine(0.0f, dp(2.0f));
+        // Its modulators: an LFO, steps, an envelope... dragged onto knobs.
+        const auto modulatorTip = modulatorCount > 0
+                                      ? juce::String(columnOpen ? "Hide" : "Show") + " its modulators ("
+                                            + juce::String(static_cast<int>(modulatorCount)) + ")"
+                                      : juce::String("Modulators: an LFO, steps, an envelope, a macro... moving its knobs");
+        if (ui::iconButton(icon::modulation, modulatorTip.toRawUTF8(), columnOpen || modulatorCount > 0, p.modulation, button))
+            modulators_->setOpen(node->id, !columnOpen);
+        ImGui::SameLine(0.0f, dp(2.0f));
+    }
+    if (separable) {
+        const PluginWindow window { track, node->id };
+        const auto open = prismCard     ? prism_->showsEditor(track, node->id) && ui::isDetached(prism_->editorWindowId(track, node->id).c_str())
+                          : kickCard    ? kick_->showsEditor(track, node->id) && ui::isDetached(kick_->editorWindowId(track, node->id).c_str())
+                          : synthCard   ? synth_->showsEditor(track, node->id) && ui::isDetached(synth_->editorWindowId(track, node->id).c_str())
+                          : batterieCard ? batterie_->showsEditor(track, node->id) && ui::isDetached(batterie_->editorWindowId(track, node->id).c_str())
+                          : samplerCard ? sampler_->showsEditor(track, node->id) && ui::isDetached(sampler_->editorWindowId(track, node->id).c_str())
+                          : windowed && surface.panes.empty()
+                              ? state_.pluginWindowOpen(window) && ui::isDetached(PluginWindows::windowId(window).c_str())
+                                        : state_.expandedPaneOpen(track, node->id)
+                                              && ui::isDetached(DeviceEditorView::windowId(track, node->id).c_str());
+        if (ui::iconButton(icon::newWindow,
+                           L("Ouvrir dans une fenêtre séparée, hors du studio, comme un VST (sur un autre écran si vous voulez)",
+                             "Open in a separate window, out of the studio, as a VST's (onto another screen if you like)"),
+                           open, p.accent, button)) {
+            if (prismCard)
+                prism_->openEditor(track, node->id, true);
+            else if (kickCard)
+                kick_->openEditor(track, node->id, true);
+            else if (synthCard)
+                synth_->openEditor(track, node->id, true);
+            else if (batterieCard)
+                batterie_->openEditor(track, node->id, true);
+            else if (samplerCard)
+                sampler_->openEditor(track, node->id, true);
+            else if (windowed && surface.panes.empty()) {
+                if (!state_.pluginWindowOpen(window))
+                    state_.togglePluginWindow(window);
+                ui::setDetached(PluginWindows::windowId(window).c_str(), true);
+            } else {
+                state_.openExpandedPane(ExpandedPane { track, node->id, -1, true });
+            }
+        }
+        ImGui::SameLine(0.0f, dp(2.0f));
+    }
+    if (sidechained) {
+        const auto source = studio_.sidechainSource(track, node->id);
+        const auto tip = (source ? ui::Ls("Sidechain : ", "Sidechain: ") + studio_.trackName(*source)
+                                 : ui::Ls("Sidechain : le détecteur écoute le son du périphérique. Cliquez pour qu'il écoute "
+                                          "une autre piste (un kick qui fait pomper une basse).",
+                                          "Sidechain: the detector listens to the device's own sound. Click to make it listen "
+                                          "to another track (a kick pumping a bass)."))
+                             .toStdString();
+        if (ui::iconButton(icon::link, tip.c_str(), source.has_value(), p.accent, button))
+            ImGui::OpenPopup("##sidechain");
+        if (ImGui::BeginPopup("##sidechain")) {
+            ImGui::TextDisabled("%s", L("Ce que le détecteur écoute", "What the detector listens to"));
+            ImGui::Separator();
+            const auto report = [this](const juce::Result& result) {
+                if (result.failed()) {
+                    state_.status = result.getErrorMessage();
+                    state_.statusIsError = true;
+                    state_.statusTime = ImGui::GetTime();
+                }
+            };
+            if (ImGui::MenuItem(L("Son propre (pas de sidechain)", "Its own sound (no sidechain)"), nullptr, !source))
+                report(studio_.setSidechainSource(track, node->id, std::nullopt));
+            for (const auto& candidate : studio_.tracks()) {
+                if (candidate.master || candidate == track)
+                    continue;
+                const auto name = studio_.trackName(candidate);
+                const auto routable = studio_.canRoute(candidate, track);
+                ImGui::PushID(static_cast<int>(studio_.routingKey(candidate)));
+                if (ImGui::MenuItem(name.toRawUTF8(), nullptr, source && *source == candidate, routable))
+                    report(studio_.setSidechainSource(track, node->id, candidate));
+                ImGui::PopID();
+            }
+            ImGui::EndPopup();
+        }
+        ImGui::SameLine(0.0f, dp(2.0f));
+    }
+    if (windowed) {
+        // Its large window: all its card shows (and the interface drawn
+        // for it, a tab); a card with no display, its drawn interface.
+        const PluginWindow window { track, node->id };
+        const auto large = !surface.panes.empty();
+        if (ui::iconButton(icon::view,
+                           large ? L("Ouvrir sa grande fenêtre : tout ce que montre la carte, en grand (et l'interface dessinée "
+                                     "dans l'atelier, un onglet)",
+                                     "Open its large window: all the card shows, large (and the interface designed in the "
+                                     "workshop, a tab)")
+                                 : L("Ouvrir sa fenêtre, comme un plugin (l'interface dessinée dans l'atelier)",
+                                     "Open its window, as a plugin's (the interface designed in the workshop)"),
+                           large ? state_.expandedPaneOpen(track, node->id) : state_.pluginWindowOpen(window), p.accent, button)) {
+            if (!large)
+                state_.togglePluginWindow(window);
+            else if (state_.expandedPaneOpen(track, node->id))
+                state_.closeExpandedPane(track, node->id);
+            else
+                state_.openExpandedPane(ExpandedPane { track, node->id, -1 });
+        }
+        ImGui::SameLine(0.0f, dp(2.0f));
+    }
+    if (editable) {
+        if (ui::iconButton(icon::edit, L("Éditer dans l'atelier de périphériques", "Edit in the device workshop"), false, 0, button)) {
+            state_.workshopRequest = WorkshopRequest { WorkshopRequest::Kind::trackDevice, track, node->id, {} };
+            state_.bringToFront = Panel::workshop;
+        }
+        ImGui::SameLine(0.0f, dp(2.0f));
+    }
+    if (!collapsed)
+        if (const auto holder = studio_.devicePresetHolder(track, node->id)) {
+            const auto nodeId = node->id;
+            presets_.button("devicePresets", *holder, [this, track, nodeId] { return studio_.devicePresetState(track, nodeId); },
+                            [this, track, nodeId](const juce::var& preset, juce::String& error) {
+                                return studio_.applyDevicePreset(track, nodeId, preset, error);
+                            },
+                            button);
+            ImGui::SameLine(0.0f, dp(2.0f));
+        }
+    if (ui::iconButton(collapsed ? icon::chevronRight : icon::chevronLeft,
+                       collapsed ? L("Déplier", "Expand") : L("Replier", "Collapse"), false, 0, button))
+        graph.editorSetCollapsed(node->id, !collapsed);
+    if (!collapsed) {
+        ImGui::SameLine(0.0f, dp(2.0f));
+        if (ui::iconButton(icon::close, L("Retirer de la chaîne", "Remove from the chain"), false, 0, button))
+            strip.removeNode = node->id;
+    }
+    ImGui::PopFont();
+
+    if (collapsed) {
+        // Vertical title.
+        ImGui::PushFont(theme::boldFont(), ui::currentFontBase() * 0.8f);
+        auto y = origin.y + dp(30.0f);
+        for (auto index = 0; index < node->title.length() && y < origin.y + height - dp(14.0f); ++index) {
+            const auto glyph = juce::String::charToString(node->title[index]);
+            const auto glyphSize = ImGui::CalcTextSize(glyph.toRawUTF8());
+            list->AddText(ImVec2(origin.x + (width - glyphSize.x) * 0.5f, y), p.textDim, glyph.toRawUTF8());
+            y += glyphSize.y * 0.9f;
+        }
+        ImGui::PopFont();
+    } else {
+        if (const auto live = graph.editorControlValue(node->id)) {
+            const auto t = std::clamp((*live + 1.0f) * 0.5f, 0.0f, 1.0f);
+            list->AddRectFilled(ImVec2(origin.x, origin.y + dp(24.0f)), ImVec2(origin.x + width * t, origin.y + dp(26.0f)),
+                                p.modulation);
+        }
+        if (count == 0 && surface.panes.empty() && !prismCard && !kickCard && !synthCard && !batterieCard && !samplerCard
+            && !modelCard && !designed) {
+            ImGui::SetCursorScreenPos(ImVec2(origin.x + dp(8.0f), origin.y + dp(36.0f)));
+            ImGui::TextDisabled("%s", node->category.isNotEmpty() ? node->category.toRawUTF8() : "");
+        }
+        // The displays, side by side.
+        DeviceSignals::Histories histories;
+        auto live = signals_.live(node->id, histories);
+        live.modulated = &modulated;
+        if (const auto control = graph.editorControlValue(node->id)) {
+            live.hasControl = true;
+            live.control = *control;
+            live.running = live.running || studio_.engine().isPlaying();
+        }
+        auto x = origin.x + dp(8.0f);
+        if (columnOpen) {
+            modulators_->draw(node->id, ImVec2(x, origin.y + bodyTop), ImVec2(ModulatorsView::width(), bodyHeight), colour);
+            x += ModulatorsView::width() + dp(6.0f);
+        }
+        if (containerCard) {
+            ImGui::PushID("##container");
+            drawContainerPanel(strip, *node, ImVec2(x, origin.y + bodyTop), ImVec2(containerWidth, bodyHeight), colour);
+            ImGui::PopID();
+            x += containerWidth + dp(6.0f);
+        }
+        if (modelCard) {
+            drawSoundModelPane(track, graph, node->id, ImVec2(x, origin.y + bodyTop), ImVec2(modelPaneWidth, bodyHeight), colour);
+            x += modelPaneWidth + dp(6.0f);
+        }
+        if (missingCard) {
+            // As another application shows it: a warning, the plug-in's
+            // name, its maker and format, what to do.
+            const ImVec2 min(x, origin.y + bodyTop);
+            const ImVec2 max(x + missingWidth, origin.y + bodyTop + bodyHeight);
+            list->AddRectFilled(min, max, p.bg1, dp(4.0f));
+            const auto about = juce::JSON::parse(node->description);
+            const auto vendor = about.getProperty("vendor", juce::var()).toString();
+            const auto format = about.getProperty("format", juce::var()).toString();
+            const auto missingInstrument = node->typeKey == "missing-instrument";
+            auto y = min.y + std::max(dp(8.0f), bodyHeight * 0.18f);
+            const auto centre = (min.x + max.x) * 0.5f;
+            // The warning sign.
+            const auto size = dp(15.0f);
+            list->AddTriangleFilled(ImVec2(centre, y), ImVec2(centre - size, y + size * 1.7f), ImVec2(centre + size, y + size * 1.7f),
+                                    p.warn);
+            list->AddRectFilled(ImVec2(centre - dp(1.5f), y + size * 0.55f), ImVec2(centre + dp(1.5f), y + size * 1.15f), p.bg0);
+            list->AddCircleFilled(ImVec2(centre, y + size * 1.38f), dp(1.8f), p.bg0);
+            y += size * 1.7f + dp(10.0f);
+            const auto line = [&](const juce::String& text, const ImU32 lineColour, const float scale, ImFont* font) {
+                ImGui::PushFont(font, ui::currentFontBase() * scale);
+                ui::centredText(list, ImVec2(min.x + dp(6.0f), y), ImVec2(max.x - dp(6.0f), y + ImGui::GetFontSize()), lineColour,
+                                text.toRawUTF8());
+                y += ImGui::GetFontSize() + dp(4.0f);
+                ImGui::PopFont();
+            };
+            line(missingInstrument ? ui::Ls("Instrument manquant", "Missing instrument") : ui::Ls("Plugin manquant", "Missing plugin"), p.text, 1.0f,
+                 theme::boldFont());
+            line(node->title, p.textDim, 0.9f, nullptr);
+            if (vendor.isNotEmpty() || format.isNotEmpty())
+                line(vendor + (vendor.isNotEmpty() && format.isNotEmpty() ? juce::String::fromUTF8(" · ") : juce::String()) + format,
+                     p.textFaint, 0.8f, nullptr);
+            ImGui::SetCursorScreenPos(min);
+            ImGui::InvisibleButton("##missing", ImVec2(missingWidth, bodyHeight));
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", missingInstrument ? L("Le projet importé jouait cet instrument (un plug-in qui n'est pas ici). "
+                                                       "Sa place est gardée, silencieuse : choisissez un instrument avec + "
+                                                       "pour le remplacer, ses effets restent.",
+                                                       "The imported project played this instrument (a plug-in that is not here). "
+                                                       "Its place is kept, silent: pick an instrument with + to replace it, its "
+                                                       "effects stay.")
+                                                   : L("Le projet importé avait cet effet (un plug-in qui n'est pas ici). Sa place est "
+                                                       "gardée et le son passe sans lui.",
+                                                       "The imported project had this effect (a plug-in that is not here). Its place "
+                                                       "is kept and the sound passes without it."));
+            x += missingWidth + dp(6.0f);
+        }
+        if (samplerCard) {
+            sampler_->drawPane(track, graph, node->id, ImVec2(x, origin.y + bodyTop), ImVec2(samplerPaneWidth, bodyHeight),
+                               colour);
+            x += samplerPaneWidth + dp(6.0f);
+        }
+        if (prismCard) {
+            prism_->drawPane(track, graph, node->id, ImVec2(x, origin.y + bodyTop), ImVec2(PrismView::paneWidth(), bodyHeight),
+                             colour);
+            x += PrismView::paneWidth() + dp(6.0f);
+        }
+        if (kickCard) {
+            kick_->drawPane(track, graph, node->id, ImVec2(x, origin.y + bodyTop), ImVec2(KickView::paneWidth(), bodyHeight),
+                            colour);
+            x += KickView::paneWidth() + dp(6.0f);
+        }
+        if (synthCard) {
+            synth_->drawPane(track, graph, node->id, ImVec2(x, origin.y + bodyTop), ImVec2(synthWidth, bodyHeight),
+                             colour);
+            x += synthWidth + dp(6.0f);
+        }
+        if (batterieCard) {
+            batterie_->drawPane(track, graph, node->id, ImVec2(x, origin.y + bodyTop), ImVec2(BatterieView::paneWidth(), bodyHeight),
+                                colour);
+            x += BatterieView::paneWidth() + dp(6.0f);
+        }
+        if (rackCard) {
+            rack_->drawPane(track, ImVec2(x, origin.y + bodyTop), ImVec2(RackView::paneWidth(), bodyHeight), colour);
+            x += RackView::paneWidth() + dp(6.0f);
+        }
+        if (designed) {
+            ImGui::SetCursorScreenPos(ImVec2(x, origin.y + bodyTop));
+            const auto playedId = "designed" + juce::String(static_cast<juce::int64>(node->id));
+            designed_->drawPlayed(playedId.toRawUTF8(), *designed, ImVec2(designedWidth, bodyHeight - dp(4.0f)),
+                                  [&graph, this](const juce::String& key, const double value) {
+                                      (void) graph.editorSetParameter(key, value);
+                                      state_.focused = Panel::devices;
+                                  }, &graph.editorAnalysis());
+            x += designedWidth + dp(6.0f);
+        }
+        const CardFileScope cardFile(studio_, state_, track, graph, node->id, node->typeKey);
+        for (const auto& face : faces) {
+            const auto top = origin.y + bodyTop;
+            if (face.pane >= 0) {
+                // The display small, its corner opening it in its window;
+                // its controls under it.
+                const auto& pane = surface.panes[static_cast<std::size_t>(face.pane)];
+                ImGui::PushID(face.pane);
+                auto expand = false;
+                (void) visual::drawPane("##pane", pane, parameters, ImVec2(x, top), ImVec2(face.width, face.pictureHeight), colour, live,
+                                        setParameter, false, &expand);
+                if (expand) {
+                    const auto shown = std::find_if(windowPanes.begin(), windowPanes.end(), [&pane](const visual::Pane& other) {
+                        return other.kind == pane.kind && other.parameters == pane.parameters && other.variant == pane.variant;
+                    });
+                    state_.openExpandedPane(
+                        ExpandedPane { track, node->id, shown != windowPanes.end() ? static_cast<int>(shown - windowPanes.begin()) : 0 });
+                }
+                (void) flowControls(parameters, paneControls(pane, parameters, "##pane"), ImVec2(x, top + face.pictureHeight + dp(6.0f)),
+                                    face.width, true, colour, live, setParameter);
+                ImGui::PopID();
+            } else {
+                // Its other settings, in columns.
+                ImGui::PushID("##others");
+                (void) flowControls(parameters, face.others, ImVec2(x, top), face.width, true, colour, live, setParameter);
+                ImGui::PopID();
+            }
+            x += face.width + dp(6.0f);
+        }
+        if (listOpen) {
+            ImGui::PushID("##valueList");
+            drawValueList(track, graph, *node, ImVec2(x, origin.y + bodyTop), ImVec2(listWidth, bodyHeight), colour, modulated);
+            ImGui::PopID();
+            x += listWidth + dp(6.0f);
+        }
+    }
+    if (node->bypassed)
+        // Switched off: the card greyed under its header.
+        list->AddRectFilled(ImVec2(origin.x + 1.0f, origin.y + dp(26.0f)), ImVec2(origin.x + width - 1.0f, origin.y + height - 1.0f),
+                            (p.bg0 & 0x00ffffffu) | 0x9a000000u, dp(5.0f), ImDrawFlags_RoundCornersBottom);
+    // What comes out of it: a meter down its right edge.
+    if (level) {
+        const auto meterTop = origin.y + dp(collapsed ? 50.0f : 30.0f);
+        const auto meterLeft = origin.x + width - (collapsed ? dp(8.0f) : meterWidth) - dp(3.0f);
+        ImGui::SetCursorScreenPos(ImVec2(meterLeft, meterTop));
+        ui::meter("##output", ImVec2(collapsed ? dp(6.0f) : meterWidth, std::max(dp(20.0f), origin.y + height - dp(6.0f) - meterTop)),
+                  level->left, level->right, level->left * 0.7f, level->right * 0.7f);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", L("Ce qui sort de ce périphérique", "What comes out of this device"));
+    }
+    ImGui::SetCursorScreenPos(origin);
+    ImGui::Dummy(ImVec2(width, height));
+    if (ImGui::BeginDragDropTarget()) {
+        if (const auto* payload = ImGui::AcceptDragDropPayload(cardPayload, ImGuiDragDropFlags_AcceptBeforeDelivery
+                                                                                | ImGuiDragDropFlags_AcceptNoDrawDefaultRect)) {
+            const auto dragged = *static_cast<const std::uint64_t*>(payload->Data);
+            // Its left half: before it; its right half (or a card that
+            // stays first): after it.
+            const auto before = movable(strip, *node) && ImGui::GetIO().MousePos.x < origin.x + width * 0.5f;
+            const auto target = before ? node->id : place.next;
+            const auto lineX = before ? origin.x - dp(3.0f) : origin.x + width + dp(2.0f);
+            if (dragged != node->id) {
+                list->AddLine(ImVec2(lineX, origin.y), ImVec2(lineX, origin.y + height), p.accent, dp(3.0f));
+                if (payload->IsDelivery())
+                    strip.moveCard = CardMove { dragged, place.head, place.branch, target };
+            }
+        }
+        ImGui::EndDragDropTarget();
+    }
+    ImGui::EndGroup();
+    ImGui::PopID();
+    ImGui::SameLine(0.0f, dp(5.0f));
+    // A container: its chosen branch's cards after it, inside its frame.
+    if (graph.editorIsContainer(node->id) && !node->collapsed)
+        drawBranch(strip, *node, origin, height, place);
+}
+
+bool DevicesView::movable(const Strip& strip, const app::NodeGraphComponent::EditorNode& node) const
+{
+    if (node.boundary || wholeVoiceType(node.typeKey) || (strip.track.midi && strip.graph.editorIsVoiceNode(node.id)))
+        return false;
+    const auto has = [&node](const bool input) {
+        return std::any_of(node.ports.begin(), node.ports.end(), [input](const auto& port) {
+            return port.input == input && port.kind == 0 && port.key != "sidechain-in";
+        });
+    };
+    return has(true) && has(false);
+}
+
+namespace {
+
+// A container's setting on its card, by its catalogue key.
+const app::NodeGraphComponent::EditorParameter* containerSetting(const app::NodeGraphComponent::EditorNode& head,
+                                                                 const std::string_view key)
+{
+    const auto* effect = engine::effectForType(head.typeKey.toStdString());
+    const auto* setting = effect != nullptr ? engine::effectParameter(*effect, key) : nullptr;
+    if (setting == nullptr)
+        return nullptr;
+    const auto suffix = "." + juce::String(std::string(setting->suffix));
+    for (const auto& parameter : head.parameters)
+        if (parameter.binding.endsWith(suffix))
+            return &parameter;
+    return nullptr;
+}
+
+juce::String branchName(const engine::NativeDspNodeKind kind, const int branch)
+{
+    if (const auto* word = engine::container::branchWord(kind))
+        return juce::String(word) + " " + juce::String(branch + 1);
+    if (const auto* name = engine::container::fixedBranchName(kind, branch))
+        return name;
+    return "Chain " + juce::String(branch + 1);
+}
+
+} // namespace
+
+void DevicesView::drawContainerPanel(Strip& strip, const app::NodeGraphComponent::EditorNode& head, const ImVec2 at, const ImVec2 size,
+                                     const ImU32 colour)
+{
+    const auto& p = theme::palette();
+    auto& graph = strip.graph;
+    const auto* effect = engine::effectForType(head.typeKey.toStdString());
+    const auto container = graph.editorContainer(head.id);
+    if (effect == nullptr || !container)
+        return;
+    const auto kind = effect->kind;
+    auto* list = ImGui::GetWindowDrawList();
+    list->AddRectFilled(at, ImVec2(at.x + size.x, at.y + size.y), p.bg1, dp(4.0f));
+    const auto count = static_cast<int>(container->branches.size());
+    auto& shown = state_.containerBranch[{ trackKey_, head.id }];
+    shown = std::clamp(shown, 0, std::max(0, count - 1));
+    const auto set = [&graph, this](const juce::String& binding, const double value) {
+        (void) graph.editorSetParameter(binding, value);
+        state_.focused = Panel::devices;
+    };
+    // A knob of the container's, learnt, modulated, automated as any other.
+    const auto knob = [&](const std::string_view key, const char* label, const ImVec2 where, const float diameter,
+                          const float labelWidth) {
+        const auto* parameter = containerSetting(head, key);
+        if (parameter == nullptr)
+            return;
+        ImGui::SetCursorScreenPos(where);
+        ui::KnobStyle style;
+        style.diameter = diameter;
+        style.colour = colour;
+        style.label = label;
+        style.labelWidth = labelWidth;
+        style.unit = parameter->unit.isNotEmpty() ? parameter->unit.toRawUTF8() : nullptr;
+        style.format = parameter->unit == "Hz" || parameter->unit == "ms" ? "%.0f" : parameter->unit == "dB" ? "%.1f" : "%.2f";
+        if (label == nullptr)
+            style.flags |= ui::knobNoLabel;
+        if (parameter->minimum < 0.0 && parameter->maximum > 0.0 && parameter->unit != "dB")
+            style.flags |= ui::knobBipolar;
+        if (parameter->minimum > 0.0 && parameter->maximum / parameter->minimum >= 100.0)
+            style.flags |= ui::knobLogarithmic;
+        if (const auto moved = strip.modulated.find(parameter->binding);
+            moved != strip.modulated.end() && parameter->maximum > parameter->minimum)
+            style.modulation = static_cast<float>((moved->second - parameter->minimum) / (parameter->maximum - parameter->minimum));
+        auto value = static_cast<float>(parameter->value);
+        ImGui::PushID(parameter->binding.toRawUTF8());
+        {
+            const ui::LearnParameterScope learn(parameter->binding, parameter->label);
+            if (ui::knob("##knob", &value, static_cast<float>(parameter->minimum), static_cast<float>(parameter->maximum),
+                         static_cast<float>(parameter->defaultValue), style))
+                set(parameter->binding, value);
+        }
+        if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+            openParameterMenu(strip.track, parameter->binding, parameter->label);
+        ImGui::PopID();
+    };
+    // A switch of the container's (a branch's solo, its mute).
+    const auto toggle = [&](const std::string_view key, const char* label, const ImU32 on) {
+        const auto* parameter = containerSetting(head, key);
+        if (parameter == nullptr)
+            return;
+        ImGui::PushID(parameter->binding.toRawUTF8());
+        auto value = parameter->value >= 0.5;
+        {
+            const ui::LearnParameterScope learn(parameter->binding, parameter->label);
+            if (ui::toggle(label, &value, on, ImVec2(dp(20.0f), dp(18.0f)), parameter->label.toRawUTF8()))
+                set(parameter->binding, value ? 1.0 : 0.0);
+        }
+        ImGui::PopID();
+    };
+    ImGui::PushFont(nullptr, ui::currentFontBase() * 0.82f);
+
+    // The foot: the container's mix, its wet gain, and what its kind adds.
+    const auto footHeight = dp(26.0f) + ImGui::GetFontSize() * 0.86f + dp(8.0f);
+    const auto footTop = at.y + size.y - footHeight;
+    {
+        std::vector<std::pair<std::string_view, const char*>> foot { { "mix", "Mix" }, { "wet-gain", "Wet Gain" } };
+        switch (kind) {
+        case engine::NativeDspNodeKind::fxSelector: foot.push_back({ "fade", "Fade" }); break;
+        case engine::NativeDspNodeKind::midSideSplit:
+            foot.push_back({ "mid-gain", "Mid" });
+            foot.push_back({ "side-gain", "Side" });
+            break;
+        case engine::NativeDspNodeKind::stereoSplit:
+            foot.push_back({ "left-gain", "Left" });
+            foot.push_back({ "right-gain", "Right" });
+            break;
+        case engine::NativeDspNodeKind::multiband2: foot.push_back({ "crossover", "Crossover" }); break;
+        case engine::NativeDspNodeKind::multiband3:
+            foot.push_back({ "crossover-low", "Low X" });
+            foot.push_back({ "crossover-high", "High X" });
+            break;
+        case engine::NativeDspNodeKind::xyFx:
+            foot.push_back({ "x", "X" });
+            foot.push_back({ "y", "Y" });
+            break;
+        default: break;
+        }
+        const auto cell = (size.x - dp(8.0f)) / static_cast<float>(std::max<std::size_t>(foot.size(), 4));
+        for (std::size_t index = 0; index < foot.size(); ++index)
+            knob(foot[index].first, foot[index].second,
+                 ImVec2(at.x + dp(4.0f) + cell * static_cast<float>(index) + (cell - dp(38.0f)) * 0.5f, footTop + dp(2.0f)), 26.0f,
+                 cell);
+    }
+    auto y = at.y + dp(4.0f);
+    const auto top = y;
+    const auto rowHeight = dp(22.0f);
+    const auto layered = kind == engine::NativeDspNodeKind::fxLayer || kind == engine::NativeDspNodeKind::fxSelector
+                         || kind == engine::NativeDspNodeKind::multiband2 || kind == engine::NativeDspNodeKind::multiband3;
+
+    // A multiband: its bands over the frequencies, each crossover dragged.
+    if (kind == engine::NativeDspNodeKind::multiband2 || kind == engine::NativeDspNodeKind::multiband3) {
+        const ImVec2 min(at.x + dp(4.0f), y);
+        const ImVec2 max(at.x + size.x - dp(4.0f), y + dp(46.0f));
+        list->AddRectFilled(min, max, p.bg2, dp(3.0f));
+        const auto xOf = [&](const double hz) {
+            return min.x + static_cast<float>(std::log(std::clamp(hz, 20.0, 20'000.0) / 20.0) / std::log(1'000.0)) * (max.x - min.x);
+        };
+        const auto hzOf = [&](const float x) {
+            return 20.0 * std::pow(1'000.0, std::clamp(static_cast<double>((x - min.x) / (max.x - min.x)), 0.0, 1.0));
+        };
+        std::vector<const app::NodeGraphComponent::EditorParameter*> crossovers;
+        for (const auto* key : { "crossover", "crossover-low", "crossover-high" })
+            if (const auto* parameter = containerSetting(head, key))
+                crossovers.push_back(parameter);
+        auto left = min.x;
+        for (int band = 0; band < count; ++band) {
+            const auto right = band < static_cast<int>(crossovers.size()) ? xOf(crossovers[static_cast<std::size_t>(band)]->value) : max.x;
+            list->AddRectFilled(ImVec2(left, min.y), ImVec2(right, max.y), theme::alpha(colour, band == shown ? 0.38f : 0.14f));
+            ui::centredText(list, ImVec2(left, min.y), ImVec2(right, max.y), band == shown ? p.text : p.textDim,
+                            branchName(kind, band).toRawUTF8());
+            left = right;
+        }
+        for (std::size_t index = 0; index < crossovers.size(); ++index) {
+            const auto* parameter = crossovers[index];
+            const auto x = xOf(parameter->value);
+            list->AddLine(ImVec2(x, min.y), ImVec2(x, max.y), colour, dp(2.0f));
+            ImGui::SetCursorScreenPos(ImVec2(x - dp(5.0f), min.y));
+            ImGui::PushID(static_cast<int>(index));
+            ImGui::InvisibleButton("##crossover", ImVec2(dp(10.0f), max.y - min.y));
+            if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+                ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+            if (ImGui::IsItemActive())
+                set(parameter->binding, juce::jlimit(parameter->minimum, parameter->maximum, hzOf(ImGui::GetIO().MousePos.x)));
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s: %.0f Hz", parameter->label.toRawUTF8(), parameter->value);
+            ImGui::PopID();
+        }
+        // A click in a band shows its chain.
+        ImGui::SetCursorScreenPos(min);
+        ImGui::SetNextItemAllowOverlap();
+        if (ImGui::InvisibleButton("##bands", ImVec2(max.x - min.x, max.y - min.y)))
+            for (int band = 0; band < count; ++band) {
+                const auto right = band < static_cast<int>(crossovers.size()) ? xOf(crossovers[static_cast<std::size_t>(band)]->value) : max.x;
+                if (ImGui::GetIO().MousePos.x < right) {
+                    shown = band;
+                    break;
+                }
+            }
+        y = max.y + dp(4.0f);
+    }
+
+    // XY: the pad, its point dragged; a corner's name shows its chain.
+    if (kind == engine::NativeDspNodeKind::xyFx) {
+        const auto side = std::min(size.x - dp(40.0f), footTop - y - dp(6.0f));
+        const ImVec2 min(at.x + (size.x - side) * 0.5f, y);
+        const ImVec2 max(min.x + side, min.y + side);
+        list->AddRectFilled(min, max, p.bg2, dp(3.0f));
+        list->AddLine(ImVec2((min.x + max.x) * 0.5f, min.y), ImVec2((min.x + max.x) * 0.5f, max.y), p.line);
+        list->AddLine(ImVec2(min.x, (min.y + max.y) * 0.5f), ImVec2(max.x, (min.y + max.y) * 0.5f), p.line);
+        const auto* xs = containerSetting(head, "x");
+        const auto* ys = containerSetting(head, "y");
+        if (xs != nullptr && ys != nullptr) {
+            ImGui::SetCursorScreenPos(min);
+            ImGui::InvisibleButton("##pad", ImVec2(side, side));
+            if (ImGui::IsItemActive()) {
+                const auto mouse = ImGui::GetIO().MousePos;
+                set(xs->binding, std::clamp((mouse.x - min.x) / side, 0.0f, 1.0f));
+                set(ys->binding, std::clamp(1.0f - (mouse.y - min.y) / side, 0.0f, 1.0f));
+            }
+            auto pointX = xs->value;
+            auto pointY = ys->value;
+            if (const auto moved = strip.modulated.find(xs->binding); moved != strip.modulated.end())
+                pointX = moved->second;
+            if (const auto moved = strip.modulated.find(ys->binding); moved != strip.modulated.end())
+                pointY = moved->second;
+            const ImVec2 point(min.x + static_cast<float>(std::clamp(pointX, 0.0, 1.0)) * side,
+                               max.y - static_cast<float>(std::clamp(pointY, 0.0, 1.0)) * side);
+            list->AddCircleFilled(point, dp(6.0f), colour, 16);
+            list->AddCircle(point, dp(6.0f), p.text, 16, dp(1.2f));
+        }
+        // The corners: A top left, B top right, C bottom left, D bottom right.
+        const ImVec2 corners[4] { ImVec2(min.x - dp(18.0f), min.y), ImVec2(max.x + dp(2.0f), min.y),
+                                  ImVec2(min.x - dp(18.0f), max.y - dp(16.0f)), ImVec2(max.x + dp(2.0f), max.y - dp(16.0f)) };
+        for (int corner = 0; corner < 4 && corner < count; ++corner) {
+            ImGui::SetCursorScreenPos(corners[corner]);
+            ImGui::PushID(corner);
+            const auto name = branchName(kind, corner);
+            if (ImGui::Selectable(name.toRawUTF8(), shown == corner, ImGuiSelectableFlags_None, ImVec2(dp(16.0f), dp(16.0f))))
+                shown = corner;
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", "Show this corner's chain");
+            ImGui::PopID();
+        }
+        y = max.y + dp(4.0f);
+    }
+
+    // The replacer: what it listens for, what it plays.
+    if (kind == engine::NativeDspNodeKind::replacer) {
+        if (const auto* generator = containerSetting(head, "generator")) {
+            list->AddText(ImVec2(at.x + dp(6.0f), y + dp(3.0f)), p.textDim, "Sound");
+            ImGui::SetCursorScreenPos(ImVec2(at.x + dp(52.0f), y));
+            ImGui::SetNextItemWidth(size.x - dp(58.0f));
+            const auto current = std::clamp(static_cast<int>(std::lround(generator->value)), 0, engine::container::generatorCount - 1);
+            const ui::LearnParameterScope learn(generator->binding, generator->label);
+            if (ImGui::BeginCombo("##generator", engine::container::generatorName(current))) {
+                for (int index = 0; index < engine::container::generatorCount; ++index)
+                    if (ImGui::Selectable(engine::container::generatorName(index), index == current))
+                        set(generator->binding, index);
+                ImGui::EndCombo();
+            }
+            ui::learnItem();
+            y += dp(26.0f);
+        }
+        const std::pair<std::string_view, const char*> knobs[] { { "threshold", "Threshold" }, { "sensitivity", "Sensitivity" },
+                                                                 { "hold", "Hold" },          { "pitch", "Pitch" },
+                                                                 { "decay", "Decay" },        { "velocity", "Velocity" } };
+        const auto cell = (size.x - dp(8.0f)) / 3.0f;
+        for (std::size_t index = 0; index < std::size(knobs); ++index)
+            knob(knobs[index].first, knobs[index].second,
+                 ImVec2(at.x + dp(4.0f) + cell * static_cast<float>(index % 3) + (cell - dp(38.0f)) * 0.5f,
+                        y + static_cast<float>(index / 3) * (dp(26.0f) + ImGui::GetFontSize() * 0.86f + dp(6.0f))),
+                 26.0f, cell);
+    }
+
+    // The branches, a row each: shown (a click), solo, mute, volume, pan.
+    if (kind != engine::NativeDspNodeKind::xyFx && kind != engine::NativeDspNodeKind::replacer
+        && kind != engine::NativeDspNodeKind::fxChain) {
+        ImGui::SetCursorScreenPos(ImVec2(at.x, y));
+        if (ImGui::BeginChild("##branches", ImVec2(size.x, std::max(dp(24.0f), footTop - y - dp(2.0f))), ImGuiChildFlags_None)) {
+            auto* rows = ImGui::GetWindowDrawList();
+            std::optional<int> removeBranch;
+            const auto* selected = containerSetting(head, "selected");
+            for (int branch = 0; branch < count; ++branch) {
+                ImGui::PushID(branch);
+                const auto rowTop = ImGui::GetCursorScreenPos();
+                const ImVec2 rowEnd(rowTop.x + size.x - dp(4.0f), rowTop.y + rowHeight);
+                if (branch == shown)
+                    rows->AddRectFilled(rowTop, rowEnd, theme::alpha(colour, 0.22f), dp(3.0f));
+                auto x = rowTop.x + dp(4.0f);
+                // A selector: the chain playing.
+                if (selected != nullptr) {
+                    const auto playing = static_cast<int>(std::lround(selected->value)) == branch;
+                    const ImVec2 centre(x + dp(6.0f), rowTop.y + rowHeight * 0.5f);
+                    if (playing)
+                        rows->AddCircleFilled(centre, dp(4.5f), colour, 12);
+                    else
+                        rows->AddCircle(centre, dp(4.5f), p.textDim, 12, dp(1.2f));
+                    ImGui::SetCursorScreenPos(ImVec2(x, rowTop.y));
+                    {
+                        const ui::LearnParameterScope learn(selected->binding, selected->label);
+                        if (ImGui::InvisibleButton("##play", ImVec2(dp(13.0f), rowHeight)))
+                            set(selected->binding, branch);
+                        ui::learnItem();
+                    }
+                    if (ImGui::IsItemHovered())
+                        ImGui::SetTooltip("%s", "Play this chain");
+                    x += dp(16.0f);
+                }
+                // Its name: shows its chain after the container.
+                const auto name = branchName(kind, branch);
+                const auto controls = layered ? dp(kind == engine::NativeDspNodeKind::fxLayer ? 94.0f : 70.0f) : dp(28.0f);
+                ImGui::SetCursorScreenPos(ImVec2(x, rowTop.y));
+                if (ImGui::InvisibleButton("##name", ImVec2(std::max(1.0f, rowEnd.x - controls - x), rowHeight)))
+                    shown = branch;
+                if (ImGui::IsItemClicked(ImGuiMouseButton_Right) && engine::container::variableBranches(kind) && count > 1)
+                    ImGui::OpenPopup("##branchMenu");
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("%s", "Show its chain (right click: remove it)");
+                ui::clippedText(rows, ImVec2(x, rowTop.y + (rowHeight - ImGui::GetFontSize()) * 0.5f), rowEnd.x - controls - x,
+                                branch == shown ? p.text : p.textDim, name.toRawUTF8());
+                // How many cards it holds.
+                const auto cards = container->branches[static_cast<std::size_t>(branch)].size();
+                if (cards > 0) {
+                    const auto badge = juce::String(static_cast<int>(cards));
+                    const auto width = ImGui::CalcTextSize(badge.toRawUTF8()).x;
+                    rows->AddText(ImVec2(rowEnd.x - controls - width - dp(4.0f), rowTop.y + (rowHeight - ImGui::GetFontSize()) * 0.5f),
+                                  p.textFaint, badge.toRawUTF8());
+                }
+                auto controlX = rowEnd.x - controls;
+                const auto number = juce::String(branch + 1);
+                if (layered) {
+                    if (kind != engine::NativeDspNodeKind::fxSelector) {
+                        ImGui::SetCursorScreenPos(ImVec2(controlX, rowTop.y + dp(2.0f)));
+                        toggle(("solo" + number).toStdString(), "S", p.accent);
+                        ImGui::SetCursorScreenPos(ImVec2(controlX + dp(22.0f), rowTop.y + dp(2.0f)));
+                        toggle(("mute" + number).toStdString(), "M", p.warn);
+                        controlX += dp(46.0f);
+                    }
+                    knob(("volume" + number).toStdString(), nullptr, ImVec2(controlX, rowTop.y + dp(1.0f)), 20.0f, 0.0f);
+                    controlX += dp(24.0f);
+                    if (kind == engine::NativeDspNodeKind::fxLayer)
+                        knob(("pan" + number).toStdString(), nullptr, ImVec2(controlX, rowTop.y + dp(1.0f)), 20.0f, 0.0f);
+                }
+                if (ImGui::BeginPopup("##branchMenu")) {
+                    ImGui::TextDisabled("%s", name.toRawUTF8());
+                    ImGui::Separator();
+                    if (ImGui::MenuItem("Remove, with its devices"))
+                        removeBranch = branch;
+                    ImGui::EndPopup();
+                }
+                ImGui::SetCursorScreenPos(ImVec2(rowTop.x, rowEnd.y + dp(1.0f)));
+                ImGui::PopID();
+            }
+            // One more layer, one more chain.
+            if (engine::container::variableBranches(kind) && count < engine::container::maximumBranches) {
+                ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x + dp(4.0f), ImGui::GetCursorScreenPos().y + dp(2.0f)));
+                const auto label = std::string("+ ") + (kind == engine::NativeDspNodeKind::fxLayer ? "Layer" : "Chain");
+                if (ImGui::SmallButton(label.c_str())) {
+                    if (graph.editorAddBranch(head.id)) {
+                        shown = count;
+                        state_.focused = Panel::devices;
+                    }
+                }
+            }
+            if (removeBranch && graph.editorRemoveBranch(head.id, *removeBranch)) {
+                shown = std::max(0, std::min(shown, count - 2));
+                graph_layout::arrange(graph);
+                state_.focused = Panel::devices;
+            }
+            ImGui::Dummy(ImVec2(0.0f, 0.0f));
+        }
+        ImGui::EndChild();
+    } else if (kind == engine::NativeDspNodeKind::fxChain) {
+        ImGui::PushTextWrapPos(at.x + size.x - dp(8.0f));
+        ImGui::SetCursorScreenPos(ImVec2(at.x + dp(6.0f), y + dp(2.0f)));
+        ImGui::TextDisabled("%s", "Its devices follow it, in its frame; Mix blends them with the sound that came in.");
+        ImGui::PopTextWrapPos();
+    }
+    juce::ignoreUnused(top);
+    ImGui::PopFont();
+    ImGui::SetCursorScreenPos(at);
+    ImGui::Dummy(ImVec2(size.x, 1.0f));
+}
+
+void DevicesView::drawBranch(Strip& strip, const app::NodeGraphComponent::EditorNode& head, const ImVec2 headOrigin, const float height,
+                             const CardPlace& place)
+{
+    const auto& p = theme::palette();
+    auto& graph = strip.graph;
+    const auto container = graph.editorContainer(head.id);
+    if (!container || container->end == 0 || container->branches.empty())
+        return;
+    const auto* effect = engine::effectForType(head.typeKey.toStdString());
+    auto& shown = state_.containerBranch[{ trackKey_, head.id }];
+    shown = std::clamp(shown, 0, static_cast<int>(container->branches.size()) - 1);
+    const auto branch = shown;
+    const auto& cards = container->branches[static_cast<std::size_t>(branch)];
+    const auto colour = toImColour(head.colour);
+    auto* list = ImGui::GetWindowDrawList();
+    const auto inset = dp(7.0f);
+    const auto innerTop = headOrigin.y + inset;
+    const auto innerHeight = height - inset * 2.0f;
+    const auto innerLeft = ImGui::GetCursorScreenPos().x;
+    // The cards over the frame's tint: drawn first, the tint under them.
+    ImDrawListSplitter splitter;
+    splitter.Split(list, 2);
+    splitter.SetCurrentChannel(list, 1);
+    for (std::size_t index = 0; index < cards.size(); ++index) {
+        const auto found = std::find_if(strip.nodes.begin(), strip.nodes.end(), [&](const auto& node) { return node.id == cards[index]; });
+        if (found == strip.nodes.end())
+            continue;
+        ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x, innerTop));
+        drawCard(strip, *found, innerHeight,
+                 CardPlace { head.id, branch, index + 1 < cards.size() ? cards[index + 1] : 0, place.depth + 1 });
+    }
+    // Its end: a device dropped or chosen there joins the branch.
+    ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x, innerTop));
+    const auto plus = ImGui::GetCursorScreenPos();
+    const ImVec2 plusSize(dp(40.0f), innerHeight);
+    ImGui::PushID(static_cast<int>(head.id));
+    ImGui::InvisibleButton("##branchEnd", plusSize);
+    ui::recordSpot("branch-end:" + std::to_string(head.id) + ":" + std::to_string(branch));
+    const auto hovered = ImGui::IsItemHovered();
+    if (ImGui::IsItemClicked()) {
+        catalogueBranch_ = std::make_pair(head.id, branch);
+        search_[0] = 0;
+        highlight_ = 0;
+        focusSearch_ = true;
+        openCatalogue_ = true;
+    }
+    if (ImGui::BeginDragDropTarget()) {
+        if (const auto* payload = ImGui::AcceptDragDropPayload(cardPayload, ImGuiDragDropFlags_AcceptBeforeDelivery
+                                                                                | ImGuiDragDropFlags_AcceptNoDrawDefaultRect)) {
+            list->AddLine(ImVec2(plus.x - dp(3.0f), plus.y), ImVec2(plus.x - dp(3.0f), plus.y + plusSize.y), p.accent, dp(3.0f));
+            if (payload->IsDelivery())
+                strip.moveCard = CardMove { *static_cast<const std::uint64_t*>(payload->Data), head.id, branch, 0 };
+        }
+        ImGui::EndDragDropTarget();
+    }
+    if (hovered)
+        ImGui::SetTooltip("%s", "Add a device to this chain (or drop one here)");
+    ImGui::PopID();
+    list->AddRect(plus, ImVec2(plus.x + plusSize.x, plus.y + plusSize.y), hovered ? p.accent : theme::alpha(colour, 0.6f), dp(4.0f),
+                  dp(1.0f));
+    ImGui::PushFont(nullptr, ui::currentFontBase() * 1.2f);
+    ui::centredText(list, plus, ImVec2(plus.x + plusSize.x, plus.y + plusSize.y * 0.9f), hovered ? p.accent : p.textDim, icon::add);
+    ImGui::PopFont();
+    const auto innerRight = plus.x + plusSize.x;
+    // The branch's name on the frame, the tint under the cards.
+    splitter.SetCurrentChannel(list, 0);
+    list->AddRectFilled(ImVec2(innerLeft - dp(4.0f), headOrigin.y), ImVec2(innerRight + dp(4.0f), headOrigin.y + height),
+                        theme::alpha(colour, 0.09f), dp(5.0f));
+    splitter.Merge(list);
+    list->AddRect(ImVec2(headOrigin.x - dp(2.0f), headOrigin.y - dp(2.0f)), ImVec2(innerRight + dp(4.0f), headOrigin.y + height + dp(2.0f)),
+                  theme::alpha(colour, 0.75f), dp(6.0f), dp(1.5f));
+    if (effect != nullptr) {
+        const auto label = branchName(effect->kind, branch).toUpperCase();
+        ImGui::PushFont(theme::boldFont(), ui::currentFontBase() * 0.68f);
+        list->AddText(ImVec2(innerLeft, headOrigin.y + dp(0.5f)), theme::alpha(colour, 0.9f), label.toRawUTF8());
+        ImGui::PopFont();
+    }
+    ImGui::SetCursorScreenPos(ImVec2(innerRight + dp(4.0f), headOrigin.y));
+    ImGui::Dummy(ImVec2(dp(1.0f), height));
+    ImGui::SameLine(0.0f, dp(6.0f));
 }
 
 void DevicesView::drawValueList(const TrackRef& track, app::NodeGraphComponent& graph, const app::NodeGraphComponent::EditorNode& node,
@@ -1996,7 +2487,11 @@ void DevicesView::drawCatalogue(const TrackRef& track)
         ImGui::CloseCurrentPopup();
     }
     if (chosen != nullptr) {
-        const auto result = studio_.insertDevice(track, chosen->key);
+        // Into the branch it was opened from, else the chain.
+        const auto result = catalogueBranch_ ? studio_.insertDeviceInBranch(track, chosen->key, catalogueBranch_->first,
+                                                                           catalogueBranch_->second)
+                                             : studio_.insertDevice(track, chosen->key);
+        catalogueBranch_.reset();
         if (result.failed())
             state_.status = result.getErrorMessage();
         ImGui::CloseCurrentPopup();

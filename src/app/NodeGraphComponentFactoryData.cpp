@@ -1220,7 +1220,9 @@ void NodeGraphComponent::initialiseCatalog()
         { "transport-tempo", "node.transportTempo", {}, "nodes.category.transport", juce::Colour(0xffffc65c), true, transport, true, control, false, false },
         { "transport-beat", "node.transportBeat", {}, "nodes.category.transport", juce::Colour(0xffffc65c), true, transport, true, control, false, false },
         { "transport-playing", "node.transportPlaying", {}, "nodes.category.transport", juce::Colour(0xffffc65c), true, transport, true, control, false, false },
-        { "envelope-follower", "node.envelopeFollower", {}, "nodes.category.analyzers", juce::Colour(0xff7ed878), true, audio, true, control, false, false }
+        { "envelope-follower", "node.envelopeFollower", {}, "nodes.category.analyzers", juce::Colour(0xff7ed878), true, audio, true, control, false, false },
+        // A container's end (Containers.h): its branches mixed back.
+        { "container-end", "node.containerEnd", {}, "nodes.category.containers", juce::Colour(0xffe0b25a), true, audio, true, audio, false, false }
     };
     // The effect catalogue's cards; their sockets and schema come from the
     // primitive registry like everyone else's.

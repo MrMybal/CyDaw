@@ -229,6 +229,13 @@ public:
         state_.selectedTrack = track;
         return true;
     }
+    bool showContainerBranch(const TrackRef& track, std::uint64_t head, int branch) override
+    {
+        state_.containerBranch[{ studio_.routingKey(track) + (track.pad >= 0 ? static_cast<std::uint64_t>(track.pad + 1) << 48 : 0),
+                                 head }] = branch;
+        state_.selectedTrack = track;
+        return true;
+    }
     bool armModulator(const TrackRef& track, std::uint64_t modulator) override
     {
         if (modulator == 0)

@@ -846,6 +846,7 @@ private:
     juce::var onAddMidiClip();
     juce::var onDescribeNodeType();
     juce::var onModulator();
+    juce::var onContainer();
     juce::var onNodes();
     juce::var onListPlugins();
     juce::var onPlugins();
@@ -1564,6 +1565,8 @@ juce::var Commands::run()
     }
     if (command == "modulator")
         return onModulator();
+    if (command == "container")
+        return onContainer();
     if (command == "ui_spots") {
         // {record, filter}: where the knobs (knob:<binding>) and the
         // modulators' arrows (modulator-arrow:<id>) were last drawn, in the
@@ -4618,6 +4621,118 @@ juce::var Commands::onModulator()
         return ok(object());
     }
     return fail("action: add, set, modulate, unmodulate, remove, arm, column or list");
+}
+
+juce::var Commands::onContainer()
+{
+    // {track, action, ...}: the containers of a track's chain (Containers.h).
+    //   insert {type, before}: fx-chain, fx-layer, fx-selector, mid-side-split,
+    //     stereo-split, multiband-2, multiband-3, xy-fx, replacer; before a
+    //     card (0: the chain's end);
+    //   add_device {head, branch, key, before}: a device into a branch;
+    //   move {nodeId, head (0: the main chain), branch, before}: a card (a
+    //     container with all it holds) moved;
+    //   add_branch {head}; remove_branch {head, branch}; remove {head};
+    //   show {head, branch}: the branch shown after the card;
+    //   list: every container, its branches' cards.
+    std::optional<GraphTarget> target;
+    if (auto error = targetOrFail(target); !error.isVoid())
+        return error;
+    if (!target->track)
+        return fail("containers belong to a track's chain");
+    auto& graph = target->graph();
+    const auto action = text("action").trim().toLowerCase();
+    const auto head = static_cast<std::uint64_t>(number("head", 0.0));
+    const auto branch = static_cast<int>(number("branch", 0.0));
+    const auto before = static_cast<std::uint64_t>(number("before", 0.0));
+    const auto describe = [&](const std::uint64_t id) {
+        auto entry = object();
+        const auto container = graph.editorContainer(id);
+        if (!container)
+            return entry;
+        const auto nodes = graph.editorNodes();
+        set(entry, "head", static_cast<juce::int64>(container->head));
+        set(entry, "end", static_cast<juce::int64>(container->end));
+        set(entry, "type", container->typeKey);
+        juce::Array<juce::var> branches;
+        for (const auto& cards : container->branches) {
+            juce::Array<juce::var> listed;
+            for (const auto card : cards) {
+                auto item = object();
+                set(item, "id", static_cast<juce::int64>(card));
+                if (const auto found = std::find_if(nodes.begin(), nodes.end(), [card](const auto& node) { return node.id == card; });
+                    found != nodes.end()) {
+                    set(item, "type", found->typeKey);
+                    set(item, "title", found->title);
+                }
+                listed.add(item);
+            }
+            branches.add(listed);
+        }
+        set(entry, "branches", branches);
+        return entry;
+    };
+    const auto done = [&](const std::uint64_t id, const bool structural) {
+        graph_layout::arrange(graph);
+        commitGraph(*target, structural);
+        return ok(describe(id));
+    };
+    if (action == "list") {
+        juce::Array<juce::var> listed;
+        for (const auto& node : graph.editorNodes())
+            if (graph.editorIsContainer(node.id))
+                listed.add(describe(node.id));
+        auto result = object();
+        set(result, "containers", listed);
+        return ok(result);
+    }
+    if (action == "insert") {
+        const auto type = text("type").trim().toLowerCase();
+        const auto* effect = engine::effectForType(type.toStdString());
+        if (effect == nullptr || !effect->container)
+            return fail("no container \"" + type + "\": fx-chain, fx-layer, fx-selector, mid-side-split, stereo-split, multiband-2, "
+                        "multiband-3, xy-fx, replacer");
+        const auto made = graph.editorInsertContainer(type, before);
+        if (made == 0)
+            return fail("the container could not be inserted there");
+        return done(made, true);
+    }
+    if (action == "add_device") {
+        const auto key = text("key").trim();
+        if (const auto added = studio_.insertDeviceInBranch(*target->track, key, head, branch, before); added.failed())
+            return fail(added.getErrorMessage());
+        return ok(describe(head));
+    }
+    if (action == "move") {
+        if (!graph.editorMoveCard(static_cast<std::uint64_t>(number("nodeId", 0.0)), head, branch, before))
+            return fail("that card cannot move there (inside itself, an instrument's voice, or it is already there)");
+        return done(head, true);
+    }
+    if (!graph.editorIsContainer(head))
+        return fail("no container " + juce::String(static_cast<juce::int64>(head)) + " on that track; list gives them");
+    if (action == "add_branch") {
+        if (!graph.editorAddBranch(head))
+            return fail("this container takes no more branches");
+        return done(head, true);
+    }
+    if (action == "remove_branch") {
+        if (!graph.editorRemoveBranch(head, branch))
+            return fail("that branch cannot be removed");
+        return done(head, true);
+    }
+    if (action == "remove") {
+        if (!graph.editorRemoveContainer(head))
+            return fail("the container was not removed");
+        graph_layout::arrange(graph);
+        commitGraph(*target, true);
+        return ok(object());
+    }
+    if (action == "show") {
+        if (!ui_.showContainerBranch(*target->track, head, branch))
+            return fail("this interface shows no containers");
+        return ok(describe(head));
+    }
+    return fail("action: list, insert, add_device, move, add_branch, remove_branch, remove or show");
 }
 
 juce::var Commands::onDescribeNodeType()

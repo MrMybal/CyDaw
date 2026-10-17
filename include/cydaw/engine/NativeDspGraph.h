@@ -159,10 +159,23 @@ enum class NativeDspNodeKind : std::uint8_t {
     modMacro,
     modButton,
     modMath,
-    modFollower
+    modFollower,
+    // The containers (Containers.h): a head, the card, holding chains of
+    // devices; the end that mixes them; the part of the sound a branch hears.
+    fxChain,
+    fxLayer,
+    fxSelector,
+    midSideSplit,
+    stereoSplit,
+    multiband2,
+    multiband3,
+    xyFx,
+    replacer,
+    containerEnd,
+    containerTap
 };
 // The last kind: what a stored graph may name (a kind appended moves it).
-inline constexpr NativeDspNodeKind lastNativeDspNodeKind = NativeDspNodeKind::modFollower;
+inline constexpr NativeDspNodeKind lastNativeDspNodeKind = NativeDspNodeKind::containerTap;
 
 // A modulator's kind.
 [[nodiscard]] constexpr bool isModulatorKind(const NativeDspNodeKind kind) noexcept

@@ -930,6 +930,10 @@ public:
     // A whole device from the catalogue: a preset replaces the graph, a
     // module or node is spliced before the output.
     juce::Result insertDevice(const TrackRef& track, const juce::String& key) override;
+    // A device (a container too) into a branch of a container, before the
+    // card `before` (0: at the branch's end).
+    juce::Result insertDeviceInBranch(const TrackRef& track, const juce::String& key, std::uint64_t head, int branch,
+                                      std::uint64_t before = 0);
     // Recompiles and publishes a track's graph to the engine.
     juce::Result publishGraph(const TrackRef& track, bool structural);
     // The graph the live values are fed to (the one on screen).

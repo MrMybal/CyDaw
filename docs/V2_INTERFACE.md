@@ -798,6 +798,10 @@ La liste reste ouverte par carte pendant la session. Port de contrôle : `value_
 
 Le bouton **modulateurs** de l'en-tête d'une carte ouvre une colonne à sa gauche : **+** ajoute un LFO, des Steps, un Random, un ADSR, un Keytrack, des Expressions, une Macro, un Button, un Math ou un Envelope Follower. La flèche d'un modulateur se glisse sur n'importe quel potard de la piste. Cliquée, elle s'arme : tirer un potard règle alors la quantité (Échap désarme). Un anneau de la couleur du modulateur entoure chaque potard modulé, et la liste des valeurs montre les modulations. Détails : [MODULATEURS.md](MODULATEURS.md). Port de contrôle : `modulator {track, action, …}`. Test : `tests/v2_modulators_check.py` (ctest `cydaw2_modulators_check`).
 
+## Conteneurs
+
+Le **+** de la bande propose les conteneurs (Chain, FX Layer, FX Selector, Mid-Side Split, Stereo Split, Multiband FX-2 et FX-3, XY FX, Replacer). La carte d'un conteneur montre ses branches et ses réglages ; les cartes de la branche choisie la suivent dans son cadre, avec un **+** au bout. Une carte tirée par son nom entre dans une branche ou en sort. Détails : [CONTENEURS.md](CONTENEURS.md). Port de contrôle : `container {track, action, …}`. Test : `tests/v2_containers_check.py` (ctest `cydaw2_containers_check`).
+
 ## Allumer, éteindre, tourner sans claquer
 
 **Changer l'ordre** : on prend un effet par son nom (en tête de sa carte) et on le lâche sur une autre

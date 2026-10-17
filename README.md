@@ -50,6 +50,9 @@ sons intégrée.
 - Sur chaque périphérique, des **modulateurs** comme dans Bitwig : LFO, Steps, Random, ADSR, Keytrack,
   Expressions, Macro, Button, Math, Envelope Follower. On glisse leur flèche sur n'importe quel potard,
   effets et instruments compris ; un anneau montre de combien il bouge, réglable pendant que ça joue.
+- Des **conteneurs** comme dans Bitwig : Chain, FX Layer, FX Selector, Mid-Side Split, Stereo Split,
+  Multiband FX-2 et FX-3, XY FX et Replacer. Leurs chaînes s'affichent dans la bande, on y glisse des
+  périphériques, ils s'imbriquent.
 
 **Mixer et router**
 - Mixeur avec bus, envois, side-chain, compensation de latence.
@@ -132,6 +135,7 @@ Les tests se lancent avec `ctest -C Release` dans le dossier de compilation.
 - [Synchronisation du transport : MIDI, JACK, Link](docs/TRANSPORT_SYNC.md)
 - [Contrôleurs MIDI / OSC : appareils RAW, virtuels, apprentissage](docs/CONTROLEURS.md)
 - [Modulateurs : LFO, pas, enveloppes, macros sur chaque périphérique](docs/MODULATEURS.md)
+- [Conteneurs : couches, sélecteur, mid-side, bandes, pavé XY, remplacement](docs/CONTENEURS.md)
 - [Serveur MCP](tools/mcp/README.md)
 
 ## Licence

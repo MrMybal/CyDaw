@@ -1,5 +1,7 @@
 #include "Studio.h"
 
+#include <cydaw/engine/EffectCatalogue.h>
+
 #include "DeviceOps.h"
 #include "DeviceTransfer.h"
 #include "GraphPresetFile.h"
@@ -1134,6 +1136,27 @@ juce::Result Studio::publishGraph(const TrackRef& track, const bool structural)
     return result;
 }
 
+juce::Result Studio::insertDeviceInBranch(const TrackRef& track, const juce::String& key, const std::uint64_t head, const int branch,
+                                          const std::uint64_t before)
+{
+    auto* slot = graphFor(track);
+    if (slot == nullptr)
+        return juce::Result::fail(ui::Ls("Piste introuvable", "No such track"));
+    auto& graph = slot->graph();
+    const auto catalogue = graph.deviceCatalogue();
+    const auto device = std::find_if(catalogue.begin(), catalogue.end(), [&key](const auto& entry) { return entry.key == key; });
+    if (device == catalogue.end())
+        return juce::Result::fail("no device \"" + key + "\"");
+    if (device->soundSource || device->input != "audio" || device->output != "audio")
+        return juce::Result::fail("\"" + device->name + "\" " + ui::Ls("ne traite pas le son : pas dans un conteneur",
+                                                                      "does not process sound: not in a container"));
+    if (graph.editorInsertInBranch(head, branch, key, before) == 0)
+        return juce::Result::fail(ui::Ls("Le périphérique n'a pas pu entrer dans cette branche", "The device could not go into that branch"));
+    graph_layout::arrange(graph);
+    dirty_ = true;
+    return publishGraph(track, true);
+}
+
 juce::Result Studio::insertDevice(const TrackRef& track, const juce::String& key)
 {
     auto* slot = graphFor(track);
@@ -1151,6 +1174,14 @@ juce::Result Studio::insertDevice(const TrackRef& track, const juce::String& key
     // the effects after it kept.
     if (track.midi && device->kind == "preset" && device->soundSource)
         return replaceInstrument(track, key, device->name);
+    // A container: its head and end, its branches empty, before the output.
+    if (const auto* effect = engine::effectForType(key.toStdString()); effect != nullptr && effect->container) {
+        if (graph.editorInsertContainer(key, 0) == 0)
+            return juce::Result::fail("the container could not be added");
+        graph_layout::arrange(graph);
+        dirty_ = true;
+        return publishGraph(track, true);
+    }
     // A MIDI card (an arpeggiator, chords…) goes before the instrument.
     const auto notes = device->input == "midi" && device->output == "midi";
     if (notes && !track.midi)

@@ -30,6 +30,7 @@ namespace cydaw::app::detail {
     if (key == "gain") return "core.gain";
     if (key == "audio-sum") return "core.audio-sum";
     if (key == "mixer-4") return "core.mixer-4";
+    if (key == "container-end") return "core.container-end";
     if (key == "gain-pan") return "core.pan";
     if (key == "lowpass") return "core.lowpass";
     if (key == "eq-band") return "core.peaking-eq";

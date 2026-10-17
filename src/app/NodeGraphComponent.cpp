@@ -1712,6 +1712,8 @@ void appendPublishedParameters(
                                         : effect->typeKey == "resonateurs" ? "effect.parameter.resonatorWord"
                                         : effect->typeKey == "accords"     ? "effect.parameter.noteWord"
                                         : effect->typeKey == "sequenceur"  ? "effect.parameter.stepWord"
+                                        : effect->typeKey == "fx-layer"    ? "container.parameter.layerWord"
+                                        : effect->typeKey == "fx-selector" ? "container.parameter.chainWord"
                                                                            : "effect.parameter.band") + " "
                                          + juce::String(item.band + 1) + juce::String::fromUTF8(" \xc2\xb7 ")
                                          + tr(juce::String(std::string(item.labelKey)))
@@ -5087,6 +5089,12 @@ cydaw::engine::NativeDspGraph NodeGraphComponent::nativeDspGraph() const
     for (const auto& node : nodes_) {
         if (!node.bypassed)
             continue;
+        // A container switched off: its end gives what its head received.
+        if (editorIsContainer(node.id)) {
+            if (const auto container = editorContainer(node.id); container && container->end != 0)
+                graph.bypasses.push_back({ container->end, node.id });
+            continue;
+        }
         // A card of the instrument's voice: the voice falls silent where it
         // enters the effects.
         if (voice.voiceNodes.contains(node.id)) {
@@ -5555,6 +5563,7 @@ cydaw::engine::NativeDspGraph NodeGraphComponent::buildNativeDspGraph(
         if (typeKey == "reverb-rack") return Kind::reverbRack;
         if (typeKey == "vocal-strip") return Kind::vocalStrip;
         if (typeKey == "mixer-4") return Kind::mixer;
+        if (typeKey == "container-end") return Kind::containerEnd;
         // A MIDI effect has no sound to process: the instrument's plan
         // carries it (PolySynthGraphPlan::midiEffects).
         if (const auto* effect = cydaw::engine::effectForType(typeKey.toStdString()))
@@ -25839,7 +25848,7 @@ NodeGraphComponent::deviceCatalogue() const
     for (const auto& type : catalog_) {
         if (!type.hasOutput || type.composite || type.key.startsWith("graph-")
             || type.key == "midi-input" || type.key == "audio-clips" || type.key.startsWith("missing-")
-            || type.key == "midi-arp")
+            || type.key == "midi-arp" || type.key == "container-end")
             continue;
         entries.push_back({ type.key,
                             type.title.isNotEmpty() ? type.title
@@ -25894,6 +25903,9 @@ bool NodeGraphComponent::editorRemoveFromChain(const std::uint64_t id)
     auto* node = findNode(id);
     if (editingLocked_ || node == nullptr || isBoundaryNode(*node))
         return false;
+    // A container goes with all it holds.
+    if (editorIsContainer(id))
+        return editorRemoveContainer(id);
     // The signal around it: audio and MIDI, not the control cables that
     // only steered it.
     std::vector<Connection> into;

@@ -117,6 +117,7 @@ add_library(cydaw_core STATIC
     src/engine/AudioRenderPlan.cpp
     src/engine/BuiltinProcessors.cpp
     src/engine/EffectProcessors.cpp
+    src/engine/ContainerProcessors.cpp
     src/engine/ProEffects.cpp
     src/engine/AmpDesign.cpp
     src/engine/AmpEffects.cpp
@@ -1486,6 +1487,13 @@ if(CYDAW_BUILD_DESKTOP)
                              COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/v2_modulators_check.py"
                                      --port 47858 --exe "$<TARGET_FILE:CyDAW2>")
                     set_tests_properties(cydaw2_modulators_check PROPERTIES TIMEOUT 300)
+                    # Containers: layers summed, muted, a card moved by a drag, a
+                    # container inside one, bands split, saved and opened again.
+                    # Silent.
+                    add_test(NAME cydaw2_containers_check
+                             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/v2_containers_check.py"
+                                     --port 47859 --exe "$<TARGET_FILE:CyDAW2>")
+                    set_tests_properties(cydaw2_containers_check PROPERTIES TIMEOUT 300)
                     # Batterie: its kits (the banks downloaded on this computer;
                     # skipped without them), its pieces' mix, grooves, presets.
                     add_test(NAME cydaw2_batterie_check

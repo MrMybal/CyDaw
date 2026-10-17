@@ -80,7 +80,7 @@ inline constexpr std::array<NoteDivision, 12> noteDivisions { {
 }
 
 // Where an effect sits in the primitive registry.
-enum class EffectGroup : std::uint8_t { modulation, delay, filter, dynamics, channels, analysis, midi, control };
+enum class EffectGroup : std::uint8_t { modulation, delay, filter, dynamics, channels, analysis, midi, control, container };
 
 // The sidechain input of an effect that has one ("sidechain-in"). Far above the value ports
 // (3, 4… one per parameter) so adding it moved none of them: saved cables
@@ -112,6 +112,9 @@ struct EffectDescriptor {
     // A modulator (Modulators.h): no sound in or out, a control value that
     // moves other cards' knobs.
     bool control {};
+    // A container's head (Containers.h): its chains' devices between it and
+    // its end.
+    bool container {};
 
     [[nodiscard]] constexpr std::size_t parameterCount() const noexcept { return parameters.size(); }
     [[nodiscard]] constexpr bool convertsChannels() const noexcept { return inputChannels != outputChannels; }
@@ -1309,12 +1312,89 @@ inline constexpr EffectParameter modFollowerParameters[] {
 };
 #undef CYDAW_MODULATOR_OWNER
 
+// The containers (Containers.h): every one mixes its chains back into its
+// input by Mix, their sum lifted by Wet Gain.
+#define CYDAW_CONTAINER_MIX(prefix)                                                                                      \
+    { "mix", prefix ".mix", "effect.parameter.mix", "", 0.0f, 1.0f, 1.0f, &P::effect1 },                                 \
+    { "wet-gain", prefix ".wetGain", "container.parameter.wetGain", "dB", -36.0f, 12.0f, 0.0f, &P::effect2 }
+// A branch's own: its volume, pan, mute and solo, labelled by its number.
+#define CYDAW_BRANCH(prefix, n)                                                                                          \
+    { "volume" #n, prefix ".volume" #n, "effect.parameter.volume", "dB", -60.0f, 12.0f, 0.0f, nullptr, (n) - 1, (n) - 1 },  \
+    { "pan" #n, prefix ".pan" #n, "effect.parameter.pan", "", -1.0f, 1.0f, 0.0f, nullptr, 8 + (n) - 1, (n) - 1 },         \
+    { "mute" #n, prefix ".mute" #n, "container.parameter.mute", "", 0.0f, 1.0f, 0.0f, nullptr, 16 + (n) - 1, (n) - 1 },   \
+    { "solo" #n, prefix ".solo" #n, "container.parameter.solo", "", 0.0f, 1.0f, 0.0f, nullptr, 24 + (n) - 1, (n) - 1 }
+#define CYDAW_BRANCHES(prefix)                                                                                           \
+    CYDAW_BRANCH(prefix, 1), CYDAW_BRANCH(prefix, 2), CYDAW_BRANCH(prefix, 3), CYDAW_BRANCH(prefix, 4),                 \
+    CYDAW_BRANCH(prefix, 5), CYDAW_BRANCH(prefix, 6), CYDAW_BRANCH(prefix, 7), CYDAW_BRANCH(prefix, 8)
+// A band's: its level, mute and solo.
+#define CYDAW_BAND(prefix, n)                                                                                            \
+    { "volume" #n, prefix ".volume" #n, "effect.parameter.volume", "dB", -60.0f, 12.0f, 0.0f, nullptr, (n) - 1, (n) - 1 },  \
+    { "mute" #n, prefix ".mute" #n, "container.parameter.mute", "", 0.0f, 1.0f, 0.0f, nullptr, 16 + (n) - 1, (n) - 1 },   \
+    { "solo" #n, prefix ".solo" #n, "container.parameter.solo", "", 0.0f, 1.0f, 0.0f, nullptr, 24 + (n) - 1, (n) - 1 }
+inline constexpr EffectParameter fxChainParameters[] {
+    CYDAW_CONTAINER_MIX("fxChain"),
+};
+inline constexpr EffectParameter fxLayerParameters[] {
+    CYDAW_CONTAINER_MIX("fxLayer"),
+    { "chains", "fxLayer.chains", "container.parameter.layers", "", 1.0f, 8.0f, 2.0f, &P::effect3 },
+    CYDAW_BRANCHES("fxLayer"),
+};
+inline constexpr EffectParameter fxSelectorParameters[] {
+    CYDAW_CONTAINER_MIX("fxSelector"),
+    { "chains", "fxSelector.chains", "container.parameter.chains", "", 1.0f, 8.0f, 2.0f, &P::effect3 },
+    { "selected", "fxSelector.selected", "container.parameter.selected", "", 0.0f, 7.0f, 0.0f, &P::effect4 },
+    { "fade", "fxSelector.fade", "container.parameter.fade", "ms", 0.0f, 500.0f, 20.0f, &P::effect5 },
+    CYDAW_BRANCHES("fxSelector"),
+};
+inline constexpr EffectParameter midSideParameters[] {
+    CYDAW_CONTAINER_MIX("midSide"),
+    { "mid-gain", "midSide.midGain", "container.parameter.midGain", "dB", -36.0f, 12.0f, 0.0f, &P::effect3 },
+    { "side-gain", "midSide.sideGain", "container.parameter.sideGain", "dB", -36.0f, 12.0f, 0.0f, &P::effect4 },
+};
+inline constexpr EffectParameter stereoSplitParameters[] {
+    CYDAW_CONTAINER_MIX("stereoSplit"),
+    { "left-gain", "stereoSplit.leftGain", "container.parameter.leftGain", "dB", -36.0f, 12.0f, 0.0f, &P::effect3 },
+    { "right-gain", "stereoSplit.rightGain", "container.parameter.rightGain", "dB", -36.0f, 12.0f, 0.0f, &P::effect4 },
+};
+inline constexpr EffectParameter multiband2Parameters[] {
+    CYDAW_CONTAINER_MIX("multiband2"),
+    { "crossover", "multiband2.crossover", "container.parameter.crossover", "Hz", 40.0f, 16000.0f, 400.0f, &P::effect3 },
+    CYDAW_BAND("multiband2", 1), CYDAW_BAND("multiband2", 2),
+};
+inline constexpr EffectParameter multiband3Parameters[] {
+    CYDAW_CONTAINER_MIX("multiband3"),
+    { "crossover-low", "multiband3.crossoverLow", "container.parameter.crossoverLow", "Hz", 40.0f, 16000.0f, 250.0f, &P::effect3 },
+    { "crossover-high", "multiband3.crossoverHigh", "container.parameter.crossoverHigh", "Hz", 40.0f, 16000.0f, 2500.0f, &P::effect4 },
+    CYDAW_BAND("multiband3", 1), CYDAW_BAND("multiband3", 2), CYDAW_BAND("multiband3", 3),
+};
+inline constexpr EffectParameter xyFxParameters[] {
+    CYDAW_CONTAINER_MIX("xyFx"),
+    { "x", "xyFx.x", "container.parameter.x", "", 0.0f, 1.0f, 0.5f, &P::effect3 },
+    { "y", "xyFx.y", "container.parameter.y", "", 0.0f, 1.0f, 0.5f, &P::effect4 },
+};
+inline constexpr EffectParameter replacerParameters[] {
+    CYDAW_CONTAINER_MIX("replacer"),
+    { "threshold", "replacer.threshold", "effect.parameter.threshold", "dB", -60.0f, 0.0f, -24.0f, &P::effect3 },
+    { "sensitivity", "replacer.sensitivity", "container.parameter.sensitivity", "dB", 1.0f, 24.0f, 6.0f, &P::effect4 },
+    { "hold", "replacer.hold", "container.parameter.hold", "ms", 10.0f, 500.0f, 60.0f, &P::effect5 },
+    { "generator", "replacer.generator", "container.parameter.generator", "", 0.0f, 3.0f, 0.0f, &P::effect6 },
+    { "pitch", "replacer.pitch", "container.parameter.pitch", "Hz", 20.0f, 2000.0f, 55.0f, &P::effect7 },
+    { "decay", "replacer.decay", "effect.parameter.decay", "ms", 5.0f, 2000.0f, 250.0f, &P::effect8 },
+    { "velocity", "replacer.velocity", "modulator.parameter.velocity", "", 0.0f, 1.0f, 0.5f, nullptr, 0, -1 },
+};
+#undef CYDAW_BAND
+#undef CYDAW_BRANCHES
+#undef CYDAW_BRANCH
+#undef CYDAW_CONTAINER_MIX
+
+inline constexpr std::string_view containers = "nodes.category.containers";
+
 #undef CYDAW_EQ_DYNAMIC
 #undef CYDAW_EQ_BAND
 #undef CYDAW_SLOT
 } // namespace effect_detail
 
-inline constexpr std::array<EffectDescriptor, 70> effectCatalogue { {
+inline constexpr std::array<EffectDescriptor, 79> effectCatalogue { {
     { "chorus", "core.chorus", effect_detail::K::chorus, "node.chorus", "node.chorus.description", "Chorus",
       effect_detail::effects, EffectGroup::modulation, 0xff5fd0c4u, effect_detail::chorus },
     { "flanger", "core.flanger", effect_detail::K::flanger, "node.flanger", "node.flanger.description", "Flanger",
@@ -1427,6 +1507,16 @@ inline constexpr std::array<EffectDescriptor, 70> effectCatalogue { {
     { "mod-button", "core.mod-button", effect_detail::K::modButton, "node.modButton", "node.modButton.description", "Button", effect_detail::modulators, EffectGroup::control, 0xffff7f6bu, effect_detail::modButtonParameters, 2, 2, false, false, true },
     { "mod-math", "core.mod-math", effect_detail::K::modMath, "node.modMath", "node.modMath.description", "Math", effect_detail::modulators, EffectGroup::control, 0xff9aa8b8u, effect_detail::modMathParameters, 2, 2, false, false, true },
     { "mod-follower", "core.mod-follower", effect_detail::K::modFollower, "node.modFollower", "node.modFollower.description", "Envelope Follower", effect_detail::modulators, EffectGroup::control, 0xff7ed878u, effect_detail::modFollowerParameters, 2, 2, false, false, true },
+    // The containers.
+    { "fx-chain", "core.fx-chain", effect_detail::K::fxChain, "node.fxChain", "node.fxChain.description", "Chain", effect_detail::containers, EffectGroup::container, 0xffe0b25au, effect_detail::fxChainParameters, 2, 2, false, false, false, true },
+    { "fx-layer", "core.fx-layer", effect_detail::K::fxLayer, "node.fxLayer", "node.fxLayer.description", "FX Layer", effect_detail::containers, EffectGroup::container, 0xffe0b25au, effect_detail::fxLayerParameters, 2, 2, false, false, false, true },
+    { "fx-selector", "core.fx-selector", effect_detail::K::fxSelector, "node.fxSelector", "node.fxSelector.description", "FX Selector", effect_detail::containers, EffectGroup::container, 0xffe0b25au, effect_detail::fxSelectorParameters, 2, 2, false, false, false, true },
+    { "mid-side-split", "core.mid-side-split", effect_detail::K::midSideSplit, "node.midSideSplit", "node.midSideSplit.description", "Mid-Side Split", effect_detail::containers, EffectGroup::container, 0xffe0b25au, effect_detail::midSideParameters, 2, 2, false, false, false, true },
+    { "stereo-split", "core.stereo-split", effect_detail::K::stereoSplit, "node.stereoSplit", "node.stereoSplit.description", "Stereo Split", effect_detail::containers, EffectGroup::container, 0xffe0b25au, effect_detail::stereoSplitParameters, 2, 2, false, false, false, true },
+    { "multiband-2", "core.multiband-2", effect_detail::K::multiband2, "node.multiband2", "node.multiband2.description", "Multiband FX-2", effect_detail::containers, EffectGroup::container, 0xffe0b25au, effect_detail::multiband2Parameters, 2, 2, false, false, false, true },
+    { "multiband-3", "core.multiband-3", effect_detail::K::multiband3, "node.multiband3", "node.multiband3.description", "Multiband FX-3", effect_detail::containers, EffectGroup::container, 0xffe0b25au, effect_detail::multiband3Parameters, 2, 2, false, false, false, true },
+    { "xy-fx", "core.xy-fx", effect_detail::K::xyFx, "node.xyFx", "node.xyFx.description", "XY FX", effect_detail::containers, EffectGroup::container, 0xffe0b25au, effect_detail::xyFxParameters, 2, 2, false, false, false, true },
+    { "replacer", "core.replacer", effect_detail::K::replacer, "node.replacer", "node.replacer.description", "Replacer", effect_detail::containers, EffectGroup::container, 0xffe0b25au, effect_detail::replacerParameters, 2, 2, false, false, false, true },
 } };
 
 [[nodiscard]] constexpr const EffectDescriptor* effectForKind(const NativeDspNodeKind kind) noexcept

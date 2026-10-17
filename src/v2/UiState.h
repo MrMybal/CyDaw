@@ -111,6 +111,8 @@ struct UiState {
     std::set<std::pair<std::uint64_t, std::uint64_t>> modulatorColumns;
     std::map<std::pair<std::uint64_t, std::uint64_t>, std::uint64_t> shownModulator;
     std::optional<std::pair<std::uint64_t, std::uint64_t>> armedModulator;
+    // Each container's branch shown after it (the track's key, its head).
+    std::map<std::pair<std::uint64_t, std::uint64_t>, int> containerBranch;
     std::vector<ClipRef> selectedClips;
     // The launcher's slots picked (a click; Ctrl or Shift adds): what its
     // menu and Ctrl+E act on.

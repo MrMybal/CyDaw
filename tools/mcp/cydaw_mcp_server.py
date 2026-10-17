@@ -342,6 +342,24 @@ TOOLS = [
                         "required": ["track", "action"]},
     },
     {
+        "name": "container",
+        "description": ("Les conteneurs d'une piste, comme dans Bitwig : une carte (la tete) qui tient des chaines "
+                        "de peripheriques et les remelange. action insert {type: fx-chain|fx-layer|fx-selector|"
+                        "mid-side-split|stereo-split|multiband-2|multiband-3|xy-fx|replacer, before (0 : fin de "
+                        "chaine)} ; add_device {head, branch, key, before} : un peripherique dans une branche ; move "
+                        "{nodeId, head (0 : la chaine principale), branch, before} ; add_branch {head} ; remove_branch "
+                        "{head, branch} ; remove {head} (avec tout ce qu'il tient) ; show {head, branch} : la branche "
+                        "affichee ; list : chaque conteneur, ses branches et leurs cartes. Ses reglages "
+                        "(fxLayer.mix, fxLayer.wetGain, fxLayer.volume1, mute1, solo1, pan1, fxSelector.selected, "
+                        "multiband3.crossoverLow, xyFx.x, replacer.threshold...) passent par set_node_parameter."),
+        "inputSchema": {"type": "object",
+                        "properties": {"track": {}, "action": {"type": "string"}, "type": {"type": "string"},
+                                       "head": {"type": "integer"}, "branch": {"type": "integer"},
+                                       "key": {"type": "string"}, "nodeId": {"type": "integer"},
+                                       "before": {"type": "integer"}},
+                        "required": ["track", "action"]},
+    },
+    {
         "name": "controllers",
         "description": ("Les controleurs MIDI / OSC : appareils RAW (ports MIDI, points OSC "
                         "local/reseau, appareils des plug-ins d'application .cyctl), appareils "

@@ -169,6 +169,14 @@ public:
         (void) shown;
         return false;
     }
+    // container: which branch of a container shows after its card.
+    virtual bool showContainerBranch(const TrackRef& track, std::uint64_t head, int branch)
+    {
+        (void) track;
+        (void) head;
+        (void) branch;
+        return false;
+    }
     virtual bool armModulator(const TrackRef& track, std::uint64_t modulator)
     {
         (void) track;

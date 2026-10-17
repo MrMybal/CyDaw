@@ -1,4 +1,5 @@
 #include <cydaw/engine/EffectProcessors.h>
+#include <cydaw/engine/ContainerProcessors.h>
 
 #include <cydaw/engine/AudioBuffer.h>
 #include <cydaw/engine/BiquadDesign.h>
@@ -1383,6 +1384,15 @@ std::unique_ptr<AudioProcessor> makeEffectProcessor(const NativeDspNode& node)
     case NativeDspNodeKind::monoToStereo: processor = std::make_unique<MonoToStereo>(*effect); break;
     case NativeDspNodeKind::stereoToMono: processor = std::make_unique<StereoToMono>(*effect); break;
     case NativeDspNodeKind::spectrometer: processor = std::make_unique<Spectrometer>(*effect); break;
+    case NativeDspNodeKind::fxChain:
+    case NativeDspNodeKind::fxLayer:
+    case NativeDspNodeKind::fxSelector:
+    case NativeDspNodeKind::midSideSplit:
+    case NativeDspNodeKind::stereoSplit:
+    case NativeDspNodeKind::multiband2:
+    case NativeDspNodeKind::multiband3:
+    case NativeDspNodeKind::xyFx:
+    case NativeDspNodeKind::replacer: processor = makeContainerHead(*effect); break;
     default:
         // The studio effects (ProEffects.cpp).
         processor = makeProEffect(*effect);

@@ -2,11 +2,13 @@
 #include <cydaw/engine/PrismSynth.h>
 #include <cydaw/graph/PrimitiveRegistry.h>
 
+#include <cydaw/engine/Containers.h>
 #include <cydaw/engine/EffectCatalogue.h>
 
 #include <algorithm>
 #include <cmath>
 #include <ranges>
+#include <string>
 #include <unordered_set>
 
 namespace cydaw::graph {
@@ -704,6 +706,20 @@ PrimitiveRegistry createFactoryPrimitiveRegistry()
         { port(1, "midi-in", Type::midi, Direction::input, Rate::event),
           port(2, "midi-out", Type::midi, Direction::output, Rate::event),
           port(3, "events", Type::analysis, Direction::output, Rate::event) }));
+    // A container's end: the dry sound and each branch in, the mix out.
+    {
+        std::vector<GraphPort> ports { port(static_cast<PortId>(engine::container::endDryPort), "dry-in", Type::audio, Direction::input,
+                                            Rate::audio, 2) };
+        for (int branch = 0; branch < engine::container::maximumBranches; ++branch) {
+            auto in = port(static_cast<PortId>(engine::container::branchPort(branch)), "branch-" + std::to_string(branch + 1) + "-in",
+                           Type::audio, Direction::input, Rate::audio, 2, true);
+            in.optional = true;
+            ports.push_back(std::move(in));
+        }
+        ports.push_back(port(static_cast<PortId>(engine::container::endOutputPort), "audio-out", Type::audio, Direction::output,
+                             Rate::audio, 2));
+        add(primitive("core.container-end", "Container End", Category::utility, std::move(ports), {}, true, false, false, true));
+    }
     // The effect catalogue: an audio input and output, then one value input
     // per parameter a cable can drive, in the catalogue's order.
     for (const auto& effect : engine::effectCatalogue) {
@@ -735,10 +751,19 @@ PrimitiveRegistry createFactoryPrimitiveRegistry()
                           std::move(values), true));
             continue;
         }
+        // A container's head (Containers.h): the dry sound out to its end,
+        // then a branch output each.
         std::vector<GraphPort> ports {
             port(1, "audio-in", Type::audio, Direction::input, Rate::audio, effect.inputChannels),
-            port(2, "audio-out", Type::audio, Direction::output, Rate::audio, effect.outputChannels)
+            port(2, effect.container ? "dry-out" : "audio-out", Type::audio, Direction::output, Rate::audio, effect.outputChannels)
         };
+        if (effect.container)
+            for (int branch = 0; branch < engine::container::maximumBranches; ++branch) {
+                auto out = port(static_cast<PortId>(engine::container::branchPort(branch)), "branch-" + std::to_string(branch + 1),
+                                Type::audio, Direction::output, Rate::audio, effect.outputChannels, true);
+                out.optional = true;
+                ports.push_back(std::move(out));
+            }
         std::vector<NodeParameter> parameters;
         PortId next = 3;
         for (const auto& item : effect.parameters) {

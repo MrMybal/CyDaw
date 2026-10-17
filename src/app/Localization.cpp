@@ -52,7 +52,7 @@ bool isModuleText(const juce::String& key)
 {
     return isNodeName(key) || key.startsWith("effect.parameter.") || key.startsWith("node.parameter.")
            || key.startsWith("sampler.parameter.") || key.startsWith("model.parameter.") || key.startsWith("module.ui.")
-           || key.startsWith("modulator.parameter.");
+           || key.startsWith("modulator.parameter.") || key.startsWith("container.parameter.");
 }
 } // namespace
 

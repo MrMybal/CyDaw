@@ -49,6 +49,39 @@ public:
     void setRackView(RackView* rack) noexcept { rack_ = rack; }
 
 private:
+    // The strip being drawn: what every card's drawing shares.
+    struct CardMove {
+        std::uint64_t card {};
+        std::uint64_t head {};
+        int branch { -1 };
+        std::uint64_t before {};
+    };
+    struct Strip {
+        const TrackRef& track;
+        GraphSlot* slot {};
+        app::NodeGraphComponent& graph;
+        const std::vector<app::NodeGraphComponent::EditorNode>& nodes;
+        std::map<juce::String, float>& modulated;
+        const visual::Setter& setParameter;
+        std::optional<std::uint64_t> removeNode;
+        std::optional<CardMove> moveCard;
+    };
+    // Where a card sits: the main chain (head 0) or a container's branch;
+    // the card after it there (0: the end); how deep in containers.
+    struct CardPlace {
+        std::uint64_t head {};
+        int branch { -1 };
+        std::uint64_t next {};
+        int depth {};
+    };
+    void drawCard(Strip& strip, const app::NodeGraphComponent::EditorNode& node, float height, const CardPlace& place);
+    [[nodiscard]] bool movable(const Strip& strip, const app::NodeGraphComponent::EditorNode& node) const;
+    // A container's chosen branch: its cards after the container's card,
+    // inside its frame, and a "+" at its end.
+    void drawBranch(Strip& strip, const app::NodeGraphComponent::EditorNode& head, ImVec2 headOrigin, float height,
+                    const CardPlace& place);
+    // A container's own panel on its card: its branches, its mix.
+    void drawContainerPanel(Strip& strip, const app::NodeGraphComponent::EditorNode& head, ImVec2 at, ImVec2 size, ImU32 colour);
     void drawCatalogue(const TrackRef& track);
     // The catalogue as a tree (nothing searched): My devices, the graphs by
     // their category, whole chains, the nodes.
@@ -74,6 +107,11 @@ private:
     std::map<std::pair<std::uint64_t, std::uint64_t>, std::array<char, 64>> valueSearch_;
     // Each card's modulators (a column at its left) and the knobs' rings.
     std::unique_ptr<ModulatorsView> modulators_;
+    // The quick catalogue opened from a container's branch: where its device
+    // goes (the head, the branch).
+    std::optional<std::pair<std::uint64_t, int>> catalogueBranch_;
+    // The track's key (its routing key and pad), for UiState's per-card maps.
+    std::uint64_t trackKey_ {};
 
 
     // A plugin's parameters as its worker last reported them, refreshed a
