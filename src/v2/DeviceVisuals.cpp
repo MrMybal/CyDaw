@@ -1904,6 +1904,11 @@ bool levelPlot(const Plot& plot, const ImU32 colour, const Live& live)
 
 } // namespace
 
+bool logarithmic(const Param& parameter)
+{
+    return isLogarithmic(parameter);
+}
+
 // ---- The parametric equaliser ------------------------------------------------------------------
 
 namespace {

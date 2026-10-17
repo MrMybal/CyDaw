@@ -1472,6 +1472,12 @@ if(CYDAW_BUILD_DESKTOP)
                              COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/v2_controllers_check.py"
                                      --port 47856 --exe "$<TARGET_FILE:CyDAW2>")
                     set_tests_properties(cydaw2_controllers_check PROPERTIES TIMEOUT 300)
+                    # A card's list of values: every value, the last touched
+                    # first, its search. Silent.
+                    add_test(NAME cydaw2_value_list_check
+                             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/v2_value_list_check.py"
+                                     --port 47857 --exe "$<TARGET_FILE:CyDAW2>")
+                    set_tests_properties(cydaw2_value_list_check PROPERTIES TIMEOUT 300)
                     # Batterie: its kits (the banks downloaded on this computer;
                     # skipped without them), its pieces' mix, grooves, presets.
                     add_test(NAME cydaw2_batterie_check

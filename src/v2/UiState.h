@@ -6,6 +6,7 @@
 
 #include <array>
 #include <map>
+#include <set>
 #include <memory>
 #include <optional>
 #include <algorithm>
@@ -100,6 +101,9 @@ struct UiState {
     // with the transport), not as they are.
     bool auditionAtTempo { true };
     std::optional<TrackRef> selectedTrack;
+    // The cards whose list of values is open (the track's routing key, the
+    // card's node id).
+    std::set<std::pair<std::uint64_t, std::uint64_t>> valueLists;
     std::vector<ClipRef> selectedClips;
     // The launcher's slots picked (a click; Ctrl or Shift adds): what its
     // menu and Ctrl+E act on.

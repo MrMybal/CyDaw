@@ -151,6 +151,14 @@ public:
     }
     // device_window: a device's window, as a plugin's (its designed
     // interface), opened or closed. nodeId 0: the track's whole graph.
+    // value_list: a card's list of values, opened or closed.
+    virtual bool showValueList(const TrackRef& track, std::uint64_t nodeId, bool open)
+    {
+        (void) track;
+        (void) nodeId;
+        (void) open;
+        return false;
+    }
     virtual bool showDeviceWindow(const TrackRef& track, std::uint64_t nodeId, bool open)
     {
         (void) track;

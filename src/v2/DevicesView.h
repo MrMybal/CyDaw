@@ -66,6 +66,11 @@ private:
     // A parameter's right-click menu: automate it in the arrangement.
     void openParameterMenu(const TrackRef& track, const juce::String& binding, const juce::String& label);
     void drawParameterMenu();
+    // A card's list of values: every parameter it has, raw, searched, the
+    // last touched first (a knob turned anywhere goes to the top).
+    void drawValueList(const TrackRef& track, app::NodeGraphComponent& graph, const app::NodeGraphComponent::EditorNode& node,
+                       ImVec2 at, ImVec2 size, ImU32 colour, const std::map<juce::String, float>& modulated);
+    std::map<std::pair<std::uint64_t, std::uint64_t>, std::array<char, 64>> valueSearch_;
 
 
     // A plugin's parameters as its worker last reported them, refreshed a

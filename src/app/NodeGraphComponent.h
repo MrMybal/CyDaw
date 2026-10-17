@@ -784,6 +784,9 @@ public:
     bool editorDisconnect(std::uint64_t source, std::uint64_t sourcePort,
                           std::uint64_t destination, std::uint64_t destinationPort);
     bool editorSetParameter(const juce::String& binding, double value);
+    // When a parameter was last set through editorSetParameter (a knob
+    // turned anywhere, a controller): a count that only grows; 0 never.
+    [[nodiscard]] std::uint64_t editorParameterTouch(const juce::String& binding) const;
     // A Prisme card's settings, as its own panel reads them every frame.
     [[nodiscard]] std::optional<cydaw::engine::prism::PrismValues> editorPrismValues(std::uint64_t nodeId) const;
     // A Kick card's settings, the same way.
@@ -2007,6 +2010,8 @@ private:
     bool editingLocked_ {};
     bool parameterNotificationPending_ {};
     bool parameterHistoryPending_ {};
+    std::map<juce::String, std::uint64_t> parameterTouches_;
+    std::uint64_t parameterTouchCount_ {};
     bool parameterGestureActive_ {};
     juce::int64 lastParameterUiChangeTimeMs_ {};
     // Trees, not text. Stringifying the graph on every edit is what made

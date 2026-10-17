@@ -307,6 +307,17 @@ TOOLS = [
                                        "show": {"type": "boolean"}}},
     },
     {
+        "name": "value_list",
+        "description": ("La liste des valeurs d'une carte de peripherique (le bouton liste de son en-tete) : "
+                        "toutes ses valeurs brutes, la derniere touchee en haut. track, nodeId (get_track_graph), "
+                        "open (defaut true), filter : la recherche. Rend values [{binding, label, value, unit, "
+                        "touched}] dans l'ordre affiche."),
+        "inputSchema": {"type": "object",
+                        "properties": {"track": {}, "nodeId": {"type": "integer"}, "open": {"type": "boolean"},
+                                       "filter": {"type": "string"}},
+                        "required": ["track", "nodeId"]},
+    },
+    {
         "name": "controllers",
         "description": ("Les controleurs MIDI / OSC : appareils RAW (ports MIDI, points OSC "
                         "local/reseau, appareils des plug-ins d'application .cyctl), appareils "

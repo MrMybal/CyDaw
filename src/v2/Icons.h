@@ -71,6 +71,7 @@ inline constexpr const char* dockRight = "\xee\xa4\x8d"; // U+E90D
 inline constexpr const char* dockBottom = "\xee\xa4\x8e"; // U+E90E
 inline constexpr const char* fullScreen = "\xee\x9d\x80"; // U+E740
 inline constexpr const char* menu = "\xee\x9c\x80"; // U+E700
+inline constexpr const char* list = "\xee\xa3\xbd"; // U+E8FD
 inline constexpr const char* touch = "\xee\xa0\x95"; // U+E815
 inline constexpr const char* crop = "\xee\x9e\xa8"; // U+E7A8
 inline constexpr const char* trim = "\xee\x9e\x8a"; // U+E78A

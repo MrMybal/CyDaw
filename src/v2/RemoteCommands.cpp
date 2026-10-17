@@ -1521,6 +1521,43 @@ juce::var Commands::run()
         studio_.refreshTranslations();
         return ok(status());
     }
+    if (command == "value_list") {
+        // {track, nodeId, open}: a card's list of values in the devices' strip.
+        std::optional<GraphTarget> target;
+        if (auto error = targetOrFail(target); !error.isVoid())
+            return error;
+        if (!target->track)
+            return fail("a list of values belongs to a track's card");
+        const auto nodeId = static_cast<std::uint64_t>(number("nodeId", 0.0));
+        if (!ui_.showValueList(*target->track, nodeId, flag("open", true)))
+            return fail("this interface shows no lists of values");
+        // Its values as the list shows them: the touched first (the last at
+        // the top), then the others; "filter" as its search.
+        auto& graph = target->slot->graph();
+        const auto nodes = graph.editorNodes();
+        const auto node = std::find_if(nodes.begin(), nodes.end(), [nodeId](const auto& item) { return item.id == nodeId; });
+        if (node == nodes.end())
+            return fail("no card " + juce::String(static_cast<juce::int64>(nodeId)) + " on that track");
+        const auto filter = text("filter").trim();
+        std::vector<std::pair<std::uint64_t, const app::NodeGraphComponent::EditorParameter*>> order;
+        for (const auto& parameter : node->parameters)
+            if (filter.isEmpty() || parameter.label.containsIgnoreCase(filter) || parameter.binding.containsIgnoreCase(filter))
+                order.emplace_back(graph.editorParameterTouch(parameter.binding), &parameter);
+        std::stable_sort(order.begin(), order.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
+        juce::Array<juce::var> values;
+        for (const auto& [touch, parameter] : order) {
+            auto entry = object();
+            set(entry, "binding", parameter->binding);
+            set(entry, "label", parameter->label);
+            set(entry, "value", parameter->value);
+            set(entry, "unit", parameter->unit);
+            set(entry, "touched", touch != 0);
+            values.add(entry);
+        }
+        auto result = object();
+        set(result, "values", values);
+        return ok(result);
+    }
     if (command == "device_window") {
         // {track ("master" too), nodeId (0: the track's whole graph), open}
         std::optional<GraphTarget> target;

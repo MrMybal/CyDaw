@@ -205,6 +205,17 @@ public:
         state_.audioEditorFace = face;
         state_.bringToFront = Panel::editor;
     }
+    bool showValueList(const TrackRef& track, std::uint64_t nodeId, bool open) override
+    {
+        const auto key = std::make_pair(studio_.routingKey(track) + (track.pad >= 0 ? static_cast<std::uint64_t>(track.pad + 1) << 48 : 0),
+                                        nodeId);
+        if (open)
+            state_.valueLists.insert(key);
+        else
+            state_.valueLists.erase(key);
+        state_.selectedTrack = track;
+        return true;
+    }
     bool showDeviceWindow(const TrackRef& track, std::uint64_t nodeId, bool open) override
     {
         const PluginWindow window { track, nodeId };

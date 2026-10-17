@@ -784,6 +784,16 @@ directement la fenêtre du périphérique hors du studio. Par le port de contrô
 sélectionnée. Le signal vient de prises que le moteur garde à l'entrée et à la sortie de chaque
 périphérique affiché (`NativeDspRuntime::setTaps`, sans verrou ni allocation dans le thread audio).
 
+## Liste des valeurs d'une carte
+
+Le bouton liste de l'en-tête de chaque carte (instrument, effet, périphérique de l'atelier) ouvre une colonne à droite de la carte avec **toutes ses valeurs**, y compris celles que sa face ne montre pas (les contrôles d'un SFZ, les réglages d'un synthé) :
+- chaque valeur a un petit potard, son nom et sa valeur brute avec son unité ; sous le pointeur, sa clé (`node.3.opale.osc1.level`) et sa valeur exacte ;
+- **la dernière valeur touchée vient en haut**, surlignée, au-dessus des précédentes, puis un trait et les autres dans l'ordre de la carte. Une valeur est « touchée » quand elle change par un potard, où qu'il soit (carte, grande fenêtre, éditeur de graphe, interface dessinée) ou par un contrôleur ; cela fait le lien entre ce qu'on tourne et son nom ;
+- la recherche garde les valeurs dont le nom ou la clé contient les mots tapés ;
+- clic droit : le menu du paramètre (l'automatiser dans l'arrangement, sa valeur par défaut) ; en mode Apprendre (Ctrl+M), chaque potard de la liste s'assigne à un contrôleur.
+
+La liste reste ouverte par carte pendant la session. Port de contrôle : `value_list {track, nodeId, open, filter}` l'ouvre ou la ferme et rend ses valeurs dans l'ordre affiché (`binding`, `label`, `value`, `unit`, `touched`). Test : `tests/v2_value_list_check.py` (ctest `cydaw2_value_list_check`).
+
 ## Allumer, éteindre, tourner sans claquer
 
 **Changer l'ordre** : on prend un effet par son nom (en tête de sa carte) et on le lâche sur une autre

@@ -1203,6 +1203,7 @@ bool NodeGraphComponent::editorSetParameter(const juce::String& binding, const d
 {
     if (!setGraphInterfaceParameter(binding, value))
         return false;
+    parameterTouches_[binding] = ++parameterTouchCount_;
     // Heard at once; the undo step is taken once the knob rests, as the
     // timer does for CyDAW 1's sliders.
     parameterHistoryPending_ = true;
@@ -1211,6 +1212,12 @@ bool NodeGraphComponent::editorSetParameter(const juce::String& binding, const d
     if (!isTimerRunning())
         startTimerHz(30);
     return true;
+}
+
+std::uint64_t NodeGraphComponent::editorParameterTouch(const juce::String& binding) const
+{
+    const auto found = parameterTouches_.find(binding);
+    return found != parameterTouches_.end() ? found->second : 0;
 }
 
 std::optional<cydaw::engine::prism::PrismValues> NodeGraphComponent::editorPrismValues(const std::uint64_t nodeId) const

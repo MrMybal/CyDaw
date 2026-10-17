@@ -228,6 +228,8 @@ bool valueField(const char* id, Param& parameter, float width, ImU32 colour, con
 
 // "1.20 kHz", "-6.0 dB", "35 %", "4.0:1".
 [[nodiscard]] juce::String formatValue(const Param& parameter, double value);
+// Whether its knob turns on a logarithmic scale (a frequency, a time).
+[[nodiscard]] bool logarithmic(const Param& parameter);
 
 // A value as a position 0..1 of its range (logarithmic for frequencies and
 // times), and back; what knobs, fields and automation lanes share.

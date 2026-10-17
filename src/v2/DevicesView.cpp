@@ -495,6 +495,13 @@ void DevicesView::draw()
         if (designed)
             panesWidth += designedWidth + dp(6.0f);
         const auto collapsed = node->collapsed;
+        // Its list of values, a column at its right.
+        const auto listKey = std::make_pair(studio_.routingKey(track) + (track.pad >= 0 ? static_cast<std::uint64_t>(track.pad + 1) << 48 : 0),
+                                            node->id);
+        const auto listOpen = !collapsed && state_.valueLists.contains(listKey);
+        const auto listWidth = dp(232.0f);
+        if (listOpen)
+            panesWidth += listWidth + dp(6.0f);
         // Its output's meter, along its right edge (an instrument's cards:
         // what its voices give out).
         auto level = signals_.outputLevel(node->id);
@@ -529,7 +536,7 @@ void DevicesView::draw()
         const auto bypassable = std::any_of(node->ports.begin(), node->ports.end(), [](const auto& port) {
             return !port.input && port.kind == 0;
         });
-        const auto separateWidth = (separable ? dp(22.0f) : 0.0f) + (sidechained ? dp(22.0f) : 0.0f);
+        const auto separateWidth = (separable ? dp(22.0f) : 0.0f) + (sidechained ? dp(22.0f) : 0.0f) + (collapsed ? 0.0f : dp(22.0f));
         // The on/off switch comes first, at the left of the title.
         const auto switchWidth = bypassable && !collapsed ? dp(22.0f) : 0.0f;
         if (!collapsed) {
@@ -582,6 +589,19 @@ void DevicesView::draw()
         if (!collapsed)
             ImGui::SetCursorScreenPos(ImVec2(origin.x + width - (windowed ? dp(112.0f) : editable ? dp(90.0f) : dp(68.0f)) - separateWidth,
                                              origin.y + dp(3.0f)));
+        if (!collapsed) {
+            // All its values in a list: raw, searched, the last touched first.
+            if (ui::iconButton(icon::list,
+                               L("Toutes ses valeurs dans une liste : brutes, à chercher, la dernière touchée en haut",
+                                 "All its values in a list: raw, searchable, the last touched at the top"),
+                               listOpen, p.accent, button)) {
+                if (listOpen)
+                    state_.valueLists.erase(listKey);
+                else
+                    state_.valueLists.insert(listKey);
+            }
+            ImGui::SameLine(0.0f, dp(2.0f));
+        }
         if (separable) {
             const PluginWindow window { track, node->id };
             const auto open = prismCard     ? prism_->showsEditor(track, node->id) && ui::isDetached(prism_->editorWindowId(track, node->id).c_str())
@@ -853,6 +873,12 @@ void DevicesView::draw()
                 }
                 x += face.width + dp(6.0f);
             }
+            if (listOpen) {
+                ImGui::PushID("##valueList");
+                drawValueList(track, graph, *node, ImVec2(x, origin.y + bodyTop), ImVec2(listWidth, bodyHeight), colour, modulated);
+                ImGui::PopID();
+                x += listWidth + dp(6.0f);
+            }
         }
         if (node->bypassed)
             // Switched off: the card greyed under its header.
@@ -964,6 +990,98 @@ void DevicesView::draw()
     drawCatalogue(track);
     drawPluginParameters();
     drawParameterMenu();
+}
+
+void DevicesView::drawValueList(const TrackRef& track, app::NodeGraphComponent& graph, const app::NodeGraphComponent::EditorNode& node,
+                                const ImVec2 at, const ImVec2 size, const ImU32 colour, const std::map<juce::String, float>& modulated)
+{
+    const auto& p = theme::palette();
+    auto* list = ImGui::GetWindowDrawList();
+    list->AddRectFilled(at, ImVec2(at.x + size.x, at.y + size.y), p.bg1, dp(4.0f));
+    // The search, at the top.
+    auto& search = valueSearch_[{ studio_.routingKey(track), node.id }];
+    ImGui::SetCursorScreenPos(ImVec2(at.x + dp(4.0f), at.y + dp(4.0f)));
+    ImGui::SetNextItemWidth(size.x - dp(8.0f));
+    ImGui::InputTextWithHint("##search", L("Chercher une valeur…", "Find a value…"), search.data(), search.size());
+    const auto filter = juce::String::fromUTF8(search.data()).trim();
+    // Every value of the card, those touched first (the last at the top),
+    // then the others as the card lists them.
+    std::vector<std::pair<std::uint64_t, const app::NodeGraphComponent::EditorParameter*>> order;
+    for (const auto& parameter : node.parameters)
+        if (filter.isEmpty() || parameter.label.containsIgnoreCase(filter) || parameter.binding.containsIgnoreCase(filter))
+            order.emplace_back(graph.editorParameterTouch(parameter.binding), &parameter);
+    std::stable_sort(order.begin(), order.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
+    const auto top = ImGui::GetCursorScreenPos().y + dp(2.0f);
+    ImGui::SetCursorScreenPos(ImVec2(at.x, top));
+    if (ImGui::BeginChild("##values", ImVec2(size.x, at.y + size.y - top - dp(2.0f)), ImGuiChildFlags_None)) {
+        auto* rows = ImGui::GetWindowDrawList();
+        const auto rowHeight = dp(30.0f);
+        const auto latest = order.empty() ? 0 : order.front().first;
+        auto touchedShown = false;
+        for (std::size_t index = 0; index < order.size(); ++index) {
+            const auto [touch, parameter] = order[index];
+            // Between the touched and the others: a line.
+            if (touch == 0 && touchedShown) {
+                const auto y = ImGui::GetCursorScreenPos().y;
+                rows->AddLine(ImVec2(at.x + dp(6.0f), y), ImVec2(at.x + size.x - dp(6.0f), y), p.line, dp(1.0f));
+                ImGui::Dummy(ImVec2(0.0f, dp(3.0f)));
+                touchedShown = false;
+            }
+            touchedShown = touchedShown || touch != 0;
+            ImGui::PushID(parameter->binding.toRawUTF8());
+            const auto rowTop = ImGui::GetCursorScreenPos();
+            const ImVec2 rowEnd(rowTop.x + size.x - dp(4.0f), rowTop.y + rowHeight);
+            if (touch != 0 && touch == latest)
+                rows->AddRectFilled(rowTop, rowEnd, theme::alpha(colour, 0.22f), dp(3.0f));
+            const visual::Param shown { parameter->binding, parameter->label, parameter->unit, parameter->minimum, parameter->maximum,
+                                        parameter->value, parameter->defaultValue };
+            ui::KnobStyle style;
+            style.diameter = 22.0f;
+            style.flags = ui::knobNoLabel;
+            if (parameter->minimum < 0.0 && parameter->maximum > 0.0)
+                style.flags |= ui::knobBipolar;
+            if (visual::logarithmic(shown))
+                style.flags |= ui::knobLogarithmic;
+            style.colour = colour;
+            if (const auto moved = modulated.find(parameter->binding); moved != modulated.end() && parameter->maximum > parameter->minimum)
+                style.modulation = static_cast<float>((moved->second - parameter->minimum) / (parameter->maximum - parameter->minimum));
+            ImGui::SetCursorScreenPos(ImVec2(rowTop.x + dp(2.0f), rowTop.y + dp(2.0f)));
+            auto value = static_cast<float>(parameter->value);
+            {
+                const ui::LearnParameterScope learn(parameter->binding, parameter->label);
+                if (ui::knob("##knob", &value, static_cast<float>(parameter->minimum), static_cast<float>(parameter->maximum),
+                             static_cast<float>(parameter->defaultValue), style)) {
+                    (void) graph.editorSetParameter(parameter->binding, value);
+                    state_.focused = Panel::devices;
+                }
+            }
+            if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+                openParameterMenu(track, parameter->binding, parameter->label);
+            // Its name, its value raw (its unit), its key under the pointer.
+            const auto textX = rowTop.x + dp(40.0f);
+            const auto textWidth = rowEnd.x - textX - dp(4.0f);
+            ui::clippedText(rows, ImVec2(textX, rowTop.y + dp(1.0f)), textWidth, p.text, parameter->label.toRawUTF8());
+            const auto text = visual::formatValue(shown, parameter->value);
+            ImGui::PushFont(nullptr, ui::currentFontBase() * 0.85f);
+            ui::clippedText(rows, ImVec2(textX, rowTop.y + dp(15.0f)), textWidth, p.textDim, text.toRawUTF8());
+            ImGui::PopFont();
+            ImGui::SetCursorScreenPos(ImVec2(textX, rowTop.y));
+            ImGui::InvisibleButton("##name", ImVec2(std::max(1.0f, textWidth), rowHeight));
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s\n%s = %.6g %s\n%s", parameter->label.toRawUTF8(), parameter->binding.toRawUTF8(), parameter->value,
+                                  parameter->unit.toRawUTF8(),
+                                  L("Clic droit : automatiser, valeur par défaut", "Right click: automate, default value"));
+            if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+                openParameterMenu(track, parameter->binding, parameter->label);
+            ImGui::SetCursorScreenPos(ImVec2(rowTop.x, rowEnd.y + dp(2.0f)));
+            ImGui::PopID();
+        }
+        if (order.empty())
+            ImGui::TextDisabled("  %s", L("Aucune valeur", "No value"));
+        // The last row's end, held by an item (not by the cursor alone).
+        ImGui::Dummy(ImVec2(0.0f, 0.0f));
+    }
+    ImGui::EndChild();
 }
 
 void DevicesView::drawSoundModelPane(const TrackRef& track, app::NodeGraphComponent& graph, const std::uint64_t nodeId,
