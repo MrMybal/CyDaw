@@ -50,6 +50,9 @@ public:
     // kept; 0 until the graphics device exists.
     [[nodiscard]] unsigned long long texture(const juce::String& key, const juce::Image& image);
 
+    [[nodiscard]] unsigned long long updateTexture(const juce::String& key,const juce::Image& image);
+    void releaseTexture(const juce::String& key);
+
     void resized() override;
     void parentHierarchyChanged() override;
     void visibilityChanged() override;

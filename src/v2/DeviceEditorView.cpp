@@ -73,7 +73,7 @@ bool DeviceEditorView::drawWindow(ExpandedPane& expanded, const int order)
     if (body.empty())
         return false;
 
-    const auto id = windowId(expanded.track, expanded.nodeId);
+    const auto id = windowId(expanded.track, expanded.nodeId) + state_.deviceWindowNamespace;
     if (expanded.detach) {
         ui::setDetached(id.c_str(), true);
         expanded.detach = false;

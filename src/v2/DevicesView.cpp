@@ -367,9 +367,14 @@ void DevicesView::draw()
         std::optional<app::ModuleInterfaceState> designed;
         if (node->composite && node->hasInterface && !node->collapsed) {
             auto shownInterface = graph.editorNodeInterface(node->id);
+            if(shownInterface.deviceDesigned) {
+                shownInterface.controls=shownInterface.deviceControls;
+                shownInterface.windowWidth=shownInterface.deviceWidth; shownInterface.windowHeight=shownInterface.deviceHeight;
+                shownInterface.windowDesign=shownInterface.deviceDesign;
+            }
             const auto designedHeight = dp(static_cast<float>(shownInterface.windowHeight != 0 ? shownInterface.windowHeight : 420));
             const auto readable = (height - dp(43.0f)) / std::max(1.0f, designedHeight) >= 0.6f;
-            if (readable && std::any_of(shownInterface.controls.begin(), shownInterface.controls.end(), [](const auto& control) {
+            if ((readable || shownInterface.deviceDesigned) && std::any_of(shownInterface.controls.begin(), shownInterface.controls.end(), [](const auto& control) {
                     return control.kind != app::ModuleControlKind::inputPort && control.kind != app::ModuleControlKind::outputPort;
                 }))
                 designed = std::move(shownInterface);
@@ -814,7 +819,7 @@ void DevicesView::draw()
                                       [&graph, this](const juce::String& key, const double value) {
                                           (void) graph.editorSetParameter(key, value);
                                           state_.focused = Panel::devices;
-                                      });
+                                      }, &graph.editorAnalysis());
                 x += designedWidth + dp(6.0f);
             }
             const CardFileScope cardFile(studio_, state_, track, graph, node->id, node->typeKey);
@@ -919,21 +924,24 @@ void DevicesView::draw()
         ImGui::PushFont(nullptr, ui::currentFontBase() * 1.4f);
         ui::centredText(list, origin, ImVec2(origin.x + size.x, origin.y + size.y * 0.9f), hovered ? p.accent : p.textDim, icon::add);
         ImGui::PopFont();
-        ui::tooltip(L("Ajouter un périphérique : la bibliothèque en grand (clic droit : la liste rapide)",
+        ui::tooltip(state_.inlineDeviceCatalogue ? L("Ajouter un effet dans le catalogue", "Add an effect from the catalogue") : L("Ajouter un périphérique : la bibliothèque en grand (clic droit : la liste rapide)",
                       "Add a device: the library, large (right click: the quick list)"));
         if (ImGui::IsItemClicked()) {
-            // The big window, on the effects, putting what is picked here.
-            state_.showLibrary = true;
-            state_.libraryTab = 2;
-            state_.libraryTarget = track;
-            state_.libraryPick = true;
-            state_.libraryFocus = true;
+            if(state_.inlineDeviceCatalogue) {
+                state_.openDeviceCatalogue=true;
+            } else {
+                state_.showLibrary = true;
+                state_.libraryTab = 2;
+                state_.libraryTarget = track;
+                state_.libraryPick = true;
+                state_.libraryFocus = true;
+            }
         }
         if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
             search_[0] = 0;
             highlight_ = 0;
             focusSearch_ = true;
-            openCatalogue_ = true;
+            if(state_.inlineDeviceCatalogue)state_.openDeviceCatalogue=true;else openCatalogue_=true;
         }
     }
     // The wheel runs the strip sideways wherever nothing under the pointer
@@ -943,7 +951,7 @@ void DevicesView::draw()
         ImGui::SetScrollX(ImGui::GetScrollX() - io.MouseWheel * dp(120.0f));
     ImGui::EndChild();
     // Opened from the panel itself, once the strip's own window is closed.
-    if (std::exchange(state_.openDeviceCatalogue, false)) {
+    if (!state_.inlineDeviceCatalogue && std::exchange(state_.openDeviceCatalogue, false)) {
         search_[0] = 0;
         highlight_ = 0;
         openCatalogue_ = true;
@@ -1295,6 +1303,10 @@ void DevicesView::drawPlugins(const TrackRef& track, const float height)
         if (ui::iconButton(icon::more, L("Tous les paramètres, en potards", "Every parameter, as knobs"), false, 0, button))
             openPluginWindow(track, index, plugin.file, plugin.name);
         ImGui::SameLine(0.0f, dp(2.0f));
+        if(plugin.file.hasFileExtension("jsfx")||plugin.file.getFileExtension().isEmpty()) {
+            if(ImGui::SmallButton("JSFX")){state_.jsfxFileToOpen=plugin.file;state_.showJsfx=true;}
+            ImGui::SameLine(0.0f,dp(2.0f));
+        }
         if (const auto holder = studio_.pluginPresetHolder(track, static_cast<int>(index))) {
             const auto pluginIndex = static_cast<int>(index);
             ImGui::PushID(pluginIndex);
@@ -1804,10 +1816,10 @@ void DevicesView::drawCatalogue(const TrackRef& track)
     ui::tooltip(L("Fabriquer un effet ou un instrument avec un graphe", "Build an effect or an instrument with a graph"));
     if (plugins)
         ImGui::SameLine();
-    if (plugins && ImGui::Button(L("Plugin VST3…", "VST3 plugin…"), ImVec2(-1.0f, 0.0f))) {
+    if (plugins && ImGui::Button(L("Plugin VST3 / CLAP / LV2 / JSFX…", "VST3 / CLAP / LV2 / JSFX plugin…"), ImVec2(-1.0f, 0.0f))) {
         ImGui::CloseCurrentPopup();
-        chooser_ = std::make_unique<juce::FileChooser>(L("Choisir un plugin VST3", "Choose a VST3 plugin"),
-                                                       juce::File("C:\\Program Files\\Common Files\\VST3"), "*.vst3");
+        chooser_ = std::make_unique<juce::FileChooser>(L("Choisir un plugin", "Choose a plugin"),
+                                                       juce::File("C:\\Program Files\\Common Files\\VST3"), "*.vst3;*.clap;*.lv2;*.jsfx;*.cyplugin");
         const auto index = track.audioIndex;
         chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
                                   | juce::FileBrowserComponent::canSelectDirectories,

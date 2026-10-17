@@ -35,8 +35,8 @@ struct EffectParameter {
     float defaultValue {};
     // Either a field of the payload...
     float NativeDspNodeParameters::* field {};
-    // ...or a slot of its eqBands array. A slot has no value socket: cables
-    // drive named fields only.
+    // ...or a slot of its eqBands array. Extended typed sockets address
+    // these slots explicitly, resolved before the audio callback.
     std::int16_t slot { -1 };
     // The band it belongs to, 0 based, for its label; -1 for none.
     std::int8_t band { -1 };

@@ -223,6 +223,41 @@ static const juce::Identifier zoom("zoom");
 
 namespace {
 
+juce::var serialiseGraphPrograms(const std::vector<NodeGraphComponent::EditorProgram>& programs)
+{
+    juce::Array<juce::var> entries;
+    for (const auto& program : programs) {
+        auto entry = juce::DynamicObject::Ptr(new juce::DynamicObject());
+        entry->setProperty("name", program.name);
+        auto values = juce::DynamicObject::Ptr(new juce::DynamicObject());
+        for (const auto& [key, value] : program.values)
+            values->setProperty(juce::Identifier(key), value);
+        entry->setProperty("values", juce::var(values.get()));
+        entries.add(juce::var(entry.get()));
+    }
+    return entries;
+}
+
+std::vector<NodeGraphComponent::EditorProgram> restoreGraphPrograms(const juce::var& state)
+{
+    std::vector<NodeGraphComponent::EditorProgram> programs;
+    if (const auto* entries = state.getArray())
+        for (const auto& encoded : *entries) {
+            NodeGraphComponent::EditorProgram program;
+            program.name = encoded.getProperty("name", {}).toString().trim().substring(0, 128);
+            if (const auto* values = encoded.getProperty("values", {}).getDynamicObject())
+                for (const auto& property : values->getProperties())
+                    if ((property.value.isDouble() || property.value.isInt() || property.value.isInt64())
+                        && std::isfinite(static_cast<double>(property.value)))
+                        program.values.emplace_back(property.name.toString(), static_cast<double>(property.value));
+            if (program.name.isNotEmpty() && programs.size() < 512
+                && std::none_of(programs.begin(), programs.end(), [&](const auto& other) { return other.name == program.name; }))
+                programs.push_back(std::move(program));
+        }
+    return programs;
+}
+
+
 // A card's own data beyond its knobs, saved with it wherever it sits (the
 // graph, a device's inside, a device's class, the plug-in's state): a
 // wavetable's table (its harmonics), a sound model (its JSON as made) and a
@@ -607,6 +642,11 @@ juce::String primitiveParameterKeyForBinding(const juce::String& suffix)
         return suffix.substring(6);
     if (suffix.startsWith("kick."))
         return suffix.substring(5);
+    const auto familyPrefix=suffix.upToFirstOccurrenceOf(".",false,false);
+    if(const auto model=cydaw::engine::synth::modelForPrefix(familyPrefix.toStdString());model!=cydaw::engine::synth::Model::none) {
+        const auto key=suffix.substring(familyPrefix.length()+1);
+        if(cydaw::engine::synth::parameterIndex(model,key.toStdString())>=0)return key;
+    }
     // A sound model's and a sampler's settings, by their primitive keys
     // ("model.harmonics" is "harmonics"): without them a card's settings
     // were never published, so a host never saw them.
@@ -4760,19 +4800,8 @@ juce::var NodeGraphComponent::serialise() const
     for (const auto& tag : graphTags_)
         graphTags.add(tag);
     root->setProperty(jsonKeys::graphTags, graphTags);
-    if (!programs_.empty()) {
-        juce::Array<juce::var> programs;
-        for (const auto& program : programs_) {
-            auto entry = juce::DynamicObject::Ptr(new juce::DynamicObject());
-            entry->setProperty("name", program.name);
-            auto values = juce::DynamicObject::Ptr(new juce::DynamicObject());
-            for (const auto& [key, value] : program.values)
-                values->setProperty(juce::Identifier(key), value);
-            entry->setProperty("values", juce::var(values.get()));
-            programs.add(juce::var(entry.get()));
-        }
-        root->setProperty("programs", programs);
-    }
+    if (!programs_.empty())
+        root->setProperty("programs", serialiseGraphPrograms(programs_));
     const auto exportIdentity = pluginExportIdentity();
     auto exportProfile = juce::DynamicObject::Ptr(new juce::DynamicObject());
     exportProfile->setProperty(jsonKeys::productName,
@@ -4957,6 +4986,7 @@ juce::var NodeGraphComponent::serialise() const
         moduleValue->setProperty(jsonKeys::version,
                                  juce::String(module.version.toString()));
         moduleValue->setProperty(jsonKeys::parentClassKey, module.parentClassKey);
+        moduleValue->setProperty("programs", serialiseGraphPrograms(module.programs));
         moduleValue->setProperty(jsonKeys::description, module.description);
         moduleValue->setProperty(jsonKeys::category, module.category);
         moduleValue->setProperty(jsonKeys::author, module.author);
@@ -6503,18 +6533,7 @@ void NodeGraphComponent::restore(const juce::var& state)
     if (const auto* tags = root->getProperty(jsonKeys::graphTags).getArray())
         for (const auto& tag : *tags)
             graphTags_.add(tag.toString());
-    programs_.clear();
-    if (const auto* programs = root->getProperty("programs").getArray())
-        for (const auto& encoded : *programs) {
-            EditorProgram program;
-            program.name = encoded.getProperty("name", {}).toString().trim().substring(0, 128);
-            if (const auto* values = encoded.getProperty("values", {}).getDynamicObject())
-                for (const auto& property : values->getProperties())
-                    if (property.value.isDouble() || property.value.isInt() || property.value.isInt64())
-                        program.values.emplace_back(property.name.toString(), static_cast<double>(property.value));
-            if (program.name.isNotEmpty() && programs_.size() < 512)
-                programs_.push_back(std::move(program));
-        }
+    programs_ = restoreGraphPrograms(root->getProperty("programs"));
     if (const auto* exportProfile = root->getProperty(jsonKeys::vst3Export)
                                         .getDynamicObject()) {
         pluginExportIdentity_.productName = exportProfile
@@ -6676,6 +6695,7 @@ void NodeGraphComponent::restore(const juce::var& state)
             if (schemaVersion >= 27)
                 module.parentClassKey = object->getProperty(
                     "parentClassKey").toString();
+            module.programs = restoreGraphPrograms(object->getProperty("programs"));
             module.description = object->getProperty(jsonKeys::description).toString()
                                      .substring(0, 2'048);
             if (schemaVersion >= 28) {
@@ -9228,11 +9248,9 @@ juce::var NodeGraphComponent::createVst3RuntimeState() const
                       serialisePolySynthGraphPlan(
                           runtimeExport.instrumentPlan));
 
-    juce::Array<juce::var> publishedValues;
+    juce::Array<juce::var> publishedValues, allValues;
     juce::Array<juce::var> hostValues;
     for (const auto& parameter : runtimeExport.publishedParameters) {
-        if (!parameter.exportedToHost)
-            continue;
         auto value = juce::DynamicObject::Ptr(new juce::DynamicObject());
         value->setProperty(jsonKeys::id, static_cast<juce::int64>(parameter.id));
         value->setProperty(jsonKeys::key, juce::String(parameter.key));
@@ -9249,6 +9267,8 @@ juce::var NodeGraphComponent::createVst3RuntimeState() const
         value->setProperty(jsonKeys::modulatable, parameter.modulatable);
         value->setProperty(jsonKeys::visibleInDevice, parameter.visibleInDevice);
         value->setProperty(jsonKeys::exportedToHost, parameter.exportedToHost);
+        allValues.add(juce::var(value.get()));
+        if (!parameter.exportedToHost) continue;
         publishedValues.add(juce::var(value.get()));
         const auto extent = parameter.maximum - parameter.minimum;
         hostValues.add(extent > 0.0
@@ -9258,28 +9278,38 @@ juce::var NodeGraphComponent::createVst3RuntimeState() const
                                      / extent)
                            : 0.0);
     }
+    juce::Array<juce::var> voiceModulations;
+    for(const auto& modulation:editorVoiceModulations()) {
+        auto* value=new juce::DynamicObject();value->setProperty("source",static_cast<juce::int64>(modulation.controlNodeId));
+        value->setProperty("target",static_cast<int>(modulation.target));value->setProperty("depth",modulation.depth);
+        voiceModulations.add(juce::var(value));
+    }
+    root->setProperty("voiceModulations",voiceModulations);
+    root->setProperty("allParameters", allValues);
     root->setProperty(jsonKeys::publishedParameters, publishedValues);
     root->setProperty(jsonKeys::hostValues, hostValues);
-    // The device's programs, as the plugin's: each its host values, in the
+    // The device's programs, as the plugin's: each its parameter values, in the
     // published order (a setting a program lacks keeps its default).
     if (!programs_.empty()) {
         juce::Array<juce::var> programs;
         for (const auto& program : programs_) {
-            juce::Array<juce::var> values;
+            juce::Array<juce::var> values, allProgramValues;
             for (const auto& parameter : runtimeExport.publishedParameters) {
-                if (!parameter.exportedToHost)
-                    continue;
                 auto value = parameter.defaultValue;
                 const auto key = juce::String(parameter.key);
                 for (const auto& [programKey, programValue] : program.values)
                     if (programKey == key)
                         value = programValue;
                 const auto extent = parameter.maximum - parameter.minimum;
-                values.add(extent > 0.0 ? juce::jlimit(0.0, 1.0, (value - parameter.minimum) / extent) : 0.0);
+                const auto normalised = extent > 0.0 ? juce::jlimit(0.0, 1.0, (value - parameter.minimum) / extent) : 0.0;
+                allProgramValues.add(normalised);
+                if (parameter.exportedToHost)
+                    values.add(normalised);
             }
             auto entry = juce::DynamicObject::Ptr(new juce::DynamicObject());
             entry->setProperty("name", program.name);
             entry->setProperty("hostValues", values);
+            entry->setProperty("allValues", allProgramValues);
             programs.add(juce::var(entry.get()));
         }
         root->setProperty("programs", programs);
@@ -9288,7 +9318,7 @@ juce::var NodeGraphComponent::createVst3RuntimeState() const
 }
 
 juce::Result NodeGraphComponent::generateVst3Project(
-    const juce::File& destination) const
+    const juce::File& destination, const juce::String& format) const
 {
     const auto exportResult = planVst3Export();
     if (!exportResult)
@@ -9296,10 +9326,12 @@ juce::Result NodeGraphComponent::generateVst3Project(
             exportResult.issues.empty()
                 ? "The Graph is not ready for VST3 export"
                 : juce::String(exportResult.issues.front().message));
+    const auto runtime=runtimeGraphExport();
+    if(runtime.compilationResult.failed())return runtime.compilationResult;
     return generateGraphVst3Project(
         destination, *exportResult.plan,
         serialisePluginExportPlan(*exportResult.plan, serialise()),
-        createVst3RuntimeState());
+        createVst3RuntimeState(), format);
 }
 
 cydaw::graph::GraphRole NodeGraphComponent::inferCurrentGraphRole() const
@@ -15395,6 +15427,7 @@ void NodeGraphComponent::registerModuleType(const SavedModule& module)
             boundary.alias.isNotEmpty() ? boundary.alias : boundary.title,
             portType(kind), input, channels, false, 0.0
         });
+        if(!boundary.ports.empty()) {found->ports.back().category=boundary.ports.front().category; found->ports.back().defaultValue=boundary.ports.front().defaultValue;}
     }
     // Legacy modules created before explicit boundary nodes retain their
     // single typed connector until they are opened and upgraded.
@@ -15455,6 +15488,7 @@ ModuleInterfaceState NodeGraphComponent::createDefaultGraphInterface() const
     for (const auto& node : nodes_) {
         auto presentation = presentationForNode(node);
         for (auto& parameter : presentation.parameters) {
+            if(node.typeKey=="value-constant" && node.alias.isNotEmpty()) parameter.label=node.alias;
             if (findModule(node.typeKey) == nullptr)
                 parameter.value = nativeParameterValue(node.parameters,
                                                        parameter.key);
@@ -15582,7 +15616,9 @@ void NodeGraphComponent::synchroniseGraphInterface()
 {
     auto current = createDefaultGraphInterface();
     if (graphInterfaceState_.controls.empty()
-        && graphInterfaceState_.deviceControls.empty()) {
+        && graphInterfaceState_.deviceControls.empty()
+        && !graphInterfaceState_.designed && !graphInterfaceState_.deviceDesigned
+        && !graphInterfaceState_.windowDesign.isObject() && !graphInterfaceState_.deviceDesign.isObject()) {
         graphInterfaceState_ = std::move(current);
         return;
     }
@@ -17319,6 +17355,7 @@ NodeGraphComponent::graphDefinitions() const
                 channels,
                 boundary.alias.isNotEmpty() ? boundary.alias
                                             : boundary.title));
+            if (!boundary.ports.empty()) definition.ports.back().defaultValue=boundary.ports.front().defaultValue;
         }
         if (module.hasInput && !hasExplicitInput)
             definition.ports.push_back(makePort(
@@ -17537,6 +17574,7 @@ NodeGraphComponent::graphDefinitions() const
                     static_cast<juce::int64>(node.id)),
                 node.outputKind, graph::PortDirection::input,
                 audioOutputChannels(node), displayTitle(node)));
+            if (!node.ports.empty()) root.ports.back().defaultValue=node.ports.front().defaultValue;
             continue;
         }
         if (isBoundaryOutput(node.typeKey)) {
@@ -18424,6 +18462,7 @@ juce::var NodeGraphComponent::moduleGraphState(const SavedModule& module) const
     root->setProperty(jsonKeys::graphName, module.name);
     root->setProperty(jsonKeys::graphCategory, module.category);
     root->setProperty(jsonKeys::graphAuthor, module.author);
+    root->setProperty("programs", serialiseGraphPrograms(module.programs));
     root->setProperty(jsonKeys::graphDescription, module.description);
     juce::Array<juce::var> moduleTags;
     for (const auto& tag : module.tags)
@@ -18477,6 +18516,7 @@ void NodeGraphComponent::applyModuleGraphState(const juce::String& moduleKey,
                 parsed.version = *version;
             parsed.parentClassKey = object->getProperty(
                 "parentClassKey").toString();
+            parsed.programs = restoreGraphPrograms(object->getProperty("programs"));
             parsed.description = object->getProperty(jsonKeys::description).toString()
                                      .substring(0, 2'048);
             parsed.category = object->getProperty(jsonKeys::category).toString()
@@ -18733,6 +18773,7 @@ void NodeGraphComponent::applyModuleGraphState(const juce::String& moduleKey,
             root->getProperty(jsonKeys::definitionVersion).toString());
         editedVersion.has_value())
         module->version = *editedVersion;
+    module->programs = restoreGraphPrograms(root->getProperty("programs"));
     module->description = root->getProperty(jsonKeys::graphDescription).toString()
                               .substring(0, 2'048);
     module->category = root->getProperty(jsonKeys::graphCategory).toString().trim()
@@ -18800,6 +18841,8 @@ void NodeGraphComponent::applyModuleGraphState(const juce::String& moduleKey,
             updated.gridRows = previous.gridRows;
             updated.controls = previous.controls;
             updated.deviceControls = previous.deviceControls;
+            updated.designed=previous.designed;updated.windowWidth=previous.windowWidth;updated.windowHeight=previous.windowHeight;updated.windowDesign=previous.windowDesign;updated.deviceDesign=previous.deviceDesign;
+            updated.deviceDesigned=previous.deviceDesigned;updated.deviceWidth=previous.deviceWidth;updated.deviceHeight=previous.deviceHeight;
             const auto removeStaleBindings = [&updated](auto& controls) {
                 std::erase_if(controls, [&updated](const auto& control) {
                     const auto parameterControl =
@@ -18868,7 +18911,12 @@ void NodeGraphComponent::applyModuleGraphState(const juce::String& moduleKey,
                 if (const auto previous = std::ranges::find(
                         node.ports, port.id, &NodePort::id);
                     previous != node.ports.end())
-                    port.defaultValue = previous->defaultValue;
+                    {
+                        port.defaultValue = previous->defaultValue;
+                        port.exposure = previous->exposure;
+                        if (previous->category.isNotEmpty()) port.category = previous->category;
+                        if (port.name.isEmpty()) port.name = previous->name;
+                    }
             node.ports = std::move(ports);
             node.interfaceState = reconcileInstance(
                 node.id, node.interfaceState,
@@ -18885,7 +18933,12 @@ void NodeGraphComponent::applyModuleGraphState(const juce::String& moduleKey,
                             if (const auto previous = std::ranges::find(
                                     child.ports, port.id, &NodePort::id);
                                 previous != child.ports.end())
-                                port.defaultValue = previous->defaultValue;
+                                {
+                        port.defaultValue = previous->defaultValue;
+                        port.exposure = previous->exposure;
+                        if (previous->category.isNotEmpty()) port.category = previous->category;
+                        if (port.name.isEmpty()) port.name = previous->name;
+                    }
                         child.ports = std::move(ports);
                     }
                     child.interfaceState = reconcileInstance(
@@ -22112,7 +22165,32 @@ cydaw::graph::PluginExportResult NodeGraphComponent::planVst3Export(
     const cydaw::graph::PluginIdentity& identity) const
 {
     cydaw::graph::GraphLibrary library;
-    const auto installed = library.installBatch(graphDefinitions());
+    auto definitions=graphDefinitions();
+    // A value input wired straight to published settings becomes those host
+    // parameters in VST3. The CyDAW graph retains its typed external socket.
+    const auto root=std::ranges::find(definitions,graphReference_,&cydaw::graph::GraphDefinition::reference);
+    if(root!=definitions.end()) {
+        const auto editor=editorNodes();
+        std::set<cydaw::graph::PortId> lowered;
+        for(const auto& node:editor) {
+            if(node.typeKey!="graph-value-input")continue;
+            int connected=0; bool mapped=true;
+            for(const auto& c:connections_)if(c.source==node.id) {
+                ++connected;
+                if(c.mode!=0) {mapped=false;break;}
+                const auto target=std::ranges::find(editor,c.destination,&EditorNode::id);
+                if(target==editor.end()) {mapped=false;break;}
+                const auto p=std::ranges::find_if(target->parameters,[&](const auto& p){return p.inputPortId==c.destinationPort && p.publishToHost;});
+                if(p==target->parameters.end()) {mapped=false;break;}
+            }
+            if(connected==1 && mapped)lowered.insert(node.id);
+        }
+        for(auto& surface:root->interfaces)
+            std::erase_if(surface.controls,[&](const auto& c){return c.portBinding && lowered.contains(*c.portBinding);});
+        std::erase_if(root->ports,[&](const auto& p){return lowered.contains(p.id);});
+        std::erase_if(root->connections,[&](const auto& c){return c.source.nodeId==cydaw::graph::boundaryNodeId && lowered.contains(c.source.portId);});
+    }
+    const auto installed = library.installBatch(std::move(definitions));
     if (!installed.ok()) {
         cydaw::graph::PluginExportResult result;
         for (const auto& issue : installed.issues)
@@ -24706,43 +24784,33 @@ const NodeGraphComponent::NodePort* NodeGraphComponent::findPort(
     return found != node.ports.end() ? &*found : nullptr;
 }
 
-juce::var NodeGraphComponent::serialisePortDefaults(
-    const std::vector<NodePort>& ports)
+juce::var NodeGraphComponent::serialisePortDefaults(const std::vector<NodePort>& ports)
 {
     juce::Array<juce::var> values;
     for (const auto& port : ports) {
-        if (!port.input
-            || (port.type != cydaw::graph::PortType::value
-                && port.type != cydaw::graph::PortType::trigger))
-            continue;
-        auto value = juce::DynamicObject::Ptr(new juce::DynamicObject());
-        value->setProperty(jsonKeys::id, static_cast<juce::int64>(port.id));
-        value->setProperty(jsonKeys::value, port.defaultValue);
-        values.add(juce::var(value.get()));
+        auto* value = new juce::DynamicObject;
+        value->setProperty("id", static_cast<juce::int64>(port.id));
+        value->setProperty("value", port.defaultValue);
+        value->setProperty("exposure", port.exposure);
+        value->setProperty("name", port.name);
+        value->setProperty("category", port.category);
+        values.add(juce::var(value));
     }
     return juce::var(std::move(values));
 }
 
-void NodeGraphComponent::restorePortDefaults(
-    const juce::var& state, std::vector<NodePort>& ports)
+void NodeGraphComponent::restorePortDefaults(const juce::var& state, std::vector<NodePort>& ports)
 {
-    const auto* values = state.getArray();
-    if (values == nullptr)
-        return;
+    const auto* values = state.getArray(); if (!values) return;
     for (const auto& value : *values) {
-        const auto* object = value.getDynamicObject();
-        if (object == nullptr)
-            continue;
-        const auto id = static_cast<cydaw::graph::PortId>(
-            static_cast<juce::int64>(object->getProperty(jsonKeys::id)));
-        const auto port = std::ranges::find(ports, id, &NodePort::id);
-        const auto numeric = static_cast<double>(object->getProperty(jsonKeys::value));
-        if (port != ports.end() && std::isfinite(numeric)
-            && port->input
-            && (port->type == cydaw::graph::PortType::value
-                || port->type == cydaw::graph::PortType::trigger))
-            port->defaultValue = juce::jlimit(-1'000'000.0, 1'000'000.0,
-                                              numeric);
+        const auto id = static_cast<cydaw::graph::PortId>(static_cast<juce::int64>(value.getProperty("id",0)));
+        auto port = std::ranges::find(ports,id,&NodePort::id); if (port == ports.end()) continue;
+        const auto number = static_cast<double>(value.getProperty("value",port->defaultValue));
+        if (std::isfinite(number) && port->input && (port->type == cydaw::graph::PortType::value
+            || port->type == cydaw::graph::PortType::trigger)) port->defaultValue = juce::jlimit(-1'000'000.0,1'000'000.0,number);
+        port->exposure = juce::jlimit(-1,1,static_cast<int>(value.getProperty("exposure",-1)));
+        if (value.hasProperty("name")) port->name = value.getProperty("name",{}).toString().substring(0,96);
+        port->category = value.getProperty("category",{}).toString().substring(0,128);
     }
 }
 

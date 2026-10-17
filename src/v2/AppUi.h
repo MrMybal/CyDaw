@@ -42,11 +42,15 @@ class LauncherView;
 class DeviceSignals;
 class DeviceEditorView;
 class WorkshopView;
+class DjView;
+class FoundryView;
 class PluginWindows;
 class Vst3Build;
 class ContextMenus;
 class ComputerKeyboard;
 class ThemesView;
+class TransportSync;
+class JsfxView;
 
 class AppUi final : public RemoteUi {
 public:
@@ -101,7 +105,9 @@ public:
     void showAudioSettings() { showAudioSettings_ = true; }
     bool showDialog(const juce::String& name) override
     {
-        if (name == "audio")
+        if (name == "transport-sync")
+            showTransportSync_ = true;
+        else if (name == "audio")
             showAudioSettings_ = true;
         else if (name == "soundcard")
             showAudioSettings_ = showSoundCard_ = true;
@@ -179,6 +185,12 @@ public:
     juce::var library(const juce::String& command, const juce::var& request) override;
     juce::var midiInputs(const juce::String& command, const juce::var& request) override;
     juce::var themes(const juce::var& request) override;
+    juce::var jsfx(const juce::var&) override;
+    juce::var transportSync(const juce::var& request) override;
+    juce::var dj(const juce::var& request) override;
+    juce::var foundry(const juce::var& request) override;
+    juce::var cinema(const juce::var& request) override;
+    juce::String appMode(const juce::String& mode) override;
     bool showDeviceEditor(std::uint64_t nodeId, int pane, bool detached = false) override;
     void showWorkshop() override { state_.bringToFront = Panel::workshop; }
     void showDeviceCatalogue() override { state_.openDeviceCatalogue = true; }
@@ -218,12 +230,16 @@ private:
     // at once when there are none.
     void whenSaved(std::function<void()> action);
     void drawUnsavedPrompt();
+    void drawFoundryPrompt();
     void chooseSaveAsThen(std::function<void()> then);
     void drawMenuBar();
     void drawTransportBar();
     void drawStatusBar();
     void drawDockSpace();
     void drawWindows();
+    void toggleBottomPanel();
+    void toggleSidePanel(Panel panel);
+    void resetUiState();
     void drawDialogs();
     void buildDefaultLayout(unsigned int dockspaceId);
     void handleShortcuts();
@@ -276,11 +292,17 @@ private:
     std::unique_ptr<DeviceEditorView> deviceEditor_;
     std::unique_ptr<Vst3Build> vst3Build_;
     std::unique_ptr<ContextMenus> contextMenus_;
-    // The VST workshop mode: the whole window is the workshop.
+    // The Plugin workshop mode: the whole window is the workshop.
     void resolveMode();
     void drawWorkshopMode();
     void drawModeSwitch();
     std::unique_ptr<WorkshopView> workshop_;
+    std::unique_ptr<DjView> dj_;
+    std::unique_ptr<FoundryView> foundry_;
+    std::unique_ptr<FoundryView> cinema_;
+    std::unique_ptr<TransportSync> transportSync_;
+    std::unique_ptr<JsfxView> jsfx_;
+    bool showTransportSync_{};
     // The devices' windows, as plugins' (their designed interfaces).
     std::unique_ptr<PluginWindows> pluginWindows_;
     std::unique_ptr<ClipEditorView> clipEditor_;
@@ -291,6 +313,8 @@ private:
     std::unique_ptr<LauncherView> launcher_;
     std::unique_ptr<juce::FileChooser> chooser_;
 
+    bool inspectorVisible_ { true };
+    bool browserVisible_ { true };
     bool layoutBuilt_ {};
     bool resetLayoutRequested_ {};
     bool showDemo_ {};
@@ -339,6 +363,10 @@ private:
     char layoutName_[64] {};
     Panel lastFocused_ { Panel::arrangement };
     std::function<void()> pendingAction_;
+    // Quitting with the Foundry's files not saved: what follows once the
+    // person chose.
+    std::function<void()> foundryAction_;
+    bool foundryPromptRequested_ {};
     bool unsavedPromptRequested_ {};
     // The control port's pointer (ui_input): in use, where, the event for
     // the next frame, whether Shift is held.

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "AudioEdit.h"
+#include "DjEngine.h"
+#include "FoundryPlayer.h"
 #include "IsolatedPluginHost.h"
 #include "VirtualAudioBus.h"
 
@@ -115,6 +117,8 @@ public:
     explicit GainPanAudioSource(juce::AudioTransportSource& input) noexcept;
     ~GainPanAudioSource() override;
 
+    void setExternalTimeline(const std::atomic<double>* clock) noexcept { modeTimeline_ = clock; }
+    void setExternalInput(juce::AudioSource* source) noexcept { externalInput_.store(source); }
     void setGain(float linearGain) noexcept;
     void setPan(float pan) noexcept;
     [[nodiscard]] float pan() const noexcept { return pan_.load(std::memory_order_relaxed); }
@@ -184,6 +188,7 @@ public:
                                          int maximumBlockSize,
                                          int channelCount,
                                          std::size_t* pluginIndex = nullptr);
+    juce::Result reloadPlugin(std::size_t pluginIndex, double sampleRate, int blockSize, int channels);
     void removePlugin(std::size_t pluginIndex);
     void clearPlugins();
     [[nodiscard]] bool movePlugin(std::size_t pluginIndex, int direction);
@@ -244,9 +249,11 @@ private:
     void publishAnalysisFrame(
         const juce::AudioSourceChannelInfo& bufferToFill) noexcept;
 
+    std::atomic<juce::AudioSource*> externalInput_ {};
     juce::AudioSource& input_;
     juce::AudioTransportSource* transport_ {};
     const std::atomic<double>* timelinePosition_ {};
+    const std::atomic<double>* modeTimeline_ {};
     std::atomic<float> gain_ { 1.0f };
     std::atomic<float> pan_ {};
     // Automation lanes are rebuilt on the message thread and borrowed by the
@@ -867,6 +874,20 @@ public:
         const juce::File& file,
         std::size_t* newTrackIndex = nullptr,
         double initialClipStartSeconds = 0.0);
+    // A secondary mixing session, driven by the Foundry/DJ audio callback.
+    // No sound card is opened. External sources outlive the track.
+    void prepareModeMix(double rate, int block) { modeRate_ = rate; masterOutput_.prepareToPlay(block, rate); }
+    void renderModeMix(const juce::AudioSourceChannelInfo& output) { masterOutput_.getNextAudioBlock(output); }
+    void setModeTrackSource(std::size_t index, juce::AudioSource* source);
+    void setModeGainAutomation(bool midi, std::uint64_t id, std::vector<GainAutomationPoint> points);
+    void setModeTimeline(double seconds, int samples, bool midiPlaying = true) noexcept {
+        modeMidiPlaying_.store(midiPlaying,std::memory_order_relaxed);
+        modePosition_.store(seconds, std::memory_order_relaxed);
+        modeEndPosition_.store(seconds + samples / std::max(1.0, modeRate_), std::memory_order_relaxed);
+        modeTimelineEnabled_.store(true, std::memory_order_release);
+        masterOutput_.setClock(seconds);
+        masterOutput_.setClockRunning(true);
+    }
     [[nodiscard]] juce::Result addEmptyAudioTrack(
         std::size_t* newTrackIndex = nullptr);
     // A sample auditioned at the project's tempo: its own tempo (0: as it
@@ -1330,6 +1351,7 @@ public:
     [[nodiscard]] juce::Result setTrackPlugin(std::size_t index,
                                               const juce::File& pluginFile,
                                               std::size_t* pluginIndex = nullptr);
+    juce::Result reloadTrackPlugin(std::size_t track, std::size_t plugin);
     void clearTrackPlugin(std::size_t index, std::size_t pluginIndex);
     void clearTrackPlugins(std::size_t index);
     [[nodiscard]] bool moveTrackPlugin(std::size_t index,
@@ -1860,6 +1882,13 @@ public:
     // changing nothing, on a loop.
     juce::Result setTrackRouting(const std::vector<TrackRouting>& routing);
 
+    // ---- The DJ mode and the Foundry -----------------------------------------
+    // Their sound joins the master's mixer with the tracks (the master's
+    // effects, gain and meter apply).
+    [[nodiscard]] DjEngine& dj() noexcept { return *dj_; }
+    [[nodiscard]] FoundryPlayer& foundryPlayer() noexcept { return *foundryPlayer_; }
+    [[nodiscard]] FoundryPlayer& cinemaPlayer() noexcept { return *cinemaPlayer_; }
+
     // ---- The workshop's simulator ------------------------------------------
     // A device tried on its own, apart from the tracks: test signals into an
     // effect, a looped pattern or a keyboard into an instrument, the result
@@ -1909,6 +1938,9 @@ public:
 private:
     struct Simulation;
     std::unique_ptr<Simulation> simulation_;
+    std::unique_ptr<DjEngine> dj_;
+    std::unique_ptr<FoundryPlayer> foundryPlayer_;
+    std::unique_ptr<FoundryPlayer> cinemaPlayer_;
     std::vector<SimulationNote> simulationPattern_;
     double simulationPatternBeats_ {};
     void publishSimulationPattern();
@@ -2058,6 +2090,10 @@ private:
         std::shared_ptr<AudioDelayLine> line;
     };
     std::vector<EdgeDelay> edgeDelays_;
+    double modeRate_{48000};
+    std::atomic<double> modePosition_{}, modeEndPosition_{};
+    std::atomic<bool> modeTimelineEnabled_{};
+    std::atomic<bool> modeMidiPlaying_{true};
     std::atomic<float> masterGainDb_ {};
     std::atomic<bool> masterMuted_ {};
     juce::AudioTransportSource samplePreviewTransport_;

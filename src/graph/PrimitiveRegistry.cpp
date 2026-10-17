@@ -155,6 +155,7 @@ ValidationResult PrimitiveRegistry::validateNode(const GraphNode& node) const
         const auto actual = std::ranges::find(node.ports, expected.id,
                                               &GraphPort::id);
         if (actual == node.ports.end()) {
+            if(expected.optional)continue;
             issue(result, ValidationCode::invalidPort,
                   "Missing primitive port: " + expected.key,
                   node.id, expected.id);
@@ -189,7 +190,7 @@ ValidationResult PrimitiveRegistry::validateNode(const GraphNode& node) const
                       node.id, item.id);
         }
     }
-    if (node.ports.size() != descriptor->ports.size())
+    if (std::ranges::any_of(node.ports,[&](const auto& port){return std::ranges::find(descriptor->ports,port.id,&GraphPort::id)==descriptor->ports.end();}))
         issue(result, ValidationCode::invalidPort,
               "Primitive node exposes undeclared ports", node.id);
     for (const auto& expected : descriptor->parameters) {
@@ -714,6 +715,14 @@ PrimitiveRegistry createFactoryPrimitiveRegistry()
             if (item.modulatable())
                 ports.push_back(port(next++, std::string(item.key), Type::value, Direction::input, Rate::control));
             parameters.push_back(parameter(std::string(item.key), item.minimum, item.maximum, item.defaultValue));
+        }
+        // Additional settings keep deterministic high IDs, so extending the
+        // catalogue never shifts the legacy sockets or sidechain endpoint.
+        for(std::size_t i=0;i<effect.parameters.size();++i) {
+            const auto& item=effect.parameters[i];
+            if(item.key.empty()||item.modulatable())continue;
+            auto extra=port(1024+i,std::string(item.key),Type::value,Direction::input,Rate::control,1,false,item.defaultValue);
+            extra.optional=true;ports.push_back(std::move(extra));
         }
         // Its own key: "sidechain" is already the compressor's detector
         // filter, and two ports of one key make the whole primitive invalid.

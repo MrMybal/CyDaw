@@ -69,11 +69,15 @@ void PluginWindows::draw()
                                                            : "a")
                         + juce::String(static_cast<juce::int64>(window.track.midi ? window.track.midiId : window.track.audioIndex)) + "-"
                         + juce::String(static_cast<juce::int64>(window.nodeId));
-        const auto windowKey = windowId(window);
+        const auto windowKey = windowId(window) + state_.deviceWindowNamespace;
         const auto title = name + "  —  " + studio_.trackName(window.track) + juce::String(windowKey);
         ui::beforeDetachable(windowKey.c_str());
-        ImGui::SetNextWindowSize(ImVec2(dp(width * 0.5f) * 2.0f, dp(height * 0.5f) * 2.0f + 2.0f * ImGui::GetFrameHeightWithSpacing()),
-                                 ImGuiCond_Appearing);
+        const auto dimensions=std::make_pair(width,height);
+        const auto previous=authoredSizes_.find(windowKey);
+        const bool resized=previous==authoredSizes_.end() || previous->second!=dimensions;
+        authoredSizes_[windowKey]=dimensions;
+        ImGui::SetNextWindowSize(ImVec2(dp(width),dp(height)+2.0f*ImGui::GetFrameHeightWithSpacing()),
+                                 resized?ImGuiCond_Always:ImGuiCond_Appearing);
         auto open = true;
         ImGui::PushStyleColor(ImGuiCol_WindowBg, theme::palette().bg1);
         if (ImGui::Begin(title.toRawUTF8(), &open, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar
@@ -113,7 +117,7 @@ void PluginWindows::draw()
             } else {
                 renderer_->drawPlayed(id.toRawUTF8(), interface, room, [&graph](const juce::String& key, const double value) {
                     (void) graph.editorSetParameter(key, value);
-                });
+                }, &graph.editorAnalysis());
             }
         }
         ImGui::End();

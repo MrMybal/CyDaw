@@ -4,6 +4,8 @@
 #include "UiState.h"
 
 #include <imgui.h>
+#include <array>
+#include <map>
 
 #include <map>
 #include <optional>
@@ -31,6 +33,9 @@ public:
     enum class Mode { track, workshop };
     GraphEditor(Studio& studio, UiState& state, ImGuiHost& host, DeviceSignals& signals, Mode mode = Mode::track);
     void draw();
+    void drawDetails();
+    void drawPorts();
+    void drawPrograms();
     // A card of that type: in the middle of the view (the palette's click),
     // a little aside from the last one so they do not pile up.
     void addNode(const juce::String& typeKey);
@@ -105,6 +110,10 @@ private:
     void drawMinimap(ImDrawList* list, const std::vector<NodeLayout>& layouts);
     void searchPopup(GraphSlot& slot, const std::optional<TrackRef>& track);
     void nodeContextMenu(GraphSlot& slot);
+    void valueActions(app::NodeGraphComponent& graph, const EditorNode& node,
+                      const app::NodeGraphComponent::EditorParameter& parameter);
+    void promoteValue(app::NodeGraphComponent& graph, std::uint64_t node, std::uint64_t port,
+                      const juce::String& binding, bool input);
     void handleKeys(GraphSlot& slot);
     // Returns the zoom that fits.
     float frameAll(const std::vector<EditorNode>& nodes, bool selectionOnly);
@@ -158,6 +167,16 @@ private:
     ImGuiID nodeMenuId_ {};
     ImGuiID searchMenuId_ {};
     bool showMinimap_ { true };
+    bool showDetails_ { true };
+    char detailName_[128] {};
+    char detailDescription_[2048] {};
+    char detailFilter_[128] {};
+    std::map<std::pair<std::uint64_t,std::uint64_t>,std::array<char,128>> detailPortCategories_;
+    char boundaryName_[128] {};
+    char boundaryCategory_[128] {};
+    int boundaryKind_ {};
+    int boundaryDirection_ {};
+    int boundaryChannels_ { 2 };
     // A card just let go of, to be spliced into the cable under it.
     std::optional<std::uint64_t> droppedNode_;
     // The cable a card being dragged would be spliced into.
@@ -165,6 +184,11 @@ private:
     void findSpliceTarget(const std::vector<EditorConnection>& connections, const std::vector<NodeLayout>& layouts);
     void splice(app::NodeGraphComponent& graph, const std::vector<NodeLayout>& layouts);
     bool knobHovered_ {};
+    const void* programGraph_ {};
+    juce::String program_;
+    int renamingProgram_ { -1 };
+    std::vector<char> programName_ = std::vector<char>(128, 0);
+    std::vector<char> programRename_ = std::vector<char>(128, 0);
     juce::String lastError_;
     double lastErrorTime_ {};
     Mode mode_;

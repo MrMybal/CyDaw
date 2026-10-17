@@ -75,6 +75,29 @@ public:
         juce::ignoreUnused(request);
         return {};
     }
+    // dj: the Mix DJ mode's decks, mixer and collection; foundry: the
+    // Foundry's sound files. Their answer, or a string saying what failed;
+    // null when there is no interface.
+    virtual juce::var jsfx(const juce::var&) { return {}; }
+    virtual juce::var cinema(const juce::var&) { return {}; }
+    virtual juce::var transportSync(const juce::var&) { return {}; }
+    virtual juce::var dj(const juce::var& request)
+    {
+        juce::ignoreUnused(request);
+        return {};
+    }
+    virtual juce::var foundry(const juce::var& request)
+    {
+        juce::ignoreUnused(request);
+        return {};
+    }
+    // app_mode: the whole window's mode (studio, dj, foundry, workshop), put
+    // on when named; the one on ("" when the name is none of them).
+    virtual juce::String appMode(const juce::String& mode)
+    {
+        juce::ignoreUnused(mode);
+        return {};
+    }
     virtual juce::var midiInputs(const juce::String& command, const juce::var& request)
     {
         juce::ignoreUnused(command, request);
@@ -85,6 +108,7 @@ public:
     // pointer: {"type": "move"|"down"|"up"|"wheel"|"wait"|"release", "x",
     // "y", "button" (0 left, 1 right), "dy", "frames", "shift"}. The
     // scripted pointer stays in place of the real one until "release".
+    // file_drop: {files:[absolute paths],x,y}, through the desktop drop handler.
     // Empty on success, otherwise why not.
     virtual juce::String injectInput(const juce::var& events)
     {

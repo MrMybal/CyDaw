@@ -92,6 +92,7 @@ private:
     ImGuiHost& host_;
     SampleCatalog& catalog_;
     std::shared_ptr<int> alive_ { std::make_shared<int>(0) };
+    std::string windowId_;
     bool maximised_ {};
     bool keepOpen_ {};
     double frameMs_ {};

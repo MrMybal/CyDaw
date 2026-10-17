@@ -351,6 +351,14 @@ void BrowserView::drawSampleMenu(const app::SampleRecord& record)
         ImGui::EndMenu();
     }
     ImGui::Separator();
+    if (ImGui::MenuItem(L("Ouvrir dans la Fonderie", "Open in the Foundry"))) {
+        state_.foundryOpen = record.file();
+        state_.mode = AppMode::foundry;
+    }
+    if (ImGui::MenuItem(L("Charger sur une platine (Mix DJ)", "Load on a deck (DJ mix)"))) {
+        state_.djLoad = std::pair { -1, record.file() };
+        state_.mode = AppMode::dj;
+    }
     if (ImGui::MenuItem(L("Montrer dans l'explorateur", "Show in the file explorer")))
         record.file().revealToUser();
     if (ImGui::MenuItem(L("Copier le chemin", "Copy the path")))

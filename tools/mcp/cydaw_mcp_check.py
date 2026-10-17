@@ -216,8 +216,10 @@ def main():
         print("banks:", len(banks.get("banks", [])), "in", banks.get("folder"), "; locations:", [p["key"] for p in places])
         if not banks.get("banks"):
             failures.append("banks lists no bank")
-        if len(places) != 9:
-            failures.append("locations gives %d folders, expected 9" % len(places))
+        # Banks, downloads, cache, companion, AI models, sound models, devices,
+        # presets, plug-in exports, DJ mixes, the Foundry.
+        if len(places) != 11:
+            failures.append("locations gives %d folders, expected 11" % len(places))
         status = client.tool("load_template", name="basse-et-nappes")
         print("loaded:", os.path.basename(status["project"]), "tempo", status["tempo"],
               "midi tracks", [t["name"] for t in status["midiTracks"]])

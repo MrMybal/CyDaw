@@ -173,8 +173,9 @@ class DocumentLoad;
 }
 
 class Studio final : public DeviceHost {
+    friend class ModeProcessing;
 public:
-    Studio();
+    explicit Studio(bool auxiliary = false);
     ~Studio();
 
     // ---- Audio device -------------------------------------------------------
@@ -252,6 +253,8 @@ public:
                                double sourceStart, double sourceLength, const juce::String& label);
     // A clip's comp made into one file (its best passages joined, as they
     // play): the clip keeps that take alone. One undo step.
+    juce::Result reverseAudioClip(const TrackRef& track, std::uint64_t id);
+    juce::Result reverseLauncherClip(const TrackRef& track, int scene);
     juce::Result flattenAudioClipComp(const TrackRef& track, std::uint64_t clipId);
     // An event of a clip edited in place (normalize, gain, reverse... what
     // keeps its length): a new file, which the event then plays.
@@ -591,6 +594,9 @@ public:
     void closeWorkshop();
     // Into My devices: under its file, or a new file named after it.
     juce::Result saveWorkshop(juce::File& written, bool asNewFile);
+    // A portable graph snapshot, independent of the local device library.
+    // Does not change the working tab's save destination or dirty flag.
+    juce::Result exportWorkshop(const juce::File& file, juce::StringArray& externalFiles);
     // Its name, author, description: the exported plugin's name follows
     // the device's until the person gives it another.
     void setWorkshopInfo(const app::NodeGraphComponent::EditorGraphInfo& info);
@@ -1108,6 +1114,7 @@ private:
     juce::var sharedModulationModules_;
 
     juce::File projectFile_;
+    bool auxiliary_ {};
     bool dirty_ {};
     bool virtualIoDirty_ {};
     bool virtualIoSaving_ {};

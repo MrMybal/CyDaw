@@ -1,4 +1,5 @@
 #include <cydaw/engine/AudioGraph.h>
+#include "../src/native_plugin/NativeRuntime.h"
 #include <cydaw/engine/GraphDefinitionCompiler.h>
 #include <cydaw/engine/GraphInstrumentCompiler.h>
 #include <cydaw/engine/NativeDspCompiler.h>
@@ -1132,6 +1133,37 @@ void typedInstrumentGraphCompilesThroughNestedBoundaries()
            "instrument plan is derived from primitive overrides inside the nested Graph");
 }
 
+void nativeRuntimeRetainsRealtimeBaselinesAndExtendedSockets()
+{
+    using namespace cydaw::engine;
+    using cydaw::native::NativeDspRuntime;
+    NativeDspGraph graph;
+    NativeDspNode input {1,NativeDspNodeKind::input},gain {2,NativeDspNodeKind::gain},output {3,NativeDspNodeKind::output},control {4,NativeDspNodeKind::controlConstant};
+    control.parameters.valueOperand=0;
+    graph.nodes={input,gain,output,control};graph.outputNodeId=3;
+    graph.connections={{1,2},{2,3}};graph.modulations={{4,2,1,2,"gain-db",1,.25f,-120,24}};
+    NativeDspRuntime runtime;runtime.prepare(48000,64,2);
+    expect(runtime.setGraph(graph).wasOk(),"JUCE-free native runtime accepts modulation");
+    std::array<float,64> left,right;left.fill(.1f);right.fill(.1f);float* pointers[]{left.data(),right.data()};
+    cydaw::native::PlanarBuffer buffer {pointers,2,64};
+    gain.parameters.gainDb=-6;
+    expect(runtime.updateNodeParametersRealtime(gain),"native host automation updates its baseline");
+    expect(runtime.process(buffer,0,64),"native graph renders into borrowed host channels");
+    expect(std::isfinite(left.back())&&left.back()<.075f,"zero modulation retains the automated gain instead of restoring the old knob");
+    const auto* effect=effectForType("comp-pro");
+    expect(effect!=nullptr,"compressor catalogue available without JUCE");
+    if(effect) {
+        NativeDspNode compressor {2,effect->kind};applyEffectDefaults(*effect,compressor.parameters);
+        graph.nodes={input,compressor,output,control};graph.modulations={{4,2,1,1024,"style",0,.5f,0,7}};
+        expect(runtime.setGraph(graph).wasOk(),"an extended effect setting accepts a typed control cable");
+        left.fill(.1f);right.fill(.1f);expect(runtime.process(buffer,0,64),"extended slot modulation renders finite audio");
+        expect(std::isfinite(left.back()),"extended slot modulation is finite");
+        const auto* descriptor=cydaw::graph::factoryPrimitiveRegistry().find(std::string(effect->processorKey));
+        const auto hasStyle=descriptor&&std::ranges::any_of(descriptor->ports,[](const auto& p){return p.key=="style"&&p.optional;});
+        expect(hasStyle,"advanced effect input has a stable optional socket for old graphs");
+    }
+}
+
 void dockingLayoutsSupportTabsSplitsAndWindows()
 {
     using namespace cydaw::ui;
@@ -1165,6 +1197,7 @@ int main()
     typedGraphDefinitionsCompileToNativeDsp();
     typedInstrumentGraphCompilesThroughNestedBoundaries();
     dockingLayoutsSupportTabsSplitsAndWindows();
+    nativeRuntimeRetainsRealtimeBaselinesAndExtendedSockets();
 
     if (failures != 0) {
         std::cerr << failures << " test(s) failed\n";

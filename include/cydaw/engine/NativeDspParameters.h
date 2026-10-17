@@ -173,6 +173,14 @@ nativeDspControlKindForProcessor(const std::string_view processorKey) noexcept
     return std::nullopt;
 }
 
+// A catalogue parameter stored in the extended payload can also be driven
+// by a typed value socket. Resolve its array index before audio processing.
+[[nodiscard]] constexpr int nativeDspParameterSlot(NativeDspNodeKind kind,std::string_view key) noexcept
+{
+    if(const auto* effect=effectForKind(kind))if(const auto* p=effectParameter(*effect,key))return p->slot;
+    return -1;
+}
+
 // Which parameter key a primitive's value-input port carries. Empty means the
 // port drives nothing, which is what a socket on a control primitive does.
 [[nodiscard]] constexpr std::string_view nativeDspParameterKeyForPort(

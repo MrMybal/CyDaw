@@ -15,7 +15,7 @@
 namespace cydaw::v2 {
 namespace {
 
-constexpr auto kTarget = "CyDAWGeneratedGraphPlugin_VST3";
+
 
 // What the compiler writes: UTF-8, else the console's code page (Visual
 // Studio's French messages come in CP850). Control characters other than
@@ -53,6 +53,14 @@ juce::File cmakeOnPath()
     return {};
 }
 
+juce::File executableOnPath(const juce::String& name)
+{
+    for(const auto& folder:juce::StringArray::fromTokens(juce::SystemStats::getEnvironmentVariable("PATH",{}),";","\""))
+        if(folder.trim().isNotEmpty())
+            if(auto file=juce::File(folder.trim()).getChildFile(name);file.existsAsFile()&&!file.getFullPathName().containsIgnoreCase("WindowsApps"))return file;
+    return {};
+}
+
 juce::File visualStudioCmake()
 {
     for (const auto* root : { "C:\\Program Files\\Microsoft Visual Studio\\2022", "C:\\Program Files (x86)\\Microsoft Visual Studio\\2022" })
@@ -65,39 +73,13 @@ juce::File visualStudioCmake()
     return {};
 }
 
-// JUCE as the CyDAW build that made this program found it.
-juce::File juceBeside(const juce::File& sourceRoot)
-{
-    const auto builds = sourceRoot.getChildFile("build");
-    if (!builds.isDirectory())
-        return {};
-    for (const auto& build : builds.findChildFiles(juce::File::findDirectories, false)) {
-        const auto cache = build.getChildFile("CMakeCache.txt");
-        if (cache.existsAsFile() && cache.getSize() < 4 * 1024 * 1024) {
-            juce::StringArray lines;
-            cache.readLines(lines);
-            for (const auto& line : lines)
-                if (line.startsWith("CYDAW_JUCE_SOURCE_DIR:PATH=")) {
-                    const juce::File folder(line.fromFirstOccurrenceOf("=", false, false).trim());
-                    if (line.fromFirstOccurrenceOf("=", false, false).trim().isNotEmpty()
-                        && folder.getChildFile("CMakeLists.txt").existsAsFile())
-                        return folder;
-                }
-        }
-        if (const auto fetched = build.getChildFile("_deps").getChildFile("juce-src"); fetched.getChildFile("CMakeLists.txt").existsAsFile())
-            return fetched;
-    }
-    return {};
-}
-
 } // namespace
 
 bool Vst3Build::isSourceRoot(const juce::File& folder)
 {
     const auto lists = folder.getChildFile("CMakeLists.txt");
     return lists.existsAsFile() && lists.getSize() < 2 * 1024 * 1024
-           && lists.loadFileAsString().contains("cydaw_add_graph_runtime_plugin")
-           && folder.getChildFile("src").getChildFile("graph_plugin").isDirectory();
+           && folder.getChildFile("src/native_plugin/NativePlugin.cmake").existsAsFile();
 }
 
 Vst3Build::Tools Vst3Build::findTools(const juce::File& sourceRootHint)
@@ -123,14 +105,27 @@ Vst3Build::Tools Vst3Build::findTools(const juce::File& sourceRootHint)
                 break;
         }
     }
+    tools.ninja=executableOnPath("ninja.exe");
+    if(!tools.ninja.existsAsFile()&&tools.cmake.existsAsFile()) {
+        auto candidate=tools.cmake.getParentDirectory().getParentDirectory().getSiblingFile("Ninja").getChildFile("ninja.exe");
+        if(candidate.existsAsFile())tools.ninja=candidate;
+    }
+    tools.python=executableOnPath("python.exe");
+    if(!tools.python.existsAsFile()) {
+        const auto local=juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory).getSiblingFile("Local").getChildFile("Programs/Python");
+        for(const auto& folder:local.findChildFiles(juce::File::findDirectories,false,"Python*"))
+            if(folder.getChildFile("python.exe").existsAsFile())tools.python=folder.getChildFile("python.exe");
+    }
+    const auto configured=juce::SystemStats::getEnvironmentVariable("CYDAW_PLUGIN_TOOLCHAINS",{});
+    tools.linuxToolchain=(configured.isNotEmpty()?juce::File(configured):locations::folder(Location::cache).getChildFile("plugin-toolchains")).getChildFile("linux/linux-x86_64.cmake");
     if (tools.sourceRoot.isDirectory())
-        tools.juceSource = juceBeside(tools.sourceRoot);
+        tools.vst3Sdk = tools.sourceRoot.getChildFile("build/native-vst3-sdk");
     return tools;
 }
 
 juce::File Vst3Build::workFolder()
 {
-    return locations::folder(Location::cache).getChildFile("vst3");
+    return locations::folder(Location::cache).getChildFile("vst3-native");
 }
 
 Vst3Build::Vst3Build() : juce::Thread("CyDAW VST3 build") {}
@@ -142,25 +137,26 @@ Vst3Build::~Vst3Build()
 }
 
 bool Vst3Build::start(const juce::File& project, const juce::File& destination, const juce::String& productName,
-                      const Tools& tools)
+                      const Tools& tools, const juce::String& format)
 {
-    if (running() || isThreadRunning() || !tools.ready())
-        return false;
+    return startBatch({Job{project,destination,productName,format,"Windows"}},tools);
+}
+
+bool Vst3Build::startBatch(const std::vector<Job>& jobs,const Tools& tools)
+{
+    if(running()||isThreadRunning()||!tools.ready()||jobs.empty())return false;
+    for(const auto& job:jobs)
+        if((job.format!="VST3"&&job.format!="CLAP"&&job.format!="LV2")||(job.platform!="Windows"&&job.platform!="Linux"))return false;
     {
         const std::scoped_lock lock(mutex_);
-        log_.clear();
-        project_ = project;
-        destination_ = destination;
-        productName_ = productName;
-        tools_ = tools;
-        bundle_ = juce::File();
-        failure_.clear();
-        started_ = juce::Time::getMillisecondCounterHiRes() * 0.001;
-        finished_ = 0.0;
+        jobs_=jobs;tools_=tools;results_.clear();log_.clear();bundle_=juce::File();failure_.clear();
+        started_=juce::Time::getMillisecondCounterHiRes()*.001;finished_=0;
     }
-    phase_ = Phase::configuring;
-    startThread(juce::Thread::Priority::low);
-    return true;
+    phase_=Phase::configuring;startThread(juce::Thread::Priority::low);return true;
+}
+std::vector<Vst3Build::JobResult> Vst3Build::results()const
+{
+    const std::scoped_lock lock(mutex_);return results_;
 }
 
 void Vst3Build::cancel()
@@ -197,6 +193,7 @@ void Vst3Build::addLine(const juce::String& line)
 {
     const std::scoped_lock lock(mutex_);
     log_.add(line);
+    (void)workFolder().getChildFile("build.log").appendText(line+"\n",false,false,"\n");
     if (log_.size() > kLogLines)
         log_.removeRange(0, log_.size() - kLogLines);
 }
@@ -215,7 +212,16 @@ bool Vst3Build::runStep(const juce::StringArray& command)
 {
     addLine("> " + command.joinIntoString(" "));
     juce::ChildProcess process;
-    if (!process.start(command, juce::ChildProcess::wantStdOut | juce::ChildProcess::wantStdErr)) {
+    const auto windows=juce::SystemStats::getEnvironmentVariable("SystemRoot","C:/Windows");
+    const auto path=windows+"/System32;"+windows+";"+juce::SystemStats::getEnvironmentVariable("PATH",{});
+    juce::StringArray clean {tools_.cmake.getFullPathName(), "-E", "env", "--unset=PATH", "--unset=Path", "Path="+path, "--"};
+    // MSBuild uses the mixed-case Path property for post-build tools; an
+    // uppercase PATH is replaced by an empty property in VC targets.
+    // SDK post-build commands also contain paths relative to the build directory.
+    if(command.size()>2 && command[1]=="--build")
+        clean.addArray({command[0],"-E","chdir",command[2]});
+    clean.addArray(command);
+    if (!process.start(clean, juce::ChildProcess::wantStdOut | juce::ChildProcess::wantStdErr)) {
         addLine("could not start " + command[0]);
         return false;
     }
@@ -249,56 +255,97 @@ bool Vst3Build::runStep(const juce::StringArray& command)
 
 void Vst3Build::run()
 {
-    Tools tools;
-    juce::File project;
-    juce::File destination;
-    juce::String productName;
-    {
-        const std::scoped_lock lock(mutex_);
-        tools = tools_;
-        project = project_;
-        destination = destination_;
-        productName = productName_;
+    (void)workFolder().createDirectory();
+    (void)workFolder().getChildFile("build.log").replaceWithText(juce::String());
+    bool failed=false;
+    for(const auto& job:jobs_) {
+        if(threadShouldExit()){finish(Phase::cancelled);return;}
+        phase_=Phase::configuring;
+        addLine("=== "+job.platform+" / "+job.format+" ===");
+        const auto success=runJob(job);
+        {
+            const std::scoped_lock lock(mutex_);
+            results_.push_back({job.format,job.platform,success?bundle_:juce::File(),success?juce::String():failure_});
+        }
+        failed|=!success;
+        if(threadShouldExit()){finish(Phase::cancelled);return;}
     }
+    finish(failed?Phase::failed:Phase::done,failed?"Certaines cibles ont échoué ; voir les résultats et le journal.":juce::String());
+}
+
+bool Vst3Build::runJob(const Job& job)
+{
+    const auto jobFailed = [this](Phase, const juce::String& message) {
+        const std::scoped_lock lock(mutex_);
+        failure_=message;
+        for(auto i=log_.size()-1;i>=0;--i)
+            if(log_[i].containsIgnoreCase("error:")||log_[i].containsIgnoreCase("fatal error")||log_[i].contains("CMake Error")) {
+                failure_ += "\n" + log_[i].trim();
+                break;
+            }
+    };
+    const auto tools=tools_;
+    const auto project=job.project;
+    const auto destination=job.destination;
+    const auto productName=job.productName;
+    const auto format=job.format;
+    const auto linuxTarget=job.platform=="Linux";
+    if(linuxTarget) {
+        if(!tools.python.existsAsFile()||!tools.ninja.existsAsFile()) {
+            jobFailed(Phase::failed,"Linux needs Python 3 and Ninja (included with Visual Studio CMake)");return false;
+        }
+        if(!tools.linuxToolchain.existsAsFile()) {
+            if(!runStep({tools.python.getFullPathName(),tools.sourceRoot.getChildFile("tools/setup_plugin_toolchains.py").getFullPathName(),
+                         "--output",tools.linuxToolchain.getParentDirectory().getFullPathName()})) {
+                jobFailed(Phase::failed,"Could not prepare the local Linux toolchain");return false;
+            }
+        }
+    }
+    (void)workFolder().createDirectory();
     // One working folder for every export: the sources compiled once are
     // reused by the next device.
-    const auto work = workFolder();
+    const auto work = linuxTarget ? workFolder().getSiblingFile(format.toLowerCase()+"-linux-native") : format == "VST3" ? workFolder() : workFolder().getSiblingFile(format.toLowerCase() + "-native");
     const auto source = work.getChildFile("project");
     const auto output = work.getChildFile("build");
     if (!work.createDirectory() || (source.exists() && !source.deleteRecursively()) || !project.copyDirectoryTo(source)) {
-        finish(Phase::failed, "could not prepare " + source.getFullPathName());
-        return;
+        jobFailed(Phase::failed, "could not prepare " + source.getFullPathName());
+        return false;
     }
     juce::StringArray configure { tools.cmake.getFullPathName(), "-S", source.getFullPathName(), "-B", output.getFullPathName(),
-                                  "-G", "Visual Studio 17 2022", "-A", "x64",
                                   "-DCYDAW_SOURCE_ROOT=" + tools.sourceRoot.getFullPathName().replaceCharacter('\\', '/'),
+                                  "-DCYDAW_EXPORT_FORMAT=" + format,
                                   "-DCYDAW_BUILD_TESTS=OFF", "-DCYDAW_BUILD_GRAPH_EDITOR=OFF",
                                   "-DCYDAW_BUILD_GRAPH_RUNTIME_PLUGIN=OFF", "-DCYDAW_BUILD_V2=OFF", "-DCYDAW_ENABLE_LTO=OFF" };
-    if (tools.juceSource.isDirectory())
-        configure.add("-DCYDAW_JUCE_SOURCE_DIR=" + tools.juceSource.getFullPathName().replaceCharacter('\\', '/'));
-    else
-        configure.add("-DCYDAW_FETCH_JUCE=ON");
+    if(linuxTarget)configure.addArray({"-G","Ninja","-DCMAKE_BUILD_TYPE=Release",
+        "-DCMAKE_TOOLCHAIN_FILE="+tools.linuxToolchain.getFullPathName().replaceCharacter('\\','/'),
+        "-DCMAKE_MAKE_PROGRAM="+tools.ninja.getFullPathName().replaceCharacter('\\','/'),
+        "-DCYDAW_HOST_PYTHON="+tools.python.getFullPathName().replaceCharacter('\\','/')});
+    else configure.addArray({"-G","Visual Studio 17 2022","-A","x64"});
+    if (format == "VST3" && tools.vst3Sdk.getChildFile("CMakeLists.txt").existsAsFile())
+        configure.add("-DCYDAW_VST3_SDK_DIR=" + tools.vst3Sdk.getFullPathName().replaceCharacter('\\', '/'));
     if (!runStep(configure)) {
-        finish(threadShouldExit() ? Phase::cancelled : Phase::failed, "CMake could not configure the project");
-        return;
+        jobFailed(threadShouldExit() ? Phase::cancelled : Phase::failed, "CMake could not configure the project");
+        return false;
     }
     phase_ = Phase::building;
     // The build folder is every export's: the bundles an earlier export left
     // there go first, so the one found next is this device's.
-    const auto built = output.getChildFile("CyDAWGeneratedGraphPlugin_artefacts").getChildFile("Release").getChildFile("VST3");
-    for (const auto& old : built.findChildFiles(juce::File::findDirectories, false, "*.vst3"))
+    const auto built = output.getChildFile(format).getChildFile("Release");
+    const auto extension = "." + format.toLowerCase();
+    const auto bundleType = format == "CLAP" ? juce::File::findFiles : juce::File::findDirectories;
+    if(!(linuxTarget&&format=="LV2")) for (const auto& old : built.findChildFiles(bundleType, false, "*" + extension))
         (void) old.deleteRecursively();
-    if (!runStep({ tools.cmake.getFullPathName(), "--build", output.getFullPathName(), "--config", "Release", "--target", kTarget,
-                   "--parallel" })) {
-        finish(threadShouldExit() ? Phase::cancelled : Phase::failed, "the build failed; the log says why");
-        return;
+    if (!runStep({ tools.cmake.getFullPathName(), "--build", output.getFullPathName(), "--config", "Release", "--target", "CyDAWGeneratedGraphPlugin_" + format,
+                   "--parallel", "4" })) {
+        jobFailed(threadShouldExit() ? Phase::cancelled : Phase::failed, "the build failed; the log says why");
+        return false;
     }
     // The bundle, beside the project the person keeps: the one named after
     // the product, else the newest (a name the build wrote otherwise).
-    auto bundles = built.findChildFiles(juce::File::findDirectories, false, "*.vst3");
+    auto bundles = built.findChildFiles(bundleType, false, "*" + extension);
     if (bundles.isEmpty()) {
-        finish(Phase::failed, "no .vst3 in " + built.getFullPathName());
-        return;
+        jobFailed(Phase::failed, "no " + extension + " in " + built.getFullPathName());
+        return false;
     }
     auto made = bundles.getFirst();
     for (const auto& bundle : bundles)
@@ -309,18 +356,24 @@ void Vst3Build::run()
     auto name = juce::File::createLegalFileName(productName).trim();
     if (name.isEmpty())
         name = made.getFileNameWithoutExtension();
-    const auto target = destination.getChildFile(name + ".vst3");
+    const auto target = destination.getChildFile(name + extension);
     if ((target.exists() && !target.deleteRecursively()) || !destination.createDirectory()
-        || !made.copyDirectoryTo(target)) {
-        finish(Phase::failed, "could not copy the plugin to " + target.getFullPathName());
-        return;
+        || !(made.isDirectory() ? made.copyDirectoryTo(target) : made.copyFileTo(target))) {
+        jobFailed(Phase::failed, "could not copy the plugin to " + target.getFullPathName());
+        return false;
     }
     {
         const std::scoped_lock lock(mutex_);
         bundle_ = target;
     }
-    addLine("VST3: " + target.getFullPathName());
-    finish(Phase::done);
+    if (format == "CLAP") {
+        const auto licenses = made.getSiblingFile(made.getFileName() + ".Licenses");
+        if (licenses.isDirectory() && !licenses.copyDirectoryTo(target.getSiblingFile(target.getFileName() + ".Licenses"))) {
+            jobFailed(Phase::failed, "Cannot copy CLAP licenses"); return false;
+        }
+    }
+    addLine(format + ": " + target.getFullPathName());
+    return true;
 }
 
 } // namespace cydaw::v2

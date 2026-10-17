@@ -35,7 +35,9 @@ enum class ModuleControlKind : std::uint8_t {
     filterResponse,
     dynamicsResponse,
     eqCurve,
-    wavetable
+    wavetable,
+    nativePanel,
+    custom
 };
 
 enum class ModuleInterfaceLayoutMode : std::uint8_t {
@@ -94,6 +96,8 @@ struct ModuleInterfaceControl {
     // hold list the rest here, in the order the control defines. An EQ curve
     // reads them as consecutive frequency / gain / Q triples, one per band.
     std::vector<juce::String> extraParameterBindings;
+    // Portable appearance, page/group membership and custom ImGui component source.
+    juce::var design;
     // Same arrangement as ModulePublishedParameter, for the same reason.
     mutable juce::var serialised;
     mutable std::uint64_t serialisedSignature {};
@@ -115,6 +119,12 @@ struct ModuleInterfaceState {
     // one made from the published settings: a plug-in made of the graph
     // opens on it.
     bool designed {};
+    bool deviceDesigned {};
+    // Per-surface appearance, independent of control-level overrides.
+    juce::var windowDesign;
+    juce::var deviceDesign;
+    std::uint16_t deviceWidth { 480 };
+    std::uint16_t deviceHeight { 240 };
     std::vector<ModulePublishedParameter> parameters;
     // Free-form controls rendered inside graph nodes and reusable sub-graphs.
     std::vector<ModuleInterfaceControl> controls;
@@ -143,6 +153,7 @@ void dropSerialisedPresentation(ModuleInterfaceState& state);
 void rebuildAutomaticDeviceControls(ModuleInterfaceState& state);
 [[nodiscard]] juce::var serialiseModuleInterface(const ModuleInterfaceState& state);
 [[nodiscard]] ModuleInterfaceState restoreModuleInterface(const juce::var& value);
+[[nodiscard]] juce::Result validateModuleInterfaceDocument(const juce::var& document, const ModuleInterfaceState& parameters);
 [[nodiscard]] juce::Result validateModuleInterface(const ModuleInterfaceState& state);
 
 class ModuleXyPadComponent final : public juce::Component,

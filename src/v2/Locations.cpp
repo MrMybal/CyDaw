@@ -68,6 +68,8 @@ const char* key(const Location location)
     case Location::devices: return "devices";
     case Location::pluginExports: return "pluginExports";
     case Location::presets: return "presets";
+    case Location::mixes: return "mixes";
+    case Location::foundry: return "foundry";
     }
     return "";
 }
@@ -97,6 +99,8 @@ juce::File defaultFolder(const Location location)
     case Location::devices: return documents().getChildFile("Devices");
     case Location::pluginExports: return documents().getChildFile("Plugin Exports");
     case Location::presets: return documents().getChildFile("Presets");
+    case Location::mixes: return documents().getChildFile("Mixes");
+    case Location::foundry: return documents().getChildFile("Foundry");
     }
     return localData();
 }
@@ -203,6 +207,12 @@ juce::Array<juce::File> contentOf(const Location location, const juce::File& whe
         for (const auto* kind : { "device", "plugin", "chain" })
             if (const auto folder = where.getChildFile(kind); folder.isDirectory())
                 items.add(folder);
+        break;
+    case Location::mixes:
+    case Location::foundry:
+        // The sound files made there.
+        for (const auto* pattern : { "*.wav", "*.flac", "*.aiff", "*.aif", "*.ogg" })
+            items.addArray(where.findChildFiles(juce::File::findFiles, false, pattern));
         break;
     case Location::downloads:
     case Location::pluginExports:

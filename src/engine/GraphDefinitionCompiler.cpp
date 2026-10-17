@@ -238,9 +238,11 @@ bool applyControlDefault(NativeDspNode& node,
     }
     const auto field = nativeDspParameterField(node.kind,
                                               endpoint.parameterKey);
-    if (field == nullptr)
-        return false;
-    node.parameters.*field = numeric;
+    if (field == nullptr) {
+        const auto slot=nativeDspParameterSlot(node.kind,endpoint.parameterKey);
+        if(slot<0||slot>=static_cast<int>(node.parameters.eqBands.size()))return false;
+        node.parameters.eqBands[slot]=numeric;
+    } else node.parameters.*field = numeric;
     return true;
 }
 

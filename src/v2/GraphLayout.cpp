@@ -63,7 +63,7 @@ int defaultSocketRows(const EditorNode& node)
     auto inputs = 0;
     auto outputs = 0;
     for (const auto& port : node.ports) {
-        if (port.input && port.kind == 2)
+        if (port.exposure==0 || (port.exposure<0 && port.input && port.kind==2))
             continue;
         (port.input ? inputs : outputs)++;
     }

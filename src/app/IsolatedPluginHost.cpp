@@ -135,6 +135,7 @@ juce::Result IsolatedPluginHost::startWorker(PluginWorkerLaunch launch,
 
     pluginFile_ = pluginFile;
     pluginName_ = passthrough ? "IPC Passthrough" : pluginFile.getFileNameWithoutExtension();
+    if(!passthrough&&pluginFile.hasFileExtension("cyplugin"))pluginName_=juce::JSON::parse(pluginFile).getProperty("name",pluginName_).toString();
     lastStatus_ = "Running in isolated worker";
     nextSequence_ = 1;
     lastOutputSequence_ = 0;
@@ -399,7 +400,7 @@ juce::Result IsolatedPluginHost::hideEditor()
 
 bool IsolatedPluginHost::processBlock(juce::AudioBuffer<float>& buffer,
                                       const int startSample,
-                                      const int numSamples) noexcept
+                                      const int numSamples, double timelineSeconds, double tempo, bool playing) noexcept
 {
     callbacksInFlight_.fetch_add(1, std::memory_order_acq_rel);
     auto* shared = active_.load(std::memory_order_acquire);
@@ -420,6 +421,10 @@ bool IsolatedPluginHost::processBlock(juce::AudioBuffer<float>& buffer,
     auto processed = false;
 
     if (requestSequence == responseSequence) {
+        shared->transportSeconds = std::isfinite(timelineSeconds) ? timelineSeconds : 0.0;
+        shared->transportTempo = std::isfinite(tempo) && tempo > 0 ? tempo : 120.0;
+        shared->transportQuarterNotes = shared->transportSeconds * shared->transportTempo / 60.0;
+        shared->transportPlaying = playing ? 1u : 0u;
         if (pendingRealtimeParameterCount_ > 0) {
             for (std::size_t valueIndex = 0;
                  valueIndex < pendingRealtimeParameterCount_;

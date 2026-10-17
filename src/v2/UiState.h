@@ -4,6 +4,7 @@
 
 #include <juce_audio_utils/juce_audio_utils.h>
 
+#include <array>
 #include <map>
 #include <memory>
 #include <optional>
@@ -28,7 +29,13 @@ struct ClipRef {
 // Drag-and-drop payload carrying a file path between panels.
 inline constexpr const char* kFilePayload = "CYDAW_FILE";
 
-enum class Panel { none, arrangement, launcher, devices, graph, mixer, editor, browser, inspector, workshop, routing };
+enum class Panel { none, arrangement, launcher, devices, graph, mixer, editor, browser, inspector, workshop, routing, dj,
+                   foundry, cinema };
+
+// What the whole window is for: the studio (tracks, arrangement, launcher,
+// their panels), the DJ mix, the Foundry (sound files edited), the VST
+// workshop. The modes but the studio take the whole window.
+enum class AppMode { studio, dj, foundry, workshop, cinema };
 
 // What the device workshop is asked to open (a track's device, a file of My
 // devices, a new device). It asks first when the device it holds is not
@@ -111,9 +118,30 @@ struct UiState {
     Panel focused { Panel::arrangement };
     std::optional<WorkshopRequest> workshopRequest;
     std::optional<ContextRequest> contextRequest;
-    // The VST workshop mode: the whole window builds devices (graph, its
-    // tools, the plugin export); no tracks, no arrangement.
-    bool workshopMode {};
+    // The window's mode. The Plugin workshop: the whole window builds devices
+    // (graph, its tools, the plugin export); no tracks, no arrangement.
+    AppMode mode { AppMode::studio };
+    // Kept separately for Studio, DJ and Foundry; the workshop has its own layout.
+    std::array<bool, 5> bottomPanelsVisible { true, true, true, true, true };
+    [[nodiscard]] bool bottomPanelVisible() const noexcept
+    {
+        return mode != AppMode::workshop && bottomPanelsVisible[static_cast<std::size_t>(mode)];
+    }
+    void setBottomPanelVisible(bool visible) noexcept
+    {
+        if (mode != AppMode::workshop)
+            bottomPanelsVisible[static_cast<std::size_t>(mode)] = visible;
+    }
+    static bool isBottomPanel(Panel panel) noexcept
+    {
+        return panel == Panel::devices || panel == Panel::graph || panel == Panel::mixer
+            || panel == Panel::routing || panel == Panel::editor;
+    }
+    [[nodiscard]] bool inWorkshop() const noexcept { return mode == AppMode::workshop; }
+    // A sound file asked open in the Foundry; a file asked loaded on a deck
+    // of the DJ mix (-1: the first free).
+    std::optional<juce::File> foundryOpen;
+    std::optional<std::pair<int, juce::File>> djLoad;
     // Asks a panel to come to the front (set by one panel, honoured by the
     // frame).
     Panel bringToFront { Panel::none };
@@ -123,11 +151,14 @@ struct UiState {
     bool closeAudioSettings {};
     // The sound banks' window shown; the locations asked open.
     bool showBanks {};
+    bool showJsfx {};
+    juce::File jsfxFileToOpen;
     // The colour themes' window.
     bool showThemes {};
     // Several instruments' windows open at once (one each), or one at a
     // time (opening another closes the last): Options, kept in the settings.
     bool manyInstrumentWindows { true };
+    std::string deviceWindowNamespace;
     // A rack's pad opened in the device panel (its instrument and effects):
     // its track, its index.
     std::optional<std::pair<TrackRef, int>> openRackPad;
@@ -207,6 +238,7 @@ struct UiState {
     }
     // The device panel's catalogue asked open (the control port).
     bool openDeviceCatalogue {};
+    bool inlineDeviceCatalogue {};
     // The devices' windows open (PluginWindows draws them).
     std::vector<PluginWindow> pluginWindows;
     void togglePluginWindow(const PluginWindow& window)

@@ -1470,6 +1470,14 @@ void ArrangementView::clipContextMenu()
                     open(*contextClip_, 1);
                 if (ImGui::MenuItem(L("Étirement et transposition", "Stretch and transpose")))
                     open(*contextClip_, 2);
+                if (ImGui::MenuItem(L("Ouvrir son fichier dans la Fonderie", "Open its file in the Foundry"))) {
+                    state_.foundryOpen = clip->sourceFile;
+                    state_.mode = AppMode::foundry;
+                }
+                if (ImGui::MenuItem(L("Charger sur une platine (Mix DJ)", "Load on a deck (DJ mix)"))) {
+                    state_.djLoad = std::pair { -1, clip->sourceFile };
+                    state_.mode = AppMode::dj;
+                }
                 if (clip->takes.size() > 1 && ImGui::BeginMenu(L("Prise jouée", "Take played"))) {
                     for (std::size_t take = 0; take < clip->takes.size(); ++take) {
                         char label[160];
@@ -1503,15 +1511,8 @@ void ArrangementView::clipContextMenu()
                         done.failed())
                         reportStatus(done.getErrorMessage());
                 }
-                if (ImGui::MenuItem(L("Inverser (à l'envers)", "Reverse"))) {
-                    app::AudioEditRequest request;
-                    request.operation = app::AudioEditOperation::reverse;
-                    if (const auto done = studio_.editAudioClip(contextClip_->track, id, request, clip->sourceOffsetSeconds,
-                                                                clip->sourceDurationSeconds > 0.0 ? clip->sourceDurationSeconds : clip->durationSeconds,
-                                                                juce::String::fromUTF8("Inverser"));
-                        done.failed())
-                        reportStatus(done.getErrorMessage());
-                }
+                if (ImGui::MenuItem(L("Inverser le clip (Reverse)", "Reverse clip")))
+                    if(const auto done=studio_.reverseAudioClip(contextClip_->track,id);done.failed())reportStatus(done.getErrorMessage());
                 ImGui::Separator();
             }
         if (ImGui::MenuItem(L("Dupliquer", "Duplicate"), "Ctrl+D"))

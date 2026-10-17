@@ -5,6 +5,7 @@
 #include "UiState.h"
 
 #include <memory>
+#include <map>
 #include <string>
 
 // The windows of the devices made of a graph, as a plugin's: the interface
@@ -30,6 +31,7 @@ private:
     UiState& state_;
     std::unique_ptr<InterfaceEditor> renderer_;
     PresetMenu presets_;
+    std::map<std::string,std::pair<float,float>> authoredSizes_;
 };
 
 } // namespace cydaw::v2

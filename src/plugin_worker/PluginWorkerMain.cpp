@@ -1,3 +1,4 @@
+#include "ExtraPluginFormats.h"
 #include <cydaw/plugins/PluginIsolation.h>
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -24,6 +25,7 @@ juce::var pluginDescriptionToJson(const juce::PluginDescription& description)
     value->setProperty("format", description.pluginFormatName);
     value->setProperty("identifier", description.createIdentifierString());
     value->setProperty("file", description.fileOrIdentifier);
+    value->setProperty("pluginId", description.pluginFormatName == "CLAP" ? description.descriptiveName : description.fileOrIdentifier);
     value->setProperty("inputs", description.numInputChannels);
     value->setProperty("outputs", description.numOutputChannels);
     value->setProperty("instrument", description.isInstrument);
@@ -43,7 +45,7 @@ int runSelfTest()
 #if JUCE_PLUGINHOST_VST
               << ",\"VST2\""
 #endif
-              << "],\"status\":\"ready\"}\n";
+              << ",\"CLAP\",\"LV2\",\"JSFX\"],\"status\":\"ready\"}\n";
     return 0;
 }
 
@@ -69,6 +71,16 @@ bool isVst2Candidate(const juce::File& pluginFile)
 
 PluginFormatSelection formatForPlugin(const juce::File& pluginFile)
 {
+    if (pluginFile.hasFileExtension("cyplugin")) {
+        const auto data = juce::JSON::parse(pluginFile);
+        const auto path = data.getProperty("file", {}).toString();
+        if (!juce::File::isAbsolutePath(path)) return {{}, {}, "Invalid plugin descriptor"};
+        const juce::File target(path);
+        if(target.hasFileExtension("cyplugin"))return {{}, {}, "Nested plugin descriptors are not supported"};
+        return formatForPlugin(target);
+    }
+    if (pluginFile.hasFileExtension("lv2")) return {std::make_unique<juce::LV2PluginFormat>(), "LV2", {}};
+    if (cydaw::plugins::isExtraFormat(pluginFile)) return {cydaw::plugins::extraPluginFormat(pluginFile), pluginFile.hasFileExtension("clap") ? "CLAP" : "JSFX", {}};
     if (pluginFile.hasFileExtension("vst3")) {
 #if JUCE_PLUGINHOST_VST3
         return { std::make_unique<juce::VST3PluginFormat>(), "VST3", {} };
@@ -85,7 +97,14 @@ PluginFormatSelection formatForPlugin(const juce::File& pluginFile)
                  "CYDAW_ENABLE_VST2=ON and a licensed historical SDK." };
 #endif
     }
-    return { {}, {}, "Unsupported plugin file. Expected VST3 or a platform VST2 binary." };
+    return { {}, {}, "Unsupported plugin file. Expected VST3, CLAP, LV2 or JSFX." };
+}
+
+void findPluginTypes(PluginFormatSelection& selection, const juce::File& requested, juce::OwnedArray<juce::PluginDescription>& result) {
+    auto file=requested;juce::String id;
+    if(file.hasFileExtension("cyplugin")) {const auto data=juce::JSON::parse(file);id=data.getProperty("id",{}).toString();file=juce::File(data.getProperty("file",{}).toString());}
+    selection.format->findAllTypesForFile(result,file.getFullPathName());
+    if(id.isNotEmpty())for(int i=result.size();--i>=0;)if(result[i]->descriptiveName!=id && result[i]->fileOrIdentifier!=id)result.remove(i);
 }
 
 juce::var graphStateFromPlugin(juce::AudioProcessor& processor)
@@ -126,14 +145,18 @@ int probePlugin(const juce::File& pluginFile,
         results.add(juce::var(failure.get()));
     }
     juce::OwnedArray<juce::PluginDescription> descriptions;
-    if (selection.format != nullptr)
-        selection.format->findAllTypesForFile(descriptions, pluginFile.getFullPathName());
+    if (selection.format != nullptr) {
+        if (pluginFile.hasFileExtension("jsfx") || pluginFile.getFileExtension().isEmpty()) {
+            juce::String error;auto instance=cydaw::plugins::createExtraPlugin(pluginFile,48000,512,error);
+            if(instance){auto d=std::make_unique<juce::PluginDescription>();instance->fillInPluginDescription(*d);descriptions.add(std::move(d));}
+            else selection.error=error;
+        } else findPluginTypes(selection, pluginFile, descriptions);
+    }
     if (selection.format != nullptr && descriptions.isEmpty()) {
         auto failure = juce::DynamicObject::Ptr(new juce::DynamicObject());
         failure->setProperty("format", selection.name);
         failure->setProperty("file", pluginFile.getFullPathName());
-        failure->setProperty("error", "No " + selection.name
-                                      + " type was found in the selected file");
+        failure->setProperty("error", selection.error.isNotEmpty() ? selection.error : "No " + selection.name + " type was found in the selected file");
         failure->setProperty("processingOk", false);
         results.add(juce::var(failure.get()));
     }
@@ -148,6 +171,9 @@ int probePlugin(const juce::File& pluginFile,
                 if (instance != nullptr) {
                     instance->setNonRealtime(true);
                     instance->prepareToPlay(48'000.0, 512);
+                    if(auto graphics=cydaw::plugins::validateJsfxGraphics(*instance);graphics.isObject())
+                        for(const auto& property:graphics.getDynamicObject()->getProperties())object->setProperty(property.name,property.value);
+
                     const auto editableGraphRuntime = description->name.containsIgnoreCase(
                         "CyDAW Graph Runtime");
                     auto initialGraphState = graphStateFromPlugin(*instance);
@@ -589,6 +615,21 @@ public:
     void closeButtonPressed() override { setVisible(false); }
 };
 
+class WorkerPlayHead final : public juce::AudioPlayHead {
+public:
+    juce::Optional<PositionInfo> getPosition() const override { return position; }
+    void update(const cydaw::plugins::SharedPluginAudio& shared, double rate) {
+        position.setTimeInSeconds(shared.transportSeconds);
+        position.setTimeInSamples(static_cast<juce::int64>(shared.transportSeconds*rate));
+        position.setPpqPosition(shared.transportQuarterNotes);
+        position.setBpm(shared.transportTempo);
+        position.setIsPlaying(shared.transportPlaying!=0);
+        position.setTimeSignature(TimeSignature{static_cast<int>(shared.transportNumerator),static_cast<int>(shared.transportDenominator)});
+    }
+private:
+    PositionInfo position;
+};
+
 int runRealtimeWorker(const juce::File& pluginFile,
                       const juce::File& sharedFile,
                       const double sampleRate,
@@ -606,6 +647,7 @@ int runRealtimeWorker(const juce::File& pluginFile,
         return 11;
 
     try {
+        WorkerPlayHead playHead;
         std::unique_ptr<juce::AudioPluginInstance> instance;
         juce::String pluginFormatName;
         auto processingChannels = juce::jlimit(1,
@@ -620,7 +662,7 @@ int runRealtimeWorker(const juce::File& pluginFile,
                 return 12;
             }
             juce::OwnedArray<juce::PluginDescription> descriptions;
-            selection.format->findAllTypesForFile(descriptions, pluginFile.getFullPathName());
+            findPluginTypes(selection, pluginFile, descriptions);
             if (descriptions.isEmpty()) {
                 setWorkerStatus(*shared, cydaw::plugins::SharedPluginState::error,
                                 "No " + pluginFormatName
@@ -637,6 +679,7 @@ int runRealtimeWorker(const juce::File& pluginFile,
                                                          + pluginFormatName + " plugin");
                 return 14;
             }
+            instance->setPlayHead(&playHead);
             instance->setNonRealtime(false);
             instance->prepareToPlay(sampleRate, maximumBlockSize);
             processingChannels = juce::jlimit(1,
@@ -704,6 +747,7 @@ int runRealtimeWorker(const juce::File& pluginFile,
                         appliedAutomationSequence = automationSequence;
                     }
                     juce::ScopedNoDenormals noDenormals;
+                    playHead.update(*shared,sampleRate);
                     instance->processBlock(buffer, midi);
                     std::atomic_ref(shared->latencySamples).store(
                         static_cast<std::uint32_t>(std::max(0, instance->getLatencySamples())),
@@ -832,7 +876,7 @@ int runRealtimeWorker(const juce::File& pluginFile,
                 didWork = true;
             }
 
-            if (editorWindow != nullptr && editorWindow->isVisible())
+            if ((editorWindow != nullptr && editorWindow->isVisible()) || !didWork)
                 juce::MessageManager::getInstance()->runDispatchLoopUntil(1);
             else if (!didWork)
                 juce::Thread::sleep(1);

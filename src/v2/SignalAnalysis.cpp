@@ -1,6 +1,7 @@
 #include "SignalAnalysis.h"
 
-#include <juce_dsp/juce_dsp.h>
+#include <cydaw/engine/Fft.h>
+#include <numbers>
 
 #include <algorithm>
 #include <cmath>
@@ -16,15 +17,18 @@ static_assert(kSize == static_cast<int>(engine::AudioAnalysisFrame::waveformCapa
 
 // One transform and its window, shared by every display.
 struct Transform {
-    juce::dsp::FFT fft { kOrder };
+    engine::Fft fft;
+    std::array<std::complex<float>,kSize> complex;
+    void forward(){for(int i=0;i<kSize;++i)complex[i]={work[i],0};fft.forward(complex.data());for(int i=0;i<kSize/2;++i)work[i]=std::abs(complex[i]);}
     std::vector<float> window;
     std::vector<float> work;
 
     Transform() : window(kSize), work(kSize * 2)
     {
+        fft.prepare(kSize);
         for (auto index = 0; index < kSize; ++index)
             window[static_cast<std::size_t>(index)]
-                = 0.5f - 0.5f * std::cos(2.0f * juce::MathConstants<float>::pi * static_cast<float>(index)
+                = 0.5f - 0.5f * std::cos(2.0f * std::numbers::pi_v<float> * static_cast<float>(index)
                                          / static_cast<float>(kSize - 1));
     }
 };
@@ -74,7 +78,7 @@ void Spectrum::update(const engine::AudioAnalysisFrame* frame, const double nowS
         for (auto index = 0; index < count; ++index)
             t.work[static_cast<std::size_t>(offset + index)]
                 = frame->waveform[static_cast<std::size_t>(index)] * t.window[static_cast<std::size_t>(offset + index)];
-        t.fft.performFrequencyOnlyForwardTransform(t.work.data(), true);
+        t.forward();
         // A full-scale sine reads 0 dB: two sides, and the Hann window's
         // coherent gain of a half.
         const auto scale = 4.0f / static_cast<float>(kSize);
@@ -155,7 +159,7 @@ void Spectrometer::update(const engine::AudioAnalysisFrame* frame, const double 
         for (auto index = 0; index < count; ++index)
             t.work[static_cast<std::size_t>(offset + index)]
                 = frame->waveform[static_cast<std::size_t>(index)] * t.window[static_cast<std::size_t>(offset + index)];
-        t.fft.performFrequencyOnlyForwardTransform(t.work.data(), true);
+        t.forward();
         const auto scale = 4.0f / static_cast<float>(kSize);
         const auto hzPerBin = std::max(1'000.0f, frame->sampleRate) / static_cast<float>(kSize);
         for (auto bin = 0; bin < binCount; ++bin) {

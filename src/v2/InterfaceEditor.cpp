@@ -1,4 +1,7 @@
 #include "InterfaceEditor.h"
+#include "InstrumentPanels.h"
+#include "CustomInterface.h"
+#include "DeviceVisuals.h"
 
 #include "Icons.h"
 #include "Theme.h"
@@ -49,6 +52,8 @@ constexpr KindInfo kinds[] = {
     { Kind::waveform, "Forme d'onde", "Waveform", 8, 4, 0 },
     { Kind::spectrum, "Spectre", "Spectrum", 8, 4, 0 },
     { Kind::levelMeter, "Vumètre", "Level meter", 1, 6, 0 },
+    { Kind::wavetable, "Oscillateur / table", "Oscillator / wavetable", 8, 5, 1 },
+    { Kind::custom, "Composant C++ ImGui", "C++ ImGui component", 8, 5, 0 },
 };
 
 const KindInfo* infoOf(const Kind kind)
@@ -83,6 +88,13 @@ void InterfaceEditor::pull(GraphSlot& slot, const bool force)
         return;
     if (force || slot_ != &slot || revision_ != slot.revision()) {
         interface_ = slot.graph().editorInterface();
+        analysis_ = &slot.graph().editorAnalysis();
+        if(deviceLayout_) {
+            std::swap(interface_.controls,interface_.deviceControls);
+            std::swap(interface_.windowWidth,interface_.deviceWidth);
+            std::swap(interface_.windowHeight,interface_.deviceHeight);
+            std::swap(interface_.windowDesign,interface_.deviceDesign);
+        }
         if (slot_ != &slot)
             selected_ = 0;
         slot_ = &slot;
@@ -94,7 +106,15 @@ void InterfaceEditor::pull(GraphSlot& slot, const bool force)
 
 bool InterfaceEditor::push(GraphSlot& slot, const bool commit)
 {
-    if (const auto result = slot.graph().editorSetInterface(interface_, commit); result.failed()) {
+    auto canonical=interface_;
+    if(deviceLayout_) {
+        canonical.deviceDesigned=true;
+        std::swap(canonical.controls,canonical.deviceControls);
+        std::swap(canonical.windowWidth,canonical.deviceWidth);
+        std::swap(canonical.windowHeight,canonical.deviceHeight);
+        std::swap(canonical.windowDesign,canonical.deviceDesign);
+    } else canonical.designed=true;
+    if (const auto result = slot.graph().editorSetInterface(canonical, commit); result.failed()) {
         report(result.getErrorMessage());
         pull(slot, true);
         return false;
@@ -170,7 +190,7 @@ std::uint64_t InterfaceEditor::hit(const ImVec2 screen) const
     const auto size = ImVec2(canvasMax_.x - canvasMin_.x, canvasMax_.y - canvasMin_.y);
     for (auto index = interface_.controls.size(); index-- > 0;) {
         const auto& control = interface_.controls[index];
-        if (isPort(control.kind))
+        if (isPort(control.kind) || !visible(control))
             continue;
         const ImVec2 min(canvasMin_.x + control.x * size.x, canvasMin_.y + control.y * size.y);
         const ImVec2 max(min.x + control.width * size.x, min.y + control.height * size.y);
@@ -265,8 +285,12 @@ std::uint64_t InterfaceEditor::add(GraphSlot& slot, const Kind kind, const ImVec
         control.label = ui::Ls(info->fr, info->en);
     if (kind == Kind::text)
         control.label = slot.graph().editorGraphName().isNotEmpty() ? slot.graph().editorGraphName() : ui::Ls("Texte", "Text");
-    if (kind == Kind::group)
-        control.label = {};
+    if (kind == Kind::group) control.label = {};
+    if (page_.isNotEmpty()) { control.design=new juce::DynamicObject;control.design.getDynamicObject()->setProperty("page",page_); }
+    if (kind == Kind::custom) {
+        control.design = control.design.isObject()?control.design:juce::var(new juce::DynamicObject);
+        control.design.getDynamicObject()->setProperty("customSource",CustomInterface::example());
+    }
 
     const auto needs = [&]() -> juce::String {
         if (info->bindings >= 1 && control.parameterBinding.isEmpty())
@@ -295,7 +319,7 @@ std::uint64_t InterfaceEditor::add(GraphSlot& slot, const Kind kind, const ImVec
     interface_.controls.push_back(control);
     if (!push(slot, true))
         return 0;
-    selected_ = control.id;
+    selected_ = control.id; selection_={selected_};
     return control.id;
 }
 
@@ -343,7 +367,15 @@ void InterfaceEditor::autoLayout(GraphSlot& slot)
 
 void InterfaceEditor::drawControl(ImDrawList* list, const Control& control, const ImVec2 min, const ImVec2 max) const
 {
-    const auto& p = theme::palette();
+    auto p = theme::palette();
+    const auto color=[&](const char* key,ImU32 fallback) {
+        const auto value=control.design.getProperty(key,interface_.windowDesign.getProperty(key,{})).toString();if(value.isEmpty())return fallback;
+        const auto c=juce::Colour::fromString(value);
+        return ImGui::ColorConvertFloat4ToU32({c.getFloatRed(),c.getFloatGreen(),c.getFloatBlue(),c.getFloatAlpha()});
+    };
+    p.accent=color("accent",p.accent);p.bg1=color("background",p.bg1);p.text=color("text",p.text);p.textDim=color("text",p.textDim);
+    const auto rounding=static_cast<float>(control.design.getProperty("rounding",4.0));
+    list->AddRectFilled(min,max,p.bg1,rounding);
     const auto w = max.x - min.x;
     const auto h = max.y - min.y;
     const auto font = ImGui::GetFontSize();
@@ -364,6 +396,10 @@ void InterfaceEditor::drawControl(ImDrawList* list, const Control& control, cons
         const auto digits = magnitude >= 100.0 ? 0 : magnitude >= 10.0 ? 1 : 2;
         return juce::String(item->value, digits) + (item->unit.isNotEmpty() ? " " + item->unit : juce::String());
     };
+    if(static_cast<bool>(control.design.getProperty("showValue",false)) && control.parameterBinding.isNotEmpty())
+        list->AddText(ImVec2(min.x+4,min.y+2),p.text,valueText(control.parameterBinding).toRawUTF8());
+    const auto fontScale=std::clamp(static_cast<float>(control.design.getProperty("fontScale",1.0)),.5f,3.0f);
+    ImGui::PushFont(nullptr,ui::currentFontBase()*fontScale);
     switch (control.kind) {
     case Kind::knob: {
         const auto room = std::max(4.0f, h - font * 1.3f);
@@ -499,16 +535,22 @@ void InterfaceEditor::drawControl(ImDrawList* list, const Control& control, cons
                 list->AddCircleFilled(dot, 4.0f, p.accent, 12);
             }
         } else if (control.kind == Kind::spectrum) {
-            for (auto index = 0; index < 24; ++index) {
-                const auto x0 = a.x + (b.x - a.x) * static_cast<float>(index) / 24.0f;
-                const auto level = 0.75f - 0.5f * static_cast<float>(index) / 24.0f + 0.08f * std::sin(static_cast<float>(index) * 1.7f);
-                list->AddRectFilled(ImVec2(x0 + 1.0f, toY(level)), ImVec2(x0 + (b.x - a.x) / 24.0f - 1.0f, b.y), theme::alpha(p.accent, 0.6f));
+            std::array<float,64> bins {};
+            if(analysis_) cydaw::engine::computeLogSpectrum(*analysis_,20,20000,bins.data(),bins.size());
+            for(std::size_t i=0;i<bins.size();++i) {
+                const auto x=a.x+(b.x-a.x)*static_cast<float>(i)/bins.size();
+                list->AddRectFilled(ImVec2(x,toY(bins[i])),ImVec2(x+(b.x-a.x)/bins.size(),b.y),theme::alpha(p.accent,.65f));
             }
+        } else if (control.kind == Kind::waveform) {
+            if(analysis_ && analysis_->waveformCount>1) for(std::size_t i=0;i<analysis_->waveformCount;i+=std::max(1u,analysis_->waveformCount/256))
+                points.push_back({a.x+(b.x-a.x)*static_cast<float>(i)/analysis_->waveformCount,toY(.5f+.45f*analysis_->waveform[i])});
+            else points={{a.x,toY(.5f)},{b.x,toY(.5f)}};
         } else {
-            for (auto index = 0; index <= count; ++index) {
-                const auto t = static_cast<float>(index) / count;
-                points.push_back({ a.x + t * (b.x - a.x), toY(0.5f + 0.38f * std::sin(t * std::numbers::pi_v<float> * 4.0f)) });
-            }
+            const auto shape=value01(control.parameterBinding);
+            for(auto i=0;i<=count;++i){const auto t=static_cast<float>(i)/count;
+                const auto sine=std::sin(t*std::numbers::pi_v<float>*4);
+                const auto saw=(t*2-std::floor(t*2))*2-1;
+                points.push_back({a.x+t*(b.x-a.x),toY(.5f+.38f*static_cast<float>((1-shape)*sine+shape*saw))});}
         }
         if (points.size() > 1)
             list->AddPolyline(points.data(), static_cast<int>(points.size()), p.accent, dp(1.6f));
@@ -517,23 +559,84 @@ void InterfaceEditor::drawControl(ImDrawList* list, const Control& control, cons
     }
     case Kind::levelMeter: {
         list->AddRectFilled(ImVec2(min.x + 2.0f, min.y + 2.0f), ImVec2(max.x - 2.0f, max.y - 2.0f), p.bg1, 2.0f);
-        list->AddRectFilled(ImVec2(min.x + 3.0f, min.y + h * 0.4f), ImVec2(max.x - 3.0f, max.y - 3.0f), theme::alpha(p.play, 0.7f), 2.0f);
+        list->AddRectFilled(ImVec2(min.x + 3.0f, min.y + h * (1.0f-(analysis_?std::clamp(analysis_->peak[0],0.0f,1.0f):0.0f))), ImVec2(max.x - 3.0f, max.y - 3.0f), theme::alpha(p.play, 0.7f), 2.0f);
+        break;
+    }
+    case Kind::nativePanel: {
+        if(control.design.hasProperty("instrumentType")) {
+            std::vector<visual::Param> parameters;std::vector<std::string> keys;
+            for(const auto& binding:control.extraParameterBindings) {
+                if(const auto* a=parameter(binding))parameters.push_back({a->key,a->label,a->unit,a->minimum,a->maximum,a->value,a->defaultValue});
+                else parameters.emplace_back();
+            }
+            if(const auto* list=control.design.getProperty("instrumentKeys",{}).getArray())for(const auto& key:*list)keys.push_back(key.toString().toStdString());
+            const auto type=control.design.getProperty("instrumentType",{}).toString().toStdString();
+            const auto panel=control.design.getProperty("instrumentPanel",{}).toString().toStdString();
+            const auto compact=static_cast<bool>(control.design.getProperty("instrumentCompact",false));
+            if(const auto* spec=instrument_ui::panel(type,panel,compact)) {
+                ImGui::PushID(static_cast<int>(control.id));
+                ImGui::PushStyleColor(ImGuiCol_ChildBg,p.bg1);ImGui::PushStyleColor(ImGuiCol_Text,p.text);
+                instrument_ui::draw("##instrument",type,*spec,keys,parameters,min,ImVec2(w,h),p.accent,
+                    [this](const auto& param,double value){if(renderingPlayed_&&componentSet_)componentSet_(param.binding,value);},renderingPlayed_,
+                    w/std::max(1.0f,control.width*windowSize().x),control.label.toRawUTF8());
+                ImGui::PopStyleColor(2);ImGui::PopID();
+            }
+            break;
+        }
+        std::vector<visual::Param> parameters;
+        for(const auto& binding:control.extraParameterBindings) if(const auto* p=parameter(binding))
+            parameters.push_back({p->key,p->label,p->unit,p->minimum,p->maximum,p->value,p->defaultValue});
+        visual::Pane pane;
+        pane.kind=static_cast<visual::PaneKind>(juce::jlimit(0,static_cast<int>(visual::PaneKind::roulement),static_cast<int>(control.design.getProperty("pane",0))));
+        pane.variant=static_cast<int>(control.design.getProperty("variant",0));
+        if(const auto* indices=control.design.getProperty("indices",{}).getArray())for(const auto& i:*indices)pane.parameters.push_back(static_cast<int>(i));
+        visual::Live live;live.afterFrame=analysis_;live.beforeFrame=analysis_;live.running=analysis_&&analysis_->sequence>0;
+        const visual::Setter set=[this](const auto& p,double value){if(renderingPlayed_&&componentSet_)componentSet_(p.binding,value);};
+        const auto cursor=ImGui::GetCursorScreenPos();ImGui::PushID(static_cast<int>(control.id));
+        ImGui::BeginDisabled(!renderingPlayed_);
+        if(static_cast<bool>(control.design.getProperty("large",false)))visual::drawLargePane("##native",pane,parameters,min,ImVec2(w,h),p.accent,live,set);
+        else visual::drawPane("##native",pane,parameters,min,ImVec2(w,h),p.accent,live,set,true);
+        ImGui::EndDisabled();ImGui::PopID();ImGui::SetCursorScreenPos(cursor);ImGui::Dummy(ImVec2(0,0));break;
+    }
+    case Kind::custom: {
+        const auto source=control.design.getProperty("customSource",{}).toString();
+        if(const auto draw=CustomInterface::renderer(source)) {
+            struct Data { const InterfaceEditor* editor; } data {this};
+            const auto primary=control.parameterBinding.toStdString(),secondary=control.secondaryParameterBinding.toStdString();
+            const auto tertiary=control.tertiaryParameterBinding.toStdString(),quaternary=control.quaternaryParameterBinding.toStdString();
+            CyInterfaceContext api;
+            api.imgui=ImGui::GetCurrentContext();api.user=&data;api.primary=primary.c_str();api.secondary=secondary.c_str();
+            api.tertiary=tertiary.c_str();api.quaternary=quaternary.c_str();
+            if(const auto* p=parameter(control.parameterBinding)) {api.minimum=p->minimum;api.maximum=p->maximum;}
+            api.get=[](void* user,const char* binding) { const auto* self=static_cast<Data*>(user)->editor;
+                if(const auto* p=self->parameter(juce::String::fromUTF8(binding)))return p->value;return 0.0; };
+            api.set=[](void* user,const char* binding,double value) {const auto* self=static_cast<Data*>(user)->editor;
+                const auto key=juce::String::fromUTF8(binding);if(const auto* p=self->parameter(key);p && std::isfinite(value) && self->renderingPlayed_ && self->componentSet_)
+                    self->componentSet_(key,std::clamp(value,p->minimum,p->maximum));};
+            const auto cursor=ImGui::GetCursorScreenPos();ImGui::SetCursorScreenPos(min);ImGui::PushID(static_cast<int>(control.id));
+            ImGui::BeginChild("##cppComponent",ImVec2(std::max(1.0f,w),std::max(1.0f,h)),0,ImGuiWindowFlags_NoBackground|ImGuiWindowFlags_NoSavedSettings|(!renderingPlayed_?ImGuiWindowFlags_NoInputs:0));
+            ImGui::BeginDisabled(!renderingPlayed_);draw(&api);ImGui::EndDisabled();ImGui::EndChild();ImGui::PopID();ImGui::SetCursorScreenPos(cursor);ImGui::Dummy(ImVec2(0,0));
+        } else ui::centredText(list,min,max,p.textDim,L("Composant C++ à compiler","C++ component: compile first"));
         break;
     }
     case Kind::inputPort:
     case Kind::outputPort: break;
     }
+    ImGui::PopFont();
 }
 
 void InterfaceEditor::drawPlayed(const char* id, const app::ModuleInterfaceState& state, const ImVec2 size,
-                                 const std::function<void(const juce::String&, double)>& setValue)
+                                 const std::function<void(const juce::String&, double)>& setValue, const engine::AudioAnalysisFrame* analysis)
 {
+    const auto previousAnalysis=std::exchange(analysis_,analysis);
     // Inside a module: English, whatever the language.
     const ui::ModuleText english;
     const auto& p = theme::palette();
     auto& io = ImGui::GetIO();
     // The controls read the state through the editor's own lookups.
     const auto kept = std::exchange(interface_, state);
+    drawPageBar();
+    renderingPlayed_=true;componentSet_=setValue;
     auto& gesture = played_[id];
     const auto window = windowSize();
     const auto origin = ImGui::GetCursorScreenPos();
@@ -542,7 +645,7 @@ void InterfaceEditor::drawPlayed(const char* id, const app::ModuleInterfaceState
     const ImVec2 min(origin.x + (size.x - canvasSize.x) * 0.5f, origin.y + (size.y - canvasSize.y) * 0.5f);
     const ImVec2 max(min.x + canvasSize.x, min.y + canvasSize.y);
     auto* list = ImGui::GetWindowDrawList();
-    list->AddRectFilled(min, max, p.bg1, 6.0f);
+    list->AddRectFilled(min, max, surfaceColour("background",p.bg1), 6.0f);
     const auto rectOf = [&](const Control& control) {
         const ImVec2 at(min.x + control.x * canvasSize.x, min.y + control.y * canvasSize.y);
         return std::make_pair(at, ImVec2(at.x + control.width * canvasSize.x, at.y + control.height * canvasSize.y));
@@ -550,7 +653,7 @@ void InterfaceEditor::drawPlayed(const char* id, const app::ModuleInterfaceState
     const auto hitAt = [&](const ImVec2 screen) -> const Control* {
         for (auto index = interface_.controls.size(); index > 0; --index) {
             const auto& control = interface_.controls[index - 1];
-            if (isPort(control.kind) || control.kind == Kind::group || control.kind == Kind::text)
+            if (isPort(control.kind) || !visible(control) || control.kind == Kind::group || control.kind == Kind::text || control.kind == Kind::custom || control.kind == Kind::nativePanel)
                 continue;
             const auto [a, b] = rectOf(control);
             if (screen.x >= a.x && screen.x <= b.x && screen.y >= a.y && screen.y <= b.y)
@@ -623,13 +726,14 @@ void InterfaceEditor::drawPlayed(const char* id, const app::ModuleInterfaceState
     list->PushClipRect(min, max, true);
     for (const auto pass : { 0, 1 })
         for (const auto& control : interface_.controls) {
-            if (isPort(control.kind) || (control.kind == Kind::group) != (pass == 0))
+            if (isPort(control.kind) || !visible(control) || (control.kind == Kind::group) != (pass == 0))
                 continue;
             const auto [a, b] = rectOf(control);
             drawControl(list, control, a, b);
         }
     list->PopClipRect();
     interface_ = kept;
+    analysis_ = previousAnalysis;
 }
 
 void InterfaceEditor::drawCanvas(GraphSlot& slot)
@@ -638,6 +742,8 @@ void InterfaceEditor::drawCanvas(GraphSlot& slot)
     pull(slot);
     auto& io = ImGui::GetIO();
 
+    renderingPlayed_=play_;
+    componentSet_=[&slot](const juce::String& key,double value){slot.graph().editorSetParameter(key,value);};
     // The toolbar: edit or play, the automatic layout, the grid.
     if (ui::iconButton(icon::edit, L("Disposer : déplacer et dimensionner les contrôles", "Lay out: move and size the controls"), !play_))
         play_ = false;
@@ -657,26 +763,44 @@ void InterfaceEditor::drawCanvas(GraphSlot& slot)
         (void) push(slot, true);
     }
     ImGui::SameLine();
-    const auto size = windowSize();
-    ImGui::TextDisabled("%d × %d px", static_cast<int>(size.x), static_cast<int>(size.y));
+    ImGui::NewLine();
+    auto size=windowSize();int dimensions[]{static_cast<int>(size.x),static_cast<int>(size.y)};
+    ImGui::TextUnformatted(deviceLayout_?L("Taille carte","Card size"):L("Taille fenêtre","Window size"));ImGui::SameLine();ImGui::SetNextItemWidth(dp(180));
+    if(ImGui::InputInt2("##canvasDimensions",dimensions,ImGuiInputTextFlags_EnterReturnsTrue)) {
+        interface_.windowWidth=static_cast<std::uint16_t>(std::clamp(dimensions[0],deviceLayout_?120:240,4096));
+        interface_.windowHeight=static_cast<std::uint16_t>(std::clamp(dimensions[1],deviceLayout_?80:160,2160));push(slot,true);
+    }
+    if(ImGui::IsItemDeactivatedAfterEdit()) {
+        interface_.windowWidth=static_cast<std::uint16_t>(std::clamp(dimensions[0],deviceLayout_?120:240,4096));
+        interface_.windowHeight=static_cast<std::uint16_t>(std::clamp(dimensions[1],deviceLayout_?80:160,2160));push(slot,true);
+    }
+    size=windowSize();ImGui::SameLine();ImGui::TextDisabled("px");
     if (error_.isNotEmpty() && ImGui::GetTime() - errorTime_ < 6.0) {
         ImGui::SameLine();
         ImGui::TextColored(theme::vec(p.record), "%s", error_.toRawUTF8());
     }
 
+    ImGui::SameLine();
+    if(ImGui::Button("Code JSON")) { codeMode_=!codeMode_; code_[0]=0; }
+    if(codeMode_) { drawCode(slot); return; }
+    ImGui::SameLine();ImGui::SetNextItemWidth(dp(105));ImGui::SliderFloat("Zoom",&zoom_,.25f,3.0f,"%.2fx");
+    ImGui::SameLine();if(ImGui::SmallButton(L("Cadrer","Fit"))){zoom_=1;pan_={};actualSize_=false;}
+    ImGui::SameLine();if(ImGui::SmallButton("1:1")){actualSize_=true;zoom_=1;pan_={};}
+    ui::tooltip(L("Aperçu à la taille choisie en pixels. Bouton du milieu pour déplacer la vue.","Preview at the chosen pixel size. Pan with the middle mouse button."));
+    drawPageBar();
     // The window, as large as fits, its proportions kept.
     const auto available = ImGui::GetContentRegionAvail();
     const auto origin = ImGui::GetCursorScreenPos();
     const auto margin = dp(16.0f);
-    const auto scale = std::max(0.1f, std::min((available.x - margin * 2.0f) / size.x, (available.y - margin * 2.0f) / size.y));
-    const ImVec2 canvasSize(size.x * scale, size.y * scale);
-    canvasMin_ = ImVec2(origin.x + (available.x - canvasSize.x) * 0.5f, origin.y + (available.y - canvasSize.y) * 0.5f);
+    const auto scale = actualSize_?1.0f:std::max(0.1f, std::min((available.x - margin * 2.0f) / size.x, (available.y - margin * 2.0f) / size.y));
+    const ImVec2 canvasSize(size.x * scale * zoom_, size.y * scale * zoom_);
+    canvasMin_ = ImVec2(origin.x + (available.x - canvasSize.x) * 0.5f+pan_.x, origin.y + (available.y - canvasSize.y) * 0.5f+pan_.y);
     canvasMax_ = ImVec2(canvasMin_.x + canvasSize.x, canvasMin_.y + canvasSize.y);
     auto* list = ImGui::GetWindowDrawList();
     list->AddRectFilled(origin, ImVec2(origin.x + available.x, origin.y + available.y), p.bg0);
     list->AddRectFilled(ImVec2(canvasMin_.x + 4.0f, canvasMin_.y + 6.0f), ImVec2(canvasMax_.x + 4.0f, canvasMax_.y + 6.0f),
                         theme::alpha(0xff000000u, 0.35f), 6.0f);
-    list->AddRectFilled(canvasMin_, canvasMax_, p.bg1, 6.0f);
+    list->AddRectFilled(canvasMin_, canvasMax_, surfaceColour("background",p.bg1), 6.0f);
     list->AddRect(canvasMin_, canvasMax_, p.lineStrong, 6.0f, 1.0f);
     const auto cell = ImVec2(canvasSize.x / interface_.gridColumns, canvasSize.y / interface_.gridRows);
     if (!play_)
@@ -688,6 +812,7 @@ void InterfaceEditor::drawCanvas(GraphSlot& slot)
     ImGui::SetCursorScreenPos(origin);
     ImGui::InvisibleButton("##interfaceCanvas", ImVec2(std::max(1.0f, available.x), std::max(1.0f, available.y)));
     const auto hovered = ImGui::IsItemHovered();
+    if(hovered && ImGui::IsMouseDragging(ImGuiMouseButton_Middle)) {pan_.x+=io.MouseDelta.x;pan_.y+=io.MouseDelta.y;}
     const auto mouse = io.MousePos;
     const auto toFraction = [&](const ImVec2 screen) {
         return ImVec2((screen.x - canvasMin_.x) / canvasSize.x, (screen.y - canvasMin_.y) / canvasSize.y);
@@ -721,7 +846,19 @@ void InterfaceEditor::drawCanvas(GraphSlot& slot)
             drag_ = Drag::resize;
         } else {
             selected_ = hit(mouse);
+            if(!play_) {
+                if(!io.KeyCtrl && !io.KeyShift && !selection_.contains(selected_))selection_.clear();
+                if(selected_) {
+                    if(io.KeyCtrl && selection_.contains(selected_))selection_.erase(selected_);else selection_.insert(selected_);
+                    if(const auto* c=find(selected_)){const auto group=c->design.getProperty("group",{}).toString();
+                        if(group.isNotEmpty() && !io.KeyCtrl)for(const auto& other:interface_.controls)if(other.design.getProperty("group",{}).toString()==group)selection_.insert(other.id);}
+                }
+            }
+            marquee_=!play_ && selected_==0;
+            if(marquee_){dragStart_=mouse;marqueeSelection_=selection_;}
             drag_ = selected_ != 0 ? (play_ ? Drag::play : Drag::move) : Drag::none;
+            if(const auto* c=find(selected_);c && !play_ && static_cast<bool>(c->design.getProperty("locked",false)))drag_=Drag::none;
+            dragOrigins_.clear();for(const auto& c:interface_.controls)if(selection_.contains(c.id))dragOrigins_[c.id]=c;
         }
         if (const auto* control = find(selected_)) {
             dragOrigin_ = *control;
@@ -752,8 +889,11 @@ void InterfaceEditor::drawCanvas(GraphSlot& slot)
         if (auto* control = find(selected_)) {
             const ImVec2 delta((mouse.x - dragStart_.x) / canvasSize.x, (mouse.y - dragStart_.y) / canvasSize.y);
             if (drag_ == Drag::move) {
-                control->x = std::clamp(snap(dragOrigin_.x + delta.x, interface_.gridColumns), 0.0f, 1.0f - control->width);
-                control->y = std::clamp(snap(dragOrigin_.y + delta.y, interface_.gridRows), 0.0f, 1.0f - control->height);
+                auto dx=snap(delta.x,interface_.gridColumns),dy=snap(delta.y,interface_.gridRows);
+                for(const auto& [id,c]:dragOrigins_) {dx=std::clamp(dx,-c.x,1-c.x-c.width);dy=std::clamp(dy,-c.y,1-c.y-c.height);}
+                for(auto& c:interface_.controls)if(auto it=dragOrigins_.find(c.id);it!=dragOrigins_.end() && !static_cast<bool>(c.design.getProperty("locked",false))) {
+                    c.x=it->second.x+dx;c.y=it->second.y+dy;
+                }
                 (void) push(slot, false);
             } else if (drag_ == Drag::resize) {
                 const auto minimumWidth = 1.0f / interface_.gridColumns;
@@ -773,6 +913,17 @@ void InterfaceEditor::drawCanvas(GraphSlot& slot)
             }
         }
     }
+    if(marquee_ && ImGui::IsItemActive()) {
+        const ImVec2 a(std::min(mouse.x,dragStart_.x),std::min(mouse.y,dragStart_.y));
+        const ImVec2 b(std::max(mouse.x,dragStart_.x),std::max(mouse.y,dragStart_.y));
+        selection_=marqueeSelection_;
+        if(ImGui::IsMouseDragging(ImGuiMouseButton_Left,3))for(const auto& c:interface_.controls) {
+            const auto [min,max]=rectOf(c);
+            if(visible(c)&&!isPort(c.kind)&&min.x<b.x&&max.x>a.x&&min.y<b.y&&max.y>a.y)selection_.insert(c.id);
+        }
+        list->AddRectFilled(a,b,theme::alpha(p.accent,.12f));list->AddRect(a,b,p.accent);
+    }
+    if(marquee_ && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {marquee_=false;if(!selection_.empty())selected_=*selection_.begin();}
     if (ImGui::IsItemDeactivated() && drag_ != Drag::none) {
         const auto moved = drag_ == Drag::move || drag_ == Drag::resize;
         drag_ = Drag::none;
@@ -795,12 +946,12 @@ void InterfaceEditor::drawCanvas(GraphSlot& slot)
     list->PushClipRect(canvasMin_, canvasMax_, true);
     for (const auto pass : { 0, 1 })
         for (const auto& control : interface_.controls) {
-            if (isPort(control.kind) || (control.kind == Kind::group) != (pass == 0))
+            if (isPort(control.kind) || !visible(control) || (control.kind == Kind::group) != (pass == 0))
                 continue;
             const auto [min, max] = rectOf(control);
             drawControl(list, control, min, max);
             if (!play_) {
-                const auto picked = control.id == selected_;
+                const auto picked = control.id == selected_ || selection_.contains(control.id);
                 list->AddRect(min, max, picked ? p.accent : theme::alpha(p.textFaint, 0.35f), 3.0f, picked ? 1.6f : 1.0f);
                 if (picked)
                     list->AddRectFilled(ImVec2(max.x - handle, max.y - handle), max, p.accent, 2.0f);
@@ -815,20 +966,40 @@ void InterfaceEditor::drawCanvas(GraphSlot& slot)
     // Keys, while the pointer is over the window and nothing is typed.
     if (hovered && !io.WantTextInput && !play_) {
         if (selected_ != 0 && (ImGui::IsKeyPressed(ImGuiKey_Delete, false) || ImGui::IsKeyPressed(ImGuiKey_Backspace, false))) {
-            std::erase_if(interface_.controls, [this](const Control& control) { return control.id == selected_; });
-            selected_ = 0;
+            std::erase_if(interface_.controls, [this](const Control& control) { return control.id == selected_ || selection_.contains(control.id); });
+            selected_ = 0;selection_.clear();
             (void) push(slot, true);
         }
-        if (selected_ != 0 && io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_D, false))
-            if (const auto* control = find(selected_)) {
-                auto copy = *control;
-                copy.id = interface_.nextControlId++;
-                copy.x = std::min(1.0f - copy.width, copy.x + 1.0f / interface_.gridColumns);
-                copy.y = std::min(1.0f - copy.height, copy.y + 1.0f / interface_.gridRows);
-                interface_.controls.push_back(copy);
-                selected_ = copy.id;
-                (void) push(slot, true);
+        if(io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_A,false)) {
+            selection_.clear();for(const auto& c:interface_.controls)if(!isPort(c.kind) && visible(c))selection_.insert(c.id);
+            if(!selection_.empty())selected_=*selection_.begin();
+        }
+        if(selected_ && io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_C,false)) {
+            auto copy=interface_;std::erase_if(copy.controls,[this](const auto& c){return c.id!=selected_ && !selection_.contains(c.id);});
+            copy.deviceControls.clear();const auto json=juce::JSON::toString(app::serialiseModuleInterface(copy),false);
+            ImGui::SetClipboardText((juce::String("CyDAW-Interface\n")+json).toRawUTF8());
+        }
+        if(io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_V,false)) {
+            const auto text=juce::String::fromUTF8(ImGui::GetClipboardText());
+            if(text.startsWith("CyDAW-Interface\n")) {
+                const auto copied=app::restoreModuleInterface(juce::JSON::parse(text.substring(16)));
+                std::vector<Control> additions;bool valid=true;
+                for(auto c:copied.controls) {
+                    for(const auto* key:{&c.parameterBinding,&c.secondaryParameterBinding,&c.tertiaryParameterBinding,&c.quaternaryParameterBinding})if(key->isNotEmpty() && !parameter(*key))valid=false;
+                    c.id=interface_.nextControlId++;c.x=std::min(1-c.width,c.x+1.0f/interface_.gridColumns);c.y=std::min(1-c.height,c.y+1.0f/interface_.gridRows);additions.push_back(std::move(c));
+                }
+                if(valid){selection_.clear();for(const auto& c:additions)selection_.insert(c.id);interface_.controls.insert(interface_.controls.end(),additions.begin(),additions.end());if(!additions.empty())selected_=additions.back().id;push(slot,true);}
+                else report(L("Les paramètres copiés n'existent pas dans ce graphe.","Copied parameters do not exist in this graph."));
             }
+        }
+        if (selected_ != 0 && io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_D, false)) {
+            std::vector<Control> copies;
+            for(const auto& c:interface_.controls)if(c.id==selected_ || selection_.contains(c.id)) {
+                auto copy=c;copy.id=interface_.nextControlId++;copy.x=std::min(1-copy.width,copy.x+1.0f/interface_.gridColumns);copy.y=std::min(1-copy.height,copy.y+1.0f/interface_.gridRows);copies.push_back(std::move(copy));
+            }
+            selection_.clear();for(const auto& c:copies)selection_.insert(c.id);
+            interface_.controls.insert(interface_.controls.end(),copies.begin(),copies.end());if(!copies.empty())selected_=copies.back().id;push(slot,true);
+        }
         if (auto* control = find(selected_)) {
             const auto stepX = 1.0f / interface_.gridColumns;
             const auto stepY = 1.0f / interface_.gridRows;
@@ -880,6 +1051,8 @@ void InterfaceEditor::drawPalette(GraphSlot& slot)
         return ImVec2(0.0f, 0.0f);
     };
 
+    drawLayers(slot);
+    drawNativePalette(slot);
     ui::sectionTitle(L("Contrôles", "Controls"));
     ImGui::TextDisabled("%s", L("Clic : ajouter. Glisser : où il tombe.", "Click: add. Drag: where it drops."));
     for (const auto& info : kinds) {
@@ -931,38 +1104,15 @@ void InterfaceEditor::drawProperties(GraphSlot& slot)
     pull(slot);
     const auto width = ImGui::GetContentRegionAvail().x;
     auto* control = find(selected_);
+    drawWindowProperties(slot);
     if (control == nullptr || play_) {
-        // The window itself.
-        ui::sectionTitle(L("La fenêtre du plugin", "The plugin's window"));
-        auto size = windowSize();
-        int pixels[2] = { static_cast<int>(size.x), static_cast<int>(size.y) };
-        ImGui::SetNextItemWidth(width);
-        if (ImGui::DragInt2("##windowSize", pixels, 2.0f, 240, 2'160, "%d px")) {
-            interface_.windowWidth = static_cast<std::uint16_t>(std::clamp(pixels[0], 240, 4'096));
-            interface_.windowHeight = static_cast<std::uint16_t>(std::clamp(pixels[1], 160, 2'160));
-            (void) push(slot, false);
-        }
-        if (ImGui::IsItemDeactivatedAfterEdit())
-            (void) push(slot, true);
-        ui::tooltip(L("Largeur et hauteur, en pixels, à l'ouverture du plugin.", "Width and height, in pixels, when the plugin opens."));
-        int grid[2] = { interface_.gridColumns, interface_.gridRows };
-        ImGui::TextDisabled("%s", L("Grille (colonnes, lignes)", "Grid (columns, rows)"));
-        ImGui::SetNextItemWidth(width);
-        if (ImGui::DragInt2("##grid", grid, 0.1f, 4, 64)) {
-            interface_.gridColumns = static_cast<std::uint8_t>(std::clamp(grid[0], 4, 64));
-            interface_.gridRows = static_cast<std::uint8_t>(std::clamp(grid[1], 4, 64));
-            (void) push(slot, false);
-        }
-        if (ImGui::IsItemDeactivatedAfterEdit())
-            (void) push(slot, true);
-        ImGui::Spacing();
-        ImGui::PushTextWrapPos(0.0f);
-        ImGui::TextDisabled("%s", L("Choisissez un contrôle pour le régler. Glisser : le déplacer ; le coin : le dimensionner ; "
-                                    "Suppr : le retirer ; Ctrl+D : le dupliquer ; flèches : d'une case.",
-                                    "Pick a control to set it. Drag: move it; its corner: size it; Delete: remove it; "
-                                    "Ctrl+D: duplicate it; arrows: one cell."));
-        ImGui::PopTextWrapPos();
+        ImGui::TextWrapped("%s",L("Sélectionnez un contrôle pour régler son apparence et sa liaison à une valeur.",
+                                 "Select a control to edit its appearance and value binding."));
         return;
+    }
+    ImGui::Separator();
+    if (ImGui::SmallButton(L("Désélectionner le contrôle", "Deselect control"))) {
+        selected_=0; selection_.clear(); return;
     }
 
     const auto* info = infoOf(control->kind);
@@ -1000,8 +1150,8 @@ void InterfaceEditor::drawProperties(GraphSlot& slot)
         }
         ImGui::PopID();
     };
-    if (info != nullptr && info->bindings >= 1)
-        binding(info->bindings == 4 ? "Attaque" : info->bindings == 2 ? "Réglage (horizontal, ou principal)" : "Réglage",
+    if ((info != nullptr && info->bindings >= 1) || control->kind==Kind::custom)
+        binding(info != nullptr && info->bindings == 4 ? "Attaque" : info != nullptr && info->bindings == 2 ? "Réglage (horizontal, ou principal)" : "Réglage",
                 info->bindings == 4 ? "Attack" : info->bindings == 2 ? "Setting (horizontal, or main)" : "Setting",
                 control->parameterBinding);
     if (info != nullptr && (info->bindings == 2 || info->bindings == 4))
@@ -1018,6 +1168,7 @@ void InterfaceEditor::drawProperties(GraphSlot& slot)
     if (control == nullptr)
         return;
 
+    styleProperties(slot,*control);
     // Where, in percent of the window.
     ImGui::Spacing();
     ImGui::TextDisabled("%s", L("Position et taille (% de la fenêtre)", "Place and size (% of the window)"));

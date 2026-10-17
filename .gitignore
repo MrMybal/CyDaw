@@ -30,3 +30,9 @@ __pycache__/
 /templates/19-medellin-comparaison-midi.cydaw
 /templates/20-this-old-tune-comparaison-midi.cydaw
 /tools/templates/audio_compare.py
+
+# Pinned binary FFmpeg SDK; populated by tools/setup_ffmpeg.py.
+/third_party/ffmpeg/
+
+# DJ example built on commercial songs, kept local.
+/Examples/2026-10-17/Mix DJ - Fugees/

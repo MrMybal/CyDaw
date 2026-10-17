@@ -71,7 +71,7 @@ public:
     // block was available; false means that the dry input was left untouched.
     [[nodiscard]] bool processBlock(juce::AudioBuffer<float>& buffer,
                                     int startSample,
-                                    int numSamples) noexcept;
+                                    int numSamples, double timelineSeconds = 0.0, double tempo = 120.0, bool playing = false) noexcept;
 
     [[nodiscard]] bool isRunning() const noexcept;
     [[nodiscard]] juce::File pluginFile() const;

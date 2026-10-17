@@ -20,16 +20,20 @@
 //   devices        My devices                              Documents/CyDAW/Devices
 //   pluginExports  exported plug-ins' projects             Documents/CyDAW/Plugin Exports
 //   presets        the presets made here                   Documents/CyDAW/Presets
+//   mixes          the DJ mixes recorded                   Documents/CyDAW/Mixes
+//   foundry        the Foundry's new sound files           Documents/CyDAW/Foundry
 //
 // CYDAW_BANKS_DIR moves the banks' default (tools/factory_content reads it,
 // and this file, too); CYDAW_LOCATIONS_FILE names another file (a test's).
 
 namespace cydaw::v2 {
 
-enum class Location { banks, downloads, cache, companion, aiModels, soundModels, devices, pluginExports, presets };
+enum class Location { banks, downloads, cache, companion, aiModels, soundModels, devices, pluginExports, presets, mixes,
+                      foundry };
 inline constexpr std::array allLocations { Location::banks,       Location::downloads, Location::cache,
                                            Location::companion,   Location::aiModels,  Location::soundModels,
-                                           Location::devices,     Location::presets,   Location::pluginExports };
+                                           Location::devices,     Location::presets,   Location::pluginExports,
+                                           Location::mixes,       Location::foundry };
 
 namespace locations {
 

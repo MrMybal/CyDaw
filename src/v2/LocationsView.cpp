@@ -24,6 +24,8 @@ const char* nameOf(const Location location)
     case Location::devices: return L("Mes périphériques", "My devices");
     case Location::pluginExports: return L("Exports de plug-ins", "Plug-in exports");
     case Location::presets: return L("Préréglages", "Presets");
+    case Location::mixes: return L("Mixes DJ", "DJ mixes");
+    case Location::foundry: return L("Fonderie", "Foundry");
     }
     return "";
 }
@@ -55,6 +57,11 @@ const char* descriptionOf(const Location location)
     case Location::presets:
         return L("Les préréglages enregistrés : périphériques, plug-ins, chaînes.",
                  "The presets saved: devices, plug-ins, chains.");
+    case Location::mixes:
+        return L("Les mixes enregistrés dans le mode Mix DJ.", "The mixes recorded in the DJ mix mode.");
+    case Location::foundry:
+        return L("Les nouveaux fichiers de la Fonderie, avant d'être enregistrés ailleurs.",
+                 "The Foundry's new files, until they are saved elsewhere.");
     }
     return "";
 }

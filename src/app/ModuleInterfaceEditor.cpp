@@ -1348,6 +1348,8 @@ juce::String controlKindKey(const ModuleControlKind kind)
         case ModuleControlKind::dynamicsResponse: return "dynamics-response";
         case ModuleControlKind::eqCurve: return "eq-curve";
         case ModuleControlKind::wavetable: return "wavetable";
+        case ModuleControlKind::nativePanel: return "native-panel";
+        case ModuleControlKind::custom: return "custom";
     }
     return "knob";
 }
@@ -1371,6 +1373,8 @@ ModuleControlKind controlKindFromKey(const juce::String& key)
     if (key == "dynamics-response") return ModuleControlKind::dynamicsResponse;
     if (key == "eq-curve") return ModuleControlKind::eqCurve;
     if (key == "wavetable") return ModuleControlKind::wavetable;
+    if (key == "native-panel") return ModuleControlKind::nativePanel;
+    if (key == "custom") return ModuleControlKind::custom;
     return ModuleControlKind::knob;
 }
 
@@ -1424,6 +1428,7 @@ const std::vector<ModuleInterfaceControl>& moduleInterfaceControls(
 
 void rebuildAutomaticDeviceControls(ModuleInterfaceState& state)
 {
+    if (state.deviceDesigned) return;
     auto previous = std::move(state.deviceControls);
     state.deviceControls.clear();
     const auto exposedCount = static_cast<std::size_t>(std::count_if(
@@ -1468,9 +1473,10 @@ void rebuildAutomaticDeviceControls(ModuleInterfaceState& state)
         const auto column = visibleIndex % columns;
         const auto row = visibleIndex / columns;
         control.x = static_cast<float>(column) * cellWidth + 0.025f;
-        control.y = static_cast<float>(row) * cellHeight + 0.04f;
+        const auto verticalPadding=std::min(0.04f,cellHeight*0.12f);
+        control.y = static_cast<float>(row) * cellHeight + verticalPadding;
         control.width = std::max(0.08f, cellWidth - 0.05f);
-        control.height = std::max(0.18f, cellHeight - 0.08f);
+        control.height = cellHeight-2.0f*verticalPadding;
         state.deviceControls.push_back(std::move(control));
         ++visibleIndex;
     }
@@ -1479,7 +1485,7 @@ void rebuildAutomaticDeviceControls(ModuleInterfaceState& state)
 juce::var serialiseModuleInterface(const ModuleInterfaceState& state)
 {
     auto root = juce::DynamicObject::Ptr(new juce::DynamicObject());
-    root->setProperty(jsonKeys::schema, std::max(16, static_cast<int>(state.schema)));
+    root->setProperty(jsonKeys::schema, std::max(18, static_cast<int>(state.schema)));
     root->setProperty(jsonKeys::nextControlId, static_cast<juce::int64>(state.nextControlId));
     root->setProperty(jsonKeys::snapToGrid, state.snapToGrid);
     root->setProperty(jsonKeys::gridColumns, static_cast<int>(state.gridColumns));
@@ -1488,8 +1494,12 @@ juce::var serialiseModuleInterface(const ModuleInterfaceState& state)
         root->setProperty(jsonKeys::windowWidth, static_cast<int>(state.windowWidth));
         root->setProperty(jsonKeys::windowHeight, static_cast<int>(state.windowHeight));
     }
-    if (state.designed)
-        root->setProperty(jsonKeys::designed, true);
+    if (state.designed) root->setProperty(jsonKeys::designed, true);
+    root->setProperty("deviceDesigned",state.deviceDesigned);
+    if(state.windowDesign.isObject())root->setProperty("windowDesign",state.windowDesign.clone());
+    if(state.deviceDesign.isObject())root->setProperty("deviceDesign",state.deviceDesign.clone());
+    root->setProperty("deviceWidth",static_cast<int>(state.deviceWidth));
+    root->setProperty("deviceHeight",static_cast<int>(state.deviceHeight));
 
     juce::Array<juce::var> parameters;
     for (const auto& parameter : state.parameters) {
@@ -1583,6 +1593,7 @@ juce::var serialiseModuleInterface(const ModuleInterfaceState& state)
             mixFloat(control.height);
             mix(control.portKind);
             mix(control.portChannels);
+            if (control.design.isObject()) mixString(juce::JSON::toString(control.design,false));
             if (!control.serialised.isVoid()
                 && control.serialisedSignature == signature) {
                 controls.add(control.serialised);
@@ -1592,6 +1603,7 @@ juce::var serialiseModuleInterface(const ModuleInterfaceState& state)
             value->setProperty(jsonKeys::id, static_cast<juce::int64>(control.id));
             value->setProperty(jsonKeys::kind, controlKindKey(control.kind));
             value->setProperty(jsonKeys::label, control.label);
+            if(control.design.isObject()) value->setProperty("design",control.design);
             value->setProperty(jsonKeys::binding, control.parameterBinding);
             value->setProperty(jsonKeys::secondaryBinding,
                                control.secondaryParameterBinding);
@@ -1643,7 +1655,7 @@ ModuleInterfaceState restoreModuleInterface(const juce::var& value)
 
     const auto sourceSchema = static_cast<std::uint32_t>(std::max(
         1, static_cast<int>(root->getProperty(jsonKeys::schema))));
-    state.schema = 16;
+    state.schema = 17;
     state.snapToGrid = sourceSchema < 6
                            || !root->hasProperty(jsonKeys::snapToGrid)
                            || static_cast<bool>(root->getProperty(jsonKeys::snapToGrid));
@@ -1660,6 +1672,11 @@ ModuleInterfaceState restoreModuleInterface(const juce::var& value)
             160, 2'160, static_cast<int>(root->getProperty(jsonKeys::windowHeight))));
     }
     state.designed = static_cast<bool>(root->getProperty(jsonKeys::designed));
+    state.deviceDesigned = static_cast<bool>(root->getProperty("deviceDesigned"));
+    if(root->getProperty("windowDesign").isObject())state.windowDesign=root->getProperty("windowDesign").clone();
+    if(root->getProperty("deviceDesign").isObject())state.deviceDesign=root->getProperty("deviceDesign").clone();
+    state.deviceWidth=static_cast<std::uint16_t>(juce::jlimit(120,4096,static_cast<int>((root->hasProperty("deviceWidth")?root->getProperty("deviceWidth"):juce::var(480)))));
+    state.deviceHeight=static_cast<std::uint16_t>(juce::jlimit(80,2160,static_cast<int>((root->hasProperty("deviceHeight")?root->getProperty("deviceHeight"):juce::var(240)))));
     std::set<juce::String> parameterKeys;
     if (const auto* parameters = root->getProperty(jsonKeys::parameters).getArray()) {
         for (const auto& parameterValue : *parameters) {
@@ -1736,6 +1753,7 @@ ModuleInterfaceState restoreModuleInterface(const juce::var& value)
                 && control.kind == ModuleControlKind::eqCurve)
                 control.kind = ModuleControlKind::knob;
             control.label = object->getProperty(jsonKeys::label).toString();
+            control.design = object->getProperty("design").clone();
             control.parameterBinding = object->getProperty(jsonKeys::binding).toString();
             control.secondaryParameterBinding = sourceSchema >= 11
                 ? object->getProperty(jsonKeys::secondaryBinding).toString()
@@ -1820,7 +1838,7 @@ ModuleInterfaceState restoreModuleInterface(const juce::var& value)
                     control.kind = ModuleControlKind::waveform;
             }
             else if (!isParameterControl(control.kind)
-                     && !isPortControl(control.kind))
+                     && control.kind != ModuleControlKind::custom && !isPortControl(control.kind))
                 control.parameterBinding.clear();
             controlIds.insert(control.id);
             highestId = std::max(highestId, control.id);
@@ -1860,6 +1878,75 @@ ModuleInterfaceState restoreModuleInterface(const juce::var& value)
     }
     rebuildAutomaticDeviceControls(state);
     return state;
+}
+
+juce::Result validateModuleInterfaceDocument(const juce::var& document, const ModuleInterfaceState& parameters)
+{
+    const auto fail=[](const juce::String& reason){return juce::Result::fail(reason);};
+    if(!document.isObject())return fail("Interface document must be a JSON object");
+    for(const auto* surface:{"windowDesign","deviceDesign"}) {
+        const auto design=document.getProperty(surface,{});
+        if(!design.isVoid()&&!design.isObject())return fail(juce::String(surface)+" must be an object");
+        for(const auto* key:{"background","accent","text"})if(design.hasProperty(key)) {
+            const auto color=design.getProperty(key,{}).toString();
+            if(color.length()!=8 || !color.containsOnly("0123456789abcdefABCDEF"))return fail("Surface colors must be 8-digit ARGB hex strings");
+        }
+    }
+    const auto bindingExists=[&](const juce::String& key){return std::ranges::any_of(parameters.parameters,[&](const auto& p){return p.key==key;});};
+    for(const auto* layout:{"controls","deviceControls"}) {
+        const auto value=document.getProperty(layout,{});
+        const auto* controls=value.getArray();
+        if(!controls) {if(juce::String(layout)=="controls")return fail("controls must be an array");else continue;}
+        if(controls->size()>4096)return fail("An interface supports up to 4096 controls");
+        std::set<juce::int64> ids;
+        for(const auto& c:*controls) {
+            if(!c.isObject())return fail("A control must be a JSON object");
+            const auto id=static_cast<juce::int64>(c.getProperty("id",0));
+            if(id<=0||!ids.insert(id).second)return fail("Control IDs must be positive and unique within each layout");
+            const auto kind=c.getProperty("kind",{}).toString();
+            bool known=false;
+            for(int i=0;i<=static_cast<int>(ModuleControlKind::custom);++i)if(kind==controlKindKey(static_cast<ModuleControlKind>(i)))known=true;
+            if(!known)return fail("Unknown control kind: "+kind);
+            double coordinates[4]{};int index=0;
+            for(const auto* key:{"x","y","width","height"}) {
+                const auto v=c.getProperty(key,{});
+                if(!(v.isInt()||v.isInt64()||v.isDouble()))return fail("Control geometry must be numeric: "+juce::String(key));
+                const auto number=static_cast<double>(v);
+                if(!std::isfinite(number)||number<0||number>1||(index>=2&&number<=0))return fail("Control geometry must fit inside 0..1");
+                coordinates[index++]=number;
+            }
+            if(coordinates[0]+coordinates[2]>1.00001||coordinates[1]+coordinates[3]>1.00001)return fail("A control extends beyond the canvas");
+            if(kind!="input-port"&&kind!="output-port") {
+                for(const auto* key:{"binding","secondaryBinding","tertiaryBinding","quaternaryBinding"}) {
+                    const auto binding=c.getProperty(key,{}).toString();
+                    if(binding.isNotEmpty()&&!bindingExists(binding))return fail("Unknown parameter: "+binding);
+                }
+                if(const auto* list=c.getProperty("extraBindings",{}).getArray())for(const auto& binding:*list)if(!bindingExists(binding.toString()))return fail("Unknown extra parameter: "+binding.toString());
+            }
+            const auto design=c.getProperty("design",{});
+            if(!design.isVoid()&&!design.isObject())return fail("design must be a JSON object");
+            for(const auto* key:{"fontScale","rounding"})if(design.hasProperty(key)) {
+                const auto v=static_cast<double>(design.getProperty(key,{}));
+                if(!std::isfinite(v)||(juce::String(key)=="fontScale"?(v<.5||v>3):(v<0||v>30)))return fail("Invalid style value: "+juce::String(key));
+            }
+            if(kind=="native-panel" && design.hasProperty("instrumentType")) {
+                const auto keys=design.getProperty("instrumentKeys",{});
+                if(!keys.isArray() || keys.size()!=c.getProperty("extraBindings",{}).size())return fail("Instrument keys must match the panel bindings");
+                std::set<juce::String> seen;
+                for(const auto& key:*keys.getArray())if(!key.isString()||key.toString().isEmpty()||!seen.insert(key.toString()).second)return fail("Instrument keys must be nonempty and unique");
+                if(design.getProperty("instrumentPanel",{}).toString().isEmpty())return fail("Instrument panel ID is required");
+            }
+            if(kind=="native-panel") {
+                const auto pane=static_cast<int>(design.getProperty("pane",0));
+                if(pane<0||pane>128)return fail("Unknown native panel kind");
+                const auto count=c.getProperty("extraBindings",{}).size();
+                if(const auto* indices=design.getProperty("indices",{}).getArray())for(const auto& i:*indices)if(static_cast<int>(i)<-1||static_cast<int>(i)>=count)return fail("Native panel index has no parameter binding");
+            }
+            if(design.getProperty("customSource",{}).toString().getNumBytesAsUTF8()>128*1024)return fail("Custom component source exceeds 128 KiB");
+        }
+    }
+    auto restored=restoreModuleInterface(document);restored.parameters=parameters.parameters;
+    return validateModuleInterface(restored);
 }
 
 juce::Result validateModuleInterface(const ModuleInterfaceState& state)

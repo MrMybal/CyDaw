@@ -1,4 +1,5 @@
 #include "SynthView.h"
+#include "InstrumentPanels.h"
 
 #include "InstrumentEffects.h"
 #include "Theme.h"
@@ -800,115 +801,9 @@ void SynthView::drawWave(ImDrawList* list, const char* key, const ImVec2 origin,
     }
 }
 
-namespace {
-
-// One of Colosse's filters at `hz` (its kinds as its engine has them).
-std::complex<double> colosseStage(const int type, const double cutoff, const double resonance, const double hz)
-{
-    using complex = std::complex<double>;
-    const complex s(0.0, hz / std::max(1.0, cutoff));
-    const auto damping = std::max(0.02, 2.0 - 1.98 * resonance);
-    switch (type) {
-    case 0: {
-        const auto k = 4.2 * resonance;
-        const auto pole = 1.0 + s;
-        return (1.0 + 0.6 * k) / (pole * pole * pole * pole + k);
-    }
-    case 1: return 1.0 / (s * s + damping * s + 1.0);
-    case 2: return damping * s / (s * s + damping * s + 1.0);
-    case 3: return s * s / (s * s + damping * s + 1.0);
-    case 4: {
-        const auto feedback = 0.97 * resonance;
-        const auto delay = 1.0 / std::max(40.0, cutoff);
-        const auto z = std::exp(complex(0.0, -2.0 * kPi * hz * delay));
-        return (1.0 - 0.6 * feedback) / (1.0 - feedback * z);
-    }
-    case 5: {
-        static constexpr std::array<std::array<double, 3>, 5> vowels { { { 800.0, 1'150.0, 2'900.0 },
-                                                                        { 400.0, 1'900.0, 2'700.0 },
-                                                                        { 280.0, 2'200.0, 2'950.0 },
-                                                                        { 450.0, 800.0, 2'830.0 },
-                                                                        { 325.0, 700.0, 2'530.0 } } };
-        static constexpr std::array<double, 3> gains { 1.0, 0.7, 0.35 };
-        const auto t = std::clamp(std::log(std::max(20.0, cutoff) / 20.0) / std::log(1'000.0), 0.0, 1.0) * 4.0;
-        const auto lower = std::min(static_cast<int>(t), 3);
-        const auto mix = t - static_cast<double>(lower);
-        const auto width = std::max(0.04, 0.5 - 0.44 * resonance);
-        complex sum;
-        for (std::size_t at = 0; at < 3; ++at) {
-            const auto centre = vowels[static_cast<std::size_t>(lower)][at]
-                                + (vowels[static_cast<std::size_t>(lower + 1)][at] - vowels[static_cast<std::size_t>(lower)][at]) * mix;
-            const complex f(0.0, hz / centre);
-            sum += gains[at] * width * f / (f * f + width * f + 1.0);
-        }
-        return sum * 1.6;
-    }
-    default: {
-        const auto screaming = std::max(0.02, 2.0 - 1.98 * std::min(0.98, 0.55 + 0.45 * resonance));
-        return (0.5 + resonance) * s / (s * s + screaming * s + 1.0);
-    }
-    }
-}
-
-} // namespace
-
 double SynthView::filterDb(const double hz) const
 {
-    using complex = std::complex<double>;
-    complex response;
-    // A model that draws its own curve.
-    if (const auto own = synth::filterDb(card_.model, card_.values, hz); std::isfinite(own))
-        return own;
-    if (indexOf("f.type") >= 0) {
-        // One filter of the family's kinds.
-        response = colosseStage(static_cast<int>(std::lround(valueOf("f.type"))), static_cast<double>(valueOf("f.cutoff")),
-                                std::clamp(static_cast<double>(valueOf("f.resonance")), 0.0, 1.0), hz);
-        return 20.0 * std::log10(std::max(1.0e-9, std::abs(response)));
-    }
-    if (indexOf("f1.type") >= 0) {
-        // Two filters, in series or side by side, blended.
-        const auto stage = [this, hz](const char* type, const char* cutoff, const char* resonance) {
-            return colosseStage(static_cast<int>(std::lround(valueOf(type))), static_cast<double>(valueOf(cutoff)),
-                                std::clamp(static_cast<double>(valueOf(resonance)), 0.0, 1.0), hz);
-        };
-        const auto one = stage("f1.type", "f1.cutoff", "f1.resonance");
-        const auto two = stage("f2.type", "f2.cutoff", "f2.resonance");
-        const auto parallel = valueOf("filter.routing") >= 0.5f;
-        if (indexOf("filter.blend") >= 0) {
-            // The second dosed by its blend.
-            const auto blend = std::clamp(static_cast<double>(valueOf("filter.blend")), 0.0, 1.0);
-            response = parallel ? one + (two - one) * blend : one + (one * two - one) * blend;
-        } else {
-            // Side by side, each as much as the engines send it; in series, both.
-            const auto levelA = static_cast<double>(valueOf("a.level"));
-            const auto levelB = static_cast<double>(valueOf("b.level"));
-            const auto sent = (levelA * valueOf("a.send") + levelB * valueOf("b.send")) / std::max(1.0e-6, levelA + levelB);
-            response = parallel ? one + (two - one) * sent : one * two;
-        }
-        return 20.0 * std::log10(std::max(1.0e-9, std::abs(response)));
-    }
-    const auto cutoff = std::max(1.0, static_cast<double>(valueOf("filter.cutoff")));
-    const auto resonance = std::clamp(static_cast<double>(valueOf("filter.resonance")), 0.0, 1.0);
-    const auto model = indexOf("filter.model") >= 0 ? static_cast<int>(std::lround(valueOf("filter.model"))) : 2;
-    const auto mode = indexOf("filter.mode") >= 0 ? static_cast<int>(std::lround(valueOf("filter.mode"))) : 0;
-    const complex s(0.0, hz / cutoff);
-    if (model == 0 || model == 1) {
-        // Four poles in a loop: low-pass, the lows given back as it resonates.
-        const auto k = (model == 0 ? 4.2 : 4.6) * resonance;
-        const auto makeUp = 1.0 + (model == 0 ? 0.6 : 0.35) * k;
-        const auto pole = 1.0 + s;
-        response = makeUp / (pole * pole * pole * pole + k);
-    } else {
-        // Two poles, state-variable: low, band or high.
-        const auto damping = std::max(0.02, 2.0 - 2.0 * resonance * 0.99);
-        const auto denominator = s * s + damping * s + 1.0;
-        response = mode == 1 ? s / denominator : mode == 2 ? s * s / denominator : 1.0 / denominator;
-    }
-    if (const auto hp = indexOf("hpf") >= 0 ? static_cast<double>(valueOf("hpf")) : 0.0; hp > 20.5) {
-        const complex h(0.0, hz / hp);
-        response *= h / (1.0 + h);
-    }
-    return 20.0 * std::log10(std::max(1.0e-9, std::abs(response)));
+    return instrument_ui::filterResponse(card_.model,card_.values,hz);
 }
 
 void SynthView::drawFilter(ImDrawList* list, const char* key, const char* second, const ImVec2 origin, const ImVec2 size,

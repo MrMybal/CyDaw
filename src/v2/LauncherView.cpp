@@ -34,6 +34,8 @@ LauncherView::LauncherView(Studio& studio, UiState& state) : studio_(studio), st
 
 void LauncherView::draw()
 {
+    drawnFrame_ = ImGui::GetFrameCount();
+    dropSlots_.clear();
     const auto& p = theme::palette();
     auto& engine = studio_.engine();
     const auto tracks = studio_.tracks();
@@ -181,6 +183,8 @@ void LauncherView::draw()
     const auto origin = ImGui::GetCursorScreenPos();
     const auto viewTop = origin.y + slotsTop;
     const auto viewBottom = viewTop + viewport;
+    dropMin_ = ImVec2(ImGui::GetWindowPos().x, viewTop);
+    dropMax_ = ImVec2(dropMin_.x + gridWidth, viewBottom);
     if (tracks.empty())
         ui::emptyState(L("Aucune piste", "No tracks"), L("Les clips du lanceur appartiennent aux pistes.", "Launcher clips belong to tracks."));
 
@@ -274,6 +278,12 @@ void LauncherView::draw()
             ImGui::PushID(static_cast<int>(column) * 1'024 + scene);
             ImGui::SetCursorScreenPos(min);
             ImGui::InvisibleButton("##cell", ImVec2(cellWidth, cellHeight), ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
+            dropSlots_.push_back({slot, min, max});
+            if (ImGui::BeginDragDropTarget()) {
+                if (const auto* payload = ImGui::AcceptDragDropPayload(kFilePayload); payload && payload->DataSize > 1)
+                    dropFiles(juce::StringArray(juce::String::fromUTF8(static_cast<const char*>(payload->Data))), io.MousePos);
+                ImGui::EndDragDropTarget();
+            }
             const auto hovered = ImGui::IsItemHovered();
             const auto overPlay = hovered && inPlay(io.MousePos);
             const auto overStop = hovered && inStop(io.MousePos);
@@ -365,6 +375,14 @@ void LauncherView::draw()
         }
     }
     ImGui::PopClipRect();
+    const auto blankX = origin.x + static_cast<float>(tracks.size()) * (cellWidth + gap);
+    if (blankX < dropMax_.x && ImGui::BeginDragDropTargetCustom(
+            ImRect(ImVec2(std::max(blankX, dropMin_.x), viewTop), dropMax_), ImGui::GetID("##newSamplerDrop"))) {
+        if (const auto* payload = ImGui::AcceptDragDropPayload(kFilePayload); payload && payload->DataSize > 1)
+            dropFiles(juce::StringArray(juce::String::fromUTF8(static_cast<const char*>(payload->Data))), io.MousePos);
+        ImGui::EndDragDropTarget();
+    }
+
 
     // Under the slots: each track's stop, its clips stopped.
     for (std::size_t column = 0; column < tracks.size(); ++column) {
@@ -489,6 +507,51 @@ void LauncherView::draw()
         mixer_strip::master(studio_, state_, masterWidth, stripHeight);
     }
     ImGui::EndChild();
+}
+
+bool LauncherView::dropFiles(const juce::StringArray& files, const ImVec2 point)
+{
+    if (state_.mode != AppMode::studio || ImGui::GetFrameCount() - drawnFrame_ > 1) return false;
+    if (point.x < dropMin_.x || point.x >= dropMax_.x || point.y < dropMin_.y || point.y >= dropMax_.y)
+        return false;
+    std::optional<SlotRef> target;
+    for (const auto& cell : dropSlots_)
+        if (point.x >= cell.min.x && point.x < cell.max.x && point.y >= cell.min.y && point.y < cell.max.y) {
+            target = cell.slot;
+            break;
+        }
+    bool added = false;
+    for (const auto& path : files) {
+        const juce::File file(path);
+        if (!file.existsAsFile() || !file.hasFileExtension("wav;aif;aiff;flac;ogg;mp3;wv"))
+            continue;
+        if (target && !target->track.midi) {
+            auto& engine = studio_.engine();
+            juce::AudioFormatManager formats;
+            formats.registerBasicFormats();
+            std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
+            if (!reader || reader->sampleRate <= 0) continue;
+            if (engine.setLauncherClip(target->track.audioIndex, target->scene, file.getFileNameWithoutExtension(), 0,
+                    reader->lengthInSamples / reader->sampleRate, true, studio_.trackColour(target->track), file)) {
+                state_.selectTrack(target->track);
+                state_.selectedSlots = {*target};
+                ++target->scene;
+                added = true;
+            }
+        } else {
+            juce::String error;
+            if (const auto track = studio_.newSamplerTrack({file}, error)) {
+                state_.selectTrack(*track);
+                added = true;
+            } else {
+                state_.status = error;
+                state_.statusIsError = true;
+                state_.statusTime = ImGui::GetTime();
+            }
+        }
+    }
+    if (added) studio_.markDirty();
+    return added;
 }
 
 void LauncherView::masterSlot(const int scene, const ImVec2 min, const ImVec2 max)

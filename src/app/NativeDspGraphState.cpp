@@ -215,6 +215,9 @@ juce::var serialiseNativeDspGraphState(
         modulations.add(juce::var(value.get()));
     }
     root->setProperty("modulations", std::move(modulations));
+    juce::Array<juce::var> bypasses;
+    for(const auto& b:graph.bypasses){auto* v=new juce::DynamicObject();v->setProperty("node",static_cast<juce::int64>(b.node));v->setProperty("from",static_cast<juce::int64>(b.from));bypasses.add(juce::var(v));}
+    root->setProperty("bypasses",bypasses);
     return juce::var(root.get());
 }
 
@@ -324,6 +327,12 @@ std::optional<cydaw::engine::NativeDspGraph> restoreNativeDspGraphState(
                 restored.maximum = static_cast<float>(static_cast<double>(value->getProperty("maximum")));
             }
         }
+    if(const auto* bypasses=root->getProperty("bypasses").getArray())for(const auto& b:*bypasses){
+        const auto node=static_cast<std::uint64_t>(static_cast<juce::int64>(b.getProperty("node",0)));
+        const auto from=static_cast<std::uint64_t>(static_cast<juce::int64>(b.getProperty("from",0)));
+        if(!nodeIds.contains(node)||(from&&!nodeIds.contains(from))){error="Invalid bypass route";return {};}
+        graph.bypasses.push_back({node,from});
+    }
     if (!nodeIds.contains(graph.outputNodeId)) {
         error = "Native Graph state has no valid output";
         return {};

@@ -537,6 +537,34 @@ unsigned long long ImGuiHost::texture(const juce::String& key, const juce::Image
     return reinterpret_cast<unsigned long long>(view);
 }
 
+// Reuse one GPU resource for a video stream instead of caching every frame.
+unsigned long long ImGuiHost::updateTexture(const juce::String& key,const juce::Image& image)
+{
+    if(!native_||!image.isValid())return 0;
+    auto& n=*native_;
+    const auto found=n.textures.find(key);
+    if(found==n.textures.end())return texture(key,image);
+    ID3D11Resource* resource{};found->second->GetResource(&resource);
+    if(!resource)return 0;
+    D3D11_TEXTURE2D_DESC desc{};static_cast<ID3D11Texture2D*>(resource)->GetDesc(&desc);
+    if(desc.Width!=static_cast<UINT>(image.getWidth())||desc.Height!=static_cast<UINT>(image.getHeight())){
+        resource->Release();releaseTexture(key);return texture(key,image);
+    }
+    juce::Image::BitmapData bitmap(image,juce::Image::BitmapData::readOnly);
+    std::vector<std::uint8_t> pixels(static_cast<std::size_t>(image.getWidth())*image.getHeight()*4);
+    for(int y=0;y<image.getHeight();++y)for(int x=0;x<image.getWidth();++x){
+        const auto colour=bitmap.getPixelColour(x,y);const auto i=(static_cast<std::size_t>(y)*image.getWidth()+x)*4;
+        pixels[i]=colour.getRed();pixels[i+1]=colour.getGreen();pixels[i+2]=colour.getBlue();pixels[i+3]=255;
+    }
+    n.context->UpdateSubresource(resource,0,nullptr,pixels.data(),static_cast<UINT>(image.getWidth()*4),0);
+    resource->Release();return reinterpret_cast<unsigned long long>(found->second);
+}
+void ImGuiHost::releaseTexture(const juce::String& key)
+{
+    if(!native_)return;
+    if(auto it=native_->textures.find(key);it!=native_->textures.end()){it->second->Release();native_->textures.erase(it);}
+}
+
 void ImGuiHost::renderNow()
 {
     if (native_->backendsReady)
@@ -661,6 +689,8 @@ void ImGuiHost::captureNextFrame(const juce::File&, std::function<void(bool)> do
 void ImGuiHost::vblank(double) {}
 void ImGuiHost::renderNow() {}
 unsigned long long ImGuiHost::texture(const juce::String&, const juce::Image&) { return 0; }
+unsigned long long ImGuiHost::updateTexture(const juce::String&, const juce::Image&) { return 0; }
+void ImGuiHost::releaseTexture(const juce::String&) {}
 void ImGuiHost::frame() {}
 
 #endif

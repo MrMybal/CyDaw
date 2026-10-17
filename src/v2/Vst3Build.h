@@ -4,26 +4,24 @@
 
 #include <atomic>
 #include <mutex>
+#include <vector>
 
-// A VST3 built from a device, in the background.
-//
-// The device's project (what NodeGraphComponent::generateVst3Project writes)
-// is copied into one working folder and built there with CMake and Visual
-// Studio, which compile CyDAW's graph runtime around it: the first build
-// takes minutes, the next ones reuse what did not change. The .vst3 bundle
-// lands beside the project the person keeps. Nothing runs until they ask.
+// Native plugin builds run sequentially in the background. Each platform/format
+// has its own compiler cache; generated projects and delivered bundles remain
+// in the requested export folder. The historical class name is retained for
+// existing API callers.
 
 namespace cydaw::v2 {
 
 class Vst3Build final : private juce::Thread {
 public:
     // What a build needs: CMake (Visual Studio's own will do), CyDAW's
-    // sources, and JUCE's when they are already on disk (else CMake
-    // downloads them).
+    // sources, and the MIT VST3 SDK (fetched when absent).
     struct Tools {
         juce::File cmake;
         juce::File sourceRoot;
-        juce::File juceSource;
+        juce::File vst3Sdk;
+        juce::File ninja, python, linuxToolchain;
         [[nodiscard]] bool ready() const { return cmake.existsAsFile() && sourceRoot.isDirectory(); }
     };
     [[nodiscard]] static Tools findTools(const juce::File& sourceRootHint = {});
@@ -38,7 +36,18 @@ public:
 
     // `project` is the generated folder; the bundle is copied into
     // `destination`. False while a build runs.
-    bool start(const juce::File& project, const juce::File& destination, const juce::String& productName, const Tools& tools);
+    bool start(const juce::File& project, const juce::File& destination, const juce::String& productName, const Tools& tools, const juce::String& format = "VST3");
+    struct Job {
+        juce::File project, destination;
+        juce::String productName, format, platform {"Windows"};
+    };
+    struct JobResult {
+        juce::String format, platform;
+        juce::File file;
+        juce::String error;
+    };
+    bool startBatch(const std::vector<Job>& jobs, const Tools& tools);
+    [[nodiscard]] std::vector<JobResult> results() const;
     void cancel();
 
     [[nodiscard]] Phase phase() const noexcept { return phase_.load(); }
@@ -54,6 +63,7 @@ public:
 
 private:
     void run() override;
+    bool runJob(const Job& job);
     bool runStep(const juce::StringArray& command);
     void addLine(const juce::String& line);
     void finish(Phase phase, const juce::String& failure = {});
@@ -61,10 +71,9 @@ private:
     std::atomic<Phase> phase_ { Phase::idle };
     mutable std::mutex mutex_;
     juce::StringArray log_;
-    juce::File project_;
-    juce::File destination_;
-    juce::String productName_;
     Tools tools_;
+    std::vector<Job> jobs_;
+    std::vector<JobResult> results_;
     juce::File bundle_;
     juce::String failure_;
     double started_ {};

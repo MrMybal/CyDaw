@@ -1,0 +1,26 @@
+{
+  "Fugees - Exemple Mix DJ.wav": {
+    "seconds": 137.25,
+    "peakDbFS": -1.7999994529225174,
+    "rmsDbFS": -21.188617706298828,
+    "allFinite": true,
+    "noClipping": true
+  },
+  "Atelier des machines - Mixage.wav": {
+    "seconds": 45.39997916666667,
+    "peakDbFS": -2.1574671129043703,
+    "rmsDbFS": -26.15245819091797,
+    "allFinite": true,
+    "noClipping": true
+  },
+  "nativeChecks": {
+    "djFourDecksAt92": true,
+    "foundryTracks": 8,
+    "foundryClips": 27,
+    "foundryRegions": 5,
+    "foundryReopened": true,
+    "masterGainRestored": true,
+    "oneMasterLimiter": true,
+    "sourceOriginalsUnmodified": true
+  }
+}

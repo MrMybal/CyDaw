@@ -1,3 +1,4 @@
+#include "PluginFiles.h"
 // The control port's commands for CyDAW 2, one function per verb, on the
 // message thread. A port of CyDAW 1's WorkspaceComponentRemote.cpp: the same
 // verbs, parameters, answers and messages, so tools/mcp/cydaw_mcp_server.py
@@ -6,6 +7,8 @@
 // published to the engine after every edit; what the interface shows goes
 // through RemoteUi.
 #include "RemoteCommands.h"
+#include "CustomInterface.h"
+#include "InterfaceEditor.h"
 #include "Presets.h"
 #include "NativeDspGraphState.h"
 #include "SamplerMapFile.h"
@@ -1589,6 +1592,21 @@ juce::var Commands::run()
         return onVoiceLive();
     if (command == "slot_stop")
         return onSlotStop();
+    if (command == "jsfx" || command == "dj" || command == "foundry" || command == "cinema" || command == "transport_sync") {
+        // Their own actions ({"action": ...}); app_mode shows them.
+        const auto answer = command == "jsfx" ? ui_.jsfx(request_) : command == "cinema" ? ui_.cinema(request_) : command == "transport_sync" ? ui_.transportSync(request_) : command == "dj" ? ui_.dj(request_) : ui_.foundry(request_);
+        if (!answer.isObject())
+            return fail(answer.isString() ? answer.toString() : juce::String("no interface"));
+        return ok(answer);
+    }
+    if (command == "app_mode") {
+        const auto mode = ui_.appMode(text("mode").trim().toLowerCase());
+        if (mode.isEmpty())
+            return fail("mode: studio, dj, foundry, cinema or workshop");
+        auto result = object();
+        set(result, "mode", mode);
+        return ok(result);
+    }
     if (command == "theme") {
         const auto answer = ui_.themes(request_);
         if (!answer.isObject())
@@ -1624,6 +1642,7 @@ juce::var Commands::run()
     if (command == "list_plugins")
         return onListPlugins();
     if (command == "add_plugin" || command == "remove_plugin" || command == "move_plugin"
+        || command == "list_plugin_programs" || command == "select_plugin_program"
         || command == "list_plugin_parameters" || command == "set_plugin_parameter" || command == "show_plugin_editor")
         return onPlugins();
     if (command == "set_audio_clip" || command == "stretch_audio_clip" || command == "split_audio_clip"
@@ -3997,6 +4016,68 @@ juce::var Commands::onWorkshop()
     if (root == nullptr)
         return fail("the workshop has no device");
     auto& graph = root->graph();
+    if(action=="runtime_state") {
+        const auto state=graph.createVst3RuntimeState();
+        if(state.isVoid()) {
+            const auto runtime=graph.runtimeGraphExport();
+            return fail(runtime.compilationResult.failed()?runtime.compilationResult.getErrorMessage():juce::String("Graph is not ready for native export"));
+        }
+        return ok(state);
+    }
+    if(action=="instrument_interface") {
+        UiState state;InterfaceEditor editor(studio_,state);
+        editor.setDeviceLayout(flag("compact",false));
+        if(has("type")) {
+            if(!editor.addInstrumentSection(*root,text("type"),text("panel")))return fail(editor.lastError().isNotEmpty()?editor.lastError():juce::String("unknown native instrument section"));
+            return ok(app::serialiseModuleInterface(graph.editorInterface()));
+        }
+        if(!editor.addInstrumentInterface(*root,static_cast<std::uint64_t>(number("nodeId",0)),!has("panel"),text("panel")))
+            return fail(editor.lastError().isNotEmpty()?editor.lastError():juce::String("no native instrument layout for this node or panel"));
+        return ok(app::serialiseModuleInterface(graph.editorInterface()));
+    }
+    if(action=="presentation") {
+        if(has("state")) {
+            const auto document=request_.getProperty("state",{});
+            if(const auto checked=app::validateModuleInterfaceDocument(document,graph.editorInterface());checked.failed())return fail(checked.getErrorMessage());
+            const auto candidate=app::restoreModuleInterface(document);
+            if(const auto result=graph.editorSetInterface(candidate,true);result.failed())return fail(result.getErrorMessage());
+            root->touch();
+        }
+        return ok(app::serialiseModuleInterface(graph.editorInterface()));
+    }
+    if(action=="port_exposure") {
+        const auto id=static_cast<std::uint64_t>(number("nodeId",0));
+        const auto port=static_cast<std::uint64_t>(number("portId",0));
+        if(!graph.editorSetPortExposure(id,port,flag("exposed",true)))return fail("unknown node or port");
+        if(has("name")||has("category")) {
+            for(const auto& n:graph.editorNodes())if(n.id==id)for(const auto& p:n.ports)if(p.id==port)
+                graph.editorSetPortDetails(id,port,has("name")?text("name"):p.name,has("category")?text("category"):p.category);
+        }
+        return ok(graph.serialise());
+    }
+    if(action=="promote_value") {
+        std::uint64_t created{};
+        const auto mode=has("mode")?text("mode"):juce::String("input");
+        if(mode!="input" && mode!="variable") return fail("mode must be input or variable");
+        const auto result=graph.editorPromoteValue(static_cast<std::uint64_t>(number("nodeId",0)),
+            static_cast<std::uint64_t>(number("portId",0)),text("binding"),mode=="input",created);
+        if(result.failed())return fail(result.getErrorMessage());
+        auto answer=object();set(answer,"nodeId",static_cast<juce::int64>(created));set(answer,"state",graph.serialise());
+        return ok(answer);
+    }
+    if(action=="remove_boundary") {
+        if(!graph.editorRemoveBoundary(static_cast<std::uint64_t>(number("nodeId",0))))return fail("unknown boundary");
+        return ok(workshopStatus());
+    }
+    if(action=="component") {
+        const auto source=has("source")?text("source"):CustomInterface::example();
+        if(flag("build",false))CustomInterface::build(source);
+        const auto job=CustomInterface::job(source);auto result=object();
+        set(result,"source",source);set(result,"status",job->status.load());set(result,"log",CustomInterface::diagnostics(job));
+        set(result,"library",job->file.getFullPathName());
+        if(job->status.load()==2)set(result,"loadable",CustomInterface::renderer(source)!=nullptr);
+        return ok(result);
+    }
     if (action == "info") {
         auto info = graph.editorGraphInfo();
         if (has("name"))
@@ -4026,39 +4107,45 @@ juce::var Commands::onWorkshop()
     // keeps the settings as they are (a name there is replaced); runtime:
     // the programs as the exported plug-in gets them.
     if (action == "programs") {
-        auto programs = graph.editorPrograms();
+        auto* presetSlot = studio_.workshopGraph();
+        if (presetSlot == nullptr)
+            return fail("no graph open");
+        auto& presetGraph = presetSlot->graph();
+        auto programs = presetGraph.editorPrograms();
         const auto op = text("op").isNotEmpty() ? text("op") : juce::String("list");
         const auto name = text("name").trim();
         const auto found = std::find_if(programs.begin(), programs.end(), [&name](const auto& program) { return program.name == name; });
         if (op == "add") {
             if (name.isEmpty())
                 return fail("a program needs a name");
-            auto captured = graph.editorCaptureProgram(name);
+            auto captured = presetGraph.editorCaptureProgram(name, flag("defaults", false));
             if (found != programs.end())
                 *found = std::move(captured);
             else
                 programs.push_back(std::move(captured));
-            graph.editorSetPrograms(programs);
+            presetGraph.editorSetPrograms(programs);
         } else if (op == "load" || op == "remove" || op == "rename") {
             if (found == programs.end())
                 return fail("no program \"" + name + "\"");
             if (op == "load") {
-                (void) graph.editorApplyProgram(*found);
+                (void) presetGraph.editorApplyProgram(*found);
             } else if (op == "remove") {
                 programs.erase(found);
-                graph.editorSetPrograms(programs);
+                presetGraph.editorSetPrograms(programs);
             } else {
                 if (text("newName").trim().isEmpty())
                     return fail("newName is empty");
+                if (std::any_of(programs.begin(), programs.end(), [&](const auto& other) { return &other != &*found && other.name == text("newName").trim(); }))
+                    return fail("a program already has this name");
                 found->name = text("newName").trim();
-                graph.editorSetPrograms(programs);
+                presetGraph.editorSetPrograms(programs);
             }
         } else if (op != "list") {
             return fail("unknown op \"" + op + "\"");
         }
         auto result = object();
         juce::Array<juce::var> list;
-        for (const auto& program : graph.editorPrograms()) {
+        for (const auto& program : presetGraph.editorPrograms()) {
             auto entry = object();
             set(entry, "name", program.name);
             auto values = object();
@@ -4070,7 +4157,19 @@ juce::var Commands::onWorkshop()
         }
         set(result, "programs", list);
         if (flag("runtime", false))
-            set(result, "runtime", graph.createVst3RuntimeState().getProperty("programs", {}));
+            set(result, "runtime", presetGraph.createVst3RuntimeState().getProperty("programs", {}));
+        return ok(result);
+    }
+    if (action == "device_export") {
+        if (!has("file") || text("file").trim().isEmpty())
+            return fail("device_export needs file (.cydawdevice)");
+        const auto file = fileFor(text("file")).withFileExtension("cydawdevice");
+        juce::StringArray dependencies;
+        if (const auto saved = studio_.exportWorkshop(file, dependencies); saved.failed())
+            return fail(saved.getErrorMessage());
+        auto result = workshopStatus();
+        set(result, "written", file.getFullPathName());
+        set(result, "externalFiles", strings(dependencies));
         return ok(result);
     }
     if (action == "save") {
@@ -4081,7 +4180,38 @@ juce::var Commands::onWorkshop()
         set(result, "written", written.getFullPathName());
         return ok(result);
     }
-    if (action == "vst3_check" || action == "vst3_export") {
+    if (action == "plugin_export_batch") {
+        const auto* formats=request_.getProperty("formats",{}).getArray();
+        const auto* platforms=request_.getProperty("platforms",{}).getArray();
+        if(!formats||formats->isEmpty()||!platforms||platforms->isEmpty())return fail("formats and platforms must be non-empty arrays");
+        for(const auto& f:*formats)if(f!="VST3"&&f!="CLAP"&&f!="LV2")return fail("format is VST3, CLAP or LV2");
+        for(const auto& p:*platforms)if(p!="Windows"&&p!="Linux")return fail("platform is Windows or Linux; macOS is deferred");
+        auto identity=graph.pluginExportIdentity();
+        if(has("productName"))identity.productName=text("productName").toStdString();
+        if(has("companyName"))identity.companyName=text("companyName").toStdString();
+        if(has("manufacturerCode"))identity.manufacturerCode=text("manufacturerCode").toStdString();
+        if(has("pluginCode"))identity.pluginCode=text("pluginCode").toStdString();
+        graph.setPluginExportIdentity(identity);
+        if(!has("folder"))return fail("folder is required");
+        auto* builder=ui_.vst3Build();
+        if(!builder)return fail("this interface cannot build");
+        if(builder->running())return fail("a build is already running");
+        std::vector<Vst3Build::Job> jobs;
+        juce::Array<juce::var> targets;
+        for(const auto& p:*platforms)for(const auto& f:*formats) {
+            const auto destination=fileFor(text("folder")).getChildFile(p.toString()).getChildFile(f.toString());
+            const auto project=destination.getChildFile("projet");
+            if(const auto made=graph.generateVst3Project(project,f.toString());made.failed())return fail(made.getErrorMessage());
+            jobs.push_back({project,destination,juce::String(identity.productName),f.toString(),p.toString()});
+            auto target=object();set(target,"platform",p);set(target,"format",f);set(target,"project",project.getFullPathName());targets.add(target);
+        }
+        if(flag("build",false)) {
+            const auto tools=Vst3Build::findTools(has("sourceRoot")?fileFor(text("sourceRoot")):juce::File());
+            if(!builder->startBatch(jobs,tools))return fail("could not start batch; check CMake/sourceRoot");
+        }
+        auto result=object();set(result,"targets",targets);return ok(result);
+    }
+    if (action == "vst3_check" || action == "vst3_export" || action == "clap_export" || action == "lv2_export" || action == "plugin_export") {
         if (has("productName") || has("companyName") || has("manufacturerCode") || has("pluginCode")) {
             auto identity = graph.pluginExportIdentity();
             if (has("productName"))
@@ -4118,10 +4248,12 @@ juce::var Commands::onWorkshop()
                                           .getChildFile("CyDAW")
                                           .getChildFile("Plugin Exports")
                                           .getChildFile(juce::File::createLegalFileName(juce::String(identity.productName)));
+        const auto format = action == "clap_export" ? juce::String("CLAP") : action == "lv2_export" ? juce::String("LV2") : request_.getProperty("format", "VST3").toString().toUpperCase();
+        if (format != "VST3" && format != "CLAP" && format != "LV2") return fail("format is VST3, CLAP or LV2");
         const auto project = folder.getChildFile("projet");
         if (project.exists())
             (void) project.deleteRecursively();
-        if (const auto made = graph.generateVst3Project(project); made.failed())
+        if (const auto made = graph.generateVst3Project(project, format); made.failed())
             return fail(made.getErrorMessage());
         set(result, "project", project.getFullPathName());
         // Built with CMake in the background when asked: vst3_status follows it.
@@ -4132,7 +4264,7 @@ juce::var Commands::onWorkshop()
             const auto tools = Vst3Build::findTools(has("sourceRoot") ? fileFor(text("sourceRoot")) : juce::File());
             if (!tools.ready())
                 return fail("building needs CMake and CyDAW's sources (sourceRoot)");
-            if (!build->start(project, folder, juce::String(identity.productName), tools))
+            if (!build->start(project, folder, juce::String(identity.productName), tools, format))
                 return fail("a build is already running");
             set(result, "building", true);
         }
@@ -4150,11 +4282,17 @@ juce::var Commands::onWorkshop()
         set(result, "seconds", build->elapsedSeconds());
         if (build->bundle() != juce::File())
             set(result, "bundle", build->bundle().getFullPathName());
+        juce::Array<juce::var> targets;
+        for(const auto& target:build->results()) {
+            auto entry=object();set(entry,"platform",target.platform);set(entry,"format",target.format);
+            set(entry,"file",target.file.getFullPathName());set(entry,"error",target.error);targets.add(entry);
+        }
+        set(result,"targets",targets);
         if (build->failure().isNotEmpty())
             set(result, "failure", build->failure());
         const auto log = build->log();
         juce::StringArray tail;
-        for (auto index = std::max(0, log.size() - 25); index < log.size(); ++index)
+        for (auto index = std::max(0, log.size() - std::clamp(static_cast<int>(number("logLines",25)),1,400)); index < log.size(); ++index)
             tail.add(log[index]);
         set(result, "log", strings(tail));
         return ok(result);
@@ -5302,32 +5440,23 @@ juce::var Commands::onUndoRedo()
 
 juce::var Commands::onListPlugins()
 {
-    juce::Array<juce::File> folders;
-    if (has("folder"))
-        folders.add(fileFor(text("folder")));
-    folders.add(juce::File::getSpecialLocation(juce::File::commonApplicationDataDirectory)
-                    .getSiblingFile("Program Files")
-                    .getChildFile("Common Files")
-                    .getChildFile("VST3"));
-    folders.add(juce::File("C:/Program Files/Common Files/VST3"));
-    folders.add(juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
-                    .getChildFile("Programs")
-                    .getChildFile("Common")
-                    .getChildFile("VST3"));
+    auto folders=plugin_files::folders();
+    if(has("folder"))folders.add(fileFor(text("folder")));
     juce::Array<juce::var> entries;
     juce::StringArray seen;
     for (const auto& folder : folders) {
         if (!folder.isDirectory())
             continue;
         juce::Array<juce::File> found;
-        folder.findChildFiles(found, juce::File::findFilesAndDirectories, true, "*.vst3");
+        folder.findChildFiles(found, juce::File::findFilesAndDirectories, true, "*");
         for (const auto& plugin : found) {
-            if (seen.contains(plugin.getFullPathName()))
+            if (!plugin_files::candidate(plugin) || seen.contains(plugin.getFullPathName()))
                 continue;
             seen.add(plugin.getFullPathName());
             auto entry = object();
             set(entry, "name", plugin.getFileNameWithoutExtension());
             set(entry, "path", plugin.getFullPathName());
+            set(entry, "format", plugin_files::format(plugin));
             entries.add(entry);
         }
     }
@@ -5361,6 +5490,11 @@ juce::var Commands::onPlugins()
     const auto pluginIndex = static_cast<std::size_t>(number("plugin", 0.0));
     if (pluginIndex >= info.size())
         return fail("no plugin " + juce::String(static_cast<int>(pluginIndex)) + " on that track; status lists them");
+    if(command_=="list_plugin_programs"||command_=="select_plugin_program") {
+        if(command_=="select_plugin_program") {auto applied=engine_.setTrackPluginProgram(index,pluginIndex,int(number("program",0)));if(applied.failed())return fail(applied.getErrorMessage());studio_.markDirty();}
+        juce::StringArray names;int current{};auto listed=engine_.getTrackPluginPrograms(index,pluginIndex,names,current);if(listed.failed())return fail(listed.getErrorMessage());
+        auto result=object();juce::Array<juce::var> programs;for(const auto& name:names)programs.add(name);set(result,"programs",programs);set(result,"current",current);return ok(result);
+    }
     if (command_ == "remove_plugin") {
         studio_.removePlugin(track->ref(), pluginIndex);
         return ok(describeTracks());

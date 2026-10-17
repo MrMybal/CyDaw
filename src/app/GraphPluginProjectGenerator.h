@@ -13,6 +13,6 @@ namespace cydaw::app {
     const juce::File& destination,
     const cydaw::graph::PluginExportPlan& plan,
     const juce::var& manifest,
-    const juce::var& runtimeState);
+    const juce::var& runtimeState, const juce::String& format = "VST3");
 
 } // namespace cydaw::app

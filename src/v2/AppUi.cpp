@@ -1,3 +1,4 @@
+#include "JsfxView.h"
 #include "AppUi.h"
 
 #include "ArrangementView.h"
@@ -11,6 +12,11 @@
 #include "Vst3Build.h"
 #include "ContextMenus.h"
 #include "WorkshopView.h"
+#include "DjView.h"
+#include "FoundryView.h"
+#include "TransportSync.h"
+#include "../app/DjEngine.h"
+#include "../app/FoundryPlayer.h"
 #include "PluginWindows.h"
 #include "SamplerView.h"
 #include "PrismView.h"
@@ -34,6 +40,7 @@
 #include "SampleCatalog.h"
 #include "Theme.h"
 #include "Widgets.h"
+#include "BottomPanelControls.h"
 
 #include "ProjectImport.h"
 #include "CyDAWBranding.h"
@@ -48,6 +55,7 @@ namespace cydaw::v2 {
 
 using ui::dp;
 using ui::L;
+juce::var AppUi::jsfx(const juce::var& request){return jsfx_->command(request);}
 
 namespace {
 
@@ -108,6 +116,10 @@ AppUi::AppUi(Studio& studio, ImGuiHost& host)
     themes_ = std::make_unique<ThemesView>(studio_, state_);
     themes_->applySaved();
     state_.manyInstrumentWindows = studio_.settings().getBoolValue("manyInstrumentWindows", true);
+    inspectorVisible_ = studio_.settings().getBoolValue("inspectorPanelVisible", true);
+    browserVisible_ = studio_.settings().getBoolValue("browserPanelVisible", true);
+    for (int i = 0; i < 5; ++i)
+        state_.bottomPanelsVisible[i] = studio_.settings().getBoolValue("bottomPanelVisible" + juce::String(i), true);
     {
         // The displays' taps: the track's chain in the engine (or the simulator's).
         auto* session = &studio_;
@@ -186,7 +198,40 @@ AppUi::AppUi(Studio& studio, ImGuiHost& host)
     vst3Build_ = std::make_unique<Vst3Build>();
     contextMenus_ = std::make_unique<ContextMenus>(studio_, state_);
     workshop_ = std::make_unique<WorkshopView>(studio_, state_, host_, *signals_, *vst3Build_);
+    dj_ = std::make_unique<DjView>(studio_, state_, host_);
+    foundry_ = std::make_unique<FoundryView>(studio_, state_, host_);
+    cinema_ = std::make_unique<FoundryView>(studio_, state_, host_, true);
+    transportSync_ = std::make_unique<TransportSync>(studio_.settings(),studio_.engine().deviceManager(),studio_.keepsSettings(),
+        [this](int target) {
+            TransportSync::State s;
+            auto& e=studio_.engine();
+            if(target==0){s.playing=e.isPlaying();s.seconds=e.position();s.bpm=e.tempo();
+                s.numerator=e.timeSignatureNumerator();s.denominator=e.timeSignatureDenominator();s.available=!e.isMasterExporting();}
+            else if(target==1)s=foundry_->transportState();
+            else if(target==6)s=cinema_->transportState();
+            else {const auto d=e.dj().deck(target-2);s.playing=d.playing;s.bpm=d.playedBpm>0?d.playedBpm:(d.bpm>0?d.bpm:120);
+                s.seconds=std::max(0.0,(d.position-d.firstBeat)*d.bpm/s.bpm);s.available=d.state==app::DjEngine::LoadState::ready;}
+            return s;
+        },[this](int target,const TransportSync::Update& u) {
+            auto& e=studio_.engine();
+            if(target==0){if(e.isMasterExporting())return;
+                if(u.tempo){e.setTempo(u.state.bpm);
+                    if(e.timeSignatureNumerator()!=u.state.numerator||e.timeSignatureDenominator()!=u.state.denominator)
+                        e.setTimeSignature(u.state.numerator,u.state.denominator);}
+                if(u.position)e.setPosition(u.state.seconds);
+                if(u.play){if(u.state.playing)studio_.play();else {if(studio_.isRecording())(void)studio_.stopRecording(true);studio_.stopPlayback();}}}
+            else if(target==1)foundry_->applyTransport(u);
+            else if(target==6)cinema_->applyTransport(u);
+            else {const int index=target-2;const auto d=e.dj().deck(index);
+                if(d.state!=app::DjEngine::LoadState::ready)return;
+                if(u.tempo&&d.bpm>0){e.dj().setSync(index,false);e.dj().setTempo(index,u.state.bpm/d.bpm);}
+                if(u.position)e.dj().seek(index,d.firstBeat+u.state.seconds*(u.tempo?u.state.bpm:(d.playedBpm>0?d.playedBpm:d.bpm))/std::max(20.0,d.bpm));
+                if(u.play)e.dj().setPlaying(index,u.state.playing);
+            }
+            host_.wake();
+        });
     pluginWindows_ = std::make_unique<PluginWindows>(studio_, state_);
+    jsfx_ = std::make_unique<JsfxView>(studio_, state_);
     clipEditor_ = std::make_unique<ClipEditorView>(studio_, state_, waveforms_, host_);
     catalog_ = std::make_unique<SampleCatalog>(studio_.samples());
     browser_ = std::make_unique<BrowserView>(studio_, state_, host_, *catalog_);
@@ -197,6 +242,13 @@ AppUi::AppUi(Studio& studio, ImGuiHost& host)
 
 AppUi::~AppUi()
 {
+    transportSync_.reset();
+    if (studio_.keepsSettings()) {
+        for (int i = 0; i < 5; ++i)
+            studio_.settings().setValue("bottomPanelVisible" + juce::String(i), state_.bottomPanelsVisible[i]);
+        studio_.settings().setValue("inspectorPanelVisible", inspectorVisible_);
+        studio_.settings().setValue("browserPanelVisible", browserVisible_);
+    }
     // The layout as it is when the window closes.
     if (layoutSaving_ && ImGui::GetCurrentContext() != nullptr) {
         size_t size = 0;
@@ -709,7 +761,7 @@ void AppUi::saveLayoutIfNeeded()
 void AppUi::newProject()
 {
     studio_.newProject();
-    state_ = UiState {};
+    resetUiState();
     waveforms_.clear();
     notify(ui::Ls("Nouveau projet", "New project"));
 }
@@ -745,7 +797,7 @@ void AppUi::continueOpening()
         }
         // An import: its summary, what it could not bring.
         const auto file = std::exchange(opening_, juce::File {});
-        state_ = UiState {};
+        resetUiState();
         waveforms_.clear();
         if (result->failed()) {
             notify(result->getErrorMessage(), true);
@@ -776,7 +828,7 @@ void AppUi::projectOpened(const juce::File& file, const juce::Result& result)
 {
     opening_ = juce::File {};
     const auto selectedBefore = state_.pixelsPerSecond;
-    state_ = UiState {};
+    resetUiState();
     state_.pixelsPerSecond = selectedBefore;
     waveforms_.clear();
     if (result.failed()) {
@@ -902,6 +954,12 @@ void AppUi::chooseImportMidi()
 
 void AppUi::filesDropped(const juce::StringArray& files, const float x, const float y)
 {
+    if (state_.mode == AppMode::dj && dj_->dropFiles(files))
+        return;
+    if (state_.mode == AppMode::cinema && cinema_->dropFiles(files, x, y))
+        return;
+    if (state_.mode == AppMode::foundry && foundry_->dropFiles(files, x, y))
+        return;
     // Onto a sampler: its zones. A project opens; a sound model, an SFZ
     // become instruments; audio lands where it is dropped.
     if (const auto& drop = state_.samplerDrop; drop && x >= drop->x0 && x < drop->x1 && y >= drop->y0 && y < drop->y1) {
@@ -910,6 +968,7 @@ void AppUi::filesDropped(const juce::StringArray& files, const float x, const fl
     }
     for (const auto& path : files) {
         const juce::File file(path);
+        if (file.hasFileExtension("jsfx")) {state_.jsfxFileToOpen=file;state_.showJsfx=true;return;}
         if (file.hasFileExtension(".cysound")) {
             loadSoundModelFile(file);
             return;
@@ -934,6 +993,8 @@ void AppUi::filesDropped(const juce::StringArray& files, const float x, const fl
                 return;
             }
     }
+    if (launcher_->dropFiles(files, ImVec2(x, y)))
+        return;
     if (!arrangement_->dropFiles(files, ImVec2(x, y)))
         if (const auto track = studio_.addAudioTrack(juce::File(files[0])))
             state_.selectedTrack = track;
@@ -957,8 +1018,14 @@ void AppUi::toggleRecording()
 
 void AppUi::undo()
 {
+    if(state_.mode==AppMode::cinema){if(!cinema_->undoProcessing())cinema_->undo();return;}
     auto& engine = studio_.engine();
-    if (state_.focused == Panel::workshop || state_.workshopMode) {
+    if (state_.mode == AppMode::foundry) {
+        if(!foundry_->undoProcessing())(void) foundry_->undo();
+        return;
+    }
+    if (state_.mode == AppMode::dj) { (void)dj_->undo();return; }
+    if (state_.focused == Panel::workshop || state_.inWorkshop()) {
         if (auto* slot = studio_.workshopGraph())
             (void) slot->graph().editorUndo();
         return;
@@ -982,8 +1049,14 @@ void AppUi::undo()
 
 void AppUi::redo()
 {
+    if(state_.mode==AppMode::cinema){if(!cinema_->undoProcessing(true))cinema_->redo();return;}
     auto& engine = studio_.engine();
-    if (state_.focused == Panel::workshop || state_.workshopMode) {
+    if (state_.mode == AppMode::foundry) {
+        if(!foundry_->undoProcessing(true))(void) foundry_->redo();
+        return;
+    }
+    if (state_.mode == AppMode::dj) { (void)dj_->undo(true);return; }
+    if (state_.focused == Panel::workshop || state_.inWorkshop()) {
         if (auto* slot = studio_.workshopGraph())
             (void) slot->graph().editorRedo();
         return;
@@ -1054,7 +1127,7 @@ void AppUi::frame()
     // The computer's keys play the picked instrument track, before the
     // shortcuts can take them; not where letters are shortcuts of their own
     // (the graph, the workshop).
-    computerKeyboard_->update(state_.selectedTrack && state_.selectedTrack->midi && !state_.workshopMode
+    computerKeyboard_->update(state_.selectedTrack && state_.selectedTrack->midi && state_.mode == AppMode::studio
                               && state_.focused != Panel::graph);
     // A MIDI keyboard plugged in for the first time plays at once, as in
     // Bitwig; one switched off in the MIDI inputs stays off.
@@ -1076,6 +1149,7 @@ void AppUi::frame()
             studio_.saveAudioSetup();
         }
     }
+    cinema_->tickCinemaVideo();
     handleShortcuts();
     drawMenuBar();
     drawTransportBar();
@@ -1086,15 +1160,20 @@ void AppUi::frame()
     drawStatusBar();
     drawDockSpace();
     drawWindows();
+    if (state_.mode != AppMode::dj)
+        dj_->tickPersistence();
     pluginWindows_->draw();
+    jsfx_->draw();
+    JsfxView::drawQuitPrompts();
     contextMenus_->draw();
     drawDialogs();
 
     if (showDemo_)
         ImGui::ShowDemoWindow(&showDemo_);
     // The workshop's device plays in the simulator while the workshop shows it.
-    studio_.setSimulatorActive(state_.workshopMode && studio_.workshopRoot() != nullptr);
-    host_.setAnimating(studio_.engine().isPlaying() || studio_.engine().isSamplePreviewing() || studio_.simulating());
+    studio_.setSimulatorActive(state_.inWorkshop() && studio_.workshopRoot() != nullptr);
+    host_.setAnimating(studio_.engine().isPlaying() || studio_.engine().isSamplePreviewing() || studio_.simulating()
+                       || studio_.engine().dj().anyPlaying() || studio_.engine().foundryPlayer().playing() || studio_.engine().cinemaPlayer().playing());
     saveLayoutIfNeeded();
 }
 
@@ -1173,14 +1252,66 @@ void AppUi::drawOpening()
 
 void AppUi::resolveMode()
 {
-    // Asked for (a panel's request, the port), the workshop takes the whole
-    // window; a studio panel asked for gives it back.
-    if (state_.bringToFront == Panel::workshop) {
-        state_.workshopMode = true;
+    // Asked for (a panel's request, the port), the workshop, the DJ mix or
+    // the Foundry takes the whole window; a studio panel asked for gives it
+    // back.
+    if (state_.bringToFront == Panel::workshop || state_.bringToFront == Panel::dj || state_.bringToFront == Panel::foundry || state_.bringToFront == Panel::cinema) {
+        state_.mode = state_.bringToFront == Panel::workshop ? AppMode::workshop
+                      : state_.bringToFront == Panel::dj     ? AppMode::dj
+                      : state_.bringToFront == Panel::cinema ? AppMode::cinema
+                                                             : AppMode::foundry;
         state_.bringToFront = Panel::none;
-    } else if (state_.workshopMode && state_.bringToFront != Panel::none) {
-        state_.workshopMode = false;
+    } else if (state_.mode != AppMode::studio && state_.bringToFront != Panel::none) {
+        state_.mode = AppMode::studio;
     }
+}
+
+juce::var AppUi::transportSync(const juce::var& request)
+{
+    if(static_cast<bool>(request.getProperty("show",false)))showTransportSync_=true;
+    return transportSync_->command(request);
+}
+
+juce::var AppUi::dj(const juce::var& request)
+{
+    if (static_cast<bool>(request.getProperty("show", false)))
+        state_.mode = AppMode::dj;
+    return dj_->command(request);
+}
+
+juce::var AppUi::foundry(const juce::var& request)
+{
+    if (static_cast<bool>(request.getProperty("show", false)))
+        state_.mode = AppMode::foundry;
+    return foundry_->command(request);
+}
+
+juce::var AppUi::cinema(const juce::var& request)
+{
+    if(static_cast<bool>(request.getProperty("show",false)))state_.mode=AppMode::cinema;
+    return cinema_->command(request);
+}
+
+juce::String AppUi::appMode(const juce::String& mode)
+{
+    static constexpr std::pair<const char*, AppMode> modes[] { { "studio", AppMode::studio },
+                                                                { "dj", AppMode::dj },
+                                                                { "foundry", AppMode::foundry },
+                                                                { "workshop", AppMode::workshop }, { "cinema", AppMode::cinema } };
+    if (mode.isNotEmpty()) {
+        auto found = false;
+        for (const auto& [name, value] : modes)
+            if (mode == name) {
+                state_.mode = value;
+                found = true;
+            }
+        if (!found)
+            return {};
+    }
+    for (const auto& [name, value] : modes)
+        if (value == state_.mode)
+            return name;
+    return "studio";
 }
 
 void AppUi::drawWorkshopMode()
@@ -1194,10 +1325,19 @@ void AppUi::drawWorkshopMode()
     constexpr auto flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize
                            | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoBringToFrontOnFocus
                            | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
-    if (ImGui::Begin("##workshopMode", nullptr, flags)) {
-        if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows))
-            state_.focused = Panel::workshop;
-        workshop_->draw();
+    const auto* name = state_.mode == AppMode::dj ? "##djMode" : state_.mode == AppMode::foundry ? "##foundryMode" : state_.mode == AppMode::cinema ? "##cinemaMode" : "##workshopMode";
+    if (ImGui::Begin(name, nullptr, flags)) {
+        if (state_.mode == AppMode::dj) {
+            dj_->draw();
+        } else if (state_.mode == AppMode::foundry) {
+            foundry_->draw();
+        } else if(state_.mode==AppMode::cinema){
+            state_.focused=Panel::cinema;cinema_->draw();
+        } else {
+            if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows))
+                state_.focused = Panel::workshop;
+            workshop_->draw();
+        }
     }
     ImGui::End();
     ImGui::PopStyleVar(2);
@@ -1215,22 +1355,84 @@ void AppUi::drawModeSwitch()
         ui::tooltip(tooltip);
         return clicked;
     };
-    if (button("Studio", !state_.workshopMode, L("Pistes, arrangement, lanceur, mixage", "Tracks, arrangement, launcher, mixing")))
-        state_.workshopMode = false;
+    if (button("Studio", state_.mode == AppMode::studio, L("Pistes, arrangement, lanceur, mixage", "Tracks, arrangement, launcher, mixing")))
+        state_.mode = AppMode::studio;
     ImGui::SameLine(0.0f, dp(2.0f));
-    if (button(L("Atelier VST", "VST workshop"), state_.workshopMode,
+    if (button(L("Mix DJ", "DJ mix"), state_.mode == AppMode::dj,
+               L("Mixer des morceaux comme un DJ : platines, synchro, boucles, hot cues, table de mixage, collection (F10)",
+                 "Mix tracks as a DJ does: decks, sync, loops, hot cues, a mixer, a collection (F10)")))
+        state_.mode = AppMode::dj;
+    ImGui::SameLine(0.0f, dp(2.0f));
+    if (button(L("Cinéma", "Cinema"), state_.mode==AppMode::cinema,
+            L("Son à l'image, pistes virtuelles et transport externe", "Sound to picture, virtual tracks and external transport")))
+        state_.mode=AppMode::cinema;
+    ImGui::SameLine(0.0f,dp(2));
+    if (button(L("Fonderie", "Foundry"), state_.mode == AppMode::foundry,
+               L("Éditer des fichiers son : couper, coller, traiter, analyser, enregistrer (F11)",
+                 "Edit sound files: cut, paste, process, analyse, save (F11)")))
+        state_.mode = AppMode::foundry;
+    ImGui::SameLine(0.0f, dp(2.0f));
+    if (button(L("Atelier Plugin", "Plugin workshop"), state_.inWorkshop(),
                L("Fabriquer ses propres effets et instruments avec un graphe, et les exporter en VST3 (F7)",
                  "Build your own effects and instruments with a graph, and export them as VST3 (F7)")))
-        state_.workshopMode = true;
+        state_.mode = AppMode::workshop;
+}
+
+void AppUi::resetUiState()
+{
+    const auto visibility = state_.bottomPanelsVisible;
+    state_ = UiState {};
+    state_.bottomPanelsVisible = visibility;
+}
+
+void AppUi::toggleBottomPanel()
+{
+    if (state_.inWorkshop())
+        return;
+    state_.setBottomPanelVisible(!state_.bottomPanelVisible());
+    if (!state_.bottomPanelVisible()) {
+        if (UiState::isBottomPanel(state_.bringToFront))
+            state_.bringToFront = Panel::none;
+        if (UiState::isBottomPanel(state_.focused))
+            state_.focused = state_.mode == AppMode::studio ? Panel::arrangement
+                             : state_.mode == AppMode::dj ? Panel::dj : state_.mode == AppMode::cinema ? Panel::cinema : Panel::foundry;
+    }
+    host_.wake(3);
+}
+
+void AppUi::toggleSidePanel(const Panel panel)
+{
+    if (panel != Panel::inspector && panel != Panel::browser)
+        return;
+    auto& visible = panel == Panel::inspector ? inspectorVisible_ : browserVisible_;
+    visible = !visible;
+    if (!visible) {
+        if (state_.bringToFront == panel) {
+            state_.bringToFront = Panel::none;
+            focusFrames_ = 0;
+        }
+        if (state_.focused == panel)
+            state_.focused = Panel::arrangement;
+    }
+    host_.wake(3);
 }
 
 void AppUi::drawWindows()
 {
-    if (state_.workshopMode) {
+    if (state_.mode != AppMode::studio) {
         drawWorkshopMode();
         return;
     }
+    if (UiState::isBottomPanel(state_.bringToFront))
+        state_.setBottomPanelVisible(true);
+    if (state_.bringToFront == Panel::browser)
+        browserVisible_ = true;
+    if (state_.bringToFront == Panel::inspector)
+        inspectorVisible_ = true;
     const auto panel = [this](const std::string& name, const Panel which, auto&& body) {
+        if ((UiState::isBottomPanel(which) && !state_.bottomPanelVisible())
+            || (which == Panel::browser && !browserVisible_) || (which == Panel::inspector && !inspectorVisible_))
+            return;
         // Out of the dock, in a window of its own beside the main one, which
         // stays a window even when moved back over it.
         if (detaching_ == which) {
@@ -1272,6 +1474,40 @@ void AppUi::drawWindows()
     panel(editorName(), Panel::editor, [this] { clipEditor_->draw(); });
     panel(browserName(), Panel::browser, [this] { browser_->draw(); });
     panel(inspectorName(), Panel::inspector, [this] { inspector_->draw(); });
+    if (state_.bottomPanelVisible()) {
+        std::vector<ImGuiDockNode*> amended;
+        bool hide = false;
+        for (const auto& name : { devicesName(), graphName(), mixerName(), routingName(), editorName() }) {
+            const auto* window = ImGui::FindWindowByName(name.c_str());
+            auto* node = window != nullptr ? window->DockNode : nullptr;
+            if (node == nullptr || std::find(amended.begin(), amended.end(), node) != amended.end())
+                continue;
+            amended.push_back(node);
+            if (ImGui::DockNodeBeginAmendTabBar(node)) {
+                hide = ui::bottomPanelHideTab() || hide;
+                ImGui::DockNodeEndAmendTabBar();
+            }
+        }
+        if (hide)
+            toggleBottomPanel();
+    }
+    for (const auto which : { Panel::inspector, Panel::browser }) {
+        if (!(which == Panel::inspector ? inspectorVisible_ : browserVisible_))
+            continue;
+        const auto name = which == Panel::inspector ? inspectorName() : browserName();
+        const auto* window = ImGui::FindWindowByName(name.c_str());
+        auto* node = window != nullptr ? window->DockNode : nullptr;
+        if (node != nullptr && ImGui::DockNodeBeginAmendTabBar(node)) {
+            const auto hide = which == Panel::inspector
+                ? ui::panelHideTab(L("Masquer  <###hideInspector", "Hide  <###hideInspector"),
+                                   L("Masquer l'inspecteur", "Hide the inspector"))
+                : ui::panelHideTab(L("Masquer  >###hideBrowser", "Hide  >###hideBrowser"),
+                                   L("Masquer le navigateur", "Hide the browser"));
+            ImGui::DockNodeEndAmendTabBar();
+            if (hide)
+                toggleSidePanel(which);
+        }
+    }
     deviceEditor_->draw();
 }
 
@@ -1846,6 +2082,7 @@ void AppUi::drawCompanionWindow()
 void AppUi::drawDialogs()
 {
     drawAudioSettings();
+    transportSync_->draw(showTransportSync_);
     drawCompanionWindow();
     locations_->draw();
     banks_->draw();
@@ -1859,6 +2096,7 @@ void AppUi::drawDialogs()
     batterie_->drawEditor();
     drawShortcuts();
     drawUnsavedPrompt();
+    drawFoundryPrompt();
     // A session a crash left behind: offered once, at the start.
     if (!recoveryChecked_) {
         recoveryChecked_ = true;
@@ -1874,7 +2112,7 @@ void AppUi::drawDialogs()
         ImGui::Spacing();
         if (ui::primaryButton(L("Restaurer", "Restore"), ImVec2(dp(110.0f), 0.0f))) {
             const auto result = studio_.restoreRecovery();
-            state_ = UiState {};
+            resetUiState();
             waveforms_.clear();
             notify(result.wasOk() ? ui::Ls("Session restaurée", "Session restored") : result.getErrorMessage(), result.failed());
             ImGui::CloseCurrentPopup();
@@ -1902,6 +2140,7 @@ void AppUi::drawDialogs()
         ImGui::PopFont();
         ImGui::TextDisabled("%s", L("Nouvelle interface : Dear ImGui sur Direct3D 11.", "New interface: Dear ImGui on Direct3D 11."));
         ImGui::TextDisabled("%s", host_.rendererDescription().toRawUTF8());
+        ImGui::TextDisabled("FFmpeg : LGPL-3.0-or-later — Licenses/FFmpeg");
         ImGui::Spacing();
         if (ui::primaryButton("OK", ImVec2(dp(90.0f), 0.0f)))
             ImGui::CloseCurrentPopup();
@@ -1944,15 +2183,56 @@ void AppUi::whenSaved(std::function<void()> action)
 
 void AppUi::askBeforeQuit()
 {
-    // The workshop's device first, then the project.
+    // The workshop's device first, the Foundry's files, then the project.
     const auto project = [this] {
         whenSaved([this] {
             if (onQuitNow)
                 onQuitNow();
         });
     };
-    if (!workshop_->askBeforeQuit(project))
-        project();
+    const auto files = [this, project] {
+        if (foundry_->unsaved().isEmpty()&&cinema_->unsaved().isEmpty()) {
+            project();
+            return;
+        }
+        foundryAction_ = project;
+        foundryPromptRequested_ = true;
+        host_.wake();
+    };
+    const auto workspaces=[this,files]{if(!workshop_->askBeforeQuit(files))files();};
+    if(!JsfxView::askBeforeQuit(workspaces))workspaces();
+}
+
+void AppUi::drawFoundryPrompt()
+{
+    if (foundryPromptRequested_) {
+        foundryPromptRequested_ = false;
+        ImGui::OpenPopup("##foundryUnsaved");
+    }
+    if (!ImGui::BeginPopupModal("##foundryUnsaved", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar))
+        return;
+    ImGui::PushFont(theme::boldFont(), ImGui::GetStyle().FontSizeBase * 1.1f);
+    ImGui::TextUnformatted(L("Des sessions de Fonderie ou de Cinéma ne sont pas enregistrées", "Some Foundry or Cinema sessions are not saved"));
+    ImGui::PopFont();
+    for (const auto& name : foundry_->unsaved())
+        ImGui::BulletText("%s", name.toRawUTF8());
+    for(const auto& name:cinema_->unsaved())ImGui::BulletText("Cinéma : %s",name.toRawUTF8());
+    ImGui::Spacing();
+    const ImVec2 button(dp(170.0f), 0.0f);
+    if (ui::primaryButton(L("Revenir aux sessions", "Back to sessions"), button) || ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
+        foundryAction_ = {};
+        state_.mode = cinema_->unsaved().isEmpty()?AppMode::foundry:AppMode::cinema;
+        ImGui::CloseCurrentPopup();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button(L("Quitter sans les enregistrer", "Quit without saving them"), button)) {
+        auto action = std::move(foundryAction_);
+        foundryAction_ = {};
+        ImGui::CloseCurrentPopup();
+        if (action)
+            action();
+    }
+    ImGui::EndPopup();
 }
 
 void AppUi::drawUnsavedPrompt()
@@ -2034,11 +2314,20 @@ juce::String AppUi::injectInput(const juce::var& events)
     for (const auto& event : *list) {
         const auto type = event.getProperty("type", juce::var()).toString();
         if (type != "move" && type != "down" && type != "up" && type != "wheel" && type != "wait" && type != "release"
-            && type != "text" && type != "key")
+            && type != "text" && type != "key" && type != "file_drop")
             return "unknown event type \"" + type + "\"";
     }
     for (const auto& event : *list) {
         const auto type = event.getProperty("type", juce::var()).toString();
+        if(type=="file_drop") {
+            host_.renderNow();
+            juce::StringArray files;
+            if(const auto* paths=event.getProperty("files",{}).getArray())for(const auto& path:*paths)files.add(path.toString());
+            if(files.isEmpty())return "file_drop requires files";
+            const auto* viewport=ImGui::GetMainViewport();
+            filesDropped(files,viewport->Pos.x+static_cast<float>(static_cast<double>(event.getProperty("x",0))),viewport->Pos.y+static_cast<float>(static_cast<double>(event.getProperty("y",0))));
+            host_.renderNow();continue;
+        }
         if (type == "release") {
             scriptedMouse_ = false;
             scriptedShift_ = false;
@@ -2154,7 +2443,7 @@ bool AppUi::snapshot(const juce::File& png)
 void AppUi::sessionReplaced()
 {
     const auto zoom = state_.pixelsPerSecond;
-    state_ = UiState {};
+    resetUiState();
     state_.pixelsPerSecond = zoom;
     waveforms_.clear();
     const auto tracks = studio_.tracks();
@@ -2318,18 +2607,40 @@ void AppUi::handleShortcuts()
     auto& io = ImGui::GetIO();
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Q, false) && onQuit)
         onQuit();
+    // In the Foundry, the files are its sound files.
+    const auto foundry = state_.mode == AppMode::foundry||state_.mode==AppMode::cinema;
+    auto* sessionView=state_.mode==AppMode::cinema?cinema_.get():foundry_.get();
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_S, false)) {
-        if (io.KeyShift)
+        if (foundry)
+            sessionView->save(io.KeyShift);
+        else if (io.KeyShift)
             chooseSaveAs();
         else
             save();
     }
-    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_O, false))
-        whenSaved([this] { chooseOpenProject(); });
-    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_N, false))
-        whenSaved([this] { newProject(); });
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_O, false)) {
+        if (foundry)
+            sessionView->chooseOpen();
+        else
+            whenSaved([this] { chooseOpenProject(); });
+    }
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_N, false)) {
+        if (foundry)
+            sessionView->newDocument();
+        else
+            whenSaved([this] { newProject(); });
+    }
     if (io.WantTextInput)
         return;
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_J, false))
+        toggleBottomPanel();
+    if (ImGui::IsKeyPressed(ImGuiKey_F10, false))
+        state_.mode = state_.mode == AppMode::dj ? AppMode::studio : AppMode::dj;
+    if (ImGui::IsKeyPressed(ImGuiKey_F11, false))
+        state_.mode = state_.mode == AppMode::foundry ? AppMode::studio : AppMode::foundry;
+    // The DJ mix and the Foundry have their own keys (the Foundry's view
+    // reads them); the studio's transport keys stay out of them.
+    const auto ownKeys = state_.mode == AppMode::dj || foundry;
     // Ctrl+K: the computer's keys as a MIDI keyboard, or not.
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_K, false)) {
         computerKeyboard_->setEnabled(!computerKeyboard_->enabled());
@@ -2341,36 +2652,40 @@ void AppUi::handleShortcuts()
         io.KeyShift ? redo() : undo();
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Y, true))
         redo();
-    if (ImGui::IsKeyPressed(ImGuiKey_Space, false)) {
+    if (!ownKeys && ImGui::IsKeyPressed(ImGuiKey_Space, false)) {
         // In the workshop, play is the simulation's.
-        if (state_.workshopMode)
+        if (state_.inWorkshop())
             studio_.setSimulating(!studio_.simulating());
         else
             studio_.togglePlay();
     }
-    if (ImGui::IsKeyPressed(ImGuiKey_Home, false))
+    if (!ownKeys && ImGui::IsKeyPressed(ImGuiKey_Home, false))
         studio_.rewind();
-    if (!io.KeyCtrl && !state_.workshopMode && ImGui::IsKeyPressed(ImGuiKey_R, false))
+    if (!ownKeys && !io.KeyCtrl && !state_.inWorkshop() && ImGui::IsKeyPressed(ImGuiKey_R, false))
         toggleRecording();
-    if (!io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_L, false)) {
+    if (!ownKeys && !io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_L, false)) {
         studio_.setLoopEnabled(!studio_.loopEnabled());
     }
     // Function keys bring the main panels forward.
-    if (ImGui::IsKeyPressed(ImGuiKey_F1, false))
+    if(state_.mode==AppMode::cinema){
+        const std::pair<ImGuiKey,int> tools[]={{ImGuiKey_F3,0},{ImGuiKey_F4,1},{ImGuiKey_F5,2},{ImGuiKey_F8,3},{ImGuiKey_F6,4}};
+        for(const auto& [key,panel]:tools)if(ImGui::IsKeyPressed(key,false))cinema_->showToolsPanel(panel);
+    }
+    if (state_.mode!=AppMode::cinema&&ImGui::IsKeyPressed(ImGuiKey_F1, false))
         state_.bringToFront = Panel::arrangement;
-    if (ImGui::IsKeyPressed(ImGuiKey_F2, false))
+    if (state_.mode!=AppMode::cinema&&ImGui::IsKeyPressed(ImGuiKey_F2, false))
         state_.bringToFront = Panel::launcher;
-    if (ImGui::IsKeyPressed(ImGuiKey_F3, false))
+    if (state_.mode!=AppMode::cinema&&ImGui::IsKeyPressed(ImGuiKey_F3, false))
         state_.bringToFront = Panel::devices;
-    if (ImGui::IsKeyPressed(ImGuiKey_F4, false))
+    if (state_.mode!=AppMode::cinema&&ImGui::IsKeyPressed(ImGuiKey_F4, false))
         state_.bringToFront = Panel::graph;
-    if (ImGui::IsKeyPressed(ImGuiKey_F5, false))
+    if (state_.mode!=AppMode::cinema&&ImGui::IsKeyPressed(ImGuiKey_F5, false))
         state_.bringToFront = Panel::mixer;
-    if (ImGui::IsKeyPressed(ImGuiKey_F6, false))
+    if (state_.mode!=AppMode::cinema&&ImGui::IsKeyPressed(ImGuiKey_F6, false))
         state_.bringToFront = Panel::editor;
     if (ImGui::IsKeyPressed(ImGuiKey_F7, false))
-        state_.workshopMode = !state_.workshopMode;
-    if (ImGui::IsKeyPressed(ImGuiKey_F8, false))
+        state_.mode = state_.inWorkshop() ? AppMode::studio : AppMode::workshop;
+    if (state_.mode!=AppMode::cinema&&ImGui::IsKeyPressed(ImGuiKey_F8, false))
         state_.bringToFront = Panel::routing;
     // The library's big window, on the sounds unless it is open.
     if (ImGui::IsKeyPressed(ImGuiKey_F9, false)) {
@@ -2402,10 +2717,13 @@ void AppUi::drawMenuBar()
     ImGui::PopFont();
     ImGui::SameLine(0.0f, dp(10.0f));
     if (ImGui::BeginMenu(ui::labelId(L("Fichier", "File"), "menuFile").c_str())) {
-        if (ImGui::MenuItem(L("Nouveau projet", "New project"), "Ctrl+N"))
-            whenSaved([this] { newProject(); });
-        if (ImGui::MenuItem(L("Ouvrir…", "Open…"), "Ctrl+O"))
-            whenSaved([this] { chooseOpenProject(); });
+        auto* fileView=state_.mode==AppMode::cinema?cinema_.get():state_.mode==AppMode::foundry?foundry_.get():nullptr;
+        if (ImGui::MenuItem(L("Nouveau projet", "New project"), "Ctrl+N")){
+            if(fileView)fileView->newDocument();else whenSaved([this] { newProject(); });
+        }
+        if (ImGui::MenuItem(L("Ouvrir…", "Open…"), "Ctrl+O")){
+            if(fileView)fileView->chooseOpen();else whenSaved([this] { chooseOpenProject(); });
+        }
         if (ImGui::BeginMenu(L("Modèles", "Templates"))) {
             const auto templates = studio_.templates();
             for (const auto& file : templates)
@@ -2416,10 +2734,12 @@ void AppUi::drawMenuBar()
             ImGui::EndMenu();
         }
         ImGui::Separator();
-        if (ImGui::MenuItem(L("Enregistrer", "Save"), "Ctrl+S"))
-            save();
-        if (ImGui::MenuItem(L("Enregistrer sous…", "Save as…"), "Ctrl+Maj+S"))
-            chooseSaveAs();
+        if (ImGui::MenuItem(L("Enregistrer", "Save"), "Ctrl+S")){
+            if(fileView)fileView->save(false);else save();
+        }
+        if (ImGui::MenuItem(L("Enregistrer sous…", "Save as…"), "Ctrl+Maj+S")){
+            if(fileView)fileView->save(true);else chooseSaveAs();
+        }
         ImGui::Separator();
         if (ImGui::MenuItem(L("Importer un projet…", "Import a project…")))
             whenSaved([this] { chooseImportProject(); });
@@ -2429,6 +2749,7 @@ void AppUi::drawMenuBar()
         if (ImGui::MenuItem(exporting ? L("Annuler l'export", "Cancel the export") : L("Exporter le mix (WAV)…", "Export the mix (WAV)…"))) {
             if (exporting)
                 studio_.engine().cancelMasterExport();
+            else if(fileView)fileView->chooseExport();
             else
                 chooseExportMix();
         }
@@ -2526,20 +2847,28 @@ void AppUi::drawMenuBar()
         ImGui::EndMenu();
     }
     if (ImGui::BeginMenu(ui::labelId(L("Affichage", "View"), "menuView").c_str())) {
+        if(ImGui::MenuItem(L("Éditeur de scripts JSFX…", "JSFX script editor…"),nullptr,state_.showJsfx))state_.showJsfx=!state_.showJsfx;
+        if (ImGui::MenuItem(L("Panneau du bas", "Bottom panel"), "Ctrl+J", state_.bottomPanelVisible(), !state_.inWorkshop()))
+            toggleBottomPanel();
+        if (ImGui::MenuItem(L("Inspecteur (gauche)", "Inspector (left)"), nullptr, inspectorVisible_, state_.mode == AppMode::studio))
+            toggleSidePanel(Panel::inspector);
+        if (ImGui::MenuItem(L("Navigateur (droite)", "Browser (right)"), nullptr, browserVisible_, state_.mode == AppMode::studio))
+            toggleSidePanel(Panel::browser);
+        ImGui::Separator();
         if (ImGui::MenuItem("Arrangement", "F1"))
             state_.bringToFront = Panel::arrangement;
         if (ImGui::MenuItem(L("Lanceur", "Launcher"), "F2"))
             state_.bringToFront = Panel::launcher;
         if (ImGui::MenuItem(L("Périphériques", "Devices"), "F3"))
-            state_.bringToFront = Panel::devices;
+            {if(state_.mode==AppMode::cinema)cinema_->showToolsPanel(0);else state_.bringToFront = Panel::devices;}
         if (ImGui::MenuItem(L("Graphe", "Graph"), "F4"))
-            state_.bringToFront = Panel::graph;
+            {if(state_.mode==AppMode::cinema)cinema_->showToolsPanel(1);else state_.bringToFront = Panel::graph;}
         if (ImGui::MenuItem(L("Mixeur", "Mixer"), "F5"))
-            state_.bringToFront = Panel::mixer;
+            {if(state_.mode==AppMode::cinema)cinema_->showToolsPanel(2);else state_.bringToFront = Panel::mixer;}
         if (ImGui::MenuItem(L("Éditeur", "Editor"), "F6"))
-            state_.bringToFront = Panel::editor;
+            {if(state_.mode==AppMode::cinema)cinema_->showToolsPanel(4);else state_.bringToFront = Panel::editor;}
         if (ImGui::MenuItem(L("Routage", "Routing"), "F8"))
-            state_.bringToFront = Panel::routing;
+            {if(state_.mode==AppMode::cinema)cinema_->showToolsPanel(3);else state_.bringToFront = Panel::routing;}
         if (ImGui::MenuItem(L("Bibliothèque (grande fenêtre)", "Library (big window)"), "F9", state_.showLibrary)) {
             state_.showLibrary = !state_.showLibrary;
             state_.libraryFocus = state_.showLibrary;
@@ -2547,8 +2876,13 @@ void AppUi::drawMenuBar()
             state_.libraryTarget.reset();
         }
         ImGui::Separator();
-        if (ImGui::MenuItem(L("Atelier VST (plein écran)", "VST workshop (whole window)"), "F7", state_.workshopMode))
-            state_.workshopMode = !state_.workshopMode;
+        if (ImGui::MenuItem(L("Mix DJ (plein écran)", "DJ mix (whole window)"), "F10", state_.mode == AppMode::dj))
+            state_.mode = state_.mode == AppMode::dj ? AppMode::studio : AppMode::dj;
+        if (ImGui::MenuItem(L("Cinéma (son à l'image)", "Cinema (sound to picture)"),nullptr,state_.mode==AppMode::cinema))state_.mode=AppMode::cinema;
+        if (ImGui::MenuItem(L("Fonderie (plein écran)", "Foundry (whole window)"), "F11", state_.mode == AppMode::foundry))
+            state_.mode = state_.mode == AppMode::foundry ? AppMode::studio : AppMode::foundry;
+        if (ImGui::MenuItem(L("Atelier Plugin (plein écran)", "Plugin workshop (whole window)"), "F7", state_.inWorkshop()))
+            state_.mode = state_.inWorkshop() ? AppMode::studio : AppMode::workshop;
         ImGui::Separator();
         // A panel in a window of its own, to put on another screen. Dragging
         // a panel's tab out of the window does the same.
@@ -2606,6 +2940,8 @@ void AppUi::drawMenuBar()
             showAudioSettings_ = true;
         if (ImGui::MenuItem(L("Entrées et sorties de la carte son…", "Sound card inputs and outputs…")))
             showAudioSettings_ = showSoundCard_ = true;
+        if (ImGui::MenuItem(L("Synchronisation du transport…", "Transport synchronization…")))
+            showTransportSync_ = true;
         if (ImGui::MenuItem(L("Entrées MIDI…", "MIDI inputs…")))
             openMidiInputs();
         ui::tooltip(L("Les claviers et contrôleurs MIDI branchés, et le clavier de l'ordinateur comme clavier MIDI.",
@@ -2706,152 +3042,165 @@ void AppUi::drawTransportBar()
     if (ImGui::BeginViewportSideBar("##transport", ImGui::GetMainViewport(), ImGuiDir_Up, height,
                                     ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings)) {
         // In the workshop the transport plays the simulation, not the tracks.
-        const auto simulation = state_.workshopMode;
+        const auto simulation = state_.inWorkshop();
         const auto playing = simulation ? studio_.simulating() : engine.isPlaying();
         drawModeSwitch();
         ui::toolbarSeparator();
-        if (ui::iconButton(icon::previous, L("Au début (Origine)", "To the start (Home)"))) {
-            if (simulation && playing)
-                studio_.setSimulating(true);
-            else if (!simulation)
-                studio_.rewind();
-        }
-        ImGui::SameLine(0.0f, dp(2.0f));
-        if (ui::iconButton(playing ? icon::pause : icon::play,
-                           simulation ? L("Lancer la simulation : le périphérique seul, avec les sources de test (Espace)",
-                                          "Run the simulation: the device on its own, with the test sources (Space)")
-                                      : L("Lecture / pause (Espace)", "Play / pause (Space)"),
-                           playing, p.play)) {
-            if (simulation)
-                studio_.setSimulating(!playing);
+        const auto own = state_.mode == AppMode::dj || state_.mode == AppMode::foundry || state_.mode==AppMode::cinema;
+        if (own) {
+            if (state_.mode == AppMode::dj)
+                dj_->drawTransport();
+            else if(state_.mode==AppMode::cinema)
+                cinema_->drawTransport();
             else
-                studio_.togglePlay();
+                foundry_->drawTransport();
         }
-        ImGui::SameLine(0.0f, dp(2.0f));
-        if (ui::iconButton(icon::stop, L("Stop (deux fois : retour au début)", "Stop (twice: back to the start)"))) {
-            if (simulation)
-                studio_.setSimulating(false);
-            else
-                studio_.stop();
-        }
-        const auto recording = studio_.isRecording();
-        if (!state_.workshopMode || recording) {
-            ImGui::SameLine(0.0f, dp(2.0f));
-            if (ui::iconButton(icon::record, L("Enregistrer la piste armée ou sélectionnée (R)", "Record the armed or selected track (R)"),
-                               recording, p.record))
-                toggleRecording();
-        }
-        if (!simulation) {
-            ImGui::SameLine(0.0f, dp(2.0f));
-            if (ui::iconButton(icon::loop, L("Boucle (L)", "Loop (L)"), studio_.loopEnabled()))
-                studio_.setLoopEnabled(!studio_.loopEnabled());
-        }
-
-        ui::toolbarSeparator();
-        const auto seconds = simulation ? studio_.simulationSeconds() : engine.position();
-        const auto tempo = std::max(1.0, engine.tempo());
-        const auto beats = seconds * tempo / 60.0;
-        // Bars as the metre counts them; beats in its own value (an eighth in 7/8).
-        const auto barLength = engine.beatsPerBar();
-        const auto bar = static_cast<int>(std::floor(beats / barLength + 1.0e-9)) + 1;
-        const auto inBar = beats - (bar - 1) * barLength;
-        const auto beatLength = 4.0 / engine.timeSignatureDenominator();
-        const auto beat = static_cast<int>(std::floor(inBar / beatLength + 1.0e-9)) + 1;
-        const auto sixteenth = static_cast<int>(std::fmod(beats * 4.0, 4.0)) + 1;
-        char position[64];
-        std::snprintf(position, sizeof(position), "%3d.%d.%d", bar, beat, sixteenth);
-        char clock[64];
-        const auto minutes = static_cast<int>(seconds / 60.0);
-        std::snprintf(clock, sizeof(clock), "%02d:%06.3f", minutes, seconds - minutes * 60.0);
-        ImGui::PushFont(theme::monoFont(), ImGui::GetStyle().FontSizeBase * 1.15f);
-        const auto origin = ImGui::GetCursorScreenPos();
-        const ImVec2 box(dp(190.0f), ImGui::GetFrameHeight());
-        auto* list = ImGui::GetWindowDrawList();
-        list->AddRectFilled(origin, ImVec2(origin.x + box.x, origin.y + box.y), p.bg0, ImGui::GetStyle().FrameRounding);
-        list->AddText(ImVec2(origin.x + dp(8.0f), origin.y + (box.y - ImGui::GetFontSize()) * 0.5f), playing ? p.play : p.text,
-                      position);
-        list->AddText(ImVec2(origin.x + dp(92.0f), origin.y + (box.y - ImGui::GetFontSize()) * 0.5f), p.textDim, clock);
-        ImGui::Dummy(box);
-        ImGui::PopFont();
-
-        ui::toolbarSeparator();
-        auto bpm = static_cast<float>(engine.tempo());
-        if (ui::dragNumber("##tempo", &bpm, 0.1f, 20.0f, 300.0f, "%.2f BPM", dp(96.0f))) {
-            engine.setTempo(bpm);
-            studio_.markDirty();
-        }
-        ui::tooltip(L("Tempo : glisser, ou double-clic pour taper une valeur", "Tempo: drag, or double click to type"));
-        ImGui::SameLine();
-        {
-            // The metre: a click opens its choice.
-            char metre[16];
-            std::snprintf(metre, sizeof(metre), "%d/%d###metre", engine.timeSignatureNumerator(), engine.timeSignatureDenominator());
-            ImGui::PushStyleColor(ImGuiCol_Button, p.bg1);
-            if (ImGui::Button(metre))
-                ImGui::OpenPopup("##metrePopup");
-            ImGui::PopStyleColor();
-            ui::tooltip(L("Signature rythmique (temps par mesure)", "Time signature (beats per bar)"));
-            if (ImGui::BeginPopup("##metrePopup")) {
-                auto numerator = engine.timeSignatureNumerator();
-                auto denominator = engine.timeSignatureDenominator();
-                ImGui::TextDisabled("%s", L("Temps par mesure", "Beats per bar"));
-                ImGui::SetNextItemWidth(dp(120.0f));
-                if (ImGui::InputInt("##numerator", &numerator, 1, 1)) {
-                    engine.setTimeSignature(numerator, denominator);
-                    studio_.markDirty();
-                }
-                ImGui::TextDisabled("%s", L("Valeur du temps", "Beat value"));
-                for (const auto value : { 2, 4, 8, 16 }) {
-                    char label[8];
-                    std::snprintf(label, sizeof(label), "%d", value);
-                    if (ImGui::RadioButton(label, denominator == value)) {
-                        engine.setTimeSignature(numerator, value);
-                        studio_.markDirty();
-                    }
-                    ImGui::SameLine();
-                }
-                ImGui::NewLine();
-                ImGui::Separator();
-                for (const auto& preset : { std::pair { 4, 4 }, std::pair { 3, 4 }, std::pair { 5, 4 }, std::pair { 6, 8 },
-                                            std::pair { 7, 8 }, std::pair { 12, 8 } }) {
-                    char label[8];
-                    std::snprintf(label, sizeof(label), "%d/%d", preset.first, preset.second);
-                    if (ImGui::Selectable(label, numerator == preset.first && denominator == preset.second,
-                                          ImGuiSelectableFlags_None, ImVec2(dp(56.0f), 0.0f))) {
-                        engine.setTimeSignature(preset.first, preset.second);
-                        studio_.markDirty();
-                    }
-                }
-                ImGui::EndPopup();
+        if (!own) {
+            if (ui::iconButton(icon::previous, L("Au début (Origine)", "To the start (Home)"))) {
+                if (simulation && playing)
+                    studio_.setSimulating(true);
+                else if (!simulation)
+                    studio_.rewind();
             }
-        }
+            ImGui::SameLine(0.0f, dp(2.0f));
+            if (ui::iconButton(playing ? icon::pause : icon::play,
+                               simulation ? L("Lancer la simulation : le périphérique seul, avec les sources de test (Espace)",
+                                              "Run the simulation: the device on its own, with the test sources (Space)")
+                                          : L("Lecture / pause (Espace)", "Play / pause (Space)"),
+                               playing, p.play)) {
+                if (simulation)
+                    studio_.setSimulating(!playing);
+                else
+                    studio_.togglePlay();
+            }
+            ImGui::SameLine(0.0f, dp(2.0f));
+            if (ui::iconButton(icon::stop, L("Stop (deux fois : retour au début)", "Stop (twice: back to the start)"))) {
+                if (simulation)
+                    studio_.setSimulating(false);
+                else
+                    studio_.stop();
+            }
+            const auto recording = studio_.isRecording();
+            if (!state_.inWorkshop() || recording) {
+                ImGui::SameLine(0.0f, dp(2.0f));
+                if (ui::iconButton(icon::record, L("Enregistrer la piste armée ou sélectionnée (R)", "Record the armed or selected track (R)"),
+                                   recording, p.record))
+                    toggleRecording();
+            }
+            if (!simulation) {
+                ImGui::SameLine(0.0f, dp(2.0f));
+                if (ui::iconButton(icon::loop, L("Boucle (L)", "Loop (L)"), studio_.loopEnabled()))
+                    studio_.setLoopEnabled(!studio_.loopEnabled());
+            }
 
-        // The computer's keys as a MIDI keyboard: on or off, its octave; a
-        // right click opens the MIDI inputs.
-        {
             ui::toolbarSeparator();
-            auto& keyboard = *computerKeyboard_;
-            const auto& p = theme::palette();
-            if (ui::iconButton(icon::keyboard,
-                               keyboard.enabled() ? L("Clavier de l'ordinateur : il joue la piste instrument choisie (Ctrl+K). "
-                                                      "Clic droit : les entrées MIDI.",
-                                                      "Computer keyboard: it plays the picked instrument track (Ctrl+K). "
-                                                      "Right click: the MIDI inputs.")
-                                                  : L("Clavier de l'ordinateur éteint (Ctrl+K). Clic droit : les entrées MIDI.",
-                                                      "Computer keyboard off (Ctrl+K). Right click: the MIDI inputs."),
-                               keyboard.enabled(), p.accent))
-                keyboard.setEnabled(!keyboard.enabled());
-            if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
-                openMidiInputs();
-            if (keyboard.enabled()) {
-                ImGui::SameLine(0.0f, dp(4.0f));
-                ImGui::AlignTextToFramePadding();
-                ImGui::TextColored(theme::vec(keyboard.active() ? p.text : p.textFaint), "Oct %d", keyboard.octave());
-                ui::tooltip(keyboard.active() ? L("L'octave de sa première touche", "Its first key's octave")
-                                              : L("Choisissez une piste instrument pour jouer", "Pick an instrument track to play"));
-            }
-        }
+            const auto seconds = simulation ? studio_.simulationSeconds() : engine.position();
+            const auto tempo = std::max(1.0, engine.tempo());
+            const auto beats = seconds * tempo / 60.0;
+            // Bars as the metre counts them; beats in its own value (an eighth in 7/8).
+            const auto barLength = engine.beatsPerBar();
+            const auto bar = static_cast<int>(std::floor(beats / barLength + 1.0e-9)) + 1;
+            const auto inBar = beats - (bar - 1) * barLength;
+            const auto beatLength = 4.0 / engine.timeSignatureDenominator();
+            const auto beat = static_cast<int>(std::floor(inBar / beatLength + 1.0e-9)) + 1;
+            const auto sixteenth = static_cast<int>(std::fmod(beats * 4.0, 4.0)) + 1;
+            char position[64];
+            std::snprintf(position, sizeof(position), "%3d.%d.%d", bar, beat, sixteenth);
+            char clock[64];
+            const auto minutes = static_cast<int>(seconds / 60.0);
+            std::snprintf(clock, sizeof(clock), "%02d:%06.3f", minutes, seconds - minutes * 60.0);
+            ImGui::PushFont(theme::monoFont(), ImGui::GetStyle().FontSizeBase * 1.15f);
+            const auto origin = ImGui::GetCursorScreenPos();
+            const ImVec2 box(dp(190.0f), ImGui::GetFrameHeight());
+            auto* list = ImGui::GetWindowDrawList();
+            list->AddRectFilled(origin, ImVec2(origin.x + box.x, origin.y + box.y), p.bg0, ImGui::GetStyle().FrameRounding);
+            list->AddText(ImVec2(origin.x + dp(8.0f), origin.y + (box.y - ImGui::GetFontSize()) * 0.5f), playing ? p.play : p.text,
+                          position);
+            list->AddText(ImVec2(origin.x + dp(92.0f), origin.y + (box.y - ImGui::GetFontSize()) * 0.5f), p.textDim, clock);
+            ImGui::Dummy(box);
+            ImGui::PopFont();
 
+            ui::toolbarSeparator();
+            auto bpm = static_cast<float>(engine.tempo());
+            if (ui::dragNumber("##tempo", &bpm, 0.1f, 20.0f, 300.0f, "%.2f BPM", dp(96.0f))) {
+                engine.setTempo(bpm);
+                studio_.markDirty();
+            }
+            ui::tooltip(L("Tempo : glisser, ou double-clic pour taper une valeur", "Tempo: drag, or double click to type"));
+            ImGui::SameLine();
+            {
+                // The metre: a click opens its choice.
+                char metre[16];
+                std::snprintf(metre, sizeof(metre), "%d/%d###metre", engine.timeSignatureNumerator(), engine.timeSignatureDenominator());
+                ImGui::PushStyleColor(ImGuiCol_Button, p.bg1);
+                if (ImGui::Button(metre))
+                    ImGui::OpenPopup("##metrePopup");
+                ImGui::PopStyleColor();
+                ui::tooltip(L("Signature rythmique (temps par mesure)", "Time signature (beats per bar)"));
+                if (ImGui::BeginPopup("##metrePopup")) {
+                    auto numerator = engine.timeSignatureNumerator();
+                    auto denominator = engine.timeSignatureDenominator();
+                    ImGui::TextDisabled("%s", L("Temps par mesure", "Beats per bar"));
+                    ImGui::SetNextItemWidth(dp(120.0f));
+                    if (ImGui::InputInt("##numerator", &numerator, 1, 1)) {
+                        engine.setTimeSignature(numerator, denominator);
+                        studio_.markDirty();
+                    }
+                    ImGui::TextDisabled("%s", L("Valeur du temps", "Beat value"));
+                    for (const auto value : { 2, 4, 8, 16 }) {
+                        char label[8];
+                        std::snprintf(label, sizeof(label), "%d", value);
+                        if (ImGui::RadioButton(label, denominator == value)) {
+                            engine.setTimeSignature(numerator, value);
+                            studio_.markDirty();
+                        }
+                        ImGui::SameLine();
+                    }
+                    ImGui::NewLine();
+                    ImGui::Separator();
+                    for (const auto& preset : { std::pair { 4, 4 }, std::pair { 3, 4 }, std::pair { 5, 4 }, std::pair { 6, 8 },
+                                                std::pair { 7, 8 }, std::pair { 12, 8 } }) {
+                        char label[8];
+                        std::snprintf(label, sizeof(label), "%d/%d", preset.first, preset.second);
+                        if (ImGui::Selectable(label, numerator == preset.first && denominator == preset.second,
+                                              ImGuiSelectableFlags_None, ImVec2(dp(56.0f), 0.0f))) {
+                            engine.setTimeSignature(preset.first, preset.second);
+                            studio_.markDirty();
+                        }
+                    }
+                    ImGui::EndPopup();
+                }
+            }
+
+            // The computer's keys as a MIDI keyboard: on or off, its octave; a
+            // right click opens the MIDI inputs.
+            {
+                ui::toolbarSeparator();
+                auto& keyboard = *computerKeyboard_;
+                const auto& p = theme::palette();
+                if (ui::iconButton(icon::keyboard,
+                                   keyboard.enabled() ? L("Clavier de l'ordinateur : il joue la piste instrument choisie (Ctrl+K). "
+                                                          "Clic droit : les entrées MIDI.",
+                                                          "Computer keyboard: it plays the picked instrument track (Ctrl+K). "
+                                                          "Right click: the MIDI inputs.")
+                                                      : L("Clavier de l'ordinateur éteint (Ctrl+K). Clic droit : les entrées MIDI.",
+                                                          "Computer keyboard off (Ctrl+K). Right click: the MIDI inputs."),
+                                   keyboard.enabled(), p.accent))
+                    keyboard.setEnabled(!keyboard.enabled());
+                if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+                    openMidiInputs();
+                if (keyboard.enabled()) {
+                    ImGui::SameLine(0.0f, dp(4.0f));
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::TextColored(theme::vec(keyboard.active() ? p.text : p.textFaint), "Oct %d", keyboard.octave());
+                    ui::tooltip(keyboard.active() ? L("L'octave de sa première touche", "Its first key's octave")
+                                                  : L("Choisissez une piste instrument pour jouer", "Pick an instrument track to play"));
+                }
+            }
+
+        }
+        ui::toolbarSeparator();
+        transportSync_->drawButton(showTransportSync_);
         const auto right = ImGui::GetWindowWidth() - ImGui::GetStyle().WindowPadding.x;
         ImGui::SameLine(right - dp(262.0f));
         const auto& meter = studio_.masterMeter();
@@ -2919,10 +3268,49 @@ void AppUi::drawStatusBar()
 void AppUi::drawDockSpace()
 {
     resolveMode();
-    // The studio's panels wait, as they are, while the workshop has the window.
-    if (state_.workshopMode)
+    // The studio's panels wait, as they are, while another mode has the window.
+    if (state_.mode != AppMode::studio)
         return;
-    const auto* viewport = ImGui::GetMainViewport();
+    auto* viewport = ImGui::GetMainViewport();
+    // Slim edge handles keep hidden side panels reachable without a menu.
+    for (const auto which : { Panel::inspector, Panel::browser }) {
+        if (which == Panel::inspector ? inspectorVisible_ : browserVisible_)
+            continue;
+        const auto left = which == Panel::inspector;
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(dp(4.0f), dp(4.0f)));
+        const auto stripWidth = ImGui::GetFrameHeight() + dp(8.0f);
+        if (ImGui::BeginViewportSideBar(left ? "##inspectorRestore" : "##browserRestore", viewport,
+                                       left ? ImGuiDir_Left : ImGuiDir_Right, stripWidth,
+                                       ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings
+                                       | ImGuiWindowFlags_NoFocusOnAppearing)) {
+            if (ui::primaryButton(left ? ">" : "<", ImVec2(stripWidth - dp(8.0f), ImGui::GetFrameHeight())))
+                toggleSidePanel(which);
+            ui::tooltip(left ? L("Afficher l'inspecteur", "Show the inspector")
+                             : L("Afficher le navigateur", "Show the browser"));
+        }
+        ImGui::End();
+        ImGui::PopStyleVar();
+    }
+    if (!state_.bottomPanelVisible()) {
+        // Keep a small reopen handle below the central area, beside the browser.
+        float left = viewport->WorkPos.x + viewport->WorkSize.x * 0.14f;
+        float width = viewport->WorkSize.x * 0.65f;
+        const auto* window = ImGui::FindWindowByName(arrangementName().c_str());
+        if (window != nullptr && window->DockNode != nullptr) {
+            left = window->DockNode->Pos.x;
+            width = window->DockNode->Size.x;
+        }
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+        if (ImGui::BeginViewportSideBar("##studioBottomHandle", viewport, ImGuiDir_Down, ui::bottomPanelRestoreHeight(),
+                                       ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings
+                                       | ImGuiWindowFlags_NoFocusOnAppearing)) {
+            ImGui::SetCursorPosX(std::clamp(left - viewport->Pos.x, 0.0f, viewport->Size.x - dp(120.0f)));
+            if (ui::bottomPanelRestoreBar(std::min(width, ImGui::GetContentRegionAvail().x)))
+                toggleBottomPanel();
+        }
+        ImGui::End();
+        ImGui::PopStyleVar();
+    }
     const auto dockspaceId = ImGui::GetID("CyDAW2Dockspace");
     if (resetLayoutRequested_ || !layoutBuilt_ || ImGui::DockBuilderGetNode(dockspaceId) == nullptr) {
         buildDefaultLayout(dockspaceId);

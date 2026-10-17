@@ -171,8 +171,47 @@ void WorkshopView::save(const bool asNewFile)
         report(saved.getErrorMessage(), true);
         return;
     }
-    report(ui::Ls("Enregistré dans Mes périphériques : ", "Saved into My devices: ") + written.getFileName(), false);
+    const auto inLibrary = written.isAChildOf(Studio::deviceLibraryFolder());
+    report(inLibrary ? ui::Ls("Enregistré dans Mes périphériques : ", "Saved into My devices: ") + written.getFileName()
+                     : ui::Ls("Périphérique enregistré : ", "Device saved: ") + written.getFullPathName(), false);
     refreshLibrary(true);
+}
+
+void WorkshopView::chooseDevice(const bool exporting)
+{
+    const auto tab = studio_.activeWorkshopTab();
+    auto name = juce::File::createLegalFileName(studio_.workshop().name).trim();
+    if (name.isEmpty()) name = "Device";
+    chooser_ = std::make_unique<juce::FileChooser>(
+        exporting ? ui::Ls("Exporter le périphérique CyDAW", "Export CyDAW device") : ui::Ls("Ouvrir un périphérique CyDAW", "Open CyDAW device"),
+        exporting ? locations::folder(Location::pluginExports).getChildFile(name + ".cydawdevice") : Studio::deviceLibraryFolder(),
+        "*.cydawdevice");
+    chooser_->launchAsync((exporting ? juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting
+                                   : juce::FileBrowserComponent::openMode) | juce::FileBrowserComponent::canSelectFiles,
+        [this, exporting, tab](const juce::FileChooser& chooser) {
+            auto file = chooser.getResult();
+            if (file == juce::File()) return;
+            if (!exporting) {
+                perform({ WorkshopRequest::Kind::file, {}, 0, file });
+                return;
+            }
+            if (studio_.activeWorkshopTab() != tab) {
+                report(ui::Ls("Le périphérique actif a changé : relancez l'export.", "The active device changed: start the export again."), true);
+                return;
+            }
+            file = file.withFileExtension("cydawdevice");
+            juce::StringArray dependencies;
+            if (const auto saved = studio_.exportWorkshop(file, dependencies); saved.failed()) {
+                report(saved.getErrorMessage(), true);
+                return;
+            }
+            deviceTransferWarning_ = !dependencies.isEmpty();
+            deviceTransferMessage_ = ui::Ls("Périphérique CyDAW exporté : ", "CyDAW device exported: ") + file.getFullPathName();
+            if (deviceTransferWarning_)
+                deviceTransferMessage_ += ui::Ls("\nFichiers externes à fournir séparément :\n", "\nExternal files to transfer separately:\n") + dependencies.joinIntoString("\n");
+            report(deviceTransferMessage_, false);
+            host_.wake();
+        });
 }
 
 void WorkshopView::drawDiscard()
@@ -343,7 +382,7 @@ void WorkshopView::drawTopBar()
     const auto current = studio_.workshop();
 
     if (ImGui::Button((juce::String::fromUTF8(icon::back) + " Studio").toRawUTF8()))
-        state_.workshopMode = false;
+        state_.mode = AppMode::studio;
     ui::tooltip(L("Revenir au studio : pistes, arrangement, mixage (F7)", "Back to the studio: tracks, arrangement, mixing (F7)"));
     ImGui::SameLine(0.0f, dp(6.0f));
     if (ui::iconButton(icon::dockLeft, L("Nœuds et Mes périphériques", "Nodes and My devices"), showLibrary_))
@@ -375,6 +414,13 @@ void WorkshopView::drawTopBar()
             ImGui::EndMenu();
         }
         ImGui::Separator();
+        if(ImGui::MenuItem(L("Graphe vide — E/S manuelles", "Empty graph — manual I/O"))) {
+            perform({WorkshopRequest::Kind::newEffect});
+            if(auto* slot=studio_.workshopRoot()) {
+                const auto nodes=slot->graph().editorNodes();
+                for(const auto& n:nodes) if(n.boundary) slot->graph().editorRemoveBoundary(n.id);
+            }
+        }
         if (ImGui::MenuItem(L("Instrument (MIDI → son)", "Instrument (MIDI to sound)")))
             state_.workshopRequest = WorkshopRequest { WorkshopRequest::Kind::newInstrument };
         if (state_.selectedTrack && state_.selectedTrack->midi
@@ -382,6 +428,10 @@ void WorkshopView::drawTopBar()
             state_.workshopRequest = WorkshopRequest { WorkshopRequest::Kind::trackDevice, *state_.selectedTrack, 0, {} };
         ImGui::EndPopup();
     }
+    ImGui::SameLine(0.0f, dp(2.0f));
+    if (ImGui::Button(L("Ouvrir CyDAW…", "Open CyDAW…")))
+        chooseDevice(false);
+    ui::tooltip(L("Ouvrir un graphe .cydawdevice provenant d'un autre CyDAW", "Open a .cydawdevice graph from another CyDAW"));
     if (!current.open) {
         ImGui::SameLine();
         ImGui::AlignTextToFramePadding();
@@ -389,11 +439,17 @@ void WorkshopView::drawTopBar()
         return;
     }
     ImGui::SameLine(0.0f, dp(2.0f));
-    if (ui::iconButton(icon::save, L("Enregistrer dans Mes périphériques", "Save into My devices"), current.unsaved, p.accent))
+    if (ui::iconButton(icon::save, current.file != juce::File() && !current.file.isAChildOf(Studio::deviceLibraryFolder())
+                           ? L("Enregistrer le périphérique ouvert", "Save the open device")
+                           : L("Enregistrer dans Mes périphériques", "Save into My devices"), current.unsaved, p.accent))
         save(false);
     ImGui::SameLine(0.0f, dp(2.0f));
     if (ui::iconButton(icon::copy, L("Enregistrer une copie (un nouveau périphérique)", "Save a copy (a new device)")))
         save(true);
+    ImGui::SameLine(0.0f, dp(2.0f));
+    if (ImGui::Button(L("Exporter CyDAW…", "Export CyDAW…")))
+        chooseDevice(true);
+    ui::tooltip(L("Partager le graphe, les interfaces et les presets en .cydawdevice", "Share the graph, interfaces and presets as .cydawdevice"));
     ui::toolbarSeparator();
 
     // Its name, and what it is.
@@ -437,6 +493,10 @@ void WorkshopView::drawTopBar()
         if (modeButton(L("Interface", "Interface"), interfaceMode_))
             interfaceMode_ = true;
         ui::tooltip(L("La fenêtre du plugin : ses potards, faders, courbes, à placer", "The plugin's window: its knobs, faders, curves, to place"));
+        if(interfaceMode_) {
+            ImGui::SameLine(); if(modeButton(L("Grande fenêtre", "Full window"),!interface_->deviceLayout())) interface_->setDeviceLayout(false);
+            ImGui::SameLine(); if(modeButton(L("Carte module", "Module card"),interface_->deviceLayout())) interface_->setDeviceLayout(true);
+        }
     }
     ui::toolbarSeparator();
 
@@ -978,6 +1038,12 @@ void WorkshopView::drawSide()
         return;
     }
     if (ImGui::BeginTabBar("##workshopTabs")) {
+        if (ImGui::BeginTabItem(L("Détails", "Details"))) {
+            ImGui::BeginChild("##selectionDetails"); graph_->drawDetails(); ImGui::EndChild(); ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem(L("E/S", "I/O"))) {
+            ImGui::BeginChild("##boundaryDetails"); graph_->drawPorts(); ImGui::EndChild(); ImGui::EndTabItem();
+        }
         if (ImGui::BeginTabItem(L("Infos", "Info"))) {
             ImGui::BeginChild("##workshopInfo");
             drawInfo(root->graph());
@@ -992,11 +1058,11 @@ void WorkshopView::drawSide()
         }
         if (ImGui::BeginTabItem(L("Préréglages", "Presets"))) {
             ImGui::BeginChild("##workshopPrograms");
-            drawPrograms(root->graph());
+            graph_->drawPrograms();
             ImGui::EndChild();
             ImGui::EndTabItem();
         }
-        if (ImGui::BeginTabItem("VST3")) {
+        if (ImGui::BeginTabItem("Export")) {
             ImGui::BeginChild("##workshopExport");
             drawExport(*root);
             ImGui::EndChild();
@@ -1098,9 +1164,9 @@ void WorkshopView::drawParameters(app::NodeGraphComponent& graph)
     const auto& p = theme::palette();
     const auto parameters = graph.editorGraphParameters();
     ImGui::PushTextWrapPos(0.0f);
-    ImGui::TextDisabled("%s", L("Les réglages des cartes que le périphérique montre : « Panneau » dans Périphériques, « VST3 » "
+    ImGui::TextDisabled("%s", L("Les réglages des cartes que le périphérique montre : « Panneau » dans Périphériques, « Hôte » "
                                 "comme paramètres du plugin exporté.",
-                                "The cards' settings the device shows: \"Panel\" in Devices, \"VST3\" as the exported plugin's "
+                                "The cards' settings the device shows: \"Panel\" in Devices, \"Host\" as the exported plugin's "
                                 "parameters."));
     ImGui::PopTextWrapPos();
     if (parameters.empty()) {
@@ -1152,13 +1218,11 @@ void WorkshopView::drawParameters(app::NodeGraphComponent& graph)
     auto toHost = 0;
     for (const auto& parameter : parameters)
         toHost += parameter.publishToHost ? 1 : 0;
-    if (toHost > 32)
-        ImGui::TextColored(theme::vec(p.warn), L("%d réglages pour le VST3 : 32 au plus.", "%d settings for the VST3: 32 at most."), toHost);
     labels_.resize(parameters.size(), std::vector<char>(96, 0));
     if (ImGui::BeginTable("##workshopParameterTable", 4, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_RowBg)) {
         ImGui::TableSetupColumn(L("Nom", "Name"), ImGuiTableColumnFlags_WidthStretch, 1.6f);
         ImGui::TableSetupColumn(L("Panneau", "Panel"), ImGuiTableColumnFlags_WidthFixed);
-        ImGui::TableSetupColumn("VST3", ImGuiTableColumnFlags_WidthFixed);
+        ImGui::TableSetupColumn(L("Hôte", "Host"), ImGuiTableColumnFlags_WidthFixed);
         ImGui::TableSetupColumn(L("Valeur", "Value"), ImGuiTableColumnFlags_WidthStretch, 1.0f);
         ImGui::TableHeadersRow();
         for (std::size_t index = 0; index < parameters.size(); ++index) {
@@ -1179,7 +1243,7 @@ void WorkshopView::drawParameters(app::NodeGraphComponent& graph)
             auto inHost = parameter.publishToHost;
             if (ImGui::Checkbox("##host", &inHost))
                 (void) graph.setPublishedParameterExposure(parameter.binding, parameter.showInDevice, inHost);
-            ui::tooltip(L("Paramètre du plugin VST3 (automatisable dans l'hôte)", "A parameter of the VST3 plugin (automatable in the host)"));
+            ui::tooltip(L("Paramètre du plugin exporté (automatisable dans l'hôte)", "An exported plugin parameter (automatable in the host)"));
             ImGui::TableNextColumn();
             auto value = static_cast<float>(parameter.value);
             ImGui::SetNextItemWidth(-1.0f);
@@ -1195,134 +1259,22 @@ void WorkshopView::drawParameters(app::NodeGraphComponent& graph)
     }
 }
 
-void WorkshopView::drawPrograms(app::NodeGraphComponent& graph)
-{
-    const auto& p = theme::palette();
-    auto programs = graph.editorPrograms();
-    ImGui::PushTextWrapPos(0.0f);
-    ImGui::TextDisabled("%s", L("Les réglages du périphérique gardés sous un nom : enregistrés avec lui, ils deviennent les "
-                                "programmes du VST3 exporté (la liste de préréglages de l'hôte). Un clic en charge un.",
-                                "The device's settings kept under a name: saved with it, they become the exported VST3's "
-                                "programs (the host's preset list). A click loads one."));
-    ImGui::PopTextWrapPos();
-    ImGui::Spacing();
-
-    // Adding the settings as they are.
-    const auto width = ImGui::GetContentRegionAvail().x;
-    ImGui::SetNextItemWidth(width - dp(96.0f));
-    const auto entered = ImGui::InputTextWithHint("##programName", L("Nom du préréglage", "Preset name"), programName_.data(),
-                                                  programName_.size(), ImGuiInputTextFlags_EnterReturnsTrue);
-    ImGui::SameLine();
-    const auto name = textOf(programName_).trim();
-    const auto existing = std::find_if(programs.begin(), programs.end(), [&name](const auto& program) { return program.name == name; });
-    ImGui::BeginDisabled(name.isEmpty());
-    if (ui::primaryButton(existing != programs.end() ? L("Remplacer", "Replace") : L("Ajouter", "Add"), ImVec2(dp(88.0f), 0.0f))
-        || (entered && name.isNotEmpty())) {
-        auto captured = graph.editorCaptureProgram(name);
-        if (existing != programs.end())
-            *existing = std::move(captured);
-        else
-            programs.push_back(std::move(captured));
-        graph.editorSetPrograms(programs);
-        program_ = name;
-        std::fill(programName_.begin(), programName_.end(), '\0');
-        report(ui::Ls("Préréglage enregistré dans le périphérique : ", "Preset kept in the device: ") + name, false);
-        return;
-    }
-    ImGui::EndDisabled();
-    ui::tooltip(L("Garde les réglages actuels sous ce nom", "Keeps the current settings under this name"));
-
-    ImGui::Spacing();
-    ui::sectionTitle(L("Préréglages du périphérique", "The device's presets"));
-    if (programs.empty()) {
-        ImGui::TextDisabled("%s", L("Aucun pour l'instant.", "None yet."));
-        return;
-    }
-    auto changed = false;
-    std::optional<std::size_t> remove;
-    std::optional<std::pair<std::size_t, std::size_t>> swap;
-    for (std::size_t index = 0; index < programs.size(); ++index) {
-        auto& program = programs[index];
-        ImGui::PushID(static_cast<int>(index));
-        if (renamingProgram_ == static_cast<int>(index)) {
-            ImGui::SetNextItemWidth(-dp(48.0f));
-            if (ImGui::IsWindowAppearing() || !ImGui::IsAnyItemActive())
-                ImGui::SetKeyboardFocusHere();
-            const auto done = ImGui::InputText("##rename", programRename_.data(), programRename_.size(),
-                                               ImGuiInputTextFlags_EnterReturnsTrue);
-            ImGui::SameLine();
-            if (done || ImGui::Button("OK")) {
-                const auto renamed = textOf(programRename_).trim();
-                if (renamed.isNotEmpty()) {
-                    if (program_ == program.name)
-                        program_ = renamed;
-                    program.name = renamed;
-                    changed = true;
-                }
-                renamingProgram_ = -1;
-            }
-            if (ImGui::IsKeyPressed(ImGuiKey_Escape))
-                renamingProgram_ = -1;
-        } else {
-            const auto label = juce::String(static_cast<int>(index) + 1) + ".  " + program.name;
-            if (ImGui::Selectable(label.toRawUTF8(), program.name == program_)) {
-                (void) graph.editorApplyProgram(program);
-                program_ = program.name;
-                report(ui::Ls("Préréglage : ", "Preset: ") + program.name, false);
-            }
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("%s", (juce::String(static_cast<int>(program.values.size()))
-                                         + ui::Ls(" réglages", " settings")).toRawUTF8());
-            if (ImGui::BeginPopupContextItem("##programMenu")) {
-                if (ImGui::MenuItem(L("Charger", "Load"))) {
-                    (void) graph.editorApplyProgram(program);
-                    program_ = program.name;
-                }
-                if (ImGui::MenuItem(L("Remplacer par les réglages actuels", "Replace with the current settings"))) {
-                    program = graph.editorCaptureProgram(program.name);
-                    changed = true;
-                }
-                if (ImGui::MenuItem(L("Renommer", "Rename"))) {
-                    renamingProgram_ = static_cast<int>(index);
-                    std::fill(programRename_.begin(), programRename_.end(), '\0');
-                    program.name.copyToUTF8(programRename_.data(), programRename_.size());
-                }
-                if (ImGui::MenuItem(L("Monter", "Move up"), nullptr, false, index > 0))
-                    swap = std::make_pair(index, index - 1);
-                if (ImGui::MenuItem(L("Descendre", "Move down"), nullptr, false, index + 1 < programs.size()))
-                    swap = std::make_pair(index, index + 1);
-                ImGui::Separator();
-                ImGui::PushStyleColor(ImGuiCol_Text, theme::vec(p.record));
-                if (ImGui::MenuItem(L("Supprimer", "Remove")))
-                    remove = index;
-                ImGui::PopStyleColor();
-                ImGui::EndPopup();
-            }
-        }
-        ImGui::PopID();
-    }
-    if (swap) {
-        std::swap(programs[swap->first], programs[swap->second]);
-        changed = true;
-    }
-    if (remove) {
-        if (programs[*remove].name == program_)
-            program_.clear();
-        programs.erase(programs.begin() + static_cast<std::ptrdiff_t>(*remove));
-        changed = true;
-    }
-    if (changed)
-        graph.editorSetPrograms(programs);
-    ImGui::Spacing();
-    ImGui::TextDisabled("%s", L("Clic droit : remplacer, renommer, ordonner, supprimer.",
-                                "Right click: replace, rename, order, remove."));
-}
-
 void WorkshopView::drawExport(GraphSlot& slot)
 {
     const auto& p = theme::palette();
     auto& graph = slot.graph();
     const auto width = ImGui::GetContentRegionAvail().x;
+
+    ui::sectionTitle(L("Périphérique CyDAW", "CyDAW device"));
+    if (ImGui::Button(L("Exporter le graphe .cydawdevice…", "Export .cydawdevice graph…"), ImVec2(width, 0.0f)))
+        chooseDevice(true);
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextDisabled("%s", L("Graphe éditable, interfaces et presets. Ouvrable sur un autre CyDAW, sans compilation.",
+                                "Editable graph, interfaces and presets. Open in another CyDAW without compiling."));
+    if (deviceTransferMessage_.isNotEmpty())
+        ImGui::TextColored(theme::vec(deviceTransferWarning_ ? p.warn : p.play), "%s", deviceTransferMessage_.toRawUTF8());
+    ImGui::PopTextWrapPos();
+    ImGui::Separator();
 
     // The plugin's identity, as hosts list it.
     ui::sectionTitle(L("Identité du plugin", "Plugin identity"));
@@ -1385,12 +1337,9 @@ void WorkshopView::drawExport(GraphSlot& slot)
                              + juce::String(outputs) + ui::Ls(" sortie(s)", " output(s)")
                              + (plan.acceptsMidi ? ui::Ls(", reçoit le MIDI", ", takes MIDI") : juce::String()));
             planDetails_.add(ui::Ls("Paramètres : ", "Parameters: ") + juce::String(planParameters_));
-            if (planParameters_ > 32)
-                planIssues_.add(ui::Ls("32 paramètres au plus : décochez « VST3 » pour les autres (onglet Paramètres).",
-                                       "32 parameters at most: untick \"VST3\" for the others (Parameters tab)."));
-            if (outputs != 1 || inputs > 1)
-                planIssues_.add(ui::Ls("Un VST3 exporté a une sortie audio, et une entrée au plus.",
-                                       "An exported VST3 has one audio output, and one input at most."));
+            if (outputs != 1 || inputs > 4)
+                planIssues_.add(ui::Ls("Un plugin exporté a une sortie audio, et quatre entrées au plus.",
+                                       "An exported plugin has one audio output, and four inputs at most."));
         }
         planReady_ = result.plan.has_value() && planIssues_.isEmpty();
     }
@@ -1398,30 +1347,47 @@ void WorkshopView::drawExport(GraphSlot& slot)
     ui::sectionTitle(L("Vérification", "Check"));
     ImGui::PushTextWrapPos(0.0f);
     if (planReady_)
-        ImGui::TextColored(theme::vec(p.play), "%s", L("Prêt à devenir un VST3.", "Ready to become a VST3."));
+        ImGui::TextColored(theme::vec(p.play), "%s", L("Prêt pour l’export natif.", "Ready for native export."));
     for (const auto& issue : planIssues_)
         ImGui::TextColored(theme::vec(p.record), "• %s", issue.toRawUTF8());
     for (const auto& detail : planDetails_)
         ImGui::TextDisabled("%s", detail.toRawUTF8());
     ImGui::PopTextWrapPos();
 
-    // The project, then the plugin.
     ImGui::Spacing();
-    ui::sectionTitle(L("Export", "Export"));
-    const auto folder = exportFolderFor(juce::String(identity.productName));
-    const auto project = folder.getChildFile("projet");
+    ui::sectionTitle(L("Formats", "Formats"));
+    const char* formats[]{"VST3", "CLAP", "LV2"};
+    for(int i=0;i<3;++i) {
+        if(i)ImGui::SameLine();
+        ImGui::Checkbox(formats[i],&exportFormats_[i]);
+    }
+    ui::sectionTitle(L("Plateformes", "Platforms"));
+    ImGui::Checkbox("Windows x64",&exportWindows_);ImGui::SameLine();
+    ImGui::Checkbox("Linux x64",&exportLinux_);
+    ImGui::TextDisabled("%s",L("macOS : reporté", "macOS: deferred"));
+    const auto folder=exportFolderFor(juce::String(identity.productName));
     ImGui::PushTextWrapPos(0.0f);
-    ImGui::TextDisabled(L("Dans %s", "Into %s"), folder.getFullPathName().toRawUTF8());
+    ImGui::TextDisabled(L("Dans %s", "Into %s"),folder.getFullPathName().toRawUTF8());
+    if(exportLinux_)ImGui::TextDisabled("%s",L("Première compilation Linux : téléchargement local de Zig et du SDK X11/OpenGL. Python 3 et Ninja requis.",
+        "First Linux build: local download of Zig and the X11/OpenGL SDK. Python 3 and Ninja required."));
     ImGui::PopTextWrapPos();
-    const auto generate = [&]() {
-        if (project.exists())
-            (void) project.deleteRecursively();
-        if (const auto made = graph.generateVst3Project(project); made.failed()) {
-            report(made.getErrorMessage(), true);
-            return false;
+    std::vector<Vst3Build::Job> jobs;
+    const auto generate=[&]() {
+        jobs.clear();
+        for(const auto* platform:{"Windows","Linux"}) {
+            if((juce::String(platform)=="Windows"&&!exportWindows_)||(juce::String(platform)=="Linux"&&!exportLinux_))continue;
+            for(int i=0;i<3;++i)if(exportFormats_[i]) {
+                const auto destination=folder.getChildFile(platform).getChildFile(formats[i]);
+                const auto project=destination.getChildFile("projet");
+                if(const auto made=graph.generateVst3Project(project,formats[i]);made.failed()) {
+                    report(made.getErrorMessage(),true);return false;
+                }
+                jobs.push_back({project,destination,juce::String(identity.productName),formats[i],platform});
+            }
         }
-        return true;
+        return !jobs.empty();
     };
+    const auto selection=(exportWindows_||exportLinux_)&&(exportFormats_[0]||exportFormats_[1]||exportFormats_[2]);
 
     ImGui::TextDisabled("%s", L("Sources de CyDAW", "CyDAW's sources"));
     ImGui::SetNextItemWidth(width);
@@ -1437,20 +1403,20 @@ void WorkshopView::drawExport(GraphSlot& slot)
     ImGui::PopTextWrapPos();
 
     const auto busy = build_.running();
-    ImGui::BeginDisabled(!planReady_ || busy);
-    if (ui::primaryButton(L("Compiler le VST3", "Build the VST3"), ImVec2(width, 0.0f))) {
+    ImGui::BeginDisabled(!planReady_ || busy || !selection);
+    if (ui::primaryButton(L("Compiler les cibles choisies", "Build selected targets"), ImVec2(width, 0.0f))) {
         if (!tools.ready()) {
             report(ui::Ls("Il faut CMake et les sources de CyDAW pour compiler.", "Building needs CMake and CyDAW's sources."), true);
         } else if (generate()) {
-            (void) build_.start(project, folder, juce::String(identity.productName), tools);
+            if(!build_.startBatch(jobs,tools))report(ui::Ls("Une compilation est déjà en cours.","A build is already running."),true);
             exported_.clear();
         }
     }
-    ui::tooltip(L("Compile le plugin avec Visual Studio : la première fois prend plusieurs minutes, les suivantes moins.",
-                  "Builds the plugin with Visual Studio: minutes the first time, less afterwards."));
-    if (ImGui::Button(L("Créer seulement le projet", "Only make the project"), ImVec2(width, 0.0f)) && generate()) {
-        exported_ = project.getFullPathName();
-        report(ui::Ls("Projet VST3 créé : ", "VST3 project made: ") + exported_, false);
+    ui::tooltip(L("Compilation locale, une cible après l’autre. Les bibliothèques compilées sont mises en cache.",
+                  "Build locally, one target after another. Compiled libraries are cached."));
+    if (ImGui::Button(L("Créer seulement les projets", "Only create projects"), ImVec2(width, 0.0f)) && generate()) {
+        exported_ = folder.getFullPathName();
+        report(ui::Ls("Projet natif créé : ", "Native project made: ") + exported_, false);
     }
     ImGui::EndDisabled();
     if (exported_.isNotEmpty()) {
@@ -1472,7 +1438,7 @@ void WorkshopView::drawExport(GraphSlot& slot)
             ImGui::TextColored(theme::vec(p.accent), L("Compilation… %d s", "Building… %d s"), seconds);
             break;
         case Vst3Build::Phase::done:
-            ImGui::TextColored(theme::vec(p.play), L("VST3 prêt (%d s)", "VST3 ready (%d s)"), seconds);
+            ImGui::TextColored(theme::vec(p.play), L("Plugin prêt (%d s)", "Plugin ready (%d s)"), seconds);
             break;
         case Vst3Build::Phase::failed:
             ImGui::TextColored(theme::vec(p.record), "%s", build_.failure().toRawUTF8());
@@ -1489,13 +1455,19 @@ void WorkshopView::drawExport(GraphSlot& slot)
             const auto bundle = build_.bundle();
             ImGui::PushTextWrapPos(0.0f);
             ImGui::TextUnformatted(bundle.getFullPathName().toRawUTF8());
-            ImGui::TextDisabled("%s", L("Pour d'autres logiciels : copiez-le dans C:\\Program Files\\Common Files\\VST3. "
+            ImGui::TextDisabled("%s", L("Pour d'autres logiciels : copiez-le dans le dossier du format choisi. "
                                         "Dans CyDAW, le périphérique est déjà dans Mes périphériques une fois enregistré.",
-                                        "For other software: copy it into C:\\Program Files\\Common Files\\VST3. In CyDAW, the "
+                                        "For other software: copy it into the selected format’s folder. In CyDAW, the "
                                         "device is in My devices once saved."));
             ImGui::PopTextWrapPos();
             if (ImGui::Button(L("Afficher le plugin", "Show the plugin")))
                 bundle.revealToUser();
+        }
+        for(const auto& result:build_.results()) {
+            ImGui::PushTextWrapPos(0.0f);
+            ImGui::TextColored(theme::vec(result.error.isEmpty()?p.play:p.record),"%s / %s : %s",result.platform.toRawUTF8(),result.format.toRawUTF8(),
+                (result.error.isEmpty()?result.file.getFullPathName():result.error).toRawUTF8());
+            ImGui::PopTextWrapPos();
         }
         const auto log = build_.log();
         if (!log.isEmpty() && ImGui::CollapsingHeader(L("Journal de compilation", "Build log"))) {

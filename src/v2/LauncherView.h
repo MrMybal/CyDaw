@@ -14,6 +14,7 @@ class LauncherView final {
 public:
     LauncherView(Studio& studio, UiState& state);
     void draw();
+    bool dropFiles(const juce::StringArray& files, ImVec2 screenPoint);
     // Ctrl+E, the slot menu: the selected empty slots' stop taken off (a
     // scene launched then leaves their track playing), or put back.
     void toggleSelectedStops();
@@ -30,6 +31,10 @@ private:
     UiState& state_;
     // How far the scenes are scrolled down (the names and the strips stay).
     float sceneScroll_ {};
+    int drawnFrame_{-100};
+    struct DropSlot { SlotRef slot; ImVec2 min, max; };
+    std::vector<DropSlot> dropSlots_;
+    ImVec2 dropMin_{}, dropMax_{};
 };
 
 } // namespace cydaw::v2

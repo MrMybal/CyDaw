@@ -1,4 +1,5 @@
 #include "PrismView.h"
+#include "InstrumentPanels.h"
 
 #include "Icons.h"
 #include "InstrumentEffects.h"
@@ -499,19 +500,6 @@ void PrismView::drawFilterResponse(const ImVec2 origin, const ImVec2 size)
     if (!drawingHeard_)
         list->AddRectFilled(origin, ImVec2(origin.x + size.x, origin.y + size.y), p.bg0, dp(4.0f));
     const auto on = value(prism::filterBase + prism::filterOn) >= 0.5f;
-    const auto type = static_cast<prism::FilterType>(std::lround(value(prism::filterBase + prism::filterType)));
-    const auto cutoff = static_cast<double>(value(prism::filterBase + prism::filterCutoff));
-    const auto resonance = static_cast<double>(value(prism::filterBase + prism::filterResonance));
-    const auto variation = static_cast<double>(value(prism::filterBase + prism::filterVariation));
-    const auto mix = static_cast<double>(value(prism::filterBase + prism::filterMix));
-    const auto q = 0.5 + resonance * resonance * 24.0;
-    using C = std::complex<double>;
-    const auto svf = [](const C s, const double quality, C& low, C& band, C& high) {
-        const auto d = s * s + s / quality + 1.0;
-        low = 1.0 / d;
-        band = (s / quality) / d;
-        high = (s * s) / d;
-    };
     // Grid: octaves.
     if (!drawingHeard_) {
         for (double f = 100.0; f < 20'000.0; f *= 10.0) {
@@ -525,66 +513,7 @@ void PrismView::drawFilterResponse(const ImVec2 origin, const ImVec2 size)
     ImVec2 line[points];
     for (int i = 0; i < points; ++i) {
         const auto f = 20.0 * std::pow(1'000.0, static_cast<double>(i) / (points - 1));
-        const C s(0.0, f / std::max(cutoff, 1.0));
-        C h(1.0, 0.0);
-        C low;
-        C band;
-        C high;
-        switch (type) {
-        case prism::FilterType::lowpass12: svf(s, q, low, band, high); h = low; break;
-        case prism::FilterType::highpass12: svf(s, q, low, band, high); h = high; break;
-        case prism::FilterType::bandpass12: svf(s, q, low, band, high); h = band; break;
-        case prism::FilterType::notch: svf(s, q, low, band, high); h = low + high; break;
-        case prism::FilterType::peak: {
-            svf(s, q, low, band, high);
-            const auto gain = std::pow(10.0, (variation - 0.5) * 36.0 / 20.0);
-            h = 1.0 + (gain - 1.0) * band;
-            break;
-        }
-        case prism::FilterType::lowpass24:
-        case prism::FilterType::highpass24:
-        case prism::FilterType::bandpass24: {
-            C l2;
-            C b2;
-            C h2;
-            svf(s, 0.54, low, band, high);
-            svf(s, 1.31 * (1.0 + resonance * resonance * 9.0), l2, b2, h2);
-            h = type == prism::FilterType::lowpass24 ? low * l2 : type == prism::FilterType::highpass24 ? high * h2 : band * b2;
-            break;
-        }
-        case prism::FilterType::ladder: {
-            const auto k = resonance * 3.9;
-            const auto pole = 1.0 + s;
-            h = (1.0 + k * 0.35) / (pole * pole * pole * pole + k);
-            break;
-        }
-        case prism::FilterType::combPlus:
-        case prism::FilterType::combMinus: {
-            const auto feedback = (type == prism::FilterType::combMinus ? -1.0 : 1.0) * resonance * 0.97;
-            const auto phase = 2.0 * std::numbers::pi * f / std::max(cutoff, 1.0);
-            h = 0.5 / (1.0 - feedback * std::polar(1.0, -phase));
-            break;
-        }
-        case prism::FilterType::formant: {
-            const double vowels[5][3] = { { 800, 1150, 2900 }, { 400, 1600, 2700 }, { 270, 2290, 3010 },
-                                          { 450, 800, 2830 },  { 325, 700, 2530 } };
-            const auto at = variation * 4.0;
-            const auto from = std::min(3, static_cast<int>(at));
-            const auto t = at - from;
-            const auto shift = std::clamp(cutoff / 1'000.0, 0.25, 4.0);
-            const double gains[3] = { 1.0, 0.7, 0.4 };
-            h = 0.0;
-            for (int formant = 0; formant < 3; ++formant) {
-                const auto centre = (vowels[from][formant] + (vowels[from + 1][formant] - vowels[from][formant]) * t) * shift;
-                svf(C(0.0, f / centre), 4.0 + resonance * 16.0, low, band, high);
-                h += band * gains[formant] * 1.4;
-            }
-            break;
-        }
-        case prism::FilterType::count: break;
-        }
-        h = 1.0 + (h - 1.0) * mix;
-        const auto db = std::clamp(20.0 * std::log10(std::max(std::abs(h), 1.0e-6)), -36.0, 18.0);
+        const auto db=instrument_ui::filterResponse(card_.values,f);
         line[i] = ImVec2(origin.x + size.x * static_cast<float>(i) / (points - 1),
                          origin.y + size.y * static_cast<float>((18.0 - db) / 54.0));
     }

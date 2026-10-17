@@ -9,7 +9,7 @@
 namespace cydaw::plugins {
 
 inline constexpr std::uint32_t workerProtocolMagic = 0x43594457; // "CYDW"
-inline constexpr std::uint16_t workerProtocolVersion = 5;
+inline constexpr std::uint16_t workerProtocolVersion = 6;
 inline constexpr std::uint32_t maximumSharedAudioChannels = 8;
 inline constexpr std::uint32_t maximumSharedAudioFrames = 2'048;
 inline constexpr std::uint32_t maximumSharedPluginParameters = 512;
@@ -145,6 +145,13 @@ struct alignas(64) SharedPluginAudio {
     alignas(64) float input[maximumSharedAudioChannels * maximumSharedAudioFrames] {};
     alignas(64) float output[maximumSharedAudioChannels * maximumSharedAudioFrames] {};
     alignas(64) std::uint8_t stateData[maximumSharedPluginStateBytes] {};
+    // Appended in protocol 6: one transport snapshot per submitted audio block.
+    double transportSeconds {};
+    double transportTempo {120.0};
+    double transportQuarterNotes {};
+    std::uint32_t transportPlaying {};
+    std::uint32_t transportNumerator {4};
+    std::uint32_t transportDenominator {4};
 };
 #if defined(_MSC_VER)
 #pragma warning(pop)
@@ -173,7 +180,7 @@ static_assert(offsetof(SharedPluginAudio, automation) == 88'940);
 static_assert(offsetof(SharedPluginAudio, input) == 89'472);
 static_assert(offsetof(SharedPluginAudio, output) == 155'008);
 static_assert(offsetof(SharedPluginAudio, stateData) == 220'544);
-static_assert(sizeof(SharedPluginAudio) == 4'414'848);
+static_assert(sizeof(SharedPluginAudio) == 4'414'912);
 
 struct CrashPolicy {
     std::uint32_t automaticRestartLimit { 3 };

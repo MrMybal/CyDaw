@@ -107,6 +107,8 @@ std::vector<NodeGraphComponent::EditorNode> NodeGraphComponent::editorNodes() co
             editorPort.channels = port.channels;
             editorPort.multiple = port.acceptsMultipleConnections;
             editorPort.defaultValue = port.defaultValue;
+            editorPort.exposure = port.exposure;
+            editorPort.category = port.category;
             entry.ports.push_back(std::move(editorPort));
         }
         // Older cards declare one socket per side and no port list.
@@ -121,7 +123,8 @@ std::vector<NodeGraphComponent::EditorNode> NodeGraphComponent::editorNodes() co
         for (const auto& parameter : node.interfaceState.parameters) {
             EditorParameter editorParameter;
             editorParameter.binding = parameter.key;
-            editorParameter.label = parameter.label.isNotEmpty() ? parameter.label : parameter.key;
+            editorParameter.label = node.typeKey=="value-constant" && node.alias.isNotEmpty() ? node.alias
+                : parameter.label.isNotEmpty() ? parameter.label : parameter.key;
             editorParameter.unit = parameter.unit;
             editorParameter.minimum = parameter.minimum;
             editorParameter.maximum = parameter.maximum;
@@ -129,11 +132,128 @@ std::vector<NodeGraphComponent::EditorNode> NodeGraphComponent::editorNodes() co
             editorParameter.defaultValue = std::isnan(parameter.defaultValue) ? parameter.value
                                                                               : parameter.defaultValue;
             editorParameter.showInDevice = parameter.showInDevice;
+            editorParameter.publishToHost = parameter.publishToHost;
+            editorParameter.description = parameter.description;
+            const auto primitiveKey = parameter.key.fromLastOccurrenceOf(".",false,false);
+            juce::String catalogueKey;
+            if(const auto* effect=cydaw::engine::effectForType(node.typeKey.toStdString()))
+                for(const auto& setting:effect->parameters)
+                    if(parameter.key.endsWith("."+juce::String(std::string(setting.suffix)))) {catalogueKey=juce::String(std::string(setting.key));break;}
+            for (const auto& port : node.ports)
+                if (port.input && ((catalogueKey.isNotEmpty() && port.key==catalogueKey) || port.key == primitiveKey || port.key == "knob." + parameter.key
+                    || parameter.key.endsWith("." + port.key) || (port.key=="gain" && parameter.key.endsWith("gain.db"))
+                    || (port.key=="drive" && parameter.key.endsWith("drive.db")))) {
+                    editorParameter.inputPortId = port.id; break;
+                }
             entry.parameters.push_back(std::move(editorParameter));
         }
         out.push_back(std::move(entry));
     }
     return out;
+}
+
+bool NodeGraphComponent::editorSetPortExposure(const std::uint64_t id, const std::uint64_t portId, const bool exposed)
+{
+    auto* node = findNode(id);
+    if (!node || editingLocked_) return false;
+    auto port = std::ranges::find(node->ports, portId, &NodePort::id);
+    if (port == node->ports.end()) return false;
+    // Connected sockets remain visible. Hiding one never deletes its cable.
+    port->exposure = exposed ? 1 : 0;
+    node->serialised = juce::var();
+    notifyLayoutChanged("v2-port-exposure");
+    return true;
+}
+
+bool NodeGraphComponent::editorSetPortDetails(const std::uint64_t id, const std::uint64_t portId,
+    const juce::String& name, const juce::String& category)
+{
+    auto* node = findNode(id);
+    if (!node || editingLocked_) return false;
+    auto port = std::ranges::find(node->ports, portId, &NodePort::id);
+    if (port == node->ports.end()) return false;
+    port->name = name.trim().substring(0, 96); port->category = category.trim().substring(0, 128);
+    node->serialised = juce::var(); notifyLayoutChanged("v2-port-details"); return true;
+}
+
+bool NodeGraphComponent::editorRemoveBoundary(const std::uint64_t id)
+{
+    auto* node = findNode(id);
+    if (!node || !isBoundaryNode(*node) || editingLocked_) return false;
+    std::erase_if(connections_, [id](const auto& c) { return c.source == id || c.destination == id; });
+    std::erase_if(nodes_, [id](const auto& n) { return n.id == id; });
+    selectedNodes_.erase(id); synchroniseGraphInterface();
+    notifyLayoutChanged("v2-remove-boundary"); return true;
+}
+
+juce::Result NodeGraphComponent::editorPromoteValue(const std::uint64_t id, std::uint64_t portId,
+    const juce::String& binding, const bool graphInput, std::uint64_t& created)
+{
+    created = 0;
+    if (editingLocked_) return juce::Result::fail(localText("Ce graphe est verrouillé", "This graph is locked"));
+    const auto all = editorNodes();
+    const auto target = std::ranges::find(all, id, &EditorNode::id);
+    if (target == all.end()) return juce::Result::fail("Unknown node");
+    const auto parameter = std::ranges::find(target->parameters, binding, &EditorParameter::binding);
+    if (binding.isNotEmpty()) {
+        if (parameter == target->parameters.end()) return juce::Result::fail("Unknown parameter");
+        portId = parameter->inputPortId;
+    }
+    const auto socket = std::ranges::find(target->ports, portId, &EditorPort::id);
+    if (socket == target->ports.end() || !socket->input)
+        return juce::Result::fail(localText("Cette valeur n'a pas encore d'entrée pilotable dans le moteur.",
+                                          "This value does not yet have a controllable input in the engine."));
+    if (!graphInput && socket->kind != 2)
+        return juce::Result::fail(localText("Une variable locale doit être une valeur.", "A local variable must be a value."));
+    if (std::ranges::any_of(connections_, [&](const auto& c) {return c.destination==id && c.destinationPort==portId;}))
+        return juce::Result::fail(localText("Cette entrée est déjà reliée. Débranchez-la avant de la promouvoir.",
+                                          "This input is already connected. Disconnect it before promoting it."));
+    const auto key = !graphInput ? juce::String("value-constant")
+        : socket->kind==0 ? juce::String("graph-audio-input-")+juce::String(socket->channels)
+        : juce::String(socket->kind==1 ? "graph-midi-input" : socket->kind==2 ? "graph-value-input" : "graph-transport-input");
+    const auto* type = findType(key);
+    if (!type) return juce::Result::fail("Input type is unavailable");
+    const auto beforeInterface = graphInterfaceState_;
+    const auto beforeSelection = selectedNodes_;
+    const auto beforeNext = nextNodeId_;
+    auto at = target->position.translated(-.27f, .04f);
+    addNodeFromType(*type, clampedPosition(at));
+    const auto sourceId = nodes_.back().id;
+    auto* source = findNode(sourceId);
+    auto label = parameter != target->parameters.end() ? parameter->label : socket->name;
+    source->alias = label;
+    const auto value = parameter != target->parameters.end() ? parameter->value : socket->defaultValue;
+    auto output = std::ranges::find_if(source->ports, [](const auto& p){return !p.input;});
+    const auto outputId = output != source->ports.end() ? output->id : 0;
+    if (output != source->ports.end()) {
+        output->name = label; output->category = socket->category; output->defaultValue = value;
+    }
+    if (!graphInput) {
+        auto& p = source->interfaceState.parameters.front();
+        p.label = label; p.value = value; p.defaultValue = value;
+        for(auto* controls:{&source->interfaceState.controls,&source->interfaceState.deviceControls})
+            for(auto& c:*controls)if(c.parameterBinding==p.key)c.label=label;
+        if (parameter != target->parameters.end()) {
+            p.minimum = parameter->minimum; p.maximum = parameter->maximum; p.unit = parameter->unit;
+        }
+        source->parameters.valueOperand=static_cast<float>(value);
+    }
+    if (!outputId || !connectReplacingInput(sourceId,id,outputId,portId)) {
+        std::erase_if(nodes_, [sourceId](const auto& n){return n.id==sourceId;});
+        graphInterfaceState_ = beforeInterface; selectedNodes_=beforeSelection; nextNodeId_=beforeNext;
+        return juce::Result::fail("The promoted value could not be connected");
+    }
+    // A promoted value sets its destination exactly; it is not an LFO.
+    for (auto& c : connections_) if(c.source==sourceId && c.destination==id && c.destinationPort==portId) c.mode=0;
+    if (auto* destination=findNode(id)) {
+        if(auto p=std::ranges::find(destination->ports,portId,&NodePort::id);p!=destination->ports.end()) p->exposure=1;
+        destination->serialised=juce::var();
+    }
+    source->serialised=juce::var();
+    synchroniseGraphInterface(); rebuildEmbeddedSliders();
+    notifyLayoutChanged(graphInput ? "v2-create-input" : "v2-create-variable");
+    created=sourceId;
+    return juce::Result::ok();
 }
 
 ModuleInterfaceState NodeGraphComponent::editorNodeInterface(const std::uint64_t nodeId) const
@@ -817,16 +937,22 @@ juce::Result NodeGraphComponent::editorSetInterface(const ModuleInterfaceState& 
         return juce::Result::fail(localText("Ce graphe est verrouillé", "This graph is locked"));
     auto next = graphInterfaceState_;
     next.controls = state.controls;
+    next.deviceControls = state.deviceControls;
+    next.deviceDesigned = state.deviceDesigned;
+    next.deviceWidth = state.deviceWidth;
+    next.deviceHeight = state.deviceHeight;
     next.snapToGrid = state.snapToGrid;
     next.gridColumns = state.gridColumns;
     next.gridRows = state.gridRows;
+    next.windowDesign=state.windowDesign.clone();
+    next.deviceDesign=state.deviceDesign.clone();
     next.windowWidth = state.windowWidth;
     next.windowHeight = state.windowHeight;
     // The person's own layout from now on.
-    next.designed = true;
+    next.designed = state.designed;
     next.nextControlId = std::max(next.nextControlId, state.nextControlId);
-    for (const auto& control : next.controls)
-        next.nextControlId = std::max(next.nextControlId, control.id + 1);
+    for (const auto* controls : { &next.controls, &next.deviceControls })
+        for (const auto& control : *controls) next.nextControlId = std::max(next.nextControlId, control.id + 1);
     if (const auto valid = validateModuleInterface(next); valid.failed())
         return valid;
     graphInterfaceState_ = std::move(next);
@@ -866,7 +992,8 @@ void NodeGraphComponent::editorSetPrograms(std::vector<EditorProgram> programs)
     std::vector<EditorProgram> cleaned;
     for (auto& program : programs) {
         program.name = program.name.trim().substring(0, 128);
-        if (program.name.isNotEmpty() && cleaned.size() < 512)
+        if (program.name.isNotEmpty() && cleaned.size() < 512
+            && std::none_of(cleaned.begin(), cleaned.end(), [&](const auto& other) { return other.name == program.name; }))
             cleaned.push_back(std::move(program));
     }
     const auto same = cleaned.size() == programs_.size()
@@ -879,12 +1006,12 @@ void NodeGraphComponent::editorSetPrograms(std::vector<EditorProgram> programs)
     notifyLayoutChanged("v2-programs");
 }
 
-NodeGraphComponent::EditorProgram NodeGraphComponent::editorCaptureProgram(const juce::String& name) const
+NodeGraphComponent::EditorProgram NodeGraphComponent::editorCaptureProgram(const juce::String& name, const bool defaults) const
 {
     EditorProgram program;
     program.name = name.trim();
     for (const auto& parameter : graphInterfaceState_.parameters)
-        program.values.emplace_back(parameter.key, parameter.value);
+        program.values.emplace_back(parameter.key, defaults && std::isfinite(parameter.defaultValue) ? parameter.defaultValue : parameter.value);
     return program;
 }
 

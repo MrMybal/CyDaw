@@ -12,7 +12,7 @@
 #include <optional>
 #include <vector>
 
-// The VST workshop: a mode of the whole window, apart from the studio
+// The Plugin workshop: a mode of the whole window, apart from the studio
 // (tracks, arrangement), for building one device made of a graph, an effect
 // or an instrument, as a plugin is built.
 //
@@ -49,8 +49,6 @@ private:
     void drawSide();
     void drawInfo(app::NodeGraphComponent& graph);
     void drawParameters(app::NodeGraphComponent& graph);
-    // The device's programs: saved with it, the exported VST3's programs.
-    void drawPrograms(app::NodeGraphComponent& graph);
     void drawExport(GraphSlot& slot);
     void drawDiscard();
     // The devices open, one tab each; + makes another.
@@ -59,6 +57,7 @@ private:
     void drawSimulator();
     void drawKeyboard(ImVec2 size);
     void chooseSample();
+    void chooseDevice(bool exporting);
     // Before quitting: the next device that would be lost comes forward.
     bool askAboutNextAtRisk();
     void refreshLibrary(bool force);
@@ -116,12 +115,6 @@ private:
     std::vector<char> version_ = std::vector<char>(24, 0);
     std::vector<char> sourceRoot_ = std::vector<char>(512, 0);
     std::vector<std::vector<char>> labels_;
-    // The « Préréglages » tab: the program last chosen, the one renamed.
-    juce::String program_;
-    int renamingProgram_ { -1 };
-    std::vector<char> programName_ = std::vector<char>(128, 0);
-    std::vector<char> programRename_ = std::vector<char>(128, 0);
-
     // The export check, done again when the device changes.
     const void* planSlot_ {};
     std::uint64_t planRevision_ {};
@@ -131,6 +124,10 @@ private:
     juce::StringArray planDetails_;
     int planParameters_ {};
     juce::String exported_;
+    juce::String deviceTransferMessage_;
+    bool deviceTransferWarning_ {};
+    bool exportFormats_[3] {true, false, false};
+    bool exportWindows_ {true}, exportLinux_ {};
 };
 
 } // namespace cydaw::v2

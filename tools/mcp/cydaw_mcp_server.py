@@ -268,6 +268,109 @@ TOOLS = [
                         "required": ["track", "scene"]},
     },
     {
+        "name": "app_mode",
+        "description": ("Le mode de toute la fenetre : studio (pistes, arrangement, lanceur), "
+                        "dj (Mix DJ : platines, table de mixage, collection), foundry (la "
+                        "Fonderie : editer des fichiers son), cinema (son a l image) ou workshop (Atelier VST). mode : "
+                        "le mettre ; sans : celui en place."),
+        "inputSchema": {"type": "object",
+                        "properties": {"mode": {"type": "string", "enum": ["studio", "dj", "foundry", "workshop", "cinema"]}}},
+    },
+    {
+        "name": "dj",
+        "description": ("Le mode Mix DJ (style Traktor) : 2 ou 4 platines (deck A..D ou 0..3). "
+                        "action : status (defaut), load {deck, file}, eject, play {deck, on}, "
+                        "cue {deck, down}, seek {deck, seconds}, tempo {deck, ratio|percent|bpm}, "
+                        "bend {deck, amount}, sync {deck, on}, keylock {deck, on}, master {deck "
+                        "ou -1 auto}, hotcue {deck, index 0..7, do: jump|set|remove}, loop {deck, "
+                        "beats, 0 : arret}, loop_move {deck, beats}, loop_resize {deck, factor}, "
+                        "beatjump {deck, beats}, grid {deck, bpm, firstBeat}, channel {deck, "
+                        "trimDb, high, mid, low (0..1, 0,5 = 0 dB), killHigh, killMid, killLow, "
+                        "filter (-1 passe-bas .. 1 passe-haut), resonance, fader, cue, side "
+                        "(left|thru|right), effect {kind: echo|reverb|flanger|phaser|filter-lfo|"
+                        "gater|stutter|crusher, on, mix, first, second}}, mixer {crossfader, "
+                        "curve, masterDb, cueMix, split, decks 2|4, quantize, autoGain, limiter}, "
+                        "record {on, path}, folders {add|remove, scan}, analyse {file ou tout}, "
+                        "tracks {query}. show : true met la fenetre en mode DJ. Les niveaux "
+                        "(peakDb) sont ceux du mix DJ, avant le master."),
+        "inputSchema": {"type": "object",
+                        "properties": {"action": {"type": "string"}, "deck": {}, "file": {"type": "string"},
+                                       "on": {"type": "boolean"}, "down": {"type": "boolean"},
+                                       "seconds": {"type": "number"}, "ratio": {"type": "number"},
+                                       "percent": {"type": "number"}, "bpm": {"type": "number"},
+                                       "amount": {"type": "number"}, "index": {"type": "integer"},
+                                       "do": {"type": "string"}, "beats": {"type": "number"},
+                                       "factor": {"type": "number"}, "firstBeat": {"type": "number"},
+                                       "effect": {"type": "object"}, "crossfader": {"type": "number"},
+                                       "path": {"type": "string"}, "add": {"type": "string"},
+                                       "remove": {"type": "string"}, "query": {"type": "string"},
+                                       "show": {"type": "boolean"}}},
+    },
+    {
+        "name": "foundry",
+        "description": ("La Fonderie, editeur de sons multipiste (comme un Sound Forge) : des "
+                        "sessions en onglets (tab : l'index), des pistes (track : l'index) avec des "
+                        "clips (id). action : status (defaut), open {file : un son ou une session "
+                        ".cyfoundry}, new {rate, name}, close, import {file, track (-1 : nouvelle "
+                        "piste), at}, add_track, remove_track {track}, track {track, gainDb, pan, "
+                        "mute, solo, name}, clip {id, start, offset, length, fadeIn, fadeOut, "
+                        "gainDb, toTrack, delete}, select {start, end, seconds: true pour des "
+                        "secondes, tracks: [index], channels: left|right|both}, cursor {at, track}, "
+                        "edit {op: cut|copy|paste|paste_mix|delete|crop|split|select_all}, process "
+                        "{name: gain {gainDb}|normalise {targetDb, rms}|fade_in|fade_out {curve "
+                        "0..3}|invert|reverse|dc|silence|insert_silence {duration}|stretch {speed, "
+                        "pitch en demi-tons, algorithm 0 bande 1 tonal 2 rythmique 3 texture}|rate "
+                        "{rate}|channels {channels 0 mono 1 stereo 2 echange 3 gauche 4 droite}|"
+                        "effects {track : une piste audio du projet, tail}}, undo, redo, save "
+                        "{path, bits 16|24|32 : un son seul}, save_session {path}, export {path, "
+                        "bits, start, end : le mixage}, play {loop}, stop, marker {do: "
+                        "add|region|remove, index}, stats (crete, RMS, DC, LUFS, spectre du "
+                        "mixage de la selection), send_to_studio {eachTrack}. show : true met la "
+                        "fenetre en mode Fonderie."),
+        "inputSchema": {"type": "object",
+                        "properties": {"action": {"type": "string"}, "file": {"type": "string"},
+                                       "tab": {"type": "integer"}, "start": {"type": "number"},
+                                       "end": {"type": "number"}, "seconds": {}, "channels": {},
+                                       "at": {"type": "number"}, "op": {"type": "string"},
+                                       "name": {"type": "string"}, "gainDb": {"type": "number"},
+                                       "targetDb": {"type": "number"}, "rms": {"type": "boolean"},
+                                       "curve": {"type": "integer"}, "speed": {"type": "number"},
+                                       "pitch": {"type": "number"}, "algorithm": {"type": "integer"},
+                                       "rate": {"type": "number"}, "track": {"type": "string"},
+                                       "tail": {"type": "number"}, "path": {"type": "string"},
+                                       "bits": {"type": "integer"}, "loop": {"type": "boolean"},
+                                       "do": {"type": "string"}, "index": {"type": "integer"},
+                                       "tracks": {"type": "array"}, "id": {"type": "integer"},
+                                       "toTrack": {"type": "integer"}, "duration": {"type": "number"},
+                                       "eachTrack": {"type": "boolean"}, "show": {"type": "boolean"}}},
+    },
+    {
+        "name": "cinema",
+        "description": ("Cinema : bus en lignes Arrangement, conteneurs temporels de sous-pistes audio/MIDI, "
+                        "video facultative et extraction automatique de sa bande son en clip editable. "
+                        "Actions foundry pour clips/notes/automation/processing/export/save_session (.cycinema), "
+                        "container {id,op:focus|select|move|resize|rename|delete,at,length,seconds:true}, "
+                        "plus group {op:add|rename|select|remove,id,name}, add_subtrack {groupId,type:audio|midi,name}, "
+                        "assign {trackId,groupId}, video {file,start,sourceIn,duration,fps,remove}, video_audio, "
+                        "view {start,seconds:fenetre visible en secondes,snap,length:duree projet}. "
+                        "Pour les actions de clips, seconds:true convertit les valeurs temporelles en secondes. "
+                        "show:true ouvre le mode. Le statut fournit les IDs et le routage reste dans processing."),
+        "inputSchema": {"type": "object", "properties": {
+            "action": {"type": "string"}, "show": {"type": "boolean"}, "tab": {"type": "integer"},
+            "op": {"type": "string"}, "file": {"type": "string"}, "path": {"type": "string"},
+            "name": {"type": "string"}, "type": {"type": "string"}, "track": {"type": "integer"},
+            "id": {"type": "integer"}, "groupId": {"type": "integer"}, "trackId": {"type": "integer"},
+            "at": {"type": "number"}, "start": {"type": "number"}, "end": {"type": "number"},
+            "length": {"type": "number"}, "duration": {"type": "number"}, "sourceIn": {"type": "number"},
+            "fps": {"type": "number"}, "seconds": {}, "snap": {"type": "boolean"}, "contentsVisible": {"type": "boolean"},
+            "notes": {"type": "array"}, "lanes": {"type": "array"}, "remove": {"type": "boolean"},
+            "toTrack": {"type": "integer"}, "offset": {"type": "number"}, "gainDb": {"type": "number"},
+            "mute": {"type": "boolean"}, "solo": {"type": "boolean"}, "bits": {"type": "integer"},
+            "tail": {"type": "number"}, "key": {"type": "string"}, "binding": {"type": "string"},
+            "value": {"type": "number"}, "inputId": {"type": "integer"}, "trackKey": {"type": "integer"}
+        }},
+    },
+    {
         "name": "theme",
         "description": ("Les themes de couleurs de l'interface (mid-grey : gris "
                         "moyen, par defaut ; light-grey : gris clair ; dark : le "
@@ -820,7 +923,7 @@ TOOLS = [
         "name": "workshop",
         "description": ("L'atelier de peripheriques : un effet ou un instrument fait "
                         "d'un graphe, edite a part des pistes, enregistre dans Mes "
-                        "peripheriques et exportable en VST3. action : status, new "
+                        "peripheriques et exportable en VST3, CLAP ou LV2. action : status, new "
                         "(instrument, name), open (name d'un peripherique de Mes "
                         "peripheriques), open_track (track, nodeId ; 0 = "
                         "l'instrument d'une piste MIDI), link (track : le mettre "
@@ -830,8 +933,9 @@ TOOLS = [
                         "(asNew), close, enter / leave (peripherique dans le "
                         "peripherique), info (name, description, author, "
                         "category ; parameter + panel / vst3 / label), vst3_check, "
-                        "vst3_export (folder, build : compile avec CMake et "
-                        "Visual Studio en tache de fond), vst3_status, vst3_cancel. "
+                        "vst3_export / clap_export / lv2_export (folder, build : compile avec CMake et "
+                        "Visual Studio en tache de fond), plugin_export_batch (formats, plateformes Windows/Linux, folder, build), "
+                        "device_export (file .cydawdevice partageable), open (file), vst3_status (targets), vst3_cancel. "
                         "Plusieurs peripheriques s'ouvrent en onglets : status "
                         "donne tabs et activeTab ; tab (id) en passe un devant, "
                         "close_tab (id) le ferme. simulate : le peripherique "
@@ -850,7 +954,7 @@ TOOLS = [
                                        "enum": ["status", "new", "open", "open_track",
                                                 "link", "unlink", "channels", "save", "close",
                                                 "enter", "leave", "info", "vst3_check",
-                                                "vst3_export", "vst3_status",
+                                                "vst3_export", "clap_export", "lv2_export", "plugin_export", "plugin_export_batch", "device_export", "vst3_status",
                                                 "vst3_cancel", "tab", "close_tab",
                                                 "simulate", "note"]},
                             "id": {"type": "integer"},
@@ -886,6 +990,12 @@ TOOLS = [
                             "companyName": {"type": "string"},
                             "manufacturerCode": {"type": "string"},
                             "pluginCode": {"type": "string"},
+                            "file": {"type": "string"},
+                            "format": {"type": "string", "enum": ["VST3", "CLAP", "LV2"]},
+                            "formats": {"type": "array", "minItems": 1, "uniqueItems": True,
+                                        "items": {"type": "string", "enum": ["VST3", "CLAP", "LV2"]}},
+                            "platforms": {"type": "array", "minItems": 1, "uniqueItems": True,
+                                          "items": {"type": "string", "enum": ["Windows", "Linux"]}},
                             "folder": {"type": "string"},
                             "build": {"type": "boolean"},
                             "sourceRoot": {"type": "string"}},
@@ -1334,6 +1444,21 @@ TOOLS = [
                                        "parameter": {"type": ["integer", "string"]},
                                        "value": {"type": "number"}},
                         "required": ["track", "plugin", "parameter", "value"]},
+    },
+    {
+        "name": "jsfx",
+        "description": "Editeur JSFX : open (file), source (source), compile, apply (insert), save, new, info. Compilation isolee, diagnostics et rechargement sur la piste audio selectionnee.",
+        "inputSchema": {"type": "object", "properties": {"action": {"type": "string", "enum": ["info", "open", "source", "compile", "apply", "save", "new"]}, "file": {"type": "string"}, "source": {"type": "string"}, "insert": {"type": "boolean"}}},
+    },
+    {
+        "name": "list_plugin_programs",
+        "description": "Liste les programmes disponibles du plugin et le programme actif.",
+        "inputSchema": {"type": "object", "properties": {"track": TRACK, "plugin": {"type": "integer"}}, "required": ["track", "plugin"]},
+    },
+    {
+        "name": "select_plugin_program",
+        "description": "Rappelle un programme du plugin.",
+        "inputSchema": {"type": "object", "properties": {"track": TRACK, "plugin": {"type": "integer"}, "program": {"type": "integer"}}, "required": ["track", "plugin", "program"]},
     },
     {
         "name": "show_plugin_editor",

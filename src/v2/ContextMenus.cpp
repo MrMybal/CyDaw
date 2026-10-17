@@ -147,7 +147,7 @@ void ContextMenus::trackMenu(const TrackRef& track)
                 state_.bringToFront = Panel::editor;
             }
         }
-        if (ImGui::MenuItem(L("Éditer l'instrument dans l'atelier VST", "Edit the instrument in the VST workshop"))) {
+        if (ImGui::MenuItem(L("Éditer l'instrument dans l'atelier Plugin", "Edit the instrument in the Plugin workshop"))) {
             state_.workshopRequest = WorkshopRequest { WorkshopRequest::Kind::trackDevice, track, 0, {} };
             state_.bringToFront = Panel::workshop;
         }
@@ -291,6 +291,12 @@ void ContextMenus::slotMenu(const TrackRef& track, const int scene)
     if (ImGui::MenuItem(L("Arrêter la piste", "Stop the track")))
         stopTrack();
     ImGui::Separator();
+    if (ImGui::MenuItem(L("Inverser le clip (Reverse)", "Reverse clip"))) {
+        const auto result = studio_.reverseLauncherClip(track, scene);
+        state_.status = result.failed() ? result.getErrorMessage() : ui::Ls("Clip inversé", "Clip reversed");
+        state_.statusIsError = result.failed();
+        state_.statusTime = ImGui::GetTime();
+    }
     const auto nextFree = !engine.launcherClip(track.audioIndex, scene + 1).has_value();
     if (ImGui::MenuItem(L("Dupliquer dans la scène suivante", "Duplicate into the next scene"), nullptr, false, nextFree))
         if (engine.transferLauncherClip(track.audioIndex, scene, track.audioIndex, scene + 1, true))

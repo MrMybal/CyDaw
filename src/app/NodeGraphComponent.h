@@ -528,7 +528,7 @@ public:
     [[nodiscard]] juce::var createVst3ExportManifest() const;
     [[nodiscard]] juce::var createVst3RuntimeState() const;
     [[nodiscard]] juce::Result generateVst3Project(
-        const juce::File& destination) const;
+        const juce::File& destination, const juce::String& format = "VST3") const;
     void setEffectParameters(float driveDb, float filterCutoffHz, bool enabled);
     // The long way round, for the suite to compare the short one against.
     void resynchroniseGraphInterfaceForTest() { synchroniseGraphInterface(); }
@@ -549,6 +549,8 @@ public:
         int channels { 1 };
         bool multiple {};
         double defaultValue {};
+        int exposure { -1 };
+        juce::String category;
     };
     struct EditorParameter {
         juce::String binding;
@@ -561,6 +563,7 @@ public:
         bool showInDevice { true };
         bool publishToHost { true };
         juce::String description;
+        std::uint64_t inputPortId {};
     };
     struct EditorNode {
         std::uint64_t id {};
@@ -619,6 +622,14 @@ public:
         std::vector<int> outputKinds;
     };
     [[nodiscard]] std::vector<EditorNode> editorNodes() const;
+    bool editorSetPortExposure(std::uint64_t node, std::uint64_t port, bool exposed);
+    bool editorSetPortDetails(std::uint64_t node, std::uint64_t port, const juce::String& name, const juce::String& category);
+    bool editorRemoveBoundary(std::uint64_t node);
+    // Promote a value/socket in one undoable edit. An input becomes part of
+    // the graph contract; a variable is a local editable constant.
+    juce::Result editorPromoteValue(std::uint64_t node, std::uint64_t port,
+        const juce::String& binding, bool graphInput, std::uint64_t& created);
+    [[nodiscard]] const cydaw::engine::AudioAnalysisFrame& editorAnalysis() const noexcept { return lastAnalysisFrame_; }
     // The audio inputs beside the main one (the instrument, else the first:
     // the track's clips), in the graph's order: node, bus (1, 2…). What
     // other tracks are routed into, a sidechain. On an instrument track's
@@ -722,7 +733,7 @@ public:
     // One undo step; the names are trimmed, an empty one is dropped.
     void editorSetPrograms(std::vector<EditorProgram> programs);
     // The published settings as they are now, under a name.
-    [[nodiscard]] EditorProgram editorCaptureProgram(const juce::String& name) const;
+    [[nodiscard]] EditorProgram editorCaptureProgram(const juce::String& name, bool defaults = false) const;
     // Sets the settings a program has (those still published).
     bool editorApplyProgram(const EditorProgram& program);
     // This graph's own interface: the controls a device (and a plugin) made
@@ -897,6 +908,8 @@ private:
         std::uint8_t channels { 1 };
         bool acceptsMultipleConnections {};
         double defaultValue {};
+        int exposure { -1 };
+        juce::String category;
     };
 
     struct NodeType {
@@ -1076,6 +1089,7 @@ private:
         std::vector<ModuleNode> nodes;
         std::vector<Connection> connections;
         ModuleInterfaceState interfaceState;
+        std::vector<EditorProgram> programs;
         bool hasInput { true };
         PortKind inputKind { PortKind::audio };
         bool hasOutput { true };

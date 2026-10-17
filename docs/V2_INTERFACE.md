@@ -195,6 +195,12 @@ piste, supprimer) ; sur une case du lanceur : lancer, arrêter, ouvrir, renommer
 dans la scène suivante, supprimer, ou un nouveau clip MIDI, et sur une case vide son stop
 (`ContextMenus.*`).
 
+Dans le Lanceur, déposer un fichier audio sur une case de piste audio crée ou remplace son clip.
+Plusieurs fichiers occupent les scènes successives. Déposer un son dans la zone vide à droite des
+pistes crée une piste MIDI dont l’instrument est un sampler chargé avec ce son. Le dépôt fonctionne
+avec les fichiers du navigateur interne et ceux de l’Explorateur Windows. Le clic droit sur un clip
+audio propose **Inverser le clip (Reverse)**, également disponible dans l’Arrangement et la Fonderie.
+
 **Lanceur** (`LauncherView.*`, `Studio::launchScene`…) : comme dans Bitwig, la **colonne des scènes est à
 gauche** (un bouton par rangée, « Tout » sous elles arrête tous les clips) et la **colonne Master à droite
 a ses propres cases** : des **clips d'automation du master**, un par scène (`MasterClip`, `Studio::masterClips`).
@@ -247,6 +253,11 @@ leur place, l'onglet en avant et les fenêtres détachées ; un clic sur un nom 
 suivante : Dear ImGui ne lit une disposition qu'entre deux images) ; Supprimer l'envoie à la
 corbeille. Fichiers : `%APPDATA%\CyDAW\Layouts\<nom>.ini` (`AppUi::saveLayoutAs`, `loadLayout`) :
 
+Les boutons **Masquer** à droite du titre de l’**Inspecteur** et du **Navigateur** replient chaque
+panneau indépendamment. Une flèche orange reste sur le bord gauche ou droit pour le rouvrir ;
+**Affichage > Inspecteur (gauche) / Navigateur (droite)** offre les mêmes commandes. Le centre
+récupère la place libérée et les préférences sont conservées au redémarrage.
+
 | Panneau | Contenu |
 |---|---|
 | Arrangement (F1) | Pistes compactes, règle, clips avec forme d'onde ou aperçu des notes, boucle, tête de lecture |
@@ -260,10 +271,10 @@ corbeille. Fichiers : `%APPDATA%\CyDAW\Layouts\<nom>.ini` (`AppUi::saveLayoutAs`
 | Navigateur | La liste rapide de la bibliothèque de samples : vos dossiers et les banques de CyDAW, un arbre par famille › catégorie › instrument et par source, recherche par nom, et, en option, par description et par ressemblance (modèle CLAP, docs/BANQUE_DE_SONS.md) ; favoris, écoute, glisser vers l'arrangement. Instruments d'usine et catalogue de périphériques |
 | Inspecteur | Piste (format, entrée, niveau de chaque canal, routage), clip ou projet sélectionné ; modulation de la piste (son LFO, « Éditer le graphe de modulation › », les paramètres modulés, ceux des plugins VST3 compris) |
 
-## Atelier VST
+## Atelier Plugin
 
-Un mode de toute la fenêtre, à part du studio : le sélecteur **Studio | Atelier VST** en tête de la
-barre de transport, F7, ou Affichage > Atelier VST. Il sert à fabriquer ses propres effets et
+Un mode de toute la fenêtre, à part du studio : le sélecteur **Studio | Atelier Plugin** en tête de la
+barre de transport, F7, ou Affichage > Atelier Plugin. Il sert à fabriquer ses propres effets et
 instruments avec un graphe, à les garder dans *Mes périphériques* (`Documents/CyDAW/Devices`, un
 fichier `.cydawdevice` chacun, utilisable dans tous les projets) et à les exporter en VST3. Ni
 pistes ni arrangement dans ce mode ; le transport reste, pour écouter.
@@ -348,6 +359,21 @@ pistes ni arrangement dans ce mode ; le transport reste, pour écouter.
 Code : `src/v2/WorkshopView.*` (le mode), `src/v2/Vst3Build.*` (la compilation),
 `Studio::workshop*` (le document : graphe propre, lien à une piste, niveaux ouverts, bibliothèque),
 `GraphEditor` en mode `workshop`.
+
+## Mix DJ et Fonderie
+
+La barre du haut a quatre modes : **Studio** (pistes, arrangement, lanceur et leurs panneaux), **Mix DJ**
+(F10), **Fonderie** (F11) et **Atelier Plugin** (F7). Les trois derniers prennent toute la fenêtre ; les
+panneaux du studio attendent tels quels. En Mix DJ et en Fonderie, la barre de transport devient la
+leur (tempo maître et enregistrement du mix ; lecture, boucle et position du fichier), et les touches
+Espace, Origine, L et R ne pilotent plus le studio. En Fonderie, Ctrl+S, Ctrl+O, Ctrl+N, Ctrl+Z et
+Ctrl+Y travaillent sur ses sessions.
+
+- [Mix DJ](MIX_DJ.md) : deux ou quatre platines, table de mixage, collection.
+- [Fonderie](FONDERIE.md) : un éditeur de sons multipiste.
+
+Leur son rejoint le mixeur du master comme celui des pistes (le simulateur de l'Atelier fait de même).
+Le clic droit d'un clip audio ou d'un son du navigateur les ouvre directement.
 
 ## Ouvrir un projet
 
@@ -526,6 +552,15 @@ Les fichiers : `<Préréglages>/<device|plugin|chain>/<type de carte, nom du plu
 Emplacements (Documents/CyDAW/Presets par défaut) ; ceux de CyDAW dans `Factory/Presets`, avec la même
 forme. Les préréglages d'un périphérique de l'atelier, eux, sont dans le périphérique (onglet Préréglages,
 plus haut) et suivent son export en VST3.
+
+Le bouton **Préréglages** de la barre du graphe ouvre la même gestion dans le studio et l'atelier.
+Dans un sous-graphe, il agit sur ce sous-graphe : ses presets restent indépendants de ceux du parent.
+Un nom et **Ajouter** enregistrent les valeurs actuelles ; **Créer Init (valeurs par défaut)** garde
+les valeurs par défaut déclarées des paramètres, sans changer le son actuel. Un clic charge le preset ;
+le clic droit permet de remplacer, renommer, ordonner ou supprimer. Enregistrer ensuite le périphérique
+conserve cette banque dans son `.cydawdevice`. Les presets ne changent ni les connexions ni l'interface.
+L'export VST3 natif conserve également les valeurs des paramètres internes non publiés à l'hôte.
+
 
 Code : `src/v2/Presets.*` (les fichiers), `src/v2/PresetMenu.*` (le bouton, la barre, la liste),
 `Studio::*PresetHolder / *PresetState / apply*Preset / pluginPrograms`,
@@ -1089,7 +1124,7 @@ sur un bouton ; `get_track_graph` donne les ports et le mode de chaque câble. `
 prises `knob.*` d'un périphérique fait d'un graphe. Dispositions : `layout` avec `action` = list, save,
 load ou delete et `name`.
 
-Atelier VST : `workshop` avec `action` = status, new (`instrument`, `name`, `inputChannels`,
+Atelier Plugin : `workshop` avec `action` = status, new (`instrument`, `name`, `inputChannels`,
 `outputChannels`), channels, open (`name` de Mes
 périphériques), open_track (`track`, `nodeId`, 0 = l'instrument d'une piste MIDI), link (`track`),
 unlink, save (`asNew`), close, enter / leave, info (`name`, `description`, `author`, `category` ;
@@ -1164,3 +1199,75 @@ l'export (qui joue le projet en temps réel par le master) continuent, la carte 
 - Les graphes des bus de la carte son s'éditent en nœuds comme ceux d'une piste (Routage › Modifier ses
   effets, ou `set_view {mode: 7, bus}`), et l'atelier dessine librement l'interface d'un périphérique
   (Graphe | Interface). Il ne reste rien de la liste d'origine.
+
+### Designer de l'Atelier Plugin (15 octobre 2026)
+
+- Dans Graphe, **Détails** suit la carte sélectionnée : réglages, publication
+  Panneau/VST3, prises Exposer, noms et catégories. **E/S** crée et supprime les
+  entrées/sorties typées. Le menu Nouveau propose aussi un graphe vide.
+- Dans Interface, choisir **Grande fenêtre** ou **Carte module**. Les tailles
+  et les contrôles sont indépendants ; la carte apparaît dans Périphériques.
+  **Réglages de la grande fenêtre** reste accessible même avec un contrôle
+  sélectionné : formats, largeur/hauteur en pixels, fond, accent, texte et grille.
+  Les couleurs de la fenêtre et de la carte sont indépendantes, sauvegardées et
+  reprises à l'export ; un contrôle peut définir ses propres couleurs.
+- Depuis une valeur du panneau Détails ou le clic droit sur un potard :
+  **Create Input** crée une entrée typée du graphe et la relie au réglage ;
+  **Create Variable** crée une constante locale nommée, modifiable et reliée.
+  La variable conserve la valeur, l'unité et la plage du réglage. Les mêmes
+  actions existent sur les prises d'entrée (variable pour les valeurs seulement).
+  Une entrée déjà reliée doit être débranchée avant la promotion. Les entrées de
+  valeur reliées directement à un seul paramètre publié, en mode valeur,
+  deviennent ce paramètre dans le VST3 ; les prises restent présentes dans le
+  module CyDAW. Une même entrée vers plusieurs paramètres demande encore un
+  adaptateur VST3 et n'est pas exportée.
+- **Panneaux natifs CyDAW** propose les sections des 15 synthés de la famille,
+  de Prisme et de Kick. Sous un instrument présent dans le graphe,
+  **Ajouter l'interface complète** crée ses pages et ses sections déjà reliées.
+  Chaque panneau reste déplaçable, dimensionnable et personnalisable (titre,
+  couleurs, page et liaisons). Un premier modèle remplace la disposition
+  automatique ; les contrôles déjà dessinés à la main sont conservés.
+- **Bibliothèque de sections** permet de prendre un panneau natif pour un
+  graphe personnel, même sans cet instrument. Dans **Liaisons du panneau
+  natif**, affecter chaque valeur à un paramètre du graphe ; **Sans liaison**
+  désactive le contrôle. Les panneaux d'effets ont aussi leurs liaisons éditables.
+- **Taille fenêtre**, dans la barre du canevas, règle directement largeur et
+  hauteur en pixels. **1:1** montre la taille réelle ; **Cadrer** ajuste l'aperçu
+  à la place disponible. Ces dimensions sont indépendantes de la carte module,
+  sauvegardées et reprises par la grande fenêtre et le VST3 exporté.
+- La colonne Calques gère la visibilité et la sélection multiple. Ctrl/Shift
+  ajoute à la sélection ; un rectangle sélectionne plusieurs éléments.
+  Alignement, distribution et groupes sont disponibles pour une sélection.
+- Les propriétés ajoutent couleurs, fond, texte, taille de police, arrondi,
+  page, groupe, verrouillage et valeur visible. Les pages se changent au-dessus
+  du canevas. Le zoom et le déplacement au bouton du milieu facilitent le travail.
+- **Code JSON** édite le descriptif complet de la disposition active. Appliquer
+  refuse notamment les types inconnus, IDs dupliqués, liaisons manquantes et
+  contrôles hors canevas. Recharger récupère le modèle actuel.
+- **Composant C++ ImGui** crée un contrôle personnalisé. Exemple insère un
+  composant utilisable ; Compiler affiche ses diagnostics. Le code utilise
+  `CustomInterfaceABI.h` et les callbacks de paramètres `get`/`set`.
+- Les panneaux natifs disponibles reprennent les afficheurs et réglages de
+  leurs modules. Le mode lecture permet de les utiliser dans le designer.
+- L'export de l'Atelier est désormais VST3 natif sans JUCE, avec l'interface
+  conçue et les composants C++ compilés, sans l'éditeur de graphe. La limite
+  historique de 32 paramètres a été retirée. La première compilation nécessite
+  Visual Studio C++, CMake et le SDK VST3 ; les suivantes réutilisent le cache.
+
+Version actuelle de l'export : Windows x64, une sortie audio et jusqu'à quatre
+entrées. Synthèse et effets ; les lecteurs de samples et modèles enregistrés
+sont exclus. Les paramètres de synthèse sans prise de modulation moteur restent
+non exposables en câble. La licence du moteur embarqué conserve ses conditions.
+
+## Formats CLAP, LV2 et scripts JSFX
+
+L’onglet **Export** de l’Atelier propose maintenant VST3, CLAP et LV2. L’éditeur de scripts est accessible dans **Affichage → Éditeur de scripts JSFX**, dans la bibliothèque et sur les cartes JSFX. Voir [PLUGIN_FORMATS.md](PLUGIN_FORMATS.md) pour les chemins, le rechargement, les dépendances et les limites de l’hôte.
+
+
+### Export natif et compilation multiplateforme
+
+La barre de l'Atelier Plugin propose **Exporter CyDAW…** / **Ouvrir CyDAW…** pour partager un `.cydawdevice` éditable entre installations, sans compiler. L'export conserve interfaces, presets et définitions des modules utilisés. Les fichiers audio externes sont listés, à transférer séparément.
+
+Dans **Export**, sélectionner plusieurs formats VST3/CLAP/LV2 et plateformes Windows x64/Linux x64 ; les résultats vont dans `<appareil>/<plateforme>/<format>`. Linux se compile localement depuis Windows avec Zig et un sysroot X11/OpenGL préparé au premier usage (Python 3 et Ninja requis), sans runner. macOS est reporté. Voir [PLUGIN_FORMATS.md](PLUGIN_FORMATS.md) pour la chaîne locale, les limites et les tests.
+
+Contrôle : `workshop` `device_export` (`file`), `open` (`file`), `plugin_export_batch` (`formats`, `platforms`, `folder`, `build`, `sourceRoot`). `vst3_status` donne une entrée par cible dans `targets`, avec `platform`, `format`, `file`, `error`.

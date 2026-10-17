@@ -51,8 +51,24 @@ sons intégrée.
 - Pistes de mono à 7.1, entrées et sorties virtuelles avec leurs propres effets.
 - Accueil des plug-ins VST3, isolés dans leur propre processus.
 
+**Mixer en DJ**
+- Le mode **Mix DJ** : deux ou quatre platines (tempo et tonalité gardée, synchro, hot cues, boucles,
+  scratch, un effet par platine), table de mixage (égaliseur à kills, filtre, crossfader, casque,
+  limiteur), collection analysée (tempo, grille, tonalité), mix enregistré.
+
+**Éditer des fichiers son**
+- La **Fonderie** : un éditeur de sons multipiste (plusieurs pistes, plusieurs sons sur chacune) —
+  couper, coller, fondus, normaliser, étirer et transposer, traiter avec les effets du studio, mesurer
+  (crête, RMS, LUFS, spectre), enregistrer en WAV, FLAC, AIFF ou Ogg, exporter le mixage.
+
+**Travailler le son à l’image**
+- Le mode **Cinéma** : vidéo de référence facultative, bus en lignes comme dans l’arrangement,
+  conteneurs temporels de sous-pistes avec des clips audio/MIDI, liste avec cadrage, effets natifs,
+  routage et automations. La bande son
+  d’une vidéo devient automatiquement un clip audio éditable dans son propre bus.
+
 **Créer ses périphériques**
-- L'**Atelier VST** assemble des périphériques à partir de graphes de modules, leur dessine une
+- L'**Atelier Plugin** assemble des périphériques à partir de graphes de modules, leur dessine une
   interface, et les exporte en plug-ins **VST3**.
 
 **Trouver ses sons**
@@ -100,6 +116,8 @@ Les tests se lancent avec `ctest -C Release` dans le dossier de compilation.
   [Effets créatifs et MIDI](docs/EFFETS_CREATIFS.md) · [Amplis et micros](docs/AMPLIS_ET_MICROS.md)
 - [Bibliothèque de sons](docs/BANQUE_DE_SONS.md) · [Modèles de son](docs/SOUND_MATCHING.md)
 - [Édition audio](docs/EDITION_AUDIO.md) · [Architecture](docs/ARCHITECTURE.md)
+- [Cinéma : vidéo, montage audio et bus](docs/CINEMA.md)
+- [Synchronisation du transport : MIDI, JACK, Link](docs/TRANSPORT_SYNC.md)
 - [Serveur MCP](tools/mcp/README.md)
 
 ## Licence
@@ -109,3 +127,5 @@ CyDAW est distribué sous la licence publique générale GNU Affero, version 3 (
 
 Il s'appuie sur [JUCE 8](https://juce.com) (AGPLv3) et [Dear ImGui](https://github.com/ocornut/imgui)
 (MIT). Les banques de sons gardent leurs propres licences.
+
+Les formats externes **VST3, CLAP, LV2 et JSFX**, les exports natifs et l’éditeur JSFX sont décrits dans [PLUGIN_FORMATS.md](docs/PLUGIN_FORMATS.md).

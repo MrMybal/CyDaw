@@ -1,6 +1,8 @@
 #include "Studio.h"
 
 #include "DeviceOps.h"
+#include "DeviceTransfer.h"
+#include "GraphPresetFile.h"
 
 #include "Locations.h"
 #include "SamplerMapFile.h"
@@ -52,17 +54,43 @@ juce::uint32 defaultColour(const std::size_t index)
     return kTrackColours[index % (sizeof(kTrackColours) / sizeof(kTrackColours[0]))];
 }
 
+juce::Result reverseEvents(std::vector<app::AudioTrackController::AudioEvent>& events, double duration, const juce::File& folder)
+{
+    std::vector<juce::File> made;
+    for (auto& event : events) {
+        const auto file = folder.getNonexistentChildFile(event.sourceFile.getFileNameWithoutExtension() + " ~reverse", ".wav", false);
+        app::AudioEditRequest request;
+        request.operation = app::AudioEditOperation::reverse;
+        const auto length = event.sourceDurationSeconds > 0 ? event.sourceDurationSeconds : event.durationSeconds;
+        const auto result = app::AudioTrackController::renderAudioEdit(event.sourceFile, event.sourceOffsetSeconds, length, request, file);
+        if (result.failed()) {
+            for (const auto& written : made) (void)written.deleteFile();
+            return result;
+        }
+        made.push_back(file);
+        event.sourceFile = file;
+        event.startSeconds = std::max(0.0, duration - event.startSeconds - event.durationSeconds);
+        std::swap(event.fadeInSeconds, event.fadeOutSeconds);
+        for (auto& marker : event.stretchMarkers) {
+            marker.sourceSeconds = 2 * event.sourceOffsetSeconds + length - marker.sourceSeconds;
+            marker.timelineSeconds = event.durationSeconds - marker.timelineSeconds;
+        }
+        std::reverse(event.stretchMarkers.begin(), event.stretchMarkers.end());
+    }
+    return juce::Result::ok();
+}
+
 } // namespace
 
 // ---- Studio -----------------------------------------------------------------------
 
-Studio::Studio()
+Studio::Studio(const bool auxiliary) : auxiliary_(auxiliary)
 {
     // The same settings file as CyDAW 1, so the audio device carries over.
     juce::PropertiesFile::Options options;
     options.applicationName = "CyDAW";
     options.folderName = "CyDAW";
-    options.filenameSuffix = ".layout.settings";
+    options.filenameSuffix = auxiliary ? ".processing.settings" : ".layout.settings";
     options.osxLibrarySubFolder = "Application Support";
     properties_.setStorageParameters(options);
     // The engine starts with one MIDI track; a session starts empty.
@@ -73,10 +101,10 @@ Studio::Studio()
     samples_ = std::make_unique<app::SampleLibrary>(false);
     semantic_ = std::make_unique<SemanticSearch>(*samples_, aiModels_, companion_);
     applyLocations();
-    banks_.loadRegistry();
+    if (!auxiliary) banks_.loadRegistry();
     // The factory instruments' maps read ahead (26 MB of zones): their list
     // then opens at once.
-    {
+    if (!auxiliary) {
         std::vector<juce::File> maps;
         const auto folder = app::factoryContentFolder();
         const auto catalogue = juce::JSON::parse(folder.getChildFile("catalogue.json"));
@@ -175,7 +203,7 @@ Studio::~Studio()
     while (autosaveWriting_.load())
         juce::Thread::sleep(5);
     engine_.stop();
-    if (samples_ != nullptr)
+    if (samples_ != nullptr && !auxiliary_)
         samples_->saveNow();
     clearSession();
 }
@@ -2228,6 +2256,12 @@ juce::Result Studio::openWorkshopFile(const juce::File& file)
     const auto* root = document.getDynamicObject();
     if (root == nullptr || root->getProperty("format").toString() != "CyDAW Device")
         return juce::Result::fail(ui::Ls("Pas un périphérique CyDAW : ", "Not a CyDAW device: ") + file.getFullPathName());
+    const auto graphState = root->getProperty("graph");
+    const auto schema = static_cast<int>(graphState.getProperty("schema", 0));
+    if (static_cast<int>(root->getProperty("schema")) != 1 || !graphState.isObject()
+        || graphState.getProperty("nodes", {}).getArray() == nullptr || schema < 1 || schema > app::nodeGraphStateSchema)
+        return juce::Result::fail(ui::Ls("Version de périphérique incompatible ou graphe invalide : ",
+                                         "Incompatible device version or invalid graph: ") + file.getFullPathName());
     Workshop opened;
     opened.instrument = root->getProperty("role").toString() == "instrument";
     opened.own = makeWorkshopSlot();
@@ -2412,6 +2446,36 @@ juce::Result Studio::saveWorkshop(juce::File& written, const bool asNewFile)
     workshop_->file = target;
     workshop_->unsaved = false;
     written = target;
+    return juce::Result::ok();
+}
+
+juce::Result Studio::exportWorkshop(const juce::File& file, juce::StringArray& externalFiles)
+{
+    externalFiles.clear();
+    auto* slot = workshopRoot();
+    if (slot == nullptr)
+        return juce::Result::fail(ui::Ls("L'atelier n'a pas de périphérique", "The workshop has no device"));
+    if (!file.hasFileExtension("cydawdevice"))
+        return juce::Result::fail(ui::Ls("Utilisez l'extension .cydawdevice", "Use the .cydawdevice extension"));
+    commitWorkshop(false);
+    auto document = deviceDocument(slot->graph(), workshop_->instrument);
+    auto* root = document.getDynamicObject();
+    const auto graph = device_transfer::portableGraph(slot->graph().serialise());
+    root->setProperty("graph", graph);
+    root->setProperty("portableGraph", true);
+    root->setProperty("createdBy", "CyDAW 2");
+    device_transfer::externalFiles(graph, externalFiles);
+    juce::Array<juce::var> dependencies;
+    for (const auto& path : externalFiles)
+        dependencies.add(path);
+    root->setProperty("externalFiles", dependencies);
+    const auto json = juce::JSON::toString(document, false);
+    if (json.getNumBytesAsUTF8() > 16 * 1024 * 1024)
+        return juce::Result::fail(ui::Ls("Le périphérique dépasse la limite de 16 Mio", "The device exceeds the 16 MiB limit"));
+    if (const auto made = file.getParentDirectory().createDirectory(); made.failed())
+        return made;
+    if (!file.replaceWithText(json))
+        return juce::Result::fail(ui::Ls("Impossible d'écrire ", "Could not write ") + file.getFullPathName());
     return juce::Result::ok();
 }
 
@@ -4873,6 +4937,7 @@ juce::Result Studio::restoreRecovery()
 
 void Studio::discardRecovery()
 {
+    if (auxiliary_) return;
     (void) app::ProjectRecovery::discard(recoveryFile());
 }
 
@@ -4884,6 +4949,7 @@ void Studio::discardChanges()
 
 void Studio::autosaveIfDue()
 {
+    if (auxiliary_) return;
     const auto now = juce::Time::getMillisecondCounterHiRes() * 0.001;
     if (!autosaveEnabled_ || !dirty_ || isRecording() || autosaveWriting_.load() || now - lastAutosaveSeconds_ < 45.0)
         return;
@@ -5744,6 +5810,29 @@ juce::Result Studio::editAudioClip(const TrackRef& track, const std::uint64_t cl
     }
     dirty_ = true;
     return juce::Result::ok();
+}
+
+juce::Result Studio::reverseLauncherClip(const TrackRef& track, int scene)
+{
+    if(track.midi || track.master || !isValid(track))return juce::Result::fail("No audio track");
+    const auto clip=engine_.launcherClip(track.audioIndex,scene);if(!clip)return juce::Result::fail("No launcher clip");
+    auto events=clip->events;if(events.empty())return juce::Result::fail(ui::Ls("Ce clip est vide","This clip is empty"));
+    const auto folder=audioEditFolder();if(const auto result=folder.createDirectory();result.failed())return result;
+    if(const auto result=reverseEvents(events,clip->durationSeconds,folder);result.failed())return result;
+    const auto result=engine_.replaceLauncherClipEvents(track.audioIndex,scene,std::move(events));if(result.wasOk())markDirty();return result;
+}
+juce::Result Studio::reverseAudioClip(const TrackRef& track, std::uint64_t id)
+{
+    if(track.midi || track.master || !isValid(track))return juce::Result::fail("No audio track");
+    const auto clip=engine_.audioClip(track.audioIndex,id);if(!clip)return juce::Result::fail("No audio clip");
+    if(!clip->usesEventTimeline && clip->events.empty()) {
+        app::AudioEditRequest request;request.operation=app::AudioEditOperation::reverse;
+        return editAudioClip(track,id,request,clip->sourceOffsetSeconds,clip->sourceDurationSeconds>0?clip->sourceDurationSeconds:clip->durationSeconds,ui::Ls("Inverser","Reverse"));
+    }
+    auto events=engine_.audioClipEvents(track.audioIndex,id);
+    const auto folder=audioEditFolder();if(const auto result=folder.createDirectory();result.failed())return result;
+    if(const auto result=reverseEvents(events,clip->durationSeconds,folder);result.failed())return result;
+    const auto result=engine_.replaceAudioClipEvents(track.audioIndex,id,std::move(events));if(result.wasOk())markDirty();return result;
 }
 
 juce::Result Studio::flattenAudioClipComp(const TrackRef& track, const std::uint64_t clipId)

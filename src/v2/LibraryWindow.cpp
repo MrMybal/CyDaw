@@ -1,3 +1,5 @@
+#include "PluginFiles.h"
+#include "WindowsPluginBridge.h"
 #include "LibraryWindow.h"
 
 #include "Icons.h"
@@ -18,7 +20,7 @@ using ui::L;
 
 namespace {
 
-constexpr auto windowId = "###library";
+
 // Who the semantic search answers here.
 constexpr auto semanticOwner = 2;
 
@@ -232,6 +234,7 @@ public:
         juce::String vendor;
         juce::String kind; // "Fx", "Instrument"…
         juce::String subcategory;
+        juce::String format;
         juce::File file;
     };
 
@@ -263,12 +266,7 @@ private:
     void run() override
     {
         std::vector<Plugin> found;
-        juce::Array<juce::File> folders;
-        folders.add(juce::File("C:/Program Files/Common Files/VST3"));
-        folders.add(juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
-                        .getChildFile("Programs")
-                        .getChildFile("Common")
-                        .getChildFile("VST3"));
+        auto folders = plugin_files::folders();
         {
             const std::scoped_lock lock(mutex_);
             for (const auto& folder : extra_)
@@ -279,18 +277,63 @@ private:
         for (const auto& folder : folders) {
             if (!folder.isDirectory())
                 continue;
-            for (const auto& entry : juce::RangedDirectoryIterator(folder, true, "*.vst3", juce::File::findFilesAndDirectories)) {
+            for (const auto& entry : juce::RangedDirectoryIterator(folder, true, "*", juce::File::findFilesAndDirectories)) {
                 if (threadShouldExit())
                     return;
                 const auto file = entry.getFile();
                 // A bundle's insides are not plug-ins of their own.
-                if (file.getFullPathName().containsIgnoreCase(".vst3" + juce::File::getSeparatorString())
-                    || seen.contains(file.getFullPathName()))
+                if (!plugin_files::candidate(file) || seen.contains(file.getFullPathName()))
                     continue;
                 seen.add(file.getFullPathName());
                 Plugin plugin;
                 plugin.name = file.getFileNameWithoutExtension();
                 plugin.file = file;
+                plugin.format = plugin_files::format(file);
+                if (!file.hasFileExtension("vst3")) {
+                    auto cache = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory).getChildFile("CyDAW/plugin-catalogue");
+                    (void) cache.createDirectory();
+                    auto stamp = file.getLastModificationTime().toMilliseconds();
+                    if (file.isDirectory()) for (const auto& child : juce::RangedDirectoryIterator(file, true, "*", juce::File::findFiles)) stamp = std::max(stamp, child.getFile().getLastModificationTime().toMilliseconds());
+                    const auto key = juce::String::toHexString(file.getFullPathName().hashCode64());
+                    const auto report = cache.getChildFile(key + ".json");
+                    auto data = juce::JSON::parse(report);
+                    if (static_cast<juce::int64>(data.getProperty("stamp", 0)) != stamp) {
+                        const auto launch = app::WindowsPluginBridge::workerLaunchFor(file);
+                        auto command = launch.command; const auto resultFile = cache.getChildFile(key + "-" + juce::Uuid().toString() + ".probe.json");
+                        (void) resultFile.deleteFile();
+                        command.addArray({"--probe-plugin", file.getFullPathName(), "--output", resultFile.getFullPathName()});
+                        juce::ChildProcess process;
+                        if (launch.isValid() && process.start(command, 0)) {
+                            const auto deadline=juce::Time::getMillisecondCounterHiRes()+15000;
+                            while(process.isRunning() && !threadShouldExit() && juce::Time::getMillisecondCounterHiRes()<deadline) wait(30);
+                            if(process.isRunning())process.kill();
+                            data=juce::JSON::parse(resultFile);
+                            if (auto* entries=data.getArray()) {
+                                auto root=juce::DynamicObject::Ptr(new juce::DynamicObject());root->setProperty("stamp", stamp);root->setProperty("plugins", *entries);data=juce::var(root.get());
+                                (void) report.replaceWithText(juce::JSON::toString(data));
+                            }
+                        }
+                    }
+                    if (const auto* entries=data.getProperty("plugins", {}).getArray()) {
+                        bool added=false;
+                        for (int index=0; index<entries->size(); ++index) {
+                            const auto& item=(*entries)[index];if(item.hasProperty("error"))continue;
+                            auto foundPlugin=plugin;foundPlugin.name=item.getProperty("name", plugin.name).toString();foundPlugin.vendor=item.getProperty("manufacturer", {}).toString();
+                            foundPlugin.kind=static_cast<bool>(item.getProperty("instrument", false))?"Instrument":"Fx";
+                            foundPlugin.subcategory=item.getProperty("category", {}).toString();foundPlugin.format=item.getProperty("format", plugin.format).toString();
+                            if(entries->size()>1) {
+                                auto descriptor=juce::DynamicObject::Ptr(new juce::DynamicObject());descriptor->setProperty("file", file.getFullPathName());descriptor->setProperty("id", item.getProperty("pluginId", {}));
+                                const auto descriptors=cache.getSiblingFile("PluginDescriptors");(void)descriptors.createDirectory();
+                                descriptor->setProperty("name",foundPlugin.name);descriptor->setProperty("format",foundPlugin.format);
+                                const auto entryId=juce::String::toHexString(item.getProperty("pluginId",{}).toString().hashCode64());
+                                const auto path=descriptors.getChildFile(key+"-"+entryId+".cyplugin");
+                                (void) path.replaceWithText(juce::JSON::toString(juce::var(descriptor.get())));foundPlugin.file=path;
+                            }
+                            found.push_back(std::move(foundPlugin));added=true;
+                        }
+                        if(added)continue;
+                    }
+                }
                 // What the bundle says of itself (VST 3.7 and later).
                 const auto info = juce::JSON::parse(file.getChildFile("Contents").getChildFile("Resources").getChildFile("moduleinfo.json"));
                 plugin.vendor = info.getProperty("Factory Info", {}).getProperty("Vendor", {}).toString();
@@ -337,6 +380,7 @@ LibraryWindow::LibraryWindow(Studio& studio, UiState& state, ImGuiHost& host, Sa
       effectFacets_(std::make_unique<Facets>(std::vector<juce::String> { "category", "genre", "role", "maker" })),
       plugins_(std::make_unique<PluginScan>())
 {
+    windowId_ = "###library" + state_.deviceWindowNamespace;
     catalog_.addOnChange(this, [this] {
         dirty_ = true;
         host_.wake();
@@ -380,9 +424,9 @@ void LibraryWindow::draw()
     const auto started = nowMs();
     const auto* viewport = ImGui::GetMainViewport();
     if (std::exchange(state_.libraryDetach, false))
-        ui::setDetached(windowId, true);
-    ui::beforeDetachable(windowId);
-    const auto detached = ui::isDetached(windowId);
+        ui::setDetached(windowId_.c_str(), true);
+    ui::beforeDetachable(windowId_.c_str());
+    const auto detached = ui::isDetached(windowId_.c_str());
     if (maximised_ && !detached) {
         ImGui::SetNextWindowPos(viewport->WorkPos);
         ImGui::SetNextWindowSize(viewport->WorkSize);
@@ -401,7 +445,7 @@ void LibraryWindow::draw()
         flags |= ImGuiWindowFlags_NoDocking;
     if (maximised_ && !detached)
         flags |= ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize;
-    const auto title = juce::String::fromUTF8(L("Bibliothèque", "Library")) + windowId;
+    const auto title = juce::String::fromUTF8(L("Bibliothèque", "Library")) + windowId_.c_str();
     if (ImGui::Begin(title.toRawUTF8(), &open, flags)) {
         drawHeader();
         switch (state_.libraryTab) {
@@ -454,13 +498,13 @@ void LibraryWindow::drawHeader()
     ImGui::SameLine();
     ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(),
                                   ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - button.x * 2.0f - dp(6.0f)));
-    if (!ui::isDetached(windowId)) {
+    if (!ui::isDetached(windowId_.c_str())) {
         if (ui::iconButton(icon::fullScreen, maximised_ ? L("Taille normale", "Normal size") : L("Toute la fenêtre", "The whole window"),
                            maximised_, p.accent, button))
             maximised_ = !maximised_;
         ImGui::SameLine(0.0f, dp(4.0f));
     }
-    (void) ui::detachButton(windowId, button);
+    (void) ui::detachButton(windowId_.c_str(), button);
     ImGui::Separator();
 }
 
@@ -1505,7 +1549,7 @@ void LibraryWindow::drawEffects()
             row.file = plugin.file;
             row.soundSource = plugin.kind == "Instrument";
             row.category = plugin.subcategory.isNotEmpty() ? plugin.subcategory : plainText("Plug-ins", "Plug-ins");
-            row.genre = "VST3";
+            row.genre = plugin.format;
             row.role = row.soundSource ? plainText("Instrument", "Instrument") : plainText("Effet audio", "Audio effect");
             row.maker = plugin.vendor.isNotEmpty() ? plugin.vendor : plainText("Inconnu", "Unknown");
             row.description = plugin.file.getFullPathName();
@@ -1541,10 +1585,12 @@ void LibraryWindow::drawEffects()
     if (ImGui::Button(L("Atelier de périphériques…", "Device workshop…")))
         state_.bringToFront = Panel::workshop;
     ImGui::SameLine();
+    if (ImGui::Button(L("Éditeur JSFX…", "JSFX editor…"))) state_.showJsfx=true;
+    ImGui::SameLine();
     if (ImGui::Button(plugins_->scanning() ? L("Recherche des plug-ins…", "Finding plug-ins…") : L("Dossiers de plug-ins…", "Plug-in folders…")))
         ImGui::OpenPopup("##pluginFolders");
     if (ImGui::BeginPopup("##pluginFolders")) {
-        ImGui::TextDisabled("%s", L("Les dossiers VST3 standard, et ceux-ci :", "The standard VST3 folders, and these:"));
+        ImGui::TextDisabled("%s", L("Les dossiers VST3, CLAP, LV2 et JSFX standard, et ceux-ci :", "The standard VST3, CLAP, LV2 and JSFX folders, and these:"));
         auto folders = pluginFolders;
         folders.removeEmptyStrings();
         auto changed = false;
@@ -1613,7 +1659,7 @@ void LibraryWindow::drawEffects()
         juce::Result result = juce::Result::ok();
         if (row.kind == EffectRow::vst3) {
             if (track->midi || track->master)
-                result = juce::Result::fail(ui::Ls("Les plug-ins VST3 vont sur les pistes audio", "VST3 plug-ins go on audio tracks"));
+                result = juce::Result::fail(ui::Ls("Les plug-ins externes vont sur les pistes audio", "External plug-ins go on audio tracks"));
             else
                 result = studio_.engine().setTrackPlugin(track->audioIndex, row.file);
         } else if (row.kind == EffectRow::mine) {

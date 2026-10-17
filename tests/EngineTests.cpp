@@ -29,6 +29,10 @@
 #include <cydaw/engine/SynthFamily.h>
 #include <cydaw/engine/Convolver.h>
 #include <cydaw/engine/TimeStretch.h>
+#include <cydaw/engine/DjMix.h>
+#include <cydaw/engine/FoundrySound.h>
+#include <cydaw/engine/FoundrySession.h>
+#include <cydaw/engine/Loudness.h>
 #include <algorithm>
 #include <numbers>
 
@@ -1077,7 +1081,8 @@ void realtimePublisherSurvivesConcurrentSwapping()
 // compile.
 //
 // The sweep is deliberately strict: a declared value input must name a
-// parameter, and that parameter must resolve to a field. Skipping the ones
+// parameter, and that parameter must resolve to a field or an in-bounds
+// extended payload slot. Skipping the ones
 // that name nothing would leave open the very hole this is here to close.
 void everyDeclaredValueInputDrivesAParameterField()
 {
@@ -1101,10 +1106,13 @@ void everyDeclaredValueInputDrivesAParameterField()
                 continue;
             }
             ++checked;
+            const auto slot = cydaw::engine::nativeDspParameterSlot(*kind, parameterKey);
+            const auto validSlot = slot >= 0 && static_cast<std::size_t>(slot)
+                < cydaw::engine::NativeDspNodeParameters{}.eqBands.size();
             expect(cydaw::engine::nativeDspParameterField(*kind, parameterKey)
-                       != nullptr,
+                       != nullptr || validSlot,
                    descriptor->key + " port '" + port.key
-                       + "' names a parameter that no field answers to");
+                       + "' names a parameter with no field or valid payload slot");
         }
     }
     expect(checked >= 20, "the registry sweep actually examined its ports");
@@ -4577,6 +4585,7 @@ void convolverMatchesDirectConvolution()
 #include "PitchTrackerTests.inc"
 #include "GrainTests.inc"
 #include "SilexTests.inc"
+#include "DjFoundryTests.inc"
 
 } // namespace
 
@@ -4659,6 +4668,13 @@ int main()
     pitchTrackerReadsInTune();
     samplerPlaysGrains();
     silexPlaysItsPieces();
+    djDeckPlaysAtItsTempo();
+    djChannelKillsItsBands();
+    djEffectsPlayInTime();
+    djAnalysisFindsTempoAndKey();
+    loudnessOfASine();
+    foundrySoundEdits();
+    foundrySessionEdits();
 
     if (failures != 0) {
         std::cerr << failures << " test(s) failed\n";

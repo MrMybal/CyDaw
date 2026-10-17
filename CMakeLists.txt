@@ -102,11 +102,13 @@ endfunction()
 function(cydaw_configure_plugin_formats target_name)
     target_compile_definitions(${target_name} PRIVATE
         JUCE_PLUGINHOST_VST3=1
+        JUCE_PLUGINHOST_LV2=1
         JUCE_PLUGINHOST_VST=$<BOOL:${CYDAW_VST2_AVAILABLE}>
     )
 endfunction()
 
 add_library(cydaw_core STATIC
+    src/native_plugin/NativeRuntime.cpp
     src/graph/GraphDefinition.cpp
     src/graph/GraphPluginExport.cpp
     src/graph/PrimitiveRegistry.cpp
@@ -132,6 +134,10 @@ add_library(cydaw_core STATIC
     src/engine/UtilityEffects.cpp
     src/engine/Convolver.cpp
     src/engine/TimeStretch.cpp
+    src/engine/Loudness.cpp
+    src/engine/DjMix.cpp
+    src/engine/FoundrySound.cpp
+    src/engine/FoundrySession.cpp
     src/engine/KickSynth.cpp
     src/engine/DrumSynth.cpp
     src/engine/WavetableShape.cpp
@@ -203,6 +209,9 @@ if(CYDAW_BUILD_TESTS)
     endfunction()
 
     add_test(NAME cydaw_core_tests COMMAND cydaw_core_tests)
+    add_executable(cydaw_transport_timecode_tests tests/TransportTimecodeTests.cpp)
+    target_compile_features(cydaw_transport_timecode_tests PRIVATE cxx_std_20)
+    add_test(NAME cydaw_transport_timecode_tests COMMAND cydaw_transport_timecode_tests)
     cydaw_configure_test(cydaw_core_tests 120)
 
     add_executable(cydaw_engine_tests tests/EngineTests.cpp)
@@ -308,6 +317,8 @@ if(CYDAW_BUILD_DESKTOP)
             src/app/AudioEditorComponent.cpp
             src/app/AudioEditorComponent.h
             src/app/AudioTrackController.cpp
+            src/app/DjEngine.cpp
+            src/app/FoundryPlayer.cpp
             src/app/AudioTrackController.h
             src/app/ClipLauncherComponent.cpp
             src/app/ClipLauncherComponent.h
@@ -573,6 +584,8 @@ if(CYDAW_BUILD_DESKTOP)
                     "${cydaw_root}/src/v2/StudioEffectsView.cpp"
                     "${cydaw_root}/src/v2/CardFiles.cpp"
                     "${cydaw_root}/src/v2/InterfaceEditor.cpp"
+                    "${cydaw_root}/src/v2/InterfaceDesigner.cpp"
+                    "${cydaw_root}/src/v2/InstrumentPanels.cpp"
                     "${cydaw_root}/src/v2/Presets.cpp"
                     "${cydaw_root}/src/v2/PresetMenu.cpp"
                     "${cydaw_root}/src/v2/Locations.cpp"
@@ -630,6 +643,7 @@ if(CYDAW_BUILD_DESKTOP)
                     JUCE_USE_CURL=0
                     JUCE_WEB_BROWSER=0
                     JUCE_PLUGINHOST_VST3=1
+                    JUCE_PLUGINHOST_LV2=1
                     JUCE_MODAL_LOOPS_PERMITTED=1)
                 target_link_libraries(cydaw_graph_runtime_host PRIVATE
                     juce::juce_audio_processors
@@ -735,6 +749,8 @@ if(CYDAW_BUILD_DESKTOP)
             target_sources(cydaw_desktop_tests PRIVATE
                 tests/DesktopAudioTests.cpp
                 src/app/AudioTrackController.cpp
+                src/app/DjEngine.cpp
+                src/app/FoundryPlayer.cpp
                 src/app/VirtualAudioBus.cpp
                 src/app/AudioTrackController.h
                 src/app/AudioEditorComponent.cpp
@@ -769,6 +785,7 @@ if(CYDAW_BUILD_DESKTOP)
                 src/app/WindowsPluginBridge.cpp
                 src/app/WindowsPluginBridge.h
                 src/app/NodeGraphComponent.cpp
+                src/app/NodeGraphComponentEditorAccess.cpp
                 src/app/SoundModelFile.cpp
                 src/app/SamplerMapFile.cpp
                 src/app/NodeGraphComponentFactoryData.cpp
@@ -849,9 +866,25 @@ if(CYDAW_BUILD_DESKTOP)
                 APPEND
                 DEPENDS "${CYDAW_PLUGIN_WORKER_INFO_FILE}")
         endif()
-        target_sources(CyDAWPluginWorker PRIVATE src/plugin_worker/PluginWorkerMain.cpp)
+        set(YSFX_PLUGIN OFF CACHE BOOL "" FORCE)
+        set(YSFX_TESTS OFF CACHE BOOL "" FORCE)
+        set(YSFX_SKIP_CHECKSUM ON CACHE BOOL "" FORCE)
+        set(CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING "Build type for single-configuration generators")
+        find_program(NASM_PROGRAM nasm PATHS "${CMAKE_CURRENT_SOURCE_DIR}/output/plugin-formats/tools/nasm-2.16.03")
+        if(NASM_PROGRAM)
+            set(YSFX_PORTABLE OFF CACHE BOOL "" FORCE)
+        endif()
+        if(MSVC AND NOT NASM_PROGRAM)
+            set(YSFX_PORTABLE ON CACHE BOOL "EEL interpreter fallback without NASM" FORCE)
+        endif()
+        add_subdirectory(third_party/ysfx EXCLUDE_FROM_ALL)
+        target_sources(CyDAWPluginWorker PRIVATE src/plugin_worker/PluginWorkerMain.cpp
+            src/plugin_worker/ExtraPluginFormats.cpp src/plugin_worker/ClapInstance.cpp src/plugin_worker/JsfxInstance.cpp)
+        target_include_directories(CyDAWPluginWorker PRIVATE third_party/clap/include)
+        target_link_libraries(CyDAWPluginWorker PRIVATE ysfx::ysfx juce::juce_gui_extra)
         target_compile_features(CyDAWPluginWorker PRIVATE cxx_std_20)
         target_compile_definitions(CyDAWPluginWorker PRIVATE
+            NOMINMAX WIN32_LEAN_AND_MEAN
             JUCE_USE_CURL=0
             JUCE_WEB_BROWSER=0
             JUCE_MODAL_LOOPS_PERMITTED=1
@@ -983,6 +1016,12 @@ if(CYDAW_BUILD_DESKTOP)
                 ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/resources/branding/cydaw-logo-512.png"
                 ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/resources/branding/cydaw-icon-small.png"
             )
+            # Header-only Link transport (no audio sharing) and JACK's dynamically loaded control API.
+            include("${CMAKE_CURRENT_SOURCE_DIR}/third_party/ableton-link/AbletonLinkConfig.cmake")
+            target_link_libraries(CyDAW2 PRIVATE Ableton::Link ws2_32 iphlpapi)
+            include("${CMAKE_CURRENT_SOURCE_DIR}/src/v2/FFmpeg.cmake")
+            target_compile_definitions(CyDAW2 PRIVATE ASIO_STANDALONE)
+            target_include_directories(CyDAW2 PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/third_party/jack-transport/include")
             # The logo inside the interface (menu bar, About, opening a project).
             juce_add_binary_data(CyDAW2Branding
                 HEADER_NAME CyDAWBranding.h
@@ -999,6 +1038,12 @@ if(CYDAW_BUILD_DESKTOP)
                 DEPENDS "${CYDAW2_JUCE_INFO_FILE}")
             target_sources(CyDAW2 PRIVATE
                 src/v2/Main.cpp
+                src/v2/CinemaVideo.cpp
+                src/v2/CinemaVideo.h
+                src/v2/CinemaEditing.inc
+                src/v2/CinemaTimeline.inc
+                src/v2/TransportSync.cpp
+                src/v2/TransportSync.h
                 src/v2/AppUi.cpp
                 src/v2/AppUi.h
                 src/v2/ImGuiHost.cpp
@@ -1081,15 +1126,28 @@ if(CYDAW_BUILD_DESKTOP)
                 src/v2/DeviceBody.h
                 src/v2/DeviceEditorView.h
                 src/v2/WorkshopView.cpp
-                src/v2/PluginWindows.cpp
+                src/v2/JsfxView.cpp
+            src/v2/PluginWindows.cpp
                 src/v2/RoutingUi.cpp
                 src/v2/Companion.cpp
                 src/v2/WorkshopView.h
+                src/v2/DjView.cpp
+                src/v2/DjView.h
+                src/v2/DjLibrary.cpp
+                src/v2/DjLibrary.h
+                src/v2/FoundryView.cpp
+                src/v2/FoundryView.h
+                src/v2/ModeProcessing.cpp
+                src/v2/ModeProcessing.h
+                src/v2/FoundryDocument.cpp
+                src/v2/FoundryDocument.h
                 src/v2/NodeTree.cpp
                 src/v2/NodeTree.h
                 src/v2/ContextMenus.cpp
                 src/v2/ContextMenus.h
                 src/v2/InterfaceEditor.cpp
+                src/v2/InterfaceDesigner.cpp
+                src/v2/InstrumentPanels.cpp
                 src/v2/InterfaceEditor.h
                 src/v2/Vst3Build.cpp
                 src/v2/Vst3Build.h
@@ -1125,6 +1183,8 @@ if(CYDAW_BUILD_DESKTOP)
                 src/v2/PresetMenu.h
                 # The engine and the services the interface drives.
                 src/app/AudioTrackController.cpp
+                src/app/DjEngine.cpp
+                src/app/FoundryPlayer.cpp
                 src/app/AudioTrackController.h
                 src/app/VirtualAudioBus.cpp
                 src/app/IsolatedPluginHost.cpp
@@ -1184,6 +1244,16 @@ if(CYDAW_BUILD_DESKTOP)
                     VERBATIM
                 )
             endif()
+            add_custom_command(TARGET CyDAW2 POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/Examples/JSFX" "$<TARGET_FILE_DIR:CyDAW2>/JSFX"
+                COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:CyDAW2>/Licenses/PluginFormats"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/third_party/ysfx/LICENSE" "$<TARGET_FILE_DIR:CyDAW2>/Licenses/PluginFormats/ysfx-Apache-2.txt"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/third_party/ysfx/thirdparty/WDL/LICENSE.txt" "$<TARGET_FILE_DIR:CyDAW2>/Licenses/PluginFormats/WDL.txt"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/third_party/ysfx/thirdparty/stb/LICENSE" "$<TARGET_FILE_DIR:CyDAW2>/Licenses/PluginFormats/stb.txt"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/third_party/ysfx/thirdparty/dr_libs/LICENSE" "$<TARGET_FILE_DIR:CyDAW2>/Licenses/PluginFormats/dr_libs.txt"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/third_party/clap/LICENSE" "$<TARGET_FILE_DIR:CyDAW2>/Licenses/PluginFormats/CLAP.txt"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/third_party/lv2/COPYING" "$<TARGET_FILE_DIR:CyDAW2>/Licenses/PluginFormats/LV2.txt"
+                VERBATIM)
             add_custom_command(TARGET CyDAW2 POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:CyDAW2>/i18n"
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -1358,6 +1428,18 @@ if(CYDAW_BUILD_DESKTOP)
                                          --plugin "${CMAKE_BINARY_DIR}/CyDAWGraphRuntime_artefacts/$<CONFIG>/VST3/CyDAW Graph Runtime.vst3")
                         set_tests_properties(cydaw2_plugin_window_check PROPERTIES TIMEOUT 600)
                     endif()
+                    # The Mix DJ mode: the collection, the decks (analysis, sync, loops,
+                    # cues), the mixer, the mix recorded, the collection kept.
+                    add_test(NAME cydaw2_dj_check
+                             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/v2_dj_check.py"
+                                     --port 47854 --exe "$<TARGET_FILE:CyDAW2>")
+                    set_tests_properties(cydaw2_dj_check PROPERTIES TIMEOUT 300)
+                    # The Foundry: a sound file opened, edited, processed, saved with
+                    # its markers, a track's effects rendered into it.
+                    add_test(NAME cydaw2_foundry_check
+                             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/v2_foundry_check.py"
+                                     --port 47855 --exe "$<TARGET_FILE:CyDAW2>")
+                    set_tests_properties(cydaw2_foundry_check PROPERTIES TIMEOUT 300)
                     # Batterie: its kits (the banks downloaded on this computer;
                     # skipped without them), its pieces' mix, grooves, presets.
                     add_test(NAME cydaw2_batterie_check
@@ -1431,6 +1513,14 @@ if(CYDAW_BUILD_DESKTOP)
                 BUNDLE DESTINATION . COMPONENT CyDAWRuntime)
         install(TARGETS CyDAWPluginWorker CyDAWAudioProbe
                 RUNTIME DESTINATION . COMPONENT CyDAWRuntime)
+        install(DIRECTORY Examples/JSFX/ DESTINATION JSFX COMPONENT CyDAWRuntime)
+        install(FILES third_party/clap/LICENSE DESTINATION Licenses/PluginFormats RENAME CLAP.txt COMPONENT CyDAWRuntime)
+        install(FILES third_party/lv2/COPYING DESTINATION Licenses/PluginFormats RENAME LV2.txt COMPONENT CyDAWRuntime)
+        install(FILES third_party/ysfx/LICENSE DESTINATION Licenses/PluginFormats RENAME ysfx-Apache-2.txt COMPONENT CyDAWRuntime)
+        install(FILES third_party/ysfx/thirdparty/WDL/LICENSE.txt DESTINATION Licenses/PluginFormats RENAME WDL.txt COMPONENT CyDAWRuntime)
+        install(FILES third_party/ysfx/thirdparty/stb/LICENSE DESTINATION Licenses/PluginFormats RENAME stb.txt COMPONENT CyDAWRuntime)
+        install(FILES third_party/ysfx/thirdparty/dr_libs/LICENSE DESTINATION Licenses/PluginFormats RENAME dr_libs.txt COMPONENT CyDAWRuntime)
+        install(FILES docs/PLUGIN_FORMATS.md DESTINATION docs COMPONENT CyDAWRuntime)
         install(DIRECTORY resources/i18n
                 DESTINATION . COMPONENT CyDAWRuntime)
         install(FILES README.md docs/TEST_BUILD_README.md

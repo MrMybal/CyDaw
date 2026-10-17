@@ -206,7 +206,21 @@ void GraphEditor::draw()
     }
     view_ = &views_[slot];
     drawToolbar(*slot, track);
-    drawCanvas(*slot, track);
+    if (!inWorkshop() && showDetails_) {
+        const auto space = ImGui::GetContentRegionAvail();
+        const auto width = std::min(dp(340.0f), space.x * 0.38f);
+        ImGui::BeginChild("##graphArea",ImVec2(std::max(60.0f,space.x-width-ImGui::GetStyle().ItemSpacing.x),space.y),0,
+                          ImGuiWindowFlags_NoScrollbar|ImGuiWindowFlags_NoScrollWithMouse);
+        drawCanvas(*slot,track); ImGui::EndChild(); ImGui::SameLine();
+        ImGui::BeginChild("##graphDetails",ImVec2(width,space.y),ImGuiChildFlags_Borders);
+        if (ImGui::BeginTabBar("##detailTabs")) {
+            if (ImGui::BeginTabItem(L("Détails","Details"))) { drawDetails(); ImGui::EndTabItem(); }
+            if (ImGui::BeginTabItem(L("Entrées / sorties","Inputs / outputs"))) { drawPorts(); ImGui::EndTabItem(); }
+            if (ImGui::BeginTabItem(L("Préréglages", "Presets"))) { drawPrograms(); ImGui::EndTabItem(); }
+            ImGui::EndTabBar();
+        }
+        ImGui::EndChild();
+    } else drawCanvas(*slot, track);
     if (const auto popup = std::exchange(pendingPopup_, ImGuiID {}); popup != 0)
         ImGui::OpenPopup(popup);
     searchPopup(*slot, track);
@@ -214,7 +228,7 @@ void GraphEditor::draw()
     newDeviceMenu(*slot, track);
     ioMenu(*slot);
     cableMenu(*slot);
-    if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows))
+    if (ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows))
         handleKeys(*slot);
     // A device made of a graph opens after the frame that asked for it: in
     // place inside the workshop, in the workshop from a track.
@@ -603,6 +617,15 @@ void GraphEditor::drawToolbar(GraphSlot& slot, const std::optional<TrackRef>& tr
     ImGui::SameLine();
     ImGui::TextDisabled("%d %%", static_cast<int>(std::round(view_->zoom * 100.0f)));
 
+    ImGui::SameLine();
+    if (ImGui::Button(L("Préréglages", "Presets")))
+        ImGui::OpenPopup("##graphPrograms");
+    ImGui::SetNextWindowSize(ImVec2(dp(390), dp(430)), ImGuiCond_Appearing);
+    if (ImGui::BeginPopup("##graphPrograms")) {
+        drawPrograms();
+        ImGui::EndPopup();
+    }
+
     // Compilation state, on the right.
     const auto error = slot.lastCompileError();
     const auto message = error.isNotEmpty() ? error
@@ -640,13 +663,14 @@ void GraphEditor::layoutNodes(const std::vector<EditorNode>& nodes, const std::v
         const auto world = fractionToWorld(node.position);
         layout.min = worldToScreen(world);
         layout.headerHeight = kHeader * s;
-        const auto showAll = drawingControl || selection_.contains(node.id);
+        const auto showAll = drawingControl;
         std::vector<const EditorPort*> shown;
         for (const auto& port : node.ports) {
-            auto visible = !(port.input && port.kind == 2) || showAll;
+            auto visible = port.exposure == 1 || (port.exposure < 0 && (!(port.input && port.kind == 2) || showAll));
             if (!visible)
                 for (const auto& connection : connections)
-                    if (connection.destination == node.id && connection.destinationPort == port.id)
+                    if ((connection.destination == node.id && connection.destinationPort == port.id)
+                        || (connection.source == node.id && connection.sourcePort == port.id))
                         visible = true;
             if (visible)
                 shown.push_back(&port);
@@ -854,6 +878,12 @@ void GraphEditor::drawCanvas(GraphSlot& slot, const std::optional<TrackRef>& tra
                 ImGui::PushID(static_cast<int>(port->id) * 2 + (inputs ? 1 : 0));
                 ImGui::InvisibleButton("##socket", ImVec2(hit * 2.0f, hit * 2.0f));
                 const auto hovered = ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
+                if(inputs && ImGui::BeginPopupContextItem("##socketActions")) {
+                    ImGui::TextDisabled("%s",port->name.toRawUTF8());ImGui::Separator();
+                    if(ImGui::MenuItem("Create Input"))promoteValue(graph,layout.node->id,port->id,{},true);
+                    if(port->kind==2 && ImGui::MenuItem("Create Variable"))promoteValue(graph,layout.node->id,port->id,{},false);
+                    ImGui::EndPopup();
+                }
                 const auto colour = kindColour(port->kind);
                 auto connected = false;
                 for (const auto& connection : connections)
@@ -1285,7 +1315,9 @@ void GraphEditor::drawNode(app::NodeGraphComponent& graph, const NodeLayout& lay
             std::snprintf(renameBuffer_, sizeof(renameBuffer_), "%s", node.title.toRawUTF8());
         }
     }
-    if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+    if (ImGui::IsItemClicked(ImGuiMouseButton_Right)
+        && io.MousePos.y < layout.min.y+layout.headerHeight
+        && io.MousePos.x > layout.min.x+dp(12) && io.MousePos.x < layout.max.x-dp(12)) {
         if (!selection_.contains(node.id))
             selection_ = { node.id };
         contextNode_ = node.id;
@@ -1443,6 +1475,7 @@ void GraphEditor::drawNode(app::NodeGraphComponent& graph, const NodeLayout& lay
                 (void) graph.editorSetParameter(parameter.binding, value);
                 state_.focused = panel();
             }
+            valueActions(graph,node,parameter);
             if (ImGui::IsItemHovered()) {
                 knobHovered_ = true;
                 ImGui::SetTooltip("%s", parameter.label.toRawUTF8());
@@ -1964,5 +1997,294 @@ void GraphEditor::handleKeys(GraphSlot& slot)
         selectedWire_.reset();
     }
 }
+
+
+void GraphEditor::promoteValue(app::NodeGraphComponent& graph, std::uint64_t node, std::uint64_t port,
+    const juce::String& binding, bool input)
+{
+    std::uint64_t created{};
+    const auto result=graph.editorPromoteValue(node,port,binding,input,created);
+    if(result.failed()) {lastError_=result.getErrorMessage();lastErrorTime_=ImGui::GetTime();}
+    else {selection_={created};state_.focused=panel();}
+}
+
+void GraphEditor::valueActions(app::NodeGraphComponent& graph, const EditorNode& node,
+    const app::NodeGraphComponent::EditorParameter& parameter)
+{
+    if(ImGui::BeginPopupContextItem("##valueActions")) {
+        ImGui::TextDisabled("%s",parameter.label.toRawUTF8());ImGui::Separator();
+        ImGui::BeginDisabled(!parameter.inputPortId);
+        if(ImGui::MenuItem("Create Input")) promoteValue(graph,node.id,parameter.inputPortId,parameter.binding,true);
+        if(ImGui::MenuItem("Create Variable")) promoteValue(graph,node.id,parameter.inputPortId,parameter.binding,false);
+        ImGui::EndDisabled();
+        if(!parameter.inputPortId) ImGui::TextWrapped("%s",L("Cette valeur n'a pas encore de prise pilotable.","This value does not yet have a controllable socket."));
+        ImGui::EndPopup();
+    }
+}
+
+void GraphEditor::drawDetails()
+{
+    auto* slot = inWorkshop() ? studio_.workshopGraph() : (state_.selectedTrack ? trackSlot(*state_.selectedTrack) : nullptr);
+    if (!slot || currentGraph_ != slot) { ImGui::TextDisabled("%s",L("Choisissez un nœud.","Pick a node.")); return; }
+    auto& graph = slot->graph();
+    const auto nodes = graph.editorNodes();
+    auto chosen = std::find_if(nodes.begin(),nodes.end(),[this](const auto& n){return selection_.contains(n.id);});
+    if (chosen == nodes.end()) {
+        ui::sectionTitle(L("Sélection","Selection"));
+        ImGui::TextWrapped("%s",L("Sélectionnez une carte pour éditer ses réglages et choisir les prises à exposer.",
+                                 "Pick a card to edit its settings and choose the sockets to expose.")); return;
+    }
+    const auto& node = *chosen;
+    ImGui::PushID(static_cast<int>(node.id));
+    ui::sectionTitle(node.title.toRawUTF8());
+    ImGui::TextDisabled("%s",node.typeKey.toRawUTF8());
+    if (selection_.size()>1) ImGui::TextDisabled(L("%d nœuds sélectionnés","%d nodes selected"),static_cast<int>(selection_.size()));
+    const auto field = [](const char* id,char* buffer,std::size_t size,const juce::String& value,bool multiline=false) {
+        if(ImGui::GetActiveID()!=ImGui::GetID(id)) std::snprintf(buffer,size,"%s",value.toRawUTF8());
+        ImGui::SetNextItemWidth(-1);
+        if(multiline) ImGui::InputTextMultiline(id,buffer,size,ImVec2(-1,dp(66)));
+        else ImGui::InputText(id,buffer,size);
+        return ImGui::IsItemDeactivatedAfterEdit();
+    };
+    ImGui::TextDisabled("%s",L("Nom","Name"));
+    if(field("##name",detailName_,sizeof(detailName_),node.title)) graph.editorSetAlias(node.id,juce::String::fromUTF8(detailName_));
+    ImGui::TextDisabled("%s",L("Description","Description"));
+    if(field("##description",detailDescription_,sizeof(detailDescription_),node.description,true))
+        graph.editorSetDescription(node.id,juce::String::fromUTF8(detailDescription_));
+    if(!node.boundary) { auto bypass=node.bypassed; if(ImGui::Checkbox("Bypass",&bypass)) graph.editorSetBypassed(node.id,bypass); }
+    ImGui::Separator();
+    ImGui::SetNextItemWidth(-1); ImGui::InputTextWithHint("##filter",L("Filtrer les paramètres…","Filter parameters…"),detailFilter_,sizeof(detailFilter_));
+    const auto filter=juce::String::fromUTF8(detailFilter_);
+    if(ImGui::CollapsingHeader(L("Paramètres du nœud","Node parameters"),ImGuiTreeNodeFlags_DefaultOpen)) {
+        for(const auto& param:node.parameters) {
+            if(filter.isNotEmpty() && !param.label.containsIgnoreCase(filter) && !param.binding.containsIgnoreCase(filter)) continue;
+            ImGui::PushID(param.binding.toRawUTF8());
+            ImGui::TextUnformatted(param.label.toRawUTF8());
+            auto v=static_cast<float>(param.value);
+            ImGui::SetNextItemWidth(-1);
+            const auto fmt=param.unit.isNotEmpty()?juce::String("%.3f ")+param.unit.replace("%","%%"):"%.3f";
+            if(ImGui::DragFloat("##value",&v,static_cast<float>(std::max(0.0001,(param.maximum-param.minimum)/400)),
+                static_cast<float>(param.minimum),static_cast<float>(param.maximum),fmt.toRawUTF8(),ImGuiSliderFlags_AlwaysClamp)) graph.editorSetParameter(param.binding,v);
+            valueActions(graph,node,param);
+            ImGui::BeginDisabled(!param.inputPortId);
+            if(ImGui::SmallButton("Create Input")) promoteValue(graph,node.id,param.inputPortId,param.binding,true);
+            ImGui::SameLine(); if(ImGui::SmallButton("Create Variable")) promoteValue(graph,node.id,param.inputPortId,param.binding,false);
+            ImGui::EndDisabled();
+            auto panel=param.showInDevice; auto host=param.publishToHost;
+            if(ImGui::Checkbox(L("Panneau","Panel"),&panel)) graph.setPublishedParameterExposure(param.binding,panel,host);
+            ImGui::SameLine(); if(ImGui::Checkbox("VST3",&host)) graph.setPublishedParameterExposure(param.binding,panel,host);
+            if(param.inputPortId) {
+                const auto p=std::find_if(node.ports.begin(),node.ports.end(),[&](const auto& p){return p.id==param.inputPortId;});
+                auto exposed=p!=node.ports.end() && p->exposure==1;
+                ImGui::SameLine(); if(ImGui::Checkbox(L("Exposer","Expose"),&exposed)) graph.editorSetPortExposure(node.id,param.inputPortId,exposed);
+                ui::tooltip(L("Afficher cette entrée de paramètre sur la carte.","Show this parameter input on the card."));
+            } else {
+                ImGui::SameLine();ImGui::BeginDisabled();bool unavailable=false;ImGui::Checkbox(L("Exposer","Expose"),&unavailable);ImGui::EndDisabled();
+                ui::tooltip(L("Ce paramètre ne dispose pas encore d'une entrée de modulation dans le moteur.","This parameter does not yet have a modulation input in the engine."));
+            }
+            if(ImGui::SmallButton(L("Réinitialiser","Reset"))) graph.editorSetParameter(param.binding,param.defaultValue);
+            if(param.description.isNotEmpty()) ImGui::TextWrapped("%s",param.description.toRawUTF8());
+            ImGui::Separator(); ImGui::PopID();
+        }
+    }
+    if(ImGui::CollapsingHeader(L("Prises d'entrée et de sortie","Input and output sockets"),ImGuiTreeNodeFlags_DefaultOpen))
+        for(const auto& port:node.ports) {
+            ImGui::PushID(static_cast<int>(port.id));
+            auto exposed=port.exposure==1 || (port.exposure<0 && !(port.input && port.kind==2));
+            if(ImGui::Checkbox("##expose",&exposed)) graph.editorSetPortExposure(node.id,port.id,exposed);
+            ImGui::SameLine(); ImGui::TextColored(theme::vec(kindColour(port.kind)),"%s %s",port.input?"IN":"OUT",port.name.toRawUTF8());
+            ImGui::SameLine(); ImGui::TextDisabled(port.kind==0?"audio %d ch":port.kind==1?"MIDI":port.kind==2?"valeur":"transport",port.channels);
+            auto& category=detailPortCategories_[{node.id,port.id}];
+            if(field("##category",category.data(),category.size(),port.category))
+                (void)graph.editorSetPortDetails(node.id,port.id,port.name,juce::String::fromUTF8(category.data()));
+            ui::tooltip(L("Catégorie de la prise","Socket category"));
+            if(port.input) {
+                if(ImGui::SmallButton("Create Input")) promoteValue(graph,node.id,port.id,{},true);
+                if(port.kind==2) {ImGui::SameLine(); if(ImGui::SmallButton("Create Variable")) promoteValue(graph,node.id,port.id,{},false);}
+            }
+            ImGui::PopID();
+        }
+    if(node.boundary && ImGui::Button(L("Supprimer cette entrée/sortie","Delete this input/output"))) graph.editorRemoveBoundary(node.id);
+    ImGui::PopID();
+}
+
+void GraphEditor::drawPorts()
+{
+    auto* slot=inWorkshop()?studio_.workshopGraph():(state_.selectedTrack?trackSlot(*state_.selectedTrack):nullptr);
+    if(!slot) return;
+    ui::sectionTitle(L("Contrat du graphe","Graph contract"));
+    ImGui::TextWrapped("%s",L("Ajoutez uniquement les entrées et sorties nécessaires. Leur nom devient celui de la prise du module.",
+                             "Add only the inputs and outputs needed. Their names become the module socket names."));
+    ImGui::SetNextItemWidth(-1); ImGui::InputTextWithHint("##ioName",L("Nom de la prise","Socket name"),boundaryName_,sizeof(boundaryName_));
+    ImGui::SetNextItemWidth(-1); ImGui::InputTextWithHint("##ioCategory",L("Catégorie / sous-catégorie","Category / subcategory"),boundaryCategory_,sizeof(boundaryCategory_));
+    ImGui::SetNextItemWidth(-1); ImGui::Combo("##ioDirection",&boundaryDirection_,L("Entrée\0Sortie\0","Input\0Output\0"));
+    ImGui::SetNextItemWidth(-1); ImGui::Combo("##ioType",&boundaryKind_,L("Audio\0MIDI\0Valeur / contrôle\0Transport\0","Audio\0MIDI\0Value / control\0Transport\0"));
+    if(boundaryKind_==0) { ImGui::SetNextItemWidth(-1); ImGui::SliderInt(L("Canaux","Channels"),&boundaryChannels_,1,8); }
+    if(ImGui::Button(L("Ajouter la prise","Add socket"),ImVec2(-1,0))) {
+        const auto in=boundaryDirection_==0;
+        const auto key=boundaryKind_==0?juce::String(in?"graph-audio-input-":"graph-audio-output-")+juce::String(boundaryChannels_)
+            :juce::String(boundaryKind_==1?(in?"graph-midi-input":"graph-midi-output"):(boundaryKind_==2?(in?"graph-value-input":"graph-value-output"):(in?"graph-transport-input":"graph-transport-output")));
+        addBoundary(*slot,key,in);
+        if(!selection_.empty()) { const auto id=*selection_.begin();
+            if(boundaryName_[0]) slot->graph().editorSetAlias(id,juce::String::fromUTF8(boundaryName_));
+            for(const auto& n:slot->graph().editorNodes()) if(n.id==id) for(const auto& p:n.ports)
+                slot->graph().editorSetPortDetails(id,p.id,boundaryName_[0]?juce::String::fromUTF8(boundaryName_):p.name,juce::String::fromUTF8(boundaryCategory_));
+        }
+    }
+    ImGui::Separator();
+    for(const auto& n:slot->graph().editorNodes()) if(n.boundary) {
+        ImGui::PushID(static_cast<int>(n.id));
+        if(ImGui::Selectable(n.title.toRawUTF8(),selection_.contains(n.id))) selection_={n.id};
+        for(const auto& p:n.ports) if(p.category.isNotEmpty()) ImGui::TextDisabled("%s",p.category.toRawUTF8());
+        if(ImGui::SmallButton(L("Supprimer","Delete"))) { slot->graph().editorRemoveBoundary(n.id); ImGui::PopID(); break; }
+        ImGui::PopID();
+    }
+}
+
+void GraphEditor::drawPrograms()
+{
+    auto* slot = inWorkshop() ? studio_.workshopGraph() : (state_.selectedTrack ? trackSlot(*state_.selectedTrack) : nullptr);
+    if (slot == nullptr)
+        return;
+    auto& graph = slot->graph();
+    if (programGraph_ != slot) {
+        programGraph_ = slot;
+        program_.clear();
+        renamingProgram_ = -1;
+        std::fill(programName_.begin(), programName_.end(), '\0');
+    }
+    ImGui::TextDisabled("%s", graph.editorGraphInfo().name.toRawUTF8());
+    const auto& p = theme::palette();
+    auto programs = graph.editorPrograms();
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextDisabled("%s", L("Les réglages du périphérique gardés sous un nom : enregistrés avec lui, ils deviennent les "
+                                "programmes du VST3 exporté (la liste de préréglages de l'hôte). Un clic en charge un.",
+                                "The device's settings kept under a name: saved with it, they become the exported VST3's "
+                                "programs (the host's preset list). A click loads one."));
+    ImGui::PopTextWrapPos();
+    ImGui::Spacing();
+
+    if (ImGui::Button(L("Créer Init (valeurs par défaut)", "Create Init (default values)"))) {
+        auto initName = juce::String("Init");
+        for (int n = 2; std::any_of(programs.begin(), programs.end(), [&](const auto& preset) { return preset.name == initName; }); ++n)
+            initName = "Init " + juce::String(n);
+        programs.push_back(graph.editorCaptureProgram(initName, true));
+        graph.editorSetPrograms(programs);
+        state_.status = ui::Ls("Préréglage créé : ", "Preset created: ") + initName;
+    }
+    ui::tooltip(L("Enregistre les valeurs par défaut sans changer le son actuel.", "Saves default values without changing the current sound."));
+    ImGui::Spacing();
+    // Adding the settings as they are.
+    const auto width = ImGui::GetContentRegionAvail().x;
+    ImGui::SetNextItemWidth(width - dp(96.0f));
+    const auto entered = ImGui::InputTextWithHint("##programName", L("Nom du préréglage", "Preset name"), programName_.data(),
+                                                  programName_.size(), ImGuiInputTextFlags_EnterReturnsTrue);
+    ImGui::SameLine();
+    const auto name = juce::String::fromUTF8(programName_.data()).trim();
+    const auto existing = std::find_if(programs.begin(), programs.end(), [&name](const auto& program) { return program.name == name; });
+    ImGui::BeginDisabled(name.isEmpty());
+    if (ui::primaryButton(existing != programs.end() ? L("Remplacer", "Replace") : L("Ajouter", "Add"), ImVec2(dp(88.0f), 0.0f))
+        || (entered && name.isNotEmpty())) {
+        ImGui::EndDisabled();
+        auto captured = graph.editorCaptureProgram(name);
+        if (existing != programs.end())
+            *existing = std::move(captured);
+        else
+            programs.push_back(std::move(captured));
+        graph.editorSetPrograms(programs);
+        program_ = name;
+        std::fill(programName_.begin(), programName_.end(), '\0');
+        state_.status = ui::Ls("Préréglage enregistré : ", "Preset saved: ") + name;
+        return;
+    }
+    ImGui::EndDisabled();
+    ui::tooltip(L("Garde les réglages actuels sous ce nom", "Keeps the current settings under this name"));
+
+    ImGui::Spacing();
+    ui::sectionTitle(L("Préréglages du périphérique", "The device's presets"));
+    if (programs.empty()) {
+        ImGui::TextDisabled("%s", L("Aucun pour l'instant.", "None yet."));
+        return;
+    }
+    auto changed = false;
+    std::optional<std::size_t> remove;
+    std::optional<std::pair<std::size_t, std::size_t>> swap;
+    for (std::size_t index = 0; index < programs.size(); ++index) {
+        auto& program = programs[index];
+        ImGui::PushID(static_cast<int>(index));
+        if (renamingProgram_ == static_cast<int>(index)) {
+            ImGui::SetNextItemWidth(-dp(48.0f));
+            if (ImGui::IsWindowAppearing() || !ImGui::IsAnyItemActive())
+                ImGui::SetKeyboardFocusHere();
+            const auto done = ImGui::InputText("##rename", programRename_.data(), programRename_.size(),
+                                               ImGuiInputTextFlags_EnterReturnsTrue);
+            ImGui::SameLine();
+            if (done || ImGui::Button("OK")) {
+                const auto renamed = juce::String::fromUTF8(programRename_.data()).trim();
+                if (renamed.isNotEmpty() && std::none_of(programs.begin(), programs.end(), [&](const auto& other) { return &other != &program && other.name == renamed; })) {
+                    if (program_ == program.name)
+                        program_ = renamed;
+                    program.name = renamed;
+                    changed = true;
+                }
+                renamingProgram_ = -1;
+            }
+            if (ImGui::IsKeyPressed(ImGuiKey_Escape))
+                renamingProgram_ = -1;
+        } else {
+            const auto label = juce::String(static_cast<int>(index) + 1) + ".  " + program.name;
+            if (ImGui::Selectable(label.toRawUTF8(), program.name == program_)) {
+                (void) graph.editorApplyProgram(program);
+                program_ = program.name;
+                state_.status = ui::Ls("Préréglage : ", "Preset: ") + program.name;
+            }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", (juce::String(static_cast<int>(program.values.size()))
+                                         + ui::Ls(" réglages", " settings")).toRawUTF8());
+            if (ImGui::BeginPopupContextItem("##programMenu")) {
+                if (ImGui::MenuItem(L("Charger", "Load"))) {
+                    (void) graph.editorApplyProgram(program);
+                    program_ = program.name;
+                }
+                if (ImGui::MenuItem(L("Remplacer par les réglages actuels", "Replace with the current settings"))) {
+                    program = graph.editorCaptureProgram(program.name);
+                    changed = true;
+                }
+                if (ImGui::MenuItem(L("Renommer", "Rename"))) {
+                    renamingProgram_ = static_cast<int>(index);
+                    std::fill(programRename_.begin(), programRename_.end(), '\0');
+                    program.name.copyToUTF8(programRename_.data(), programRename_.size());
+                }
+                if (ImGui::MenuItem(L("Monter", "Move up"), nullptr, false, index > 0))
+                    swap = std::make_pair(index, index - 1);
+                if (ImGui::MenuItem(L("Descendre", "Move down"), nullptr, false, index + 1 < programs.size()))
+                    swap = std::make_pair(index, index + 1);
+                ImGui::Separator();
+                ImGui::PushStyleColor(ImGuiCol_Text, theme::vec(p.record));
+                if (ImGui::MenuItem(L("Supprimer", "Remove")))
+                    remove = index;
+                ImGui::PopStyleColor();
+                ImGui::EndPopup();
+            }
+        }
+        ImGui::PopID();
+    }
+    if (swap) {
+        std::swap(programs[swap->first], programs[swap->second]);
+        changed = true;
+    }
+    if (remove) {
+        if (programs[*remove].name == program_)
+            program_.clear();
+        programs.erase(programs.begin() + static_cast<std::ptrdiff_t>(*remove));
+        changed = true;
+    }
+    if (changed)
+        graph.editorSetPrograms(programs);
+    ImGui::Spacing();
+    ImGui::TextDisabled("%s", L("Clic droit : remplacer, renommer, ordonner, supprimer.",
+                                "Right click: replace, rename, order, remove."));
+}
+
 
 } // namespace cydaw::v2

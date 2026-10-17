@@ -35,7 +35,7 @@ demande un emplacement et ne modifie jamais l'exemple. Espace lance et arrête l
 
 ## À essayer
 
-**Atelier VST** (bouton « Atelier VST » en haut à gauche, ou F7) : toute la fenêtre sert à fabriquer
+**Atelier Plugin** (bouton « Atelier Plugin » en haut à gauche, ou F7) : toute la fenêtre sert à fabriquer
 un effet ou un instrument avec un graphe, puis à l'exporter en VST3.
 - « Effet stéréo », « Effet mono » ou « Instrument » (le bouton + propose aussi mono → stéréo et
   multicanal) ; à gauche, l'arbre des **Nœuds** : un clic pose la carte au milieu, un glisser la pose

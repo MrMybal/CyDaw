@@ -645,7 +645,7 @@ bool GainPanAudioSource::processNativeDspGraph(
     // Where the block started on the timeline, for the automation: the
     // transport has already moved past it, as the volume lane reckons.
     const auto rate = std::max(1.0, sampleRate_);
-    const auto blockEnd = transport_ != nullptr ? transport_->getCurrentPosition()
+    const auto blockEnd = modeTimeline_ != nullptr ? modeTimeline_->load(std::memory_order_relaxed) : transport_ != nullptr ? transport_->getCurrentPosition()
                           : timelinePosition_ != nullptr ? timelinePosition_->load(std::memory_order_relaxed)
                                                          : std::numeric_limits<double>::quiet_NaN();
     const auto blockStart = blockEnd - static_cast<double>(bufferToFill.numSamples) / rate;
@@ -684,6 +684,17 @@ juce::Result GainPanAudioSource::addPlugin(const juce::File& pluginFile,
     if (pluginIndex != nullptr)
         *pluginIndex = currentCount;
     return juce::Result::ok();
+}
+
+juce::Result GainPanAudioSource::reloadPlugin(std::size_t index, double rate, int block, int channels) {
+    auto* old=pluginHost(index);if(!old)return juce::Result::fail("Unknown plugin");
+    auto replacement=std::make_unique<IsolatedPluginHost>();
+    auto result=replacement->startPlugin(old->pluginFile(),rate,block,channels);if(result.failed())return result;
+    juce::MemoryBlock state;if(old->getState(state).wasOk()&&!state.isEmpty())(void)replacement->setState(state);
+    pluginsAvailable_.store(false,std::memory_order_release);
+    while(pluginCallbacksInFlight_.load(std::memory_order_acquire)!=0)std::this_thread::yield();
+    auto removed=std::move(pluginHosts_[index]);pluginHosts_[index]=std::move(replacement);
+    pluginsAvailable_.store(true,std::memory_order_release);removed->stop();return juce::Result::ok();
 }
 
 void GainPanAudioSource::removePlugin(const std::size_t pluginIndex)
@@ -895,7 +906,10 @@ void GainPanAudioSource::publishAnalysisFrame(
 
 void GainPanAudioSource::getNextAudioBlock(const juce::AudioSourceChannelInfo& bufferToFill)
 {
-    input_.getNextAudioBlock(bufferToFill);
+    if (auto* source = externalInput_.load(std::memory_order_acquire))
+        source->getNextAudioBlock(bufferToFill);
+    else
+        input_.getNextAudioBlock(bufferToFill);
     // Its own sound waits for what is routed into it.
     if (bufferToFill.buffer != nullptr)
         inputDelay_.process(*bufferToFill.buffer, bufferToFill.startSample, bufferToFill.numSamples);
@@ -953,7 +967,7 @@ void GainPanAudioSource::getNextAudioBlock(const juce::AudioSourceChannelInfo& b
         if (pluginsAvailable_.load(std::memory_order_acquire)) {
             const auto count = pluginCount_.load(std::memory_order_acquire);
             const auto pluginAutomation = pluginAutomation_.read();
-            const auto blockEnd = transport_ != nullptr
+            const auto blockEnd = modeTimeline_ != nullptr ? modeTimeline_->load(std::memory_order_relaxed) : transport_ != nullptr
                                       ? transport_->getCurrentPosition()
                                       : timelinePosition_ != nullptr
                                             ? timelinePosition_->load(
@@ -999,9 +1013,13 @@ void GainPanAudioSource::getNextAudioBlock(const juce::AudioSourceChannelInfo& b
                     }
                     if (valueCount > 0)
                         pluginHosts_[index]->publishRealtimeParameters(values.data(), valueCount);
+                    const auto endPosition = modeTimeline_ ? modeTimeline_->load(std::memory_order_relaxed)
+                        : transport_ ? transport_->getCurrentPosition()
+                        : timelinePosition_ ? timelinePosition_->load(std::memory_order_relaxed) : 0.0;
                     (void) pluginHosts_[index]->processBlock(*bufferToFill.buffer,
-                                                             bufferToFill.startSample,
-                                                             bufferToFill.numSamples);
+                        bufferToFill.startSample, bufferToFill.numSamples,
+                        std::max(0.0,endPosition-bufferToFill.numSamples/std::max(1.0,sampleRate_)),
+                        NativeDspRuntime::sessionTempo(), NativeDspRuntime::sessionPlaying());
                     // How loud it came out, for its meter.
                     for (int channel = 0; channel < std::min(2, bufferToFill.buffer->getNumChannels()); ++channel) {
                         const auto loudest = bufferToFill.buffer->getMagnitude(channel, bufferToFill.startSample, bufferToFill.numSamples);
@@ -1037,7 +1055,7 @@ void GainPanAudioSource::getNextAudioBlock(const juce::AudioSourceChannelInfo& b
     const auto automation = automation_.read();
     if ((transport_ != nullptr || timelinePosition_ != nullptr)
         && automation != nullptr && !automation->empty()) {
-        const auto blockEnd = transport_ != nullptr
+        const auto blockEnd = modeTimeline_ != nullptr ? modeTimeline_->load(std::memory_order_relaxed) : transport_ != nullptr
                                   ? transport_->getCurrentPosition()
                                   : timelinePosition_->load(
                                         std::memory_order_relaxed);
@@ -4151,6 +4169,17 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
         if (output.buffer == nullptr || output.numSamples <= 0)
             return;
 
+        if (owner.modeTimelineEnabled_.load(std::memory_order_acquire)) {
+            const auto at = owner.modePosition_.load(std::memory_order_relaxed);
+            const auto previous = positionSeconds.load(std::memory_order_relaxed);
+            const auto active=owner.modeMidiPlaying_.load(std::memory_order_relaxed);
+            if (playing.load(std::memory_order_relaxed)!=active || std::abs(at-previous) > 2.0 / std::max(1.0, synthesiser.getSampleRate())) {
+                needsAllNotesOff.store(true, std::memory_order_relaxed);
+                needsChase.store(active, std::memory_order_relaxed);
+            }
+            positionSeconds.store(at, std::memory_order_relaxed);
+            playing.store(active, std::memory_order_relaxed);
+        }
         juce::MidiBuffer midi;
         // Where this block starts, for the automation of the effects.
         const auto automationSeconds = positionSeconds.load(std::memory_order_relaxed);
@@ -5800,6 +5829,12 @@ AudioTrackController::AudioTrackController()
     (void) addMidiTrack("Instrument 1");
     simulation_ = std::make_unique<Simulation>(*this);
     mixerSource_.addInputSource(simulation_.get(), false);
+    dj_ = std::make_unique<DjEngine>();
+    mixerSource_.addInputSource(dj_.get(), false);
+    foundryPlayer_ = std::make_unique<FoundryPlayer>();
+    mixerSource_.addInputSource(foundryPlayer_.get(), false);
+    cinemaPlayer_ = std::make_unique<FoundryPlayer>();
+    mixerSource_.addInputSource(cinemaPlayer_.get(), false);
     // The clock around the mix: it starts before it, ends with the loop
     // auditioned after it.
     auditionMixer_.addInputSource(&loopAudition_.clockStart(), false);
@@ -5829,6 +5864,9 @@ AudioTrackController::~AudioTrackController()
     auditionMixer_.removeInputSource(&masterOutput_);
     auditionMixer_.removeInputSource(&loopAudition_.clockStart());
     mixerSource_.removeInputSource(simulation_.get());
+    mixerSource_.removeInputSource(dj_.get());
+    mixerSource_.removeInputSource(foundryPlayer_.get());
+    mixerSource_.removeInputSource(cinemaPlayer_.get());
     clearTracks();
     clearMidiTracks();
     readAheadThread_.stopThread(3'000);
@@ -5903,6 +5941,23 @@ juce::Result AudioTrackController::addAudioTrack(
     if (newTrackIndex != nullptr)
         *newTrackIndex = tracks_.size() - 1;
     return juce::Result::ok();
+}
+
+void AudioTrackController::setModeTrackSource(const std::size_t index, juce::AudioSource* source)
+{
+    if (auto* track = findTrack(index)) {
+        track->gainPanSource.setExternalTimeline(&modeEndPosition_);
+        track->gainPanSource.setExternalInput(source);
+    }
+}
+
+void AudioTrackController::setModeGainAutomation(const bool midi, const std::uint64_t id, std::vector<GainAutomationPoint> points)
+{
+    // Foundry audio tracks have no transport file: its length must not clamp
+    // points to zero. Their authoritative timeline belongs to the session.
+    auto published=std::make_shared<const std::vector<GainAutomationPoint>>(std::move(points));
+    if(midi) {if(auto* track=findMidiTrack(id))track->gainPanSource.setAutomation(std::move(published));}
+    else if(auto* track=findTrack(static_cast<std::size_t>(id)))track->gainPanSource.setAutomation(std::move(published));
 }
 
 juce::Result AudioTrackController::addEmptyAudioTrack(
@@ -11825,6 +11880,12 @@ juce::Result AudioTrackController::setTrackPlugin(const std::size_t index,
                                                        pluginIndex);
     refreshLatencyCompensation();
     return result;
+}
+
+juce::Result AudioTrackController::reloadTrackPlugin(std::size_t index,std::size_t plugin) {
+    auto* track=findTrack(index);if(!track)return juce::Result::fail("Unknown audio track");
+    auto* device=deviceManager_.getCurrentAudioDevice();auto result=track->gainPanSource.reloadPlugin(plugin,device?device->getCurrentSampleRate():48000,device?device->getCurrentBufferSizeSamples():512,track->channelCount);
+    refreshLatencyCompensation();return result;
 }
 
 void AudioTrackController::clearTrackPlugin(const std::size_t index,

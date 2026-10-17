@@ -113,7 +113,7 @@ void drawDeviceBody(DeviceBody& body, int& pane, DeviceHost& host, UiState& stat
     if (pane == -2) {
         ImGui::SetCursorScreenPos(origin);
         designed.drawPlayed(("designed" + juce::String(static_cast<juce::int64>(node.id))).toRawUTF8(), body.interface, size,
-                            [&graph](const juce::String& key, const double value) { (void) graph.editorSetParameter(key, value); });
+                            [&graph](const juce::String& key, const double value) { (void) graph.editorSetParameter(key, value); }, &graph.editorAnalysis());
     } else if (pane < 0) {
         auto chosen = -1;
         (void) visual::drawOverview("##overview", surface.panes, body.parameters, origin, size, colour, live, set, surface.knobs, &chosen);
