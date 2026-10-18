@@ -33,6 +33,9 @@ public:
     // Panels may leave the window as windows of their own (the studio);
     // a plug-in's window keeps them all. Read when the context is made.
     bool ownWindows { true };
+    // In the background (an automated session): never takes the keyboard on
+    // its own, which would make its window the active one.
+    bool background {};
 
     // Keeps the display rate for a while (input, a change on screen).
     void wake(int frames = 12);
@@ -85,5 +88,11 @@ private:
 
     friend struct NativeAccess;
 };
+
+// An automated session's window (--hidden): kept off every screen, without a
+// taskbar button, never made the active window, so it never comes in front of
+// what the person is doing. It renders as any other (snapshots, input sent
+// through the control port). Called once the window is on the desktop.
+void keepInBackground(juce::Component& window);
 
 } // namespace cydaw::v2

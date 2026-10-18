@@ -361,7 +361,9 @@ void ImGuiHost::createNativeWindow()
     if (native_->hwnd != nullptr || getPeer() == nullptr)
         return;
     registerWindowClass();
-    native_->hwnd = CreateWindowExW(0, windowClassName().c_str(), L"CyDAW", WS_POPUP | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
+    // In the background, never the active window, even before it is embedded.
+    native_->hwnd = CreateWindowExW(background ? WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW : 0, windowClassName().c_str(), L"CyDAW",
+                                    WS_POPUP | WS_CLIPCHILDREN | WS_CLIPSIBLINGS,
                                     0, 0, std::max(1, getWidth()), std::max(1, getHeight()),
                                     nullptr, nullptr, thisModule(), nullptr);
     if (native_->hwnd == nullptr)
@@ -412,7 +414,8 @@ void ImGuiHost::createNativeWindow()
     native_->backendsReady = true;
     if (onInitialised)
         onInitialised();
-    SetFocus(native_->hwnd);
+    if (!background)
+        SetFocus(native_->hwnd);
     wake(30);
 }
 
@@ -436,7 +439,7 @@ void ImGuiHost::visibilityChanged()
 
 void ImGuiHost::focusGained(FocusChangeType)
 {
-    if (native_->hwnd != nullptr)
+    if (native_->hwnd != nullptr && !background)
         SetFocus(native_->hwnd);
 }
 
@@ -580,7 +583,7 @@ void ImGuiHost::frame()
     ImGui::SetCurrentContext(n.imgui);
 
     // The surface keeps the keyboard while the window is the active one.
-    if (const auto root = GetAncestor(n.hwnd, GA_ROOT); root != nullptr
+    if (const auto root = GetAncestor(n.hwnd, GA_ROOT); !background && root != nullptr
         && GetForegroundWindow() == root && GetFocus() == root)
         SetFocus(n.hwnd);
 
@@ -665,7 +668,21 @@ void ImGuiHost::frame()
     }
 }
 
+void keepInBackground(juce::Component& window)
+{
+    auto* peer = window.getPeer();
+    if (peer == nullptr)
+        return;
+    auto* hwnd = static_cast<HWND>(peer->getNativeHandle());
+    const auto style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+    SetWindowLongPtrW(hwnd, GWL_EXSTYLE,
+                      (style | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE) & ~static_cast<LONG_PTR>(WS_EX_APPWINDOW));
+    SetWindowPos(hwnd, HWND_BOTTOM, -20'000, -20'000, 0, 0, SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+}
+
 #else
+
+void keepInBackground(juce::Component&) {}
 
 struct ImGuiHost::Native {};
 

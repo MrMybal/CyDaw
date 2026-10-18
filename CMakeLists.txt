@@ -1077,6 +1077,7 @@ if(CYDAW_BUILD_DESKTOP)
             target_link_libraries(CyDAW2 PRIVATE cydaw_zstd)
             target_sources(CyDAW2 PRIVATE
                 src/v2/Main.cpp
+                src/v2/HiddenDesktop.cpp
                 src/v2/CinemaVideo.cpp
                 src/v2/CinemaVideo.h
                 src/v2/CinemaEditing.inc

@@ -16,6 +16,7 @@
 #include <juce_gui_extra/juce_gui_extra.h>
 
 #include <cstdio>
+#include <cstdlib>
 #include <numbers>
 
 namespace cydaw::v2 {
@@ -28,6 +29,10 @@ struct LaunchOptions {
     int snapshotDelayMs { 1'500 };
     bool quitAfterSnapshot {};
     bool silent {};
+    // Off every screen, never in front (automated sessions: --hidden, or
+    // --silent unless --visible).
+    bool hidden {};
+    bool visible {};
     int width { 1'600 };
     int height { 960 };
     juce::String language;
@@ -59,6 +64,10 @@ LaunchOptions parseOptions(const juce::String& commandLine)
             options.quitAfterSnapshot = true;
         else if (value == "--silent")
             options.silent = true;
+        else if (value == "--hidden")
+            options.hidden = true;
+        else if (value == "--visible")
+            options.visible = true;
         else if (value.startsWith("--window-size=")) {
             const auto size = value.fromFirstOccurrenceOf("=", false, false);
             options.width = juce::jmax(800, size.upToFirstOccurrenceOf("x", false, true).getIntValue());
@@ -92,6 +101,10 @@ LaunchOptions parseOptions(const juce::String& commandLine)
         else if (!value.startsWith("--") && juce::File::isAbsolutePath(value) && juce::File(value).existsAsFile())
             options.project = juce::File(value);
     }
+    // A silent session is an automated one (tests, probes, builders): out of
+    // sight too, unless asked for.
+    if (options.silent && !options.visible)
+        options.hidden = true;
     return options;
 }
 
@@ -125,7 +138,8 @@ private:
 class MainWindow final : public juce::DocumentWindow {
 public:
     MainWindow(Studio& studio, const LaunchOptions& options)
-        : juce::DocumentWindow("CyDAW 2", juce::Colour(0xff111317), juce::DocumentWindow::allButtons)
+        : juce::DocumentWindow("CyDAW 2", juce::Colour(0xff111317), juce::DocumentWindow::allButtons),
+          hidden_(options.hidden)
     {
         setUsingNativeTitleBar(true);
         auto* content = new MainContent(studio);
@@ -137,7 +151,33 @@ public:
         content->ui().onQuit = [] { juce::JUCEApplication::getInstance()->systemRequestedQuit(); };
         content->ui().onQuitNow = [] { juce::JUCEApplicationBase::quit(); };
         content->ui().onTitle = [this](const juce::String& title) { setName(title); };
+        if (hidden_) {
+            // Off the screens before it is ever shown: nothing comes forward.
+            content->host().background = true;
+            setTopLeftPosition(-20'000, -20'000);
+            addToDesktop(getDesktopWindowStyleFlags());
+            keepInBackground(*this);
+        }
         setVisible(true);
+        if (hidden_)
+            keepInBackground(*this);
+    }
+
+    // A hidden session's window is never brought forward (as a top-level
+    // window is when it shows).
+    void visibilityChanged() override
+    {
+        if (!hidden_)
+            juce::DocumentWindow::visibilityChanged();
+    }
+
+    // No taskbar button for a hidden session's window.
+    int getDesktopWindowStyleFlags() const override
+    {
+        auto flags = juce::DocumentWindow::getDesktopWindowStyleFlags();
+        if (hidden_)
+            flags &= ~juce::ComponentPeer::windowAppearsOnTaskbar;
+        return flags;
     }
 
     void closeButtonPressed() override
@@ -149,6 +189,7 @@ public:
 
 private:
     MainContent* content_ {};
+    const bool hidden_ {};
 };
 
 } // namespace
@@ -953,6 +994,14 @@ public:
         if (audioError.isNotEmpty())
             DBG("CyDAW 2 audio: " << audioError);
 
+        // Hidden: its panels stay inside it (no window of their own on a screen).
+        if (options_.hidden) {
+           #if JUCE_WINDOWS
+            _putenv_s("CYDAW_SINGLE_VIEWPORT", "1");
+           #else
+            setenv("CYDAW_SINGLE_VIEWPORT", "1", 1);
+           #endif
+        }
         window_ = std::make_unique<MainWindow>(*studio_, options_);
         window_->content().ui().setLayoutSaving(!noRecovery_);
 
@@ -1034,7 +1083,7 @@ public:
 
     void anotherInstanceStarted(const juce::String&) override
     {
-        if (window_ != nullptr)
+        if (window_ != nullptr && !options_.hidden)
             window_->toFront(true);
     }
 
