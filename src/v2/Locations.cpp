@@ -161,6 +161,17 @@ void set(const Location location, const juce::File& where)
     save(folders);
 }
 
+bool downloaded(const Location location)
+{
+    return location == Location::banks || location == Location::downloads || location == Location::cache
+           || location == Location::companion || location == Location::aiModels;
+}
+
+juce::File inside(const Location location, const juce::File& root)
+{
+    return root.getChildFile(defaultFolder(location).getFileName());
+}
+
 bool movable(const Location location)
 {
     return location != Location::downloads && location != Location::pluginExports;

@@ -5,7 +5,11 @@ Classic analysis, no training:
 1. trim the silence, find the pitch over time (YIN; with the note known, up to its own
    frequency, and a clear peak there is enough when YIN loses a very high note) and the note;
 2. short-time spectra sized for the pitch, of each channel; the inharmonicity B from the peaks
-   of the steady part (f_k^2 / k^2 = f0^2 + f0^2 B k^2, a weighted line fit);
+   of the steady part (f_k^2 / k^2 = f0^2 + f0^2 B k^2, a weighted line fit); a struck bar or a
+   bell, whose partials are no harmonics (a marimba's 1 : 3.9 : 9.2, a bell's minor third), keeps
+   instead the frequency of each of its partials found in its finely resolved steady spectrum,
+   as a ratio to the note's frequency (when the harmonics carry less than three quarters of the
+   peaks' amplitude);
 3. every partial's amplitude per frame: the spectral peak near k f(t) sqrt(1 + B k^2) of the
    channels' power together, refined by parabolic interpolation; in stereo, each channel's share
    of it (the balance) and the right's phase against the left over the steady part;
@@ -47,6 +51,129 @@ class AnalysisOptions:
     note_hint: float | None = None    # MIDI: picks the octave when the pitch is ambiguous
     velocity: float | None = None     # 0..1; by default from the level
     loop: bool | None = None          # force a sustain loop on (True) or off (False)
+    partials: str = "auto"            # "harmonic", "inharmonic" (free ratios) or "auto"
+    pad_seconds: float = 0.0          # silence put before the note (aligns the zones' attacks)
+    string: bool = False              # fit a plucked string too (kept on the zone; the caller decides)
+
+
+# Partials that are no harmonics: the share of the steady spectrum's peak amplitude under which
+# a note keeps free ratios rather than a harmonic series.
+HARMONIC_SHARE = 0.75
+FREE_PARTIALS = 64
+
+
+@dataclass
+class FreePartials:
+    frequencies: np.ndarray   # Hz, ascending
+    levels_db: np.ndarray     # their level in the steady spectrum
+    harmonic_share: float     # how much of the peaks' amplitude sits on k f0 sqrt(1 + B k^2)
+    reference: float          # the frequency the ratios are to (the note's)
+
+
+def free_partials(signal: np.ndarray, rate: int, f0: float, inharmonicity: float, hint_hz: float | None,
+                  limit: int = FREE_PARTIALS) -> FreePartials | None:
+    """The note's partials wherever they are: the peaks of its steady spectrum (from its loudest
+    moment, over 0.6 s, finely resolved), the strongest first, none closer than 0.4 % to another."""
+    if len(signal) < 1024:
+        return None
+    frame = int(0.005 * rate)
+    count = len(signal) // frame
+    if count < 2:
+        return None
+    rms = np.sqrt(np.mean(signal[:count * frame].reshape(count, frame) ** 2, axis=1))
+    start = int(np.argmax(rms[: max(1, int(0.3 / 0.005))])) * frame
+    segment = signal[start:start + int(0.6 * rate)]
+    if len(segment) < 1024:
+        return None
+    size = 32768 if len(segment) <= 32768 else 65536
+    power = np.abs(np.fft.rfft(segment * np.hanning(len(segment)), size)) ** 2
+    bin_hz = rate / size
+    level = 10.0 * np.log10(power + 1e-30)
+    top = float(level.max())
+    low_bin = max(2, int(20.0 / bin_hz))
+    high_bin = min(len(level) - 3, int(0.45 * rate / bin_hz))
+    inner = level[low_bin:high_bin]
+    is_peak = (inner > level[low_bin - 1:high_bin - 1]) & (inner >= level[low_bin + 1:high_bin + 1]) & (inner > top - 60.0)
+    candidates = np.nonzero(is_peak)[0] + low_bin
+    # A peak stands out of its neighbourhood (15 Hz either side) by 10 dB at least.
+    width = max(3, int(round(15.0 / bin_hz)))
+    kept_bins = []
+    for index in candidates:
+        left = level[max(0, index - width):index].min()
+        right = level[index + 1:index + 1 + width].min()
+        if level[index] - max(left, right) >= 10.0:
+            kept_bins.append(index)
+    if not kept_bins:
+        return None
+    kept_bins = np.asarray(kept_bins)
+    a = level[kept_bins - 1]
+    b = level[kept_bins]
+    c = level[kept_bins + 1]
+    denominator = a - 2.0 * b + c
+    shift = np.clip(np.where(np.abs(denominator) > 1e-12, 0.5 * (a - c) / np.where(denominator == 0, 1, denominator), 0.0),
+                    -0.5, 0.5)
+    frequencies = (kept_bins + shift) * bin_hz
+    levels = b - 0.25 * (a - c) * shift
+    order = np.argsort(-levels)
+    chosen: list[int] = []
+    for index in order:
+        if all(abs(frequencies[index] - frequencies[other]) > max(2.0 * bin_hz, 0.004 * frequencies[index]) for other in chosen):
+            chosen.append(int(index))
+        if len(chosen) >= limit:
+            break
+    chosen.sort(key=lambda index: frequencies[index])
+    frequencies = frequencies[chosen]
+    levels = levels[chosen]
+    amplitude = 10.0 ** (levels / 20.0)
+    audible = levels > levels.max() - 40.0
+
+    # How harmonic: the peaks' amplitude on the series of f0 (or the note's frequency).
+    base = f0 if f0 > 0 else (hint_hz or frequencies[np.argmax(levels)])
+    number = np.maximum(1.0, np.round(frequencies / base))
+    for _ in range(2):
+        expected = number * base * np.sqrt(1.0 + inharmonicity * number * number)
+        number = np.maximum(1.0, np.round(number * frequencies / expected))
+    expected = number * base * np.sqrt(1.0 + inharmonicity * number * number)
+    on_series = np.abs(frequencies - expected) < 0.02 * base + 0.003 * frequencies
+    share = float(np.sum(amplitude[audible & on_series]) / max(np.sum(amplitude[audible]), 1e-30))
+
+    # The ratios' reference: the peak at the note asked for (within 60 cents), else at the
+    # pitch found, else the lowest peak within 20 dB of the strongest.
+    reference = 0.0
+    for wanted in (hint_hz, f0 if f0 > 0 else None):
+        if wanted:
+            cents = np.abs(1200.0 * np.log2(frequencies / wanted))
+            if np.min(cents) < 60.0:
+                reference = float(frequencies[np.argmin(cents)])
+                break
+    if reference <= 0.0:
+        reference = float(hint_hz) if hint_hz else float(frequencies[np.nonzero(levels > levels.max() - 20.0)[0][0]])
+    return FreePartials(frequencies=frequencies, levels_db=levels, harmonic_share=share, reference=reference)
+
+
+def attack_onset(signal: np.ndarray, rate: int) -> float:
+    """Where the attack is, in seconds from the start: the first moment the 2 ms level reaches
+    -20 dB of its loudest within the first 0.3 s. The zones of a model meet there when they
+    play together."""
+    frame = max(1, int(0.002 * rate))
+    count = len(signal) // frame
+    if count < 2:
+        return 0.0
+    level = np.sqrt(np.mean(signal[:count * frame].reshape(count, frame) ** 2, axis=1))
+    first = level[: max(2, int(0.3 / 0.002))]
+    reached = np.nonzero(first >= first.max() * 0.1)[0]
+    return float(reached[0] * frame / rate) if len(reached) else 0.0
+
+
+def _peaks_each(magnitude: np.ndarray, centres: np.ndarray, searches: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """As _peaks, each column (partial) searched within its own width."""
+    peak_bins = np.zeros(centres.shape)
+    peak_log = np.zeros(centres.shape)
+    for column in range(centres.shape[1]):
+        found_bin, found_log = _peaks(magnitude, centres[:, column:column + 1], int(searches[column]))
+        peak_bins[:, column] = found_bin[:, 0]
+        peak_log[:, column] = found_log[:, 0]
+    return peak_bins, peak_log
 
 
 def _bounds(signal: np.ndarray, rate: int) -> tuple[int, int]:
@@ -172,8 +299,13 @@ def analyse(audio: np.ndarray, rate: int, options: AnalysisOptions | None = None
     mixed = np.mean(channels, axis=0)
     start, end = _bounds(mixed, rate)
     channels = [channel[start:end] for channel in channels]
+    # The zones of one model start their attacks at the same moment: silence before this one.
+    if options.pad_seconds > 0:
+        pad = np.zeros(int(round(options.pad_seconds * rate)))
+        channels = [np.concatenate([pad, channel]) for channel in channels]
     signal = np.mean(channels, axis=0)
     hop = int(round(FRAME_SECONDS * rate))
+    onset = attack_onset(signal, rate)
 
     # 1. Pitch: YIN up to the note asked for when it is very high (a piano's top octave).
     maximum_hz = 2500.0
@@ -257,13 +389,57 @@ def analyse(audio: np.ndarray, rate: int, options: AnalysisOptions | None = None
                 curve = curve * (fitted / f0)
                 f0 = fitted
 
+    # 2b. Partials that are no harmonics: their own frequencies, as ratios to the note's.
+    ratios = None
+    harmonic_share = None
+    hint_hz = midi_to_hz(options.note_hint) if options.note_hint is not None else None
+    if options.partials != "harmonic" and (pitched or hint_hz):
+        found = free_partials(signal, rate, f0 if pitched else 0.0, inharmonicity, hint_hz)
+        if found is not None:
+            harmonic_share = found.harmonic_share
+            if options.partials == "inharmonic" or found.harmonic_share < HARMONIC_SHARE:
+                ratios = found.frequencies / found.reference
+                f0 = found.reference
+                pitched = True
+                inharmonicity = 0.0
+                # A struck bar or a bell has no vibrato: its partials stay where they are.
+                curve = np.full(frames_count, f0)
+                cents = np.zeros(frames_count)
+                # Spectra fine enough to tell its closest partials apart.
+                partial_hz = ratios * f0
+                gaps = np.diff(np.concatenate([[0.0], partial_hz]))
+                closest = float(np.min(gaps)) if len(gaps) else f0
+                size = int(np.clip(2 ** np.ceil(np.log2(max(4.0 * rate / partial_hz[0], 3.0 * rate / max(closest, 1.0)))),
+                                   2048, 16384))
+                fft_size = size * 2
+                channel_spectra = []
+                for channel in channels:
+                    spectra, window = _stft(channel, size, hop, fft_size)
+                    channel_spectra.append(spectra[:frames_count])
+                magnitude = np.sqrt(np.mean([np.abs(spectra) ** 2 for spectra in channel_spectra], axis=0))
+                bin_hz = rate / fft_size
+                window_sum = window.sum()
+                window_power = np.sum(window * window)
+                energy = np.sum(magnitude ** 2, axis=1)
+
     # 3. Partials per frame; in stereo each channel's share and the right's phase.
     count = 0
     harmonics = np.zeros((frames_count, 0))
     peak_bins = np.zeros((frames_count, 0))
     balance = None
     phase = None
-    if pitched:
+    if ratios is not None:
+        count = int(np.sum(ratios * f0 < 0.45 * rate))
+        ratios = ratios[:count]
+        partial_hz = ratios * f0
+        # Each searched within 40 % of the way to its neighbours (1 % of itself at most).
+        neighbours = np.minimum(np.diff(np.concatenate([[0.0], partial_hz])),
+                                np.diff(np.concatenate([partial_hz, [np.inf]])))
+        searches = np.maximum(1, np.floor(np.minimum(0.4 * neighbours, 0.01 * partial_hz) / bin_hz))
+        expected = np.repeat((partial_hz / bin_hz)[None, :], frames_count, axis=0)
+        peak_bins, peak_log = _peaks_each(magnitude, expected, searches)
+        harmonics = 2.0 * np.exp(peak_log) / window_sum
+    elif pitched:
         k = np.arange(1, options.max_harmonics + 1, dtype=np.float64)
         top = (k * f0 * np.sqrt(1.0 + inharmonicity * k * k)) < 0.45 * rate
         count = int(top.sum())
@@ -272,18 +448,18 @@ def analyse(audio: np.ndarray, rate: int, options: AnalysisOptions | None = None
         search = max(1, int(0.12 * f0 / bin_hz))
         peak_bins, peak_log = _peaks(magnitude, expected, search)
         harmonics = 2.0 * np.exp(peak_log) / window_sum
-        if stereo and count:
-            columns = np.clip(np.round(peak_bins).astype(int), 0, magnitude.shape[1] - 1)
-            rows = np.arange(frames_count)[:, None]
-            left = channel_spectra[0][rows, columns]
-            right = channel_spectra[1][rows, columns]
-            floor = 1e-9 * max(float(np.max(magnitude)), 1e-12)
-            balance = 20.0 * np.log10((np.abs(right) + floor) / (np.abs(left) + floor))
-            balance = np.clip(balance, -40.0, 40.0)
-            # The right's phase against the left: their cross-spectrum over the loud frames.
-            loud = energy >= np.quantile(energy, 0.5)
-            cross = np.sum((right * np.conj(left))[loud], axis=0)
-            phase = np.angle(cross)
+    if stereo and count:
+        columns = np.clip(np.round(peak_bins).astype(int), 0, magnitude.shape[1] - 1)
+        rows = np.arange(frames_count)[:, None]
+        left = channel_spectra[0][rows, columns]
+        right = channel_spectra[1][rows, columns]
+        floor = 1e-9 * max(float(np.max(magnitude)), 1e-12)
+        balance = 20.0 * np.log10((np.abs(right) + floor) / (np.abs(left) + floor))
+        balance = np.clip(balance, -40.0, 40.0)
+        # The right's phase against the left: their cross-spectrum over the loud frames.
+        loud = energy >= np.quantile(energy, 0.5)
+        cross = np.sum((right * np.conj(left))[loud], axis=0)
+        phase = np.angle(cross)
 
     # 4. The residual. For the attack's waveform: the Hann spectra without the
     #    partials' main lobes (+-2 bins of the window, +-4 with the padding, and
@@ -305,7 +481,8 @@ def analyse(audio: np.ndarray, rate: int, options: AnalysisOptions | None = None
     noise_bin_hz = rate / noise_size
     noise_frequency = np.arange(noise_size // 2 + 1) * noise_bin_hz
     scale = 2.0 / (rate * np.sum(noise_window ** 2))
-    guard = max(4.5 * noise_bin_hz, 0.2 * f0)
+    spacing = f0 if ratios is None else float(np.min(np.diff(np.concatenate([[0.0], ratios * f0])))) if count else f0
+    guard = max(4.5 * noise_bin_hz, 0.2 * min(f0, spacing))
     partial_hz_all = peak_bins * bin_hz
     channel_noise = [np.zeros((frames_count, options.noise_bands)) for _ in channels]
     cross_sum = np.zeros(options.noise_bands, dtype=np.complex128)
@@ -407,7 +584,8 @@ def analyse(audio: np.ndarray, rate: int, options: AnalysisOptions | None = None
             at = length - fade
             frame = min(frames_count - 1, at // hop)
             if count:
-                frequencies = k * curve[frame] * np.sqrt(1.0 + inharmonicity * k * k)
+                frequencies = (ratios * f0 if ratios is not None
+                               else k * curve[frame] * np.sqrt(1.0 + inharmonicity * k * k))
                 head_phase = _phases_at(channels[0], rate, at, frequencies, 1.0 / f0)
             else:
                 head_phase = np.zeros(0)
@@ -455,6 +633,15 @@ def analyse(audio: np.ndarray, rate: int, options: AnalysisOptions | None = None
                 harmonics=harmonics, noise_edges=edges, noise=noise, pitch_cents=cents,
                 inharmonicity=inharmonicity, gain=1.0, attack=attack, attack_rate=rate, attack_gain=1.0,
                 loop=loop, release=release)
+    if ratios is not None:
+        zone.ratios = np.asarray(ratios, dtype=np.float64)
+    zone.onset = onset
+    # A plucked string (harmonics, decaying freely): the string that rings like them, from where
+    # the model takes over from the head.
+    if options.string and ratios is None and count >= 4 and loop is None:
+        from .string_model import fit_string  # noqa: PLC0415
+        start_frame = int((len(head) - head_fade) // hop) if head is not None else peak_frame
+        zone.string = fit_string(harmonics, f0, hop / rate, inharmonicity, min(start_frame, frames_count - 1), rate)
     if stereo:
         zone.balance = balance if balance is not None else np.zeros((frames_count, count))
         zone.phase = phase if phase is not None else np.zeros(count)
@@ -471,7 +658,10 @@ def analyse(audio: np.ndarray, rate: int, options: AnalysisOptions | None = None
         "note": root_note,
         "cents": float(1200.0 * np.log2(f0 / midi_to_hz(root_note))),
         "seconds": len(signal) / rate,
+        "onsetMs": round(1000.0 * onset, 1),
         "harmonics": count,
+        "partials": "inharmonic" if ratios is not None else ("harmonic" if count else "none"),
+        "harmonicShare": None if harmonic_share is None else round(float(harmonic_share), 3),
         "inharmonicity": inharmonicity,
         "attackMs": attack_frames * FRAME_SECONDS * 1000.0 if attack is not None else 0.0,
         "headMs": round(head_ms, 1),

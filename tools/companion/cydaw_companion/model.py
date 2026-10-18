@@ -15,6 +15,11 @@ A zone:
       "rootNote": 57, "f0": 220.3, "velocity": 0.8, "gain": 1.0,
       "frameSeconds": 0.01, "frames": N,
       "inharmonicity": B,              # partial k at k f0 sqrt(1 + B k^2)
+      "ratios": [K] | absent,          # partials that are no harmonics (a bar, a bell): partial
+                                       # k at ratios[k-1] f0 instead (B unused)
+      "onset": seconds | absent,       # where its attack is (the zones played together meet there)
+      "string": {...} | absent,        # a plucked string played instead of the partials (see
+                                       # string_model.py)
       "pitchCents": [N],               # deviation from f0 per frame (cents)
       "harmonics": {"count": K, "db10": rows},
                                        # partial amplitudes (sine peak; in stereo, the RMS of the
@@ -222,6 +227,12 @@ class Zone:
     head_rate: int = 48000
     head_fade: int = 0
     head_phase: np.ndarray | None = None
+    # Partials that are no harmonics: each one's frequency as a ratio to f0. None: harmonics.
+    ratios: np.ndarray | None = None
+    # Where its attack is (seconds from its start): zones played together meet there.
+    onset: float = 0.0
+    # A plucked string played instead of its partials (string_model.StringModel). None: partials.
+    string: object | None = None
 
     @property
     def frames(self) -> int:
@@ -276,6 +287,12 @@ class Zone:
         }
         if times is not None:
             value["frameTimes"] = [int(t) for t in times]
+        if self.ratios is not None:
+            value["ratios"] = [round(float(r), 6) for r in self.ratios]
+        if self.onset > 0:
+            value["onset"] = round(float(self.onset), 4)
+        if self.string is not None:
+            value["string"] = self.string.to_json()
         if self.attack is not None and len(self.attack):
             value["attack"] = {
                 "rate": int(self.attack_rate),
@@ -352,6 +369,12 @@ class Zone:
             attack_gain=float(attack_value.get("gain", 1.0)) if attack_value else 1.0,
             loop=(int(loop["start"]), int(loop["end"])) if loop else None,
             release=value.get("release"))
+        if value.get("ratios"):
+            zone.ratios = np.asarray(value["ratios"], dtype=np.float64)
+        zone.onset = float(value.get("onset", 0.0))
+        if value.get("string"):
+            from .string_model import StringModel  # noqa: PLC0415
+            zone.string = StringModel.from_json(value["string"])
         stereo = value.get("stereo")
         if stereo:
             rows = stereo_rows(frames, int(stereo["step"]))

@@ -20,6 +20,8 @@ played.
   exported plug-in, its window, a project keeping it.
 * Mosaïque: the same, every kind of engine sounding and ending.
 * Nébuleuse: the same, every texture sounding as grains, Halo after it in its instrument.
+* A patch found for a recorded note (match_synth): a plucked sawtooth made here, an Opale patch
+  searched for it, a new track playing it; a search cancelled makes no track.
 
 Exit code 0 when all hold.
 """
@@ -251,6 +253,51 @@ def main() -> int:
               f"Opale's own card on an instrument track: the whole instrument, the loose card gone ({nodes})")
         played = need({"cmd": "synth", "track": bare, "note": 60, "seconds": 0.5, "tail": 1.0}, "Opale heard")
         check(played.get("rmsDb", -120.0) > -45.0, f"that instrument plays ({played.get('rmsDb', -120.0):.1f} dB)")
+
+        # ---- A synth patch found for a recorded note (Genopatch-like) ----
+        note_file = scratch / "plucked-saw.wav"
+        rate = 48_000
+        frames = []
+        for index in range(int(rate * 1.2)):
+            t = index / rate
+            # A sawtooth of A3 whose highs fade first, as a filter closing.
+            value = sum(math.sin(2 * math.pi * 220.0 * k * t) / k * math.exp(-t * (1.5 + 0.9 * k)) for k in range(1, 24))
+            frames.append(int(max(-1.0, min(1.0, 0.4 * value)) * 32767))
+        with wave.open(str(note_file), "wb") as out:
+            out.setnchannels(1)
+            out.setsampwidth(2)
+            out.setframerate(rate)
+            out.writeframes(b"".join(int(v).to_bytes(2, "little", signed=True) for v in frames))
+        tracks_before = len(need({"cmd": "status"}, "status")["meters"])
+        need({"cmd": "match_synth", "file": str(note_file).replace(os.sep, "/"), "synth": "opale", "evaluations": 1000},
+             "match_synth")
+        found = {}
+        for _ in range(600):
+            found = need({"cmd": "sound_matching"}, "sound_matching")
+            if not found.get("running"):
+                break
+            time.sleep(0.2)
+        report = (found.get("zones") or [{}])[0]
+        print(f"     match: {report}")
+        check(not found.get("error") and report.get("synth") == "Opale" and report.get("loss", 9.0) < 1.5,
+              f"a patch is found for the note ({found.get('error', '')}{report.get('loss')})")
+        matched = found.get("track", "")
+        if matched:
+            values = need({"cmd": "synth", "track": matched}, "the patch's card")
+            check(values.get("model") == "opale" and abs(values["values"].get("f.cutoff", 0.0) - 20000) > 1.0,
+                  "a new Opale track holds the patch found")
+            heard = need({"cmd": "synth", "track": matched, "note": 57, "seconds": 0.5, "tail": 1.0}, "the patch heard")
+            check(heard.get("rmsDb", -120.0) > -45.0, f"the patch plays ({heard.get('rmsDb', -120.0):.1f} dB)")
+        need({"cmd": "match_synth", "file": str(note_file).replace(os.sep, "/"), "synth": "quartz"}, "a second search")
+        need({"cmd": "sound_matching", "cancel": True}, "cancel")
+        for _ in range(300):
+            stopped = need({"cmd": "sound_matching"}, "sound_matching")
+            if not stopped.get("running"):
+                break
+            time.sleep(0.1)
+        tracks_after = len(need({"cmd": "status"}, "status")["meters"])
+        check(bool(stopped.get("error")) and tracks_after == tracks_before + 1,
+              f"a search cancelled makes no track ({stopped.get('error')}, {tracks_after - tracks_before} new)")
 
         # ---- Mosaïque ----
         mosaique = need({"cmd": "add_midi_track", "name": "Mosaique", "instrument": "mosaique-instrument"}, "Mosaïque")["name"]

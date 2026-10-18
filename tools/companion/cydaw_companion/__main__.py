@@ -6,13 +6,18 @@
 
 Commands:
     info                                    Python, numpy, torch, CUDA and the GPU
-    analyse FILE... --out M.cysound         recorded notes -> a sound model (one zone each)
+    analyse FILE... --out M.cysound         recorded notes -> a sound model (one zone each; a
+                                            longer recording of several notes: a zone per note
+                                            found, up to three velocity layers per pitch)
         [--name N] [--note MIDI] [--velocity 0..1] [--loop on|off] [--no-attack]
+        [--partials auto|harmonic|inharmonic] [--split auto|on|off] [--pitch auto|yin|crepe]
+        [--kind auto|partials|string]       a plucked note as a physical string (auto: when
+                                            it plays within 0.5 dB of its partials)
         [--refine] [--device auto|cpu|cuda] [--steps N]
     render M.cysound --out F.wav            the model played (the reference player)
         [--note MIDI] [--velocity 0..1] [--seconds S] [--held S] [--zone I]
     evaluate M.cysound FILE...              each zone against its source
-    setup --env FOLDER [--torch none|cpu|cuda] [--clap]
+    setup --env FOLDER [--torch none|cpu|cuda] [--clap] [--crepe]
                                             its own environment (venv, numpy, PyTorch, and
                                             transformers for the semantic search); runs
                                             with any Python, before numpy is there
@@ -50,6 +55,11 @@ def command_info(_: argparse.Namespace) -> int:
     except Exception:  # noqa: BLE001 - reported as missing
         pass
     try:
+        import torchcrepe  # noqa: PLC0415, F401
+        value["crepe"] = True
+    except Exception:  # noqa: BLE001 - optional
+        value["crepe"] = False
+    try:
         import torch  # noqa: PLC0415
         value["torch"] = torch.__version__
         value["cuda"] = bool(torch.cuda.is_available())
@@ -64,7 +74,7 @@ def command_info(_: argparse.Namespace) -> int:
 
 def command_setup(arguments: argparse.Namespace) -> int:
     from .setup_env import setup  # noqa: PLC0415
-    return setup(Path(arguments.env), arguments.torch, arguments.clap)
+    return setup(Path(arguments.env), arguments.torch, arguments.clap, arguments.crepe)
 
 
 def command_clap_check(arguments: argparse.Namespace) -> int:
@@ -77,55 +87,125 @@ def command_clap_worker(arguments: argparse.Namespace) -> int:
     return serve(Path(arguments.model), arguments.device, arguments.idle)
 
 
-def command_analyse(arguments: argparse.Namespace) -> int:
+def _fit(zone, report: dict, audio, rate: int) -> dict:
+    """How close the model plays to the note it came from: the spectral loss, the level and the
+    third-octave band error of its rendering against the recording."""
     import numpy as np  # noqa: PLC0415
-    from .analysis import AnalysisOptions, analyse  # noqa: PLC0415
-    from .audio_io import mono, read_wav  # noqa: PLC0415
+    from .audio_io import mono, resample  # noqa: PLC0415
     from .loss import band_error_db, level_difference_db, spectral_loss  # noqa: PLC0415
-    from .model import SoundModel  # noqa: PLC0415
     from .synth import render  # noqa: PLC0415
 
+    source = mono(audio)
+    if rate != 48000:
+        source = resample(source, rate, 48000)
+    peak = np.max(np.abs(source))
+    loud = np.nonzero(np.abs(source) > peak * 10 ** (-50 / 20))[0]
+    source = source[max(0, loud[0] - int(0.002 * 48000)):]
+    held = zone.release * zone.frame_seconds if zone.release is not None else None
+    played = render(zone, zone.root_note + report["cents"] / 100.0, zone.velocity, 48000, report["seconds"], held)
+    return {"spectralLoss": round(spectral_loss(source[:len(played)], played), 4),
+            "levelDb": round(level_difference_db(source[:len(played)], played), 2),
+            "bandErrorDb": round(band_error_db(source[:len(played)], played), 2)}
+
+
+def command_analyse(arguments: argparse.Namespace) -> int:
+    from .analysis import AnalysisOptions, analyse  # noqa: PLC0415
+    from .audio_io import mono, read_wav  # noqa: PLC0415
+    from .model import SoundModel  # noqa: PLC0415
+    from .segment import choose_notes, detect_notes  # noqa: PLC0415
+
     files = [Path(f) for f in arguments.files]
+    started = time.time()
+    # The notes to analyse: each file one note, or the notes found in a longer recording.
+    takes = []
+    splits = []
+    for index, file in enumerate(files):
+        audio, rate = read_wav(file)
+        seconds = len(audio) / rate
+        found = []
+        if arguments.split == "on" or (arguments.split == "auto" and seconds > 4.0):
+            progress(index / max(1, len(files)) * 0.1, f"look for the notes in {file.name}")
+            notes, tracker = detect_notes(mono(audio), rate, arguments.pitch)
+            if arguments.split == "on" or len(notes) >= 2:
+                found = choose_notes(notes, rate)
+                splits.append({"file": str(file), "pitch": tracker, "notesFound": len(notes), "zones": len(found)})
+        if found:
+            for note in found:
+                takes.append({"file": file, "audio": audio[note.start:note.end], "rate": rate,
+                              "note": arguments.note if arguments.note is not None else float(round(note.midi)),
+                              "velocity": arguments.velocity if arguments.velocity is not None else note.velocity,
+                              "at": round(note.start / rate, 3)})
+        else:
+            takes.append({"file": file, "audio": audio, "rate": rate, "note": arguments.note,
+                          "velocity": arguments.velocity, "at": None})
+    if not takes:
+        raise ValueError("no note was found in the recordings")
+
     zones = []
     reports = []
-    started = time.time()
-    for index, file in enumerate(files):
-        progress(index / max(1, len(files)) * 0.8, f"analyse {file.name}")
-        audio, rate = read_wav(file)
-        options = AnalysisOptions(note_hint=arguments.note, velocity=arguments.velocity,
-                                  keep_attack=not arguments.no_attack,
-                                  loop=None if arguments.loop is None else arguments.loop == "on")
-        zone, report = analyse(audio, rate, options)
-        if arguments.refine:
+    for index, take in enumerate(takes):
+        file = take["file"]
+        label = file.name if take["at"] is None else f"{file.name} @ {take['at']} s"
+        progress(0.1 + index / len(takes) * 0.75, f"analyse {label}")
+        options = AnalysisOptions(note_hint=take["note"], velocity=take["velocity"], keep_attack=not arguments.no_attack,
+                                  loop=None if arguments.loop is None else arguments.loop == "on",
+                                  partials=arguments.partials, string=arguments.kind != "partials")
+        zone, report = analyse(take["audio"], take["rate"], options)
+        # The partials first (the string, if any, set aside and tried after).
+        string = zone.string
+        zone.string = None
+        report.update(_fit(zone, report, take["audio"], take["rate"]))
+        # Nearly harmonic (a marimba's bar under its overtones): the free ratios tried too, the
+        # closer of the two kept.
+        share = report.get("harmonicShare")
+        if arguments.partials == "auto" and report["partials"] == "harmonic" and share is not None and share < 0.99:
+            options.partials = "inharmonic"
+            other, other_report = analyse(take["audio"], take["rate"], options)
+            other.string = None
+            other_report.update(_fit(other, other_report, take["audio"], take["rate"]))
+            if other_report["bandErrorDb"] < report["bandErrorDb"]:
+                other_report["tried"] = {"harmonic": report["bandErrorDb"]}
+                zone, report = other, other_report
+                string = None
+            else:
+                report["tried"] = {"inharmonic": other_report["bandErrorDb"]}
+        # A plucked string: kept when asked, or (auto) when it plays nearly as close as the
+        # partials (it transposes as a string does).
+        if string is not None:
+            if arguments.kind != "partials":
+                partial_fit = dict(report)
+                zone.string = string
+                string_fit = _fit(zone, report, take["audio"], take["rate"])
+                if arguments.kind == "string" or string_fit["bandErrorDb"] <= partial_fit["bandErrorDb"] + 0.5:
+                    report.update(string_fit)
+                    report["kind"] = "string"
+                    report["partialsBandErrorDb"] = partial_fit["bandErrorDb"]
+                else:
+                    zone.string = None
+                    report["stringBandErrorDb"] = string_fit["bandErrorDb"]
+        report.setdefault("kind", "partials")
+        if arguments.refine and zone.string is not None:
+            report["refine"] = {"skipped": "a string is played, not its partials"}
+        elif arguments.refine:
             from .refine import refine  # noqa: PLC0415
-            progress((index + 0.5) / max(1, len(files)) * 0.8, f"refine {file.name}")
-            report["refine"] = refine(zone, audio, rate, device=arguments.device, steps=arguments.steps,
-                                      progress=lambda f, m: progress((index + 0.5 + 0.5 * f) / len(files) * 0.8, m))
-        # How close the model plays to the note it came from.
-        source = mono(audio)
-        if rate != 48000:
-            from .audio_io import resample  # noqa: PLC0415
-            source = resample(source, rate, 48000)
-        peak = np.max(np.abs(source))
-        loud = np.nonzero(np.abs(source) > peak * 10 ** (-50 / 20))[0]
-        source = source[max(0, loud[0] - int(0.002 * 48000)):]
-        seconds = report["seconds"]
-        held = zone.release * zone.frame_seconds if zone.release is not None else None
-        played = render(zone, zone.root_note + report["cents"] / 100.0, zone.velocity, 48000, seconds, held)
-        report["spectralLoss"] = round(spectral_loss(source[:len(played)], played), 4)
-        report["levelDb"] = round(level_difference_db(source[:len(played)], played), 2)
-        report["bandErrorDb"] = round(band_error_db(source[:len(played)], played), 2)
+            progress(0.1 + (index + 0.5) / len(takes) * 0.75, f"refine {label}")
+            report["refine"] = refine(zone, take["audio"], take["rate"], device=arguments.device, steps=arguments.steps,
+                                      progress=lambda f, m: progress(0.1 + (index + 0.5 + 0.5 * f) / len(takes) * 0.75, m))
+            report.update(_fit(zone, report, take["audio"], take["rate"]))
         report["file"] = str(file)
+        if take["at"] is not None:
+            report["atSeconds"] = take["at"]
         zones.append(zone)
         reports.append(report)
     name = arguments.name or (files[0].stem if len(files) == 1 else files[0].parent.name)
     musical = reports[0].get("musical", {}) if reports else {}
     model = SoundModel(name=name, zones=zones, source=[str(f) for f in files], musical=musical,
                        analysis={"companion": __version__, "seconds": round(time.time() - started, 2),
-                                 "zones": [{k: v for k, v in r.items() if k != "musical"} for r in reports]})
+                                 "zones": [{k: v for k, v in r.items() if k != "musical"} for r in reports],
+                                 "splits": splits})
     progress(0.95, "write the model")
     model.save(arguments.out)
-    emit(done=True, model=str(arguments.out), name=name, zones=reports)
+    emit(done=True, model=str(arguments.out), name=name, zones=reports, splits=splits)
     return 0
 
 
@@ -169,7 +249,15 @@ def command_evaluate(arguments: argparse.Namespace) -> int:
     return 0
 
 
+def _contain() -> None:
+    """Run from the environment CyDAW made: its caches and temporary files kept in it, none elsewhere."""
+    from .setup_env import MARKER, contain  # noqa: PLC0415 - standard library only
+    if (Path(sys.prefix) / MARKER).exists():
+        contain(Path(sys.prefix))
+
+
 def main(argv: list[str] | None = None) -> int:
+    _contain()
     parser = argparse.ArgumentParser(prog="cydaw_companion", description="CyDAW's Python companion")
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("info")
@@ -181,6 +269,10 @@ def main(argv: list[str] | None = None) -> int:
     analyse_parser.add_argument("--velocity", type=float)
     analyse_parser.add_argument("--loop", choices=["on", "off"])
     analyse_parser.add_argument("--no-attack", action="store_true")
+    analyse_parser.add_argument("--partials", default="auto", choices=["auto", "harmonic", "inharmonic"])
+    analyse_parser.add_argument("--split", default="auto", choices=["auto", "on", "off"])
+    analyse_parser.add_argument("--pitch", default="auto", choices=["auto", "yin", "crepe"])
+    analyse_parser.add_argument("--kind", default="auto", choices=["auto", "partials", "string"])
     analyse_parser.add_argument("--refine", action="store_true")
     analyse_parser.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
     analyse_parser.add_argument("--steps", type=int, default=300)
@@ -196,6 +288,7 @@ def main(argv: list[str] | None = None) -> int:
     setup_parser.add_argument("--env", required=True)
     setup_parser.add_argument("--torch", default="none", choices=["none", "cpu", "cuda"])
     setup_parser.add_argument("--clap", action="store_true")
+    setup_parser.add_argument("--crepe", action="store_true")
     clap_check_parser = commands.add_parser("clap-check")
     clap_check_parser.add_argument("--model")
     clap_worker_parser = commands.add_parser("clap-worker")

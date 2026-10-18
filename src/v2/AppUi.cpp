@@ -401,23 +401,35 @@ void AppUi::drawLayoutNamePrompt()
     ImGui::EndPopup();
 }
 
-void AppUi::chooseSoundToRecreate()
+void AppUi::chooseSoundToRecreate(const juce::String& kind)
 {
+    const auto synth = kind == "synth";
     chooser_ = std::make_unique<juce::FileChooser>(
-        L("Les notes à recréer (une note isolée par fichier ; plusieurs : une zone chacune)",
-          "The notes to recreate (one isolated note per file; several: a zone each)"),
-        juce::File {}, "*.wav");
-    chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
-                              | juce::FileBrowserComponent::canSelectMultipleItems,
-                          [this](const juce::FileChooser& chooser) {
-                              const auto files = chooser.getResults();
-                              if (files.isEmpty())
-                                  return;
-                              if (const auto started = studio_.recreateSound(files); started.failed())
-                                  notify(started.getErrorMessage(), true);
-                              else
-                                  notify(ui::Ls("Analyse du son en cours…", "Analysing the sound…"));
-                          });
+        synth ? L("La note dont chercher le patch (une note isolée)", "The note to find a patch for (one isolated note)")
+              : L("Les notes à recréer (une note isolée par fichier, ou un enregistrement de plusieurs notes)",
+                  "The notes to recreate (one isolated note per file, or a recording of several notes)"),
+        juce::File {}, synth ? "*.wav;*.aif;*.aiff;*.flac" : "*.wav");
+    const auto flags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
+                       | (synth ? 0 : juce::FileBrowserComponent::canSelectMultipleItems);
+    chooser_->launchAsync(flags, [this, kind, synth](const juce::FileChooser& chooser) {
+        const auto files = chooser.getResults();
+        if (files.isEmpty())
+            return;
+        if (synth) {
+            if (const auto started = studio_.matchSynth(files.getFirst()); started.failed())
+                notify(started.getErrorMessage(), true);
+            else
+                notify(ui::Ls("Recherche d'un patch de synthé…", "Searching a synth patch…"));
+            return;
+        }
+        juce::StringArray options;
+        if (kind != "auto")
+            options.addArray({ "--kind", kind });
+        if (const auto started = studio_.recreateSound(files, {}, refineRecreated_, options); started.failed())
+            notify(started.getErrorMessage(), true);
+        else
+            notify(ui::Ls("Analyse du son en cours…", "Analysing the sound…"));
+    });
 }
 
 bool AppUi::openSamplerEditor(const bool controls)
@@ -694,6 +706,13 @@ void AppUi::followSoundMatching()
     if (matching.track)
         state_.selectTrack(*matching.track);
     auto line = ui::Ls("Instrument recréé : ", "Instrument recreated: ") + matching.description;
+    // A synth patch found: how close it came (0: the very sound).
+    if (const auto* zones = matching.zones.getArray();
+        zones != nullptr && zones->size() == 1 && zones->getFirst().hasProperty("synth")) {
+        line << ui::Ls(" — écart ", " — distance ") << juce::String(static_cast<double>(zones->getFirst().getProperty("loss", 0.0)), 2);
+        notify(line);
+        return;
+    }
     if (const auto* zones = matching.zones.getArray(); zones != nullptr && !zones->isEmpty()) {
         auto error = 0.0;
         for (const auto& zone : *zones)
@@ -1971,6 +1990,7 @@ void AppUi::drawCompanionWindow()
         showCompanion_ = false;
         ImGui::OpenPopup("##companion");
         companionInfoAsked_ = false;
+        companionAccepted_.clear();
         const auto python = companion.pythonCommand();
         python.copyToUTF8(companionPython_, sizeof(companionPython_));
         // An NVIDIA card makes the CUDA build worth its size.
@@ -1983,9 +2003,15 @@ void AppUi::drawCompanionWindow()
                 nvidiaGpu_ = output.upToFirstOccurrenceOf("\n", false, false).trim();
         }
     }
-    ImGui::SetNextWindowSize(ImVec2(dp(560.0f), 0.0f), ImGuiCond_Appearing);
-    if (!ImGui::BeginPopupModal("##companion", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize))
+    // On the main window, centred, never taller than it: its body scrolls,
+    // OK stays in sight.
+    const auto* main = ImGui::GetMainViewport();
+    ImGui::SetNextWindowSize(ImVec2(std::min(dp(760.0f), main->WorkSize.x * 0.9f), std::min(dp(1000.0f), main->WorkSize.y * 0.88f)),
+                             ImGuiCond_Appearing);
+    ImGui::SetNextWindowPos(main->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+    if (!ImGui::BeginPopupModal("##companion", nullptr, ImGuiWindowFlags_NoTitleBar))
         return;
+    ImGui::BeginChild("##companionBody", ImVec2(0.0f, -(ImGui::GetFrameHeightWithSpacing() + ImGui::GetStyle().ItemSpacing.y)));
     const auto& p = theme::palette();
     const auto status = companion.status();
     if (!companionInfoAsked_ && !status.running) {
@@ -1994,11 +2020,13 @@ void AppUi::drawCompanionWindow()
     ImGui::PushFont(theme::boldFont(), ImGui::GetStyle().FontSizeBase * 1.1f);
     ImGui::TextUnformatted(L("Compagnon Python", "Python companion"));
     ImGui::PopFont();
+    ImGui::PushTextWrapPos(0.0f);
     ImGui::TextColored(theme::vec(p.textDim), "%s",
                        L("Il analyse les sons à recréer (Piste › Recréer un son…). La lecture, elle, est du DSP pur : "
                          "rien de Python ne tourne pendant que l'instrument joue.",
                          "It analyses the sounds to recreate (Track › Recreate a sound…). Playing is pure DSP: nothing "
                          "of Python runs while the instrument plays."));
+    ImGui::PopTextWrapPos();
     ImGui::Separator();
     const auto row = [&p](const char* label) {
         ImGui::AlignTextToFramePadding();
@@ -2037,6 +2065,12 @@ void AppUi::drawCompanionWindow()
     };
     field("numpy", "numpy", L("absent (nécessaire à l'analyse)", "missing (the analysis needs it)"));
     field("PyTorch", "torch", L("absent (pour l'affinage, facultatif)", "missing (for the refinement, optional)"));
+    row("CREPE");
+    if (shown.isObject() && static_cast<bool>(shown.getProperty("crepe", false)))
+        ImGui::TextColored(theme::vec(p.play), "%s", L("oui", "yes"));
+    else
+        ImGui::TextColored(theme::vec(p.textFaint), "%s", L("absent (hauteur des longs enregistrements, facultatif)",
+                                                           "missing (pitch of long recordings, optional)"));
     row("CUDA");
     if (shown.isObject() && static_cast<bool>(shown.getProperty("cuda", false)))
         ImGui::TextColored(theme::vec(p.play), "%s", (ui::Ls("oui — ", "yes — ") + shown.getProperty("gpu", {}).toString()).toRawUTF8());
@@ -2046,38 +2080,104 @@ void AppUi::drawCompanionWindow()
     ImGui::TextUnformatted(nvidiaGpu_.isNotEmpty() ? nvidiaGpu_.toRawUTF8() : L("aucune carte NVIDIA détectée", "no NVIDIA card found"));
     ImGui::Separator();
 
-    // Its own environment, on a click: nothing is downloaded otherwise.
+    // Its own environment and what can go in it, each with its licences:
+    // nothing is downloaded but on a click, and only into its folder.
     const auto environment = Companion::environmentFolder();
     ImGui::TextColored(theme::vec(p.textDim), "%s",
                        (ui::Ls("Son environnement : ", "Its environment: ") + environment.getFullPathName()).toRawUTF8());
-    ImGui::BeginDisabled(status.running);
-    const auto setup = [&](const char* torch) {
-        if (!companion.start({ "setup", "--env", environment.getFullPathName(), "--torch", torch }))
-            notify(ui::Ls("Le compagnon est occupé", "The companion is busy"), true);
+    ImGui::SameLine();
+    if (ImGui::SmallButton(L("Changer…", "Change…")))
+        state_.openLocations = true;
+    ui::tooltip(L("Options › Emplacements : tout ce qui est installé ici (et ses fichiers temporaires) reste dans ce dossier.",
+                  "Options › Locations: everything installed here (and its temporary files) stays in this folder."));
+    const auto catalogue = Companion::componentCatalogue();
+    const auto french = ui::french();
+    const auto text = [french](const juce::var& value) {
+        return value.isObject() ? value.getProperty(french ? "fr" : "en", {}).toString() : value.toString();
     };
-    if (ImGui::Button(L("Préparer (numpy)", "Set up (numpy)")))
-        setup("none");
-    ui::tooltip(L("Crée son environnement (venv) et y installe numpy depuis PyPI : quelques dizaines de Mo.",
-                  "Makes its environment (venv) and installs numpy from PyPI into it: a few tens of MB."));
-    ImGui::SameLine();
-    if (ImGui::Button(L("+ PyTorch CPU", "+ PyTorch CPU")))
-        setup("cpu");
-    ui::tooltip(L("PyTorch pour le processeur (environ 200 Mo) : l'affinage marche, plus lentement.",
-                  "PyTorch for the processor (about 200 MB): the refinement works, more slowly."));
-    ImGui::SameLine();
-    ImGui::BeginDisabled(nvidiaGpu_.isEmpty());
-    if (ImGui::Button(L("+ PyTorch CUDA (carte NVIDIA)", "+ PyTorch CUDA (NVIDIA card)")))
-        setup("cuda");
-    ImGui::EndDisabled();
-    ui::tooltip(L("PyTorch pour la carte graphique (environ 2,5 Go) : l'affinage bien plus vite.",
-                  "PyTorch for the graphics card (about 2.5 GB): a much faster refinement."));
-    ImGui::SameLine();
+    ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + dp(620.0f));
+    ImGui::TextColored(theme::vec(p.textFaint), "%s", text(catalogue.getProperty("note", {})).toRawUTF8());
+    ImGui::PopTextWrapPos();
+    const auto hasTorch = Companion::componentInstalled("torch-cpu", shown) || Companion::componentInstalled("torch-cuda", shown);
+    const auto listed = catalogue.getProperty("components", {});
+    if (const auto* components = listed.getArray()) {
+        for (const auto& item : *components) {
+            const auto id = item.getProperty("id", {}).toString();
+            ImGui::PushID(id.toRawUTF8());
+            ImGui::Separator();
+            ImGui::PushFont(theme::boldFont(), 0.0f);
+            ImGui::TextUnformatted(text(item.getProperty("title", {})).toRawUTF8());
+            ImGui::PopFont();
+            ImGui::SameLine();
+            if (Companion::componentInstalled(id, shown))
+                ImGui::TextColored(theme::vec(p.play), "%s", L("installé", "installed"));
+            else
+                ImGui::TextColored(theme::vec(p.textFaint), "%s", L("absent", "missing"));
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + dp(620.0f));
+            ImGui::TextColored(theme::vec(p.textDim), "%s", text(item.getProperty("description", {})).toRawUTF8());
+            juce::StringArray sources;
+            if (const auto* list = item.getProperty("sources", {}).getArray())
+                for (const auto& source : *list)
+                    sources.add(source.toString());
+            ImGui::TextColored(theme::vec(p.textFaint), "%s",
+                               (ui::Ls("Taille : ", "Size: ") + text(item.getProperty("size", {})) + ui::Ls("  ·  depuis ", "  ·  from ")
+                                + sources.joinIntoString(", "))
+                                   .toRawUTF8());
+            ImGui::PopTextWrapPos();
+            // Its licences: every package it brings, each with its text.
+            const auto* packages = item.getProperty("packages", {}).getArray();
+            const auto count = packages != nullptr ? packages->size() : 0;
+            if (ImGui::TreeNode((ui::Ls("Licences (", "Licences (") + juce::String(count) + ")").toRawUTF8())) {
+                for (int index = 0; index < count; ++index) {
+                    const auto& package = packages->getReference(index);
+                    ImGui::PushID(index);
+                    ImGui::TextUnformatted((package.getProperty("name", {}).toString() + "  \xe2\x80\x94  "
+                                            + package.getProperty("licence", {}).toString())
+                                               .toRawUTF8());
+                    ImGui::SameLine();
+                    const auto url = package.getProperty("url", {}).toString();
+                    if (ImGui::SmallButton(L("Lire", "Read")))
+                        (void) juce::URL(url).launchInDefaultBrowser();
+                    ui::tooltip(url.toRawUTF8());
+                    ImGui::PopID();
+                }
+                ImGui::TreePop();
+            }
+            // A licence that asks to be accepted: ticked by the person, never kept.
+            const auto asks = static_cast<bool>(item.getProperty("requiresAcceptance", false));
+            if (asks) {
+                auto ticked = companionAccepted_.contains(id);
+                if (ImGui::Checkbox(L("J'ai lu ces licences et je les accepte", "I have read these licences and accept them"), &ticked)) {
+                    if (ticked)
+                        companionAccepted_.addIfNotAlreadyThere(id);
+                    else
+                        companionAccepted_.removeString(id);
+                }
+            }
+            const auto needsGpu = static_cast<bool>(item.getProperty("gpu", false)) && nvidiaGpu_.isEmpty();
+            const auto needsTorch = item.getProperty("requires", {}).toString() == "torch" && !hasTorch;
+            ImGui::BeginDisabled(status.running || needsGpu || needsTorch || (asks && !companionAccepted_.contains(id)));
+            if (ImGui::Button(Companion::componentInstalled(id, shown) ? L("Réinstaller", "Reinstall") : L("Installer", "Install"))) {
+                juce::String error;
+                if (!companion.install(id, companionAccepted_.contains(id), error))
+                    notify(error, true);
+            }
+            ImGui::EndDisabled();
+            if (needsGpu)
+                ui::tooltip(L("Aucune carte NVIDIA détectée.", "No NVIDIA card found."));
+            else if (needsTorch)
+                ui::tooltip(L("PyTorch d'abord (processeur ou carte graphique).", "PyTorch first (processor or graphics card)."));
+            ImGui::PopID();
+        }
+    }
+    ImGui::Separator();
+    ImGui::BeginDisabled(status.running);
     if (ImGui::Button(L("Vérifier", "Check")))
         companionInfoAsked_ = false;
     ImGui::EndDisabled();
     if (ImGui::SmallButton(L("Pas de Python ? python.org", "No Python? python.org")))
         (void) juce::URL("https://www.python.org/downloads/windows/").launchInDefaultBrowser();
-    ui::tooltip(L("Installez Python 3.10 ou plus récent, puis « Préparer ».", "Install Python 3.10 or newer, then \"Set up\"."));
+    ui::tooltip(L("Installez Python 3.10 ou plus récent, puis « Installer » sur la base.", "Install Python 3.10 or newer, then \"Install\" the base."));
 
     // What it is doing.
     if (status.running && status.command != "info") {
@@ -2103,6 +2203,7 @@ void AppUi::drawCompanionWindow()
         ImGui::TextColored(theme::vec(p.record), "%s", job->error.toRawUTF8());
     if (job && !job->failed && job->command == "setup")
         ImGui::TextColored(theme::vec(p.play), "%s", L("Environnement prêt.", "Environment ready."));
+    ImGui::EndChild();
     ImGui::Separator();
     if (ui::primaryButton("OK", ImVec2(dp(90.0f), 0.0f)) || ImGui::IsKeyPressed(ImGuiKey_Escape))
         ImGui::CloseCurrentPopup();
@@ -2837,13 +2938,41 @@ void AppUi::drawMenuBar()
         ui::tooltip(L("Une piste sans clips où router d'autres pistes : groupe, réverbération partagée…",
                       "A track without clips to route other tracks into: a group, a shared reverb…"));
         ImGui::Separator();
-        if (ImGui::MenuItem(L("Recréer un son (enregistrement → instrument)…", "Recreate a sound (recording → instrument)…"),
-                            nullptr, false, !studio_.soundMatching().running))
-            chooseSoundToRecreate();
-        ui::tooltip(L("Une ou plusieurs notes enregistrées (WAV, une note isolée chacune) analysées en harmoniques et bruit : "
-                      "un instrument qui les rejoue à toutes les hauteurs et vélocités. Plusieurs notes donnent plusieurs zones.",
-                      "One or more recorded notes (WAV, one isolated note each) analysed into harmonics and noise: an "
-                      "instrument that plays them at any pitch and velocity. Several notes make several zones."));
+        if (ImGui::BeginMenu(L("Recréer un son (enregistrement → instrument)", "Recreate a sound (recording → instrument)"),
+                             !studio_.soundMatching().running)) {
+            if (ImGui::MenuItem(L("Automatique…", "Automatic…")))
+                chooseSoundToRecreate("auto");
+            ui::tooltip(L("Une ou plusieurs notes enregistrées (WAV) analysées en partiels et bruit : un instrument qui les "
+                          "rejoue à toutes les hauteurs et vélocités. Plusieurs notes donnent plusieurs zones ; un enregistrement "
+                          "de plusieurs notes est découpé. Les sons de cloche ou de marimba gardent leurs partiels non harmoniques ; "
+                          "une corde pincée est rejouée en corde quand elle sonne aussi juste.",
+                          "One or more recorded notes (WAV) analysed into partials and noise: an instrument that plays them at "
+                          "any pitch and velocity. Several notes make several zones; a recording of several notes is split. Bell "
+                          "or marimba sounds keep their inharmonic partials; a plucked string is played as a string when it "
+                          "sounds as true."));
+            if (ImGui::MenuItem(L("Corde pincée…", "Plucked string…")))
+                chooseSoundToRecreate("string");
+            ui::tooltip(L("Guitare, harpe, kalimba… : une corde simulée (Karplus-Strong) avec la caisse mesurée sur la note. "
+                          "Joue comme une vraie corde, un peu moins fidèle au timbre que les partiels mesurés.",
+                          "Guitar, harp, kalimba…: a simulated string (Karplus-Strong) with the body measured on the note. "
+                          "Plays like a real string, a little less true to the timbre than the measured partials."));
+            if (ImGui::MenuItem(L("Partiels mesurés…", "Measured partials…")))
+                chooseSoundToRecreate("partials");
+            ui::tooltip(L("Toujours les partiels et le bruit mesurés, sans chercher de corde.",
+                          "Always the measured partials and noise, never a string."));
+            if (ImGui::MenuItem(L("Patch de synthé (Opale ou Quartz)…", "Synth patch (Opale or Quartz)…")))
+                chooseSoundToRecreate("synth");
+            ui::tooltip(L("Cherche les réglages d'Opale (soustractif) ou de Quartz (FM) qui imitent la note, en écoutant des "
+                          "milliers de candidats : un patch que l'on peut ensuite retoucher comme n'importe quel autre.",
+                          "Searches the settings of Opale (subtractive) or Quartz (FM) that imitate the note, hearing thousands "
+                          "of candidates: a patch to tweak afterwards like any other."));
+            ImGui::Separator();
+            ImGui::MenuItem(L("Affiner (plus lent)", "Refine (slower)"), nullptr, &refineRecreated_);
+            ui::tooltip(L("Après l'analyse, les partiels, le bruit et l'attaque sont ajustés à l'oreille (PyTorch) : plus "
+                          "fidèle, plus long.",
+                          "After the analysis, the partials, noise and attack are adjusted by ear (PyTorch): truer, longer."));
+            ImGui::EndMenu();
+        }
         if (ImGui::MenuItem(L("Charger un modèle de son…", "Load a sound model…")))
             chooseSoundModel();
         ui::tooltip(L("Un modèle déjà analysé (.cysound, dans Documents/CyDAW/Sound Models) sur une nouvelle piste instrument.",
@@ -3469,7 +3598,7 @@ void AppUi::drawStatusBar()
         // A sound being recreated: how far, and a way to stop it.
         if (const auto matching = studio_.soundMatching(); matching.running) {
             ImGui::SameLine(0.0f, dp(18.0f));
-            ImGui::TextColored(theme::vec(p.accent), "%s %d %%  %s", L("Analyse du son", "Analysing the sound"),
+            ImGui::TextColored(theme::vec(p.accent), "%s %d %%  %s", L("Recréation du son", "Recreating the sound"),
                                static_cast<int>(std::round(matching.progress * 100.0)), matching.message.toRawUTF8());
             ImGui::SameLine(0.0f, dp(6.0f));
             if (ImGui::SmallButton(L("Annuler", "Cancel")))

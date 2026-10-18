@@ -25,6 +25,9 @@
 //
 // CYDAW_BANKS_DIR moves the banks' default (tools/factory_content reads it,
 // and this file, too); CYDAW_LOCATIONS_FILE names another file (a test's).
+// "All in one folder" (Studio::setAllLocations) puts each in its own folder
+// inside one chosen (inside()), the downloaded ones and, if asked, the
+// person's creations too. An automated session (control port) never saves.
 
 namespace cydaw::v2 {
 
@@ -56,6 +59,11 @@ void set(Location location, const juce::File& folder);
 // from (files on their way, exports).
 [[nodiscard]] juce::Array<juce::File> contentOf(Location location, const juce::File& folder);
 [[nodiscard]] bool movable(Location location);
+// What CyDAW downloads, builds and installs (banks, files on their way, cache,
+// companion, AI models), as opposed to what the person makes with it.
+[[nodiscard]] bool downloaded(Location location);
+// Its folder inside a folder that holds them all ("Banks", "Cache"...).
+[[nodiscard]] juce::File inside(Location location, const juce::File& root);
 
 // A location's content taken to another folder on a thread of its own:
 // renamed on the same drive, else copied, then the originals deleted once

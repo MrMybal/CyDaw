@@ -94,6 +94,57 @@ void voiceAssetsTravelWithTheirSound()
         same = same && first.nextSample(&model, modelValues, 48'000.0) == second.nextSample(read.soundModel.get(), modelValues, 48'000.0);
     expect(same, "the sound model read back plays exactly as the one written");
 
+    // A bell's free ratios, where a note starts, a plucked string: all kept.
+    cydaw::engine::SoundModel plucked;
+    plucked.name = "Bell and string";
+    auto bell = twoPartialZone(57, 220.0f, 0.5f, 0.25f);
+    bell.ratios = { 1.0f, 2.756f };
+    bell.onset = 0.012f;
+    auto string = twoPartialZone(64, 329.63f, 0.5f, 0.25f);
+    string.velocity = 1.0f;
+    string.string.gain = 0.996f;
+    string.string.pole = 0.2f;
+    string.string.zero = 0.05f;
+    string.string.dispersion = -0.1f;
+    string.string.stages = 2;
+    string.string.dips = { { 1'500.0f, 2.0f, -3.0f } };
+    string.string.excitationDb = { 0.0f, -6.0f, -12.0f, -18.0f };
+    string.string.bodyEdges = { 100.0f, 1'000.0f, 10'000.0f };
+    string.string.bodyDb = { 0.0f, -3.0f };
+    plucked.zones = { bell, string };
+    std::stringstream pluckedFile(std::ios::in | std::ios::out | std::ios::binary);
+    expect(cydaw::engine::writeVoiceAssets(pluckedFile, nullptr, whole, &plucked, error), "a plucked model is written (" + error + ")");
+    pluckedFile.seekg(0);
+    const auto pluckedBack = cydaw::engine::readVoiceAssets(pluckedFile, error).soundModel;
+    expect(pluckedBack != nullptr && pluckedBack->zones.size() == 2, "a plucked model is read back (" + error + ")");
+    if (pluckedBack != nullptr && pluckedBack->zones.size() == 2) {
+        const auto& backBell = pluckedBack->zones[0];
+        const auto& backString = pluckedBack->zones[1].string;
+        expect(backBell.ratios == bell.ratios && backBell.onset == bell.onset && !backBell.string.present(),
+               "a zone's free ratios and onset come back");
+        expect(backString.present() && backString.gain == 0.996f && backString.pole == 0.2f && backString.zero == 0.05f
+                   && backString.dispersion == -0.1f && backString.stages == 2 && backString.dips.size() == 1
+                   && backString.dips[0].hz == 1'500.0f && backString.excitationDb == string.string.excitationDb
+                   && backString.bodyEdges == string.string.bodyEdges && backString.bodyDb == string.string.bodyDb,
+               "a zone's string comes back");
+        for (const auto note : { 57.0, 64.0 }) {
+            cydaw::engine::SoundModelVoice written;
+            cydaw::engine::SoundModelVoice back;
+            written.prepare(48'000.0);
+            back.prepare(48'000.0);
+            written.start(plucked, modelValues, note, 0.9, 48'000.0);
+            back.start(*pluckedBack, modelValues, note, 0.9, 48'000.0);
+            auto alike = true;
+            auto energy = 0.0;
+            for (auto sample = 0; sample < 24'000; ++sample) {
+                const auto value = written.nextSample(&plucked, modelValues, 48'000.0);
+                alike = alike && value == back.nextSample(pluckedBack.get(), modelValues, 48'000.0);
+                energy += static_cast<double>(value) * value;
+            }
+            expect(alike && energy > 1.0, "a bell or a string read back plays exactly as written (energy " + std::to_string(energy) + ")");
+        }
+    }
+
     // Cut short, or another file: refused, nothing half made.
     std::stringstream cut(written.substr(0, written.size() / 2), std::ios::in | std::ios::binary);
     expect(cydaw::engine::readVoiceAssets(cut, error).empty() && !error.empty(), "voice data cut short is refused");

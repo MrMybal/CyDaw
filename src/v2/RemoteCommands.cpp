@@ -1076,7 +1076,8 @@ juce::var Commands::run()
         return ok(object());
     }
     if (command == "recreate_sound" || command == "sound_matching" || command == "load_sound_model"
-        || command == "companion_info" || command == "readable_patch")
+        || command == "companion_info" || command == "readable_patch" || command == "match_synth"
+        || command == "companion_install")
         return onSoundMatching();
     if (command == "factory_instruments" || command == "add_factory_instrument" || command == "new_sampler"
         || command == "load_sampler" || command == "sampler_map" || command == "sampler_status"
@@ -3963,13 +3964,20 @@ juce::var Commands::onPresets()
     return ok(result);
 }
 
-// locations {set, folder, take, cancel}: where CyDAW keeps its banks, downloads,
-// cache, companion, models, devices and exports; one changed (folder "" for its
-// default), its content taken along unless `take` is false.
+// locations {set, folder, take, cancel} | {all: folder, creations, take}: where
+// CyDAW keeps its banks, downloads, cache, companion, models, devices and
+// exports; one changed (folder "" for its default), or all of them in one
+// folder (each in its own folder there; `creations`: the person's too), their
+// content taken along unless `take` is false.
 juce::var Commands::onLocations()
 {
     if (flag("cancel", false))
         studio_.cancelLocationMove();
+    if (has("all")) {
+        juce::String error;
+        if (!studio_.setAllLocations(fileFor(text("all")), flag("creations", false), flag("take", true), error))
+            return fail(error);
+    }
     if (has("set")) {
         const auto location = locations::fromKey(text("set"));
         if (!location.has_value())
@@ -4003,6 +4011,7 @@ juce::var Commands::onLocations()
         set(moving, "total", move.progress.total);
         set(moving, "current", move.progress.current);
     }
+    set(moving, "pending", studio_.pendingLocations());
     set(result, "move", moving);
     // The sample index's folder, which follows the cache.
     set(result, "sampleCache", studio_.samples().cacheFolder().getFullPathName());
@@ -4030,30 +4039,81 @@ juce::var Commands::onSoundMatching()
             set(value, "zones", matching.zones);
         return value;
     };
-    if (command_ == "companion_info") {
-        // {python}: which Python runs it, and what it has (numpy, torch, CUDA).
+    if (command_ == "companion_install") {
+        // {component, acceptLicence}: installed into its environment (setup).
+        // A licence that asks to be accepted is the person's to accept: an
+        // agent passes acceptLicence only when the person said so, having
+        // read it. Followed with companion_info (its job).
+        juce::String error;
+        if (!studio_.companion().install(text("component"), flag("acceptLicence", false), error))
+            return fail(error);
+    }
+    if (command_ == "companion_info" || command_ == "companion_install") {
+        // {python}: which Python runs it, what it has (numpy, torch, CUDA,
+        // CREPE), what it can install (with sizes, sources and licences) and
+        // the job that runs (an installation's progress).
         if (has("python"))
             studio_.companion().setPythonCommand(text("python"));
         juce::String error;
-        auto info = studio_.companion().runNow({ "info" }, error);
+        const auto job = studio_.companion().status();
+        auto info = job.running && job.command == "setup" ? juce::var() : studio_.companion().runNow({ "info" }, error);
         auto result = object();
         set(result, "python", studio_.companion().pythonCommand());
         set(result, "package", Companion::packageFolder().getFullPathName());
+        set(result, "environment", Companion::environmentFolder().getFullPathName());
         if (info.isObject())
             set(result, "info", info);
         if (error.isNotEmpty())
             set(result, "error", error);
+        juce::Array<juce::var> components;
+        const auto catalogue = Companion::componentCatalogue();
+        const auto listed = catalogue.getProperty("components", {});
+        if (const auto* list = listed.getArray())
+            for (const auto& item : *list) {
+                auto entry = object();
+                for (const auto* key : { "id", "title", "description", "size", "sources", "requiresAcceptance", "requires", "gpu", "packages" })
+                    if (item.hasProperty(key))
+                        set(entry, key, item.getProperty(key, {}));
+                if (info.isObject())
+                    set(entry, "installed", Companion::componentInstalled(item.getProperty("id", {}).toString(), info));
+                components.add(entry);
+            }
+        set(result, "components", components);
+        auto running = object();
+        set(running, "running", job.running);
+        set(running, "command", job.command);
+        set(running, "progress", job.progress);
+        set(running, "message", job.message);
+        if (job.error.isNotEmpty())
+            set(running, "error", job.error);
+        set(result, "job", running);
         return ok(result);
     }
+    if (command_ == "match_synth") {
+        // {file: wav, synth: auto|opale|quartz, note, evaluations}: a synth
+        // patch found for the note; status with sound_matching.
+        if (const auto started = studio_.matchSynth(fileFor(text("file")), has("synth") ? text("synth") : juce::String("auto"),
+                                                    has("note") ? static_cast<int>(number("note", -1.0)) : -1,
+                                                    has("evaluations") ? static_cast<int>(number("evaluations", 3'000.0)) : 3'000);
+            started.failed())
+            return fail(started.getErrorMessage());
+        return ok(statusOf());
+    }
     if (command_ == "recreate_sound") {
-        // {files: [wav...], name, refine}: one zone per file; status with sound_matching.
+        // {files: [wav...], name, refine, kind, partials, split, pitch}: one zone per file (a longer
+        // recording: per note found); status with sound_matching.
         juce::Array<juce::File> files;
         if (const auto* list = request_.getProperty("files", {}).getArray())
             for (const auto& item : *list)
                 files.add(fileFor(item.toString()));
         else if (has("file"))
             files.add(fileFor(text("file")));
-        if (const auto started = studio_.recreateSound(files, text("name"), static_cast<bool>(request_.getProperty("refine", false)));
+        juce::StringArray options;
+        for (const auto* option : { "kind", "partials", "split", "pitch" })
+            if (has(option))
+                options.addArray({ "--" + juce::String(option), text(option) });
+        if (const auto started = studio_.recreateSound(files, text("name"), static_cast<bool>(request_.getProperty("refine", false)),
+                                                       options);
             started.failed())
             return fail(started.getErrorMessage());
         return ok(statusOf());

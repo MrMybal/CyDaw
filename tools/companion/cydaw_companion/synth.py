@@ -8,6 +8,8 @@ A note at `note` (MIDI, in tune: 69 = 440 Hz) and `velocity` (0..1):
 * zones: the recorded pitches either side of the note, and at each the velocity layers either
   side of the velocity, weighted bilinearly (up to four zones; one where the note or the velocity
   is beyond the recorded ones);
+* attacks: a zone's frames start (onset - onset_ref) / frameSeconds in (later), the reference
+  being the zone whose head plays (else the heaviest): the zones' attacks meet;
 * time: a frame position p advances speed / frameSeconds per second; while the
   key is down and the zone loops, p ping-pongs between loop.start and loop.end;
   at key up it jumps to `release` when the zone has one (its recorded release
@@ -19,7 +21,11 @@ A note at `note` (MIDI, in tune: 69 = 440 Hz) and `velocity` (0..1):
   (linearly, the head going out the same way), its partials set at the block where that begins
   to the phases the recording had there;
 * harmonics: partial k at k f sqrt(1 + B' k^2) 2^(cents(p) * pitch_curve / 1200),
-  f = 440 * 2^((note - 69) / 12), B' = B * inharmonicity; its amplitude is the
+  f = 440 * 2^((note - 69) / 12), B' = B * inharmonicity; a zone with free ratios (a bar, a
+  bell) has partial k at (k + (ratio_k - k) * inharmonicity) f instead (inharmonicity 0: back
+  to harmonics), and when one zone of those played has them, every zone's multiplier of f
+  (ratio or k sqrt(1 + B' k^2)) is blended by weight among the zones that have that partial;
+  its amplitude is the
   zone's at p, read by harmonic number (formant 0) or at the same frequency in
   the recorded spectrum (formant 1), tilted by `brightness` dB per octave of k;
   phases start at 2 pi frac(k * 0.6180339887); partials above 0.45 fs fade out; in stereo each
@@ -31,6 +37,12 @@ A note at `note` (MIDI, in tune: 69 = 440 Hz) and `velocity` (0..1):
   sqrt(1 - c^2) times its own; band edges move with the pitch by `noise_follows_pitch` (0..1);
 * attack (a zone without a head): its transient, played once from the start, resampled by the
   pitch ratio (attack_follows_pitch);
+* string: when the heaviest zone has one (string_model.py), it plays instead of the partials, at
+  the zones' summed level: tuned to the note (no pitch curve), its decay `speed` times faster,
+  its stiffness scaled by `inharmonicity`, its excitation tilted as the partials would be; it
+  starts where the partials take over from the head (the same block, the recording's phases
+  there), from the note-on without a head; in stereo its two channels by the partials' balance
+  at its start, weighted by their level;
 * velocity: gain 10^(velocity_db (v - v_zone) / 20), brightness
   + velocity_brightness (v - v_zone) dB/oct.
 """
@@ -130,7 +142,7 @@ class _Lane:
 
 
 def _lane_timeline(zone: Zone, rate: int, samples: int, held: int, params: PlayParameters,
-                   head_time: np.ndarray | None) -> tuple[np.ndarray, np.ndarray]:
+                   head_time: np.ndarray | None, offset: float = 0.0) -> tuple[np.ndarray, np.ndarray]:
     """The frame position for each sample, and the release fade multiplier. While a head plays
     (and the key is down), the position is the head's time; after, it steps on from there."""
     step = params.speed / (zone.frame_seconds * rate)
@@ -144,6 +156,7 @@ def _lane_timeline(zone: Zone, rate: int, samples: int, held: int, params: PlayP
     fade_seconds = params.release_seconds if params.release_seconds is not None else (None if natural else 0.3)
     release_rate = np.exp(np.log(1e-3) / max(1e-3, fade_seconds * rate)) if fade_seconds else 1.0
     level = 1.0
+    p = offset
     for index in range(samples):
         if index == held and not released:
             released = True
@@ -153,7 +166,7 @@ def _lane_timeline(zone: Zone, rate: int, samples: int, held: int, params: PlayP
         if released:
             level *= release_rate
         if head_time is not None and not released and index < len(head_time):
-            p = head_time[index] / zone.frame_seconds
+            p = head_time[index] / zone.frame_seconds + offset
         positions[index] = min(p, last)
         fade[index] = level
         p += step * direction
@@ -166,6 +179,65 @@ def _lane_timeline(zone: Zone, rate: int, samples: int, held: int, params: PlayP
                 p = start + (start - p)
                 direction = 1.0
     return positions, fade
+
+
+def _render_string(zone: Zone, lanes: list, heaviest: Zone, frequency: float, velocity: float, rate: int, samples: int,
+                   params: PlayParameters, head_zone: Zone | None, snap, model_in: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    from .string_model import PluckedString, excitation, tune  # noqa: PLC0415
+    string = zone.string
+    lane = max(lanes, key=lambda item: item.weight)
+    count = len(string.excitation_db)
+    k = np.arange(1, count + 1, dtype=np.float64)
+    amplitudes = excitation(string, frequency, rate, lane.tilt, count)
+    tuning = tune(frequency, rate, string.gain, string.pole, string.dispersion, string.stages, params.speed, params.inharmonicity,
+                  string.order, string.zero, string.dips)
+    start = 0
+    phases = 2.0 * np.pi * ((k * GOLDEN) % 1.0)
+    if head_zone is not None:
+        if snap is None:
+            return np.zeros(samples), np.zeros(samples)
+        start, since = snap
+        if head_zone.head_phase is not None and len(head_zone.head_phase):
+            own = min(count, len(head_zone.head_phase))
+            position = lane.positions[start]
+            recorded_cents = float(interpolate_frames(head_zone.pitch_cents, np.array([position]))[0])
+            recorded = (k[:own] * np.sqrt(1.0 + head_zone.inharmonicity * k[:own] ** 2) * head_zone.f0
+                        * 2.0 ** (recorded_cents / 1200.0))
+            phases[:own] = head_zone.head_phase[:own] + 2.0 * np.pi * recorded * since / head_zone.head_rate
+    voice = PluckedString(tuning, frequency, rate, amplitudes, phases)
+    out = np.zeros(samples)
+    out[start:] = voice.render(samples - start)
+    total = sum(item.level for item in lanes)
+    out *= params.harmonics_mix * total * lane.fade * model_in
+    gain_left, gain_right = 1.0, 1.0
+    if zone.stereo:
+        frame = int(min(zone.frames - 1, max(0, string.start)))
+        left, right = channel_gains(zone.balance[frame, :count])
+        power = 10.0 ** (np.minimum(string.excitation_db[:len(left)], 0.0) / 10.0)
+        gain_left = float(np.sum(left * power) / max(np.sum(power), 1e-30))
+        gain_right = float(np.sum(right * power) / max(np.sum(power), 1e-30))
+    return out * gain_left, out * gain_right
+
+
+def partial_multipliers(zones: list[tuple[Zone, float]], count: int, inharmonicity: float) -> np.ndarray:
+    """Each partial's frequency as a multiple of the note's: per zone its free ratio (moved
+    towards k by `inharmonicity` 0..1, past it beyond) or k sqrt(1 + B' k^2), blended by weight
+    among the zones that have that partial."""
+    k = np.arange(1, count + 1, dtype=np.float64)
+    total = np.zeros(count)
+    weights = np.zeros(count)
+    for zone, weight in zones:
+        if zone.ratios is not None:
+            own = min(count, len(zone.ratios))
+            values = np.zeros(count)
+            values[:own] = k[:own] + (zone.ratios[:own] - k[:own]) * inharmonicity
+            has = np.arange(count) < own
+        else:
+            values = k * np.sqrt(1.0 + zone.inharmonicity * inharmonicity * k * k)
+            has = np.ones(count, dtype=bool)
+        total += np.where(has, weight * values, 0.0)
+        weights += np.where(has, weight, 0.0)
+    return np.where(weights > 0, total / np.maximum(weights, 1e-12), k)
 
 
 def render_model(model, note: float, velocity: float, rate: int, seconds: float, held_seconds: float | None = None,
@@ -222,19 +294,28 @@ def render_zones(zones: list[tuple[Zone, float]], note: float, velocity: float, 
         if len(reaching) and controls[reaching[0]] < samples:
             snap = (int(controls[reaching[0]]), float(controls[reaching[0]] * head_step - fade_start))
 
-    # Each zone on its own timeline: positions, fades, level.
+    # Each zone on its own timeline (its attack where the reference's is): positions, fades, level.
+    reference = head_zone if head_zone is not None else heaviest
     lanes = []
     for zone, weight in zones:
+        offset = (zone.onset - reference.onset) / zone.frame_seconds
         positions, fade = _lane_timeline(zone, rate, samples, held, params,
-                                         head_time if head_zone is not None else None)
+                                         head_time if head_zone is not None else None, offset)
         ratio = frequency / zone.f0 if zone.f0 > 0 else 1.0
         dv = velocity - zone.velocity
         level = weight * params.gain * zone.gain * 10.0 ** (params.velocity_db * dv / 20.0)
         tilt = params.brightness + params.velocity_brightness * dv
         lanes.append(_Lane(zone, weight, positions, fade, ratio, level, tilt))
 
+    # A plucked string in place of the partials.
+    string_zone = heaviest if getattr(heaviest, "string", None) is not None else None
+    if string_zone is not None and params.harmonics_mix > 0:
+        out_left, out_right = _render_string(string_zone, lanes, heaviest, frequency, velocity, rate, samples, params,
+                                             head_zone, snap, model_in)
+        left += out_left
+        right += out_right
     # Harmonics, at a control rate of 32 samples, amplitudes ramped per sample.
-    if params.harmonics_mix > 0 and count > 0:
+    elif params.harmonics_mix > 0 and count > 0:
         amplitudes_left = np.zeros((len(controls), count))
         amplitudes_right = np.zeros((len(controls), count))
         rotation = np.zeros(count, dtype=np.complex128)
@@ -249,7 +330,7 @@ def render_zones(zones: list[tuple[Zone, float]], note: float, velocity: float, 
             rows = interpolate_frames(zone.harmonics, control_positions)
             by_number = np.zeros((len(controls), count))
             by_number[:, :min(own, count)] = rows[:, :count]
-            if params.formant > 0:
+            if params.formant > 0 and zone.ratios is None:
                 # The same frequency in the recorded spectrum: harmonic k * ratio.
                 source = k * lane.ratio
                 lower = np.floor(source).astype(int)
@@ -276,7 +357,10 @@ def render_zones(zones: list[tuple[Zone, float]], note: float, velocity: float, 
                 amplitudes_right += scaled
                 rotation += lane.weight
         stretch = np.sqrt(1.0 + stretch_b * k * k)
-        partials = frequency * 2.0 ** (cents / 1200.0)[:, None] * (k * stretch)[None, :]
+        multiplier = k * stretch
+        if any(lane.zone.ratios is not None for lane in lanes):
+            multiplier = partial_multipliers([(lane.zone, lane.weight) for lane in lanes], count, params.inharmonicity)
+        partials = frequency * 2.0 ** (cents / 1200.0)[:, None] * multiplier[None, :]
         audible = np.clip((0.45 * rate - partials) / (0.05 * rate), 0.0, 1.0)
         amplitudes_left *= audible
         amplitudes_right *= audible
@@ -294,8 +378,9 @@ def render_zones(zones: list[tuple[Zone, float]], note: float, velocity: float, 
             own = min(count, len(head_zone.head_phase))
             position = max(lanes, key=lambda lane: lane.weight).positions[at]
             recorded_cents = float(interpolate_frames(head_zone.pitch_cents, np.array([position]))[0])
-            recorded = (k[:own] * head_zone.f0 * np.sqrt(1.0 + head_zone.inharmonicity * k[:own] ** 2)
-                        * 2.0 ** (recorded_cents / 1200.0))
+            recorded = ((head_zone.ratios[:own] if head_zone.ratios is not None
+                         else k[:own] * np.sqrt(1.0 + head_zone.inharmonicity * k[:own] ** 2))
+                        * head_zone.f0 * 2.0 ** (recorded_cents / 1200.0))
             target = head_zone.head_phase[:own] + 2.0 * np.pi * recorded * since / head_zone.head_rate
             later = np.cumsum(increment[at:, :own], axis=0) - increment[at:at + 1, :own]
             phases[at:, :own] = target[None, :] + 2.0 * np.pi * later / rate

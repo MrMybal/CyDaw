@@ -247,6 +247,14 @@ public:
     };
     [[nodiscard]] LocationMove locationMove() const;
     void cancelLocationMove();
+    // Every location CyDAW downloads, builds and installs into, in `root`
+    // (each in its own folder there: Banks, Downloads, Cache, companion,
+    // Models), one move after another; with `creations`, what the person makes
+    // too (sound models, devices, presets, exports, mixes, Foundry files).
+    // False with `error` when a move runs already.
+    bool setAllLocations(const juce::File& root, bool creations, bool takeContent, juce::String& error);
+    // The locations still to change after the move that runs.
+    [[nodiscard]] int pendingLocations() const noexcept { return static_cast<int>(pendingLocations_.size()); }
 
     // ---- Presets (Presets.h) ------------------------------------------------------
     // What has settings, as a preset holds it and puts it back:
@@ -791,7 +799,17 @@ public:
         std::optional<TrackRef> track; // the instrument that plays it
         juce::var zones;             // the companion's report: pitch, partials, how close
     };
-    juce::Result recreateSound(const juce::Array<juce::File>& files, const juce::String& name = {}, bool refine = false);
+    // `options`: more of the companion's arguments ("--kind", "string"...).
+    juce::Result recreateSound(const juce::Array<juce::File>& files, const juce::String& name = {}, bool refine = false,
+                               const juce::StringArray& options = {});
+    // A synth patch found for a recorded note, as Synplant's Genopatch: the
+    // settings of Opale (subtractive) or Quartz (FM) whose sound comes closest
+    // ("auto": both, the closer kept), searched on threads of their own by
+    // playing candidates through the synth's own voice (SynthMatch.h). Its
+    // progress and its end are soundMatching()'s, as an analysis's; a new
+    // instrument track plays the patch found, at the level that matches.
+    // `note` < 0: the recording's pitch; `evaluations`: the candidates heard per synth.
+    juce::Result matchSynth(const juce::File& file, const juce::String& synth = "auto", int note = -1, int evaluations = 3'000);
     void cancelSoundMatching();
     [[nodiscard]] SoundMatching soundMatching() const { return soundMatching_; }
     // A model file played: on `track`'s sound-model card, or by a new
@@ -1325,10 +1343,17 @@ private:
     std::shared_ptr<int> alive_ { std::make_shared<int>(0) };
     juce::ThreadPool background_ { 1 };
     std::unique_ptr<locations::Move> locationMove_;
+    std::vector<std::pair<Location, juce::File>> pendingLocations_;
+    bool pendingTake_ { true };
+    void nextLocation();
     std::vector<std::pair<juce::String, bool>> notices_;
     std::map<juce::String, juce::String> presetNames_;
     void reloadSamplers(const juce::StringArray& banks);
     SoundMatching soundMatching_;
+    // The synth patch being searched for (matchSynth): its thread, its end.
+    struct SynthSearch;
+    std::unique_ptr<SynthSearch> synthSearch_;
+    void finishSynthSearch();
     std::optional<Companion::Status> companionJob_;
     juce::File pendingModel_;
     void applySoundMatching(const Companion::Status& finished);

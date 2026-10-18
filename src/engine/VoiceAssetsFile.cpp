@@ -17,7 +17,8 @@ namespace {
 static_assert(std::endian::native == std::endian::little, "voice assets are written little-endian");
 
 constexpr std::uint32_t magic = 0x41565943; // "CYVA"
-constexpr std::uint32_t version = 1;
+// 2: a model's zones carry their free ratios, their onset and their string.
+constexpr std::uint32_t version = 2;
 constexpr std::uint32_t samplerPart = 1;
 constexpr std::uint32_t modelPart = 2;
 
@@ -236,6 +237,25 @@ void writeModel(Writer& w, const SoundModel& model)
         w.value(zone.attackGain);
         for (const auto v : { zone.loopStart, zone.loopEnd, zone.release })
             w.value(static_cast<std::int32_t>(v));
+        // Version 2: partials that are no harmonics, where the note starts,
+        // a plucked string in place of the partials.
+        w.list(zone.ratios);
+        w.value(zone.onset);
+        const auto& string = zone.string;
+        w.value(static_cast<std::uint8_t>(string.present() ? 1 : 0));
+        if (string.present()) {
+            for (const auto v : { string.gain, string.pole, string.zero, string.dispersion })
+                w.value(v);
+            for (const auto v : { string.order, string.stages, string.start })
+                w.value(static_cast<std::int32_t>(v));
+            std::vector<float> dips;
+            for (const auto& dip : string.dips)
+                dips.insert(dips.end(), { dip.hz, dip.q, dip.db });
+            w.list(dips);
+            w.list(string.excitationDb);
+            w.list(string.bodyEdges);
+            w.list(string.bodyDb);
+        }
     }
 }
 
@@ -429,10 +449,36 @@ bool modelZoneHolds(SoundModelZone& zone)
     if (zone.loopEnd <= zone.loopStart)
         zone.loopStart = zone.loopEnd = -1;
     zone.release = std::clamp(zone.release, -1, zone.frames - 1);
+    if (std::any_of(zone.ratios.begin(), zone.ratios.end(), [](const float ratio) { return !(ratio > 0.0f && ratio < 1.0e4f); }))
+        zone.ratios.clear();
+    zone.onset = std::isfinite(zone.onset) ? std::clamp(zone.onset, 0.0f, 10.0f) : 0.0f;
+    // The string's checks are the .cysound reader's (SoundModelFile.cpp).
+    auto& string = zone.string;
+    if (string.present()) {
+        const auto finiteAll = [](const std::vector<float>& values) { return std::all_of(values.begin(), values.end(), finite); };
+        if (!finite(string.gain) || !finite(string.pole) || !finite(string.zero) || !finite(string.dispersion)
+            || !finiteAll(string.excitationDb) || !finiteAll(string.bodyEdges) || !finiteAll(string.bodyDb)
+            || string.bodyEdges.size() != string.bodyDb.size() + 1 || string.bodyDb.empty())
+            return false;
+        string.gain = std::clamp(string.gain, 0.0f, 0.999999f);
+        string.pole = std::clamp(string.pole, 0.0f, 0.99f);
+        string.zero = std::clamp(string.zero, -0.99f, string.pole);
+        string.order = string.order >= 2 ? 2 : 1;
+        string.dispersion = std::clamp(string.dispersion, -0.95f, 0.0f);
+        string.stages = std::clamp(string.stages, 0, PluckedString::maximumStages);
+        string.start = std::clamp(string.start, 0, std::max(0, zone.frames - 1));
+        if (static_cast<int>(string.dips.size()) > PluckedString::maximumDips)
+            string.dips.resize(static_cast<std::size_t>(PluckedString::maximumDips));
+        for (auto& dip : string.dips) {
+            if (!finite(dip.hz) || !finite(dip.q) || !finite(dip.db))
+                return false;
+            dip.db = std::clamp(dip.db, -6.0f, 0.0f);
+        }
+    }
     return true;
 }
 
-SoundModelRef readModel(Reader& r, std::string& error)
+SoundModelRef readModel(Reader& r, const std::uint32_t readVersion, std::string& error)
 {
     auto model = std::make_shared<SoundModel>();
     model->name = r.text();
@@ -470,6 +516,30 @@ SoundModelRef readModel(Reader& r, std::string& error)
         zone.loopStart = r.value<std::int32_t>();
         zone.loopEnd = r.value<std::int32_t>();
         zone.release = r.value<std::int32_t>();
+        if (readVersion >= 2) {
+            zone.ratios = r.list<float>();
+            zone.onset = r.value<float>();
+            if (r.value<std::uint8_t>() != 0) {
+                auto& string = zone.string;
+                string.gain = r.value<float>();
+                string.pole = r.value<float>();
+                string.zero = r.value<float>();
+                string.dispersion = r.value<float>();
+                string.order = r.value<std::int32_t>();
+                string.stages = r.value<std::int32_t>();
+                string.start = r.value<std::int32_t>();
+                const auto dips = r.list<float>();
+                for (std::size_t at = 0; at + 2 < dips.size(); at += 3)
+                    string.dips.push_back({ dips[at], dips[at + 1], dips[at + 2] });
+                string.excitationDb = r.list<float>();
+                string.bodyEdges = r.list<float>();
+                string.bodyDb = r.list<float>();
+                if (!string.present()) {
+                    error = "sound model zone " + std::to_string(index + 1) + "'s string is unreadable";
+                    return {};
+                }
+            }
+        }
         if (!r.ok() || !modelZoneHolds(zone)) {
             error = "sound model zone " + std::to_string(index + 1) + " is unreadable";
             return {};
@@ -511,14 +581,14 @@ VoiceAssets readVoiceAssets(std::istream& in, std::string& error)
             error = "not CyDAW voice data";
             return {};
         }
-        if (readVersion != version) {
+        if (readVersion < 1 || readVersion > version) {
             error = "voice data of another version (" + std::to_string(readVersion) + ")";
             return {};
         }
         VoiceAssets assets;
         if ((parts & samplerPart) != 0 && (assets.sampler = readSampler(r, error)) == nullptr)
             return {};
-        if ((parts & modelPart) != 0 && (assets.soundModel = readModel(r, error)) == nullptr)
+        if ((parts & modelPart) != 0 && (assets.soundModel = readModel(r, readVersion, error)) == nullptr)
             return {};
         return assets;
     } catch (const std::bad_alloc&) {

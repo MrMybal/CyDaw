@@ -187,6 +187,76 @@ juce::File Companion::environmentFolder()
     return locations::folder(Location::companion);
 }
 
+juce::var Companion::componentCatalogue()
+{
+    return juce::JSON::parse(packageFolder().getChildFile("cydaw_companion").getChildFile("components.json"));
+}
+
+juce::var Companion::component(const juce::String& id)
+{
+    // Held: the list lives as long as the catalogue does.
+    const auto catalogue = componentCatalogue();
+    const auto components = catalogue.getProperty("components", {});
+    if (const auto* list = components.getArray())
+        for (const auto& item : *list)
+            if (item.getProperty("id", {}).toString() == id)
+                return item;
+    return {};
+}
+
+bool Companion::componentInstalled(const juce::String& id, const juce::var& info)
+{
+    if (!info.isObject())
+        return false;
+    const auto there = [&info](const char* key) {
+        const auto value = info.getProperty(key, {});
+        return !value.isVoid() && value.toString().isNotEmpty() && value.toString() != "null" && value.toString() != "false";
+    };
+    const auto torch = info.getProperty("torch", {}).toString();
+    if (id == "base")
+        return there("numpy");
+    if (id == "torch-cpu")
+        return there("torch") && !torch.contains("+cu");
+    if (id == "torch-cuda")
+        return there("torch") && torch.contains("+cu");
+    if (id == "crepe")
+        return static_cast<bool>(info.getProperty("crepe", false));
+    return false;
+}
+
+bool Companion::install(const juce::String& id, const bool licencesAccepted, juce::String& error)
+{
+    const auto item = component(id);
+    if (!item.isObject()) {
+        error = "no component \"" + id + "\" (components.json)";
+        return false;
+    }
+    if (static_cast<bool>(item.getProperty("requiresAcceptance", false)) && !licencesAccepted) {
+        error = "its licences ask to be accepted first";
+        return false;
+    }
+    const auto environment = environmentFolder();
+    juce::StringArray arguments { "setup", "--env", environment.getFullPathName() };
+    if (const auto* extra = item.getProperty("arguments", {}).getArray())
+        for (const auto& argument : *extra)
+            arguments.add(argument.toString());
+    if (!start(arguments)) {
+        error = "the companion is busy";
+        return false;
+    }
+    // The receipt: what was asked for, from where, and the licences shown.
+    auto* receipt = new juce::DynamicObject();
+    receipt->setProperty("component", id);
+    receipt->setProperty("when", juce::Time::getCurrentTime().toISO8601(true));
+    receipt->setProperty("licencesAccepted", licencesAccepted);
+    receipt->setProperty("sources", item.getProperty("sources", {}));
+    receipt->setProperty("packages", item.getProperty("packages", {}));
+    const auto file = environment.getChildFile("receipts").getChildFile(id + ".json");
+    (void) file.getParentDirectory().createDirectory();
+    (void) file.replaceWithText(juce::JSON::toString(juce::var(receipt)));
+    return true;
+}
+
 juce::StringArray Companion::commandLine(const juce::StringArray& arguments) const
 {
     // No working folder can be given to a child process here: the package is

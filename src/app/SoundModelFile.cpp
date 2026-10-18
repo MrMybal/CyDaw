@@ -210,6 +210,35 @@ cydaw::engine::SoundModelRef soundModelFromVar(const juce::var& value, juce::Str
         zone.frameSeconds = juce::jlimit(0.001f, 1.0f, static_cast<float>(static_cast<double>(item.getProperty("frameSeconds", 0.01))));
         zone.frames = juce::jlimit(0, 1'000'000, static_cast<int>(item.getProperty("frames", 0)));
         zone.inharmonicity = juce::jlimit(0.0f, 0.05f, static_cast<float>(static_cast<double>(item.getProperty("inharmonicity", 0.0))));
+        // Partials that are no harmonics: their ratios to f0 (positive).
+        zone.ratios = readFloats(item.getProperty("ratios", {}));
+        zone.onset = juce::jlimit(0.0f, 10.0f, static_cast<float>(static_cast<double>(item.getProperty("onset", 0.0))));
+        // A plucked string in place of its partials.
+        if (const auto string = item.getProperty("string", {}); string.isObject()) {
+            auto& model = zone.string;
+            model.gain = juce::jlimit(0.0f, 0.999999f, static_cast<float>(static_cast<double>(string.getProperty("gain", 0.99))));
+            model.pole = juce::jlimit(0.0f, 0.99f, static_cast<float>(static_cast<double>(string.getProperty("pole", 0.0))));
+            model.zero = juce::jlimit(-0.99f, model.pole, static_cast<float>(static_cast<double>(string.getProperty("zero", 0.0))));
+            model.order = static_cast<int>(string.getProperty("order", 1)) >= 2 ? 2 : 1;
+            model.dispersion = juce::jlimit(-0.95f, 0.0f, static_cast<float>(static_cast<double>(string.getProperty("dispersion", 0.0))));
+            model.stages = juce::jlimit(0, cydaw::engine::PluckedString::maximumStages, static_cast<int>(string.getProperty("stages", 0)));
+            model.start = juce::jlimit(0, std::max(0, zone.frames - 1), static_cast<int>(string.getProperty("start", 0)));
+            if (const auto* dips = string.getProperty("dips", {}).getArray())
+                for (const auto& dip : *dips)
+                    if (static_cast<int>(model.dips.size()) < cydaw::engine::PluckedString::maximumDips)
+                        model.dips.push_back({ static_cast<float>(static_cast<double>(dip.getProperty("hz", 1000.0))),
+                                               static_cast<float>(static_cast<double>(dip.getProperty("q", 1.0))),
+                                               juce::jlimit(-6.0f, 0.0f, static_cast<float>(static_cast<double>(dip.getProperty("db", 0.0)))) });
+            for (const auto value : readFloats(string.getProperty("excitation", {})))
+                model.excitationDb.push_back(value / 10.0f);
+            model.bodyEdges = readFloats(string.getProperty("bodyEdges", {}));
+            for (const auto value : readFloats(string.getProperty("body", {})))
+                model.bodyDb.push_back(value / 10.0f);
+            if (model.bodyEdges.size() != model.bodyDb.size() + 1 || model.bodyDb.empty())
+                model.excitationDb.clear();
+        }
+        if (std::any_of(zone.ratios.begin(), zone.ratios.end(), [](const float ratio) { return !(ratio > 0.0f && ratio < 1.0e4f); }))
+            zone.ratios.clear();
         // A compact zone's key frames: ascending, from 0 to the last frame.
         if (const auto* times = item.getProperty("frameTimes", {}).getArray()) {
             for (const auto& time : *times)

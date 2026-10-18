@@ -22,6 +22,85 @@ namespace cydaw::engine {
 // tools/companion/cydaw_companion/synth.py is the reference player: the voice
 // below follows it step by step, so a model is checked against its source in
 // Python and played the same way here.
+// A plucked string played instead of a zone's partials (the companion's
+// string_model.py): its loop's loss (a shelf or low-pass of one or two stages,
+// times g, per period), the body's own losses (peaking cuts fixed in Hz), the
+// string's stiffness (allpasses), the frame it takes over at, and its
+// excitation (each harmonic's level there, the body taken out) with the
+// body's level per band (fixed in Hz).
+struct SoundModelString {
+    float gain { 0.999f };
+    float pole {};
+    float zero {};
+    int order { 1 };
+    float dispersion {};
+    int stages {};
+    struct Dip {
+        float hz {};
+        float q { 1.0f };
+        float db {};
+    };
+    std::vector<Dip> dips;
+    int start {};
+    std::vector<float> excitationDb;
+    std::vector<float> bodyEdges;
+    std::vector<float> bodyDb;
+
+    [[nodiscard]] bool present() const noexcept { return !excitationDb.empty(); }
+    // The body's level (dB) at a frequency: its bands' values, linear across
+    // log frequency between their centres, flat beyond.
+    [[nodiscard]] double bodyAt(double hz) const noexcept;
+};
+
+// The loop of a plucked string (extended Karplus-Strong): a line about one
+// period long, the loss filter, the body's cuts, the stiffness allpasses and
+// the period's fraction, tuned so the whole loop lasts one period. Allocates
+// in prepare() only.
+class PluckedString final {
+public:
+    static constexpr int maximumStages = 4;
+    static constexpr int maximumDips = 3;
+    static constexpr double lowestHz = 16.0;
+
+    void prepare(double sampleRate);
+    void reset() noexcept { running_ = false; }
+    // Tuned to `frequency` (its decay `speed` times faster, its stiffness
+    // scaled), one period of `count` harmonics (sine amplitudes, phases)
+    // laid in the line: what comes out first.
+    void start(const SoundModelString& string, double frequency, double rate, double speed, double stiffness,
+               const double* amplitudes, const double* phases, int count) noexcept;
+    [[nodiscard]] bool running() const noexcept { return running_; }
+    [[nodiscard]] double next() noexcept;
+
+private:
+    struct Biquad {
+        double b0 {}, b1 {}, b2 {}, a1 {}, a2 {};
+        double x1 {}, x2 {}, y1 {}, y2 {};
+    };
+    std::vector<double> line_;
+    int length_ {};
+    int position_ {};
+    double gain_ {};
+    double pole_ {};
+    double zero_ {};
+    double scale_ {};
+    bool second_ {};
+    double lowpass_ {};
+    double lowpass2_ {};
+    double input1_ {};
+    double input2_ {};
+    std::array<Biquad, maximumDips> cuts_ {};
+    int cutCount_ {};
+    double dispersion_ {};
+    int stages_ {};
+    std::array<double, maximumStages> stageIn_ {};
+    std::array<double, maximumStages> stageOut_ {};
+    double eta_ {};
+    double fractionIn_ {};
+    double fractionOut_ {};
+    bool running_ {};
+};
+
 struct SoundModelZone {
     int rootNote { 60 };
     float f0 { 261.63f };
@@ -29,8 +108,16 @@ struct SoundModelZone {
     float gain { 1.0f };
     float frameSeconds { 0.01f };
     int frames {};
-    // Partial k sits at k f0 sqrt(1 + B k^2).
+    // Partial k sits at k f0 sqrt(1 + B k^2)...
     float inharmonicity {};
+    // ...or, for partials that are no harmonics (a struck bar, a bell), at
+    // ratios[k - 1] f0 (empty: harmonics).
+    std::vector<float> ratios;
+    // Where its attack is (seconds from its start): the zones played together
+    // meet there.
+    float onset {};
+    // A plucked string played instead of the partials (none: the partials).
+    SoundModelString string;
     // The frames the rows below are at, ascending from 0 to frames - 1 (a
     // compact zone: the frames between are read by interpolation); empty: a
     // row for every frame.
@@ -175,6 +262,7 @@ inline constexpr std::array<SoundModelSettingInfo, soundModelSettingCount> sound
     { "attack", "model.attack", "model.parameter.attack", "", 0.0f, 2.0f, 1.0f },
     { "brightness", "model.brightness", "model.parameter.brightness", "dB", -24.0f, 24.0f, 0.0f },
     { "formant", "model.formant", "model.parameter.formant", "", 0.0f, 1.0f, 0.0f },
+    // B's scale; for free ratios, how far from harmonics they stand (0: harmonics).
     { "inharmonicity", "model.inharmonicity", "model.parameter.inharmonicity", "", 0.0f, 4.0f, 1.0f },
     { "pitch-curve", "model.pitchCurve", "model.parameter.pitchCurve", "", 0.0f, 2.0f, 1.0f },
     { "speed", "model.speed", "model.parameter.speed", "", 0.25f, 4.0f, 1.0f },
@@ -248,6 +336,8 @@ public:
     [[nodiscard]] double nextSample(const SoundModel* model, const SoundModelValues& values, double sampleRate) noexcept;
     // The pitch moved along the note (a note's expression), as a ratio.
     void setPitchRatio(const double ratio) noexcept { pitchRatio_ = ratio; }
+    // Whether it plays a string rather than partials (the heaviest zone's).
+    [[nodiscard]] bool playsString() const noexcept { return stringLane_ >= 0; }
 
 private:
     // One zone's own timeline in the voice.
@@ -259,6 +349,8 @@ private:
         double fade { 1.0 };
         double fadeRate { 1.0 };
         double attackPosition {};
+        // Its frames' lead on the head's time: its attack meets the reference's.
+        double offset {};
         bool released {};
     };
 
@@ -281,6 +373,9 @@ private:
     // way, the head at `position`.
     void snapToHead(const SoundModel& model, const SoundModelValues& values, double position) noexcept;
     [[nodiscard]] static float randomSample(std::uint32_t& state) noexcept;
+    // The string laid in its line for the heaviest zone, the phases where it
+    // takes over (the recording's, under a head, at `headAt`).
+    void startString(const SoundModel& model, const SoundModelValues& values, double rate, double headAt) noexcept;
 
     // Noise: two white streams (the right's own), a frame of fftSize_ shaped
     // every hop.
@@ -317,6 +412,13 @@ private:
 
     std::array<Lane, maximumSoundModelLanes> lanes_ {};
     int laneCount_ {};
+    // The string (the heaviest lane's zone has one): its lane, its loop, its
+    // gain at the last block's end, its channels' shares.
+    int stringLane_ { -1 };
+    PluckedString string_;
+    double stringGain_ {};
+    double stringLeft_ { 1.0 };
+    double stringRight_ { 1.0 };
     // The head: the heaviest lane's zone's, where it is (its samples), how
     // fast it goes, whether the partials took its phases.
     int headLane_ { -1 };

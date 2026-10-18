@@ -1,0 +1,103 @@
+{
+  "format": "cydaw-companion-components",
+  "version": 1,
+  "note": {
+    "fr": "Rien n'est livré avec CyDAW : chaque composant est téléchargé à la demande, depuis son éditeur (PyPI, download.pytorch.org), dans le dossier du compagnon (Options › Emplacements). Les licences sont celles des paquets ; la licence d'origine fait foi.",
+    "en": "Nothing ships with CyDAW: each component is downloaded on request, from its publisher (PyPI, download.pytorch.org), into the companion's folder (Options › Locations). The licences are the packages'; the original licence is what counts."
+  },
+  "components": [
+    {
+      "id": "base",
+      "title": { "fr": "Base : numpy", "en": "Base: numpy" },
+      "description": {
+        "fr": "Ce que l'analyse demande : l'environnement Python du compagnon et numpy.",
+        "en": "What the analysis needs: the companion's Python environment and numpy."
+      },
+      "arguments": ["--torch", "none"],
+      "size": { "fr": "environ 40 Mo", "en": "about 40 MB" },
+      "sources": ["pypi.org"],
+      "requiresAcceptance": false,
+      "packages": [
+        { "name": "numpy", "licence": "BSD-3-Clause", "url": "https://github.com/numpy/numpy/blob/main/LICENSE.txt" },
+        { "name": "pip", "licence": "MIT", "url": "https://github.com/pypa/pip/blob/main/LICENSE.txt" }
+      ]
+    },
+    {
+      "id": "torch-cpu",
+      "title": { "fr": "PyTorch pour le processeur", "en": "PyTorch for the processor" },
+      "description": {
+        "fr": "L'affinage des sons recréés et la recherche sémantique, sur le processeur (plus lent).",
+        "en": "The refinement of recreated sounds and the semantic search, on the processor (slower)."
+      },
+      "arguments": ["--torch", "cpu"],
+      "size": { "fr": "environ 250 Mo", "en": "about 250 MB" },
+      "sources": ["download.pytorch.org"],
+      "requiresAcceptance": false,
+      "packages": [
+        { "name": "torch", "licence": "BSD-3-Clause", "url": "https://github.com/pytorch/pytorch/blob/main/LICENSE" },
+        { "name": "sympy, mpmath", "licence": "BSD-3-Clause", "url": "https://github.com/sympy/sympy/blob/master/LICENSE" },
+        { "name": "networkx", "licence": "BSD-3-Clause", "url": "https://github.com/networkx/networkx/blob/main/LICENSE.txt" },
+        { "name": "jinja2, MarkupSafe", "licence": "BSD-3-Clause", "url": "https://github.com/pallets/jinja/blob/main/LICENSE.txt" },
+        { "name": "fsspec", "licence": "BSD-3-Clause", "url": "https://github.com/fsspec/filesystem_spec/blob/master/LICENSE" },
+        { "name": "filelock", "licence": "Unlicense", "url": "https://github.com/tox-dev/filelock/blob/main/LICENSE" },
+        { "name": "typing_extensions", "licence": "PSF-2.0", "url": "https://github.com/python/typing_extensions/blob/main/LICENSE" },
+        { "name": "setuptools", "licence": "MIT", "url": "https://github.com/pypa/setuptools/blob/main/LICENSE" }
+      ]
+    },
+    {
+      "id": "torch-cuda",
+      "title": { "fr": "PyTorch pour la carte graphique (CUDA)", "en": "PyTorch for the graphics card (CUDA)" },
+      "description": {
+        "fr": "La même chose sur une carte NVIDIA : bien plus vite. Remplace la version pour le processeur. Les bibliothèques CUDA et cuDNN de NVIDIA sont dans le paquet : leurs licences (NVIDIA) s'appliquent.",
+        "en": "The same on an NVIDIA card: much faster. Replaces the processor build. NVIDIA's CUDA and cuDNN libraries are inside the package: their (NVIDIA) licences apply."
+      },
+      "arguments": ["--torch", "cuda"],
+      "gpu": true,
+      "size": { "fr": "environ 2,5 à 3 Go (5 à 6 Go une fois installé)", "en": "about 2.5 to 3 GB (5 to 6 GB installed)" },
+      "sources": ["download.pytorch.org"],
+      "requiresAcceptance": true,
+      "packages": [
+        { "name": "torch (CUDA)", "licence": "BSD-3-Clause", "url": "https://github.com/pytorch/pytorch/blob/main/LICENSE" },
+        { "name": "NVIDIA CUDA (cudart, cuBLAS, cuFFT, cuSPARSE…)", "licence": "NVIDIA CUDA Toolkit EULA", "url": "https://docs.nvidia.com/cuda/eula/index.html" },
+        { "name": "NVIDIA cuDNN", "licence": "NVIDIA cuDNN Software License Agreement", "url": "https://docs.nvidia.com/deeplearning/cudnn/latest/reference/eula.html" },
+        { "name": "sympy, mpmath, networkx, jinja2, MarkupSafe, fsspec", "licence": "BSD-3-Clause", "url": "https://github.com/pytorch/pytorch/blob/main/LICENSE" },
+        { "name": "filelock", "licence": "Unlicense", "url": "https://github.com/tox-dev/filelock/blob/main/LICENSE" },
+        { "name": "typing_extensions", "licence": "PSF-2.0", "url": "https://github.com/python/typing_extensions/blob/main/LICENSE" },
+        { "name": "setuptools", "licence": "MIT", "url": "https://github.com/pypa/setuptools/blob/main/LICENSE" }
+      ]
+    },
+    {
+      "id": "crepe",
+      "title": { "fr": "CREPE : la hauteur des notes", "en": "CREPE: the notes' pitch" },
+      "description": {
+        "fr": "Un réseau de neurones qui lit la hauteur des notes d'un long enregistrement, plus sûr que YIN sur les voix et les sons riches. Son modèle (Kim et al., 2018) est dans le paquet. Demande PyTorch.",
+        "en": "A neural network that reads the pitch of a long recording's notes, surer than YIN on voices and rich sounds. Its model (Kim et al., 2018) is inside the package. Needs PyTorch."
+      },
+      "arguments": ["--torch", "none", "--crepe"],
+      "requires": "torch",
+      "size": { "fr": "environ 200 Mo", "en": "about 200 MB" },
+      "sources": ["pypi.org", "download.pytorch.org"],
+      "requiresAcceptance": false,
+      "packages": [
+        { "name": "torchcrepe (and the CREPE model)", "licence": "MIT", "url": "https://github.com/maxrmorrison/torchcrepe/blob/master/LICENSE" },
+        { "name": "torchaudio", "licence": "BSD-2-Clause", "url": "https://github.com/pytorch/audio/blob/main/LICENSE" },
+        { "name": "librosa", "licence": "ISC", "url": "https://github.com/librosa/librosa/blob/main/LICENSE.md" },
+        { "name": "resampy", "licence": "ISC", "url": "https://github.com/bmcfee/resampy/blob/main/LICENSE" },
+        { "name": "scipy", "licence": "BSD-3-Clause", "url": "https://github.com/scipy/scipy/blob/main/LICENSE.txt" },
+        { "name": "scikit-learn, joblib, threadpoolctl", "licence": "BSD-3-Clause", "url": "https://github.com/scikit-learn/scikit-learn/blob/main/COPYING" },
+        { "name": "numba", "licence": "BSD-2-Clause", "url": "https://github.com/numba/numba/blob/main/LICENSE" },
+        { "name": "llvmlite (with LLVM: Apache-2.0 with LLVM exception)", "licence": "BSD-2-Clause", "url": "https://github.com/numba/llvmlite/blob/main/LICENSE" },
+        { "name": "soundfile (with libsndfile: LGPL-2.1)", "licence": "BSD-3-Clause", "url": "https://github.com/bastibe/python-soundfile/blob/master/LICENSE" },
+        { "name": "soxr (libsoxr)", "licence": "LGPL-2.1-or-later", "url": "https://github.com/dofuuz/python-soxr/blob/main/LICENSE.txt" },
+        { "name": "audioread, cffi, platformdirs", "licence": "MIT", "url": "https://github.com/beetbox/audioread/blob/main/LICENSE" },
+        { "name": "pooch, lazy_loader, pycparser, idna", "licence": "BSD-3-Clause", "url": "https://github.com/fatiando/pooch/blob/main/LICENSE.txt" },
+        { "name": "decorator", "licence": "BSD-2-Clause", "url": "https://github.com/micheles/decorator/blob/master/LICENSE.txt" },
+        { "name": "msgpack, requests", "licence": "Apache-2.0", "url": "https://github.com/msgpack/msgpack-python/blob/main/COPYING" },
+        { "name": "urllib3, charset-normalizer", "licence": "MIT", "url": "https://github.com/urllib3/urllib3/blob/main/LICENSE.txt" },
+        { "name": "certifi", "licence": "MPL-2.0", "url": "https://github.com/certifi/python-certifi/blob/master/LICENSE" },
+        { "name": "tqdm", "licence": "MPL-2.0 AND MIT", "url": "https://github.com/tqdm/tqdm/blob/master/LICENCE" },
+        { "name": "packaging", "licence": "Apache-2.0 OR BSD-2-Clause", "url": "https://github.com/pypa/packaging/blob/main/LICENSE" }
+      ]
+    }
+  ]
+}

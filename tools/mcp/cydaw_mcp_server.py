@@ -219,12 +219,56 @@ TOOLS = [
                         "une nouvelle piste instrument joue le modele (DSP pur, "
                         "aucun reseau a la lecture). Tourne en tache de fond : "
                         "suivre avec sound_matching. refine : affinage DDSP "
-                        "(PyTorch, GPU si present)."),
+                        "(PyTorch, GPU si present). kind : auto (partiels, "
+                        "inharmoniques si cloche/marimba, corde pincee si aussi "
+                        "juste), string (corde Karplus-Strong + caisse), "
+                        "partials. split : auto|on|off, decoupe un "
+                        "enregistrement de plusieurs notes. pitch : auto (CREPE "
+                        "s'il est installe, sinon YIN)|yin|crepe. "
+                        "partials : auto|harmonic|inharmonic."),
         "inputSchema": {"type": "object",
                         "properties": {"files": {"type": "array", "items": {"type": "string"}},
                                        "name": {"type": "string"},
-                                       "refine": {"type": "boolean"}},
+                                       "refine": {"type": "boolean"},
+                                       "kind": {"type": "string", "enum": ["auto", "string", "partials"]},
+                                       "split": {"type": "string", "enum": ["auto", "on", "off"]},
+                                       "pitch": {"type": "string", "enum": ["auto", "yin", "crepe"]},
+                                       "partials": {"type": "string", "enum": ["auto", "harmonic", "inharmonic"]}},
                         "required": ["files"]},
+    },
+    {
+        "name": "companion_install",
+        "description": ("Installe un composant du compagnon Python dans son "
+                        "dossier (Options > Emplacements, jamais ailleurs) : "
+                        "base (numpy), torch-cpu, torch-cuda, crepe. "
+                        "companion_info liste les composants, leur taille, leur "
+                        "source et les licences de chaque paquet, et suit "
+                        "l'installation (job). acceptLicence : seulement quand "
+                        "la personne a lu et accepte les licences (torch-cuda : "
+                        "licences NVIDIA CUDA et cuDNN)."),
+        "inputSchema": {"type": "object",
+                        "properties": {"component": {"type": "string",
+                                                     "enum": ["base", "torch-cpu", "torch-cuda", "crepe"]},
+                                       "acceptLicence": {"type": "boolean"}},
+                        "required": ["component"]},
+    },
+    {
+        "name": "match_synth",
+        "description": ("Retrouve un patch de synthe qui imite une note "
+                        "enregistree (facon Genopatch) : les reglages d'Opale "
+                        "(soustractif) ou de Quartz (FM) les plus proches, "
+                        "cherches en ecoutant des milliers de candidats "
+                        "(CMA-ES). synth : auto (les deux, le plus proche "
+                        "garde), opale ou quartz. note : la touche (sinon la "
+                        "hauteur trouvee). Une nouvelle piste instrument joue "
+                        "le patch, au niveau qui correspond. Tache de fond : "
+                        "suivre avec sound_matching (zones[0] : synth, loss)."),
+        "inputSchema": {"type": "object",
+                        "properties": {"file": {"type": "string"},
+                                       "synth": {"type": "string", "enum": ["auto", "opale", "quartz"]},
+                                       "note": {"type": "integer"},
+                                       "evaluations": {"type": "integer"}},
+                        "required": ["file"]},
     },
     {
         "name": "sound_matching",
@@ -764,15 +808,22 @@ TOOLS = [
         "description": ("Ou CyDAW range les choses (Options > Emplacements) : "
                         "banks (banques de sons), downloads (telechargements en "
                         "cours), cache (index des echantillons, compilations VST3), "
-                        "companion (environnement Python), soundModels, devices, "
-                        "pluginExports. set + folder : change un dossier (folder "
-                        "vide : par defaut) ; take false : sans deplacer ce que "
-                        "CyDAW y avait mis. cancel : arrete un deplacement."),
+                        "companion (environnement Python), aiModels, soundModels, "
+                        "devices, pluginExports, presets, mixes, foundry. set + "
+                        "folder : change un dossier (folder vide : par defaut) ; "
+                        "take false : sans deplacer ce que CyDAW y avait mis. "
+                        "all + folder : tout ce que CyDAW telecharge et installe "
+                        "dans ce dossier (Banks, Downloads, Cache, companion, "
+                        "Models), deplace l'un apres l'autre ; creations true : "
+                        "aussi ce que la personne fabrique. move.pending : ce "
+                        "qui reste a deplacer. cancel : arrete."),
         "inputSchema": {"type": "object",
                         "properties": {"set": {"type": "string",
-                                               "enum": ["banks", "downloads", "cache", "companion",
-                                                        "soundModels", "devices", "pluginExports"]},
+                                               "enum": ["banks", "downloads", "cache", "companion", "aiModels",
+                                                        "soundModels", "devices", "pluginExports", "presets",
+                                                        "mixes", "foundry"]},
                                        "folder": {"type": "string"}, "take": {"type": "boolean"},
+                                       "all": {"type": "string"}, "creations": {"type": "boolean"},
                                        "cancel": {"type": "boolean"}}},
     },
     {
@@ -837,9 +888,12 @@ TOOLS = [
     {
         "name": "companion_info",
         "description": ("Le compagnon Python : quel interprete (python pour le "
-                        "changer), numpy, PyTorch, CUDA et la carte graphique. "
-                        "L'installation (numpy, PyTorch CPU/CUDA) se fait depuis "
-                        "Options > Compagnon Python, sur un clic de l'utilisateur."),
+                        "changer), numpy, PyTorch, CUDA, CREPE et la carte "
+                        "graphique ; son dossier (environment) ; les composants "
+                        "installables (taille, source, licences de chaque "
+                        "paquet, installed) et l'installation en cours (job). "
+                        "Installer : companion_install, ou Options > Compagnon "
+                        "Python."),
         "inputSchema": {"type": "object",
                         "properties": {"python": {"type": "string"}}},
     },

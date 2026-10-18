@@ -29,6 +29,8 @@ private:
     Studio& studio_;
     UiState& state_;
     bool takeContent_ { true };
+    bool withCreations_ {};
+    void chooseRoot();
     std::unique_ptr<juce::FileChooser> chooser_;
 };
 

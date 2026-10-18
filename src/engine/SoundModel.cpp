@@ -57,7 +57,186 @@ void transform(std::complex<float>* data, const int size, const std::complex<flo
     }
 }
 
+// ---- The plucked string's filters ----
+
+std::complex<double> lossResponse(const double pole, const double zero, const double omega) noexcept
+{
+    const auto z = std::polar(1.0, -omega);
+    return (1.0 - pole) / (1.0 - zero) * (1.0 - zero * z) / (1.0 - pole * z);
+}
+
+double lossDelay(const double pole, const double zero, const double omega) noexcept
+{
+    if (omega <= 0.0)
+        return pole / (1.0 - pole) - zero / (1.0 - zero);
+    return -std::arg(lossResponse(pole, zero, omega)) / omega;
+}
+
+double allpassDelay(const double c, const double omega) noexcept
+{
+    if (omega <= 0.0)
+        return (1.0 - c) / (1.0 + c);
+    const auto z = std::polar(1.0, -omega);
+    return -std::arg((c + z) / (1.0 + c * z)) / omega;
+}
+
+struct PeakingCoefficients {
+    double b0 {}, b1 {}, b2 {}, a1 {}, a2 {};
+};
+
+// RBJ's peaking filter (the reference's peaking()).
+PeakingCoefficients peaking(const double hz, const double q, const double gainDb, const double rate) noexcept
+{
+    const auto amplitude = std::pow(10.0, gainDb / 40.0);
+    const auto omega = twoPi * std::min(hz, 0.45 * rate) / rate;
+    const auto alpha = std::sin(omega) / (2.0 * std::max(q, 0.1));
+    const auto a0 = 1.0 + alpha / amplitude;
+    PeakingCoefficients c;
+    c.b0 = (1.0 + alpha * amplitude) / a0;
+    c.b1 = -2.0 * std::cos(omega) / a0;
+    c.b2 = (1.0 - alpha * amplitude) / a0;
+    c.a1 = -2.0 * std::cos(omega) / a0;
+    c.a2 = (1.0 - alpha / amplitude) / a0;
+    return c;
+}
+
+double biquadDelay(const PeakingCoefficients& c, double omega) noexcept
+{
+    omega = std::max(omega, 1.0e-4);
+    const auto z = std::polar(1.0, -omega);
+    return -std::arg((c.b0 + c.b1 * z + c.b2 * z * z) / (1.0 + c.a1 * z + c.a2 * z * z)) / omega;
+}
+
 } // namespace
+
+double SoundModelString::bodyAt(const double hz) const noexcept
+{
+    const auto bands = bodyDb.size();
+    if (bands == 0 || bodyEdges.size() != bands + 1)
+        return 0.0;
+    const auto at = std::log(std::max(hz, 1.0));
+    const auto centre = [this](const std::size_t band) {
+        return 0.5 * (std::log(static_cast<double>(bodyEdges[band])) + std::log(static_cast<double>(bodyEdges[band + 1])));
+    };
+    if (at <= centre(0))
+        return static_cast<double>(bodyDb.front());
+    for (std::size_t band = 0; band + 1 < bands; ++band) {
+        const auto low = centre(band);
+        const auto high = centre(band + 1);
+        if (at <= high)
+            return static_cast<double>(bodyDb[band]) + (static_cast<double>(bodyDb[band + 1]) - static_cast<double>(bodyDb[band]))
+                                                           * (at - low) / (high - low);
+    }
+    return static_cast<double>(bodyDb.back());
+}
+
+void PluckedString::prepare(const double sampleRate)
+{
+    line_.assign(static_cast<std::size_t>(std::max(8.0, sampleRate) / lowestHz) + 8, 0.0);
+    running_ = false;
+}
+
+void PluckedString::start(const SoundModelString& string, double frequency, const double rate, const double speed,
+                          const double stiffness, const double* amplitudes, const double* phases, const int count) noexcept
+{
+    running_ = false;
+    if (line_.empty() || rate <= 0.0)
+        return;
+    // The reference's tune(): the loop lasts one period at the fundamental.
+    frequency = std::clamp(frequency, lowestHz, 0.4 * rate);
+    const auto period = rate / frequency;
+    const auto omega = twoPi * frequency / rate;
+    const auto c = std::clamp(static_cast<double>(string.dispersion) * stiffness, -0.95, 0.0);
+    stages_ = c < 0.0 ? std::clamp(string.stages, 0, maximumStages) : 0;
+    dispersion_ = c;
+    pole_ = static_cast<double>(string.pole);
+    zero_ = static_cast<double>(string.zero);
+    second_ = string.order >= 2;
+    scale_ = (1.0 - pole_) / (1.0 - zero_);
+    const auto depth = std::max(0.05, speed);
+    cutCount_ = 0;
+    auto fixed = (second_ ? 2.0 : 1.0) * lossDelay(pole_, zero_, omega) + stages_ * allpassDelay(c, omega);
+    for (const auto& dip : string.dips) {
+        if (cutCount_ >= maximumDips || static_cast<double>(dip.hz) >= 0.45 * rate)
+            continue;
+        const auto coefficients = peaking(static_cast<double>(dip.hz), static_cast<double>(dip.q), static_cast<double>(dip.db) * depth, rate);
+        auto& cut = cuts_[static_cast<std::size_t>(cutCount_++)];
+        cut = {};
+        cut.b0 = coefficients.b0;
+        cut.b1 = coefficients.b1;
+        cut.b2 = coefficients.b2;
+        cut.a1 = coefficients.a1;
+        cut.a2 = coefficients.a2;
+        fixed += biquadDelay(coefficients, omega);
+    }
+    const auto rest = period - fixed;
+    length_ = std::clamp(static_cast<int>(std::floor(rest - 0.1)), 2, static_cast<int>(line_.size()));
+    const auto wanted = rest - length_;
+    auto d = wanted;
+    for (auto iteration = 0; iteration < 3; ++iteration) {
+        const auto eta = (1.0 - d) / (1.0 + d);
+        d += wanted - allpassDelay(eta, omega);
+        d = std::clamp(d, 0.05, 1.95);
+    }
+    eta_ = (1.0 - d) / (1.0 + d);
+    gain_ = std::min(0.999999, std::pow(static_cast<double>(string.gain), depth));
+    // One period of the harmonics: what comes out first.
+    std::fill(line_.begin(), line_.begin() + length_, 0.0);
+    for (int k = 0; k < count; ++k) {
+        const auto amplitude = amplitudes[k];
+        if (amplitude <= 0.0)
+            continue;
+        const auto step = std::polar(1.0, twoPi * frequency * static_cast<double>(k + 1) / rate);
+        auto phasor = std::polar(1.0, phases[k]);
+        for (int n = 0; n < length_; ++n) {
+            line_[static_cast<std::size_t>(n)] += amplitude * phasor.imag();
+            phasor *= step;
+        }
+    }
+    position_ = 0;
+    lowpass_ = lowpass2_ = input1_ = input2_ = 0.0;
+    stageIn_.fill(0.0);
+    stageOut_.fill(0.0);
+    fractionIn_ = fractionOut_ = 0.0;
+    running_ = true;
+}
+
+double PluckedString::next() noexcept
+{
+    if (!running_)
+        return 0.0;
+    const auto x = line_[static_cast<std::size_t>(position_)];
+    lowpass_ = scale_ * (x - zero_ * input1_) + pole_ * lowpass_;
+    input1_ = x;
+    auto v = gain_ * lowpass_;
+    if (second_) {
+        lowpass2_ = scale_ * (lowpass_ - zero_ * input2_) + pole_ * lowpass2_;
+        input2_ = lowpass_;
+        v = gain_ * lowpass2_;
+    }
+    for (int index = 0; index < cutCount_; ++index) {
+        auto& cut = cuts_[static_cast<std::size_t>(index)];
+        const auto y = cut.b0 * v + cut.b1 * cut.x1 + cut.b2 * cut.x2 - cut.a1 * cut.y1 - cut.a2 * cut.y2;
+        cut.x2 = cut.x1;
+        cut.x1 = v;
+        cut.y2 = cut.y1;
+        cut.y1 = y;
+        v = y;
+    }
+    for (int stage = 0; stage < stages_; ++stage) {
+        const auto y = dispersion_ * v + stageIn_[static_cast<std::size_t>(stage)] - dispersion_ * stageOut_[static_cast<std::size_t>(stage)];
+        stageIn_[static_cast<std::size_t>(stage)] = v;
+        stageOut_[static_cast<std::size_t>(stage)] = y;
+        v = y;
+    }
+    const auto y = eta_ * v + fractionIn_ - eta_ * fractionOut_;
+    fractionIn_ = v;
+    fractionOut_ = y;
+    line_[static_cast<std::size_t>(position_)] = y;
+    if (++position_ >= length_)
+        position_ = 0;
+    return x;
+}
 
 SoundModelZoneChoice chooseSoundModelZones(const SoundModel& model, const double midiNote, const double velocity) noexcept
 {
@@ -156,12 +335,17 @@ void SoundModelVoice::prepare(const double sampleRate)
     binPsdRight_.assign(count / 2 + 1, 0.0f);
     binCoherence_.assign(count / 2 + 1, 0.0f);
     binWeight_.assign(count / 2 + 1, 0.0f);
+    string_.prepare(sampleRate);
     reset();
 }
 
 void SoundModelVoice::reset() noexcept
 {
     active_ = false;
+    stringLane_ = -1;
+    stringGain_ = 0.0;
+    stringLeft_ = stringRight_ = 1.0;
+    string_.reset();
     releaseRequested_ = false;
     lanes_ = {};
     laneCount_ = 0;
@@ -215,7 +399,8 @@ double SoundModelVoice::lanePositionAhead(const SoundModel& model, const SoundMo
         const auto& headZone = model.zones[static_cast<std::size_t>(lanes_[static_cast<std::size_t>(headLane_)].zone)];
         const auto head = headPosition_ + headStep_ * ahead;
         if (head < static_cast<double>(headZone.headLength()))
-            return std::clamp(head / static_cast<double>(headZone.headRate) / static_cast<double>(zone.frameSeconds), 0.0, last);
+            return std::clamp(head / static_cast<double>(headZone.headRate) / static_cast<double>(zone.frameSeconds) + lane.offset, 0.0,
+                              last);
     }
     const auto step = speed / (static_cast<double>(zone.frameSeconds) * rate);
     return std::clamp(lane.position + step * lane.direction * ahead, 0.0, last);
@@ -250,6 +435,17 @@ void SoundModelVoice::start(const SoundModel& model, const SoundModelValues& val
     partialCount_ = std::clamp(partials, 0, maximumPartials);
     // The heaviest zone's head, resampled by the pitch as the transient is.
     const auto& headZone = model.zones[static_cast<std::size_t>(lanes_[static_cast<std::size_t>(heaviest)].zone)];
+    // Each lane's frames start where its attack meets the heaviest's (the
+    // head's when it has one).
+    for (int index = 0; index < laneCount_; ++index) {
+        auto& lane = lanes_[static_cast<std::size_t>(index)];
+        const auto& zone = model.zones[static_cast<std::size_t>(lane.zone)];
+        lane.offset = static_cast<double>(zone.onset - headZone.onset) / static_cast<double>(zone.frameSeconds);
+        lane.position = lane.offset;
+    }
+    // A string in place of the partials: the heaviest zone's.
+    if (headZone.string.present())
+        stringLane_ = heaviest;
     if (headZone.hasHead()) {
         headLane_ = heaviest;
         const auto ratio = headZone.f0 > 0.0f ? frequency_ / static_cast<double>(headZone.f0) : 1.0;
@@ -330,6 +526,12 @@ void SoundModelVoice::partialTargets(const SoundModel& model, const SoundModelVa
     std::array<double, maximumPartials> sumRight {};
     std::array<double, maximumPartials> rotationRe {};
     std::array<double, maximumPartials> rotationIm {};
+    // A zone with free ratios (a bar, a bell): each partial's multiple of
+    // the note's frequency, blended among the zones that have that partial
+    // (synth.py's partial_multipliers).
+    std::array<double, maximumPartials> multiplier {};
+    std::array<double, maximumPartials> multiplierWeight {};
+    auto freeRatios = false;
     auto cents = 0.0;
     auto stretch = 0.0;
     for (int laneIndex = 0; laneIndex < laneCount_; ++laneIndex) {
@@ -338,6 +540,20 @@ void SoundModelVoice::partialTargets(const SoundModel& model, const SoundModelVa
         const auto span = zone.rowAt(lane.position);
         cents += lane.weight * static_cast<double>(curveAt(zone.pitchCents, span)) * pitchCurve;
         stretch += lane.weight * static_cast<double>(zone.inharmonicity) * inharmonicityScale;
+        freeRatios = freeRatios || !zone.ratios.empty();
+        for (int index = 0; index < partialCount_; ++index) {
+            const auto k = static_cast<double>(index + 1);
+            const auto at = static_cast<std::size_t>(index);
+            if (!zone.ratios.empty()) {
+                if (at >= zone.ratios.size())
+                    continue;
+                multiplier[at] += lane.weight * (k + (static_cast<double>(zone.ratios[at]) - k) * inharmonicityScale);
+            } else {
+                multiplier[at] += lane.weight * k
+                                  * std::sqrt(1.0 + static_cast<double>(zone.inharmonicity) * inharmonicityScale * k * k);
+            }
+            multiplierWeight[at] += lane.weight;
+        }
         const auto ratio = zone.f0 > 0.0f ? frequency_ / static_cast<double>(zone.f0) : 1.0;
         const auto dv = velocity_ - static_cast<double>(zone.velocity);
         const auto tilt = static_cast<double>(soundModelValue(values, SoundModelSetting::brightness))
@@ -354,7 +570,7 @@ void SoundModelVoice::partialTargets(const SoundModel& model, const SoundModelVa
         for (int index = 0; index < partialCount_; ++index) {
             const auto k = static_cast<double>(index + 1);
             auto amplitude = amplitudeOf(index + 1);
-            if (formant > 0.0) {
+            if (formant > 0.0 && zone.ratios.empty()) {
                 // The same frequency in the recorded spectrum: harmonic k * ratio.
                 const auto source = k * ratio;
                 const auto lower = static_cast<int>(std::floor(source));
@@ -380,7 +596,11 @@ void SoundModelVoice::partialTargets(const SoundModel& model, const SoundModelVa
     const auto base = frequency_ * pitchRatio_ * std::pow(2.0, cents / 1'200.0);
     for (int index = 0; index < partialCount_; ++index) {
         const auto k = static_cast<double>(index + 1);
-        const auto frequency = base * k * std::sqrt(1.0 + stretch * k * k);
+        const auto at = static_cast<std::size_t>(index);
+        const auto multiple = !freeRatios                   ? k * std::sqrt(1.0 + stretch * k * k)
+                              : multiplierWeight[at] > 0.0 ? multiplier[at] / multiplierWeight[at]
+                                                           : k;
+        const auto frequency = base * multiple;
         const auto audible = std::clamp((0.45 * rate - frequency) / (0.05 * rate), 0.0, 1.0);
         left[index] = static_cast<float>(sumLeft[static_cast<std::size_t>(index)] * audible);
         right[index] = static_cast<float>(sumRight[static_cast<std::size_t>(index)] * audible);
@@ -407,11 +627,72 @@ void SoundModelVoice::snapToHead(const SoundModel& model, const SoundModelValues
     const auto inharmonicity = static_cast<double>(zone.inharmonicity);
     for (int index = 0; index < count; ++index) {
         const auto k = static_cast<double>(index + 1);
-        const auto frequency = k * static_cast<double>(zone.f0) * std::sqrt(1.0 + inharmonicity * k * k)
-                               * std::pow(2.0, cents / 1'200.0);
+        const auto multiple = static_cast<std::size_t>(index) < zone.ratios.size()
+                                  ? static_cast<double>(zone.ratios[static_cast<std::size_t>(index)])
+                                  : k * std::sqrt(1.0 + inharmonicity * k * k);
+        const auto frequency = multiple * static_cast<double>(zone.f0) * std::pow(2.0, cents / 1'200.0);
         const auto phase = static_cast<double>(zone.headPhase[static_cast<std::size_t>(index)]) + twoPi * frequency * since;
         cos_[static_cast<std::size_t>(index)] = std::cos(phase);
         sin_[static_cast<std::size_t>(index)] = std::sin(phase);
+    }
+}
+
+void SoundModelVoice::startString(const SoundModel& model, const SoundModelValues& values, const double rate, const double headAt) noexcept
+{
+    const auto& lane = lanes_[static_cast<std::size_t>(stringLane_)];
+    const auto& zone = model.zones[static_cast<std::size_t>(lane.zone)];
+    const auto& string = zone.string;
+    const auto count = std::min(static_cast<int>(string.excitationDb.size()), maximumPartials);
+    const auto frequency = frequency_ * pitchRatio_;
+    const auto dv = velocity_ - static_cast<double>(zone.velocity);
+    const auto tilt = static_cast<double>(soundModelValue(values, SoundModelSetting::brightness))
+                      + static_cast<double>(soundModelValue(values, SoundModelSetting::velocityBrightness)) * dv;
+    std::array<double, maximumPartials> amplitudes {};
+    std::array<double, maximumPartials> phases {};
+    for (int index = 0; index < count; ++index) {
+        const auto k = static_cast<double>(index + 1);
+        const auto level = static_cast<double>(string.excitationDb[static_cast<std::size_t>(index)]) + string.bodyAt(k * frequency)
+                           + tilt * std::log2(k);
+        amplitudes[static_cast<std::size_t>(index)]
+            = k * frequency >= 0.45 * rate || string.excitationDb[static_cast<std::size_t>(index)] <= -190.0f ? 0.0
+                                                                                                                : std::pow(10.0, level / 20.0);
+        phases[static_cast<std::size_t>(index)] = twoPi * std::fmod(k * golden, 1.0);
+    }
+    if (headLane_ >= 0) {
+        // The recording's phases where the head gives way (snapToHead's).
+        const auto& head = model.zones[static_cast<std::size_t>(lanes_[static_cast<std::size_t>(headLane_)].zone)];
+        const auto fadeStart = static_cast<double>(head.headLength()) - static_cast<double>(std::max(1, head.headFade));
+        const auto since = (headAt - fadeStart) / static_cast<double>(head.headRate);
+        const auto frame = headAt / static_cast<double>(head.headRate) / static_cast<double>(head.frameSeconds);
+        const auto cents = static_cast<double>(curveAt(head.pitchCents, head.rowAt(frame)));
+        const auto own = std::min(count, static_cast<int>(head.headPhase.size()));
+        for (int index = 0; index < own; ++index) {
+            const auto k = static_cast<double>(index + 1);
+            const auto recorded = k * std::sqrt(1.0 + static_cast<double>(head.inharmonicity) * k * k) * static_cast<double>(head.f0)
+                                  * std::pow(2.0, cents / 1'200.0);
+            phases[static_cast<std::size_t>(index)] = static_cast<double>(head.headPhase[static_cast<std::size_t>(index)]) + twoPi * recorded * since;
+        }
+    }
+    string_.start(string, frequency, rate, static_cast<double>(soundModelValue(values, SoundModelSetting::speed)),
+                  static_cast<double>(soundModelValue(values, SoundModelSetting::inharmonicity)), amplitudes.data(), phases.data(), count);
+    stringGain_ = 0.0;
+    // In stereo: the partials' balance where it starts, weighted by their level.
+    stringLeft_ = stringRight_ = 1.0;
+    if (zone.stereo() && !zone.partialLeft.empty()) {
+        const auto span = zone.stereoRowAt(static_cast<double>(std::max(0, string.start)));
+        auto left = 0.0;
+        auto right = 0.0;
+        auto weight = 0.0;
+        for (int index = 0; index < std::min(count, zone.harmonicCount); ++index) {
+            const auto power = std::pow(10.0, std::min(0.0, static_cast<double>(string.excitationDb[static_cast<std::size_t>(index)])) / 10.0);
+            left += power * static_cast<double>(SoundModelZone::cell(zone.partialLeft, zone.harmonicCount, span, index));
+            right += power * static_cast<double>(SoundModelZone::cell(zone.partialRight, zone.harmonicCount, span, index));
+            weight += power;
+        }
+        if (weight > 0.0) {
+            stringLeft_ = left / weight;
+            stringRight_ = right / weight;
+        }
     }
 }
 
@@ -583,7 +864,9 @@ void SoundModelVoice::renderBlock(const SoundModel& model, const SoundModelValue
             lane.fade *= lane.fadeRate;
             const auto head = headStart + headStep_ * static_cast<double>(index + 1);
             if (headPlaying && !lane.released && head < headLength) {
-                lane.position = std::min(head / static_cast<double>(headZone->headRate) / static_cast<double>(zone.frameSeconds), last);
+                lane.position = std::min(head / static_cast<double>(headZone->headRate) / static_cast<double>(zone.frameSeconds)
+                                             + lane.offset,
+                                         last);
                 continue;
             }
             auto p = lane.position + step * lane.direction;
@@ -636,7 +919,29 @@ void SoundModelVoice::renderBlock(const SoundModel& model, const SoundModelValue
     // lanes' blend at this block's end (the model's share of it under the
     // head); the right turned by the zones' phase offsets.
     const auto harmonicsMix = static_cast<float>(soundModelValue(values, SoundModelSetting::harmonics));
-    if (partialCount_ > 0) {
+    if (stringLane_ >= 0) {
+        // The string in their place: started where the partials would take
+        // over (this block, under a head, the recording's phases there; the
+        // first block without), its level ramped to the lanes' at the
+        // block's end (the model's share under the head).
+        if (!string_.running() && (headLane_ < 0 || (headPlaying && headSnapped_)))
+            startString(model, values, rate, headStart);
+        auto total = 0.0;
+        for (int laneIndex = 0; laneIndex < laneCount_; ++laneIndex) {
+            const auto& lane = lanes_[static_cast<std::size_t>(laneIndex)];
+            total += laneLevel(model.zones[static_cast<std::size_t>(lane.zone)], lane, values);
+        }
+        const auto target = static_cast<double>(harmonicsMix) * total * lanes_[static_cast<std::size_t>(stringLane_)].fade
+                            * modelShare(model, headPosition_);
+        const auto from = stringGain_;
+        for (int index = 0; index < controlBlock && string_.running(); ++index) {
+            const auto gain = from + (target - from) * static_cast<double>(index) / controlBlock;
+            const auto value = string_.next() * gain;
+            blockLeft_[static_cast<std::size_t>(index)] += static_cast<float>(value * stringLeft_);
+            blockRight_[static_cast<std::size_t>(index)] += static_cast<float>(value * stringRight_);
+        }
+        stringGain_ = string_.running() ? target : 0.0;
+    } else if (partialCount_ > 0) {
         std::array<float, maximumPartials> targetsLeft {};
         std::array<float, maximumPartials> targetsRight {};
         std::array<double, maximumPartials> increments {};

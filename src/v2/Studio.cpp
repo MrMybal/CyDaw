@@ -22,6 +22,10 @@
 #include <cydaw/engine/DrumKit.h>
 #include <cydaw/engine/ChannelLayout.h>
 #include <cydaw/engine/SynthFamily.h>
+#include <cydaw/engine/SynthMatch.h>
+
+#include <mutex>
+#include <thread>
 
 #include <algorithm>
 #include <cstring>
@@ -89,6 +93,19 @@ juce::Result reverseEvents(std::vector<app::AudioTrackController::AudioEvent>& e
 } // namespace
 
 // ---- Studio -----------------------------------------------------------------------
+
+// The synth patch being searched for (matchSynth), on a thread of its own.
+struct Studio::SynthSearch {
+    std::thread thread;
+    std::atomic<bool> cancel { false };
+    std::atomic<bool> done { false };
+    std::atomic<double> progress { 0.0 };
+    std::mutex mutex;
+    juce::String message;
+    engine::synth_match::Result result;
+    engine::synth::Model model { engine::synth::Model::opale };
+    juce::String name;
+};
 
 Studio::Studio(const bool auxiliary) : auxiliary_(auxiliary)
 {
@@ -206,6 +223,11 @@ struct Studio::Opening {
 
 Studio::~Studio()
 {
+    if (synthSearch_ != nullptr) {
+        synthSearch_->cancel = true;
+        if (synthSearch_->thread.joinable())
+            synthSearch_->thread.join();
+    }
     alive_.reset();
     background_.removeAllJobs(true, 10'000);
     semantic_.reset();
@@ -3646,7 +3668,8 @@ juce::File Studio::soundModelFolder()
     return locations::folder(Location::soundModels);
 }
 
-juce::Result Studio::recreateSound(const juce::Array<juce::File>& files, const juce::String& name, const bool refine)
+juce::Result Studio::recreateSound(const juce::Array<juce::File>& files, const juce::String& name, const bool refine,
+                                   const juce::StringArray& options)
 {
     if (soundMatching_.running)
         return juce::Result::fail(ui::Ls("Une analyse est déjà en cours", "An analysis is already running"));
@@ -3669,6 +3692,7 @@ juce::Result Studio::recreateSound(const juce::Array<juce::File>& files, const j
     arguments.addArray({ "--out", pendingModel_.getFullPathName(), "--name", title });
     if (refine)
         arguments.add("--refine");
+    arguments.addArray(options);
     if (!companion_.start(arguments))
         return juce::Result::fail(ui::Ls("Le compagnon est occupé", "The companion is busy"));
     soundMatching_ = {};
@@ -3679,7 +3703,125 @@ juce::Result Studio::recreateSound(const juce::Array<juce::File>& files, const j
 
 void Studio::cancelSoundMatching()
 {
+    if (synthSearch_ != nullptr) {
+        synthSearch_->cancel = true;
+        return;
+    }
     companion_.cancel();
+}
+
+// ---- A synth patch for a recorded note ----
+
+juce::Result Studio::matchSynth(const juce::File& file, const juce::String& synth, const int note, const int evaluations)
+{
+    namespace synths = engine::synth;
+    namespace match = engine::synth_match;
+    if (soundMatching_.running)
+        return juce::Result::fail(ui::Ls("Une analyse est déjà en cours", "An analysis is already running"));
+    juce::AudioFormatManager formats;
+    formats.registerBasicFormats();
+    std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
+    if (reader == nullptr || reader->sampleRate <= 0.0 || reader->lengthInSamples <= 0)
+        return juce::Result::fail(ui::Ls("Fichier audio illisible : ", "Unreadable audio file: ") + file.getFileName());
+    const auto length = static_cast<int>(std::min<juce::int64>(reader->lengthInSamples, static_cast<juce::int64>(reader->sampleRate * 6.0)));
+    juce::AudioBuffer<float> buffer(static_cast<int>(std::max(1u, reader->numChannels)), length);
+    reader->read(&buffer, 0, length, 0, true, true);
+    std::vector<float> mono(static_cast<std::size_t>(length), 0.0f);
+    for (int channel = 0; channel < buffer.getNumChannels(); ++channel)
+        for (int index = 0; index < length; ++index)
+            mono[static_cast<std::size_t>(index)] += buffer.getSample(channel, index) / static_cast<float>(buffer.getNumChannels());
+    auto target = match::prepareTarget(mono, reader->sampleRate, note);
+    if (target.samples.size() < 4'096)
+        return juce::Result::fail(ui::Ls("Le son est trop court ou silencieux", "The sound is too short or silent"));
+    std::vector<synths::Model> models;
+    if (synth.equalsIgnoreCase("opale") || synth.equalsIgnoreCase("auto"))
+        models.push_back(synths::Model::opale);
+    if (synth.equalsIgnoreCase("quartz") || synth.equalsIgnoreCase("auto"))
+        models.push_back(synths::Model::quartz);
+    if (models.empty())
+        return juce::Result::fail("synth is opale, quartz or auto");
+    if (synthSearch_ != nullptr && synthSearch_->thread.joinable())
+        synthSearch_->thread.join();
+    synthSearch_ = std::make_unique<SynthSearch>();
+    synthSearch_->name = file.getFileNameWithoutExtension();
+    soundMatching_ = {};
+    soundMatching_.running = true;
+    soundMatching_.message = ui::Ls("Recherche d'un patch pour ", "Searching a patch for ") + synthSearch_->name;
+    auto* search = synthSearch_.get();
+    const auto budget = std::max(200, evaluations);
+    search->thread = std::thread([search, target = std::move(target), models, budget] {
+        auto best = match::Result {};
+        auto bestModel = models.front();
+        auto first = true;
+        for (std::size_t index = 0; index < models.size() && !search->cancel.load(); ++index) {
+            match::Options options;
+            options.model = models[index];
+            options.evaluations = budget;
+            options.cancel = &search->cancel;
+            const auto modelName = juce::String(synths::info(models[index]).english);
+            options.progress = [search, index, count = models.size(), modelName](const double done, const double loss) {
+                search->progress = (static_cast<double>(index) + std::clamp(done, 0.0, 1.0)) / static_cast<double>(count);
+                const std::lock_guard lock(search->mutex);
+                search->message = modelName + ui::Ls(" : écart ", ": distance ") + juce::String(loss, 3);
+                return !search->cancel.load();
+            };
+            const auto found = match::match(target, options);
+            if (!found.settings.empty() && (first || found.loss < best.loss)) {
+                best = found;
+                bestModel = models[index];
+                first = false;
+            }
+        }
+        {
+            const std::lock_guard lock(search->mutex);
+            search->result = best;
+            search->model = bestModel;
+        }
+        search->done = true;
+    });
+    return juce::Result::ok();
+}
+
+void Studio::finishSynthSearch()
+{
+    namespace synths = engine::synth;
+    auto search = std::move(synthSearch_);
+    if (search->thread.joinable())
+        search->thread.join();
+    soundMatching_.running = false;
+    soundMatching_.progress = 1.0;
+    if (search->cancel.load()) {
+        soundMatching_.error = ui::Ls("Recherche annulée", "Search cancelled");
+        return;
+    }
+    const auto& result = search->result;
+    if (result.settings.empty()) {
+        soundMatching_.error = ui::Ls("Aucun patch trouvé", "No patch found");
+        return;
+    }
+    const auto instrument = juce::String(synths::info(search->model).instrument);
+    const auto track = addMidiTrack(search->name, instrument);
+    if (!track) {
+        soundMatching_.error = ui::Ls("La piste n'a pas pu être créée", "The track could not be made");
+        return;
+    }
+    (void) setSynthSettings(*track, result.settings);
+    (void) publishGraph(*track, true);
+    // The level that matched, on its fader.
+    auto mix = trackMix(*track);
+    mix.gainDb = static_cast<float>(std::clamp(result.gainDb, -24.0, 12.0));
+    setTrackMix(*track, mix);
+    soundMatching_.track = track;
+    soundMatching_.description = search->name + " (" + juce::String(synths::info(search->model).english) + ")";
+    auto* report = new juce::DynamicObject();
+    report->setProperty("synth", juce::String(synths::info(search->model).english));
+    report->setProperty("loss", result.loss);
+    report->setProperty("gainDb", result.gainDb);
+    report->setProperty("evaluations", result.evaluations);
+    juce::Array<juce::var> zones;
+    zones.add(juce::var(report));
+    soundMatching_.zones = zones;
+    dirty_ = true;
 }
 
 void Studio::applySoundMatching(const Companion::Status& finished)
@@ -4442,8 +4584,42 @@ Studio::LocationMove Studio::locationMove() const
 
 void Studio::cancelLocationMove()
 {
+    pendingLocations_.clear();
     if (locationMove_ != nullptr)
         locationMove_->cancel();
+}
+
+bool Studio::setAllLocations(const juce::File& root, const bool creations, const bool takeContent, juce::String& error)
+{
+    if (locationMove_ != nullptr || !pendingLocations_.empty()) {
+        error = ui::Ls("Un déplacement est déjà en cours", "A move is already running");
+        return false;
+    }
+    if (root == juce::File {} || root.createDirectory().failed()) {
+        error = ui::Ls("Impossible de créer ", "Cannot make ") + root.getFullPathName();
+        return false;
+    }
+    for (const auto location : allLocations)
+        if (locations::downloaded(location) || creations)
+            if (const auto target = locations::inside(location, root); target != locations::folder(location))
+                pendingLocations_.emplace_back(location, target);
+    pendingTake_ = takeContent;
+    nextLocation();
+    return true;
+}
+
+// The next location of setAllLocations, once no move runs; one refused ends them.
+void Studio::nextLocation()
+{
+    while (locationMove_ == nullptr && !pendingLocations_.empty()) {
+        const auto [location, folder] = pendingLocations_.front();
+        pendingLocations_.erase(pendingLocations_.begin());
+        juce::String error;
+        if (!setLocation(location, folder, pendingTake_, error)) {
+            notices_.emplace_back(ui::Ls("Emplacement non changé : ", "Location not changed: ") + error, true);
+            pendingLocations_.clear();
+        }
+    }
 }
 
 std::vector<std::pair<juce::String, bool>> Studio::takeNotices()
@@ -6160,14 +6336,17 @@ void Studio::tick()
             locationMove_.reset();
             if (progress.error.isNotEmpty()) {
                 notices_.emplace_back(ui::Ls("Déplacement impossible : ", "Could not move: ") + progress.error, true);
+                pendingLocations_.clear();
             } else if (progress.cancelled) {
                 notices_.emplace_back(ui::Ls("Déplacement annulé : rien n'a changé", "Move cancelled: nothing changed"), false);
+                pendingLocations_.clear();
             } else {
                 locations::set(location, to);
                 applyLocations();
                 notices_.emplace_back(ui::Ls("Déplacé dans ", "Moved to ") + to.getFullPathName(), false);
             }
         }
+    nextLocation();
     // Downloads ended: the samplers that play their banks load again.
     for (const auto& done : banks_.takeFinished()) {
         reloadSamplers(done.banks);
@@ -6195,6 +6374,17 @@ void Studio::tick()
             flushVirtualIo();
             virtualIoChangedAt_ = 0.0;
         }
+    }
+    // A synth patch search: how far, and its end.
+    if (synthSearch_ != nullptr) {
+        soundMatching_.progress = synthSearch_->progress.load();
+        {
+            const std::lock_guard lock(synthSearch_->mutex);
+            if (synthSearch_->message.isNotEmpty())
+                soundMatching_.message = synthSearch_->message;
+        }
+        if (synthSearch_->done.load())
+            finishSynthSearch();
     }
     if (soundMatching_.running && companion_.status().command == "analyse") {
         const auto status = companion_.status();

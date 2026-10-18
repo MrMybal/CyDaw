@@ -159,6 +159,7 @@ add_library(cydaw_core STATIC
     src/engine/DrumSynth.cpp
     src/engine/WavetableShape.cpp
     src/engine/SoundModel.cpp
+    src/engine/SynthMatch.cpp
     src/engine/PrismSynth.cpp
     src/engine/SynthFamily.cpp
     src/engine/AmbreSynth.cpp

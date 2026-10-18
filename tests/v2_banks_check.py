@@ -241,6 +241,28 @@ def main() -> int:
             folders = {item["key"]: item["folder"] for item in need({"cmd": "locations"}, "locations")["locations"]}
             check(Path(folders["soundModels"]) == models_a and (models_b / "Kept.cysound").exists(),
                   "changed without moving, the model stays")
+
+            # Everything CyDAW downloads and installs in one folder: each in its own
+            # there, moved one after the other; what the person makes stays.
+            together = scratch / "Together"
+            need({"cmd": "locations", "all": str(together), "take": True}, "all in one folder")
+
+            def settled() -> bool:
+                move = need({"cmd": "locations"}, "locations")["move"]
+                return not move["active"] and move.get("pending", 0) == 0
+
+            check(wait_for(settled, 60.0), "the moves end, one after the other")
+            listed = need({"cmd": "locations"}, "locations")
+            folders = {item["key"]: item["folder"] for item in listed["locations"]}
+            inside = {"banks": "Banks", "downloads": "Downloads", "cache": "Cache", "companion": "companion", "aiModels": "Models"}
+            check(all(Path(folders[key]) == together / name for key, name in inside.items()),
+                  "banks, downloads, cache, companion and models are in the one folder")
+            check((together / "Banks" / "test-bank" / "bank.json").exists() and not (banks / "test-bank").exists(),
+                  "the bank went along")
+            check(Path(listed["sampleCache"]) == together / "Cache" / "samples", "the sample index followed the cache")
+            check(Path(folders["soundModels"]) == models_a, "what the person makes stayed where it was")
+            saved = json.loads(locations.read_text(encoding="utf-8"))["folders"]
+            check(all(Path(saved.get(key, "")) == together / name for key, name in inside.items()), "the choices are saved")
         finally:
             close(process)
             server.shutdown()

@@ -176,9 +176,16 @@ struct Filter {
     }
 };
 
+// While set, the seeds of the voices this thread makes, in turn from this
+// one: a patch search (SynthMatch) hears every candidate with the same
+// phases and the same noise, two hearings of one candidate alike.
+inline thread_local std::uint32_t* fixedSeeds = nullptr;
+
 // A seed for each voice made: their drifts and phases apart.
 inline std::uint32_t nextSeed() noexcept
 {
+    if (fixedSeeds != nullptr)
+        return *fixedSeeds += 0x9e3779b9u;
     static std::atomic<std::uint32_t> counter { 0x1f3a5c79u };
     return counter.fetch_add(0x9e3779b9u, std::memory_order_relaxed);
 }

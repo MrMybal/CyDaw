@@ -106,6 +106,23 @@ void LocationsView::choose(const Location location)
                           });
 }
 
+void LocationsView::chooseRoot()
+{
+    chooser_ = std::make_unique<juce::FileChooser>(ui::Ls("Le dossier de CyDAW", "CyDAW's folder"),
+                                                   locations::folder(Location::banks).getParentDirectory());
+    chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
+                          [this](const juce::FileChooser& chooser) {
+                              const auto folder = chooser.getResult();
+                              if (folder == juce::File {})
+                                  return;
+                              juce::String error;
+                              if (!studio_.setAllLocations(folder, withCreations_, takeContent_, error))
+                                  report(error, true);
+                              else
+                                  report(ui::Ls("Tout va dans ", "Everything goes to ") + folder.getFullPathName(), false);
+                          });
+}
+
 void LocationsView::draw()
 {
     if (state_.openLocations) {
@@ -130,6 +147,22 @@ void LocationsView::draw()
 
     const auto move = studio_.locationMove();
     const auto downloading = studio_.banks().busy();
+    ImGui::BeginDisabled(move.active || studio_.pendingLocations() > 0 || downloading);
+    // One folder for everything CyDAW downloads, builds and installs.
+    if (ImGui::Button(L("Tout dans un dossier…", "All in one folder…")))
+        chooseRoot();
+    ui::tooltip(L("Banques, téléchargements, cache, compagnon Python et modèles IA dans un même dossier (chacun dans son "
+                  "sous-dossier : Banks, Downloads, Cache, companion, Models), déplacés l'un après l'autre.",
+                  "Banks, downloads, cache, Python companion and AI models in one folder (each in its own: Banks, "
+                  "Downloads, Cache, companion, Models), moved one after the other."));
+    ImGui::SameLine();
+    ImGui::Checkbox(L("avec mes créations", "with what I make"), &withCreations_);
+    ui::tooltip(L("Aussi les modèles de son faits ici, Mes périphériques, les préréglages, les exports de plug-ins, les "
+                  "mixes DJ et la Fonderie (sinon ils restent dans Documents).",
+                  "Also the sound models made here, My devices, the presets, the plug-in exports, the DJ mixes and the "
+                  "Foundry (otherwise they stay in Documents)."));
+    ImGui::EndDisabled();
+    ImGui::Spacing();
     ImGui::BeginDisabled(move.active);
     if (ImGui::BeginTable("##locationTable", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_PadOuterX)) {
         ImGui::TableSetupColumn("what", ImGuiTableColumnFlags_WidthFixed, dp(250.0f));
@@ -187,9 +220,10 @@ void LocationsView::draw()
 
     if (move.active) {
         ImGui::Spacing();
-        ImGui::TextUnformatted((ui::Ls("Déplacement : ", "Moving: ") + nameOf(move.location) + " \xe2\x86\x92 "
-                                + move.to.getFullPathName())
-                                   .toRawUTF8());
+        auto moving = ui::Ls("Déplacement : ", "Moving: ") + nameOf(move.location) + " \xe2\x86\x92 " + move.to.getFullPathName();
+        if (const auto pending = studio_.pendingLocations(); pending > 0)
+            moving << ui::Ls("  (encore ", "  (") << pending << ui::Ls(" après)", " more after)");
+        ImGui::TextUnformatted(moving.toRawUTF8());
         const auto fraction = move.progress.total > 0
                                   ? static_cast<float>(static_cast<double>(move.progress.done) / static_cast<double>(move.progress.total))
                                   : 0.0f;

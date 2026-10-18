@@ -50,6 +50,22 @@ def pluck(frequency: float, seconds: float) -> np.ndarray:
     return 0.5 * output / np.max(np.abs(output))
 
 
+# A church bell's partials (hum, prime, tierce, quint, nominal...) to its prime.
+BELL_RATIOS = (0.5, 1.0, 1.183, 1.506, 2.0, 2.514, 2.662, 3.011, 4.166, 5.433)
+
+
+def bell(frequency: float, seconds: float) -> np.ndarray:
+    """Struck partials that are no harmonics, each decaying at its own rate, and a clang."""
+    t = np.arange(int(seconds * RATE)) / RATE
+    output = np.zeros_like(t)
+    for index, ratio in enumerate(BELL_RATIOS):
+        amplitude = 1.0 / (1.0 + 0.3 * index)
+        decay = 2.5 / (1.0 + 0.5 * index)
+        output += amplitude * np.exp(-t / decay) * np.sin(2 * np.pi * ratio * frequency * t + rng.uniform(0, 2 * np.pi))
+    clang = one_pole_lowpass(rng.normal(0, 1, len(t)), 6000.0) * np.exp(-t / 0.004) * 0.4
+    return 0.3 * np.clip(t / 0.001, 0, 1) * (output + clang) / np.max(np.abs(output))
+
+
 def brass(frequency: float, seconds: float, held: float) -> np.ndarray:
     t = np.arange(int(seconds * RATE)) / RATE
     vibrato = 1.0 + 0.004 * np.sin(2 * np.pi * 5.5 * t) * np.clip((t - 0.5) / 0.3, 0, 1)

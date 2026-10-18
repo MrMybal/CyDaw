@@ -8,6 +8,7 @@
 #include <cydaw/engine/PolyVoiceFilter.h>
 #include <cydaw/engine/PolyVoiceOscillator.h>
 #include <cydaw/engine/SoundModel.h>
+#include <cydaw/engine/SynthMatch.h>
 #include <cydaw/engine/VoiceAssetsFile.h>
 #include <cydaw/control/Control.h>
 #include <cydaw/engine/PrismSynth.h>
@@ -1429,6 +1430,91 @@ void soundModelVoicePlaysItsPartials()
     }
     const auto blended = std::sqrt(energy / 24'000.0);
     expect(std::abs(blended - 1.5 * expected) < expected * 0.03, "two zones blend their partials by weight");
+}
+
+// A struck bar's partials (no harmonics) at their ratios, moved by the note
+// and back towards harmonics by the inharmonicity setting; two zones whose
+// attacks are apart meet at them.
+void soundModelPlaysFreeRatios()
+{
+    const auto rate = 48000.0;
+    cydaw::engine::SoundModel model;
+    auto zone = twoPartialZone(69, 440.0f, 0.5f, 0.5f);
+    zone.loopStart = zone.loopEnd = zone.release = -1;
+    zone.ratios = { 1.0f, 2.756f };
+    model.zones.push_back(zone);
+    auto values = cydaw::engine::defaultSoundModelValues();
+    const auto energyAt = [&](const double note, const double hz) {
+        cydaw::engine::SoundModelVoice voice;
+        voice.prepare(rate);
+        voice.start(model, values, note, 0.8, rate);
+        std::vector<double> samples;
+        for (auto sample = 0; sample < 24'000; ++sample)
+            samples.push_back(voice.nextSample(&model, values, rate));
+        // The level of one frequency over the second half (a single DFT bin).
+        double re = 0.0;
+        double im = 0.0;
+        for (std::size_t index = 12'000; index < 24'000; ++index) {
+            const auto phase = 2.0 * 3.141592653589793 * hz * static_cast<double>(index) / rate;
+            re += samples[index] * std::cos(phase);
+            im += samples[index] * std::sin(phase);
+        }
+        return 2.0 * std::hypot(re, im) / 12'000.0;
+    };
+    expect(energyAt(69.0, 440.0 * 2.756) > 0.2 && energyAt(69.0, 880.0) < 0.02,
+           "a struck bar's partial sits at its ratio, not on a harmonic");
+    expect(energyAt(81.0, 880.0 * 2.756) > 0.2, "its ratios move with the note");
+    values[static_cast<std::size_t>(cydaw::engine::SoundModelSetting::inharmonicity)] = 0.0f;
+    expect(energyAt(69.0, 880.0) > 0.2, "the inharmonicity setting at 0 brings them back to harmonics");
+}
+
+// A synth patch found for a note Opale played itself (a dark plucked bass):
+// the search comes close to it, and much closer than Opale's defaults.
+void synthMatchFindsAPatch()
+{
+    namespace synth = cydaw::engine::synth;
+    namespace match = cydaw::engine::synth_match;
+    const auto model = synth::Model::opale;
+    auto made = synth::defaultValues(model);
+    const auto set = [&](const char* key, const float value) {
+        const auto index = synth::parameterIndex(model, key);
+        expect(index >= 0, std::string("Opale has a setting ") + key);
+        if (index >= 0)
+            made[static_cast<std::size_t>(index)] = value;
+    };
+    set("drift", 0.0f);
+    set("f.cutoff", 600.0f);
+    set("f.resonance", 0.5f);
+    set("filter.env", 0.6f);
+    set("fenv.decay", 0.15f);
+    set("amp.decay", 0.4f);
+    set("amp.sustain", 0.0f);
+    match::Target target;
+    target.rate = 48'000.0;
+    target.note = 45;
+    target.velocity = 0.8f;
+    target.samples = match::render(model, made, target, 48'000);
+    const match::Comparison comparison(target);
+    const auto defaults = comparison.distance(match::render(model, synth::defaultValues(model), target, 48'000)).loss;
+    const auto itself = comparison.distance(match::render(model, made, target, 48'000)).loss;
+    match::Options options;
+    options.model = model;
+    options.evaluations = 1'600;
+    const auto found = match::match(target, options);
+    // Every hearing from the same seeds: a patch heard twice is heard alike.
+    expect(itself < 1.0e-6, "a patch heard twice sounds the same to the search (" + std::to_string(itself) + ")");
+    expect(found.evaluations > 300 && !found.settings.empty(), "the search hears its candidates");
+    // Another patch may sound alike (a static filter for a sweep): what
+    // counts is how close it sounds, not which settings it chose. Searches
+    // from other seeds end between 0.25 and 0.35 of the defaults' distance.
+    expect(found.loss < defaults * 0.45, "the patch found is far closer than the defaults (" + std::to_string(found.loss) + " against "
+                                             + std::to_string(defaults) + ")");
+    auto decay = 0.0f;
+    for (const auto& [key, value] : found.settings)
+        if (key == "amp.decay")
+            decay = value;
+    expect(decay > 0.3f && decay < 0.55f, "its envelope is the note's (decay " + std::to_string(decay) + " s against 0.4)");
+    expect(std::abs(found.gainDb) < 9.0, "the level found is near the note's (" + std::to_string(found.gainDb) + " dB)");
 }
 
 // The two channels of a model, its recorded head and its velocity layers.
@@ -4668,6 +4754,8 @@ int main()
     voiceFilterResonatesAsDrawn();
     polyVoiceShapesTheNoteAsItsCardsSay();
     soundModelVoicePlaysItsPartials();
+    soundModelPlaysFreeRatios();
+    synthMatchFindsAPatch();
     soundModelPlaysStereoHeadAndLayers();
     prismSynthPlays();
     samplerPlaysItsZones();

@@ -42,6 +42,19 @@ public:
     // The companion's own environment (a venv), made from the Options.
     [[nodiscard]] static juce::File environmentFolder();
 
+    // What it can install into its environment (components.json beside its
+    // package): each component's id, title, description, size, sources, the
+    // setup arguments, whether its licences ask to be accepted, and its
+    // packages with their licences, shown before anything is downloaded.
+    [[nodiscard]] static juce::var componentCatalogue();
+    [[nodiscard]] static juce::var component(const juce::String& id);
+    // Whether `info`'s answer says a component is there.
+    [[nodiscard]] static bool componentInstalled(const juce::String& id, const juce::var& info);
+    // Installs a component into its environment (setup), refused when its
+    // licences ask to be accepted and were not, or when one job runs. What
+    // was accepted, and when, is kept in <environment>/receipts/<id>.json.
+    bool install(const juce::String& id, bool licencesAccepted, juce::String& error);
+
     // Starts `python -m cydaw_companion <arguments>`; false when one runs.
     bool start(const juce::StringArray& arguments);
     void cancel();

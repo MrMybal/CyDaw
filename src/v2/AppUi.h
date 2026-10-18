@@ -83,7 +83,11 @@ public:
     void notify(const juce::String& message, bool error = false);
     // Sound matching: the notes to analyse, a model to load, and the result
     // followed from frame to frame.
-    void chooseSoundToRecreate();
+    // `kind`: "auto" (what the companion finds best), "string" (a plucked
+    // string), "partials" (the partials measured) or "synth" (a patch of
+    // Opale or Quartz, found by CyDAW itself).
+    void chooseSoundToRecreate(const juce::String& kind = "auto");
+    bool refineRecreated_ {};
     void chooseSoundModel();
     // The sampler: a new track from samples, from an SFZ; a factory instrument.
     void chooseSamplerFiles();
@@ -336,6 +340,8 @@ private:
     bool showCompanion_ {};
     juce::String nvidiaGpu_;
     bool companionInfoAsked_ {};
+    // The components whose licences were ticked as accepted (this opening only).
+    juce::StringArray companionAccepted_;
     char companionPython_[512] {};
     void drawShortcuts();
     void drawLayoutNamePrompt();
