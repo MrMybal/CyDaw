@@ -3,6 +3,7 @@
 #include "RoutingUi.h"
 
 #include "Icons.h"
+#include "MidiDevices.h"
 #include "Theme.h"
 #include "Widgets.h"
 
@@ -22,9 +23,15 @@ namespace {
 // A heading inside one of the two boxes.
 void heading(const char* text, const ImU32 colour)
 {
-    ImGui::PushFont(theme::boldFont(), ui::currentFontBase() * 1.05f);
+    ImGui::PushFont(theme::boldFont(), ui::currentFontBase() * 0.82f);
     ImGui::TextColored(theme::vec(colour), "%s", text);
     ImGui::PopFont();
+}
+
+// The width of the labels on the left of each line.
+float labelColumn()
+{
+    return dp(64.0f);
 }
 
 // A small dim line under a control.
@@ -56,26 +63,24 @@ void RoutingView::draw()
     const auto picked = state_.selectedTrack;
     if (!picked || (!picked->master && !studio_.isValid(*picked)) || (picked->isBus() && !studio_.hardwareBus(picked->bus))) {
         ui::emptyState(L("Aucune piste choisie", "No track picked"),
-                       L("Choisissez une piste, ou le master : son entrée et sa sortie s'affichent ici.",
-                         "Pick a track, or the master: its input and output show here."));
+                       L("Choisissez une piste, ou le master : ses entrées et ses sorties s'affichent ici.",
+                         "Pick a track, or the master: its inputs and outputs show here."));
         return;
     }
     const auto track = *picked;
-    ImGui::PushFont(nullptr, ui::currentFontBase() * 1.2f);
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(dp(10.0f), dp(7.0f)));
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(dp(8.0f), dp(8.0f)));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(dp(6.0f), dp(5.0f)));
 
     // Which track: its colour, its name, its kind and format.
     const auto colour = track.isMaster() ? p.accent : theme::fromArgb(studio_.trackColour(track));
     const auto origin = ImGui::GetCursorScreenPos();
-    const auto titleHeight = ui::currentFontBase() * 1.6f;
-    ImGui::GetWindowDrawList()->AddRectFilled(origin, ImVec2(origin.x + dp(6.0f), origin.y + titleHeight), colour, dp(2.0f));
-    ImGui::SetCursorScreenPos(ImVec2(origin.x + dp(14.0f), origin.y));
-    ImGui::PushFont(theme::boldFont(), ui::currentFontBase() * 1.45f);
+    const auto titleHeight = ImGui::GetFrameHeight();
+    ImGui::GetWindowDrawList()->AddRectFilled(origin, ImVec2(origin.x + dp(4.0f), origin.y + titleHeight), colour, dp(2.0f));
+    ImGui::SetCursorScreenPos(ImVec2(origin.x + dp(10.0f), origin.y));
+    ImGui::AlignTextToFramePadding();
+    ImGui::PushFont(theme::boldFont(), ui::currentFontBase() * 1.1f);
     ImGui::TextUnformatted(track.isMaster() ? "Master" : studio_.trackName(track).toRawUTF8());
     ImGui::PopFont();
-    ImGui::SameLine(0.0f, dp(14.0f));
-    ImGui::AlignTextToFramePadding();
+    ImGui::SameLine(0.0f, dp(10.0f));
     const auto busInput = track.isBus() && studio_.hardwareBus(track.bus)->direction == app::VirtualBusDirection::input;
     const auto kind = track.isBus()                ? juce::String(busInput ? L("entrée virtuelle", "virtual input")
                                                                            : L("sortie virtuelle", "virtual output"))
@@ -85,43 +90,41 @@ void RoutingView::draw()
                                                   : ui::Ls("piste audio", "audio track");
     ImGui::TextDisabled("%s  \xc2\xb7  %s", kind.toRawUTF8(), Studio::formatName(studio_.trackChannels(track)).toRawUTF8());
 
-    // Its input, then its output, side by side.
+    // Its inputs, then its outputs, side by side, as tall as they need.
     const auto room = ImGui::GetContentRegionAvail();
-    const auto arrow = dp(44.0f);
-    const auto width = std::max(dp(220.0f), (room.x - arrow) * 0.5f);
-    const auto height = std::max(dp(160.0f), room.y);
+    const auto arrow = dp(28.0f);
+    const auto width = std::max(dp(240.0f), (room.x - arrow) * 0.5f);
     ImGui::PushStyleColor(ImGuiCol_ChildBg, p.bg2);
-    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, dp(6.0f));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(dp(14.0f), dp(12.0f)));
-    constexpr auto childFlags = ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding;
-    if (ImGui::BeginChild("##routingInput", ImVec2(width, height), childFlags)) {
-        heading(L("ENTRÉE", "INPUT"), p.audio);
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, dp(5.0f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(dp(10.0f), dp(8.0f)));
+    constexpr auto childFlags = ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_AutoResizeY;
+    const auto top = ImGui::GetCursorScreenPos().y;
+    if (ImGui::BeginChild("##routingInput", ImVec2(width, 0.0f), childFlags)) {
+        heading(L("ENTRÉES", "INPUTS"), p.audio);
         drawInput(track);
     }
     ImGui::EndChild();
     ImGui::SameLine(0.0f, 0.0f);
     {
-        // The way the sound goes: input, track, output.
+        // The way the sound goes: inputs, track, outputs.
         const auto at = ImGui::GetCursorScreenPos();
         auto* list = ImGui::GetWindowDrawList();
-        const auto y = at.y + std::min(height * 0.5f, dp(120.0f));
-        const auto left = at.x + dp(8.0f);
-        const auto right = at.x + arrow - dp(8.0f);
-        list->AddLine(ImVec2(left, y), ImVec2(right - dp(6.0f), y), colour, dp(3.0f));
-        list->AddTriangleFilled(ImVec2(right, y), ImVec2(right - dp(12.0f), y - dp(8.0f)), ImVec2(right - dp(12.0f), y + dp(8.0f)),
-                                colour);
-        ImGui::Dummy(ImVec2(arrow, height));
+        const auto y = top + dp(22.0f);
+        const auto left = at.x + dp(6.0f);
+        const auto right = at.x + arrow - dp(6.0f);
+        list->AddLine(ImVec2(left, y), ImVec2(right - dp(5.0f), y), colour, dp(2.0f));
+        list->AddTriangleFilled(ImVec2(right, y), ImVec2(right - dp(8.0f), y - dp(5.0f)), ImVec2(right - dp(8.0f), y + dp(5.0f)), colour);
+        ImGui::Dummy(ImVec2(arrow, dp(30.0f)));
     }
     ImGui::SameLine(0.0f, 0.0f);
-    if (ImGui::BeginChild("##routingOutput", ImVec2(std::max(dp(220.0f), ImGui::GetContentRegionAvail().x), height), childFlags)) {
-        heading(L("SORTIE", "OUTPUT"), p.play);
+    if (ImGui::BeginChild("##routingOutput", ImVec2(std::max(dp(240.0f), ImGui::GetContentRegionAvail().x), 0.0f), childFlags)) {
+        heading(L("SORTIES", "OUTPUTS"), p.play);
         drawOutput(track);
     }
     ImGui::EndChild();
     ImGui::PopStyleVar(2);
     ImGui::PopStyleColor();
-    ImGui::PopStyleVar(2);
-    ImGui::PopFont();
+    ImGui::PopStyleVar();
 }
 
 // ---- The input ----------------------------------------------------------------------------------
@@ -279,6 +282,52 @@ void RoutingView::afterEffectsChoice(const TrackRef& track)
     }
 }
 
+void RoutingView::drawMidiInputs(const TrackRef& track)
+{
+    const auto& p = theme::palette();
+    auto& engine = studio_.engine();
+    const auto none = engine.midiTrackInputs(track.midiId).empty();
+    const auto hears = engine.midiTrackHearsInputs(track.midiId);
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextColored(theme::vec(p.textDim), "MIDI");
+    ImGui::SameLine(labelColumn());
+    routing_ui::midiInputCombo(studio_, track, -1.0f);
+    ImGui::Dummy(ImVec2(labelColumn() - ImGui::GetStyle().ItemSpacing.x, 0.0f));
+    ImGui::SameLine(labelColumn());
+    note(none    ? L("Elle n'entend aucun clavier.", "It hears no keyboard.")
+         : hears ? L("Elle l'entend : elle est armée, ou choisie.", "It hears it: it is armed, or picked.")
+                 : L("Elle l'entendra armée, ou choisie (sans autre piste armée).",
+                     "It will hear it armed, or picked (no other track armed)."));
+}
+
+void RoutingView::drawMidiOutput(const TrackRef& track)
+{
+    const auto& p = theme::palette();
+    auto& engine = studio_.engine();
+    const auto current = engine.midiTrackOutput(track.midiId);
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextColored(theme::vec(p.textDim), "MIDI");
+    ImGui::SameLine(labelColumn());
+    ImGui::SetNextItemWidth(-1.0f);
+    const auto shown = current.isEmpty() ? ui::Ls("Aucune sortie MIDI", "No MIDI output") : midi_devices::outputName(current);
+    if (ImGui::BeginCombo("##midiOutput", shown.toRawUTF8())) {
+        if (ImGui::Selectable(L("Aucune sortie MIDI", "No MIDI output"), current.isEmpty())) {
+            engine.setMidiTrackOutput(track.midiId, {});
+            studio_.markDirty();
+        }
+        if (midi_devices::outputs().isEmpty())
+            ImGui::TextDisabled("%s", L("Aucune sortie MIDI branchée", "No MIDI output plugged in"));
+        for (const auto& device : midi_devices::outputs())
+            if (ImGui::Selectable(device.name.toRawUTF8(), device.identifier == current)) {
+                engine.setMidiTrackOutput(track.midiId, device.identifier);
+                studio_.markDirty();
+            }
+        ImGui::EndCombo();
+    }
+    ui::tooltip(L("Ses notes (après ses effets MIDI) aussi envoyées à un appareil MIDI : un synthé, une boîte à rythmes.",
+                  "Its notes (after its MIDI effects) also sent to a MIDI device: a synth, a drum machine."));
+}
+
 void RoutingView::drawInput(const TrackRef& track)
 {
     const auto& p = theme::palette();
@@ -291,43 +340,50 @@ void RoutingView::drawInput(const TrackRef& track)
     if (track.master) {
         ImGui::TextColored(theme::vec(p.textDim), "%s", L("Les pistes mixées", "The tracks mixed"));
         drawSenders(track);
-        ImGui::Spacing();
         note(L("Ce qui sort d'une piste vers le master le rejoint ici, puis passe par ses périphériques et son volume.",
                "What a track sends to the master joins it here, then goes through its devices and its volume."));
         return;
     }
     if (track.midi) {
-        ImGui::TextColored(theme::vec(p.textDim), "%s", L("Notes", "Notes"));
-        ImGui::TextUnformatted(L("Les claviers MIDI branchés", "The MIDI keyboards plugged in"));
-        note(L("Elle les joue quand elle est choisie, ou armée.", "It plays them when it is picked, or armed."));
+        drawMidiInputs(track);
     } else if (studio_.isBusTrack(track)) {
-        ImGui::TextColored(theme::vec(p.textDim), "%s", L("Ce qui y est routé", "What is routed into it"));
-        drawSenders(track);
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextColored(theme::vec(p.textDim), "%s", L("Reçoit", "Receives"));
+        ImGui::SameLine(labelColumn());
+        const auto senders = routing_ui::sendersText(studio_, track);
+        ImGui::TextUnformatted(senders.isEmpty() ? L("aucune piste", "no track") : senders.toRawUTF8());
     } else {
-        // What it records: an input bus of the card, and its channels there.
-        ImGui::TextColored(theme::vec(p.textDim), "%s", L("Enregistre depuis", "Records from"));
-        routing_ui::recordInputCombo(studio_, track, -1.0f);
+        // What it records: an input of the card, its level, before or after
+        // the input's effects.
         auto& engine = studio_.engine();
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextColored(theme::vec(p.textDim), "Audio");
+        ImGui::SameLine(labelColumn());
+        const auto meterWidth = dp(46.0f);
+        routing_ui::recordInputCombo(studio_, track, std::max(dp(80.0f), ImGui::GetContentRegionAvail().x - meterWidth - dp(6.0f)));
         const auto busId = engine.trackMixState(track.audioIndex).inputBusId;
-        if (const auto bus = engine.virtualBus(busId)) {
-            drawCardChannels(*bus);
-            afterEffectsChoice(track);
-            drawBusEffects(busId);
+        ImGui::SameLine(0.0f, dp(6.0f));
+        {
+            const auto levels = engine.virtualBusMeterLevels(busId);
+            const auto at = ImGui::GetCursorScreenPos();
+            ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + ImGui::GetFrameHeight() * 0.25f));
+            ui::meter("##recordMeter", ImVec2(meterWidth, ImGui::GetFrameHeight() * 0.5f), levels[0], levels[1], levels[0], levels[1], false);
+            ui::tooltip(L("Le niveau de l'entrée qu'elle enregistre", "The level of the input it records"));
         }
-        note(L("Les entrées virtuelles se créent dans Options \xe2\x80\xba Audio ; leurs effets se règlent comme ceux "
-               "d'une piste.",
-               "Virtual inputs are made in Options \xe2\x80\xba Audio; their effects are set as a track's."));
+        if (engine.virtualBus(busId)) {
+            ImGui::Dummy(ImVec2(labelColumn() - ImGui::GetStyle().ItemSpacing.x, 0.0f));
+            ImGui::SameLine(labelColumn());
+            afterEffectsChoice(track);
+        }
         if (!studio_.trackSenders(track).empty()) {
-            ImGui::Spacing();
-            ImGui::TextColored(theme::vec(p.textDim), "%s", L("Reçoit aussi", "Also receives"));
-            drawSenders(track);
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextColored(theme::vec(p.textDim), "%s", L("Reçoit", "Receives"));
+            ImGui::SameLine(labelColumn());
+            ImGui::TextUnformatted(routing_ui::sendersText(studio_, track).toRawUTF8());
         }
     }
-    // Its other inputs: a sidechain, a second source.
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Spacing();
-    routing_ui::inputsEditor(studio_, track, dp(120.0f), error);
+    // Its other audio inputs: a sidechain, a second source.
+    routing_ui::inputsEditor(studio_, track, labelColumn(), error);
     report(error);
 }
 
@@ -358,81 +414,19 @@ void RoutingView::drawOutput(const TrackRef& track)
         return;
     }
     juce::String error;
-    auto outputs = studio_.trackOutputs(track);
-    auto changed = false;
-    std::optional<std::size_t> removed;
-    for (std::size_t index = 0; index < outputs.size(); ++index) {
-        ImGui::PushID(static_cast<int>(index));
-        if (index > 0) {
-            ImGui::Spacing();
-            ImGui::Separator();
-        }
-        const auto right = ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - ImGui::GetFrameHeight();
-        ImGui::AlignTextToFramePadding();
-        ImGui::TextColored(theme::vec(p.textDim), "%s",
-                           index == 0 ? L("Sortie", "Output") : (ui::Ls("Envoi ", "Send ") + juce::String(static_cast<int>(index))).toRawUTF8());
-        if (outputs.size() > 1) {
-            ImGui::SameLine(right);
-            if (ui::iconButton(icon::close, L("Retirer cette sortie", "Remove this output")))
-                removed = index;
-        }
-        changed |= routing_ui::destinationCombo("##destination", studio_, track, outputs[index], -1.0f);
-        const auto preWidth = dp(64.0f);
-        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - preWidth - ImGui::GetStyle().ItemSpacing.x);
-        if (ImGui::SliderFloat("##level", &outputs[index].gainDb, -60.0f, 12.0f, "%.1f dB"))
-            changed = true;
-        if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
-            outputs[index].gainDb = 0.0f;
-            changed = true;
-        }
-        ui::tooltip(L("Le niveau envoyé (double-clic : 0 dB)", "The level sent (double click: 0 dB)"));
-        ImGui::SameLine();
-        changed |= ui::toggle("PRE", &outputs[index].preFader, p.accent, ImVec2(preWidth, ImGui::GetFrameHeight()),
-                              L("Avant le fader : ce qu'il envoie ne suit pas son fader (il suit encore muet et solo).",
-                                "Before the fader: what it sends does not follow its fader (it still follows mute and solo)."));
-        if (outputs[index].hardware != 0) {
-            // A virtual output: through its effects, or after them.
-            auto through = !outputs[index].hardwareAfterEffects;
-            if (ImGui::RadioButton(L("à travers ses effets", "through its effects"), through) && !through) {
-                outputs[index].hardwareAfterEffects = false;
-                changed = true;
-            }
-            ImGui::SameLine();
-            if (ImGui::RadioButton(L("après ses effets", "after its effects"), !through) && through) {
-                outputs[index].hardwareAfterEffects = true;
-                changed = true;
-            }
-        }
-        ImGui::PopID();
-    }
-    if (removed) {
-        outputs.erase(outputs.begin() + static_cast<std::ptrdiff_t>(*removed));
-        changed = true;
-    }
-    ImGui::Spacing();
-    if (ImGui::Button(L("+ Envoi", "+ Send"))) {
-        // Into the first bus it does not feed yet, else the master.
-        TrackOutput output;
-        for (const auto& candidate : studio_.tracks())
-            if (studio_.isBusTrack(candidate) && studio_.canRoute(track, candidate)
-                && std::none_of(outputs.begin(), outputs.end(), [&](const TrackOutput& existing) {
-                       return existing.destination == studio_.routingKey(candidate);
-                   })) {
-                output.destination = studio_.routingKey(candidate);
-                output.gainDb = -6.0f;
-                break;
-            }
-        outputs.push_back(output);
-        changed = true;
-    }
-    ui::tooltip(L("Une sortie de plus : vers un bus (une réverbération partagée…), une autre piste, son sidechain ou une "
-                  "sortie de la carte son.",
-                  "One more output: to a bus (a shared reverb…), another track, its sidechain or an output of the sound card."));
-    if (changed)
-        if (const auto applied = studio_.setTrackOutputs(track, outputs); applied.failed())
-            error = applied.getErrorMessage();
+    if (track.midi)
+        drawMidiOutput(track);
+    // Where its sound goes, and its sends: a line each.
+    routing_ui::outputsEditor(studio_, track, labelColumn(), error);
     note(L("Une sortie « Carte \xe2\x80\xba … » va droit sur la carte son, sans passer par le master.",
            "A \xe2\x80\x9c" "Card \xe2\x80\xba \xe2\x80\xa6\xe2\x80\x9d output goes straight to the sound card, not through the master."));
+    // Its format.
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextColored(theme::vec(p.textDim), "Format");
+    ImGui::SameLine(labelColumn());
+    routing_ui::formatCombo(studio_, track, std::min(dp(160.0f), ImGui::GetContentRegionAvail().x), error);
+    ui::tooltip(L("Ses canaux : mono, stéréo, jusqu'au 7.1 (celui d'une piste audio ; une piste instrument est stéréo)",
+                  "Its channels: mono, stereo, up to 7.1 (an audio track's; an instrument track is stereo)"));
     report(error);
 }
 

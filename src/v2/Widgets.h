@@ -118,13 +118,16 @@ void takeWheel();
 bool knob(const char* id, float* value, float minimum, float maximum, float defaultValue,
           const KnobStyle& style = {});
 
-// A vertical fader in decibels with its scale; returns true while it changes.
+// A vertical fader in decibels with its scale's ticks (none when a meter
+// beside it shows the scale); returns true while it changes.
 bool fader(const char* id, float* gainDb, float minimumDb, float maximumDb, ImVec2 size,
-           ImU32 colour = 0);
+           ImU32 colour = 0, bool ticks = true);
 
-// Peak and RMS of up to two channels, in linear gain. Vertical or not.
+// Peak and RMS of up to two channels, in linear gain. Vertical or not; a
+// vertical one can carry its scale in dB (its numbers in a column on its
+// left, its marks across the bars).
 void meter(const char* id, ImVec2 size, float peakLeft, float peakRight, float rmsLeft, float rmsRight,
-           bool vertical = true);
+           bool vertical = true, bool scale = false);
 [[nodiscard]] float meterPosition(float gainDb);
 
 // A small rounded toggle: M, S, R, an icon, a word.
@@ -133,7 +136,8 @@ bool toggle(const char* label, bool* value, ImU32 onColour, ImVec2 size = ImVec2
 // A toggle showing a little drawing rather than a word, its name in its
 // tooltip: `picture` paints it in the box it is given, in the colour given.
 using Picture = void (*)(ImDrawList* list, ImVec2 min, ImVec2 max, ImU32 colour);
-bool pictureToggle(const char* id, bool* value, ImU32 onColour, Picture picture, const char* tooltip, float width = 0.0f);
+bool pictureToggle(const char* id, bool* value, ImU32 onColour, Picture picture, const char* tooltip, float width = 0.0f,
+                   float height = 0.0f);
 // The pictures the editors share.
 namespace picture {
 void magnet(ImDrawList* list, ImVec2 min, ImVec2 max, ImU32 colour);
@@ -257,9 +261,14 @@ void pushTextWrapAt(float screenX);
 bool timelineBand(const char* id, ImVec2 min, ImVec2 max, double& position, double& pixelsPerUnit, double minimumZoom,
                   double maximumZoom, double tick, double strong, double minimumPosition = 0.0);
 // The same beside rows (tracks, keys): up and down move through them,
-// toward them (left) zooms in, away zooms out. `scroll` in pixels, the
-// content's heights in proportion to `zoom`. True on a double click.
-bool rowsBand(const char* id, ImVec2 min, ImVec2 max, float& scroll, float& zoom, float minimumZoom, float maximumZoom);
+// toward them zooms in, away zooms out (`rowsAtRight`: they are on its
+// right, as the notes beside the keys). `scroll` in pixels, the content's
+// heights in proportion to `zoom`. True on a double click.
+bool rowsBand(const char* id, ImVec2 min, ImVec2 max, float& scroll, float& zoom, float minimumZoom, float maximumZoom,
+              bool rowsAtRight = false);
+// Where the time band meets the rows' one: a magnifier; true on a click
+// (the host shows everything, both ways).
+bool bandCorner(const char* id, ImVec2 min, ImVec2 max);
 // A drag field styled for numbers (tempo, positions).
 bool dragNumber(const char* id, float* value, float speed, float minimum, float maximum,
                 const char* format, float width);

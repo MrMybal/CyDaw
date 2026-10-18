@@ -189,6 +189,9 @@ double AudioEditorView::viewLength(const AudioClip& clip, const std::vector<Audi
     return std::max(0.05, end * 1.06);
 }
 
+// The view goes before the clip as far as one likes.
+constexpr double kScrollFloor = -1.0e6;
+
 double AudioEditorView::minScroll(const AudioClip& clip, const std::vector<AudioEvent>& events) const
 {
     return -std::max(beatSeconds() * 8.0, viewLength(clip, events) * 0.5);
@@ -659,11 +662,14 @@ void AudioEditorView::drawClip(const TrackRef& track, const AudioClip& clip)
         const auto full = ImGui::GetContentRegionAvail();
         // A column of cells on the left, as Bitwig has: what each row is.
         const auto headerWidth = std::clamp(full.x * 0.14f, dp(120.0f), dp(170.0f));
-        laneLeft_ = start.x + headerWidth;
-        laneWidth_ = std::max(dp(80.0f), full.x - headerWidth);
+        // Between the cells and the sounds, the band for their height.
+        const auto rowsBandWidth = dp(16.0f);
+        const auto headerRight = start.x + headerWidth;
+        laneLeft_ = headerRight + rowsBandWidth;
+        laneWidth_ = std::max(dp(80.0f), full.x - headerWidth - rowsBandWidth);
         if (pixelsPerSecond_ <= 0.0)
             fit(clip, events);
-        const auto wrapAt = laneLeft_ - ImGui::GetWindowPos().x - dp(6.0f);
+        const auto wrapAt = headerRight - ImGui::GetWindowPos().x - dp(6.0f);
         ImGui::SetCursorScreenPos(ImVec2(laneLeft_, start.y));
         drawOverview(clip, events, ImVec2(laneWidth_, dp(22.0f)));
         // The ruler, its cell saying the loop in bars.
@@ -672,7 +678,7 @@ void AudioEditorView::drawClip(const TrackRef& track, const AudioClip& clip)
         {
             const auto b = boundsOf(clip);
             const auto bar = beatSeconds() * std::max(1, studio_.engine().timeSignatureNumerator());
-            list->AddRectFilled(ImVec2(start.x, rulerTop), ImVec2(laneLeft_ - dp(2.0f), rulerTop + rulerTall), p.bg1);
+            list->AddRectFilled(ImVec2(start.x, rulerTop), ImVec2(headerRight - dp(2.0f), rulerTop + rulerTall), p.bg1);
             ImGui::SetCursorScreenPos(ImVec2(start.x + dp(4.0f), rulerTop + dp(4.0f)));
             ImGui::PushTextWrapPos(wrapAt);
             ImGui::TextColored(theme::vec(p.textDim), "%s %.2f %s", b.looping ? L("Boucle :", "Loop:") : L("Joue :", "Plays:"),
@@ -695,7 +701,7 @@ void AudioEditorView::drawClip(const TrackRef& track, const AudioClip& clip)
                                                 std::max(dp(40.0f), left - dp(64.0f)))
                                    : automatic;
         const auto eventsTall = std::max(dp(60.0f), left - lanesTall - splitter);
-        list->AddRectFilled(ImVec2(start.x, eventsTop), ImVec2(laneLeft_ - dp(2.0f), eventsTop + eventsTall), p.bg1);
+        list->AddRectFilled(ImVec2(start.x, eventsTop), ImVec2(headerRight - dp(2.0f), eventsTop + eventsTall), p.bg1);
         ImGui::SetCursorScreenPos(ImVec2(start.x + dp(4.0f), eventsTop + dp(4.0f)));
         ui::sectionTitle((ui::Ls("SONS (", "SOUNDS (") + juce::String(static_cast<int>(events.size())) + ")").toRawUTF8());
         ImGui::SetCursorScreenPos(ImVec2(start.x + dp(4.0f), ImGui::GetCursorScreenPos().y));
@@ -706,6 +712,21 @@ void AudioEditorView::drawClip(const TrackRef& track, const AudioClip& clip)
         ImGui::SetCursorScreenPos(ImVec2(laneLeft_, eventsTop));
         drawEvents(track, clip, events, ImVec2(laneWidth_, eventsTall));
         eventMenu(track, clip, events);
+        // Beside the sounds, the band for their height: up and down move
+        // through their rows, right (toward them) makes them taller, left
+        // shorter; the corner over it shows everything.
+        {
+            if (ui::rowsBand("##soundsBand", ImVec2(headerRight, eventsTop), ImVec2(laneLeft_, eventsTop + eventsTall), soundsScroll_,
+                             soundsZoom_, 1.0f, 8.0f, true)) {
+                soundsZoom_ = 1.0f;
+                soundsScroll_ = 0.0f;
+            }
+            if (ui::bandCorner("##bandCorner", ImVec2(headerRight, rulerTop), ImVec2(laneLeft_, rulerTop + dp(12.0f)))) {
+                fit(clip, events);
+                soundsZoom_ = 1.0f;
+                soundsScroll_ = 0.0f;
+            }
+        }
         {
             // The bar to drag: the lanes taller or shorter (a double click:
             // as tall as they need).
@@ -856,14 +877,14 @@ void AudioEditorView::drawToolbar(const TrackRef& track, const AudioClip& clip, 
         } else {
             const auto centre = scroll_ + laneWidth_ * 0.5 / pixelsPerSecond_;
             pixelsPerSecond_ = std::min(96'000.0, pixelsPerSecond_ * 1.6);
-            scroll_ = std::max(minScroll(clip, events), centre - laneWidth_ * 0.5 / pixelsPerSecond_);
+            scroll_ = std::max(kScrollFloor, centre - laneWidth_ * 0.5 / pixelsPerSecond_);
         }
     }
     ImGui::SameLine(0.0f, dp(2.0f));
     if (ui::iconButton(icon::zoomOut, L("Dézoomer", "Zoom out"))) {
         const auto centre = scroll_ + laneWidth_ * 0.5 / pixelsPerSecond_;
         pixelsPerSecond_ = std::max(static_cast<double>(laneWidth_) / viewLength(clip, events) * 0.5, pixelsPerSecond_ / 1.6);
-        scroll_ = std::max(minScroll(clip, events), centre - laneWidth_ * 0.5 / pixelsPerSecond_);
+        scroll_ = std::max(kScrollFloor, centre - laneWidth_ * 0.5 / pixelsPerSecond_);
     }
     ImGui::SameLine(0.0f, dp(2.0f));
     if (ui::iconButton(icon::fullScreen, L("Tout voir", "See it all")))
@@ -938,7 +959,7 @@ void AudioEditorView::drawOverview(const AudioClip& clip, const std::vector<Audi
     if (ImGui::IsItemActive()) {
         const auto span = laneWidth_ / std::max(1.0e-9, pixelsPerSecond_);
         const auto at = from + std::clamp((ImGui::GetIO().MousePos.x - origin.x) / size.x, 0.0f, 1.0f) * total;
-        scroll_ = std::clamp(at - span * 0.5, minScroll(clip, events), std::max(0.0, from + total - span * 0.5));
+        scroll_ = std::clamp(at - span * 0.5, kScrollFloor, std::max(0.0, from + total - span * 0.5));
     }
     ui::tooltip(L("Tout le clip : glissez pour voir une autre partie", "The whole clip: drag to see another part"));
     list->AddRect(origin, end, p.line, dp(2.0f));
@@ -966,13 +987,14 @@ void AudioEditorView::drawRuler(const TrackRef& track, const AudioClip& clip, co
     // The grab and zoom band (before the clip too: its start can move there).
     const auto fitted = static_cast<double>(size.x) / 600.0;
     if (ui::timelineBand("##audioBand", top, ImVec2(top.x + size.x, barMin.y), scroll_, pixelsPerSecond_, fitted, 96'000.0, beat, beat * numerator,
-                         minScroll(clip, events)))
+                         kScrollFloor))
         pixelsPerSecond_ = 0.0;
     const auto shown = rulerDrag ? draft_ : boundsOf(clip);
     list->PushClipRect(barMin, end, true);
     list->AddRectFilled(barMin, barMax, p.bg1);
     // Before the clip's content: nothing yet.
-    list->AddRectFilled(ImVec2(xOf(minScroll(clip, events) - 1000.0), barMin.y), ImVec2(xOf(0.0), barMax.y), theme::alpha(p.bg0, 0.8f));
+    if (xOf(0.0) > barMin.x)
+        list->AddRectFilled(barMin, ImVec2(xOf(0.0), barMax.y), theme::alpha(p.bg0, 0.8f));
     // The loop, on top: a bracket over its part (dim when off).
     const auto loopA = xOf(shown.loopStart);
     const auto loopB = xOf(shown.loopEnd);
@@ -1236,7 +1258,9 @@ void AudioEditorView::drawEvents(const TrackRef& track, const AudioClip& clip, c
         rowOf[i] = row;
     }
     const auto rows = std::max<std::size_t>(1, rowEnds.size());
-    const auto rowHeight = std::clamp(size.y / static_cast<float>(rows), dp(44.0f), dp(260.0f));
+    // As tall as the band beside them makes them, scrolled within the room.
+    const auto rowHeight = std::clamp(size.y / static_cast<float>(rows), dp(44.0f), dp(260.0f)) * soundsZoom_;
+    soundsScroll_ = std::clamp(soundsScroll_, 0.0f, std::max(0.0f, rowHeight * static_cast<float>(rows) - size.y));
     const auto header = dp(14.0f);
     const auto footer = dp(10.0f);
 
@@ -1286,7 +1310,7 @@ void AudioEditorView::drawEvents(const TrackRef& track, const AudioClip& clip, c
     for (std::size_t i = 0; i < events.size(); ++i) {
         const auto& event = events[i];
         const auto shown = shownOf(event);
-        const auto top = origin.y + rowHeight * static_cast<float>(rowOf[i]);
+        const auto top = origin.y - soundsScroll_ + rowHeight * static_cast<float>(rowOf[i]);
         const ImVec2 min(xOf(shown.start), top + dp(1.0f));
         const ImVec2 max(std::max(min.x + 2.0f, xOf(shown.start + shown.duration)), top + rowHeight - dp(1.0f));
         const auto colour = theme::fromArgb(event.colour != 0 ? event.colour : 0xff53d0c2u);
@@ -1978,12 +2002,12 @@ void AudioEditorView::wheel(const AudioClip& clip, const std::vector<AudioEvent>
     if (io.MouseWheelH != 0.0f || io.KeyShift) {
         // Sideways (Shift, or a sideways wheel): moves along.
         const auto amount = io.MouseWheelH != 0.0f ? -io.MouseWheelH : io.MouseWheel;
-        scroll_ = std::max(minScroll(clip, events), scroll_ - amount * 80.0 / pixelsPerSecond_);
+        scroll_ = std::max(kScrollFloor, scroll_ - amount * 80.0 / pixelsPerSecond_);
     } else {
         // The wheel zooms around the pointer.
         pixelsPerSecond_ = std::clamp(pixelsPerSecond_ * (io.MouseWheel > 0.0f ? 1.2 : 1.0 / 1.2),
                                       static_cast<double>(laneWidth_) / viewLength(clip, events) * 0.25, 96'000.0);
-        scroll_ = std::max(minScroll(clip, events), at - static_cast<double>(io.MousePos.x - laneLeft_) / pixelsPerSecond_);
+        scroll_ = std::max(kScrollFloor, at - static_cast<double>(io.MousePos.x - laneLeft_) / pixelsPerSecond_);
     }
     ui::takeWheel();
 }

@@ -1,3 +1,4 @@
+#include "MidiDevices.h"
 #include "RoutingUi.h"
 
 #include "Icons.h"
@@ -9,6 +10,8 @@
 #include <imgui.h>
 
 #include <array>
+#include <cmath>
+#include <optional>
 
 namespace cydaw::v2::routing_ui {
 
@@ -99,18 +102,60 @@ std::vector<Destination> destinationsFor(const Studio& studio, const TrackRef& t
     return buses;
 }
 
+// The lists' groups, in the order destinationsFor() gives them, each
+// under its heading (the master alone, none).
+enum class Group { master, card, bus, track };
+
+Group groupOf(const Studio& studio, const Destination& destination)
+{
+    if (destination.hardware != 0)
+        return Group::card;
+    if (destination.key == 0)
+        return Group::master;
+    const auto to = studio.trackForKey(destination.key);
+    return to && studio.isBusTrack(*to) ? Group::bus : Group::track;
+}
+
+void groupHeading(const Group group)
+{
+    const auto* name = group == Group::card ? L("Carte son, en direct", "Sound card, direct")
+                       : group == Group::bus ? L("Bus", "Buses")
+                                             : L("Autres pistes", "Other tracks");
+    ImGui::PushFont(nullptr, ui::currentFontBase() * 0.78f);
+    ImGui::PushStyleColor(ImGuiCol_Text, theme::vec(theme::palette().textFaint));
+    ImGui::SeparatorText(name);
+    ImGui::PopStyleColor();
+    ImGui::PopFont();
+}
+
+// A destination's name under its heading: an output of the card by its
+// name and channels, another input of a track under it ("› Sidechain").
+juce::String itemName(const Studio& studio, const Destination& destination)
+{
+    if (destination.hardware != 0) {
+        const auto bus = studio.engine().virtualBus(destination.hardware);
+        return bus ? bus->name + " (" + deviceChannelsText(*bus) + ")" : ui::Ls("(disparue)", "(gone)");
+    }
+    if (destination.input != 0)
+        if (const auto to = studio.trackForKey(destination.key))
+            return juce::String::fromUTF8("    \xe2\x80\xba ") + studio.trackInputName(*to, destination.input);
+    return destinationName(studio, destination.key);
+}
+
 bool pickDestination(const char* id, const Studio& studio, const TrackRef& track, TrackOutput& output, const float width)
 {
     auto changed = false;
     ImGui::SetNextItemWidth(width);
+    // Its list as wide as its names, even from a narrow combo.
+    ImGui::SetNextWindowSizeConstraints(ImVec2(std::max(width, dp(190.0f)), 0.0f), ImVec2(FLT_MAX, dp(420.0f)));
     if (ImGui::BeginCombo(id, outputName(studio, output).toRawUTF8())) {
+        std::optional<Group> last;
         for (const auto& destination : destinationsFor(studio, track)) {
-            const auto to = destination.key != 0 ? studio.trackForKey(destination.key) : std::nullopt;
-            // Another input, under its track: "› Sidechain".
-            const auto label = destination.hardware != 0 ? hardwareName(studio, destination.hardware)
-                               : destination.input != 0
-                                   ? juce::String::fromUTF8("    \xe2\x80\xba ") + studio.trackInputName(*to, destination.input)
-                                   : destinationName(studio, destination.key) + (to && studio.isBusTrack(*to) ? "  (bus)" : "");
+            const auto group = groupOf(studio, destination);
+            if (group != Group::master && group != last)
+                groupHeading(group);
+            last = group;
+            const auto label = itemName(studio, destination);
             const auto selected = destination.hardware == output.hardware && destination.key == output.destination
                                   && destination.input == output.input;
             ImGui::PushID(static_cast<int>((destination.input ^ (destination.hardware << 20)) & 0x7fffffff));
@@ -183,6 +228,17 @@ void outputsEditor(Studio& studio, const TrackRef& track, const float labelWidth
                            twoLines ? std::max(dp(48.0f), room - preWidth - dp(2.0f)) : levelWidth))
             changed = true;
         ui::tooltip(L("Le niveau envoyé", "The level sent"));
+        if (outputs[index].hardware != 0) {
+            // An output of the card: through its effects, or straight.
+            ImGui::SameLine(0.0f, dp(2.0f));
+            auto straight = outputs[index].hardwareAfterEffects;
+            if (ui::toggle(L("Direct", "Direct"), &straight, p.accent, ImVec2(0.0f, ImGui::GetFrameHeight()),
+                           L("Direct : droit sur la carte, sans passer par les effets de cette sortie ; sinon à travers eux.",
+                             "Direct: straight to the card, not through this output's effects; else through them."))) {
+                outputs[index].hardwareAfterEffects = straight;
+                changed = true;
+            }
+        }
         if (!twoLines)
             removeButton();
         ImGui::PopID();
@@ -230,19 +286,21 @@ void inputsEditor(Studio& studio, const TrackRef& track, const float labelWidth,
 {
     const auto& p = theme::palette();
     ImGui::AlignTextToFramePadding();
-    ImGui::TextColored(theme::vec(p.textDim), "%s", L("Entrées", "Inputs"));
+    ImGui::TextColored(theme::vec(p.textDim), "%s", L("Sidechain", "Sidechain"));
+    ui::tooltip(L("Ses entrées audio de plus, où d'autres pistes se routent : un sidechain (un compresseur qui suit la grosse "
+                  "caisse), une seconde source. Elles apparaissent dans son graphe.",
+                  "Its extra audio inputs other tracks are routed into: a sidechain (a compressor following the kick), a "
+                  "second source. They appear in its graph."));
     ImGui::SameLine(labelWidth);
-    ImGui::TextDisabled("%s", track.midi                   ? L("principale : son instrument", "main: its instrument")
-                              : studio.isBusTrack(track) ? L("principale : ce qui y est routé", "main: what is routed into it")
-                                                         : L("principale : ses clips", "main: its clips"));
-    ui::tooltip(L("Ce qui est routé dans son entrée principale rejoint son son avant ses effets.",
-                  "What is routed into its main input joins its sound before its devices."));
     const auto inputs = studio.trackInputs(track);
     std::optional<std::uint64_t> removed;
-    for (const auto& input : inputs) {
+    for (std::size_t index = 0; index < inputs.size(); ++index) {
+        const auto& input = inputs[index];
         ImGui::PushID(static_cast<int>(input.node & 0x7fffffff));
-        ImGui::Dummy(ImVec2(labelWidth - ImGui::GetStyle().ItemSpacing.x, 0.0f));
-        ImGui::SameLine(labelWidth);
+        if (index > 0) {
+            ImGui::Dummy(ImVec2(labelWidth - ImGui::GetStyle().ItemSpacing.x, 0.0f));
+            ImGui::SameLine(labelWidth);
+        }
         // Its name, edited in place: the graph's input card shows it too.
         std::array<char, 64> buffer {};
         input.name.copyToUTF8(buffer.data(), buffer.size());
@@ -263,8 +321,10 @@ void inputsEditor(Studio& studio, const TrackRef& track, const float labelWidth,
     if (removed)
         if (const auto applied = studio.removeTrackInput(track, *removed); applied.failed())
             error = applied.getErrorMessage();
-    ImGui::Dummy(ImVec2(labelWidth - ImGui::GetStyle().ItemSpacing.x, 0.0f));
-    ImGui::SameLine(labelWidth);
+    if (!inputs.empty()) {
+        ImGui::Dummy(ImVec2(labelWidth - ImGui::GetStyle().ItemSpacing.x, 0.0f));
+        ImGui::SameLine(labelWidth);
+    }
     ImGui::BeginDisabled(inputs.size() >= Studio::maximumTrackInputs);
     if (ImGui::Button(L("+ Entrée", "+ Input")))
         if (!studio.addTrackInput(track))
@@ -312,13 +372,17 @@ void sendersLine(const Studio& studio, const TrackRef& track, const float labelW
 void mainOutputItems(Studio& studio, const TrackRef& track, juce::String& error)
 {
     auto outputs = studio.trackOutputs(track);
+    std::optional<Group> last;
     for (const auto& destination : destinationsFor(studio, track)) {
         if (destination.input != 0)
             continue;
+        const auto group = groupOf(studio, destination);
+        if (group != Group::master && group != last)
+            groupHeading(group);
+        last = group;
         const auto selected = outputs.front().hardware == destination.hardware && outputs.front().destination == destination.key
                               && outputs.front().input == 0;
-        const auto label = destination.hardware != 0 ? hardwareName(studio, destination.hardware)
-                                                     : destinationName(studio, destination.key);
+        const auto label = itemName(studio, destination);
         ImGui::PushID(static_cast<int>(destination.hardware & 0x7fffffff));
         if (ImGui::MenuItem(label.toRawUTF8(), nullptr, selected) && !selected) {
             outputs.front().destination = destination.key;
@@ -363,6 +427,91 @@ void formatCombo(Studio& studio, const TrackRef& track, const float width, juce:
                   "its devices process every channel, and its sound converts into where it goes (the master is stereo)."));
 }
 
+std::uint32_t midiInputActivity(const Studio& studio, const TrackRef& track, const juce::String& input)
+{
+    const auto& engine = studio.engine();
+    const auto clips = engine.midiTrackClipActivity(track.midiId);
+    if (input == app::AudioTrackController::allMidiInputs)
+        return clips + engine.midiInActivity();
+    if (input == app::AudioTrackController::computerKeyboardInput)
+        return clips + engine.computerKeyboardActivity();
+    return clips + engine.midiInputActivity(input);
+}
+
+juce::String midiInputName(const juce::String& input)
+{
+    if (input == app::AudioTrackController::allMidiInputs)
+        return ui::Ls("Toutes les entrées", "Every input");
+    if (input == app::AudioTrackController::computerKeyboardInput)
+        return ui::Ls("Clavier de l'ordinateur", "Computer keyboard");
+    return midi_devices::inputName(input);
+}
+
+void midiInputCombo(Studio& studio, const TrackRef& track, const float width)
+{
+    if (!track.midi)
+        return;
+    const auto& p = theme::palette();
+    auto& engine = studio.engine();
+    const auto inputs = engine.midiTrackInputs(track.midiId);
+    const auto current = inputs.empty() ? juce::String() : inputs.front();
+    // A narrow combo (a launcher's cell) says it short.
+    const auto brief = width > 0.0f && width < dp(150.0f);
+    auto shown = inputs.empty()                                                  ? ui::Ls(brief ? "Aucune" : "Aucune entrée", brief ? "None" : "No input")
+                 : brief && current == app::AudioTrackController::allMidiInputs ? ui::Ls("Toutes", "All ins")
+                 : brief && current == app::AudioTrackController::computerKeyboardInput ? ui::Ls("Clavier PC", "PC keys")
+                                                                                         : midiInputName(current);
+    if (inputs.size() > 1)
+        shown << " +" << juce::String(static_cast<int>(inputs.size()) - 1);
+    auto* list = ImGui::GetWindowDrawList();
+    const auto at = ImGui::GetCursorScreenPos();
+    const auto height = ImGui::GetFrameHeight();
+    const auto light = std::round(height * 0.42f);
+    // Room for its light before the name.
+    const auto spaces = static_cast<int>(std::ceil((light + dp(4.0f)) / std::max(1.0f, ImGui::CalcTextSize(" ").x)));
+    const auto preview = juce::String::repeatedString(" ", spaces) + shown;
+    ImGui::SetNextItemWidth(width);
+    ImGui::SetNextWindowSizeConstraints(ImVec2(std::max(width, dp(200.0f)), 0.0f), ImVec2(FLT_MAX, dp(420.0f)));
+    if (ImGui::BeginCombo("##midiInput", preview.toRawUTF8())) {
+        const auto pick = [&](const juce::String& input, const char* label) {
+            const auto selected = input.isEmpty() ? inputs.empty() : inputs.size() == 1 && current == input;
+            if (ImGui::Selectable(label, selected) && !selected) {
+                engine.setMidiTrackInputs(track.midiId, input.isEmpty() ? std::vector<juce::String> {} : std::vector<juce::String> { input });
+                studio.markDirty();
+            }
+        };
+        pick(app::AudioTrackController::allMidiInputs, L("Toutes les entrées", "Every input"));
+        ui::tooltip(L("Tous les claviers MIDI branchés, et le clavier de l'ordinateur", "Every MIDI keyboard plugged in, and the computer keyboard"));
+        pick(app::AudioTrackController::computerKeyboardInput, L("Clavier de l'ordinateur", "Computer keyboard"));
+        ImGui::PushFont(nullptr, ui::currentFontBase() * 0.78f);
+        ImGui::PushStyleColor(ImGuiCol_Text, theme::vec(p.textFaint));
+        ImGui::SeparatorText(L("Claviers MIDI", "MIDI keyboards"));
+        ImGui::PopStyleColor();
+        ImGui::PopFont();
+        if (midi_devices::inputs().isEmpty())
+            ImGui::TextDisabled("%s", L("Aucun branché", "None plugged in"));
+        for (const auto& device : midi_devices::inputs()) {
+            ImGui::PushID(device.identifier.toRawUTF8());
+            pick(device.identifier, device.name.toRawUTF8());
+            ImGui::PopID();
+        }
+        ImGui::Separator();
+        pick({}, L("Aucune", "None"));
+        ui::tooltip(L("Elle n'entend aucun clavier : ses clips seulement", "It hears no keyboard: its clips only"));
+        ImGui::EndCombo();
+    }
+    ui::tooltip(L("L'entrée MIDI qu'elle entend (armée, ou choisie) ; son carré s'allume quand une note arrive.",
+                  "The MIDI input it hears (armed, or picked); its square lights up when a note comes in."));
+    // Its light, over the combo's frame.
+    const auto counter = current.isEmpty() ? engine.midiTrackClipActivity(track.midiId) : midiInputActivity(studio, track, current);
+    const auto lit = midi_devices::activity("in" + std::to_string(track.midiId) + ":" + current.toStdString(), counter);
+    const auto on = engine.midiTrackHearsInputs(track.midiId) ? p.play : p.textFaint;
+    const ImVec2 lightMin(at.x + ImGui::GetStyle().FramePadding.x, at.y + std::round((height - light) * 0.5f));
+    const ImVec2 lightMax(lightMin.x + light, lightMin.y + light);
+    list->AddRectFilled(lightMin, lightMax, theme::mix(p.bg0 | 0xff000000u, on, 0.15f + 0.85f * lit), dp(2.0f));
+    list->AddRect(lightMin, lightMax, theme::alpha(on, 0.7f), dp(2.0f));
+}
+
 void recordInputCombo(Studio& studio, const TrackRef& track, const float width)
 {
     if (track.master || track.midi || !studio.isValid(track)) {
@@ -375,10 +524,13 @@ void recordInputCombo(Studio& studio, const TrackRef& track, const float width)
         return bus.name + "  (" + Studio::formatName(bus.channels) + ", " + deviceChannelsText(bus) + ")";
     };
     juce::String shown = ui::Ls("(aucune)", "(none)");
+    // A narrow combo (a launcher's cell): the input's name alone.
+    const auto brief = width > 0.0f && width < dp(150.0f);
     for (const auto& bus : engine.virtualBuses())
         if (bus.id == current)
-            shown = label(bus);
+            shown = brief ? bus.name : label(bus);
     ImGui::SetNextItemWidth(width);
+    ImGui::SetNextWindowSizeConstraints(ImVec2(std::max(width, dp(200.0f)), 0.0f), ImVec2(FLT_MAX, dp(420.0f)));
     if (ImGui::BeginCombo("##recordInput", shown.toRawUTF8())) {
         for (const auto& bus : engine.virtualBuses()) {
             if (bus.direction != app::VirtualBusDirection::input)

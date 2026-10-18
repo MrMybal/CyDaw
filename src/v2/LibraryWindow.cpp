@@ -414,6 +414,7 @@ void LibraryWindow::picked()
         state_.showLibrary = false;
         state_.libraryPick = false;
         state_.libraryTarget.reset();
+        state_.deviceInsertBefore.reset();
     }
 }
 
@@ -463,6 +464,7 @@ void LibraryWindow::draw()
         state_.showLibrary = false;
         state_.libraryPick = false;
         state_.libraryTarget.reset();
+        state_.deviceInsertBefore.reset();
     }
     frameMs_ = nowMs() - started;
 }
@@ -1508,16 +1510,20 @@ void LibraryWindow::drawEffects()
                 continue;
             if (entry.key == "mono-to-stereo" || entry.key == "stereo-to-mono")
                 continue;
+            // A whole chain of effects would take every card's place: the
+            // track's preset button (in Devices) has them.
+            if (entry.kind == "preset" && !entry.soundSource)
+                continue;
             EffectRow row;
             row.kind = entry.kind == "preset" ? EffectRow::preset : entry.kind == "module" ? EffectRow::module : EffectRow::node;
             row.key = entry.key;
             row.name = entry.name;
             row.description = entry.description;
             row.soundSource = entry.soundSource;
-            row.category = entry.kind == "preset" ? plainText("Chaînes complètes", "Whole chains")
+            row.category = entry.kind == "preset" ? plainText("Instruments", "Instruments")
                            : entry.category.isNotEmpty() ? entry.category
                                                          : plainText("Utilitaires", "Utilities");
-            row.genre = row.kind == EffectRow::preset   ? plainText("Chaîne complète", "Whole chain")
+            row.genre = row.kind == EffectRow::preset   ? plainText("Instrument de CyDAW", "CyDAW instrument")
                         : row.kind == EffectRow::module ? plainText("Périphérique de CyDAW", "CyDAW device")
                                                         : plainText("Nœud", "Node");
             row.role = entry.soundSource          ? plainText("Instrument", "Instrument")
@@ -1657,15 +1663,18 @@ void LibraryWindow::drawEffects()
             return;
         }
         juce::Result result = juce::Result::ok();
+        // Before the card whose "+" opened the window, else where it goes.
+        const auto before = state_.deviceInsertBefore && state_.deviceInsertBefore->first == *track ? state_.deviceInsertBefore->second
+                                                                                                      : std::uint64_t {};
         if (row.kind == EffectRow::vst3) {
             if (track->midi || track->master)
                 result = juce::Result::fail(ui::Ls("Les plug-ins externes vont sur les pistes audio", "External plug-ins go on audio tracks"));
             else
                 result = studio_.engine().setTrackPlugin(track->audioIndex, row.file);
         } else if (row.kind == EffectRow::mine) {
-            result = studio_.insertLibraryDevice(*track, row.file);
+            result = studio_.insertLibraryDeviceBefore(*track, row.file, before);
         } else {
-            result = studio_.insertDevice(*track, row.key);
+            result = studio_.insertDeviceBefore(*track, row.key, before);
         }
         if (result.failed()) {
             report(result.getErrorMessage(), true);
@@ -1750,7 +1759,8 @@ void LibraryWindow::drawEffects()
             ImGui::PopTextWrapPos();
         }
         if (row.kind == EffectRow::preset)
-            ImGui::TextColored(theme::vec(p.accent), "%s", L("Une chaîne complète remplace le graphe de la piste.", "A whole chain replaces the track's graph."));
+            ImGui::TextColored(theme::vec(p.accent), "%s", L("Il remplace l'instrument de la piste ; ses effets restent.",
+                                                             "It replaces the track's instrument; its effects stay."));
         ImGui::Spacing();
         const auto label = track ? ui::Ls("Ajouter à ", "Add to ") + studio_.trackName(*track) : ui::Ls("Choisissez une piste", "Choose a track");
         ImGui::BeginDisabled(!track);

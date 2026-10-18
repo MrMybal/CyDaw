@@ -73,11 +73,13 @@ void PresetMenu::step(const int direction, const PresetHolder& holder, const App
 }
 
 void PresetMenu::button(const char* id, const PresetHolder& holder, const Capture& capture, const Apply& apply,
-                        const ImVec2 size, const Programs* programs)
+                        const ImVec2 size, const Programs* programs, const char* what)
 {
     const auto current = studio_.presetName(holder.key);
-    const auto tip = current.isNotEmpty() ? ui::Ls("Préréglages — ", "Presets — ") + current
-                                          : ui::Ls("Préréglages : en charger, enregistrer celui-ci", "Presets: load one, save this one");
+    const auto tip = what != nullptr ? juce::String::fromUTF8(what) + (current.isNotEmpty() ? juce::String::fromUTF8(" \xe2\x80\x94 ") + current
+                                                                                            : juce::String())
+                     : current.isNotEmpty() ? ui::Ls("Préréglages — ", "Presets — ") + current
+                                            : ui::Ls("Préréglages : en charger, enregistrer celui-ci", "Presets: load one, save this one");
     ImGui::PushID(id);
     if (ui::iconButton(icon::presets, tip.toRawUTF8(), current.isNotEmpty(), theme::palette().accent, size))
         open("##presets", holder, programs);
@@ -138,7 +140,7 @@ void PresetMenu::popup(const char* id, const PresetHolder& holder, const Capture
 
     // The plug-in's own programs.
     if (!programNames_.isEmpty() && programs != nullptr && programs->select) {
-        ImGui::TextColored(theme::vec(p.textFaint), "%s", L("DU PLUG-IN", "THE PLUG-IN'S"));
+        ImGui::TextColored(theme::vec(p.textFaint), "%s", programs->heading != nullptr ? programs->heading : L("DU PLUG-IN", "THE PLUG-IN'S"));
         ImGui::BeginChild("##programList", ImVec2(0.0f, std::min(dp(200.0f), dp(24.0f) * static_cast<float>(programNames_.size())
                                                                                    + dp(8.0f))));
         for (int index = 0; index < programNames_.size(); ++index) {
@@ -150,7 +152,8 @@ void PresetMenu::popup(const char* id, const PresetHolder& holder, const Capture
                 if (programs->select(index, error)) {
                     programCurrent_ = index;
                     studio_.setPresetName(holder.key, name);
-                    report(ui::Ls("Programme : ", "Program: ") + name, false);
+                    report((programs->heading != nullptr ? ui::Ls("Chargé : ", "Loaded: ") : ui::Ls("Programme : ", "Program: ")) + name,
+                           false);
                 } else {
                     report(error, true);
                 }

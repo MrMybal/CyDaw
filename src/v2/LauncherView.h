@@ -26,6 +26,13 @@ private:
     // triangle, opened with a double click), or an empty slot where a double
     // click makes one.
     void masterSlot(int scene, ImVec2 min, ImVec2 max);
+    // The sections over the strips, a track's cell each (the master's for
+    // a null track where it has one).
+    void devicesCell(const TrackRef& track, ImVec2 min, ImVec2 size);
+    void sendsCell(const TrackRef& track, const std::vector<TrackRef>& buses, ImVec2 min, ImVec2 size);
+    void ioCell(const TrackRef& track, ImVec2 min, ImVec2 size);
+    // The column of toggles on the right: what the launcher shows.
+    void optionsColumn(float height);
 
     Studio& studio_;
     UiState& state_;

@@ -54,6 +54,18 @@ private:
     std::optional<double> noteField(const char* id, int field, std::uint64_t note, double current, float speed, double minimum,
                                     double maximum, const char* format, float width);
     void handleMidiKeys(const TrackRef& track, const MidiClip& clip);
+    // The velocity lane: a point a note, picked with it (a click, Ctrl, Shift,
+    // a frame), the picked moved together (Shift: finely), drawn over with
+    // Alt; their values read on them; copied and pasted onto other notes.
+    void drawVelocityLane(const TrackRef& track, const MidiClip& clip, ImVec2 laneMin, ImVec2 laneMax, ImU32 colour);
+    void copyVelocities(const MidiClip& clip);
+    void pasteVelocities(const TrackRef& track, const MidiClip& clip);
+    void nudgeVelocities(const TrackRef& track, const MidiClip& clip, float amount);
+    // The picked notes copied (Ctrl+C), cut (Ctrl+X), pasted (Ctrl+V) under
+    // the pointer, else after the last ones.
+    void copyNotes(const MidiClip& clip);
+    void pasteNotes(const TrackRef& track, const MidiClip& clip);
+    void report(const juce::String& text);
     void drawMidiPopups(const TrackRef& track, const MidiClip& clip);
     // Adds a shape to the notes it is for (the one right-clicked, or the
     // selection), over what they have.
@@ -97,6 +109,23 @@ private:
 
     // Editing.
     std::set<std::uint64_t> selection_;
+    // The velocity lane's gesture; its keys once it was clicked.
+    enum class VelocityDrag { none, move, frame, paint };
+    VelocityDrag velocityDrag_ { VelocityDrag::none };
+    bool velocityFocus_ {};
+    bool velocityMoved_ {};
+    float velocityDelta_ {};
+    ImVec2 velocityFrom_ {};
+    ImVec2 velocityLast_ {};
+    double velocityFromBeat_ {};
+    std::uint64_t velocityPressed_ {};
+    std::map<std::uint64_t, MidiNote> velocityOrigins_;
+    std::set<std::uint64_t> velocityBase_;
+    // The pointer over the notes (a paste goes there), else where the next
+    // paste goes.
+    bool gridHovered_ {};
+    double mouseBeat_ {};
+    double pasteNext_ {};
     Drag drag_ { Drag::none };
     ImVec2 dragStart_ {};
     double dragStartBeat_ {};

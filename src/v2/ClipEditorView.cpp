@@ -57,6 +57,39 @@ const app::AudioTrackController::AudioClip* findAudioClip(const app::AudioTrackC
     return nullptr;
 }
 
+// What Ctrl+C took: notes (their starts from the first's) and the room
+// they take on the grid; velocities, in time order.
+struct NoteClipboard {
+    std::vector<app::AudioTrackController::MidiNote> notes;
+    double span {};
+};
+
+NoteClipboard& noteClipboard()
+{
+    static NoteClipboard clipboard;
+    return clipboard;
+}
+
+std::vector<float>& velocityClipboard()
+{
+    static std::vector<float> clipboard;
+    return clipboard;
+}
+
+// The picked notes in time order (a chord low to high).
+std::vector<app::AudioTrackController::MidiNote> pickedInOrder(const app::AudioTrackController::MidiClip& clip,
+                                                                const std::set<std::uint64_t>& selection)
+{
+    std::vector<app::AudioTrackController::MidiNote> picked;
+    for (const auto& note : clip.notes)
+        if (selection.contains(note.id))
+            picked.push_back(note);
+    std::sort(picked.begin(), picked.end(), [](const auto& a, const auto& b) {
+        return a.startBeats < b.startBeats || (a.startBeats == b.startBeats && a.noteNumber < b.noteNumber);
+    });
+    return picked;
+}
+
 // A note's curve value at a place along it (0..1), between its points.
 float curveAt(const std::vector<app::AudioTrackController::NoteExpressionPoint>& points, const float position)
 {
@@ -510,15 +543,22 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
     const auto size = ImGui::GetContentRegionAvail();
     // Wide enough for every white key's name.
     const auto keyboardWidth = dp(72.0f);
-    // Over the bars, the band to grab (moves, zooms); beside the notes, the
-    // one for their height.
+    // Over the bars, the band to grab (moves, zooms); between the keys and
+    // the notes, the one for their height, as the eye goes from one to the
+    // other.
     const auto navigatorHeight = dp(14.0f);
     const auto rulerHeight = navigatorHeight + dp(18.0f);
-    const auto rowsBandWidth = dp(14.0f);
-    const auto velocityHeight = expression_ == Expression::gain ? std::min(dp(150.0f), size.y * 0.36f) : std::min(dp(70.0f), size.y * 0.22f);
-    gridMin_ = ImVec2(origin.x + keyboardWidth, origin.y + rulerHeight);
-    gridMax_ = ImVec2(origin.x + size.x - rowsBandWidth, origin.y + size.y - velocityHeight - dp(4.0f));
-    const ImVec2 laneMin(gridMin_.x, gridMax_.y + dp(4.0f));
+    const auto rowsBandWidth = dp(16.0f);
+    const auto keysRight = origin.x + keyboardWidth;
+    // The lane under the notes as tall as dragged, else its usual height.
+    const auto splitter = dp(6.0f);
+    const auto usualLane = expression_ == Expression::gain ? std::min(dp(150.0f), size.y * 0.36f) : std::min(dp(70.0f), size.y * 0.22f);
+    const auto velocityHeight = state_.velocityLaneHeight > 0.0f
+                                    ? std::clamp(dp(state_.velocityLaneHeight), dp(36.0f), std::max(dp(36.0f), size.y * 0.6f))
+                                    : usualLane;
+    gridMin_ = ImVec2(keysRight + rowsBandWidth, origin.y + rulerHeight);
+    gridMax_ = ImVec2(origin.x + size.x, origin.y + size.y - velocityHeight - splitter);
+    const ImVec2 laneMin(gridMin_.x, gridMax_.y + splitter);
     const ImVec2 laneMax(gridMax_.x, origin.y + size.y);
     const auto rowH = dp(rowHeight_);
     const auto spb = 60.0 / std::max(1.0, engine.tempo());
@@ -608,6 +648,8 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
     const auto mouse = io.MousePos;
     const auto mouseBeat = xToBeat(mouse.x);
     const auto mouseNote = yToNote(mouse.y);
+    gridHovered_ = hovered;
+    mouseBeat_ = mouseBeat;
     const MidiNote* under = nullptr;
     auto onEdge = false;
     for (const auto& note : clip.notes) {
@@ -813,7 +855,7 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
             scrollY_ -= (gridMin_.y + edge - mouse.y) * 0.35f * step;
         else if (mouse.y > gridMax_.y - edge)
             scrollY_ += (mouse.y - (gridMax_.y - edge)) * 0.35f * step;
-        if (mouse.x < gridMin_.x + edge && scrollBeats_ > -0.25)
+        if (mouse.x < gridMin_.x + edge)
             scrollBeats_ -= (gridMin_.x + edge - mouse.x) * 0.35f * step / ppb;
         else if (mouse.x > gridMax_.x - edge)
             scrollBeats_ += (mouse.x - (gridMax_.x - edge)) * 0.35f * step / ppb;
@@ -826,6 +868,8 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
     if (drag_ == Drag::resize)
         ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
 
+    if (hovered && (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right)))
+        velocityFocus_ = false;
     if (curveMode && hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         state_.focused = Panel::editor;
         dragStart_ = mouse;
@@ -1069,7 +1113,7 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
         auto zoom = static_cast<double>(ppb);
         if (ui::timelineBand("##timeBand", ImVec2(gridMin_.x, origin.y), ImVec2(gridMax_.x, origin.y + navigatorHeight), position, zoom,
                              6.0 * ImGui::GetStyle().FontScaleDpi, 600.0 * ImGui::GetStyle().FontScaleDpi, 1.0,
-                             studio_.engine().beatsPerBar(), -4.0)) {
+                             studio_.engine().beatsPerBar(), -1.0e6)) {
             // Double click: the whole clip.
             zoom = std::clamp((gridMax_.x - gridMin_.x) / (clip.lengthBeats + 0.5), 6.0 * ImGui::GetStyle().FontScaleDpi,
                               600.0 * ImGui::GetStyle().FontScaleDpi);
@@ -1077,12 +1121,20 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
         }
         scrollBeats_ = position;
         pixelsPerBeat_ = static_cast<float>(zoom / ImGui::GetStyle().FontScaleDpi);
-        if (ui::rowsBand("##rowsBand", ImVec2(gridMax_.x, gridMin_.y), ImVec2(gridMax_.x + rowsBandWidth, gridMax_.y), scrollY_,
-                         rowHeight_, 6.0f, 30.0f)) {
+        if (ui::rowsBand("##rowsBand", ImVec2(keysRight, gridMin_.y), ImVec2(gridMin_.x, gridMax_.y), scrollY_, rowHeight_, 6.0f, 30.0f,
+                         true)) {
             rowHeight_ = 13.0f;
             scrollY_ = -1.0f;
         }
-        list->AddRectFilled(ImVec2(gridMax_.x, origin.y), ImVec2(gridMax_.x + rowsBandWidth, gridMin_.y), p.bg1);
+        if (ui::bandCorner("##bandCorner", ImVec2(keysRight, origin.y), ImVec2(gridMin_.x, origin.y + navigatorHeight))) {
+            // The whole clip, the rows at their size round its notes.
+            pixelsPerBeat_ = std::clamp(static_cast<float>((gridMax_.x - gridMin_.x) / (clip.lengthBeats + 0.5) / ImGui::GetStyle().FontScaleDpi),
+                                        6.0f, 600.0f);
+            scrollBeats_ = -0.25;
+            rowHeight_ = 13.0f;
+            scrollY_ = -1.0f;
+        }
+        list->AddRectFilled(ImVec2(keysRight, origin.y + navigatorHeight), ImVec2(gridMin_.x, gridMin_.y), p.bg1);
     }
     // Ruler.
     const auto rulerTop = origin.y + navigatorHeight;
@@ -1093,21 +1145,21 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
     while (labelStep * ppb < 34.0)
         labelStep *= 2.0;
     for (auto beat = std::floor(xToBeat(gridMin_.x) / labelStep) * labelStep; beat < xToBeat(gridMax_.x); beat += labelStep) {
-        if (beat < 0.0)
-            continue;
         const auto x = beatToX(beat);
         char text[24];
-        const auto barBeats = studio_.engine().beatsPerBar();
-        std::snprintf(text, sizeof(text), "%d.%d", static_cast<int>(beat / barBeats + 1.0e-9) + 1,
-                      static_cast<int>(std::fmod(beat + 1.0e-9, barBeats)) + 1);
+        // Before the clip too, as the audio editor counts them: -1, -2…
+        // (dimmer).
+        const auto barBeats = std::max(1.0, static_cast<double>(studio_.engine().beatsPerBar()));
+        const auto bar = static_cast<int>(std::floor(beat / barBeats + 1.0e-9));
+        std::snprintf(text, sizeof(text), "%d.%d", bar >= 0 ? bar + 1 : bar, static_cast<int>(beat - bar * barBeats + 1.0e-9) + 1);
         list->AddLine(ImVec2(x, gridMin_.y - dp(5.0f)), ImVec2(x, gridMin_.y), p.textFaint);
-        list->AddText(ImVec2(x + dp(2.0f), rulerTop + dp(2.0f)), p.textDim, text);
+        list->AddText(ImVec2(x + dp(2.0f), rulerTop + dp(2.0f)), beat < 0.0 ? p.textFaint : p.textDim, text);
     }
     list->PopClipRect();
     ImGui::PopFont();
 
     // Keyboard.
-    list->PushClipRect(ImVec2(origin.x, gridMin_.y), ImVec2(gridMin_.x, gridMax_.y), true);
+    list->PushClipRect(ImVec2(origin.x, gridMin_.y), ImVec2(keysRight, gridMax_.y), true);
     for (auto note = 0; note < 128; ++note) {
         const auto y = noteToY(note);
         if (y + rowH < gridMin_.y || y > gridMax_.y)
@@ -1123,7 +1175,7 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
             key = theme::mix(key, p.accent, 0.7f);
         if (pressed)
             key = p.accent;
-        list->AddRectFilled(ImVec2(origin.x, y), ImVec2(gridMin_.x - (black ? dp(26.0f) : 1.0f), y + rowH - 1.0f), key, dp(2.0f),
+        list->AddRectFilled(ImVec2(origin.x, y), ImVec2(keysRight - (black ? dp(26.0f) : 1.0f), y + rowH - 1.0f), key, dp(2.0f),
                             ImDrawFlags_RoundCornersRight);
         // C's name always (bold); the other white keys' when there is room;
         // the pointed key's, black or white.
@@ -1134,7 +1186,7 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
             const auto name = noteName(note);
             const auto width = ImGui::CalcTextSize(name.c_str()).x;
             const auto onBlack = black && !pointed && !pressed;
-            list->AddText(ImVec2(gridMin_.x - width - dp(5.0f), y + (rowH - ImGui::GetFontSize()) * 0.5f),
+            list->AddText(ImVec2(keysRight - width - dp(5.0f), y + (rowH - ImGui::GetFontSize()) * 0.5f),
                           onBlack ? IM_COL32(230, 232, 236, 255)
                           : note % 12 == 0 || pointed ? IM_COL32(20, 22, 26, 255)
                                                       : IM_COL32(90, 96, 106, 255),
@@ -1154,6 +1206,28 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
     }
     if (ImGui::IsItemHovered() && io.MouseWheel != 0.0f)
         scrollY_ -= io.MouseWheel * rowH * 3.0f;
+
+    // The bar between the notes and the lane: dragged, the lane taller or
+    // shorter (a double click: its usual height).
+    {
+        const ImVec2 barMin(origin.x, gridMax_.y);
+        ImGui::SetCursorScreenPos(barMin);
+        ImGui::InvisibleButton("##laneSplitter", ImVec2(std::max(1.0f, size.x), splitter));
+        const auto hot = ImGui::IsItemHovered() || ImGui::IsItemActive();
+        if (hot)
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+        if (ImGui::IsItemActive() && io.MouseDelta.y != 0.0f)
+            state_.velocityLaneHeight = std::max(20.0f, (velocityHeight - io.MouseDelta.y) / dp(1.0f));
+        if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+            state_.velocityLaneHeight = 0.0f;
+        ui::tooltip(L("Glisser : agrandir ou réduire le couloir du bas · double-clic : sa taille de base",
+                      "Drag: make the lane below taller or shorter · double click: its usual size"));
+        const auto y = barMin.y + splitter * 0.5f;
+        list->AddLine(ImVec2(origin.x, y), ImVec2(origin.x + size.x, y), hot ? p.accent : p.line, hot ? dp(2.0f) : dp(1.0f));
+        for (auto dot = -2; dot <= 2; ++dot)
+            list->AddCircleFilled(ImVec2(gridMin_.x + (gridMax_.x - gridMin_.x) * 0.5f + static_cast<float>(dot) * dp(6.0f), y), dp(1.5f),
+                                  hot ? p.accent : p.textFaint);
+    }
 
     // Velocity lane (the gain lane in that mode).
     list->AddRectFilled(ImVec2(origin.x, laneMin.y), laneMax, p.bg1);
@@ -1207,58 +1281,368 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
             handleMidiKeys(track, clip);
         return;
     }
-    ImGui::PushFont(nullptr, ui::currentFontBase() * 0.72f);
-    list->AddText(ImVec2(origin.x + dp(6.0f), laneMin.y + dp(4.0f)), p.textFaint, L("VÉLOCITÉ", "VELOCITY"));
-    ImGui::PopFont();
-    list->PushClipRect(laneMin, laneMax, true);
-    for (const auto& note : notes) {
-        const auto x = beatToX(note.startBeats);
-        if (x < laneMin.x - 4.0f || x > laneMax.x)
-            continue;
-        const auto top = laneMax.y - (laneMax.y - laneMin.y - dp(4.0f)) * note.velocity;
-        const auto selected = selection_.contains(note.id);
-        list->AddLine(ImVec2(x + dp(1.5f), laneMax.y), ImVec2(x + dp(1.5f), top), selected ? p.accent : colour, dp(3.0f));
-        list->AddCircleFilled(ImVec2(x + dp(1.5f), top), dp(3.0f), selected ? p.accent : colour);
-    }
-    list->PopClipRect();
-    ImGui::SetCursorScreenPos(laneMin);
-    ImGui::InvisibleButton("##velocity", ImVec2(std::max(1.0f, laneMax.x - laneMin.x), std::max(1.0f, laneMax.y - laneMin.y)));
-    if (ImGui::IsItemActivated())
-        beginEdit();
-    if (ImGui::IsItemActive()) {
-        const auto value = std::clamp(1.0f - (io.MousePos.y - laneMin.y) / (laneMax.y - laneMin.y), 0.01f, 1.0f);
-        // The selection when the pointer is over one of its notes, else the
-        // nearest note to the pointer.
-        std::vector<const MidiNote*> targets;
-        const MidiNote* nearest = nullptr;
-        auto best = 1.0e9f;
-        for (const auto& note : notes) {
-            const auto distance = std::abs(beatToX(note.startBeats) - io.MousePos.x);
-            if (distance < best) {
-                best = distance;
-                nearest = &note;
-            }
-        }
-        if (nearest != nullptr && best < dp(8.0f)) {
-            if (selection_.contains(nearest->id))
-                for (const auto& note : notes) {
-                    if (selection_.contains(note.id))
-                        targets.push_back(&note);
-                }
-            else
-                targets.push_back(nearest);
-        }
-        for (const auto* note : targets)
-            (void) engine.updateMidiNote(track.midiId, clip.id, note->id, note->noteNumber, note->startBeats, note->durationBeats,
-                                         value);
-    }
-    if (ImGui::IsItemDeactivated())
-        endEdit();
+    drawVelocityLane(track, clip, laneMin, laneMax, colour);
 
     ImGui::EndChild();
     drawMidiPopups(track, clip);
     if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows))
         handleMidiKeys(track, clip);
+}
+
+// ---- The velocity lane ----------------------------------------------------------------------
+
+void ClipEditorView::report(const juce::String& text)
+{
+    state_.status = text;
+    state_.statusIsError = false;
+    state_.statusTime = ImGui::GetTime();
+}
+
+void ClipEditorView::drawVelocityLane(const TrackRef& track, const MidiClip& clip, const ImVec2 laneMin, const ImVec2 laneMax,
+                                      const ImU32 colour)
+{
+    const auto& p = theme::palette();
+    auto& engine = studio_.engine();
+    auto& io = ImGui::GetIO();
+    auto* list = ImGui::GetWindowDrawList();
+    const auto mouse = io.MousePos;
+    // 127 at the top, nothing at the bottom.
+    const auto top = laneMin.y + dp(8.0f);
+    const auto bottom = laneMax.y - dp(2.0f);
+    const auto span = std::max(1.0f, bottom - top);
+    const auto yOf = [&](const float velocity) { return bottom - span * velocity; };
+    const auto stalkX = [&](const MidiNote& note) { return beatToX(note.startBeats) + dp(1.5f); };
+    const auto readable = [](const float velocity) { return static_cast<int>(std::lround(velocity * 127.0f)); };
+    const auto* current = findMidiClip(engine, track.midiId, clip.id);
+    const auto notes = current != nullptr ? current->notes : clip.notes;
+
+    // Its name, at the foot of the keys' column; its scale beside the lane.
+    ImGui::PushFont(nullptr, ui::currentFontBase() * 0.68f);
+    list->AddText(ImVec2(laneMin.x - dp(66.0f), laneMax.y - ImGui::GetFontSize() - dp(4.0f)), p.textFaint, L("VÉLOCITÉ", "VELOCITY"));
+    for (const auto value : { 127, 96, 64, 32 }) {
+        const auto y = std::round(yOf(static_cast<float>(value) / 127.0f));
+        list->AddLine(ImVec2(laneMin.x, y), ImVec2(laneMax.x, y), value == 64 ? p.gridStrong : p.grid);
+        char text[8];
+        std::snprintf(text, sizeof(text), "%d", value);
+        list->AddText(ImVec2(laneMin.x - dp(4.0f) - ImGui::CalcTextSize(text).x, y - ImGui::GetFontSize() * 0.5f), p.textFaint, text);
+    }
+    ImGui::PopFont();
+
+    ImGui::SetCursorScreenPos(laneMin);
+    ImGui::InvisibleButton("##velocity", ImVec2(std::max(1.0f, laneMax.x - laneMin.x), std::max(1.0f, laneMax.y - laneMin.y)),
+                           ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
+    const auto laneHovered = ImGui::IsItemHovered();
+    // The point under the pointer: the stalk nearest it (of a chord's, the
+    // head nearest the pointer, a picked one first).
+    const MidiNote* hit = nullptr;
+    if (laneHovered && velocityDrag_ == VelocityDrag::none) {
+        auto best = 1.0e9f;
+        for (const auto& note : notes) {
+            const auto dx = std::abs(stalkX(note) - mouse.x);
+            if (dx > dp(5.0f))
+                continue;
+            const auto score = dx + std::abs(yOf(note.velocity) - mouse.y) * 0.2f - (selection_.contains(note.id) ? 1.0f : 0.0f);
+            if (score < best) {
+                best = score;
+                hit = &note;
+            }
+        }
+    }
+    const auto setVelocity = [&](const MidiNote& note, const float velocity) {
+        (void) engine.updateMidiNote(track.midiId, clip.id, note.id, note.noteNumber, note.startBeats, note.durationBeats,
+                                     std::clamp(velocity, 1.0f / 127.0f, 1.0f));
+    };
+    // One step of the history, from the first change.
+    const auto startChange = [&] {
+        if (!velocityMoved_) {
+            (void) engine.beginMidiEdit(track.midiId, clip.id);
+            velocityMoved_ = true;
+        }
+    };
+    const auto endChange = [&] {
+        if (velocityMoved_) {
+            (void) engine.endMidiEdit();
+            studio_.markDirty();
+        }
+        velocityMoved_ = false;
+        velocityDrag_ = VelocityDrag::none;
+    };
+
+    if (laneHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+        state_.focused = Panel::editor;
+        velocityFocus_ = true;
+        velocityFrom_ = mouse;
+        velocityLast_ = mouse;
+        velocityFromBeat_ = xToBeat(mouse.x);
+        velocityMoved_ = false;
+        velocityDelta_ = 0.0f;
+        velocityPressed_ = 0;
+        if (io.KeyAlt) {
+            velocityDrag_ = VelocityDrag::paint;
+        } else if (hit != nullptr) {
+            if (io.KeyCtrl) {
+                if (selection_.contains(hit->id))
+                    selection_.erase(hit->id);
+                else
+                    selection_.insert(hit->id);
+            } else if (io.KeyShift) {
+                selection_.insert(hit->id);
+            } else if (!selection_.contains(hit->id)) {
+                selection_ = { hit->id };
+            }
+            velocityPressed_ = hit->id;
+            if (selection_.contains(hit->id)) {
+                velocityDrag_ = VelocityDrag::move;
+                velocityOrigins_.clear();
+                for (const auto& note : notes)
+                    if (selection_.contains(note.id))
+                        velocityOrigins_[note.id] = note;
+            }
+        } else {
+            if (!io.KeyCtrl && !io.KeyShift)
+                selection_.clear();
+            velocityBase_ = selection_;
+            velocityDrag_ = VelocityDrag::frame;
+        }
+    }
+    if (laneHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+        state_.focused = Panel::editor;
+        velocityFocus_ = true;
+        if (hit != nullptr && !selection_.contains(hit->id))
+            selection_ = { hit->id };
+        ImGui::OpenPopup("##velocityMenu");
+    }
+
+    switch (velocityDrag_) {
+    case VelocityDrag::move:
+        // The picked go up or down together, each from where it was.
+        if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+            velocityDelta_ += -io.MouseDelta.y / span * (io.KeyShift ? 0.2f : 1.0f);
+            if (velocityMoved_ || ImGui::IsMouseDragging(ImGuiMouseButton_Left, 2.0f)) {
+                startChange();
+                for (const auto& [id, origin] : velocityOrigins_)
+                    setVelocity(origin, origin.velocity + velocityDelta_);
+            }
+        } else {
+            // A click without a move on one of several picked: that one alone.
+            if (!velocityMoved_ && !io.KeyCtrl && !io.KeyShift && velocityPressed_ != 0)
+                selection_ = { velocityPressed_ };
+            endChange();
+        }
+        break;
+    case VelocityDrag::paint:
+        // Alt: drawn over, each stalk the pointer passes takes its height
+        // (only the picked ones when some are).
+        if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+            const auto from = std::min(velocityLast_.x, mouse.x) - dp(3.0f);
+            const auto to = std::max(velocityLast_.x, mouse.x) + dp(3.0f);
+            for (const auto& note : notes) {
+                const auto x = stalkX(note);
+                if (x < from || x > to || (!selection_.empty() && !selection_.contains(note.id)))
+                    continue;
+                const auto along = std::abs(mouse.x - velocityLast_.x) > 0.5f
+                                       ? std::clamp((x - velocityLast_.x) / (mouse.x - velocityLast_.x), 0.0f, 1.0f)
+                                       : 1.0f;
+                const auto value = std::clamp((bottom - (velocityLast_.y + (mouse.y - velocityLast_.y) * along)) / span, 1.0f / 127.0f, 1.0f);
+                if (std::abs(value - note.velocity) > 1.0e-4f) {
+                    startChange();
+                    setVelocity(note, value);
+                }
+            }
+            velocityLast_ = mouse;
+        } else {
+            endChange();
+        }
+        break;
+    case VelocityDrag::frame: {
+        // Its start where it was in time, however far the view has moved.
+        const ImVec2 from(beatToX(velocityFromBeat_), velocityFrom_.y);
+        const ImVec2 a(std::min(from.x, mouse.x), std::min(from.y, mouse.y));
+        const ImVec2 b(std::max(from.x, mouse.x), std::max(from.y, mouse.y));
+        if (b.x - a.x > 3.0f || b.y - a.y > 3.0f) {
+            selection_ = velocityBase_;
+            for (const auto& note : notes) {
+                const auto x = stalkX(note);
+                if (x >= a.x && x <= b.x && yOf(note.velocity) - dp(3.0f) <= b.y && bottom >= a.y)
+                    selection_.insert(note.id);
+            }
+            list->AddRectFilled(a, b, theme::alpha(p.accent, 0.08f));
+            list->AddRect(a, b, theme::alpha(p.accent, 0.7f));
+        }
+        if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+            velocityDrag_ = VelocityDrag::none;
+        break;
+    }
+    case VelocityDrag::none: break;
+    }
+    if (hit != nullptr)
+        ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+
+    // The points as they are now: the picked over the others.
+    const auto* now = findMidiClip(engine, track.midiId, clip.id);
+    const auto& shown = now != nullptr ? now->notes : notes;
+    list->PushClipRect(laneMin, laneMax, true);
+    struct Label {
+        float x {};
+        float head {};
+        int value {};
+        bool hot {};
+    };
+    std::vector<Label> labels;
+    for (const auto pass : { false, true })
+        for (const auto& note : shown) {
+            const auto selected = selection_.contains(note.id);
+            if (selected != pass)
+                continue;
+            const auto x = stalkX(note);
+            if (x < laneMin.x - dp(6.0f) || x > laneMax.x + dp(6.0f))
+                continue;
+            const auto head = yOf(note.velocity);
+            const auto hot = hit != nullptr && hit->id == note.id;
+            const auto ink = selected ? p.accent : hot ? theme::brighter(colour, 0.35f) : colour;
+            list->AddLine(ImVec2(x, bottom), ImVec2(x, head), ink, selected ? dp(2.5f) : dp(2.0f));
+            list->AddCircleFilled(ImVec2(x, head), selected || hot ? dp(4.0f) : dp(3.0f), ink);
+            if (selected)
+                list->AddCircle(ImVec2(x, head), dp(4.5f), p.text, 0, 1.2f);
+            if (selected || hot)
+                labels.push_back({ x, head, readable(note.velocity), hot });
+        }
+    // Their values over them, where there is room (the one under the pointer
+    // always).
+    std::sort(labels.begin(), labels.end(), [](const Label& a, const Label& b) { return a.x < b.x; });
+    ImGui::PushFont(theme::boldFont(), ui::currentFontBase() * 0.68f);
+    auto lastRight = -1.0e9f;
+    for (const auto& label : labels) {
+        char text[8];
+        std::snprintf(text, sizeof(text), "%d", label.value);
+        const auto size = ImGui::CalcTextSize(text);
+        auto at = ImVec2(label.x - size.x * 0.5f, label.head - size.y - dp(5.0f));
+        if (at.y < laneMin.y + dp(1.0f))
+            at = ImVec2(label.x + dp(7.0f), label.head - size.y * 0.5f);
+        if (!label.hot && at.x < lastRight + dp(2.0f))
+            continue;
+        list->AddRectFilled(ImVec2(at.x - dp(2.0f), at.y - dp(1.0f)), ImVec2(at.x + size.x + dp(2.0f), at.y + size.y + dp(1.0f)),
+                            theme::alpha(p.bg0, 0.85f), dp(2.0f));
+        list->AddText(at, label.hot ? p.text : p.accent, text);
+        lastRight = at.x + size.x;
+    }
+    ImGui::PopFont();
+    list->PopClipRect();
+    if (hit != nullptr && velocityDrag_ == VelocityDrag::none && !ImGui::IsPopupOpen("##velocityMenu"))
+        ImGui::SetTooltip("%s  \xc2\xb7  %s %d", noteName(hit->noteNumber).c_str(), L("vélocité", "velocity"), readable(hit->velocity));
+    else if (laneHovered && hit == nullptr)
+        ui::tooltip(L("Clic : choisir un point (Ctrl, Maj : plusieurs ; cadre dans le vide). Glisser : monter ou baisser les choisis "
+                      "(Maj : finement). Alt+glisser : dessiner. Ctrl+C / Ctrl+V : copier, coller leurs valeurs. Clic droit : menu.",
+                      "Click: pick a point (Ctrl, Shift: several; a frame in the empty lane). Drag: raise or lower the picked "
+                      "(Shift: finely). Alt+drag: draw. Ctrl+C / Ctrl+V: copy, paste their values. Right click: menu."));
+
+    if (ImGui::BeginPopup("##velocityMenu")) {
+        const auto picked = std::count_if(shown.begin(), shown.end(), [this](const MidiNote& note) { return selection_.contains(note.id); });
+        ImGui::TextDisabled("%d %s", static_cast<int>(picked), L("point(s) choisi(s)", "point(s) picked"));
+        if (ImGui::MenuItem(L("Copier les vélocités", "Copy the velocities"), "Ctrl+C", false, picked > 0) && current != nullptr)
+            copyVelocities(*current);
+        if (ImGui::MenuItem(L("Coller les vélocités", "Paste the velocities"), "Ctrl+V", false, picked > 0 && !velocityClipboard().empty())
+            && current != nullptr)
+            pasteVelocities(track, *current);
+        if (ImGui::MenuItem(L("Tout choisir", "Pick all"), "Ctrl+A"))
+            for (const auto& note : shown)
+                selection_.insert(note.id);
+        ImGui::Separator();
+        if (ImGui::MenuItem(L("Monter de 10", "Raise by 10"), L("Maj+Haut", "Shift+Up"), false, picked > 0) && current != nullptr)
+            nudgeVelocities(track, *current, 10.0f);
+        if (ImGui::MenuItem(L("Baisser de 10", "Lower by 10"), L("Maj+Bas", "Shift+Down"), false, picked > 0) && current != nullptr)
+            nudgeVelocities(track, *current, -10.0f);
+        ImGui::EndPopup();
+    }
+}
+
+void ClipEditorView::copyVelocities(const MidiClip& clip)
+{
+    const auto picked = pickedInOrder(clip, selection_);
+    if (picked.empty())
+        return;
+    auto& values = velocityClipboard();
+    values.clear();
+    for (const auto& note : picked)
+        values.push_back(note.velocity);
+    report(juce::String(static_cast<int>(values.size())) + ui::Ls(" vélocités copiées", " velocities copied"));
+}
+
+void ClipEditorView::pasteVelocities(const TrackRef& track, const MidiClip& clip)
+{
+    const auto& values = velocityClipboard();
+    const auto picked = pickedInOrder(clip, selection_);
+    if (values.empty() || picked.empty())
+        return;
+    // In time order, the copied values again from the first when there are
+    // fewer of them.
+    auto& engine = studio_.engine();
+    (void) engine.beginMidiEdit(track.midiId, clip.id);
+    for (std::size_t index = 0; index < picked.size(); ++index) {
+        const auto& note = picked[index];
+        (void) engine.updateMidiNote(track.midiId, clip.id, note.id, note.noteNumber, note.startBeats, note.durationBeats,
+                                     std::clamp(values[index % values.size()], 1.0f / 127.0f, 1.0f));
+    }
+    (void) engine.endMidiEdit();
+    studio_.markDirty();
+    report(juce::String(static_cast<int>(picked.size())) + ui::Ls(" vélocités collées", " velocities pasted"));
+}
+
+void ClipEditorView::nudgeVelocities(const TrackRef& track, const MidiClip& clip, const float amount)
+{
+    const auto picked = pickedInOrder(clip, selection_);
+    if (picked.empty())
+        return;
+    auto& engine = studio_.engine();
+    (void) engine.beginMidiEdit(track.midiId, clip.id);
+    for (const auto& note : picked)
+        (void) engine.updateMidiNote(track.midiId, clip.id, note.id, note.noteNumber, note.startBeats, note.durationBeats,
+                                     std::clamp(note.velocity + amount / 127.0f, 1.0f / 127.0f, 1.0f));
+    (void) engine.endMidiEdit();
+    studio_.markDirty();
+}
+
+void ClipEditorView::copyNotes(const MidiClip& clip)
+{
+    auto picked = pickedInOrder(clip, selection_);
+    if (picked.empty())
+        return;
+    auto first = picked.front().startBeats;
+    auto last = first;
+    for (const auto& note : picked)
+        last = std::max(last, note.startBeats + note.durationBeats);
+    for (auto& note : picked)
+        note.startBeats -= first;
+    const auto grid = gridBeats_ > 0.0 ? gridBeats_ : 0.25;
+    auto& copied = noteClipboard();
+    copied.notes = std::move(picked);
+    copied.span = std::max(grid, std::ceil((last - first) / grid - 1.0e-9) * grid);
+    pasteNext_ = first + copied.span;
+    report(juce::String(static_cast<int>(copied.notes.size())) + ui::Ls(" notes copiées", " notes copied"));
+}
+
+void ClipEditorView::pasteNotes(const TrackRef& track, const MidiClip& clip)
+{
+    const auto& copied = noteClipboard();
+    if (copied.notes.empty())
+        return;
+    // Under the pointer (on the grid's line before it), else after the
+    // last ones copied or pasted.
+    auto at = pasteNext_;
+    if (gridHovered_)
+        at = gridBeats_ > 0.0 && ui::snapping(state_.pianoRollSnap) ? std::floor(mouseBeat_ / gridBeats_) * gridBeats_ : mouseBeat_;
+    at = std::max(0.0, at);
+    auto& engine = studio_.engine();
+    std::set<std::uint64_t> pasted;
+    (void) engine.beginMidiEdit(track.midiId, clip.id);
+    for (const auto& note : copied.notes)
+        if (const auto id = engine.copyMidiNote(track.midiId, clip.id, note, at + note.startBeats); id != 0)
+            pasted.insert(id);
+    (void) engine.endMidiEdit();
+    selection_ = pasted;
+    pasteNext_ = at + copied.span;
+    studio_.markDirty();
+    report(juce::String(static_cast<int>(pasted.size())) + ui::Ls(" notes collées", " notes pasted"));
 }
 
 void ClipEditorView::drawMidiPopups(const TrackRef& track, const MidiClip& clip)
@@ -1489,15 +1873,48 @@ void ClipEditorView::handleMidiKeys(const TrackRef& track, const MidiClip& clip)
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_A, false))
         for (const auto& note : current->notes)
             selection_.insert(note.id);
+    // Copy and paste: the velocities when the lane was clicked last, else
+    // the notes.
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_C, false)) {
+        if (velocityFocus_)
+            copyVelocities(*current);
+        else
+            copyNotes(*current);
+    }
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_X, false) && !velocityFocus_ && !selection_.empty()) {
+        copyNotes(*current);
+        const auto ids = selection_;
+        (void) engine.beginMidiEdit(track.midiId, clip.id);
+        for (const auto id : ids)
+            (void) engine.removeMidiNote(track.midiId, clip.id, id);
+        (void) engine.endMidiEdit();
+        selection_.clear();
+        studio_.markDirty();
+        return;
+    }
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_V, false)) {
+        if (velocityFocus_)
+            pasteVelocities(track, *current);
+        else
+            pasteNotes(track, *current);
+        return;
+    }
+    // Up and down in the lane: the velocities (Shift: by 10).
+    if (velocityFocus_ && !selection_.empty()) {
+        if (ImGui::IsKeyPressed(ImGuiKey_UpArrow, true))
+            nudgeVelocities(track, *current, io.KeyShift ? 10.0f : 1.0f);
+        if (ImGui::IsKeyPressed(ImGuiKey_DownArrow, true))
+            nudgeVelocities(track, *current, io.KeyShift ? -10.0f : -1.0f);
+    }
     const auto transpose = [&](const int semitones) {
         edit([&](const MidiNote& note) {
             (void) engine.updateMidiNote(track.midiId, clip.id, note.id, std::clamp(note.noteNumber + semitones, 0, 127),
                                          note.startBeats, note.durationBeats, note.velocity);
         });
     };
-    if (ImGui::IsKeyPressed(ImGuiKey_UpArrow, true) && !selection_.empty())
+    if (!velocityFocus_ && ImGui::IsKeyPressed(ImGuiKey_UpArrow, true) && !selection_.empty())
         transpose(io.KeyShift ? 12 : 1);
-    if (ImGui::IsKeyPressed(ImGuiKey_DownArrow, true) && !selection_.empty())
+    if (!velocityFocus_ && ImGui::IsKeyPressed(ImGuiKey_DownArrow, true) && !selection_.empty())
         transpose(io.KeyShift ? -12 : -1);
     const auto nudge = gridBeats_ > 0.0 ? gridBeats_ : 0.25;
     if (ImGui::IsKeyPressed(ImGuiKey_RightArrow, true) && !selection_.empty())

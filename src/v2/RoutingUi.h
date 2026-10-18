@@ -2,6 +2,8 @@
 
 #include "Studio.h"
 
+#include <cstdint>
+
 #include <imgui.h>
 
 // A track's inputs and outputs, as the inspector, the routing panel, the
@@ -28,13 +30,14 @@ namespace cydaw::v2::routing_ui {
 // rows up with the panel's own labels. Why a change was refused goes to
 // `error`.
 void outputsEditor(Studio& studio, const TrackRef& track, float labelWidth, juce::String& error);
-// One output's destination picked in a combo of `width` (the master, the
-// card's outputs, buses, tracks, their other inputs); true when it changed.
+// One output's destination picked in a combo of `width`, grouped under
+// headings (the master, the card's outputs, the buses, the other tracks and
+// their other inputs); true when it changed.
 bool destinationCombo(const char* id, const Studio& studio, const TrackRef& track, TrackOutput& output, float width);
 // Its main output's destination alone, as a combo of `width`.
 void mainOutputCombo(Studio& studio, const TrackRef& track, float width, juce::String& error);
-// Its inputs: the main one, the others (named, removable) and a button for
-// another.
+// Its extra audio inputs (a sidechain, a second source), named and
+// removable, and a button for another.
 void inputsEditor(Studio& studio, const TrackRef& track, float labelWidth, juce::String& error);
 // The tracks routed into it, as one line (with the input when not the main).
 void sendersLine(const Studio& studio, const TrackRef& track, float labelWidth);
@@ -47,6 +50,13 @@ void mainOutputItems(Studio& studio, const TrackRef& track, juce::String& error)
 void formatCombo(Studio& studio, const TrackRef& track, float width, juce::String& error);
 // The input bus an audio track records from, as a combo, with its format.
 void recordInputCombo(Studio& studio, const TrackRef& track, float width);
+// An instrument track's MIDI input: its name (every input, the computer
+// keyboard, a device), what its light follows (its messages and the track's
+// clips' notes, a counter), and the combo picking it, one choice, its light
+// in it (`width` as SetNextItemWidth takes it).
+[[nodiscard]] juce::String midiInputName(const juce::String& input);
+[[nodiscard]] std::uint32_t midiInputActivity(const Studio& studio, const TrackRef& track, const juce::String& input);
+void midiInputCombo(Studio& studio, const TrackRef& track, float width);
 // Its channels' levels side by side, each over its speaker's name.
 void channelMeters(const Studio& studio, const TrackRef& track, ImVec2 size);
 

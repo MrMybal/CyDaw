@@ -248,6 +248,16 @@ struct UiState {
     // The audio clip editor's automation lanes, as tall as dragged (dp; 0:
     // as tall as they need).
     float audioClipLanesHeight {};
+    // The piano roll's velocity (or gain) lane, as tall as dragged (dp; 0:
+    // its usual height).
+    float velocityLaneHeight {};
+    // What the launcher shows, from its options' column (as Bitwig's): the
+    // clips, then over each strip the devices, the sends, the inputs and
+    // outputs.
+    bool launcherShowClips { true };
+    bool launcherShowDevices {};
+    bool launcherShowSends {};
+    bool launcherShowIo {};
     bool followPlayhead { true };
 
     // Status line: the last thing the interface has to say.
@@ -265,6 +275,9 @@ struct UiState {
     }
     // The device panel's catalogue asked open (the control port).
     bool openDeviceCatalogue {};
+    // Where the next device chosen for a track goes: before that card (a
+    // small "+" between two cards picked it). None: where it goes by itself.
+    std::optional<std::pair<TrackRef, std::uint64_t>> deviceInsertBefore;
     bool inlineDeviceCatalogue {};
     // The devices' windows open (PluginWindows draws them).
     std::vector<PluginWindow> pluginWindows;

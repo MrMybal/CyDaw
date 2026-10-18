@@ -50,7 +50,6 @@ void ContextMenus::draw()
             ImGui::PopFont();
             ImGui::Separator();
             ImGui::BeginChild("##outputsBody", ImVec2(dp(380.0f), dp(150.0f)), ImGuiChildFlags_None);
-            routing_ui::sendersLine(studio_, outputsTrack_, dp(64.0f));
             juce::String error;
             routing_ui::outputsEditor(studio_, outputsTrack_, dp(64.0f), error);
             if (error.isNotEmpty()) {

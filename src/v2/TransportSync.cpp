@@ -319,6 +319,10 @@ public:
         return status();
     }
     void draw(bool& visible);
+    // Its traffic and its Link peers, for the top bar.
+    [[nodiscard]] std::uint64_t receivedMessages() const { return rxCount.load(); }
+    [[nodiscard]] std::uint64_t sentMessages() const { return txCount.load(); }
+    [[nodiscard]] int linkPeers() const { return link ? static_cast<int>(link->numPeers()) : 0; }
 
 private:
     juce::PropertiesFile& settings;
@@ -944,6 +948,19 @@ TransportSync::TransportSync(
 }
 TransportSync::~TransportSync() = default;
 bool TransportSync::active() const { return impl_->config.enabled && impl_->connected; }
+std::uint64_t TransportSync::receivedCount() const { return impl_->receivedMessages(); }
+std::uint64_t TransportSync::sentCount() const { return impl_->sentMessages(); }
+juce::String TransportSync::statusText() const
+{
+    if (!active())
+        return {};
+    auto text = juce::String(protocols[impl_->config.protocol]);
+    if (impl_->config.protocol == 3)
+        text << " (" << impl_->linkPeers() << ui::Ls(" pair(s))", " peer(s))");
+    else
+        text << (impl_->config.send ? ui::Ls(" : CyDAW l'envoie", ": CyDAW sends it") : ui::Ls(" : CyDAW le suit", ": CyDAW follows it"));
+    return text;
+}
 juce::var TransportSync::command(const juce::var& request) { return impl_->command(request); }
 void TransportSync::drawButton(bool& visible)
 {

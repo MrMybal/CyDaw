@@ -108,6 +108,9 @@ private:
     void applyDrag(const std::vector<LaneHit>& lanes);
     void endDrag(const std::vector<LaneHit>& lanes);
     void createMidiClipAt(const TrackRef& track, double seconds);
+    // A bus track's clip of automation alone (its lanes move the bus's
+    // volume, pan, effects), four bars from the bar under `seconds`.
+    void createAutomationClipAt(const TrackRef& track, double seconds);
     void openInEditor(const ClipRef& clip);
 
     [[nodiscard]] double secondsPerBeat() const;

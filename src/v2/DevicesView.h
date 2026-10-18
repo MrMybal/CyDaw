@@ -75,6 +75,11 @@ private:
         int depth {};
     };
     void drawCard(Strip& strip, const app::NodeGraphComponent::EditorNode& node, float height, const CardPlace& place);
+    // A small "+" before a card of the chain: the device chosen goes there
+    // (a card dropped on it too).
+    void insertGap(Strip& strip, std::uint64_t before, float height);
+    // The catalogue for a track: the library window, or the quick list.
+    void chooseDevice(const TrackRef& track, bool quick);
     [[nodiscard]] bool movable(const Strip& strip, const app::NodeGraphComponent::EditorNode& node) const;
     // A container's chosen branch: its cards after the container's card,
     // inside its frame, and a "+" at its end.

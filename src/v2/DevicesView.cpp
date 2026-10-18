@@ -1,3 +1,5 @@
+#include "RoutingUi.h"
+#include "MidiDevices.h"
 #include "DevicesView.h"
 
 #include "CardFiles.h"
@@ -245,56 +247,148 @@ void DevicesView::draw()
                 state_.openRackPad.reset();
             ImGui::SetCursorScreenPos(origin);
         }
-        // Vertical name.
+        // What reaches the track, at the foot of the column under its
+        // preset: a light for each MIDI input it hears (its clips' notes,
+        // a keyboard), lit as a message goes by; a meter for each audio
+        // input (a card's input, what tracks route into it).
+        struct Light {
+            juce::String tip;
+            std::uint32_t counter {};
+            bool heard {};
+            std::string key;
+        };
+        std::vector<Light> lights;
+        std::vector<std::pair<juce::String, float>> meters;
+        if (!track.master && !track.isBus() && track.pad < 0) {
+            auto& engine = studio_.engine();
+            const auto prefix = (track.midi ? "m" : "a") + std::to_string(track.midi ? track.midiId : track.audioIndex) + ":";
+            if (track.midi) {
+                const auto hears = engine.midiTrackHearsInputs(track.midiId);
+                const auto inputs = engine.midiTrackInputs(track.midiId);
+                for (const auto& input : inputs) {
+                    Light light;
+                    light.key = prefix + input.toStdString();
+                    light.heard = hears;
+                    light.counter = routing_ui::midiInputActivity(studio_, track, input);
+                    light.tip = ui::Ls("Entrée MIDI : ", "MIDI input: ") + routing_ui::midiInputName(input)
+                                + ui::Ls("\nS'allume quand des notes arrivent : de ses clips, ou de cette entrée",
+                                         "\nLights up as notes arrive: from its clips, or from this input")
+                                + (hears ? ui::Ls(" (elle l'entend : elle est armée, ou choisie).", " (it hears it: it is armed, or picked).")
+                                         : ui::Ls(" (elle l'entendra armée, ou choisie).", " (it will hear it armed, or picked)."));
+                    lights.push_back(std::move(light));
+                }
+                if (inputs.empty())
+                    lights.push_back({ ui::Ls("Aucune entrée MIDI : la lumière suit les notes de ses clips (Routage pour en choisir une)",
+                                              "No MIDI input: the light follows its clips' notes (Routing to pick one)"),
+                                       engine.midiTrackClipActivity(track.midiId), false, prefix + "clips" });
+            }
+            const auto levels = track.midi ? engine.midiTrackInputLevels(track.midiId) : engine.trackInputLevels(track.audioIndex);
+            if (!track.midi && !studio_.isBusTrack(track)) {
+                // An audio track's main input: the card's input it records,
+                // and what tracks route into it.
+                const auto busId = engine.trackMixState(track.audioIndex).inputBusId;
+                const auto card = engine.virtualBusMeterLevels(busId);
+                const auto bus = engine.virtualBus(busId);
+                meters.emplace_back(bus ? bus->name : ui::Ls("Entrée principale", "Main input"), std::max({ card[0], card[1], levels[0] }));
+            } else if (!track.midi) {
+                meters.emplace_back(ui::Ls("Ce qui y est routé", "What is routed into it"), levels[0]);
+            }
+            const auto inputs = studio_.trackInputs(track);
+            for (std::size_t index = 0; index < inputs.size() && index + 1 < levels.size(); ++index)
+                meters.emplace_back(inputs[index].name, levels[index + 1]);
+        }
+        const auto lightSize = dp(9.0f);
+        const auto lightGap = dp(3.0f);
+        const auto meterTall = dp(34.0f);
+        const auto indicatorsBottom = origin.y + size.y - dp(4.0f);
+        auto indicatorsTop = indicatorsBottom;
+        if (!lights.empty())
+            indicatorsTop -= static_cast<float>(lights.size()) * (lightSize + lightGap);
+        if (!meters.empty())
+            indicatorsTop -= meterTall + lightGap;
+        // The track's preset, over them.
+        const auto presetsTop = indicatorsTop - dp(24.0f);
+        {
+            const auto mouse = ImGui::GetIO().MousePos;
+            auto y = indicatorsBottom;
+            const auto x = origin.x + (size.x - lightSize) * 0.5f + dp(2.0f);
+            for (const auto& light : lights) {
+                y -= lightSize + lightGap;
+                const ImVec2 min(x, y);
+                const ImVec2 max(x + lightSize, y + lightSize);
+                const auto lit = midi_devices::activity(light.key, light.counter);
+                const auto on = light.heard ? p.play : p.textFaint;
+                list->AddRectFilled(min, max, theme::mix(p.bg0 | 0xff000000u, on, 0.15f + 0.85f * lit), dp(2.0f));
+                list->AddRect(min, max, light.heard ? theme::alpha(on, 0.8f) : p.line, dp(2.0f));
+                if (ImGui::IsMouseHoveringRect(min, max) && ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
+                    ui::tooltip(light.tip.toRawUTF8());
+            }
+            if (!meters.empty()) {
+                y -= meterTall + lightGap;
+                const auto meterWide = dp(4.0f);
+                const auto count = static_cast<float>(meters.size());
+                auto meterX = origin.x + dp(2.0f) + (size.x - count * meterWide - (count - 1.0f) * dp(2.0f)) * 0.5f;
+                for (std::size_t index = 0; index < meters.size(); ++index) {
+                    const auto& [tip, level] = meters[index];
+                    ImGui::SetCursorScreenPos(ImVec2(meterX, y));
+                    ImGui::PushID(static_cast<int>(index) + 9'000);
+                    ui::meter("##inputMeter", ImVec2(meterWide, meterTall), level, level, level, level, true);
+                    ImGui::PopID();
+                    if (ImGui::IsMouseHoveringRect(ImVec2(meterX, y), ImVec2(meterX + meterWide, y + meterTall))
+                        && ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows)) {
+                        char text[32];
+                        std::snprintf(text, sizeof(text), "%.1f dB", level > 1.0e-5f ? 20.0f * std::log10(level) : -100.0f);
+                        ui::tooltip((ui::Ls("Entrée audio : ", "Audio input: ") + tip + "  " + juce::String(text)).toRawUTF8());
+                    }
+                    meterX += meterWide + dp(2.0f);
+                }
+            }
+            ImGui::SetCursorScreenPos(origin);
+        }
+        // Vertical name, above them.
         const auto name = track.pad >= 0 ? studio_.padName(track) : studio_.trackName(track);
         ImGui::PushFont(theme::boldFont(), ui::currentFontBase() * 0.85f);
         auto y = origin.y + dp(8.0f);
-        for (auto index = 0; index < name.length() && y < origin.y + size.y - dp(14.0f); ++index) {
+        for (auto index = 0; index < name.length() && y < presetsTop - dp(14.0f); ++index) {
             const auto glyph = juce::String::charToString(name[index]).toUpperCase();
             const auto glyphSize = ImGui::CalcTextSize(glyph.toRawUTF8());
             list->AddText(ImVec2(origin.x + (size.x - glyphSize.x) * 0.5f + dp(2.0f), y), p.textDim, glyph.toRawUTF8());
             y += glyphSize.y * 0.92f;
         }
         ImGui::PopFont();
-        // The whole chain's presets (an instrument and its effects, an audio
-        // track's effects), at the foot of the column, above the instrument's.
+        // The track's preset, over what reaches it: its whole chain (an
+        // instrument and its effects, an audio track's effects) replaced by
+        // one of CyDAW's chains or a saved one; this one saved.
         if (const auto holder = studio_.chainPresetHolder(track)) {
-            ImGui::SetCursorScreenPos(ImVec2(origin.x + dp(3.0f), origin.y + size.y - dp(track.midi ? 69.0f : 23.0f)));
+            ImGui::SetCursorScreenPos(ImVec2(origin.x + dp(3.0f), presetsTop));
             ImGui::PushFont(nullptr, ui::currentFontBase() * 0.8f);
+            const auto chains = studio_.factoryChains(track);
+            const auto holderKey = holder->key;
+            const PresetMenu::Programs factory {
+                [this, &chains, &holderKey](juce::StringArray& names, int& current) {
+                    const auto shown = studio_.presetName(holderKey);
+                    for (const auto& [key, name] : chains) {
+                        if (name == shown)
+                            current = names.size();
+                        names.add(name);
+                    }
+                    return !chains.empty();
+                },
+                [this, &chains, track](const int index, juce::String& error) {
+                    if (index < 0 || index >= static_cast<int>(chains.size()))
+                        return false;
+                    const auto applied = studio_.applyFactoryChain(track, chains[static_cast<std::size_t>(index)].first);
+                    error = applied.getErrorMessage();
+                    return applied.wasOk();
+                },
+                L("CHAÎNES DE CYDAW (REMPLACENT TOUTE LA CHAÎNE)", "CYDAW'S CHAINS (REPLACE THE WHOLE CHAIN)") };
             presets_.button("chainPresets", *holder, [this, track] { return studio_.chainPresetState(track); },
                             [this, track](const juce::var& preset, juce::String& error) {
                                 return studio_.applyChainPreset(track, preset, error);
                             },
-                            ImVec2(dp(20.0f), dp(20.0f)));
-            ImGui::PopFont();
-            ImGui::SetCursorScreenPos(origin);
-        }
-        // A MIDI track's instrument opens in the workshop from the foot of
-        // the column; the column itself is the last item, for the row.
-        if (track.midi) {
-            const auto designed = [&slot] {
-                const auto controls = slot->graph().editorInterface().controls;
-                return std::any_of(controls.begin(), controls.end(), [](const auto& control) {
-                    return control.kind != app::ModuleControlKind::inputPort && control.kind != app::ModuleControlKind::outputPort;
-                });
-            }();
-            ImGui::PushFont(nullptr, ui::currentFontBase() * 0.8f);
-            if (designed) {
-                const PluginWindow window { track, 0 };
-                ImGui::SetCursorScreenPos(ImVec2(origin.x + dp(3.0f), origin.y + size.y - dp(46.0f)));
-                if (ui::iconButton(icon::view, L("La fenêtre de l'instrument, comme un plugin", "The instrument's window, as a plugin's"),
-                                   state_.pluginWindowOpen(window), p.accent, ImVec2(dp(20.0f), dp(20.0f))))
-                    state_.togglePluginWindow(window);
-            }
-            ImGui::PopFont();
-            ImGui::SetCursorScreenPos(ImVec2(origin.x + dp(3.0f), origin.y + size.y - dp(23.0f)));
-            ImGui::PushFont(nullptr, ui::currentFontBase() * 0.8f);
-            if (ui::iconButton(icon::edit, L("Éditer l'instrument dans l'atelier de périphériques",
-                                             "Edit the instrument in the device workshop"),
-                               false, 0, ImVec2(dp(20.0f), dp(20.0f)))) {
-                state_.workshopRequest = WorkshopRequest { WorkshopRequest::Kind::trackDevice, track, 0, {} };
-                state_.bringToFront = Panel::workshop;
-            }
+                            ImVec2(dp(20.0f), dp(20.0f)), chains.empty() ? nullptr : &factory,
+                            L("Preset de piste : toute sa chaîne remplacée (une chaîne de CyDAW, un preset enregistré), ou celle-ci enregistrée",
+                              "Track preset: its whole chain replaced (one of CyDAW's chains, a saved preset), or this one saved"));
             ImGui::PopFont();
             ImGui::SetCursorScreenPos(origin);
         }
@@ -352,8 +446,13 @@ void DevicesView::draw()
         return 0;
     };
     Strip strip { track, slot, graph, nodes, modulated, setParameter, {}, {} };
-    for (std::size_t chainIndex = 0; chainIndex < chain.size(); ++chainIndex)
+    // A Replacer's instrument has no chain of its own: no "+" between.
+    const auto ownChain = track.pad < Studio::replacerPadBase;
+    for (std::size_t chainIndex = 0; chainIndex < chain.size(); ++chainIndex) {
+        if (ownChain)
+            insertGap(strip, chain[chainIndex]->id, height);
         drawCard(strip, *chain[chainIndex], height, CardPlace { 0, -1, nextMovable(chainIndex), 0 });
+    }
     if (strip.removeNode) {
         // Its modulators go with it (a container's, with all it holds).
         modulators_->removeWith(*strip.removeNode);
@@ -407,24 +506,10 @@ void DevicesView::draw()
         ImGui::PopFont();
         ui::tooltip(state_.inlineDeviceCatalogue ? L("Ajouter un effet dans le catalogue", "Add an effect from the catalogue") : L("Ajouter un périphérique : la bibliothèque en grand (clic droit : la liste rapide)",
                       "Add a device: the library, large (right click: the quick list)"));
-        if (ImGui::IsItemClicked() || ImGui::IsItemClicked(ImGuiMouseButton_Right))
+        if (ImGui::IsItemClicked() || ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
             catalogueBranch_.reset();
-        if (ImGui::IsItemClicked()) {
-            if(state_.inlineDeviceCatalogue) {
-                state_.openDeviceCatalogue=true;
-            } else {
-                state_.showLibrary = true;
-                state_.libraryTab = 2;
-                state_.libraryTarget = track;
-                state_.libraryPick = true;
-                state_.libraryFocus = true;
-            }
-        }
-        if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
-            search_[0] = 0;
-            highlight_ = 0;
-            focusSearch_ = true;
-            if(state_.inlineDeviceCatalogue)state_.openDeviceCatalogue=true;else openCatalogue_=true;
+            state_.deviceInsertBefore.reset();
+            chooseDevice(track, ImGui::IsItemClicked(ImGuiMouseButton_Right));
         }
     }
     // The wheel runs the strip sideways wherever nothing under the pointer
@@ -446,6 +531,72 @@ void DevicesView::draw()
     drawCatalogue(track);
     drawPluginParameters();
     drawParameterMenu();
+}
+
+void DevicesView::chooseDevice(const TrackRef& track, const bool quick)
+{
+    if (quick) {
+        search_[0] = 0;
+        highlight_ = 0;
+        focusSearch_ = true;
+    }
+    if (state_.inlineDeviceCatalogue) {
+        state_.openDeviceCatalogue = true;
+    } else if (quick) {
+        openCatalogue_ = true;
+    } else {
+        state_.showLibrary = true;
+        state_.libraryTab = 2;
+        state_.libraryTarget = track;
+        state_.libraryPick = true;
+        state_.libraryFocus = true;
+    }
+}
+
+void DevicesView::insertGap(Strip& strip, const std::uint64_t before, const float height)
+{
+    const auto& p = theme::palette();
+    auto* list = ImGui::GetWindowDrawList();
+    const auto origin = ImGui::GetCursorScreenPos();
+    const ImVec2 size(dp(14.0f), height);
+    ImGui::PushID("##insertGap");
+    ImGui::PushID(static_cast<int>(before));
+    ImGui::InvisibleButton("##insert", size, ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
+    ui::recordSpot("insert-before:" + std::to_string(before));
+    const auto hovered = ImGui::IsItemHovered();
+    const auto chosen = state_.deviceInsertBefore && state_.deviceInsertBefore->first == strip.track
+                        && state_.deviceInsertBefore->second == before;
+    const auto lit = hovered || chosen;
+    const ImVec2 centre(origin.x + size.x * 0.5f, origin.y + size.y * 0.5f);
+    // A card dragged here goes there too.
+    if (ImGui::BeginDragDropTarget()) {
+        if (const auto* payload = ImGui::AcceptDragDropPayload(cardPayload, ImGuiDragDropFlags_AcceptBeforeDelivery
+                                                                                | ImGuiDragDropFlags_AcceptNoDrawDefaultRect)) {
+            list->AddLine(ImVec2(centre.x, origin.y), ImVec2(centre.x, origin.y + size.y), p.accent, dp(3.0f));
+            if (payload->IsDelivery())
+                strip.moveCard = CardMove { *static_cast<const std::uint64_t*>(payload->Data), 0, -1, before };
+        }
+        ImGui::EndDragDropTarget();
+    }
+    if (lit)
+        list->AddLine(ImVec2(centre.x, origin.y + dp(4.0f)), ImVec2(centre.x, origin.y + size.y - dp(4.0f)),
+                      theme::alpha(p.accent, 0.55f), dp(1.5f));
+    list->AddCircleFilled(centre, dp(6.5f), lit ? p.accent : p.bg3);
+    const auto arm = dp(3.0f);
+    const auto ink = lit ? p.bg0 : p.textDim;
+    list->AddLine(ImVec2(centre.x - arm, centre.y), ImVec2(centre.x + arm + 1.0f, centre.y), ink, dp(1.5f));
+    list->AddLine(ImVec2(centre.x, centre.y - arm), ImVec2(centre.x, centre.y + arm + 1.0f), ink, dp(1.5f));
+    ui::tooltip(state_.inlineDeviceCatalogue ? L("Ajouter un périphérique ici", "Add a device here")
+                                             : L("Ajouter un périphérique ici : la bibliothèque en grand (clic droit : la liste rapide)",
+                                                 "Add a device here: the library, large (right click: the quick list)"));
+    if (ImGui::IsItemClicked() || ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+        catalogueBranch_.reset();
+        state_.deviceInsertBefore = std::make_pair(strip.track, before);
+        chooseDevice(strip.track, ImGui::IsItemClicked(ImGuiMouseButton_Right));
+    }
+    ImGui::PopID();
+    ImGui::PopID();
+    ImGui::SameLine(0.0f, dp(4.0f));
 }
 
 void DevicesView::drawCard(Strip& strip, const app::NodeGraphComponent::EditorNode& cardNode, const float height,
@@ -2594,8 +2745,13 @@ void DevicesView::drawCatalogue(const TrackRef& track)
 {
     const auto& p = theme::palette();
     ImGui::SetNextWindowSize(ImVec2(dp(340.0f), dp(420.0f)), ImGuiCond_Appearing);
-    if (!ImGui::BeginPopup("##deviceCatalogue"))
+    if (!ImGui::BeginPopup("##deviceCatalogue")) {
+        // Closed without a pick: the "+" that opened it is forgotten (the
+        // library window keeps it while it chooses).
+        if (state_.deviceInsertBefore && !state_.showLibrary && !state_.openDeviceCatalogue && !openCatalogue_)
+            state_.deviceInsertBefore.reset();
         return;
+    }
     auto* slot = studio_.graphFor(track);
     if (slot == nullptr) {
         ImGui::EndPopup();
@@ -2621,6 +2777,10 @@ void DevicesView::drawCatalogue(const TrackRef& track)
         if (!track.midi && entry.soundSource)
             continue;
         if (entry.key == "mono-to-stereo" || entry.key == "stereo-to-mono")
+            continue;
+        // A whole chain of effects would take every card's place: the
+        // track's preset button has them.
+        if (entry.kind == "preset" && !entry.soundSource)
             continue;
         if (query.isNotEmpty() && !fold(entry.name).contains(query) && !fold(entry.category).contains(query)
             && !fold(entry.key).contains(query) && !fold(entry.description).contains(query))
@@ -2725,17 +2885,23 @@ void DevicesView::drawCatalogue(const TrackRef& track)
                                   studio_.markDirty();
                               });
     }
+    // Where it goes: before the card whose "+" opened the list, else at the
+    // chain's end.
+    const auto before = state_.deviceInsertBefore && state_.deviceInsertBefore->first == track ? state_.deviceInsertBefore->second
+                                                                                                 : std::uint64_t {};
     if (chosenFile) {
-        if (const auto inserted = studio_.insertLibraryDevice(track, *chosenFile); inserted.failed())
+        if (const auto inserted = studio_.insertLibraryDeviceBefore(track, *chosenFile, before); inserted.failed())
             state_.status = inserted.getErrorMessage();
+        state_.deviceInsertBefore.reset();
         ImGui::CloseCurrentPopup();
     }
     if (chosen != nullptr) {
         // Into the branch it was opened from, else the chain.
         const auto result = catalogueBranch_ ? studio_.insertDeviceInBranch(track, chosen->key, catalogueBranch_->first,
                                                                            catalogueBranch_->second)
-                                             : studio_.insertDevice(track, chosen->key);
+                                             : studio_.insertDeviceBefore(track, chosen->key, before);
         catalogueBranch_.reset();
+        state_.deviceInsertBefore.reset();
         if (result.failed())
             state_.status = result.getErrorMessage();
         ImGui::CloseCurrentPopup();

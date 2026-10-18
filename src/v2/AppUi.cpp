@@ -38,6 +38,8 @@
 #include "SemanticSearchView.h"
 #include "LibraryWindow.h"
 #include "ComputerKeyboard.h"
+#include "MidiDevices.h"
+#include "SystemLoad.h"
 #include "ThemesView.h"
 #include "SampleCatalog.h"
 #include "Theme.h"
@@ -3247,6 +3249,7 @@ void AppUi::drawTransportBar()
         ImGui::SameLine();
         controllers_->drawButton(showControllers_);
         const auto right = ImGui::GetWindowWidth() - ImGui::GetStyle().WindowPadding.x;
+        drawSystemStatus(right - dp(262.0f));
         ImGui::SameLine(right - dp(262.0f));
         const auto& meter = studio_.masterMeter();
         ImGui::TextDisabled("MASTER");
@@ -3265,6 +3268,144 @@ void AppUi::drawTransportBar()
     ImGui::End();
     ImGui::PopStyleColor();
     ImGui::PopStyleVar();
+}
+
+void AppUi::drawSystemStatus(const float endX)
+{
+    const auto& p = theme::palette();
+    auto& engine = studio_.engine();
+    // A message in or out: the lights move, the interface draws them.
+    const auto traffic = static_cast<std::uint64_t>(engine.midiInActivity()) + engine.midiOutActivity() + transportSync_->receivedCount()
+                         + transportSync_->sentCount();
+    if (traffic != lastTraffic_) {
+        lastTraffic_ = traffic;
+        host_.wake(24);
+    }
+    const auto load = system_load::read();
+    auto& devices = engine.deviceManager();
+    auto* audio = devices.getCurrentAudioDevice();
+    const auto midiIns = midi_devices::inputs().size();
+    const auto midiOuts = midi_devices::outputs().size();
+    const auto plugged = midiIns + midiOuts + (audio != nullptr ? 1 : 0);
+    const auto dsp = devices.getCpuUsage() * 100.0;
+    char count[16], cpu[24], ram[32], dspText[24];
+    std::snprintf(count, sizeof(count), "%d", plugged);
+    if (load.cpuPercent >= 0.0)
+        std::snprintf(cpu, sizeof(cpu), "CPU %.0f%%", load.cpuPercent);
+    else
+        std::snprintf(cpu, sizeof(cpu), "CPU --");
+    if (load.memoryBytes >= 0.0)
+        std::snprintf(ram, sizeof(ram), load.memoryBytes >= 1.0e9 ? "RAM %.1f %s" : "RAM %.0f %s",
+                      load.memoryBytes >= 1.0e9 ? load.memoryBytes / 1.0e9 : load.memoryBytes / 1.0e6,
+                      load.memoryBytes >= 1.0e9 ? L("Go", "GB") : L("Mo", "MB"));
+    else
+        std::snprintf(ram, sizeof(ram), "RAM --");
+    std::snprintf(dspText, sizeof(dspText), "DSP %.0f%%", dsp);
+
+    ImGui::PushFont(nullptr, ui::currentFontBase() * 0.8f);
+    const auto light = dp(7.0f);
+    const auto inner = dp(3.0f);
+    const auto gap = dp(12.0f);
+    const auto textWidth = [](const char* text) { return ImGui::CalcTextSize(text).x; };
+    const auto pairWidth = [&](const char* label) { return textWidth(label) + inner + light + inner + light; };
+    const auto width = pairWidth("MIDI") + gap + pairWidth("SYNC") + gap + textWidth(icon::connect) + inner + textWidth(count) + gap
+                       + textWidth(cpu) + gap + textWidth(ram) + gap + textWidth(dspText);
+    // Only where the toolbar leaves it room.
+    const auto start = endX - width - dp(14.0f);
+    if (ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x + dp(12.0f) > start) {
+        ImGui::PopFont();
+        return;
+    }
+    ImGui::SameLine(start);
+    const auto origin = ImGui::GetCursorScreenPos();
+    const auto height = ImGui::GetFrameHeight();
+    auto* list = ImGui::GetWindowDrawList();
+    const auto textY = origin.y + (height - ImGui::GetFontSize()) * 0.5f;
+    auto x = origin.x;
+    const auto hovering = [&](const float from, const float to) {
+        return ImGui::IsMouseHoveringRect(ImVec2(from, origin.y), ImVec2(to, origin.y + height)) && ImGui::IsWindowHovered();
+    };
+    const auto lightAt = [&](const float level, const ImU32 colour) {
+        const ImVec2 min(x, origin.y + (height - light) * 0.5f);
+        list->AddRectFilled(min, ImVec2(min.x + light, min.y + light), theme::mix(p.bg0 | 0xff000000u, colour, 0.12f + 0.88f * level), dp(1.5f));
+        list->AddRect(min, ImVec2(min.x + light, min.y + light), theme::alpha(colour, 0.55f), dp(1.5f));
+        x += light + inner;
+    };
+    const auto label = [&](const char* text, const ImU32 colour) {
+        list->AddText(ImVec2(x, textY), colour, text);
+        x += textWidth(text) + inner;
+    };
+    // MIDI: in (green), out (orange).
+    {
+        const auto from = x;
+        label("MIDI", p.textFaint);
+        lightAt(midi_devices::activity("top:midiIn", engine.midiInActivity()), p.play);
+        lightAt(midi_devices::activity("top:midiOut", engine.midiOutActivity()), p.accent);
+        if (hovering(from, x)) {
+            juce::String tip = ui::Ls("MIDI : la lumière verte s'allume quand un message arrive (un clavier, un contrôleur, le clavier de "
+                                      "l'ordinateur), l'orange quand une piste envoie ses notes à une sortie.",
+                                      "MIDI: the green light comes on when a message arrives (a keyboard, a controller, the computer "
+                                      "keyboard), the orange one when a track sends its notes to an output.");
+            tip << "\n" << juce::String(static_cast<int>(midiIns)) << ui::Ls(" entrée(s), ", " input(s), ") << juce::String(static_cast<int>(midiOuts))
+                << ui::Ls(" sortie(s) branchée(s).", " output(s) plugged in.");
+            ui::tooltip(tip.toRawUTF8());
+        }
+        x += gap - inner;
+    }
+    // The transport's sync: in, out.
+    {
+        const auto from = x;
+        const auto status = transportSync_->statusText();
+        label("SYNC", status.isNotEmpty() ? p.textDim : p.textFaint);
+        lightAt(midi_devices::activity("top:syncIn", static_cast<std::uint32_t>(transportSync_->receivedCount())), p.play);
+        lightAt(midi_devices::activity("top:syncOut", static_cast<std::uint32_t>(transportSync_->sentCount())), p.accent);
+        if (hovering(from, x))
+            ui::tooltip(status.isNotEmpty()
+                            ? (ui::Ls("Synchronisation : ", "Sync: ") + status
+                               + ui::Ls("\nVert : ce qu'elle reçoit ; orange : ce qu'elle envoie.", "\nGreen: what it receives; orange: what it sends."))
+                                  .toRawUTF8()
+                            : L("Synchronisation éteinte (le bouton SYNC la règle).", "Sync off (the SYNC button sets it)."));
+        x += gap - inner;
+    }
+    // The devices plugged in.
+    {
+        const auto from = x;
+        label(icon::connect, p.textDim);
+        label(count, p.textDim);
+        if (hovering(from, x)) {
+            juce::String tip = ui::Ls("Périphériques branchés", "Devices plugged in");
+            tip << "\n" << ui::Ls("Carte son : ", "Sound card: ")
+                << (audio != nullptr ? audio->getName() + "  (" + juce::String(audio->getCurrentSampleRate() / 1'000.0, 1) + " kHz)"
+                                     : ui::Ls("aucune", "none"));
+            const auto names = [](const juce::Array<juce::MidiDeviceInfo>& found) {
+                juce::StringArray list;
+                for (const auto& device : found)
+                    list.add(device.name);
+                return list.isEmpty() ? ui::Ls("aucune", "none") : list.joinIntoString(", ");
+            };
+            tip << "\n" << ui::Ls("Entrées MIDI : ", "MIDI inputs: ") << names(midi_devices::inputs());
+            tip << "\n" << ui::Ls("Sorties MIDI : ", "MIDI outputs: ") << names(midi_devices::outputs());
+            ui::tooltip(tip.toRawUTF8());
+        }
+        x += gap - inner;
+    }
+    // What CyDAW takes of the computer.
+    const auto reading = [&](const char* text, const ImU32 colour, const char* tip) {
+        const auto from = x;
+        list->AddText(ImVec2(x, textY), colour, text);
+        x += textWidth(text);
+        if (hovering(from, x))
+            ui::tooltip(tip);
+        x += gap;
+    };
+    reading(cpu, load.cpuPercent > 80.0 ? p.warn : p.textDim,
+            L("Processeur : la part de l'ordinateur (tous ses cœurs) que CyDAW utilise", "Processor: the share of the computer (all its cores) CyDAW uses"));
+    reading(ram, p.textDim, L("Mémoire : ce que CyDAW occupe", "Memory: what CyDAW holds"));
+    reading(dspText, dsp > 90.0 ? p.record : dsp > 70.0 ? p.warn : p.textDim,
+            L("Charge audio : la part du temps de chaque bloc que le calcul du son prend ; au-delà de 100 %, le son craque",
+              "Audio load: the share of each block's time the sound takes to compute; past 100 %, the sound crackles"));
+    ImGui::Dummy(ImVec2(width, height));
+    ImGui::PopFont();
 }
 
 void AppUi::drawStatusBar()

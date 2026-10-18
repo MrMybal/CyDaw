@@ -192,6 +192,10 @@ private:
     std::uint64_t shownClip_ {};
     double scroll_ {};
     double pixelsPerSecond_ {};
+    // The sounds' rows: their height (a part of the room they get) and how
+    // far down they are shown, from the band beside them.
+    float soundsZoom_ { 1.0f };
+    float soundsScroll_ {};
     float laneLeft_ {};
     float laneWidth_ {};
     // The cursor and the selection (seconds of the clip; equal ends: none).

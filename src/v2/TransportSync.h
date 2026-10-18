@@ -25,6 +25,11 @@ public:
     void drawButton(bool& visible);
     juce::var command(const juce::var&);
     [[nodiscard]] bool active() const;
+    // Its traffic, for the lights: messages received and sent; what it
+    // does, in a line (empty: off).
+    [[nodiscard]] std::uint64_t receivedCount() const;
+    [[nodiscard]] std::uint64_t sentCount() const;
+    [[nodiscard]] juce::String statusText() const;
 
 private:
     class Impl;

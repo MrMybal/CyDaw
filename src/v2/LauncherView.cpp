@@ -1,3 +1,4 @@
+#include "RoutingUi.h"
 #include "LauncherView.h"
 #include "AddTrackMenu.h"
 #include "MixerView.h"
@@ -101,17 +102,37 @@ void LauncherView::draw()
     const auto barWidth = dp(10.0f);
     const auto masterWidth = cellWidth;
     const auto scenesWidth = dp(92.0f);
+    const auto optionsWidth = dp(30.0f);
     const auto slotsTop = headerHeight + gap;
-    // From the bottom: the sideways bar, the strips, the stop row; the scenes
-    // have what is left (one row at least).
+    // What the options' column shows: the clips, and the sections over the
+    // strips (each as tall as it needs).
+    const auto showClips = state_.launcherShowClips;
+    std::vector<TrackRef> buses;
+    for (const auto& track : tracks)
+        if (studio_.isBusTrack(track))
+            buses.push_back(track);
+    const auto devicesHeight = state_.launcherShowDevices ? dp(84.0f) : 0.0f;
+    const auto sendsHeight = state_.launcherShowSends ? static_cast<float>(std::max<std::size_t>(1, buses.size())) * dp(26.0f) + dp(6.0f) : 0.0f;
+    const auto ioHeight = state_.launcherShowIo ? dp(58.0f) : 0.0f;
+    auto sectionsHeight = 0.0f;
+    for (const auto height : { devicesHeight, sendsHeight, ioHeight })
+        sectionsHeight += height > 0.0f ? height + gap : 0.0f;
+    // From the bottom: the sideways bar, the strips, the sections, the stop
+    // row; the scenes have what is left (one row at least).
     const auto bottom = std::max(dp(200.0f), available.y - scrollbar - dp(1.0f));
-    const auto aboveStrips = slotsTop + dp(24.0f) + gap + stopHeight + gap * 2.0f;
-    const auto stripHeight = std::max(dp(110.0f), std::min(std::clamp(available.y * 0.42f, dp(150.0f), dp(260.0f)),
-                                                           bottom - aboveStrips));
+    const auto aboveStrips = slotsTop + dp(24.0f) + gap + stopHeight + gap * 2.0f + sectionsHeight;
+    const auto stripHeight = showClips ? std::max(dp(110.0f), std::min(std::clamp(available.y * 0.42f, dp(150.0f), dp(260.0f)),
+                                                                       bottom - aboveStrips))
+                                       : std::max(dp(110.0f), std::min(dp(300.0f), bottom - slotsTop - sectionsHeight - gap));
     const auto mixerTop = bottom - stripHeight;
-    const auto stopRowTop = mixerTop - gap * 2.0f - stopHeight;
+    const auto sectionsTop = mixerTop - sectionsHeight;
+    const auto stopRowTop = sectionsTop - gap * 2.0f - stopHeight;
     const auto scenesBottom = stopRowTop - gap;
-    const auto viewport = std::max(dp(24.0f), scenesBottom - slotsTop);
+    const auto viewport = showClips ? std::max(dp(24.0f), scenesBottom - slotsTop) : 0.0f;
+    // Where each section starts, from the top of a column.
+    const auto devicesTop = sectionsTop;
+    const auto sendsTop = devicesTop + (devicesHeight > 0.0f ? devicesHeight + gap : 0.0f);
+    const auto ioTop = sendsTop + (sendsHeight > 0.0f ? sendsHeight + gap : 0.0f);
     const auto cellHeight = std::clamp(viewport / static_cast<float>(scenes) - gap, dp(22.0f), dp(30.0f));
     const auto scenesHeight = static_cast<float>(scenes) * (cellHeight + gap) - gap;
     const auto maximumScroll = std::max(0.0f, scenesHeight - viewport);
@@ -148,7 +169,7 @@ void LauncherView::draw()
         ImGui::PopFont();
         const auto scenesTop = top.y + slotsTop;
         ImGui::PushClipRect(ImVec2(top.x, scenesTop), ImVec2(top.x + scenesWidth, scenesTop + viewport), true);
-        for (auto scene = 0; scene < scenes; ++scene) {
+        for (auto scene = 0; scene < (showClips ? scenes : 0); ++scene) {
             const ImVec2 min(top.x, scenesTop + scene * rowStep - sceneScroll_);
             if (min.y + cellHeight < scenesTop || min.y > scenesTop + viewport)
                 continue;
@@ -166,265 +187,334 @@ void LauncherView::draw()
         ImGui::PopClipRect();
         if (ImGui::IsWindowHovered() && io.MousePos.y >= scenesTop && io.MousePos.y < scenesTop + viewport)
             (void) sceneWheel(io.MouseWheel);
-        ImGui::SetCursorScreenPos(ImVec2(top.x, top.y + stopRowTop));
-        char label[48];
-        std::snprintf(label, sizeof(label), "%s  %s", icon::stop, L("Tout", "All"));
-        if (ImGui::Button(label, ImVec2(scenesWidth, stopHeight)))
-            stopAll();
-        ui::tooltip(L("Arrêter tous les clips", "Stop every clip"));
+        if (showClips) {
+            ImGui::SetCursorScreenPos(ImVec2(top.x, top.y + stopRowTop));
+            char label[48];
+            std::snprintf(label, sizeof(label), "%s  %s", icon::stop, L("Tout", "All"));
+            if (ImGui::Button(label, ImVec2(scenesWidth, stopHeight)))
+                stopAll();
+            ui::tooltip(L("Arrêter tous les clips", "Stop every clip"));
+        }
+        // The sections' names, beside them.
+        ImGui::PushFont(nullptr, ui::currentFontBase() * 0.78f);
+        const auto sectionName = [&](const float at, const float height, const char* name) {
+            if (height <= 0.0f)
+                return;
+            sceneList->AddRectFilled(ImVec2(top.x, top.y + at), ImVec2(top.x + scenesWidth, top.y + at + height), p.bg1, dp(3.0f));
+            sceneList->AddText(ImVec2(top.x + dp(6.0f), top.y + at + dp(4.0f)), p.textFaint, name);
+        };
+        sectionName(devicesTop, devicesHeight, L("Périphériques", "Devices"));
+        sectionName(sendsTop, sendsHeight, L("Envois", "Sends"));
+        sectionName(ioTop, ioHeight, L("Entrées / sorties", "Inputs / outputs"));
+        ImGui::PopFont();
     }
     ImGui::EndChild();
     ImGui::SameLine(0.0f, gap);
 
-    const auto gridWidth = std::max(dp(60.0f), available.x - scenesWidth - masterWidth - barWidth - gap * 4.0f);
-    ImGui::BeginChild("##grid", ImVec2(gridWidth, available.y), ImGuiChildFlags_None,
-                      ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
-    auto* list = ImGui::GetWindowDrawList();
-    const auto origin = ImGui::GetCursorScreenPos();
-    const auto viewTop = origin.y + slotsTop;
-    const auto viewBottom = viewTop + viewport;
-    dropMin_ = ImVec2(ImGui::GetWindowPos().x, viewTop);
-    dropMax_ = ImVec2(dropMin_.x + gridWidth, viewBottom);
-    if (tracks.empty())
-        ui::emptyState(L("Aucune piste", "No tracks"), L("Les clips du lanceur appartiennent aux pistes.", "Launcher clips belong to tracks."));
-
-    for (std::size_t column = 0; column < tracks.size(); ++column) {
-        const auto& track = tracks[column];
-        const ImVec2 min(origin.x + column * (cellWidth + gap), origin.y);
-        const ImVec2 max(min.x + cellWidth, min.y + headerHeight);
-        const auto selected = state_.selectedTrack && *state_.selectedTrack == track;
-        ImGui::PushID(static_cast<int>(column));
-        // The header selects its track, which the device panel and the graph
-        // then show; a double click brings the devices to the front. The stop
-        // button over it keeps its own clicks.
-        ImGui::SetCursorScreenPos(min);
-        ImGui::SetNextItemAllowOverlap();
-        ImGui::InvisibleButton("##header", ImVec2(cellWidth, headerHeight));
-        const auto headerHovered = ImGui::IsItemHovered();
-        if (ImGui::IsItemClicked()) {
-            state_.selectTrack(track);
-            state_.focused = Panel::launcher;
+    // The tracks, then the buses beside the master (as Bitwig's effect
+    // tracks), each column drawn the same way.
+    std::vector<TrackRef> plain;
+    for (const auto& track : tracks)
+        if (!studio_.isBusTrack(track))
+            plain.push_back(track);
+    const auto busesWidth = buses.empty() ? 0.0f
+                                          : std::min(static_cast<float>(buses.size()) * (cellWidth + gap) - gap,
+                                                     std::max(cellWidth, available.x * 0.35f));
+    const auto gridWidth = std::max(dp(60.0f), available.x - scenesWidth - masterWidth - barWidth - optionsWidth - busesWidth
+                                                   - gap * (buses.empty() ? 5.0f : 6.0f));
+    const auto drawColumns = [&](const std::vector<TrackRef>& shown, const bool grid, const float width) {
+        auto* list = ImGui::GetWindowDrawList();
+        const auto origin = ImGui::GetCursorScreenPos();
+        const auto viewTop = origin.y + slotsTop;
+        const auto viewBottom = viewTop + viewport;
+        if (grid) {
+            dropMin_ = ImVec2(ImGui::GetWindowPos().x, viewTop);
+            dropMax_ = ImVec2(dropMin_.x + width, viewBottom);
         }
-        if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
-            state_.selectTrack(track);
-            state_.contextRequest = ContextRequest { ContextRequest::Kind::track, track };
-        }
-        if (headerHovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-            state_.bringToFront = Panel::devices;
-        if (headerHovered)
-            ui::tooltip(L("Clic : choisir la piste (Périphériques, Graphe). Double-clic : ses périphériques. Clic droit : son menu.",
-                          "Click: pick the track (Devices, Graph). Double click: its devices. Right click: its menu."));
-        list->AddRectFilled(min, max, selected ? p.bg4 : headerHovered ? p.bg3 : p.bg2, dp(3.0f));
-        list->AddRectFilled(min, ImVec2(min.x + cellWidth, min.y + dp(3.0f)), theme::fromArgb(studio_.trackColour(track)), dp(3.0f),
-                            ImDrawFlags_RoundCornersTop);
-        if (selected)
-            list->AddRect(min, max, theme::fromArgb(studio_.trackColour(track)), dp(3.0f), dp(1.5f));
-        ImGui::PushFont(theme::boldFont(), ui::currentFontBase() * 0.88f);
-        ui::clippedText(list, ImVec2(min.x + dp(6.0f), min.y + dp(6.0f)), cellWidth - dp(12.0f), p.text, studio_.trackName(track).toRawUTF8());
-        ImGui::PopFont();
-        ImGui::PopID();
-    }
-    // After the last track: a "+" that adds one.
-    const auto addWidth = std::max(headerHeight, dp(34.0f));
-    ImGui::SetCursorScreenPos(ImVec2(origin.x + static_cast<float>(tracks.size()) * (cellWidth + gap), origin.y));
-    add_track::button(studio_, state_, "launcherAdd", ImVec2(addWidth, headerHeight));
+        if (grid && shown.empty())
+            ui::emptyState(L("Aucune piste", "No shown"), L("Les clips du lanceur appartiennent aux pistes.", "Launcher clips belong to shown."));
 
-    // The slots, in the scrolled band between the names and the stops. A
-    // clip: its triangle launches it (its square, while it plays, stops it),
-    // the rest of it selects it. An empty slot: its square (when it has its
-    // stop) stops the track, the rest selects it.
-    const auto playWidth = dp(20.0f);
-    const auto stopSize = dp(11.0f);
-    const auto windowLeft = ImGui::GetWindowPos().x;
-    const auto windowRight = windowLeft + ImGui::GetWindowSize().x;
-    ImGui::PushClipRect(ImVec2(windowLeft, viewTop), ImVec2(windowRight, viewBottom), true);
-    for (auto scene = 0; scene < scenes; ++scene) {
-        const auto y = viewTop + scene * rowStep - sceneScroll_;
-        if (y + cellHeight < viewTop || y > viewBottom)
-            continue;
-        for (std::size_t column = 0; column < tracks.size(); ++column) {
-            const auto& track = tracks[column];
-            const SlotRef slot { track, scene };
-            const ImVec2 min(origin.x + column * (cellWidth + gap), y);
-            const ImVec2 max(min.x + cellWidth, y + cellHeight);
-            juce::String name;
-            juce::uint32 colour {};
-            auto exists = false;
-            auto progress = 0.0f;
-            std::uint64_t midiClip {};
-            if (!track.midi) {
-                if (const auto clip = engine.launcherClip(track.audioIndex, scene)) {
-                    exists = true;
-                    name = clip->name.isNotEmpty() ? clip->name : clip->sourceFile.getFileNameWithoutExtension();
-                    colour = clip->colour;
-                }
-            } else if (const auto* clip = midiClipForScene(engine, track.midiId, scene)) {
-                exists = true;
-                name = clip->name;
-                colour = clip->colour;
-                midiClip = clip->id;
-            }
-            const auto playing = exists && studio_.playingScene(track) == scene;
-            const auto pending = exists && studio_.pendingScene(track) == scene;
-            if (playing)
-                progress = track.midi ? engine.midiLauncherClipProgress(track.midiId) : engine.launcherClipProgress(track.audioIndex);
-            const auto stops = !exists && studio_.slotStops(track, scene);
-            const ImVec2 centre((min.x + max.x) * 0.5f, (min.y + max.y) * 0.5f);
-            const auto inPlay = [&](const ImVec2 point) { return exists && point.x < min.x + playWidth; };
-            const auto inStop = [&](const ImVec2 point) {
-                return stops && std::abs(point.x - centre.x) <= stopSize && std::abs(point.y - centre.y) <= stopSize;
-            };
-
-            ImGui::PushID(static_cast<int>(column) * 1'024 + scene);
+        for (std::size_t column = 0; column < shown.size(); ++column) {
+            const auto& track = shown[column];
+            const ImVec2 min(origin.x + column * (cellWidth + gap), origin.y);
+            const ImVec2 max(min.x + cellWidth, min.y + headerHeight);
+            const auto selected = state_.selectedTrack && *state_.selectedTrack == track;
+            ImGui::PushID(static_cast<int>(column));
+            // The header selects its track, which the device panel and the graph
+            // then show; a double click brings the devices to the front. The stop
+            // button over it keeps its own clicks.
             ImGui::SetCursorScreenPos(min);
-            ImGui::InvisibleButton("##cell", ImVec2(cellWidth, cellHeight), ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
-            dropSlots_.push_back({slot, min, max});
-            if (ImGui::BeginDragDropTarget()) {
-                if (const auto* payload = ImGui::AcceptDragDropPayload(kFilePayload); payload && payload->DataSize > 1)
-                    dropFiles(juce::StringArray(juce::String::fromUTF8(static_cast<const char*>(payload->Data))), io.MousePos);
-                ImGui::EndDragDropTarget();
+            ImGui::SetNextItemAllowOverlap();
+            ImGui::InvisibleButton("##header", ImVec2(cellWidth, headerHeight));
+            const auto headerHovered = ImGui::IsItemHovered();
+            if (ImGui::IsItemClicked()) {
+                state_.selectTrack(track);
+                state_.focused = Panel::launcher;
             }
-            const auto hovered = ImGui::IsItemHovered();
-            const auto overPlay = hovered && inPlay(io.MousePos);
-            const auto overStop = hovered && inStop(io.MousePos);
             if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
                 state_.selectTrack(track);
-                if (!state_.isSlotSelected(slot))
-                    state_.selectedSlots = { slot };
-                state_.contextRequest = ContextRequest { ContextRequest::Kind::launcherSlot, track, scene };
+                state_.contextRequest = ContextRequest { ContextRequest::Kind::track, track };
             }
-            if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
-                state_.focused = Panel::launcher;
-                const auto at = io.MouseClickedPos[0];
-                if (inPlay(at)) {
-                    // The clip's button: launch it, or stop it while it plays.
-                    if (playing || pending)
-                        studio_.stopTrackClips(track);
-                    else
-                        (void) studio_.launchSlot(track, scene);
-                } else if (inStop(at)) {
-                    studio_.stopTrackClips(track);
-                } else {
-                    // A click selects (Ctrl toggles, Shift adds); it launches nothing.
-                    state_.selectTrack(track);
-                    if (io.KeyCtrl) {
-                        if (state_.isSlotSelected(slot))
-                            std::erase(state_.selectedSlots, slot);
-                        else
-                            state_.selectedSlots.push_back(slot);
-                    } else if (io.KeyShift) {
-                        if (!state_.isSlotSelected(slot))
-                            state_.selectedSlots.push_back(slot);
-                    } else {
-                        state_.selectedSlots = { slot };
-                    }
-                    // The inspector shows the clip picked: a MIDI one by its id;
-                    // an audio slot's through the slot (no MIDI clip left picked).
-                    if (track.midi && exists)
-                        state_.selectedClips = { ClipRef { track, midiClip } };
-                    else
-                        state_.selectedClips.clear();
-                }
-            }
-            if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && track.midi && !exists && !overStop) {
-                // A new MIDI clip in this scene.
-                const auto id = engine.addMidiClip(track.midiId, {}, 0.0, 4.0, true, studio_.trackColour(track), scene);
-                if (id != 0) {
-                    state_.editedClip = ClipRef { track, id };
-                    state_.bringToFront = Panel::editor;
-                    studio_.markDirty();
-                }
-            } else if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && exists && !overPlay) {
-                // The clip in the editor: a MIDI one by its id, an audio one by its slot.
-                state_.editedClip = track.midi ? ClipRef { track, midiClip } : ClipRef { track, 0, scene };
-                state_.bringToFront = Panel::editor;
-            }
-            if (overPlay)
-                ui::tooltip(playing || pending ? L("Arrêter", "Stop") : L("Lancer", "Launch"));
-            else if (overStop)
-                ui::tooltip(L("Arrêter la piste. Une scène lancée l'arrête aussi (Ctrl+E retire ce stop).",
-                              "Stop the track. A scene launched stops it too (Ctrl+E takes this stop off)."));
-
-            const auto selectedSlot = state_.isSlotSelected(slot);
-            if (exists) {
-                const auto fill = theme::fromArgb(colour != 0 ? colour : (track.midi ? 0xff4fd3aeu : 0xffff9b2fu));
-                list->AddRectFilled(min, max, theme::mix(fill, p.bg0 | 0xff000000u, hovered ? 0.4f : 0.5f), dp(3.0f));
-                if (progress > 0.0f)
-                    list->AddRectFilled(ImVec2(min.x, max.y - dp(3.0f)), ImVec2(min.x + cellWidth * std::clamp(progress, 0.0f, 1.0f), max.y),
-                                        p.play);
-                // Its button: a triangle to launch, a square to stop.
-                const ImVec2 marker(min.x + playWidth * 0.5f, centre.y);
-                if (overPlay)
-                    list->AddRectFilled(ImVec2(min.x + dp(2.0f), min.y + dp(2.0f)), ImVec2(min.x + playWidth, max.y - dp(2.0f)),
-                                        (p.text & 0x00ffffffu) | 0x22000000u, dp(2.0f));
-                if (playing || pending)
-                    list->AddRectFilled(ImVec2(marker.x - dp(4.0f), marker.y - dp(4.0f)), ImVec2(marker.x + dp(4.0f), marker.y + dp(4.0f)),
-                                        playing ? p.play : p.accent);
-                else
-                    list->AddTriangle(ImVec2(marker.x - dp(4.0f), marker.y - dp(5.0f)), ImVec2(marker.x - dp(4.0f), marker.y + dp(5.0f)),
-                                      ImVec2(marker.x + dp(5.0f), marker.y), overPlay ? p.play : p.text, 1.4f);
-                ui::clippedText(list, ImVec2(min.x + playWidth + dp(2.0f), min.y + (cellHeight - ImGui::GetFontSize()) * 0.5f),
-                                cellWidth - playWidth - dp(6.0f), p.text, name.toRawUTF8());
-                if (pending)
-                    list->AddRect(min, max, p.accent, dp(3.0f), 1.5f);
-            } else {
-                list->AddRectFilled(min, max, hovered ? p.bg3 : p.bg1, dp(3.0f));
-                // Its stop, when it has it.
-                if (stops)
-                    list->AddRect(ImVec2(centre.x - dp(4.0f), centre.y - dp(4.0f)), ImVec2(centre.x + dp(4.0f), centre.y + dp(4.0f)),
-                                  overStop ? p.text : p.textFaint, 0.0f, overStop ? 1.6f : 1.0f);
-            }
-            if (selectedSlot)
-                list->AddRect(ImVec2(min.x + 0.5f, min.y + 0.5f), ImVec2(max.x - 0.5f, max.y - 0.5f), p.text, dp(3.0f), 1.5f);
+            if (headerHovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+                state_.bringToFront = Panel::devices;
+            if (headerHovered)
+                ui::tooltip(L("Clic : choisir la piste (Périphériques, Graphe). Double-clic : ses périphériques. Clic droit : son menu.",
+                              "Click: pick the track (Devices, Graph). Double click: its devices. Right click: its menu."));
+            list->AddRectFilled(min, max, selected ? p.bg4 : headerHovered ? p.bg3 : p.bg2, dp(3.0f));
+            list->AddRectFilled(min, ImVec2(min.x + cellWidth, min.y + dp(3.0f)), theme::fromArgb(studio_.trackColour(track)), dp(3.0f),
+                                ImDrawFlags_RoundCornersTop);
+            if (selected)
+                list->AddRect(min, max, theme::fromArgb(studio_.trackColour(track)), dp(3.0f), dp(1.5f));
+            ImGui::PushFont(theme::boldFont(), ui::currentFontBase() * 0.88f);
+            ui::clippedText(list, ImVec2(min.x + dp(6.0f), min.y + dp(6.0f)), cellWidth - dp(12.0f), p.text, studio_.trackName(track).toRawUTF8());
+            ImGui::PopFont();
             ImGui::PopID();
         }
-    }
-    ImGui::PopClipRect();
-    const auto blankX = origin.x + static_cast<float>(tracks.size()) * (cellWidth + gap);
-    if (blankX < dropMax_.x && ImGui::BeginDragDropTargetCustom(
-            ImRect(ImVec2(std::max(blankX, dropMin_.x), viewTop), dropMax_), ImGui::GetID("##newSamplerDrop"))) {
-        if (const auto* payload = ImGui::AcceptDragDropPayload(kFilePayload); payload && payload->DataSize > 1)
-            dropFiles(juce::StringArray(juce::String::fromUTF8(static_cast<const char*>(payload->Data))), io.MousePos);
-        ImGui::EndDragDropTarget();
-    }
+        // After the last track: a "+" that adds one.
+        const auto addWidth = grid ? std::max(headerHeight, dp(34.0f)) : 0.0f;
+        if (grid) {
+            ImGui::SetCursorScreenPos(ImVec2(origin.x + static_cast<float>(shown.size()) * (cellWidth + gap), origin.y));
+            add_track::button(studio_, state_, "launcherAdd", ImVec2(addWidth, headerHeight));
+        }
+
+        // The slots, in the scrolled band between the names and the stops. A
+        // clip: its triangle launches it (its square, while it plays, stops it),
+        // the rest of it selects it. An empty slot: its square (when it has its
+        // stop) stops the track, the rest selects it.
+        const auto playWidth = dp(20.0f);
+        const auto stopSize = dp(11.0f);
+        const auto windowLeft = ImGui::GetWindowPos().x;
+        const auto windowRight = windowLeft + ImGui::GetWindowSize().x;
+        ImGui::PushClipRect(ImVec2(windowLeft, viewTop), ImVec2(windowRight, viewBottom), true);
+        for (auto scene = 0; scene < (showClips ? scenes : 0); ++scene) {
+            const auto y = viewTop + scene * rowStep - sceneScroll_;
+            if (y + cellHeight < viewTop || y > viewBottom)
+                continue;
+            for (std::size_t column = 0; column < shown.size(); ++column) {
+                const auto& track = shown[column];
+                const SlotRef slot { track, scene };
+                const ImVec2 min(origin.x + column * (cellWidth + gap), y);
+                const ImVec2 max(min.x + cellWidth, y + cellHeight);
+                juce::String name;
+                juce::uint32 colour {};
+                auto exists = false;
+                auto progress = 0.0f;
+                std::uint64_t midiClip {};
+                if (!track.midi) {
+                    if (const auto clip = engine.launcherClip(track.audioIndex, scene)) {
+                        exists = true;
+                        name = clip->name.isNotEmpty() ? clip->name : clip->sourceFile.getFileNameWithoutExtension();
+                        colour = clip->colour;
+                    }
+                } else if (const auto* clip = midiClipForScene(engine, track.midiId, scene)) {
+                    exists = true;
+                    name = clip->name;
+                    colour = clip->colour;
+                    midiClip = clip->id;
+                }
+                const auto playing = exists && studio_.playingScene(track) == scene;
+                const auto pending = exists && studio_.pendingScene(track) == scene;
+                if (playing)
+                    progress = track.midi ? engine.midiLauncherClipProgress(track.midiId) : engine.launcherClipProgress(track.audioIndex);
+                const auto stops = !exists && studio_.slotStops(track, scene);
+                const ImVec2 centre((min.x + max.x) * 0.5f, (min.y + max.y) * 0.5f);
+                const auto inPlay = [&](const ImVec2 point) { return exists && point.x < min.x + playWidth; };
+                const auto inStop = [&](const ImVec2 point) {
+                    return stops && std::abs(point.x - centre.x) <= stopSize && std::abs(point.y - centre.y) <= stopSize;
+                };
+
+                ImGui::PushID(static_cast<int>(column) * 1'024 + scene);
+                ImGui::SetCursorScreenPos(min);
+                ImGui::InvisibleButton("##cell", ImVec2(cellWidth, cellHeight), ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
+                dropSlots_.push_back({slot, min, max});
+                if (ImGui::BeginDragDropTarget()) {
+                    if (const auto* payload = ImGui::AcceptDragDropPayload(kFilePayload); payload && payload->DataSize > 1)
+                        dropFiles(juce::StringArray(juce::String::fromUTF8(static_cast<const char*>(payload->Data))), io.MousePos);
+                    ImGui::EndDragDropTarget();
+                }
+                const auto hovered = ImGui::IsItemHovered();
+                const auto overPlay = hovered && inPlay(io.MousePos);
+                const auto overStop = hovered && inStop(io.MousePos);
+                if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+                    state_.selectTrack(track);
+                    if (!state_.isSlotSelected(slot))
+                        state_.selectedSlots = { slot };
+                    state_.contextRequest = ContextRequest { ContextRequest::Kind::launcherSlot, track, scene };
+                }
+                if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
+                    state_.focused = Panel::launcher;
+                    const auto at = io.MouseClickedPos[0];
+                    if (inPlay(at)) {
+                        // The clip's button: launch it, or stop it while it plays.
+                        if (playing || pending)
+                            studio_.stopTrackClips(track);
+                        else
+                            (void) studio_.launchSlot(track, scene);
+                    } else if (inStop(at)) {
+                        studio_.stopTrackClips(track);
+                    } else {
+                        // A click selects (Ctrl toggles, Shift adds); it launches nothing.
+                        state_.selectTrack(track);
+                        if (io.KeyCtrl) {
+                            if (state_.isSlotSelected(slot))
+                                std::erase(state_.selectedSlots, slot);
+                            else
+                                state_.selectedSlots.push_back(slot);
+                        } else if (io.KeyShift) {
+                            if (!state_.isSlotSelected(slot))
+                                state_.selectedSlots.push_back(slot);
+                        } else {
+                            state_.selectedSlots = { slot };
+                        }
+                        // The inspector shows the clip picked: a MIDI one by its id;
+                        // an audio slot's through the slot (no MIDI clip left picked).
+                        if (track.midi && exists)
+                            state_.selectedClips = { ClipRef { track, midiClip } };
+                        else
+                            state_.selectedClips.clear();
+                    }
+                }
+                if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && !track.midi && !exists && !overStop
+                    && studio_.isBusTrack(track)) {
+                    // A bus's slot: a clip of automation alone (its lanes move the
+                    // bus's volume, pan, effects), four bars long.
+                    const auto bar = 60.0 / std::max(1.0, engine.tempo()) * std::max(1.0, static_cast<double>(engine.beatsPerBar()));
+                    if (engine.createEmptyLauncherClip(track.audioIndex, scene, ui::Ls("Automation", "Automation"), bar * 4.0,
+                                                       studio_.trackColour(track))) {
+                        state_.editedClip = ClipRef { track, 0, scene };
+                        state_.bringToFront = Panel::editor;
+                        studio_.markDirty();
+                    }
+                } else if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && track.midi && !exists && !overStop) {
+                    // A new MIDI clip in this scene.
+                    const auto id = engine.addMidiClip(track.midiId, {}, 0.0, 4.0, true, studio_.trackColour(track), scene);
+                    if (id != 0) {
+                        state_.editedClip = ClipRef { track, id };
+                        state_.bringToFront = Panel::editor;
+                        studio_.markDirty();
+                    }
+                } else if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && exists && !overPlay) {
+                    // The clip in the editor: a MIDI one by its id, an audio one by its slot.
+                    state_.editedClip = track.midi ? ClipRef { track, midiClip } : ClipRef { track, 0, scene };
+                    state_.bringToFront = Panel::editor;
+                }
+                if (overPlay)
+                    ui::tooltip(playing || pending ? L("Arrêter", "Stop") : L("Lancer", "Launch"));
+                else if (overStop)
+                    ui::tooltip(L("Arrêter la piste. Une scène lancée l'arrête aussi (Ctrl+E retire ce stop).",
+                                  "Stop the track. A scene launched stops it too (Ctrl+E takes this stop off)."));
+                else if (hovered && !exists && !track.midi && studio_.isBusTrack(track))
+                    ui::tooltip(L("Double-clic : un clip d'automation du bus (son volume, son panoramique, ses effets) joué avec cette scène",
+                                  "Double click: an automation clip of the bus (its level, pan, effects) played with this scene"));
+
+                const auto selectedSlot = state_.isSlotSelected(slot);
+                if (exists) {
+                    const auto fill = theme::fromArgb(colour != 0 ? colour : (track.midi ? 0xff4fd3aeu : 0xffff9b2fu));
+                    list->AddRectFilled(min, max, theme::mix(fill, p.bg0 | 0xff000000u, hovered ? 0.4f : 0.5f), dp(3.0f));
+                    if (progress > 0.0f)
+                        list->AddRectFilled(ImVec2(min.x, max.y - dp(3.0f)), ImVec2(min.x + cellWidth * std::clamp(progress, 0.0f, 1.0f), max.y),
+                                            p.play);
+                    // Its button: a triangle to launch, a square to stop.
+                    const ImVec2 marker(min.x + playWidth * 0.5f, centre.y);
+                    if (overPlay)
+                        list->AddRectFilled(ImVec2(min.x + dp(2.0f), min.y + dp(2.0f)), ImVec2(min.x + playWidth, max.y - dp(2.0f)),
+                                            (p.text & 0x00ffffffu) | 0x22000000u, dp(2.0f));
+                    if (playing || pending)
+                        list->AddRectFilled(ImVec2(marker.x - dp(4.0f), marker.y - dp(4.0f)), ImVec2(marker.x + dp(4.0f), marker.y + dp(4.0f)),
+                                            playing ? p.play : p.accent);
+                    else
+                        list->AddTriangle(ImVec2(marker.x - dp(4.0f), marker.y - dp(5.0f)), ImVec2(marker.x - dp(4.0f), marker.y + dp(5.0f)),
+                                          ImVec2(marker.x + dp(5.0f), marker.y), overPlay ? p.play : p.text, 1.4f);
+                    ui::clippedText(list, ImVec2(min.x + playWidth + dp(2.0f), min.y + (cellHeight - ImGui::GetFontSize()) * 0.5f),
+                                    cellWidth - playWidth - dp(6.0f), p.text, name.toRawUTF8());
+                    if (pending)
+                        list->AddRect(min, max, p.accent, dp(3.0f), 1.5f);
+                } else {
+                    list->AddRectFilled(min, max, hovered ? p.bg3 : p.bg1, dp(3.0f));
+                    // Its stop, when it has it.
+                    if (stops)
+                        list->AddRect(ImVec2(centre.x - dp(4.0f), centre.y - dp(4.0f)), ImVec2(centre.x + dp(4.0f), centre.y + dp(4.0f)),
+                                      overStop ? p.text : p.textFaint, 0.0f, overStop ? 1.6f : 1.0f);
+                }
+                if (selectedSlot)
+                    list->AddRect(ImVec2(min.x + 0.5f, min.y + 0.5f), ImVec2(max.x - 0.5f, max.y - 0.5f), p.text, dp(3.0f), 1.5f);
+                ImGui::PopID();
+            }
+        }
+        ImGui::PopClipRect();
+        const auto blankX = origin.x + static_cast<float>(shown.size()) * (cellWidth + gap);
+        if (grid && blankX < dropMax_.x && ImGui::BeginDragDropTargetCustom(
+                ImRect(ImVec2(std::max(blankX, dropMin_.x), viewTop), dropMax_), ImGui::GetID("##newSamplerDrop"))) {
+            if (const auto* payload = ImGui::AcceptDragDropPayload(kFilePayload); payload && payload->DataSize > 1)
+                dropFiles(juce::StringArray(juce::String::fromUTF8(static_cast<const char*>(payload->Data))), io.MousePos);
+            ImGui::EndDragDropTarget();
+        }
 
 
-    // Under the slots: each track's stop, its clips stopped.
-    for (std::size_t column = 0; column < tracks.size(); ++column) {
-        const auto& track = tracks[column];
-        const ImVec2 min(origin.x + column * (cellWidth + gap), origin.y + stopRowTop);
-        ImGui::PushID(static_cast<int>(column) + 5'000);
-        ImGui::SetCursorScreenPos(min);
-        const auto active = studio_.playingScene(track) >= 0 || studio_.pendingScene(track) >= 0;
-        ImGui::PushStyleColor(ImGuiCol_Button, theme::vec(active ? theme::mix(p.play, p.bg2 | 0xff000000u, 0.65f) : p.bg2));
-        char label[32];
-        std::snprintf(label, sizeof(label), "%s", icon::stop);
-        if (ImGui::Button(label, ImVec2(cellWidth, stopHeight)))
-            studio_.stopTrackClips(track);
-        ImGui::PopStyleColor();
-        ui::tooltip(L("Arrêter les clips de la piste", "Stop the track's clips"));
-        ImGui::PopID();
-    }
+        // Under the slots: each track's stop, its clips stopped.
+        for (std::size_t column = 0; column < (showClips ? shown.size() : 0); ++column) {
+            const auto& track = shown[column];
+            const ImVec2 min(origin.x + column * (cellWidth + gap), origin.y + stopRowTop);
+            ImGui::PushID(static_cast<int>(column) + 5'000);
+            ImGui::SetCursorScreenPos(min);
+            const auto active = studio_.playingScene(track) >= 0 || studio_.pendingScene(track) >= 0;
+            ImGui::PushStyleColor(ImGuiCol_Button, theme::vec(active ? theme::mix(p.play, p.bg2 | 0xff000000u, 0.65f) : p.bg2));
+            char label[32];
+            std::snprintf(label, sizeof(label), "%s", icon::stop);
+            if (ImGui::Button(label, ImVec2(cellWidth, stopHeight)))
+                studio_.stopTrackClips(track);
+            ImGui::PopStyleColor();
+            ui::tooltip(L("Arrêter les clips de la piste", "Stop the track's clips"));
+            ImGui::PopID();
+        }
 
-    // Each track's mixer strip, under its clips.
-    for (std::size_t column = 0; column < tracks.size(); ++column) {
-        ImGui::SetCursorScreenPos(ImVec2(origin.x + column * (cellWidth + gap), origin.y + mixerTop));
-        mixer_strip::track(studio_, state_, tracks[column], static_cast<int>(column), cellWidth, stripHeight);
-    }
-    ImGui::SetCursorScreenPos(origin);
-    ImGui::Dummy(ImVec2(static_cast<float>(tracks.size()) * (cellWidth + gap) + addWidth + gap, bottom));
-    // The wheel: over the scenes, up and down when they do not all fit;
-    // elsewhere (and with Shift), sideways. A knob or a fader under the
-    // pointer keeps it.
-    if (ImGui::IsWindowHovered()) {
-        const auto overScenes = io.MousePos.y >= viewTop && io.MousePos.y < viewBottom;
-        if (!(overScenes && sceneWheel(io.MouseWheel)) && io.MouseWheel != 0.0f && !io.KeyCtrl && !ui::wheelTaken()
-            && !ImGui::IsAnyItemActive())
-            ImGui::SetScrollX(ImGui::GetScrollX() - io.MouseWheel * dp(120.0f));
-        if (io.MouseWheelH != 0.0f)
-            ImGui::SetScrollX(ImGui::GetScrollX() - io.MouseWheelH * dp(120.0f));
-    }
+        // The sections the options' column shows, each track's cell over its
+        // strip.
+        for (std::size_t column = 0; column < shown.size(); ++column) {
+            const auto x = origin.x + static_cast<float>(column) * (cellWidth + gap);
+            ImGui::PushID(static_cast<int>(column) + 20'000);
+            if (devicesHeight > 0.0f)
+                devicesCell(shown[column], ImVec2(x, origin.y + devicesTop), ImVec2(cellWidth, devicesHeight));
+            if (sendsHeight > 0.0f)
+                sendsCell(shown[column], buses, ImVec2(x, origin.y + sendsTop), ImVec2(cellWidth, sendsHeight));
+            if (ioHeight > 0.0f)
+                ioCell(shown[column], ImVec2(x, origin.y + ioTop), ImVec2(cellWidth, ioHeight));
+            ImGui::PopID();
+        }
+
+        // Each track's mixer strip, under its clips.
+        for (std::size_t column = 0; column < shown.size(); ++column) {
+            ImGui::SetCursorScreenPos(ImVec2(origin.x + column * (cellWidth + gap), origin.y + mixerTop));
+            mixer_strip::track(studio_, state_, shown[column], static_cast<int>(column), cellWidth, stripHeight);
+        }
+        ImGui::SetCursorScreenPos(origin);
+        // As wide as its columns (the tracks' group: and its "+").
+        ImGui::Dummy(ImVec2(grid ? static_cast<float>(shown.size()) * (cellWidth + gap) + addWidth + gap
+                                 : static_cast<float>(shown.size()) * (cellWidth + gap) - gap,
+                            bottom));
+        // The wheel: over the scenes, up and down when they do not all fit;
+        // elsewhere (and with Shift), sideways. A knob or a fader under the
+        // pointer keeps it.
+        if (ImGui::IsWindowHovered()) {
+            const auto overScenes = io.MousePos.y >= viewTop && io.MousePos.y < viewBottom;
+            if (!(overScenes && sceneWheel(io.MouseWheel)) && io.MouseWheel != 0.0f && !io.KeyCtrl && !ui::wheelTaken()
+                && !ImGui::IsAnyItemActive())
+                ImGui::SetScrollX(ImGui::GetScrollX() - io.MouseWheel * dp(120.0f));
+            if (io.MouseWheelH != 0.0f)
+                ImGui::SetScrollX(ImGui::GetScrollX() - io.MouseWheelH * dp(120.0f));
+        }
+    };
+    ImGui::BeginChild("##grid", ImVec2(gridWidth, available.y), ImGuiChildFlags_None,
+                      ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+    drawColumns(plain, true, gridWidth);
     ImGui::EndChild();
+    if (!buses.empty()) {
+        ImGui::SameLine(0.0f, gap);
+        ImGui::BeginChild("##buses", ImVec2(busesWidth, available.y), ImGuiChildFlags_None,
+                          ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+        drawColumns(buses, false, busesWidth);
+        ImGui::EndChild();
+    }
 
     // The scenes' bar: beside them only, between the grid and the master.
     ImGui::SameLine(0.0f, gap);
@@ -488,7 +578,7 @@ void LauncherView::draw()
         // scene (masterSlot draws and plays them).
         const auto masterViewTop = top.y + slotsTop;
         ImGui::PushClipRect(ImVec2(top.x, masterViewTop), ImVec2(top.x + masterWidth, masterViewTop + viewport), true);
-        for (auto scene = 0; scene < scenes; ++scene) {
+        for (auto scene = 0; scene < (showClips ? scenes : 0); ++scene) {
             const ImVec2 min(top.x, masterViewTop + scene * rowStep - sceneScroll_);
             if (min.y + cellHeight < masterViewTop || min.y > masterViewTop + viewport)
                 continue;
@@ -500,18 +590,27 @@ void LauncherView::draw()
         if (ImGui::IsWindowHovered() && io.MousePos.y >= masterViewTop && io.MousePos.y < masterViewTop + viewport)
             (void) sceneWheel(io.MouseWheel);
         // The stop row's end: the master's clip stopped.
-        ImGui::SetCursorScreenPos(ImVec2(top.x, top.y + stopRowTop));
-        {
+        if (showClips) {
+            ImGui::SetCursorScreenPos(ImVec2(top.x, top.y + stopRowTop));
             char label[48];
             std::snprintf(label, sizeof(label), "%s", icon::stop);
             if (ImGui::Button(label, ImVec2(masterWidth, stopHeight)))
                 studio_.stopMasterClip();
             ui::tooltip(L("Arrêter le clip du master", "Stop the master's clip"));
         }
+        // Its sections: its devices (no sends, its outputs are the card's).
+        if (devicesHeight > 0.0f)
+            devicesCell(Studio::masterTrack(), ImVec2(top.x, top.y + devicesTop), ImVec2(masterWidth, devicesHeight));
+        for (const auto& [at, height] : { std::pair { sendsTop, sendsHeight }, std::pair { ioTop, ioHeight } })
+            if (height > 0.0f)
+                masterList->AddRectFilled(ImVec2(top.x, top.y + at), ImVec2(top.x + masterWidth, top.y + at + height), p.bg1, dp(3.0f));
         ImGui::SetCursorScreenPos(ImVec2(top.x, top.y + mixerTop));
         mixer_strip::master(studio_, state_, masterWidth, stripHeight);
     }
     ImGui::EndChild();
+    // The options' column: what the launcher shows.
+    ImGui::SameLine(0.0f, gap);
+    optionsColumn(available.y);
 }
 
 bool LauncherView::dropFiles(const juce::StringArray& files, const ImVec2 point)
@@ -664,12 +763,246 @@ void LauncherView::masterSlot(const int scene, const ImVec2 min, const ImVec2 ma
         if (pending)
             list->AddRect(min, max, p.accent, dp(3.0f), 1.5f);
     } else {
-        list->AddRectFilled(min, max, hovered ? p.bg3 : p.bg1, dp(3.0f));
-        if (hovered)
-            ui::centredText(list, min, max, p.textFaint, "+");
+        // An empty slot, seen: a double click makes its clip.
+        list->AddRectFilled(min, max, hovered ? p.bg3 : p.bg2, dp(3.0f));
+        list->AddRect(min, max, theme::alpha(p.accent, hovered ? 0.6f : 0.22f), dp(3.0f));
+        ui::centredText(list, min, max, hovered ? p.text : p.textFaint, "+");
     }
     if (clip != nullptr && state_.editedMasterScene && *state_.editedMasterScene == scene)
         list->AddRect(ImVec2(min.x + 0.5f, min.y + 0.5f), ImVec2(max.x - 0.5f, max.y - 0.5f), p.text, dp(3.0f), 1.5f);
+}
+
+// ---- The sections over the strips -------------------------------------------------------------
+
+void LauncherView::devicesCell(const TrackRef& track, const ImVec2 min, const ImVec2 size)
+{
+    const auto& p = theme::palette();
+    auto* list = ImGui::GetWindowDrawList();
+    list->AddRectFilled(min, ImVec2(min.x + size.x, min.y + size.y), p.bg2, dp(3.0f));
+    juce::StringArray names;
+    if (const auto* slot = studio_.graphFor(track))
+        for (const auto& node : slot->graph().editorNodes())
+            if (!node.boundary)
+                names.add(node.title.isNotEmpty() ? node.title : node.typeKey);
+    ImGui::PushFont(nullptr, ui::currentFontBase() * 0.75f);
+    const auto row = ImGui::GetFontSize() + dp(3.0f);
+    const auto addSize = dp(16.0f);
+    const auto room = static_cast<int>((size.y - addSize - dp(6.0f)) / row);
+    auto y = min.y + dp(3.0f);
+    const auto open = [&] {
+        state_.selectTrack(track);
+        state_.bringToFront = Panel::devices;
+    };
+    for (auto index = 0; index < names.size() && index < room; ++index) {
+        const auto last = index == room - 1 && names.size() > room;
+        const auto text = last ? "+" + juce::String(names.size() - index) + ui::Ls(" autres", " more") : names[index];
+        ImGui::SetCursorScreenPos(ImVec2(min.x + dp(3.0f), y));
+        ImGui::PushID(index);
+        if (ImGui::InvisibleButton("##device", ImVec2(size.x - dp(6.0f), row - dp(1.0f))))
+            open();
+        const auto hovered = ImGui::IsItemHovered();
+        ImGui::PopID();
+        list->AddRectFilled(ImVec2(min.x + dp(3.0f), y), ImVec2(min.x + size.x - dp(3.0f), y + row - dp(1.0f)), hovered ? p.bg4 : p.bg3, dp(2.0f));
+        ui::clippedText(list, ImVec2(min.x + dp(6.0f), y + dp(1.0f)), size.x - dp(12.0f), hovered ? p.text : p.textDim, text.toRawUTF8());
+        if (hovered)
+            ui::tooltip(L("Clic : ses périphériques", "Click: its devices"));
+        y += row;
+    }
+    if (names.isEmpty())
+        list->AddText(ImVec2(min.x + dp(6.0f), y), p.textFaint, L("aucun", "none"));
+    ImGui::PopFont();
+    // A device added: the catalogue, for this track.
+    ImGui::SetCursorScreenPos(ImVec2(min.x + (size.x - addSize) * 0.5f, min.y + size.y - addSize - dp(3.0f)));
+    if (ui::iconButton(icon::add, L("Ajouter un périphérique", "Add a device"), false, 0, ImVec2(addSize, addSize))) {
+        open();
+        state_.deviceInsertBefore.reset();
+        state_.openDeviceCatalogue = true;
+    }
+}
+
+void LauncherView::sendsCell(const TrackRef& track, const std::vector<TrackRef>& buses, const ImVec2 min, const ImVec2 size)
+{
+    const auto& p = theme::palette();
+    auto* list = ImGui::GetWindowDrawList();
+    list->AddRectFilled(min, ImVec2(min.x + size.x, min.y + size.y), p.bg2, dp(3.0f));
+    ImGui::PushFont(nullptr, ui::currentFontBase() * 0.72f);
+    if (buses.empty())
+        list->AddText(ImVec2(min.x + dp(6.0f), min.y + dp(6.0f)), p.textFaint, L("aucun bus", "no bus"));
+    auto outputs = studio_.trackOutputs(track);
+    auto changed = false;
+    for (std::size_t index = 0; index < buses.size(); ++index) {
+        const auto& bus = buses[index];
+        const auto y = min.y + dp(3.0f) + static_cast<float>(index) * dp(26.0f);
+        const auto key = studio_.routingKey(bus);
+        ImGui::PushID(static_cast<int>(index));
+        if (bus == track || !studio_.canRoute(track, bus)) {
+            ui::clippedText(list, ImVec2(min.x + dp(28.0f), y + dp(6.0f)), size.x - dp(32.0f), p.textFaint, studio_.trackName(bus).toRawUTF8());
+            ImGui::PopID();
+            continue;
+        }
+        auto found = std::find_if(outputs.begin(), outputs.end(),
+                                  [key](const TrackOutput& output) { return output.hardware == 0 && output.input == 0 && output.destination == key; });
+        auto level = found != outputs.end() ? found->gainDb : -60.0f;
+        ImGui::SetCursorScreenPos(ImVec2(min.x + dp(4.0f), y));
+        ui::KnobStyle style;
+        style.diameter = 18.0f;
+        style.format = "%.1f dB";
+        style.flags = ui::knobNoLabel;
+        style.colour = theme::fromArgb(studio_.trackColour(bus));
+        if (ui::knob("##send", &level, -60.0f, 6.0f, -60.0f, style)) {
+            if (found != outputs.end())
+                found->gainDb = level;
+            else {
+                TrackOutput output;
+                output.destination = key;
+                output.gainDb = level;
+                outputs.push_back(output);
+            }
+            changed = true;
+        }
+        const auto sending = found != outputs.end();
+        ui::clippedText(list, ImVec2(min.x + dp(26.0f), y + dp(5.0f)), size.x - dp(30.0f), sending ? p.text : p.textDim,
+                        studio_.trackName(bus).toRawUTF8());
+        ImGui::PopID();
+    }
+    ImGui::PopFont();
+    if (changed)
+        if (const auto done = studio_.setTrackOutputs(track, outputs); done.failed()) {
+            state_.status = done.getErrorMessage();
+            state_.statusIsError = true;
+            state_.statusTime = ImGui::GetTime();
+        }
+}
+
+void LauncherView::ioCell(const TrackRef& track, const ImVec2 min, const ImVec2 size)
+{
+    const auto& p = theme::palette();
+    auto* list = ImGui::GetWindowDrawList();
+    list->AddRectFilled(min, ImVec2(min.x + size.x, min.y + size.y), p.bg2, dp(3.0f));
+    ImGui::PushFont(nullptr, ui::currentFontBase() * 0.78f);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(dp(4.0f), dp(2.0f)));
+    const auto pictureWidth = dp(14.0f);
+    const auto width = size.x - dp(8.0f) - pictureWidth - dp(2.0f);
+    const auto bus = studio_.isBusTrack(track);
+    // A row's picture: a note (MIDI), a microphone (audio), a plug (a bus),
+    // a speaker (where it goes).
+    const auto picture = [&](const char* glyph, const ImU32 colour, const char* tip) {
+        const auto at = ImGui::GetCursorScreenPos();
+        ImGui::Dummy(ImVec2(pictureWidth, ImGui::GetFrameHeight()));
+        ui::tooltip(tip);
+        ui::centredText(list, at, ImVec2(at.x + pictureWidth, at.y + ImGui::GetFrameHeight()), colour, glyph);
+        ImGui::SameLine(0.0f, dp(2.0f));
+    };
+    // What comes in.
+    ImGui::SetCursorScreenPos(ImVec2(min.x + dp(4.0f), min.y + dp(4.0f)));
+    if (track.midi) {
+        picture(icon::note, p.midi, L("Entrée MIDI", "MIDI input"));
+        routing_ui::midiInputCombo(studio_, track, width);
+    } else if (bus) {
+        picture(icon::connect, p.textDim, L("Ce qui y est routé", "What is routed into it"));
+        const auto senders = routing_ui::sendersText(studio_, track);
+        const auto at = ImGui::GetCursorScreenPos();
+        ImGui::Dummy(ImVec2(width, ImGui::GetFrameHeight()));
+        ui::tooltip(senders.isEmpty() ? L("Aucune piste n'y est routée", "No track is routed into it") : senders.toRawUTF8());
+        ui::clippedText(list, ImVec2(at.x + dp(2.0f), at.y + (ImGui::GetFrameHeight() - ImGui::GetFontSize()) * 0.5f), width - dp(2.0f),
+                        senders.isEmpty() ? p.textFaint : p.textDim,
+                        senders.isEmpty() ? L("aucune piste", "no track") : senders.toRawUTF8());
+    } else {
+        picture(icon::microphone, p.audio, L("Entrée audio : ce qu'elle enregistre", "Audio input: what it records"));
+        routing_ui::recordInputCombo(studio_, track, width);
+    }
+    // Where it goes.
+    ImGui::SetCursorScreenPos(ImVec2(min.x + dp(4.0f), min.y + dp(8.0f) + ImGui::GetFrameHeight()));
+    picture(icon::volume, p.play, L("Sortie : où va son son", "Output: where its sound goes"));
+    juce::String error;
+    routing_ui::mainOutputCombo(studio_, track, width, error);
+    ImGui::PopStyleVar();
+    ImGui::PopFont();
+    if (error.isNotEmpty()) {
+        state_.status = error;
+        state_.statusIsError = true;
+        state_.statusTime = ImGui::GetTime();
+    }
+}
+
+namespace {
+
+// The options' pictures.
+void pictureClips(ImDrawList* list, const ImVec2 min, const ImVec2 max, const ImU32 colour)
+{
+    const auto w = (max.x - min.x - dp(2.0f)) / 2.0f;
+    const auto h = (max.y - min.y - dp(4.0f)) / 3.0f;
+    for (auto column = 0; column < 2; ++column)
+        for (auto row = 0; row < 3; ++row) {
+            const ImVec2 at(min.x + static_cast<float>(column) * (w + dp(2.0f)), min.y + static_cast<float>(row) * (h + dp(2.0f)));
+            list->AddRectFilled(at, ImVec2(at.x + w, at.y + h), colour, dp(1.0f));
+        }
+}
+
+void pictureDevices(ImDrawList* list, const ImVec2 min, const ImVec2 max, const ImU32 colour)
+{
+    const auto h = (max.y - min.y - dp(4.0f)) / 3.0f;
+    for (auto row = 0; row < 3; ++row) {
+        const auto y = min.y + static_cast<float>(row) * (h + dp(2.0f));
+        list->AddRect(ImVec2(min.x, y), ImVec2(max.x, y + h), colour, dp(1.0f));
+    }
+}
+
+void pictureSends(ImDrawList* list, const ImVec2 min, const ImVec2 max, const ImU32 colour)
+{
+    const auto stroke = std::max(1.2f, (max.y - min.y) * 0.12f);
+    list->AddLine(ImVec2(min.x + dp(1.0f), max.y - dp(1.0f)), ImVec2(max.x - dp(1.0f), min.y + dp(1.0f)), colour, stroke);
+    list->AddLine(ImVec2(max.x - dp(1.0f), min.y + dp(1.0f)), ImVec2(max.x - (max.x - min.x) * 0.45f, min.y + dp(1.0f)), colour, stroke);
+    list->AddLine(ImVec2(max.x - dp(1.0f), min.y + dp(1.0f)), ImVec2(max.x - dp(1.0f), min.y + (max.y - min.y) * 0.45f), colour, stroke);
+}
+
+void pictureIo(ImDrawList* list, const ImVec2 min, const ImVec2 max, const ImU32 colour)
+{
+    const auto stroke = std::max(1.2f, (max.y - min.y) * 0.11f);
+    const auto upper = min.y + (max.y - min.y) * 0.3f;
+    const auto lower = min.y + (max.y - min.y) * 0.7f;
+    const auto head = (max.y - min.y) * 0.22f;
+    list->AddLine(ImVec2(min.x, upper), ImVec2(max.x, upper), colour, stroke);
+    list->AddLine(ImVec2(max.x, upper), ImVec2(max.x - head, upper - head), colour, stroke);
+    list->AddLine(ImVec2(min.x, lower), ImVec2(max.x, lower), colour, stroke);
+    list->AddLine(ImVec2(min.x, lower), ImVec2(min.x + head, lower + head), colour, stroke);
+}
+
+} // namespace
+
+void LauncherView::optionsColumn(const float height)
+{
+    const auto& p = theme::palette();
+    ImGui::BeginChild("##launcherOptions", ImVec2(dp(30.0f), height), ImGuiChildFlags_None,
+                      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+    // At the foot of the column, as Bitwig has them.
+    struct Option {
+        const char* id;
+        bool* shown;
+        ui::Picture picture;
+        const char* tip;
+    };
+    const Option options[] {
+        { "##showClips", &state_.launcherShowClips, pictureClips,
+          L("Les clips : les scènes et leurs cases", "The clips: the scenes and their slots") },
+        { "##showDevices", &state_.launcherShowDevices, pictureDevices,
+          L("Les périphériques de chaque piste (un clic : les voir, + : en ajouter)", "Each track's devices (a click: see them, +: add one)") },
+        { "##showSends", &state_.launcherShowSends, pictureSends,
+          L("Les envois vers les bus, un bouton chacun", "The sends to the buses, a knob each") },
+        { "##showIo", &state_.launcherShowIo, pictureIo,
+          L("Ce qui entre (entrées MIDI, entrée audio) et où le son va", "What comes in (MIDI inputs, audio input) and where the sound goes") },
+    };
+    const auto size = dp(26.0f);
+    const auto count = static_cast<float>(sizeof(options) / sizeof(options[0]));
+    const auto top = ImGui::GetCursorScreenPos();
+    auto y = top.y + height - count * (size + dp(3.0f)) - dp(4.0f);
+    ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(top.x, y - dp(4.0f)), ImVec2(top.x + dp(30.0f), top.y + height), p.bg1, dp(3.0f));
+    for (const auto& option : options) {
+        ImGui::SetCursorScreenPos(ImVec2(top.x + dp(2.0f), y));
+        (void) ui::pictureToggle(option.id, option.shown, p.accent, option.picture, option.tip, size, size);
+        y += size + dp(3.0f);
+    }
+    ImGui::EndChild();
 }
 
 void LauncherView::launchScene(const int scene)

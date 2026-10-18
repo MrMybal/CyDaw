@@ -939,10 +939,14 @@ void BrowserView::drawDevices()
         const auto& entry = entries[index];
         if (!track.midi && entry.soundSource)
             continue;
+        // A whole chain of effects would take every card's place: the
+        // track's preset button (in Devices) has them.
+        if (entry.kind == "preset" && !entry.soundSource)
+            continue;
         if (query.isNotEmpty() && !fold(entry.name).contains(query) && !fold(entry.category).contains(query)
             && !fold(entry.description).contains(query))
             continue;
-        const auto heading = entry.kind == "preset" ? ui::Ls("Chaînes complètes", "Whole chains")
+        const auto heading = entry.kind == "preset" ? ui::Ls("Instruments", "Instruments")
                              : entry.category.isNotEmpty() ? entry.category
                                                            : ui::Ls("Autres", "Others");
         if (query.isEmpty() && heading != lastCategory) {

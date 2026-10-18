@@ -303,6 +303,11 @@ private:
     void drawMenuBar();
     void drawTransportBar();
     void drawStatusBar();
+    // Left of the master in the top bar: MIDI and sync in and out (lights),
+    // the devices plugged in, CPU, memory and audio load, ending at `endX`
+    // (in the window).
+    void drawSystemStatus(float endX);
+    std::uint64_t lastTraffic_ {};
     void drawDockSpace();
     void drawWindows();
     void toggleBottomPanel();

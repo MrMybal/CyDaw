@@ -1324,6 +1324,50 @@ juce::Result Studio::insertDeviceInBranch(const TrackRef& track, const juce::Str
     return publishGraph(track, true);
 }
 
+juce::Result Studio::insertDeviceBefore(const TrackRef& track, const juce::String& key, const std::uint64_t before)
+{
+    std::vector<std::uint64_t> had;
+    if (const auto* slot = graphFor(track))
+        for (const auto& node : slot->graph().editorNodes())
+            had.push_back(node.id);
+    const auto result = insertDevice(track, key);
+    return result.failed() || before == 0 ? result : placeNewCard(track, had, before);
+}
+
+juce::Result Studio::insertLibraryDeviceBefore(const TrackRef& track, const juce::File& file, const std::uint64_t before)
+{
+    std::vector<std::uint64_t> had;
+    if (const auto* slot = graphFor(track))
+        for (const auto& node : slot->graph().editorNodes())
+            had.push_back(node.id);
+    const auto result = insertLibraryDevice(track, file);
+    return result.failed() || before == 0 ? result : placeNewCard(track, had, before);
+}
+
+juce::Result Studio::placeNewCard(const TrackRef& track, const std::vector<std::uint64_t>& had, const std::uint64_t before)
+{
+    auto* slot = graphFor(track);
+    const auto known = [&had](const std::uint64_t id) { return std::find(had.begin(), had.end(), id) != had.end(); };
+    if (slot == nullptr || !known(before))
+        return juce::Result::ok();
+    auto& graph = slot->graph();
+    // The card made: the new one on the chain itself (a container's head,
+    // its end and branches inside it). Only one: else left where it went.
+    const auto inside = graph.editorContainerMembers();
+    std::uint64_t made {};
+    for (const auto& node : graph.editorNodes())
+        if (!node.boundary && !known(node.id) && !inside.contains(node.id)) {
+            if (made != 0)
+                return juce::Result::ok();
+            made = node.id;
+        }
+    if (made == 0 || !graph.editorMoveCard(made, 0, -1, before))
+        return juce::Result::ok();
+    graph_layout::arrange(graph);
+    dirty_ = true;
+    return publishGraph(track, true);
+}
+
 juce::Result Studio::insertDevice(const TrackRef& track, const juce::String& key)
 {
     auto* slot = graphFor(track);
@@ -1337,6 +1381,14 @@ juce::Result Studio::insertDevice(const TrackRef& track, const juce::String& key
         return juce::Result::fail("no device \"" + key + "\"");
     if (!track.midi && device->soundSource)
         return juce::Result::fail("\"" + device->name + "\" is an instrument");
+    // A whole chain of effects takes every card's place: the track's preset
+    // does that, never an added device.
+    if (device->kind == "preset" && !device->soundSource)
+        return juce::Result::fail("\"" + device->name + "\" "
+                                  + ui::Ls("est une chaîne entière : le bouton Preset de piste (au-dessus des entrées de la piste, "
+                                           "dans Périphériques) la met à la place de toute la chaîne",
+                                           "is a whole chain: the Track preset button (above the track's inputs, in Devices) "
+                                           "puts it in place of the whole chain"));
     // An instrument container's card: the instrument that is it (its pads or layers made).
     if (const auto kind = engine::instrument_container::kindOfType(key.toStdString());
         track.midi && track.pad < 0 && kind != engine::instrument_container::Kind::none)
@@ -4224,6 +4276,37 @@ bool Studio::applyChainPreset(const TrackRef& track, const juce::var& state, juc
         }
     }
     return true;
+}
+
+std::vector<std::pair<juce::String, juce::String>> Studio::factoryChains(const TrackRef& track) const
+{
+    std::vector<std::pair<juce::String, juce::String>> chains;
+    const auto* slot = graphFor(track);
+    if (slot == nullptr || track.midi)
+        return chains;
+    for (const auto& device : slot->graph().deviceCatalogue())
+        if (device.kind == "preset" && !device.soundSource && device.input == "audio" && device.output == "audio")
+            chains.emplace_back(device.key, device.name);
+    std::sort(chains.begin(), chains.end(), [](const auto& a, const auto& b) { return a.second.compareNatural(b.second) < 0; });
+    return chains;
+}
+
+juce::Result Studio::applyFactoryChain(const TrackRef& track, const juce::String& key)
+{
+    auto* slot = graphFor(track);
+    if (slot == nullptr)
+        return juce::Result::fail(ui::Ls("Piste introuvable", "No such track"));
+    const auto chains = factoryChains(track);
+    if (std::none_of(chains.begin(), chains.end(), [&key](const auto& chain) { return chain.first == key; }))
+        return juce::Result::fail(ui::Ls("Pas une chaîne de CyDAW pour cette piste : ", "Not one of CyDAW's chains for this track: ") + key);
+    if (workshop_ && workshop_->track && *workshop_->track == track && workshop_->own == nullptr)
+        unlinkWorkshop();
+    auto& graph = slot->graph();
+    if (const auto applied = graph.insertFactoryDevice(key); applied.failed())
+        return applied;
+    graph_layout::arrange(graph);
+    dirty_ = true;
+    return publishGraph(track, true);
 }
 
 juce::String Studio::presetName(const juce::String& holderKey) const

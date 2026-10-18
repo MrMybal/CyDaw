@@ -731,7 +731,7 @@ float positionToDb(const float position, const float minimumDb, const float maxi
 } // namespace
 
 bool fader(const char* id, float* gainDb, const float minimumDb, const float maximumDb, const ImVec2 size,
-           const ImU32 colour)
+           const ImU32 colour, const bool ticks)
 {
     const auto& p = theme::palette();
     auto& io = ImGui::GetIO();
@@ -765,12 +765,11 @@ bool fader(const char* id, float* gainDb, const float minimumDb, const float max
     const auto top = origin.y + dp(7.0f);
     const auto bottom = top + travel;
     // Scale ticks.
-    ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 0.7f);
-    for (const auto tick : { 6.0f, 0.0f, -6.0f, -12.0f, -24.0f, -48.0f }) {
-        const auto y = bottom - meterPosition(tick) * travel;
-        list->AddLine(ImVec2(origin.x, y), ImVec2(origin.x + dp(4.0f), y), p.textFaint);
-    }
-    ImGui::PopFont();
+    if (ticks)
+        for (const auto tick : { 6.0f, 0.0f, -6.0f, -12.0f, -24.0f, -48.0f }) {
+            const auto y = bottom - meterPosition(tick) * travel;
+            list->AddLine(ImVec2(origin.x, y), ImVec2(origin.x + dp(4.0f), y), p.textFaint);
+        }
     list->AddRectFilled(ImVec2(centreX - dp(2.0f), top), ImVec2(centreX + dp(2.0f), bottom), p.bg0, dp(2.0f));
     const auto handleY = bottom - meterPosition(*gainDb) * travel;
     const auto fill = colour != 0 ? colour : p.accent;
@@ -787,13 +786,20 @@ bool fader(const char* id, float* gainDb, const float minimumDb, const float max
     return changed;
 }
 
-void meter(const char* id, const ImVec2 size, const float peakLeft, const float peakRight, const float rmsLeft,
-           const float rmsRight, const bool vertical)
+void meter(const char* id, const ImVec2 whole, const float peakLeft, const float peakRight, const float rmsLeft,
+           const float rmsRight, const bool vertical, const bool scale)
 {
     const auto& p = theme::palette();
-    const auto origin = ImGui::GetCursorScreenPos();
+    const auto corner = ImGui::GetCursorScreenPos();
     ImGui::PushID(id);
-    ImGui::Dummy(size);
+    ImGui::Dummy(whole);
+    // With its scale: the numbers in a column on the left, the bars beside.
+    const auto scaled = scale && vertical;
+    ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 0.56f);
+    const auto labelsWidth = scaled ? std::min(whole.x * 0.5f, ImGui::CalcTextSize("-48").x + dp(2.0f)) : 0.0f;
+    ImGui::PopFont();
+    const ImVec2 origin(corner.x + labelsWidth, corner.y);
+    const ImVec2 size(whole.x - labelsWidth, whole.y);
     auto* storage = ImGui::GetStateStorage();
     const auto holdId = ImGui::GetID("hold");
     const auto holdTimeId = ImGui::GetID("holdTime");
@@ -810,7 +816,7 @@ void meter(const char* id, const ImVec2 size, const float peakLeft, const float 
     storage->SetFloat(holdId, hold);
     storage->SetFloat(holdTimeId, holdTime);
 
-    list->AddRectFilled(origin, ImVec2(origin.x + size.x, origin.y + size.y), p.bg0, dp(2.0f));
+    list->AddRectFilled(corner, ImVec2(corner.x + whole.x, corner.y + whole.y), p.bg0, dp(2.0f));
     const auto gap = dp(1.0f);
     const auto drawBar = [&](const int index, const float peak, const float rms) {
         const auto peakPos = meterPosition(toDb(peak));
@@ -842,6 +848,26 @@ void meter(const char* id, const ImVec2 size, const float peakLeft, const float 
     };
     drawBar(0, peakLeft, rmsLeft);
     drawBar(1, peakRight, rmsRight);
+    if (scaled) {
+        // Its marks across the bars, its numbers beside them (one hidden
+        // when the meter is too short to keep it apart from the last).
+        ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 0.56f);
+        const auto textHeight = ImGui::GetFontSize();
+        auto lastText = -1.0e9f;
+        for (const auto db : { 6.0f, 0.0f, -6.0f, -12.0f, -24.0f, -48.0f }) {
+            const auto y = std::round(origin.y + size.y * (1.0f - meterPosition(db)));
+            list->AddLine(ImVec2(origin.x, y), ImVec2(origin.x + size.x, y), theme::alpha(p.textFaint, db == 0.0f ? 0.55f : 0.3f), 1.0f);
+            const auto textY = std::clamp(y - textHeight * 0.5f, corner.y, corner.y + whole.y - textHeight);
+            if (textY - lastText < textHeight * 0.95f)
+                continue;
+            lastText = textY;
+            char text[8];
+            std::snprintf(text, sizeof(text), db > 0.0f ? "+%.0f" : "%.0f", db);
+            const auto width = ImGui::CalcTextSize(text).x;
+            list->AddText(ImVec2(origin.x - dp(1.5f) - width, textY), db == 0.0f ? p.textDim : p.textFaint, text);
+        }
+        ImGui::PopFont();
+    }
     const auto holdPos = meterPosition(hold);
     if (holdPos > 0.0f) {
         const auto colour = hold > -0.1f ? p.meterHigh : p.text;
@@ -856,10 +882,12 @@ void meter(const char* id, const ImVec2 size, const float peakLeft, const float 
     ImGui::PopID();
 }
 
-bool pictureToggle(const char* id, bool* value, const ImU32 onColour, const Picture picture, const char* tip, float width)
+bool pictureToggle(const char* id, bool* value, const ImU32 onColour, const Picture picture, const char* tip, float width,
+                   float height)
 {
     const auto& p = theme::palette();
-    const auto height = ImGui::GetFrameHeight();
+    if (height <= 0.0f)
+        height = ImGui::GetFrameHeight();
     if (width <= 0.0f)
         width = std::round(height * 1.5f);
     const auto origin = ImGui::GetCursorScreenPos();
@@ -1088,7 +1116,7 @@ bool timelineBand(const char* id, const ImVec2 min, const ImVec2 max, double& po
 }
 
 bool rowsBand(const char* id, const ImVec2 min, const ImVec2 max, float& scroll, float& zoom, const float minimumZoom,
-              const float maximumZoom)
+              const float maximumZoom, const bool rowsAtRight)
 {
     const auto& p = theme::palette();
     auto* list = ImGui::GetWindowDrawList();
@@ -1107,22 +1135,50 @@ bool rowsBand(const char* id, const ImVec2 min, const ImVec2 max, float& scroll,
     if (active) {
         const auto anchor = storage->GetFloat(key, 0.0f);
         if (io.MouseDelta.x != 0.0f)
-            zoom = std::clamp(zoom * std::exp(-io.MouseDelta.x * 0.012f), minimumZoom, maximumZoom);
+            zoom = std::clamp(zoom * std::exp((rowsAtRight ? io.MouseDelta.x : -io.MouseDelta.x) * 0.012f), minimumZoom, maximumZoom);
         scroll = std::max(0.0f, anchor * zoom - (io.MousePos.y - min.y));
     }
     const auto fit = hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
     list->AddRectFilled(min, max, active ? p.bg3 : (hovered ? theme::mix(p.bg2, p.bg3, 0.5f) : p.bg2));
-    // Its marks: the rows' spacing, so the zoom shows.
+    // Its marks, as the time band's (turned): the rows' spacing, so the zoom
+    // shows, longer every fourth; they move with the rows.
     const auto spacing = std::max(dp(6.0f), dp(12.0f) * zoom / std::max(1.0e-3f, (minimumZoom + maximumZoom) * 0.25f));
-    for (auto y = min.y - std::fmod(scroll, spacing); y < max.y; y += spacing)
-        if (y > min.y)
-            list->AddLine(ImVec2((min.x + max.x) * 0.5f, y), ImVec2(max.x - dp(2.0f), y), theme::alpha(p.textFaint, 0.3f));
-    list->AddLine(ImVec2(min.x + 0.5f, min.y), ImVec2(min.x + 0.5f, max.y), p.line);
+    auto index = static_cast<long long>(std::floor(scroll / spacing));
+    // The marks start on the rows' side.
+    const auto inner = rowsAtRight ? max.x - dp(1.0f) : min.x + dp(1.0f);
+    const auto outer = rowsAtRight ? min.x + dp(3.0f) : max.x - dp(3.0f);
+    for (auto y = min.y - std::fmod(scroll, spacing); y < max.y; y += spacing, ++index) {
+        if (y <= min.y)
+            continue;
+        const auto strong = index % 4 == 0;
+        list->AddLine(ImVec2(inner, y), ImVec2(strong ? outer : (min.x + max.x) * 0.5f, y), theme::alpha(p.textFaint, strong ? 0.55f : 0.25f));
+    }
+    const auto edge = rowsAtRight ? max.x - 0.5f : min.x + 0.5f;
+    list->AddLine(ImVec2(edge, min.y), ImVec2(edge, max.y), p.line);
     if (hovered && !active)
-        tooltip(L("Glisser : vers le haut et le bas pour se déplacer, vers la gauche pour agrandir, vers la droite pour "
-                  "réduire. Double-clic : taille normale.",
-                  "Drag: up and down to move, left to make bigger, right to make smaller. Double click: normal size."));
+        tooltip(rowsAtRight ? L("Glisser : vers le haut et le bas pour se déplacer, vers la droite pour agrandir, vers la gauche pour "
+                                "réduire. Double-clic : taille normale.",
+                                "Drag: up and down to move, right to make bigger, left to make smaller. Double click: normal size.")
+                            : L("Glisser : vers le haut et le bas pour se déplacer, vers la gauche pour agrandir, vers la droite pour "
+                                "réduire. Double-clic : taille normale.",
+                                "Drag: up and down to move, left to make bigger, right to make smaller. Double click: normal size."));
     return fit;
+}
+
+bool bandCorner(const char* id, const ImVec2 min, const ImVec2 max)
+{
+    const auto& p = theme::palette();
+    auto* list = ImGui::GetWindowDrawList();
+    ImGui::SetCursorScreenPos(min);
+    const auto clicked = ImGui::InvisibleButton(id, ImVec2(std::max(1.0f, max.x - min.x), std::max(1.0f, max.y - min.y)));
+    const auto hovered = ImGui::IsItemHovered();
+    list->AddRectFilled(min, max, hovered ? p.bg3 : p.bg2);
+    ImGui::PushFont(nullptr, std::min(ImGui::GetStyle().FontSizeBase * 0.72f, (max.y - min.y) * 0.9f / ImGui::GetStyle().FontScaleDpi));
+    centredText(list, min, max, hovered ? p.accent : p.textDim, icon::zoomIn);
+    ImGui::PopFont();
+    tooltip(L("Les bandes à saisir : celle du haut pour le temps, celle de droite pour la hauteur. Clic : tout voir.",
+              "The bands to grab: the top one for time, the right one for height. Click: see everything."));
+    return clicked;
 }
 
 bool dragNumber(const char* id, float* value, const float speed, const float minimum, const float maximum,

@@ -332,6 +332,12 @@ public:
     bool selectPluginProgram(const TrackRef& track, int pluginIndex, int program, juce::String& error);
     [[nodiscard]] juce::var chainPresetState(const TrackRef& track) const;
     bool applyChainPreset(const TrackRef& track, const juce::var& state, juce::String& error);
+    // CyDAW's whole chains of effects a track can take in place of its own
+    // (an audio track's, a bus's, the master's; none for an instrument
+    // track), as key and name, and one of them applied: every card replaced.
+    // The track's preset button has them; a "+" never does.
+    [[nodiscard]] std::vector<std::pair<juce::String, juce::String>> factoryChains(const TrackRef& track) const;
+    juce::Result applyFactoryChain(const TrackRef& track, const juce::String& key);
     // The preset last loaded or saved on a holder (by its key), shown on it.
     [[nodiscard]] juce::String presetName(const juce::String& holderKey) const override;
     void setPresetName(const juce::String& holderKey, const juce::String& name) override;
@@ -1015,6 +1021,11 @@ public:
     // card `before` (0: at the branch's end).
     juce::Result insertDeviceInBranch(const TrackRef& track, const juce::String& key, std::uint64_t head, int branch,
                                       std::uint64_t before = 0);
+    // A device, or a library device, put on the chain before the card
+    // `before` (0: where it goes by itself). One that cannot go there (a
+    // sound before an instrument) stays where it went.
+    juce::Result insertDeviceBefore(const TrackRef& track, const juce::String& key, std::uint64_t before);
+    juce::Result insertLibraryDeviceBefore(const TrackRef& track, const juce::File& file, std::uint64_t before);
     // Recompiles and publishes a track's graph to the engine.
     juce::Result publishGraph(const TrackRef& track, bool structural);
     // The graph the live values are fed to (the one on screen).
@@ -1106,6 +1117,9 @@ public:
 
 private:
     std::unique_ptr<GraphSlot> makeSlot(GraphSlot::Owner owner);
+    // The one card a device made on the chain (the ids before are `had`),
+    // moved before `before`.
+    juce::Result placeNewCard(const TrackRef& track, const std::vector<std::uint64_t>& had, std::uint64_t before);
     void graphChanged(GraphSlot& slot, bool structural);
     [[nodiscard]] std::optional<TrackRef> trackOf(const GraphSlot& slot) const;
     void clearSession();

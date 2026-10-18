@@ -23,16 +23,19 @@ public:
     using Capture = std::function<juce::var()>;
     using Apply = std::function<bool(const juce::var&, juce::String&)>;
     // A hosted plug-in's own programs: listed (with the current one) when
-    // the list opens, one chosen.
+    // the list opens, one chosen. Any list of that kind (a track's factory
+    // chains) under its own heading.
     struct Programs {
         std::function<bool(juce::StringArray&, int&)> list;
         std::function<bool(int, juce::String&)> select;
+        const char* heading {};
     };
 
     PresetMenu(DeviceHost& studio, UiState& state);
-    // An icon button opening the presets of `holder`.
+    // An icon button opening the presets of `holder` (`tip`: what it is,
+    // when not a card's presets).
     void button(const char* id, const PresetHolder& holder, const Capture& capture, const Apply& apply,
-                ImVec2 size, const Programs* programs = nullptr);
+                ImVec2 size, const Programs* programs = nullptr, const char* tip = nullptr);
     // A bar: previous, the current name (opening the list), next, save.
     void bar(const char* id, const PresetHolder& holder, const Capture& capture, const Apply& apply, float width,
              const Programs* programs = nullptr);

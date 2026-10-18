@@ -202,7 +202,8 @@ void InspectorView::draw()
         // Where its sound goes, and what reaches it from other tracks.
         ImGui::Spacing();
         ui::sectionTitle(L("ROUTAGE", "ROUTING"));
-        routing_ui::sendersLine(studio_, track, dp(78.0f));
+        if (studio_.isBusTrack(track) || !studio_.trackSenders(track).empty())
+            routing_ui::sendersLine(studio_, track, dp(78.0f));
         juce::String routingError;
         routing_ui::inputsEditor(studio_, track, dp(78.0f), routingError);
         ImGui::Spacing();

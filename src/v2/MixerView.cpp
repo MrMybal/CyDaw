@@ -25,10 +25,12 @@ constexpr float kStripWidth = 84.0f;
 // The pan on its own row under the name, its value beside it; the fader and
 // its meter fill the rest.
 constexpr float kPanDiameter = 26.0f;
-constexpr float kFaderWidth = 44.0f;
-constexpr float kMeterWidth = 20.0f;
+// The meter carries the scale in dB (its numbers on its left).
+constexpr float kFaderWidth = 38.0f;
+constexpr float kMeterGap = 3.0f;
+constexpr float kMeterWidth = 32.0f;
 constexpr float kFaderTop = 62.0f;
-constexpr float kFaderBlock = kFaderWidth + 6.0f + kMeterWidth;
+constexpr float kFaderBlock = kFaderWidth + kMeterGap + kMeterWidth;
 
 // A pan as read: "C", "L 30", "R 20" (percent).
 std::string panText(const float pan)
@@ -86,22 +88,41 @@ void MixerView::draw()
     const auto stripWidth = dp(kStripWidth);
     const auto masterWidth = stripWidth + dp(12.0f);
 
+    // The tracks, then the buses beside the master (as Bitwig's effect tracks).
+    std::vector<TrackRef> plain;
+    std::vector<TrackRef> buses;
+    for (const auto& track : tracks)
+        (studio_.isBusTrack(track) ? buses : plain).push_back(track);
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(dp(3.0f), dp(3.0f)));
-    ImGui::BeginChild("##strips", ImVec2(ImGui::GetContentRegionAvail().x - masterWidth, height), ImGuiChildFlags_None,
-                      ImGuiWindowFlags_HorizontalScrollbar);
+    const auto busesWidth = buses.empty() ? 0.0f
+                                          : std::min(static_cast<float>(buses.size()) * (stripWidth + dp(3.0f)),
+                                                     std::max(stripWidth, ImGui::GetContentRegionAvail().x * 0.35f));
+    ImGui::BeginChild("##strips", ImVec2(ImGui::GetContentRegionAvail().x - masterWidth - busesWidth - (buses.empty() ? 0.0f : dp(9.0f)), height),
+                      ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar);
     if (tracks.empty())
         ui::emptyState(L("Aucune piste", "No tracks"), L("Ajoutez une piste avec le +.", "Add a track with the +."));
-    for (std::size_t index = 0; index < tracks.size(); ++index) {
+    for (std::size_t index = 0; index < plain.size(); ++index) {
         if (index > 0)
             ImGui::SameLine();
-        mixer_strip::track(studio_, state_, tracks[index], static_cast<int>(index), stripWidth,
+        mixer_strip::track(studio_, state_, plain[index], static_cast<int>(index), stripWidth,
                            height - ImGui::GetStyle().ScrollbarSize - dp(4.0f));
     }
     // After the last strip: a "+" that adds a track.
-    if (!tracks.empty())
+    if (!plain.empty())
         ImGui::SameLine();
     add_track::button(studio_, state_, "mixerAdd", ImVec2(dp(34.0f), dp(34.0f)));
     ImGui::EndChild();
+    if (!buses.empty()) {
+        ImGui::SameLine(0.0f, dp(6.0f));
+        ImGui::BeginChild("##busStrips", ImVec2(busesWidth, height), ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar);
+        for (std::size_t index = 0; index < buses.size(); ++index) {
+            if (index > 0)
+                ImGui::SameLine();
+            mixer_strip::track(studio_, state_, buses[index], static_cast<int>(index) + 10'000, stripWidth,
+                               height - ImGui::GetStyle().ScrollbarSize - dp(4.0f));
+        }
+        ImGui::EndChild();
+    }
     ImGui::SameLine();
     const auto origin = ImGui::GetCursorScreenPos();
     ImGui::GetWindowDrawList()->AddLine(ImVec2(origin.x - dp(2.0f), origin.y), ImVec2(origin.x - dp(2.0f), origin.y + height),
@@ -207,12 +228,12 @@ void mixer_strip::track(Studio& studio_, UiState& state_, const TrackRef& track,
     ImGui::SetCursorScreenPos(ImVec2(left, faderTop));
     {
         const ui::LearnScope learn(learnTarget("volume"), learnLabel(ui::Ls("Volume", "Volume")));
-        changed |= ui::fader("##fader", &mix.gainDb, -60.0f, 12.0f, ImVec2(dp(kFaderWidth), faderHeight), colour);
+        changed |= ui::fader("##fader", &mix.gainDb, -60.0f, 12.0f, ImVec2(dp(kFaderWidth), faderHeight), colour, false);
     }
     const auto meterState = studio_.trackMeter(track);
-    ImGui::SetCursorScreenPos(ImVec2(left + dp(kFaderWidth + 6.0f), faderTop + dp(7.0f)));
+    ImGui::SetCursorScreenPos(ImVec2(left + dp(kFaderWidth + kMeterGap), faderTop + dp(7.0f)));
     ui::meter("##meter", ImVec2(dp(kMeterWidth), faderHeight - dp(14.0f)), meterState.peak[0], meterState.peak[1],
-              meterState.rms[0], meterState.rms[1], true);
+              meterState.rms[0], meterState.rms[1], true, true);
     changed |= gainEntry(list, origin, width, faderTop + faderHeight, mix.gainDb);
 
     // Where it goes: a click edits its outputs and sends.
@@ -308,13 +329,13 @@ void mixer_strip::master(Studio& studio_, UiState& state_, const float width, co
     auto gain = engine.masterGainDb();
     {
         const ui::LearnScope learn(control_targets::forMaster("volume"), "Master \xc2\xb7 Volume");
-        if (ui::fader("##masterFader", &gain, -60.0f, 12.0f, ImVec2(dp(kFaderWidth), faderHeight), p.accent))
+        if (ui::fader("##masterFader", &gain, -60.0f, 12.0f, ImVec2(dp(kFaderWidth), faderHeight), p.accent, false))
             engine.setMasterGain(gain);
     }
     const auto& meter = studio_.masterMeter();
-    ImGui::SetCursorScreenPos(ImVec2(left + dp(kFaderWidth + 6.0f), faderTop + dp(7.0f)));
+    ImGui::SetCursorScreenPos(ImVec2(left + dp(kFaderWidth + kMeterGap), faderTop + dp(7.0f)));
     ui::meter("##masterMeter", ImVec2(dp(kMeterWidth), faderHeight - dp(14.0f)), meter.peak[0], meter.peak[1], meter.rms[0],
-              meter.rms[1], true);
+              meter.rms[1], true, true);
     if (gainEntry(list, origin, width, faderTop + faderHeight, gain))
         engine.setMasterGain(gain);
     // Mute: the whole mix silenced, its level kept.

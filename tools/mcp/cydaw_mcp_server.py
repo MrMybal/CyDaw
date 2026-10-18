@@ -736,14 +736,17 @@ TOOLS = [
                         "rename (name, newName), delete (name). Rend la liste, "
                         "le prereglage courant et le dossier. Pour un plug-in, ses "
                         "propres programmes viennent aussi (programs, program) ; "
-                        "action program (index) en choisit un."),
+                        "action program (index) en choisit un. Pour toute la chaine "
+                        "d'une piste audio, d'un bus ou du master : les chaines de "
+                        "CyDAW (chains : key, name) ; action chain (key) en met une "
+                        "a la place de toute la chaine (le bouton Preset de piste)."),
         "inputSchema": {"type": "object",
                         "properties": {"track": TRACK, "nodeId": {"type": "integer"},
                                        "plugin": {"type": "integer"}, "pad": {"type": "integer"},
                                        "action": {"type": "string",
-                                                  "enum": ["list", "save", "load", "rename", "delete", "program"]},
+                                                  "enum": ["list", "save", "load", "rename", "delete", "program", "chain"]},
                                        "name": {"type": "string"}, "newName": {"type": "string"},
-                                       "index": {"type": "integer"}},
+                                       "index": {"type": "integer"}, "key": {"type": "string"}},
                         "required": ["track"]},
     },
     {

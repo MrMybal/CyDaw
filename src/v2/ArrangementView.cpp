@@ -262,11 +262,12 @@ void ArrangementView::drawCanvas()
     const auto rulerHeight = navigatorHeight + dp(22.0f);
     const auto scrollbarHeight = dp(12.0f);
     const auto scrollbarWidth = dp(12.0f);
-    // Beside the tracks, the band to grab for their height (as the ruler's
-    // is for time), then the scrollbar.
-    const auto rowsBandWidth = dp(14.0f);
-    lanesMin_ = ImVec2(origin.x + headerWidth_, origin.y + rulerHeight);
-    lanesMax_ = ImVec2(origin.x + size.x - scrollbarWidth - rowsBandWidth, origin.y + size.y - scrollbarHeight);
+    // Between the headers and the lanes, the band to grab for the tracks'
+    // height (as the ruler's is for time); the scrollbar at the right.
+    const auto rowsBandWidth = dp(16.0f);
+    const auto headersRight = origin.x + headerWidth_;
+    lanesMin_ = ImVec2(headersRight + rowsBandWidth, origin.y + rulerHeight);
+    lanesMax_ = ImVec2(origin.x + size.x - scrollbarWidth, origin.y + size.y - scrollbarHeight);
     auto& engine = studio_.engine();
 
     // Follow the playhead while playing, unless the person moved away
@@ -307,7 +308,7 @@ void ArrangementView::drawCanvas()
     state_.scrollY = std::clamp(state_.scrollY, 0.0f, std::max(0.0f, contentHeight - visibleHeight));
 
     // Backgrounds.
-    list->AddRectFilled(ImVec2(origin.x, lanesMin_.y), ImVec2(lanesMin_.x, lanesMax_.y), p.bg1);
+    list->AddRectFilled(ImVec2(origin.x, lanesMin_.y), ImVec2(headersRight, lanesMax_.y), p.bg1);
     list->PushClipRect(lanesMin_, lanesMax_, true);
     for (std::size_t index = 0; index < lanes.size(); ++index) {
         const auto& lane = lanes[index];
@@ -439,19 +440,19 @@ void ArrangementView::drawCanvas()
     list->PopClipRect();
 
     // Headers, scrolled with the lanes.
-    ImGui::PushClipRect(ImVec2(origin.x, lanesMin_.y), ImVec2(lanesMin_.x, lanesMax_.y), true);
+    ImGui::PushClipRect(ImVec2(origin.x, lanesMin_.y), ImVec2(headersRight, lanesMax_.y), true);
     for (std::size_t index = 0; index < lanes.size(); ++index) {
         const auto& lane = lanes[index];
         if (lane.bottom < lanesMin_.y || lane.top > lanesMax_.y)
             continue;
-        drawHeader(lane.track, ImVec2(origin.x, lane.top), ImVec2(lanesMin_.x, lane.bottom), static_cast<int>(index));
+        drawHeader(lane.track, ImVec2(origin.x, lane.top), ImVec2(headersRight, lane.bottom), static_cast<int>(index));
     }
     ImGui::PopClipRect();
     list->AddLine(ImVec2(lanesMin_.x - 0.5f, lanesMin_.y), ImVec2(lanesMin_.x - 0.5f, lanesMax_.y), p.lineStrong);
     // The wheel over the tracks' headers scrolls them up and down too (a
     // knob there keeps it).
     if (auto& io = ImGui::GetIO(); io.MouseWheel != 0.0f && !io.KeyCtrl && !io.KeyShift && ImGui::IsWindowHovered()
-                                   && !ui::wheelTaken() && io.MousePos.x >= origin.x && io.MousePos.x < lanesMin_.x
+                                   && !ui::wheelTaken() && io.MousePos.x >= origin.x && io.MousePos.x < headersRight
                                    && io.MousePos.y >= lanesMin_.y && io.MousePos.y < lanesMax_.y)
         state_.scrollY -= io.MouseWheel * dp(48.0f);
 
@@ -470,7 +471,7 @@ void ArrangementView::drawCanvas()
     // Ruler on top: the band to grab, then the times.
     drawNavigator(list, ImVec2(lanesMin_.x, origin.y), ImVec2(lanesMax_.x, origin.y + navigatorHeight));
     drawRuler(list, ImVec2(lanesMin_.x, origin.y + navigatorHeight), ImVec2(lanesMax_.x, lanesMin_.y));
-    list->AddRectFilled(origin, ImVec2(lanesMin_.x, lanesMin_.y), p.bg1);
+    list->AddRectFilled(origin, ImVec2(headersRight, lanesMin_.y), p.bg1);
     ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 0.86f);
     char header[64];
     std::snprintf(header, sizeof(header), "%d %s", static_cast<int>(tracks.size()),
@@ -499,19 +500,24 @@ void ArrangementView::drawCanvas()
                             active ? p.accentDim : theme::mix(p.bg5, p.textDim, 0.35f), dp(3.0f));
     }
 
-    // The band for the tracks' height: up and down move, left makes them
-    // bigger, right smaller; a double click brings them back.
-    if (ui::rowsBand("##rowsBand", ImVec2(lanesMax_.x, lanesMin_.y), ImVec2(lanesMax_.x + rowsBandWidth, lanesMax_.y), state_.scrollY,
-                     state_.laneZoom, 0.35f, 5.0f)) {
+    // The band for the tracks' height: up and down move, right (toward
+    // them) makes them bigger, left smaller; a double click brings them back.
+    if (ui::rowsBand("##rowsBand", ImVec2(headersRight, lanesMin_.y), ImVec2(lanesMin_.x, lanesMax_.y), state_.scrollY, state_.laneZoom,
+                     0.35f, 5.0f, true)) {
         state_.laneZoom = 1.0f;
         state_.scrollY = 0.0f;
     }
-    list->AddRectFilled(ImVec2(lanesMax_.x, origin.y), ImVec2(lanesMax_.x + rowsBandWidth, lanesMin_.y), p.bg1);
+    if (ui::bandCorner("##bandCorner", ImVec2(headersRight, origin.y), ImVec2(lanesMin_.x, origin.y + navigatorHeight))) {
+        zoomToFit();
+        state_.laneZoom = 1.0f;
+        state_.scrollY = 0.0f;
+    }
+    list->AddRectFilled(ImVec2(headersRight, origin.y + navigatorHeight), ImVec2(lanesMin_.x, lanesMin_.y), p.bg1);
 
     // Vertical scrollbar: the tracks, up and down (a click beside the thumb
     // brings it there).
     {
-        const ImVec2 barMin(lanesMax_.x + rowsBandWidth + dp(2.0f), lanesMin_.y);
+        const ImVec2 barMin(lanesMax_.x + dp(2.0f), lanesMin_.y);
         const ImVec2 barMax(origin.x + size.x - dp(1.0f), lanesMax_.y);
         const auto height = std::max(1.0f, barMax.y - barMin.y);
         const auto maximum = std::max(0.0f, contentHeight - visibleHeight);
@@ -1103,8 +1109,11 @@ void ArrangementView::handleLaneInput(const std::vector<ClipHit>& clips, const s
     if (clickable && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
         if (under != nullptr) {
             openInEditor(under->ref);
-        } else if (const auto* lane = laneAt(lanes, mouse.y); lane != nullptr && lane->track.midi) {
-            createMidiClipAt(lane->track, xToTime(mouse.x));
+        } else if (const auto* lane = laneAt(lanes, mouse.y); lane != nullptr && mouse.y < lane->clipBottom) {
+            if (lane->track.midi)
+                createMidiClipAt(lane->track, xToTime(mouse.x));
+            else if (studio_.isBusTrack(lane->track))
+                createAutomationClipAt(lane->track, xToTime(mouse.x));
         }
     }
     if (clickable && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
@@ -1399,6 +1408,23 @@ void ArrangementView::createMidiClipAt(const TrackRef& track, const double secon
     const auto startBeats = std::floor(snap(seconds, true) / spb / barBeats) * barBeats;
     const auto id = engine.addMidiClip(track.midiId, {}, std::max(0.0, startBeats), 4.0, false,
                                        studio_.trackColour(track));
+    if (id == 0)
+        return;
+    const ClipRef ref { track, id };
+    state_.selectedClips = { ref };
+    openInEditor(ref);
+    studio_.markDirty();
+}
+
+void ArrangementView::createAutomationClipAt(const TrackRef& track, const double seconds)
+{
+    auto& engine = studio_.engine();
+    const auto spb = secondsPerBeat();
+    const auto bar = spb * std::max(1.0, static_cast<double>(engine.beatsPerBar()));
+    const auto start = std::max(0.0, std::floor(snap(seconds, true) / bar) * bar);
+    // No sound: a container of lanes alone.
+    const auto id = engine.addAudioClip(track.audioIndex, start, 0.0, bar * 4.0, ui::Ls("Automation", "Automation"), studio_.trackColour(track),
+                                        {}, 0.0, 0.0);
     if (id == 0)
         return;
     const ClipRef ref { track, id };

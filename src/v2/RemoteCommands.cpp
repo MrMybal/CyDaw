@@ -3765,6 +3765,7 @@ juce::var Commands::onPresets()
         ref.pad = static_cast<int>(number("pad", -1.0));
     std::optional<Studio::PresetHolder> holder;
     std::optional<int> pluginIndex;
+    auto wholeChain = false;
     PresetMenuCapture capture;
     PresetMenuApply apply;
     if (has("nodeId")) {
@@ -3783,6 +3784,7 @@ juce::var Commands::onPresets()
             return studio_.applyPluginPreset(ref, index, state, error);
         };
     } else {
+        wholeChain = true;
         holder = studio_.chainPresetHolder(ref);
         capture = [this, ref] { return studio_.chainPresetState(ref); };
         apply = [this, ref](const juce::var& state, juce::String& error) { return studio_.applyChainPreset(ref, state, error); };
@@ -3821,6 +3823,15 @@ juce::var Commands::onPresets()
         if (!studio_.selectPluginProgram(ref, *pluginIndex, index, error))
             return fail(error);
         studio_.setPresetName(holder->key, names[index]);
+    } else if (action == "chain" && wholeChain) {
+        // One of CyDAW's whole chains in place of the track's, as its
+        // preset button takes them.
+        const auto key = text("key").trim();
+        if (const auto applied = studio_.applyFactoryChain(ref, key); applied.failed())
+            return fail(applied.getErrorMessage());
+        for (const auto& [chainKey, chainName] : studio_.factoryChains(ref))
+            if (chainKey == key)
+                studio_.setPresetName(holder->key, chainName);
     } else if (action != "list") {
         return fail("unknown action \"" + action + "\"");
     }
@@ -3838,6 +3849,16 @@ juce::var Commands::onPresets()
         list.add(value);
     }
     set(result, "presets", list);
+    if (wholeChain) {
+        juce::Array<juce::var> chains;
+        for (const auto& [chainKey, chainName] : studio_.factoryChains(ref)) {
+            auto value = object();
+            set(value, "key", chainKey);
+            set(value, "name", chainName);
+            chains.add(value);
+        }
+        set(result, "chains", chains);
+    }
     if (pluginIndex) {
         juce::StringArray names;
         auto current = -1;

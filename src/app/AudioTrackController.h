@@ -23,6 +23,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <cmath>
 #include <limits>
 #include <map>
 #include <optional>
@@ -112,6 +113,29 @@ public:
     // null. The main input's joins the track's own sound; the others are
     // the graph's extra audio inputs.
     virtual void setRoutedInputs(const juce::AudioBuffer<float>* const* buses, int numSamples) noexcept = 0;
+    // What reaches each input lately: its peak, falling by half every
+    // 0.2 s (at 48 kHz) when nothing comes, for the meters.
+    [[nodiscard]] float inputLevel(const std::size_t bus) const noexcept
+    {
+        return bus < maximumBuses ? inputLevels_[bus].load(std::memory_order_relaxed) : 0.0f;
+    }
+
+protected:
+    void measureRoutedInputs(const juce::AudioBuffer<float>* const* buses, const int numSamples) noexcept
+    {
+        if (buses == nullptr || numSamples <= 0)
+            return;
+        const auto fall = std::pow(0.5f, static_cast<float>(numSamples) / 9'600.0f);
+        for (std::size_t bus = 0; bus < maximumBuses; ++bus) {
+            auto level = inputLevels_[bus].load(std::memory_order_relaxed) * fall;
+            if (const auto* buffer = buses[bus]; buffer != nullptr && buffer->getNumSamples() > 0)
+                level = std::max(level, buffer->getMagnitude(0, std::min(numSamples, buffer->getNumSamples())));
+            inputLevels_[bus].store(level, std::memory_order_relaxed);
+        }
+    }
+
+private:
+    std::array<std::atomic<float>, maximumBuses> inputLevels_ {};
 };
 
 class GainPanAudioSource final : public juce::AudioSource, public RoutedInputReceiver {
@@ -234,6 +258,7 @@ public:
     void getNextAudioBlock(const juce::AudioSourceChannelInfo& bufferToFill) override;
     void setRoutedInputs(const juce::AudioBuffer<float>* const* buses, int numSamples) noexcept override
     {
+        measureRoutedInputs(buses, numSamples);
         for (std::size_t bus = 0; bus < maximumBuses; ++bus)
             routedInputs_[bus] = buses != nullptr ? buses[bus] : nullptr;
         routedSamples_ = numSamples;
@@ -1666,6 +1691,36 @@ public:
                                             cydaw::engine::AudioAnalysisFrame& frame) const;
     [[nodiscard]] bool setLiveMidiTrack(std::uint64_t trackId) noexcept;
     [[nodiscard]] std::uint64_t liveMidiTrackId() const noexcept;
+    // ---- An instrument track's MIDI inputs and output ----
+    // What it hears while it is the live one (armed, else picked):
+    // allMidiInputs (every keyboard plugged in and the computer's),
+    // computerKeyboardInput (the computer's alone), or a device's
+    // identifier; none: nothing.
+    static constexpr const char* allMidiInputs = "*";
+    static constexpr const char* computerKeyboardInput = "keyboard";
+    void setMidiTrackInputs(std::uint64_t trackId, std::vector<juce::String> inputs);
+    [[nodiscard]] std::vector<juce::String> midiTrackInputs(std::uint64_t trackId) const;
+    // Its notes (after its MIDI effects) also sent to a MIDI output: a
+    // device's identifier, empty for none.
+    void setMidiTrackOutput(std::uint64_t trackId, const juce::String& identifier);
+    [[nodiscard]] juce::String midiTrackOutput(std::uint64_t trackId) const;
+    // The computer's keys: on the live track when it hears them.
+    void computerKeyboardNote(int note, float velocity, bool on);
+    // ---- Activity, for the lights: counters that move with each message ----
+    [[nodiscard]] std::uint32_t midiInputActivity(const juce::String& identifier) const noexcept;
+    [[nodiscard]] std::uint32_t computerKeyboardActivity() const noexcept;
+    [[nodiscard]] std::uint32_t midiInActivity() const noexcept;
+    [[nodiscard]] std::uint32_t midiOutActivity() const noexcept;
+    // The notes an instrument track's clips played.
+    [[nodiscard]] std::uint32_t midiTrackClipActivity(std::uint64_t trackId) const noexcept;
+    // Whether it is the track the MIDI inputs play now.
+    [[nodiscard]] bool midiTrackHearsInputs(std::uint64_t trackId) const noexcept;
+    // A message sent out by another part (the transport's clock).
+    void noteMidiOut() noexcept { midiOutCount_.fetch_add(1, std::memory_order_relaxed); }
+    // ---- A track's audio inputs: the main one and three more (routed into
+    // it), their levels lately (peaks, falling) ----
+    [[nodiscard]] std::array<float, 4> trackInputLevels(std::size_t trackIndex) const noexcept;
+    [[nodiscard]] std::array<float, 4> midiTrackInputLevels(std::uint64_t trackId) const noexcept;
     // Whether arming follows the track the keyboard plays (CyDAW 1: the live
     // track is the armed one, one at a time) or is the person's own (CyDAW 2:
     // tracks are armed by hand, several at once; the keyboard plays the
@@ -2066,6 +2121,23 @@ private:
     };
     struct MidiSynthEngine;
     struct MidiPlaybackTrack;
+    // A track's notes on their way to a MIDI output: the audio thread
+    // queues them, the outputs' thread sends them.
+    struct MidiOutQueue;
+    class MidiOutputHub;
+    // What the live track hears, read by the inputs' callback.
+    struct LiveMidiRoute {
+        std::uint64_t trackId {};
+        bool all { true };
+        bool keyboard { true };
+        std::vector<juce::String> devices;
+    };
+    struct MidiSourceSlot {
+        std::atomic<std::uint64_t> key {};
+        std::atomic<std::uint32_t> count {};
+    };
+    void countMidiSource(const juce::String& identifier) noexcept;
+    void publishMidiOutputs();
     struct MidiEditState {
         std::uint64_t trackId {};
         std::uint64_t clipId {};
@@ -2228,6 +2300,13 @@ private:
     } gatedMidiInput_ { *this };
     juce::SpinLock midiGateLock_;
     std::shared_ptr<const MidiInputGate> midiGate_;
+    // Guarded by midiGateLock_ too.
+    std::shared_ptr<const LiveMidiRoute> liveRoute_;
+    std::array<MidiSourceSlot, 32> midiSources_ {};
+    std::atomic<std::uint32_t> midiInCount_ {};
+    std::atomic<std::uint32_t> midiOutCount_ {};
+    std::atomic<std::uint32_t> keyboardCount_ {};
+    std::unique_ptr<MidiOutputHub> midiOutputs_;
     juce::MidiKeyboardState midiKeyboardState_;
     juce::AudioSourcePlayer sourcePlayer_;
     InputRecorder recorder_;

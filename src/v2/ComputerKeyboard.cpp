@@ -122,7 +122,7 @@ void ComputerKeyboard::update(const bool allowed)
         allNotesOff();
         return;
     }
-    auto& keyboard = studio_.engine().keyboardState();
+    auto& engine = studio_.engine();
     static const auto owner = ImHashStr("CyDAW computer keyboard");
     for (const auto& key : keys_) {
         const auto down = ImGui::IsKeyDown(key.key);
@@ -133,7 +133,7 @@ void ComputerKeyboard::update(const bool allowed)
             if (key.semitone >= 0) {
                 const auto note = (octave_ + 1) * 12 + key.semitone;
                 if (note >= 0 && note <= 127) {
-                    keyboard.noteOn(1, note, static_cast<float>(velocity_) / 127.0f);
+                    engine.computerKeyboardNote(note, static_cast<float>(velocity_) / 127.0f, true);
                     held_[key.key] = note;
                 }
             } else {
@@ -148,7 +148,7 @@ void ComputerKeyboard::update(const bool allowed)
             }
         } else if (!down && held != held_.end()) {
             if (held->second >= 0)
-                keyboard.noteOff(1, held->second, 0.0f);
+                engine.computerKeyboardNote(held->second, 0.0f, false);
             held_.erase(held);
         }
     }
@@ -156,10 +156,10 @@ void ComputerKeyboard::update(const bool allowed)
 
 void ComputerKeyboard::allNotesOff()
 {
-    auto& keyboard = studio_.engine().keyboardState();
+    auto& engine = studio_.engine();
     for (const auto& [key, note] : held_)
         if (note >= 0)
-            keyboard.noteOff(1, note, 0.0f);
+            engine.computerKeyboardNote(note, 0.0f, false);
     held_.clear();
 }
 

@@ -1581,6 +1581,16 @@ std::uint64_t restoreMidiTrack(Studio& studio, const juce::DynamicObject& saved,
                 restoreMidiClip(engine, trackId, *clip);
     engine.setMidiTrackMixer(trackId, toFloat(saved.getProperty(keys::gainDb)), toFloat(saved.getProperty(keys::pan)),
                              static_cast<bool>(saved.getProperty(keys::mute)), static_cast<bool>(saved.getProperty(keys::solo)));
+    // What it hears (kept as it was before it was saved: every keyboard
+    // and the computer's), where its notes also go.
+    if (const auto* inputs = saved.getProperty("midiInputs").getArray()) {
+        std::vector<juce::String> heard;
+        for (const auto& input : *inputs)
+            heard.push_back(input.toString());
+        engine.setMidiTrackInputs(trackId, std::move(heard));
+    }
+    if (const auto output = saved.getProperty("midiOutput").toString(); output.isNotEmpty())
+        engine.setMidiTrackOutput(trackId, output);
     if (auto points = readGainPoints(saved.getProperty(keys::gainAutomation)); !points.empty())
         engine.replaceMidiAutomationPoints(trackId, std::move(points));
     const auto graph = saved.getProperty(keys::nodeGraph);
@@ -1794,6 +1804,15 @@ juce::var buildDocument(Studio& studio, const juce::File& projectFile, const boo
         track->setProperty(keys::mute, info.muted);
         track->setProperty(keys::solo, info.solo);
         track->setProperty(keys::armed, info.armed);
+        // What it hears, where its notes also go.
+        {
+            juce::Array<juce::var> inputs;
+            for (const auto& input : engine.midiTrackInputs(info.id))
+                inputs.add(input);
+            track->setProperty("midiInputs", inputs);
+            if (const auto output = engine.midiTrackOutput(info.id); output.isNotEmpty())
+                track->setProperty("midiOutput", output);
+        }
         // CyDAW 2's own keys; CyDAW 1 ignores them.
         track->setProperty(keys::colour, static_cast<juce::int64>(
                                              state != nullptr ? state->colour

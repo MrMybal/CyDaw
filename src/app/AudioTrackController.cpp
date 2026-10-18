@@ -4152,9 +4152,83 @@ struct AudioTrackController::MidiSynthEngineCurves {
     std::vector<NoteExpressionPoint> gain;
 };
 
+struct AudioTrackController::MidiOutQueue {
+    struct Event {
+        std::array<std::uint8_t, 3> bytes {};
+        std::uint8_t size {};
+    };
+    cydaw::realtime::SpscRing<Event, 1'024> ring;
+    // The device it goes to (set by the outputs' thread's owner); none:
+    // nothing is queued.
+    std::atomic<juce::MidiOutput*> device {};
+};
+
+// The tracks' MIDI outputs: each device opened once, a thread sending what
+// the tracks queued (a millisecond apart at most).
+class AudioTrackController::MidiOutputHub final : juce::Thread {
+public:
+    explicit MidiOutputHub(std::atomic<std::uint32_t>& sent) : juce::Thread("CyDAW MIDI out"), sent_(sent) { startThread(); }
+    ~MidiOutputHub() override
+    {
+        stopThread(2'000);
+        const juce::ScopedLock hold(lock_);
+        for (auto& [queue, identifier] : queues_)
+            queue->device.store(nullptr, std::memory_order_release);
+    }
+    // Every track's queue and the device it sends to (empty: none).
+    void setQueues(std::vector<std::pair<std::shared_ptr<MidiOutQueue>, juce::String>> queues)
+    {
+        const juce::ScopedLock hold(lock_);
+        for (auto& [queue, identifier] : queues) {
+            juce::MidiOutput* device {};
+            if (identifier.isNotEmpty()) {
+                auto& open = devices_[identifier];
+                if (open == nullptr)
+                    open = juce::MidiOutput::openDevice(identifier);
+                device = open.get();
+            }
+            queue->device.store(device, std::memory_order_release);
+        }
+        // The devices no track sends to any more are closed.
+        for (auto it = devices_.begin(); it != devices_.end();)
+            if (std::none_of(queues.begin(), queues.end(), [&it](const auto& entry) { return entry.second == it->first; }))
+                it = devices_.erase(it);
+            else
+                ++it;
+        queues_ = std::move(queues);
+    }
+
+private:
+    void run() override
+    {
+        while (!threadShouldExit()) {
+            {
+                const juce::ScopedLock hold(lock_);
+                for (auto& [queue, identifier] : queues_) {
+                    MidiOutQueue::Event event;
+                    while (queue->ring.tryPop(event)) {
+                        auto* device = queue->device.load(std::memory_order_acquire);
+                        if (device == nullptr || event.size == 0)
+                            continue;
+                        device->sendMessageNow(juce::MidiMessage(event.bytes.data(), event.size));
+                        sent_.fetch_add(1, std::memory_order_relaxed);
+                    }
+                }
+            }
+            wait(1);
+        }
+    }
+
+    std::atomic<std::uint32_t>& sent_;
+    juce::CriticalSection lock_;
+    std::vector<std::pair<std::shared_ptr<MidiOutQueue>, juce::String>> queues_;
+    std::map<juce::String, std::unique_ptr<juce::MidiOutput>> devices_;
+};
+
 struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, public RoutedInputReceiver {
     void setRoutedInputs(const juce::AudioBuffer<float>* const* buses, const int numSamples) noexcept override
     {
+        measureRoutedInputs(buses, numSamples);
         for (std::size_t bus = 0; bus < maximumBuses; ++bus)
             routedInputs[bus] = buses != nullptr ? buses[bus] : nullptr;
         routedSamples = numSamples;
@@ -4275,6 +4349,8 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
         juce::MidiBuffer midi;
         // Where this block starts, for the automation of the effects.
         const auto automationSeconds = positionSeconds.load(std::memory_order_relaxed);
+        // The notes heard live, apart from the clips', for the lights.
+        auto liveNoteOns = 0;
         if (liveInput.load(std::memory_order_acquire)) {
             collector.removeNextBlockOfMessages(midi, output.numSamples);
             if (auto* extra = hardware.load(std::memory_order_acquire)) {
@@ -4286,6 +4362,8 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
             // What the keyboard holds down, to let go of it alone later.
             for (const auto metadata : midi) {
                 const auto message = metadata.getMessage();
+                if (message.isNoteOn())
+                    ++liveNoteOns;
                 const auto channel = static_cast<std::size_t>(juce::jlimit(1, 16, message.getChannel()) - 1);
                 if (message.isNoteOn())
                     liveHeld[channel].set(static_cast<std::size_t>(message.getNoteNumber()));
@@ -4486,6 +4564,15 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
             // and the sampler's card read it through heardPlan.
             const auto published = instrumentGraph.read();
             followSamplerCard(published.get());
+            // The notes its clips played this block, for the lights.
+            {
+                auto noteOns = 0;
+                for (const auto metadata : midi)
+                    if (metadata.numBytes == 3 && (metadata.data[0] & 0xf0) == 0x90 && metadata.data[2] > 0)
+                        ++noteOns;
+                if (noteOns > liveNoteOns)
+                    clipNotes.fetch_add(static_cast<std::uint32_t>(noteOns - liveNoteOns), std::memory_order_relaxed);
+            }
             // The MIDI effects between the notes and the voices, on the
             // transport's beat while it plays.
             {
@@ -4496,6 +4583,15 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
                 clock.quarterNotes = std::max(0.0, automationSeconds) * clock.beatsPerMinute / 60.0;
                 midiEffects.apply(midi, 0, output.numSamples, published != nullptr ? published->midiEffects.get() : nullptr, clock);
             }
+            // Its MIDI output: the notes as its voices hear them.
+            if (outQueue->device.load(std::memory_order_acquire) != nullptr)
+                for (const auto metadata : midi)
+                    if (metadata.numBytes > 0 && metadata.numBytes <= 3) {
+                        MidiOutQueue::Event event;
+                        std::copy_n(metadata.data, metadata.numBytes, event.bytes.begin());
+                        event.size = static_cast<std::uint8_t>(metadata.numBytes);
+                        (void) outQueue->ring.tryPush(event);
+                    }
             renderVoices(published.get(), *output.buffer, midi, output.startSample, output.numSamples);
             // An instrument container's pads: each its instrument and its effects.
             renderPads(published.get(), midi, output, automationSeconds);
@@ -5053,6 +5149,10 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
     std::atomic<bool> needsLiveNotesOff {};
     // The MIDI keyboards' collector as well as its own (the simulator's).
     std::atomic<juce::MidiMessageCollector*> hardware {};
+    // The notes its clips played (a counter, for the lights).
+    std::atomic<std::uint32_t> clipNotes {};
+    // Its notes on their way to its MIDI output.
+    std::shared_ptr<MidiOutQueue> outQueue { std::make_shared<MidiOutQueue>() };
 };
 
 struct AudioTrackController::MidiPlaybackTrack final {
@@ -5070,6 +5170,9 @@ struct AudioTrackController::MidiPlaybackTrack final {
 
     std::uint64_t id {};
     juce::String name;
+    // What it hears while it is the live track, and where its notes also go.
+    std::vector<juce::String> midiInputs { AudioTrackController::allMidiInputs };
+    juce::String midiOutput;
     float gainDb {};
     float pan {};
     bool muted {};
@@ -5567,6 +5670,162 @@ void AudioTrackController::refreshMidiInputs() noexcept
     const auto target = midiInputTrackId();
     for (auto& track : midiTracks_)
         track->synth.setLiveInput(!takes && track->id == target);
+    // What the live track hears (the simulator: everything).
+    auto route = std::make_shared<LiveMidiRoute>();
+    route->trackId = takes ? 0 : target;
+    if (!takes)
+        for (const auto& track : midiTracks_)
+            if (track->id == target) {
+                route->all = std::find(track->midiInputs.begin(), track->midiInputs.end(), juce::String(allMidiInputs)) != track->midiInputs.end();
+                route->keyboard = route->all
+                                  || std::find(track->midiInputs.begin(), track->midiInputs.end(), juce::String(computerKeyboardInput))
+                                         != track->midiInputs.end();
+                for (const auto& input : track->midiInputs)
+                    if (input != allMidiInputs && input != computerKeyboardInput)
+                        route->devices.push_back(input);
+            }
+    std::shared_ptr<const LiveMidiRoute> shared = std::move(route);
+    const juce::SpinLock::ScopedLockType hold(midiGateLock_);
+    liveRoute_.swap(shared);
+}
+
+void AudioTrackController::countMidiSource(const juce::String& identifier) noexcept
+{
+    midiInCount_.fetch_add(1, std::memory_order_relaxed);
+    const auto key = static_cast<std::uint64_t>(identifier.hashCode64()) | 1u;
+    for (auto& slot : midiSources_) {
+        auto current = slot.key.load(std::memory_order_acquire);
+        if (current == 0) {
+            std::uint64_t expected {};
+            if (slot.key.compare_exchange_strong(expected, key, std::memory_order_acq_rel))
+                current = key;
+            else
+                current = expected;
+        }
+        if (current == key) {
+            slot.count.fetch_add(1, std::memory_order_relaxed);
+            return;
+        }
+    }
+}
+
+std::uint32_t AudioTrackController::midiInputActivity(const juce::String& identifier) const noexcept
+{
+    const auto key = static_cast<std::uint64_t>(identifier.hashCode64()) | 1u;
+    for (const auto& slot : midiSources_)
+        if (slot.key.load(std::memory_order_acquire) == key)
+            return slot.count.load(std::memory_order_relaxed);
+    return 0;
+}
+
+std::uint32_t AudioTrackController::computerKeyboardActivity() const noexcept
+{
+    return keyboardCount_.load(std::memory_order_relaxed);
+}
+
+std::uint32_t AudioTrackController::midiInActivity() const noexcept
+{
+    return midiInCount_.load(std::memory_order_relaxed);
+}
+
+std::uint32_t AudioTrackController::midiOutActivity() const noexcept
+{
+    return midiOutCount_.load(std::memory_order_relaxed);
+}
+
+std::uint32_t AudioTrackController::midiTrackClipActivity(const std::uint64_t trackId) const noexcept
+{
+    for (const auto& track : midiTracks_)
+        if (track->id == trackId)
+            return track->synth.clipNotes.load(std::memory_order_relaxed);
+    return 0;
+}
+
+bool AudioTrackController::midiTrackHearsInputs(const std::uint64_t trackId) const noexcept
+{
+    return !simulationTakesMidi() && trackId != 0 && midiInputTrackId() == trackId;
+}
+
+void AudioTrackController::setMidiTrackInputs(const std::uint64_t trackId, std::vector<juce::String> inputs)
+{
+    // Every input holds the computer's keyboard: it is not listed twice.
+    if (std::find(inputs.begin(), inputs.end(), juce::String(allMidiInputs)) != inputs.end())
+        std::erase(inputs, juce::String(computerKeyboardInput));
+    std::vector<juce::String> unique;
+    for (auto& input : inputs)
+        if (std::find(unique.begin(), unique.end(), input) == unique.end())
+            unique.push_back(std::move(input));
+    inputs = std::move(unique);
+    for (auto& track : midiTracks_)
+        if (track->id == trackId)
+            track->midiInputs = std::move(inputs);
+    refreshMidiInputs();
+}
+
+std::vector<juce::String> AudioTrackController::midiTrackInputs(const std::uint64_t trackId) const
+{
+    for (const auto& track : midiTracks_)
+        if (track->id == trackId)
+            return track->midiInputs;
+    return {};
+}
+
+void AudioTrackController::setMidiTrackOutput(const std::uint64_t trackId, const juce::String& identifier)
+{
+    for (auto& track : midiTracks_)
+        if (track->id == trackId)
+            track->midiOutput = identifier;
+    publishMidiOutputs();
+}
+
+juce::String AudioTrackController::midiTrackOutput(const std::uint64_t trackId) const
+{
+    for (const auto& track : midiTracks_)
+        if (track->id == trackId)
+            return track->midiOutput;
+    return {};
+}
+
+void AudioTrackController::publishMidiOutputs()
+{
+    std::vector<std::pair<std::shared_ptr<MidiOutQueue>, juce::String>> queues;
+    for (const auto& track : midiTracks_)
+        if (track->midiOutput.isNotEmpty())
+            queues.emplace_back(track->synth.outQueue, track->midiOutput);
+    if (queues.empty() && midiOutputs_ == nullptr)
+        return;
+    if (midiOutputs_ == nullptr)
+        midiOutputs_ = std::make_unique<MidiOutputHub>(midiOutCount_);
+    midiOutputs_->setQueues(std::move(queues));
+}
+
+void AudioTrackController::computerKeyboardNote(const int note, const float velocity, const bool on)
+{
+    keyboardCount_.fetch_add(1, std::memory_order_relaxed);
+    midiInCount_.fetch_add(1, std::memory_order_relaxed);
+    std::shared_ptr<const LiveMidiRoute> route;
+    {
+        const juce::SpinLock::ScopedLockType hold(midiGateLock_);
+        route = liveRoute_;
+    }
+    // A key let go always reaches it (it may have been pressed before the
+    // route changed).
+    if (on && route != nullptr && !route->keyboard)
+        return;
+    if (on)
+        midiKeyboardState_.noteOn(1, juce::jlimit(0, 127, note), juce::jlimit(0.0f, 1.0f, velocity));
+    else
+        midiKeyboardState_.noteOff(1, juce::jlimit(0, 127, note), 0.0f);
+}
+
+std::array<float, 4> AudioTrackController::midiTrackInputLevels(const std::uint64_t trackId) const noexcept
+{
+    std::array<float, 4> levels {};
+    for (const auto& track : midiTracks_)
+        if (track->id == trackId)
+            for (std::size_t bus = 0; bus < levels.size(); ++bus)
+                levels[bus] = track->synth.inputLevel(bus);
+    return levels;
 }
 
 void AudioTrackController::setMidiInputGate(MidiInputGate gate)
@@ -5583,7 +5842,18 @@ void AudioTrackController::GatedMidiInput::handleIncomingMidiMessage(juce::MidiI
         const juce::SpinLock::ScopedLockType hold(owner_.midiGateLock_);
         gate = owner_.midiGate_;
     }
-    if (gate != nullptr && *gate && !(*gate)(source != nullptr ? source->getIdentifier() : juce::String(), message))
+    const auto identifier = source != nullptr ? source->getIdentifier() : juce::String();
+    // Counted as it arrives (a controller's message too), for the lights.
+    owner_.countMidiSource(identifier);
+    if (gate != nullptr && *gate && !(*gate)(identifier, message))
+        return;
+    // The live track hears it when it listens to that keyboard.
+    std::shared_ptr<const LiveMidiRoute> route;
+    {
+        const juce::SpinLock::ScopedLockType hold(owner_.midiGateLock_);
+        route = owner_.liveRoute_;
+    }
+    if (route != nullptr && !route->all && std::find(route->devices.begin(), route->devices.end(), identifier) == route->devices.end())
         return;
     owner_.midiCollector_.handleIncomingMidiMessage(source, message);
 }
@@ -6133,6 +6403,7 @@ AudioTrackController::AudioTrackController()
 
 AudioTrackController::~AudioTrackController()
 {
+    midiOutputs_.reset();
     stopMidiRecording(false);
     recorder_.stop();
     masterOutput_.stopCapture();
@@ -12462,7 +12733,10 @@ bool AudioTrackController::removeMidiTrack(const std::uint64_t trackId)
         return false;
     (*found)->synth.setPlaying(false);
     mixerSource_.removeInputSource(&(*found)->latencySource);
+    const auto sentOut = (*found)->midiOutput.isNotEmpty();
     midiTracks_.erase(found);
+    if (sentOut)
+        publishMidiOutputs();
     if (liveMidiTrackId_.load(std::memory_order_acquire) == trackId) {
         liveMidiTrackId_.store(0, std::memory_order_release);
         if (!midiTracks_.empty())
@@ -14246,6 +14520,15 @@ void AudioTrackController::clearAutomation(const std::size_t trackIndex)
         track->automation.clear();
         publishTrackAutomation(*track);
     }
+}
+
+std::array<float, 4> AudioTrackController::trackInputLevels(const std::size_t trackIndex) const noexcept
+{
+    std::array<float, 4> levels {};
+    if (const auto* track = findTrack(trackIndex))
+        for (std::size_t bus = 0; bus < levels.size(); ++bus)
+            levels[bus] = track->gainPanSource.inputLevel(bus);
+    return levels;
 }
 
 std::vector<AudioTrackController::AutomationPoint>

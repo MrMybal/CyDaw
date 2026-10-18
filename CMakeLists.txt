@@ -1159,6 +1159,8 @@ if(CYDAW_BUILD_DESKTOP)
                 src/v2/CardFiles.h
                 src/v2/AudioEditorView.cpp
                 src/v2/CurveEditor.cpp
+                src/v2/MidiDevices.cpp
+                src/v2/SystemLoad.cpp
                 src/v2/AudioEditorView.h
                 src/v2/MasterClipEditor.cpp
                 src/v2/MasterClipEditor.h
