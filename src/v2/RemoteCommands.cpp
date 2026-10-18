@@ -2469,8 +2469,10 @@ juce::var Commands::onMoveTrack()
 
 namespace {
 
-// A note's expression, as [[position, value], ...] or [{position, value}, ...]
-// (position 0..1 along the note; semitones for the pitch, dB for the gain).
+// A note's expression, as [[position, value(, bend)], ...] or
+// [{position, value, bend}, ...] (position 0..1 along the note; semitones
+// for the pitch, dB for the gain; bend -1..1, how the way to the next point
+// curves: a glide's arrival toward 1).
 std::vector<Engine::NoteExpressionPoint> expressionFrom(const juce::var& value)
 {
     std::vector<Engine::NoteExpressionPoint> points;
@@ -2478,17 +2480,21 @@ std::vector<Engine::NoteExpressionPoint> expressionFrom(const juce::var& value)
         for (const auto& item : *items) {
             double position {};
             double level {};
+            double bend {};
             if (const auto* pair = item.getArray(); pair != nullptr && pair->size() >= 2) {
                 position = static_cast<double>((*pair)[0]);
                 level = static_cast<double>((*pair)[1]);
+                if (pair->size() >= 3)
+                    bend = static_cast<double>((*pair)[2]);
             } else if (item.isObject()) {
                 position = static_cast<double>(item.getProperty("position", 0.0));
                 level = static_cast<double>(item.getProperty("value", 0.0));
+                bend = static_cast<double>(item.getProperty("bend", 0.0));
             } else {
                 continue;
             }
             if (std::isfinite(position) && std::isfinite(level))
-                points.push_back({ static_cast<float>(position), static_cast<float>(level) });
+                points.push_back({ static_cast<float>(position), static_cast<float>(level), std::isfinite(bend) ? static_cast<float>(bend) : 0.0f });
         }
     return points;
 }
@@ -2497,7 +2503,8 @@ juce::var expressionVar(const std::vector<Engine::NoteExpressionPoint>& points)
 {
     juce::Array<juce::var> values;
     for (const auto& point : points)
-        values.add(juce::Array<juce::var> { point.position, point.value });
+        values.add(point.bend != 0.0f ? juce::Array<juce::var> { point.position, point.value, point.bend }
+                                      : juce::Array<juce::var> { point.position, point.value });
     return values;
 }
 

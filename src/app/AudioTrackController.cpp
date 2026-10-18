@@ -4253,21 +4253,11 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
         std::shared_ptr<const NoteCurves> curves;
     };
 
-    // A curve's value at a time of its note (0..1), between its points.
+    // A curve's value at a time of its note (0..1), between its points
+    // (each way bent as its first point says).
     [[nodiscard]] static double curveAt(const std::vector<NoteExpressionPoint>& points, const double position) noexcept
     {
-        if (points.empty())
-            return 0.0;
-        if (position <= points.front().position)
-            return points.front().value;
-        for (std::size_t index = 1; index < points.size(); ++index)
-            if (position <= points[index].position) {
-                const auto& a = points[index - 1];
-                const auto& b = points[index];
-                const auto span = std::max(1.0e-6f, b.position - a.position);
-                return a.value + (b.value - a.value) * (position - a.position) / span;
-            }
-        return points.back().value;
+        return NoteExpressionPoint::valueAt(points, static_cast<float>(position));
     }
 
     MidiSynthEngine(AudioTrackController& controller,
@@ -6001,6 +5991,24 @@ juce::Result AudioTrackController::selfTestNoteExpression()
         for (const auto& note : clip.notes)
             if (note.id == copyId && (note.pitch != stored.pitch || note.gain != stored.gain))
                 return juce::Result::fail("a copied note lost its expression");
+    // A bent way, as a glide arrives: quick first, on the key at its end,
+    // never past it; the bend kept on the note, bounded.
+    const std::vector<NoteExpressionPoint> glide { { 0.0f, 0.0f, 0.55f }, { 1.0f, 12.0f } };
+    const auto halfway = NoteExpressionPoint::valueAt(glide, 0.5f);
+    if (halfway < 9.0f || halfway > 11.0f || std::abs(NoteExpressionPoint::valueAt(glide, 1.0f) - 12.0f) > 1.0e-4f)
+        return juce::Result::fail("a bent glide is at " + juce::String(halfway, 2) + " halfway, not about 10");
+    auto previous = 0.0f;
+    for (auto step = 0; step <= 100; ++step) {
+        const auto value = NoteExpressionPoint::valueAt(glide, static_cast<float>(step) / 100.0f);
+        if (value < previous - 1.0e-5f || value > 12.0f + 1.0e-5f)
+            return juce::Result::fail("a bent glide goes back or past its key");
+        previous = value;
+    }
+    (void) controller.setMidiNoteExpression(trackId, clipId, noteId, { { 0.0f, 0.0f, 3.0f }, { 1.0f, 5.0f } }, {});
+    for (const auto& clip : controller.midiTracks().front().clips)
+        for (const auto& note : clip.notes)
+            if (note.id == noteId && (note.pitch.size() != 2 || note.pitch[0].bend != 1.0f))
+                return juce::Result::fail("a note's bend was not kept within -1..1");
     return juce::Result::ok();
 }
 
@@ -13033,6 +13041,7 @@ bool AudioTrackController::setMidiNoteExpression(const std::uint64_t trackId, co
         for (auto& point : points) {
             point.position = juce::jlimit(0.0f, 1.0f, point.position);
             point.value = juce::jlimit(low, high, point.value);
+            point.bend = std::isfinite(point.bend) ? juce::jlimit(-1.0f, 1.0f, point.bend) : 0.0f;
         }
         std::stable_sort(points.begin(), points.end(), [](const auto& a, const auto& b) { return a.position < b.position; });
         if (points.size() > 256)

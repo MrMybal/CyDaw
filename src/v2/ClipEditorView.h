@@ -38,11 +38,11 @@ private:
     using MidiClip = app::AudioTrackController::MidiClip;
     using NotePoint = app::AudioTrackController::NoteExpressionPoint;
 
-    enum class Drag { none, move, resize, box, velocity, pan, curve };
+    enum class Drag { none, move, resize, box, velocity, pan, curve, bend };
     // What the roll edits: the notes, or a curve drawn on them.
     enum class Expression { none, pitch, gain };
     // The ready-made curves the shapes menu adds to notes.
-    enum class Shape { scoop, slide, vibrato, wideVibrato, fall, doit, swell, fade, accent, clearPitch, clearGain };
+    enum class Shape { glideNext, glideFrom, scoop, slide, vibrato, wideVibrato, fall, doit, swell, fade, accent, clearPitch, clearGain };
 
     void drawMidi(const TrackRef& track, const MidiClip& clip);
     void drawAudio(const TrackRef& track, const app::AudioTrackController::AudioClip& clip);
@@ -142,6 +142,10 @@ private:
     std::uint64_t curveNote_ {};
     int curvePoint_ { -1 };
     Expression curveKind_ { Expression::none };
+    // A curve's way bent (Alt+drag): its first point, from what bend.
+    int bendSegment_ { -1 };
+    float bendFrom_ {};
+    float bendY_ {};
     std::uint64_t shapeTarget_ {};
     bool openShapes_ {};
     // The note bar: the field being dragged or typed, and the multi-edit's

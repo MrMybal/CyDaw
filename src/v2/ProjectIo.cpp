@@ -665,12 +665,14 @@ void readParameterLanes(const juce::DynamicObject& track, ParameterLanes& lanes)
         }
 }
 
-// A note's expression: [[position, value], ...] (none: not written).
+// A note's expression: [[position, value(, bend)], ...] (none: not
+// written; the bend only when the way to the next point is bent).
 juce::var expressionToVar(const std::vector<Engine::NoteExpressionPoint>& points)
 {
     juce::Array<juce::var> values;
     for (const auto& point : points)
-        values.add(juce::Array<juce::var> { point.position, point.value });
+        values.add(point.bend != 0.0f ? juce::Array<juce::var> { point.position, point.value, point.bend }
+                                      : juce::Array<juce::var> { point.position, point.value });
     return values;
 }
 
@@ -682,8 +684,9 @@ std::vector<Engine::NoteExpressionPoint> expressionFromVar(const juce::var& valu
             if (const auto* pair = item.getArray(); pair != nullptr && pair->size() >= 2) {
                 const auto position = static_cast<float>(static_cast<double>((*pair)[0]));
                 const auto level = static_cast<float>(static_cast<double>((*pair)[1]));
+                const auto bend = pair->size() >= 3 ? static_cast<float>(static_cast<double>((*pair)[2])) : 0.0f;
                 if (std::isfinite(position) && std::isfinite(level))
-                    points.push_back({ position, level });
+                    points.push_back({ position, level, std::isfinite(bend) ? bend : 0.0f });
             }
     return points;
 }

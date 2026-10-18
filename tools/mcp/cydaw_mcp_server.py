@@ -48,14 +48,18 @@ TRACK = {
 }
 
 # A note's expression: points along the note (position 0 = its start, 1 = its
-# end) as [[position, value], ...].
+# end) as [[position, value(, bend)], ...]; bend -1..1 curves the way to the
+# next point (toward 1: quick then settling, a glide's arrival).
 EXPRESSION_PITCH = {"type": "array",
                     "description": ("Courbe de hauteur sur la note : [[position 0..1, "
-                                    "demi-tons -24..24], ...]. Ex. scoop [[0,-1],[0.15,0]]."),
+                                    "demi-tons -24..24, courbure -1..1 facultative vers le "
+                                    "point suivant], ...]. Ex. scoop [[0,-1],[0.15,0]] ; "
+                                    "glisse vers +5 en fin de note [[0,0],[0.6,0,0.55],[1,5]]."),
                     "items": {"type": "array", "items": {"type": "number"}}}
 EXPRESSION_GAIN = {"type": "array",
                    "description": ("Courbe de volume sur la note : [[position 0..1, "
-                                   "dB -48..12], ...]. Ex. swell [[0,-9],[0.6,0],[1,-3]]."),
+                                   "dB -48..12, courbure -1..1 facultative], ...]. Ex. swell "
+                                   "[[0,-9],[0.6,0],[1,-3]]."),
                    "items": {"type": "array", "items": {"type": "number"}}}
 
 TOOLS = [

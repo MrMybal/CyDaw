@@ -2403,7 +2403,8 @@ void AppUi::applyScriptedInput()
                               static_cast<float>(static_cast<double>(event.getProperty("dy", 0.0))));
     // Typing: {"type":"text","text":"1.5k"}; a key pressed and let go:
     // {"type":"key","key":"enter"} (enter, escape, tab, backspace, delete,
-    // ctrl, shift, alt down with "down": true, up with false).
+    // space, the arrows up, down, left, right, a letter or a digit; ctrl,
+    // shift, alt down with "down": true, up with false).
     else if (type == "text")
         io.AddInputCharactersUTF8(event.getProperty("text", juce::var()).toString().toRawUTF8());
     else if (type == "key") {
@@ -2413,6 +2414,11 @@ void AppUi::applyScriptedInput()
                          : name == "tab"       ? ImGuiKey_Tab
                          : name == "backspace" ? ImGuiKey_Backspace
                          : name == "delete"    ? ImGuiKey_Delete
+                         : name == "space"     ? ImGuiKey_Space
+                         : name == "up"        ? ImGuiKey_UpArrow
+                         : name == "down"      ? ImGuiKey_DownArrow
+                         : name == "left"      ? ImGuiKey_LeftArrow
+                         : name == "right"     ? ImGuiKey_RightArrow
                          : name == "ctrl"      ? ImGuiMod_Ctrl
                          : name == "shift"     ? ImGuiMod_Shift
                          : name == "alt"       ? ImGuiMod_Alt

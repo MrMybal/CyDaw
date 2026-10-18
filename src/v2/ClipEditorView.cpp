@@ -90,20 +90,24 @@ std::vector<app::AudioTrackController::MidiNote> pickedInOrder(const app::AudioT
     return picked;
 }
 
-// A note's curve value at a place along it (0..1), between its points.
+// A note's curve value at a place along it (0..1), between its points, as
+// the engine plays it (each way bent as its first point says).
 float curveAt(const std::vector<app::AudioTrackController::NoteExpressionPoint>& points, const float position)
 {
-    if (points.empty())
-        return 0.0f;
-    if (position <= points.front().position)
-        return points.front().value;
-    for (std::size_t index = 1; index < points.size(); ++index)
-        if (position <= points[index].position) {
-            const auto& a = points[index - 1];
-            const auto& b = points[index];
-            return a.value + (b.value - a.value) * (position - a.position) / std::max(1.0e-6f, b.position - a.position);
-        }
-    return points.back().value;
+    return app::AudioTrackController::NoteExpressionPoint::valueAt(points, position);
+}
+
+// Where to read a curve again when it is merged with another: its points,
+// and inside its bent ways enough places to keep their shape.
+void curvePlaces(const std::vector<app::AudioTrackController::NoteExpressionPoint>& points, std::vector<float>& places)
+{
+    for (std::size_t index = 0; index < points.size(); ++index) {
+        places.push_back(points[index].position);
+        if (index + 1 < points.size() && std::abs(points[index].bend) > 1.0e-4f)
+            for (auto step = 1; step < 12; ++step)
+                places.push_back(points[index].position
+                                 + (points[index + 1].position - points[index].position) * static_cast<float>(step) / 12.0f);
+    }
 }
 
 } // namespace
@@ -682,8 +686,10 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
     };
     const auto yToValue = [&](const MidiNote& note, const Expression kind, const float y) {
         if (kind == Expression::pitch) {
+            // On whole semitones, as Bitwig does (a glide lands on a key);
+            // Shift: free; Ctrl: by twentieths.
             auto value = (noteToY(note.noteNumber) + rowH * 0.5f - y) / rowH;
-            value = io.KeyCtrl ? std::round(value) : io.KeyShift ? value : std::round(value * 20.0f) / 20.0f;
+            value = io.KeyShift ? value : io.KeyCtrl ? std::round(value * 20.0f) / 20.0f : std::round(value);
             return std::clamp(value, -24.0f, 24.0f);
         }
         auto value = (laneMax.y - dp(3.0f) - y) / laneSpan * 60.0f - 48.0f;
@@ -745,6 +751,22 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
     // on a point removes it.
     const auto pressCurve = [&](const Expression kind, const CurveHit& hit) {
         auto points = curveOf(*hit.note, kind);
+        if (io.KeyAlt && hit.point < 0) {
+            const auto position = static_cast<float>(
+                std::clamp((mouseBeat - hit.note->startBeats) / std::max(1.0e-6, hit.note->durationBeats), 0.0, 1.0));
+            for (std::size_t index = 0; index + 1 < points.size(); ++index)
+                if (points[index].position <= position && position <= points[index + 1].position) {
+                    beginEdit();
+                    curveNote_ = hit.note->id;
+                    curveKind_ = kind;
+                    bendSegment_ = static_cast<int>(index);
+                    bendFrom_ = points[index].bend;
+                    bendY_ = mouse.y;
+                    drag_ = Drag::bend;
+                    break;
+                }
+            return;
+        }
         if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
             if (hit.point >= 0 && hit.point < static_cast<int>(points.size())) {
                 beginEdit();
@@ -801,6 +823,29 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
         if (points != curveOf(*note, curveKind_))
             setCurve(*note, curveKind_, std::move(points));
     };
+    // A way's first point dragged with Alt: up bulges it up, whichever way
+    // it goes.
+    const auto dragBend = [&] {
+        if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+            endEdit();
+            drag_ = Drag::none;
+            return;
+        }
+        const auto* note = noteById(curveNote_);
+        if (note == nullptr) {
+            endEdit();
+            drag_ = Drag::none;
+            return;
+        }
+        auto points = curveOf(*note, curveKind_);
+        if (bendSegment_ < 0 || bendSegment_ + 1 >= static_cast<int>(points.size()))
+            return;
+        const auto index = static_cast<std::size_t>(bendSegment_);
+        const auto rising = points[index + 1].value >= points[index].value ? 1.0f : -1.0f;
+        points[index].bend = std::clamp(bendFrom_ + (bendY_ - mouse.y) / dp(70.0f) * rising, -1.0f, 1.0f);
+        if (points != curveOf(*note, curveKind_))
+            setCurve(*note, curveKind_, std::move(points));
+    };
     const auto drawCurve = [&](const MidiNote& note, const Expression kind, const ImU32 lineColour, const float thickness,
                                const bool withPoints) {
         const auto& points = curveOf(note, kind);
@@ -809,15 +854,62 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
         std::vector<ImVec2> line;
         line.reserve(points.size() + 2);
         line.emplace_back(x0, valueToY(note, kind, points.empty() ? 0.0f : points.front().value));
-        for (const auto& point : points)
+        for (std::size_t index = 0; index < points.size(); ++index) {
+            const auto& point = points[index];
             line.emplace_back(x0 + point.position * (x1 - x0), valueToY(note, kind, point.value));
+            // A bent way: drawn through its curve, as it plays.
+            if (index + 1 < points.size() && std::abs(point.bend) > 1.0e-4f) {
+                const auto& next = points[index + 1];
+                for (auto step = 1; step < 16; ++step) {
+                    const auto u = static_cast<float>(step) / 16.0f;
+                    const auto position = point.position + (next.position - point.position) * u;
+                    line.emplace_back(x0 + position * (x1 - x0),
+                                      valueToY(note, kind, point.value + (next.value - point.value) * NotePoint::bent(u, point.bend)));
+                }
+            }
+        }
         line.emplace_back(x1, valueToY(note, kind, points.empty() ? 0.0f : points.back().value));
         list->AddPolyline(line.data(), static_cast<int>(line.size()), lineColour, thickness);
         if (withPoints && points.size() < 64)
             for (std::size_t index = 0; index < points.size(); ++index) {
                 const auto active = drag_ == Drag::curve && curveNote_ == note.id && curvePoint_ == static_cast<int>(index);
-                list->AddCircleFilled(line[index + 1], active ? dp(4.5f) : dp(3.0f), active ? p.accent : lineColour);
+                const ImVec2 at(x0 + points[index].position * (x1 - x0), valueToY(note, kind, points[index].value));
+                list->AddCircleFilled(at, active ? dp(4.5f) : dp(3.0f), active ? p.accent : lineColour);
             }
+    };
+    // While a point or a way is dragged: what it is, by the pointer (the
+    // pitch in semitones and the key it lands on, the gain in dB, the bend).
+    const auto dragLabel = [&] {
+        if (drag_ != Drag::curve && drag_ != Drag::bend)
+            return;
+        const auto* note = noteById(curveNote_);
+        if (note == nullptr)
+            return;
+        const auto& points = curveOf(*note, curveKind_);
+        char text[48];
+        if (drag_ == Drag::bend) {
+            if (bendSegment_ < 0 || bendSegment_ >= static_cast<int>(points.size()))
+                return;
+            std::snprintf(text, sizeof(text), "%s %+.0f %%", L("Courbe", "Bend"), points[static_cast<std::size_t>(bendSegment_)].bend * 100.0f);
+        } else {
+            if (curvePoint_ < 0 || curvePoint_ >= static_cast<int>(points.size()))
+                return;
+            const auto value = points[static_cast<std::size_t>(curvePoint_)].value;
+            if (curveKind_ == Expression::gain)
+                std::snprintf(text, sizeof(text), "%+.1f dB", value);
+            else if (std::abs(value - std::round(value)) < 1.0e-3f)
+                std::snprintf(text, sizeof(text), "%+d  \xc2\xb7  %s", static_cast<int>(std::lround(value)),
+                              noteName(note->noteNumber + static_cast<int>(std::lround(value))).c_str());
+            else
+                std::snprintf(text, sizeof(text), "%+.2f", value);
+        }
+        ImGui::PushFont(theme::boldFont(), ui::currentFontBase() * 0.85f);
+        const auto size = ImGui::CalcTextSize(text);
+        const ImVec2 at(mouse.x + dp(14.0f), mouse.y - size.y - dp(6.0f));
+        auto* front = ImGui::GetForegroundDrawList();
+        front->AddRectFilled(ImVec2(at.x - dp(4.0f), at.y - dp(2.0f)), ImVec2(at.x + size.x + dp(4.0f), at.y + size.y + dp(2.0f)), p.bg4, dp(3.0f));
+        front->AddText(at, p.text, text);
+        ImGui::PopFont();
     };
     const auto curveMode = expression_ == Expression::pitch;
     CurveHit pitchHit;
@@ -942,6 +1034,15 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
     }
     if (drag_ == Drag::curve && curveKind_ == Expression::pitch)
         dragCurve();
+    if (drag_ == Drag::bend && curveKind_ == Expression::pitch)
+        dragBend();
+    if (curveKind_ == Expression::pitch)
+        dragLabel();
+    if (curveMode && hovered && drag_ == Drag::none && pitchHit.note != nullptr)
+        ui::tooltip(L("Clic : un point (sur un point : le prendre) · glisser : sa hauteur, au demi-ton (Maj : libre) · Alt+glisser "
+                      "entre deux points : courber · double-clic : retirer · clic droit : glisser vers la note suivante, vibrato…",
+                      "Click: a point (on a point: take it) · drag: its pitch, by semitones (Shift: free) · Alt+drag between two "
+                      "points: bend · double click: remove · right click: glide to the next note, vibrato…"));
     if (expression_ == Expression::none && hovered && ImGui::IsMouseDown(ImGuiMouseButton_Right) && under != nullptr) {
         beginEdit();
         (void) engine.removeMidiNote(track.midiId, clip.id, under->id);
@@ -1261,6 +1362,10 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
         }
         if (drag_ == Drag::curve && curveKind_ == Expression::gain)
             dragCurve();
+        if (drag_ == Drag::bend && curveKind_ == Expression::gain)
+            dragBend();
+        if (curveKind_ == Expression::gain)
+            dragLabel();
         const auto* now = findMidiClip(engine, track.midiId, clip.id);
         list->PushClipRect(laneMin, laneMax, true);
         for (const auto& note : now != nullptr ? now->notes : notes) {
@@ -1665,6 +1770,8 @@ void ClipEditorView::drawMidiPopups(const TrackRef& track, const MidiClip& clip)
                 const char* french;
                 const char* english;
             } pitchShapes[] = {
+                { Shape::glideNext, "Glisser vers la note suivante", "Glide to the next note" },
+                { Shape::glideFrom, "Glisser depuis la note précédente", "Glide from the previous note" },
                 { Shape::scoop, "Scoop (attaque par en dessous)", "Scoop (attack from below)" },
                 { Shape::slide, "Glissé depuis le bas", "Slide from below" },
                 { Shape::vibrato, "Vibrato retardé", "Delayed vibrato" },
@@ -1732,7 +1839,51 @@ void ClipEditorView::applyShape(const TrackRef& track, const MidiClip& clip, con
         const auto at = [seconds](const double time) { return static_cast<float>(std::clamp(time / seconds, 0.0, 1.0)); };
         std::vector<NotePoint> add;
         auto pitch = true;
+        // The note before or after it: the nearest start, of a chord the
+        // nearest key.
+        const auto neighbour = [&](const bool after) -> const MidiNote* {
+            const MidiNote* best = nullptr;
+            for (const auto& other : notes) {
+                if (other.id == note.id || (after ? other.startBeats <= note.startBeats + 1.0e-6 : other.startBeats >= note.startBeats - 1.0e-6))
+                    continue;
+                const auto closer = best == nullptr || (after ? other.startBeats < best->startBeats - 1.0e-9 : other.startBeats > best->startBeats + 1.0e-9);
+                const auto tied = best != nullptr && std::abs(other.startBeats - best->startBeats) <= 1.0e-9
+                                  && std::abs(other.noteNumber - note.noteNumber) < std::abs(best->noteNumber - note.noteNumber);
+                if (closer || tied)
+                    best = &other;
+            }
+            return best;
+        };
         switch (shape) {
+        case Shape::glideNext: {
+            // Held, then gliding to where the next note starts (or to its own
+            // end first): quick, then settling on the key.
+            const auto* next = neighbour(true);
+            if (next == nullptr)
+                break;
+            const auto offset = static_cast<float>(std::clamp(next->noteNumber - note.noteNumber, -24, 24));
+            if (offset == 0.0f)
+                break;
+            const auto arrive = static_cast<float>(std::clamp((next->startBeats - note.startBeats) / std::max(1.0e-6, note.durationBeats), 0.05, 1.0));
+            const auto span = std::min(static_cast<double>(arrive) * seconds * 0.5, 0.25);
+            const auto leave = std::max(0.0f, arrive - at(span));
+            add = { { 0.0f, 0.0f }, { leave, 0.0f, 0.55f }, { arrive, offset } };
+            if (arrive < 1.0f)
+                add.push_back({ 1.0f, offset });
+            break;
+        }
+        case Shape::glideFrom: {
+            // From the previous note's key into its own.
+            const auto* previous = neighbour(false);
+            if (previous == nullptr)
+                break;
+            const auto offset = static_cast<float>(std::clamp(previous->noteNumber - note.noteNumber, -24, 24));
+            if (offset == 0.0f)
+                break;
+            const auto span = std::min(seconds * 0.5, 0.2);
+            add = { { 0.0f, offset, 0.55f }, { at(span), 0.0f } };
+            break;
+        }
         case Shape::scoop: {
             const auto span = std::min(0.09, seconds * 0.3);
             add = { { 0.0f, -1.0f }, { at(span * 0.45), -0.3f }, { at(span), 0.0f } };
@@ -1793,13 +1944,19 @@ void ClipEditorView::applyShape(const TrackRef& track, const MidiClip& clip, con
         }
         if (add.empty())
             continue;
-        // Added to what the note has: a scoop and a vibrato and a fall.
+        // Added to what the note has: a scoop and a vibrato and a fall (a
+        // note without one takes the shape as it is, its bends kept).
         const auto& old = pitch ? note.pitch : note.gain;
+        if (old.empty()) {
+            if (pitch)
+                (void) engine.setMidiNoteExpression(track.midiId, clip.id, note.id, add, note.gain);
+            else
+                (void) engine.setMidiNoteExpression(track.midiId, clip.id, note.id, note.pitch, add);
+            continue;
+        }
         std::vector<float> positions;
-        for (const auto& point : old)
-            positions.push_back(point.position);
-        for (const auto& point : add)
-            positions.push_back(point.position);
+        curvePlaces(old, positions);
+        curvePlaces(add, positions);
         std::sort(positions.begin(), positions.end());
         positions.erase(std::unique(positions.begin(), positions.end(), [](const float a, const float b) { return b - a < 1.0e-4f; }),
                         positions.end());

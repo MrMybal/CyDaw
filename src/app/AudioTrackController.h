@@ -18,8 +18,11 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <functional>
 
+#include <algorithm>
 #include <atomic>
 #include <array>
+#include <cmath>
+#include <vector>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -620,12 +623,43 @@ public:
 
     struct MidiSynthEngineCurves;
     // A point of a note's expression: where along the note (0 its start, 1
-    // its end) and the value there (semitones for the pitch, dB for the gain).
+    // its end) and the value there (semitones for the pitch, dB for the gain);
+    // how the way to the next point bends (0 straight; toward 1 quick then
+    // settling, as a glide arrives; toward -1 slow then quick).
     struct NoteExpressionPoint {
         float position {};
         float value {};
+        float bend {};
 
         [[nodiscard]] bool operator==(const NoteExpressionPoint&) const = default;
+
+        // A part of a segment (0..1) once bent.
+        [[nodiscard]] static float bent(const float part, const float bend) noexcept
+        {
+            const auto u = std::clamp(part, 0.0f, 1.0f);
+            if (bend > 1.0e-4f)
+                return 1.0f - std::pow(1.0f - u, 1.0f + 3.0f * std::min(bend, 1.0f));
+            if (bend < -1.0e-4f)
+                return std::pow(u, 1.0f + 3.0f * std::min(-bend, 1.0f));
+            return u;
+        }
+        // A curve's value at a place along its note (0..1): the first
+        // point's before it, the last one's after it.
+        [[nodiscard]] static float valueAt(const std::vector<NoteExpressionPoint>& points, const float position) noexcept
+        {
+            if (points.empty())
+                return 0.0f;
+            if (position <= points.front().position)
+                return points.front().value;
+            for (std::size_t index = 1; index < points.size(); ++index)
+                if (position <= points[index].position) {
+                    const auto& a = points[index - 1];
+                    const auto& b = points[index];
+                    const auto part = (position - a.position) / std::max(1.0e-6f, b.position - a.position);
+                    return a.value + (b.value - a.value) * bent(part, a.bend);
+                }
+            return points.back().value;
+        }
     };
 
     struct MidiNote {
