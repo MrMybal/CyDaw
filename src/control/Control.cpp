@@ -68,6 +68,11 @@ bool isNoteAddress(const std::string_view address) noexcept
     return address.starts_with("note/");
 }
 
+bool isPressAddress(const std::string_view address) noexcept
+{
+    return isNoteAddress(address) || address.starts_with("key/") || address.starts_with("button/");
+}
+
 std::optional<RawMessage> fromMidi(const std::uint8_t* bytes, const std::size_t size)
 {
     if (bytes == nullptr || size == 0 || bytes[0] < 0x80 || bytes[0] >= 0xf0)
@@ -199,7 +204,7 @@ ControlKind kindForAddress(const std::string_view address) noexcept
         return ControlKind::pad;
     if (address.starts_with("pb/") || address.starts_with("axis/"))
         return ControlKind::axis;
-    if (address.starts_with("button/"))
+    if (address.starts_with("button/") || address.starts_with("key/"))
         return ControlKind::button;
     return ControlKind::knob;
 }

@@ -4435,6 +4435,53 @@ void timeStretchKeepsPitchAndLength()
     }
 }
 
+void timeStretchFollowsPitchCurve()
+{
+    // Half a second at its pitch, then an octave up: the tone follows, its
+    // time kept.
+    auto curve = std::make_shared<std::vector<float>>();
+    for (auto knot = 0; knot < 600; ++knot)
+        curve->push_back(knot < 100 ? 0.0f : 12.0f);
+    auto source = toneSource(440.0, 4.0);
+    for (const auto algorithm : { StretchAlgorithm::tonal, StretchAlgorithm::complex }) {
+        StretchSettings settings { algorithm, 48'000.0, 48'000.0, 0.0, 1.0, 1.0, 2 };
+        settings.pitchCurve = curve;
+        TimeStretcher stretcher;
+        stretcher.prepare(settings);
+        const auto out = stretched(stretcher, source, 0, 96'000);
+        std::vector<float> before(out[0].begin() + 4'000, out[0].begin() + 20'000);
+        std::vector<float> after(out[0].begin() + 40'000, out[0].begin() + 90'000);
+        const auto low = strongestFrequency(before, 48'000.0, 380.0, 500.0);
+        const auto high = strongestFrequency(after, 48'000.0, 800.0, 960.0);
+        if (std::abs(low - 440.0) >= 2.0 || std::abs(high - 880.0) >= 3.0)
+            std::cout << "pitch curve " << static_cast<int>(algorithm) << ": " << low << " then " << high << " Hz\n";
+        expect(std::abs(low - 440.0) < 2.0, "a pitch curve starts at the sound's pitch");
+        expect(std::abs(high - 880.0) < 3.0, "a pitch curve then takes it an octave up");
+        expect(rmsOf(out[0], 40'000, 90'000) > 0.25, "a sound under a pitch curve keeps its level");
+    }
+    // Clicks keep their places in time while the pitch moves.
+    VectorSource clicks;
+    clicks.channels.assign(1, std::vector<float>(48'000 * 3));
+    for (std::size_t at = 2'400; at < clicks.channels[0].size(); at += 12'000)
+        for (std::size_t i = 0; i < 1'200 && at + i < clicks.channels[0].size(); ++i)
+            clicks.channels[0][at + i] = static_cast<float>(0.8 * std::exp(-static_cast<double>(i) / 120.0)
+                                                            * std::sin(2.0 * std::numbers::pi * 3'000.0 * i / 48'000.0));
+    StretchSettings settings { StretchAlgorithm::beats, 48'000.0, 48'000.0, 0.0, 1.0, 1.0, 1 };
+    settings.pitchCurve = curve;
+    TimeStretcher stretcher;
+    stretcher.prepare(settings);
+    const auto out = stretched(stretcher, clicks, 0, 120'000);
+    auto weakest = 1.0f;
+    for (std::size_t click = 1; click < 9; ++click) {
+        const auto expected = 2'400 + click * 12'000;
+        auto peak = 0.0f;
+        for (auto at = expected - 600; at < expected + 600; ++at)
+            peak = std::max(peak, std::abs(out[0][at]));
+        weakest = std::min(weakest, peak);
+    }
+    expect(weakest > 0.5f, "under a pitch curve the clicks stay where they were");
+}
+
 void timeStretchKeepsAttacks()
 {
     // Clicks every quarter second, with a short decay: stretched twice as
@@ -4659,6 +4706,7 @@ int main()
     prismGoesFurther();
     batterieMixesItsPieces();
     timeStretchKeepsPitchAndLength();
+    timeStretchFollowsPitchCurve();
     timeStretchKeepsAttacks();
     stretchedLoopKeepsItsBeats();
     convolverMatchesDirectConvolution();

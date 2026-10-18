@@ -35,7 +35,6 @@ MasterClipEditor::MasterClipEditor(Studio& studio, UiState& state) : studio_(stu
 void MasterClipEditor::draw(const int scene)
 {
     const auto& p = theme::palette();
-    const auto& io = ImGui::GetIO();
     const auto* found = studio_.masterClip(scene);
     if (found == nullptr) {
         state_.editedMasterScene.reset();
@@ -47,7 +46,7 @@ void MasterClipEditor::draw(const int scene)
     if (shownScene_ != scene) {
         // Another clip: its first lane with points, else the level.
         shownScene_ = scene;
-        dragged_ = -1;
+        curve_.clearSelection();
         lane_ = clip.lanes.empty() ? juce::String(Studio::masterGainLane) : clip.lanes.begin()->first;
     }
     // A knob gone with its device: the level (always there) instead.
@@ -91,7 +90,7 @@ void MasterClipEditor::draw(const int scene)
         changed = true;
     }
     ImGui::SameLine();
-    if (ui::toggle(L("Boucle", "Loop"), &clip.looping, p.accent))
+    if (ui::loopToggle("masterClipLoop", &clip.looping, L("Boucle : le clip boucle tant que sa scène joue", "Loop: the clip loops while its scene plays")))
         changed = true;
     ImGui::SameLine();
     const auto playing = studio_.playingMasterScene() == scene;
@@ -119,7 +118,7 @@ void MasterClipEditor::draw(const int scene)
             ImGui::PushID(lane.binding.toRawUTF8());
             if (ImGui::Selectable(labelOf(lane).toRawUTF8(), lane.binding == choice.binding)) {
                 lane_ = lane.binding;
-                dragged_ = -1;
+                curve_.clearSelection();
             }
             ImGui::PopID();
         }
@@ -135,6 +134,8 @@ void MasterClipEditor::draw(const int scene)
     for (auto index = 0; index < 5; ++index)
         if (std::abs(gridBeats_ - grids[index]) < 1.0e-6)
             gridIndex = index;
+    (void) ui::snapToggle("masterClipSnap", &state_.masterClipSnap);
+    ImGui::SameLine(0.0f, dp(4.0f));
     ImGui::SetNextItemWidth(dp(80.0f));
     if (ImGui::Combo("##masterGrid", &gridIndex, gridNames, 5))
         gridBeats_ = grids[gridIndex];
@@ -142,12 +143,40 @@ void MasterClipEditor::draw(const int scene)
     ImGui::SameLine();
     if (ImGui::SmallButton(L("Effacer la courbe", "Clear the lane"))) {
         clip.lanes.erase(choice.binding);
-        dragged_ = -1;
+        curve_.clearSelection();
         changed = true;
     }
 
-    // ---- The lane: its points over the clip's beats.
-    auto points = hasPoints(choice.binding) ? clip.lanes.at(choice.binding) : std::vector<MasterClip::Point> {};
+    // ---- The lane: its points over the clip's beats, as the curve editor
+    // shows them; the bar of the picked ones first, its row kept.
+    const auto minimum = choice.minimum;
+    const auto maximum = std::max(choice.maximum, minimum + 1.0e-6);
+    curves::Lane lane;
+    lane.minimum = minimum;
+    lane.maximum = maximum;
+    lane.logarithmic = choice.logarithmic && minimum > 0.0;
+    lane.fallback = choice.value;
+    lane.colour = theme::fromArgb(clip.colour);
+    lane.filled = true;
+    const auto unit = choice.unit;
+    lane.formatValue = [unit](const double value) { return juce::String(valueText(value, unit)); };
+    lane.formatTime = [beatsPerBar](const double beats) {
+        const auto bar = std::floor(beats / beatsPerBar + 1.0e-9);
+        return juce::String(static_cast<int>(bar) + 1) + "." + juce::String(beats - bar * beatsPerBar + 1.0, 2);
+    };
+    // The points with their ids (given to those that have none).
+    auto points = std::vector<curves::Point> {};
+    if (hasPoints(choice.binding)) {
+        std::uint64_t fresh = 1;
+        for (const auto& point : clip.lanes.at(choice.binding))
+            fresh = std::max(fresh, point.id + 1);
+        for (const auto& point : clip.lanes.at(choice.binding))
+            points.push_back({ point.id != 0 ? point.id : fresh++, point.beats, point.value, point.shape, point.bend, point.handles });
+    }
+    const auto grid = gridBeats_ < 0.0 ? beatsPerBar : gridBeats_;
+    if (curve_.drawBar(points, lane, grid))
+        changed = true;
+
     const auto available = ImGui::GetContentRegionAvail();
     const auto origin = ImGui::GetCursorScreenPos();
     const auto axisWidth = dp(70.0f);
@@ -158,23 +187,10 @@ void MasterClipEditor::draw(const int scene)
     const auto width = gridMax.x - gridMin.x;
     const auto height = gridMax.y - gridMin.y;
     const auto lengthBeats = clip.lengthBeats;
-    const auto minimum = choice.minimum;
-    const auto maximum = std::max(choice.maximum, minimum + 1.0e-6);
-    const auto logarithmic = choice.logarithmic && minimum > 0.0;
-    const auto toY = [&](const double value) {
-        const auto t = logarithmic ? std::log(std::max(value, minimum) / minimum) / std::log(maximum / minimum)
-                                   : (value - minimum) / (maximum - minimum);
-        return gridMax.y - static_cast<float>(std::clamp(t, 0.0, 1.0)) * height;
-    };
-    const auto fromY = [&](const float y) {
-        const auto t = std::clamp(static_cast<double>(gridMax.y - y) / height, 0.0, 1.0);
-        return logarithmic ? minimum * std::pow(maximum / minimum, t) : minimum + (maximum - minimum) * t;
-    };
     const auto toX = [&](const double beats) { return gridMin.x + static_cast<float>(beats / lengthBeats) * width; };
     const auto fromX = [&](const float x) { return std::clamp(static_cast<double>(x - gridMin.x) / width * lengthBeats, 0.0, lengthBeats); };
-    const auto grid = gridBeats_ < 0.0 ? beatsPerBar : gridBeats_;
     const auto snap = [&](const double beats) {
-        return io.KeyAlt || grid <= 0.0 ? beats : std::clamp(std::round(beats / grid) * grid, 0.0, lengthBeats);
+        return !ui::snapping(state_.masterClipSnap) || grid <= 0.0 ? beats : std::clamp(std::round(beats / grid) * grid, 0.0, lengthBeats);
     };
 
     auto* list = ImGui::GetWindowDrawList();
@@ -193,92 +209,35 @@ void MasterClipEditor::draw(const int scene)
             list->AddText(ImVec2(x + dp(3.0f), origin.y + dp(2.0f)), p.textDim, text);
         }
     }
-    // Five values on the side.
+    // Five values on the side, where the editor puts them.
+    const auto pad = dp(5.0f);
     for (auto step = 0; step <= 4; ++step) {
-        const auto y = gridMax.y - height * static_cast<float>(step) / 4.0f;
+        const auto part = static_cast<double>(step) / 4.0;
+        const auto y = gridMax.y - pad - static_cast<float>(part) * std::max(1.0f, height - pad * 2.0f);
         list->AddLine(ImVec2(gridMin.x, y), ImVec2(gridMax.x, y), p.grid);
-        const auto text = valueText(fromY(y), choice.unit);
+        const auto text = valueText(curves::Editor::valueOf(lane, part), choice.unit);
         const auto textWidth = ImGui::CalcTextSize(text.c_str()).x;
         list->AddText(ImVec2(gridMin.x - textWidth - dp(6.0f), std::clamp(y - ImGui::GetFontSize() * 0.5f, gridMin.y, gridMax.y - ImGui::GetFontSize())),
                       p.textDim, text.c_str());
     }
 
-    // The points: a click adds one (and drags it), a drag moves it between
-    // its neighbours, a right click removes it.
-    ImGui::SetCursorScreenPos(gridMin);
-    ImGui::InvisibleButton("##masterLaneArea", ImVec2(width, height), ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
-    const auto hovered = ImGui::IsItemHovered();
-    auto hit = -1;
-    {
-        auto best = dp(8.0f);
-        for (std::size_t index = 0; index < points.size(); ++index) {
-            const auto dx = toX(points[index].beats) - io.MousePos.x;
-            const auto dy = toY(points[index].value) - io.MousePos.y;
-            const auto distance = std::sqrt(dx * dx + dy * dy);
-            if (distance < best) {
-                best = distance;
-                hit = static_cast<int>(index);
-            }
-        }
-    }
-    if (dragged_ >= static_cast<int>(points.size()))
-        dragged_ = -1;
-    if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
-        if (hit >= 0) {
-            dragged_ = hit;
-        } else {
-            const MasterClip::Point point { snap(fromX(io.MousePos.x)), static_cast<float>(fromY(io.MousePos.y)) };
-            const auto at = std::upper_bound(points.begin(), points.end(), point.beats,
-                                             [](const double beats, const MasterClip::Point& other) { return beats < other.beats; });
-            dragged_ = static_cast<int>(std::distance(points.begin(), points.insert(at, point)));
-            changed = true;
-        }
-    }
-    if (ImGui::IsItemClicked(ImGuiMouseButton_Right) && hit >= 0) {
-        points.erase(points.begin() + hit);
-        dragged_ = -1;
-        hit = -1;
+    // The curve editor over the grid.
+    curves::View view;
+    view.xOf = toX;
+    view.timeAt = fromX;
+    view.snap = snap;
+    view.cursor = playing ? lengthBeats * std::clamp(static_cast<double>(studio_.masterClipProgress()), 0.0, 1.0) : 0.0;
+    view.minimumTime = 0.0;
+    view.maximumTime = lengthBeats;
+    view.secondsPerUnit = 60.0 / std::max(20.0, studio_.engine().tempo());
+    curve_.setFocused(true);
+    if (curve_.draw("##masterCurve", gridMin, gridMax, points, lane, view))
         changed = true;
-    }
-    if (dragged_ >= 0 && ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 0.0f)
-        && (io.MouseDelta.x != 0.0f || io.MouseDelta.y != 0.0f)) {
-        auto& point = points[static_cast<std::size_t>(dragged_)];
-        const auto low = dragged_ > 0 ? points[static_cast<std::size_t>(dragged_) - 1].beats : 0.0;
-        const auto high = dragged_ + 1 < static_cast<int>(points.size()) ? points[static_cast<std::size_t>(dragged_) + 1].beats : lengthBeats;
-        point.beats = std::clamp(snap(fromX(io.MousePos.x)), low, high);
-        point.value = static_cast<float>(fromY(io.MousePos.y));
-        changed = true;
-    }
-    if (!ImGui::IsItemActive())
-        dragged_ = -1;
-
-    // The curve, filled under; before the first point and after the last,
-    // their values held. With none: the setting as it stands, faint.
     ImGui::PushClipRect(gridMin, gridMax, true);
-    const auto curveColour = theme::fromArgb(clip.colour);
-    const auto fillColour = (curveColour & 0x00ffffffu) | 0x30000000u;
-    if (points.empty()) {
-        const auto y = toY(choice.value);
-        list->AddLine(ImVec2(gridMin.x, y), ImVec2(gridMax.x, y), p.textFaint, 1.0f);
+    if (points.empty())
         ui::centredText(list, gridMin, gridMax, p.textFaint,
-                        L("Clic : ajouter un point. La courbe joue quand la scène est lancée.",
-                          "Click: add a point. The lane plays when the scene is launched."));
-    } else {
-        std::vector<ImVec2> line;
-        line.emplace_back(gridMin.x, toY(points.front().value));
-        for (const auto& point : points)
-            line.emplace_back(toX(point.beats), toY(point.value));
-        line.emplace_back(gridMax.x, toY(points.back().value));
-        for (std::size_t index = 1; index < line.size(); ++index)
-            list->AddQuadFilled(line[index - 1], line[index], ImVec2(line[index].x, gridMax.y), ImVec2(line[index - 1].x, gridMax.y), fillColour);
-        list->AddPolyline(line.data(), static_cast<int>(line.size()), curveColour, dp(1.8f));
-        for (std::size_t index = 0; index < points.size(); ++index) {
-            const ImVec2 at(toX(points[index].beats), toY(points[index].value));
-            const auto active = static_cast<int>(index) == dragged_ || static_cast<int>(index) == hit;
-            list->AddCircleFilled(at, dp(active ? 5.0f : 4.0f), active ? p.text : curveColour);
-            list->AddCircle(at, dp(active ? 5.0f : 4.0f), p.bg0, 0, 1.0f);
-        }
-    }
+                        L("Double-clic : ajouter un point. La courbe joue quand la scène est lancée.",
+                          "Double click: add a point. The lane plays when the scene is launched."));
     // Where the playing clip is.
     if (playing) {
         const auto x = gridMin.x + width * std::clamp(studio_.masterClipProgress(), 0.0f, 1.0f);
@@ -287,19 +246,16 @@ void MasterClipEditor::draw(const int scene)
     ImGui::PopClipRect();
     list->AddRect(gridMin, gridMax, p.line);
 
-    if (dragged_ >= 0 || (hovered && hit >= 0)) {
-        const auto& point = points[static_cast<std::size_t>(dragged_ >= 0 ? dragged_ : hit)];
-        ImGui::SetTooltip("%s %.2f  ·  %s%s", L("Temps", "Beat"), point.beats + 1.0, valueText(point.value, choice.unit).c_str(),
-                          dragged_ >= 0 ? "" : L("\nClic droit : retirer", "\nRight click: remove"));
-    } else if (hovered) {
-        ImGui::SetTooltip("%s %.2f  ·  %s", L("Temps", "Beat"), snap(fromX(io.MousePos.x)) + 1.0, valueText(fromY(io.MousePos.y), choice.unit).c_str());
-    }
-
     if (changed) {
-        if (points.empty())
+        if (points.empty()) {
             clip.lanes.erase(choice.binding);
-        else
-            clip.lanes[choice.binding] = std::move(points);
+        } else {
+            auto& stored = clip.lanes[choice.binding];
+            stored.clear();
+            for (const auto& point : points)
+                stored.push_back({ std::clamp(point.time, 0.0, lengthBeats), static_cast<float>(point.value), engine::clampedCurveShape(point.shape),
+                                   point.bend, point.handles, point.id });
+        }
         studio_.setMasterClip(scene, std::move(clip));
     }
 }

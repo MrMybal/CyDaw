@@ -19,13 +19,21 @@
 
 namespace cydaw::v2 {
 
+// The computer's keyboard as a raw device.
+inline constexpr const char* computerKeyboardId = "keyboard:computer";
+
+// A raw address as a person reads it: "CC 74 · ch. 1", "Key F1".
+[[nodiscard]] juce::String readableAddress(const std::string& address);
+
 class Controllers::Impl final : private juce::MidiInputCallback, private juce::AsyncUpdater, private juce::Timer {
 public:
     Impl(Studio& studio, UiState& state, ImGuiHost& host, bool keepSettings);
     ~Impl() override;
 
     // ---- RAW devices ----------------------------------------------------------------------
-    enum class RawKind { midiIn, midiOut, osc, plugin };
+    // The computer's keyboard is one too: its keys ("key/F1"), while a
+    // device listens to it.
+    enum class RawKind { midiIn, midiOut, osc, plugin, keyboard };
     struct OscPort;
     struct RawDevice {
         std::string id;
@@ -67,6 +75,21 @@ public:
     // OSC socket itself, a plug-in's device itself).
     [[nodiscard]] std::string feedbackFor(std::string_view inputDevice) const;
     void send(std::string_view device, const control::RawMessage& message);
+    [[nodiscard]] static bool isInput(RawKind kind) noexcept { return kind != RawKind::midiOut; }
+    [[nodiscard]] static bool isOutput(RawKind kind) noexcept { return kind != RawKind::midiIn && kind != RawKind::keyboard; }
+    // A raw device's name as shown (the computer's keyboard in the language).
+    [[nodiscard]] juce::String nameOf(std::string_view id) const;
+    // The family it is shown under: MIDI, a plug-in's name (gamepads), OSC.
+    [[nodiscard]] juce::String familyOf(const RawDevice& device) const;
+
+    // ---- The computer's keyboard ------------------------------------------------------------
+    // Each frame, before the shortcuts and the keyboard that plays notes:
+    // the keys a control listens to (and every key while one is learnt)
+    // are said as "key/<name>" and kept from the rest.
+    void pollKeys();
+    std::map<int, bool> keysDown;
+    // Every key is listened to: a learn waits for the computer's keyboard.
+    [[nodiscard]] bool keyboardWanted();
 
     // ---- Application plug-ins -------------------------------------------------------------
     struct Plugin {
@@ -120,7 +143,13 @@ public:
     std::map<std::string, double> told;
     void timerCallback() override;
     void feedback(bool force);
-    std::string addVirtualDevice(const juce::String& name);
+    std::string addVirtualDevice(const juce::String& name, const std::string& input = {}, const std::string& output = {});
+    std::string duplicateVirtualDevice(const std::string& id);
+    // A device's hardware changed: the controls that listened to the old
+    // input listen to the new one; those that answered the old output
+    // answer the new one, at their own address.
+    void setDeviceInput(control::VirtualDevice& device, const std::string& input);
+    void setDeviceOutput(control::VirtualDevice& device, const std::string& output);
     std::string addControl(const std::string& device, const juce::String& name, control::ControlKind kind,
                            const std::string& sourceDevice, const std::string& sourceAddress);
     // Learning replaces what moved the target; by hand, a second control adds to it.
@@ -128,7 +157,8 @@ public:
     void unassign(std::size_t index);
     void removeVirtualDevice(const std::string& id);
     void removeControl(const std::string& device, const std::string& control);
-    // The virtual device a raw device's learnt controls go into.
+    // The virtual device a raw device's learnt controls go into: the one
+    // with it as its input, else a new one.
     std::string virtualDeviceFor(const RawDevice& device);
 
     // ---- Learning -------------------------------------------------------------------------
@@ -137,8 +167,19 @@ public:
     juce::String learnTargetLabel;
     // A control's source being learnt in the window.
     std::optional<std::pair<std::string, std::string>> learnSource;
+    // A device whose hardware is found by moving something on it.
+    std::string learnHardware;
+    // A device whose controls are learnt: each new one moved on its input
+    // becomes a control.
+    std::string learnControls;
+    // A control whose target is picked by a click in the interface.
+    std::optional<std::pair<std::string, std::string>> pickTarget;
     juce::String learnStatus;
     void learnFrom(const std::string& rawDevice, const control::RawMessage& message);
+    // A message heard while a device's hardware or controls are learnt:
+    // whether it was taken.
+    bool learnDevice(const RawDevice& source, const control::RawMessage& message);
+    void stopLearning();
 
     // ---- The monitor ----------------------------------------------------------------------
     struct Seen {
@@ -165,13 +206,32 @@ public:
     void draw(bool& visible);
     void drawButton(bool& visible);
     void drawOverlay();
+    // The devices tab: the list, and the picked device (its hardware, its
+    // controls, the picked control and what it moves).
+    void drawDeviceList();
+    // A new device, its hardware found by moving something on it.
+    void newDevice();
+    void drawDevice(control::VirtualDevice& device);
+    void drawHardware(control::VirtualDevice& device);
+    void drawControls(control::VirtualDevice& device);
+    void drawControl(control::VirtualDevice& device, control::VirtualControl& control);
+    void drawControlTargets(control::VirtualDevice& device, control::VirtualControl& control);
+    bool rawCombo(const char* id, std::string& value, bool outputs, float width);
+    void drawOscSettings(RawDevice& device);
+    // The hardware tab, every assignment, the monitor.
     void drawRaw();
-    void drawVirtual();
     void drawAssignments();
-    void drawMonitor();
+    void drawMonitor(const control::VirtualDevice* only);
     std::string selectedRaw;
     std::string selectedDevice;
     std::string selectedControl;
+    int tab {};
+    int requestedTab { -1 };
+    // Brought back over the main window at its next frame.
+    bool centreWindow {};
+    // The window in front (its keys are learnt only then).
+    bool windowFocused {};
+    bool monitorAll {};
     juce::String newOscName { "OSC" };
     int newOscPort { 9000 };
     char targetFilter[96] {};

@@ -141,6 +141,12 @@ public:
     virtual void showModulationGraph(bool) {}
     // A rack's pad open in the device panel (its chain), or none.
     virtual void openRackPad(const std::optional<std::pair<TrackRef, int>>&) {}
+    // An audio track's launcher clip in the editor (by its slot's scene).
+    virtual void editLauncherClip(const TrackRef& track, int scene)
+    {
+        (void) track;
+        (void) scene;
+    }
     // A clip in the editor (an audio clip on a face of its editor: 0 sample,
     // 1 takes, 2 stretch).
     virtual void editClip(const TrackRef& track, std::uint64_t clipId, int face)

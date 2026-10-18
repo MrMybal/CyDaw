@@ -318,8 +318,12 @@ void LauncherView::draw()
                     } else {
                         state_.selectedSlots = { slot };
                     }
+                    // The inspector shows the clip picked: a MIDI one by its id;
+                    // an audio slot's through the slot (no MIDI clip left picked).
                     if (track.midi && exists)
                         state_.selectedClips = { ClipRef { track, midiClip } };
+                    else
+                        state_.selectedClips.clear();
                 }
             }
             if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && track.midi && !exists && !overStop) {
@@ -330,8 +334,9 @@ void LauncherView::draw()
                     state_.bringToFront = Panel::editor;
                     studio_.markDirty();
                 }
-            } else if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && track.midi && exists && !overPlay) {
-                state_.editedClip = ClipRef { track, midiClip };
+            } else if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && exists && !overPlay) {
+                // The clip in the editor: a MIDI one by its id, an audio one by its slot.
+                state_.editedClip = track.midi ? ClipRef { track, midiClip } : ClipRef { track, 0, scene };
                 state_.bringToFront = Panel::editor;
             }
             if (overPlay)

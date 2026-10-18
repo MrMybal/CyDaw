@@ -25,6 +25,15 @@ void controlMidiAddressesGoBothWays()
     }
     expect(cydaw::control::toMidi({ "/fader1", 0.5 }).empty() && cydaw::control::toMidi({ "cc/17/1", 0.5 }).empty(),
            "an OSC address, a 17th channel: no MIDI");
+    // Pressed and let go: a MIDI key, the computer's keys, a gamepad's buttons.
+    using cydaw::control::ControlKind;
+    expect(cydaw::control::isPressAddress("note/1/60") && cydaw::control::isPressAddress("key/F2")
+               && cydaw::control::isPressAddress("button/a") && !cydaw::control::isPressAddress("cc/1/74")
+               && !cydaw::control::isPressAddress("/push1"),
+           "a key, a computer key, a gamepad button are presses; a controller, an OSC address are not");
+    expect(cydaw::control::kindForAddress("key/F2") == ControlKind::button && cydaw::control::kindForAddress("button/a") == ControlKind::button
+               && cydaw::control::kindForAddress("note/10/36") == ControlKind::pad && cydaw::control::kindForAddress("axis/leftX") == ControlKind::axis,
+           "a computer key learns as a button, a drum key as a pad, a stick as an axis");
 }
 
 void controlModifiersShapeAndGiveBack()

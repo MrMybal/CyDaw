@@ -1703,13 +1703,11 @@ void Studio::setAutomationPoints(const TrackRef& track, const std::vector<Automa
         return;
     if (!isValid(track))
         return;
-    for (const auto& point : automationPoints(track))
-        (void) removeAutomationPoint(track, point.id);
-    for (const auto& point : points) {
-        const auto id = addAutomationPoint(track, point.timeSeconds, point.valueDb);
-        if (id != 0 && point.curve != AutomationCurve::linear)
-            (void) setAutomationPointCurve(track, id, point.curve, point.curveAmount);
-    }
+    // The whole lane at once: its points keep their ids, shapes and handles.
+    if (track.midi)
+        engine_.replaceMidiAutomationPoints(track.midiId, points);
+    else
+        engine_.replaceAutomationPoints(track.audioIndex, points);
     dirty_ = true;
 }
 
@@ -1782,7 +1780,7 @@ std::vector<Studio::AutomationPoint> Studio::lanePoints(const TrackRef& track, c
         std::vector<AutomationPoint> points;
         if (!track.midi && isValid(track))
             for (const auto& point : engine_.pluginAutomationPoints(track.audioIndex, plugin, parameter))
-                points.push_back({ point.id, point.timeSeconds, point.normalisedValue, point.curve, point.curveAmount });
+                points.push_back({ point.id, point.timeSeconds, point.normalisedValue, point.curve, point.curveAmount, point.handles });
         return points;
     }
     const auto* lanes = lanesOf(track);
@@ -1931,15 +1929,11 @@ void Studio::setLanePoints(const TrackRef& track, const juce::String& lane, cons
     if (parsePluginLane(lane, plugin, parameter)) {
         if (track.midi || !isValid(track))
             return;
-        engine_.clearPluginAutomation(track.audioIndex, plugin, parameter);
-        for (const auto& point : points) {
-            const auto id = engine_.addPluginAutomationPoint(track.audioIndex, plugin, parameter,
-                                                             pluginParameterName(track, lane), point.timeSeconds,
-                                                             std::clamp(point.valueDb, 0.0f, 1.0f));
-            if (id != 0 && point.curve != AutomationCurve::linear)
-                (void) engine_.setPluginAutomationPointCurve(track.audioIndex, plugin, parameter, id, point.curve,
-                                                             point.curveAmount);
-        }
+        std::vector<app::AudioTrackController::PluginAutomationPoint> converted;
+        for (const auto& point : points)
+            converted.push_back({ point.id, point.timeSeconds, point.valueDb, point.curve, point.curveAmount, point.handles });
+        engine_.replacePluginAutomationPoints(track.audioIndex, plugin, parameter, pluginParameterName(track, lane),
+                                              std::move(converted));
         dirty_ = true;
         return;
     }
@@ -2008,7 +2002,7 @@ std::optional<float> Studio::laneValueNow(const TrackRef& track, const juce::Str
     std::vector<app::NativeDspRuntime::AutomationPoint> engine;
     engine.reserve(points.size());
     for (const auto& point : points)
-        engine.push_back({ point.timeSeconds, point.valueDb, point.curve == AutomationCurve::linear ? 0 : 1, point.curveAmount });
+        engine.push_back({ point.timeSeconds, point.valueDb, static_cast<int>(point.curve), point.curveAmount, point.handles });
     return app::NativeDspRuntime::automationValueAt(engine, engine_.position(),
                                                     lane.isNotEmpty() && !lane.startsWith("plugin:")
                                                         && logarithmicParameter(track, lane));
@@ -2049,22 +2043,177 @@ juce::String Studio::nativeBinding(const GraphSlot* slot, const juce::String& bi
     return binding;
 }
 
+namespace {
+
+using LanePoint = app::AudioTrackController::AutomationPoint;
+
+// Where a lane stands at a time: its first value before it, its last after
+// it (none: `fallback`).
+float laneValueAt(const std::vector<LanePoint>& points, const double time, const float fallback)
+{
+    if (points.empty())
+        return fallback;
+    return static_cast<float>(engine::curveValueAt(
+        points,
+        [](const LanePoint& point) {
+            return engine::CurveKnot { point.timeSeconds, point.valueDb, static_cast<int>(point.curve), point.curveAmount, point.handles };
+        },
+        time));
+}
+
+struct ClipSpan {
+    double start {};
+    double end {};
+    const std::vector<LanePoint>* points {};
+};
+
+// A track's lane with its arrangement clips' lanes laid over their spans:
+// the clip's points (from its start) inside, the track's own outside.
+std::vector<LanePoint> mergedLane(const std::vector<LanePoint>& own, const float fallback, const std::vector<ClipSpan>& spans)
+{
+    constexpr auto edge = 0.0005;
+    std::vector<LanePoint> out;
+    for (const auto& point : own)
+        if (std::none_of(spans.begin(), spans.end(), [&point](const ClipSpan& span) {
+                return point.timeSeconds >= span.start - edge && point.timeSeconds <= span.end + edge;
+            }))
+            out.push_back(point);
+    for (const auto& span : spans) {
+        const auto before = laneValueAt(own, span.start, fallback);
+        const auto after = laneValueAt(own, span.end, fallback);
+        out.push_back({ 0, span.start - edge, before });
+        out.push_back({ 0, span.start, laneValueAt(*span.points, 0.0, before) });
+        for (const auto& point : *span.points) {
+            const auto time = span.start + point.timeSeconds;
+            if (time > span.start && time < span.end)
+                out.push_back({ 0, time, point.valueDb, point.curve, point.curveAmount, point.handles });
+        }
+        out.push_back({ 0, span.end, laneValueAt(*span.points, span.end - span.start, before) });
+        out.push_back({ 0, span.end + edge, after });
+    }
+    std::stable_sort(out.begin(), out.end(), [](const auto& a, const auto& b) { return a.timeSeconds < b.timeSeconds; });
+    std::uint64_t id = 1;
+    for (auto& point : out)
+        point.id = id++;
+    return out;
+}
+
+} // namespace
+
+void Studio::followClipLanes()
+{
+    if (opening_ != nullptr)
+        return;
+    // A launcher clip with lanes started or stopped, an arrangement clip
+    // with lanes moved: the track's automation published anew.
+    const auto hasLanes = [this](const std::size_t index, const int scene) {
+        if (scene < 0)
+            return false;
+        const auto clip = engine_.launcherClip(index, scene);
+        return clip && !clip->lanes.empty();
+    };
+    for (std::size_t index = 0; index < audioTracks_.size() && index < engine_.trackCount(); ++index) {
+        auto& state = audioTracks_[index];
+        const auto scene = engine_.activeLauncherScene(index);
+        auto signature = 0.0;
+        if (const auto* clips = engine_.audioClipsView(index))
+            for (const auto& clip : *clips)
+                if (!clip.lanes.empty())
+                    signature += clip.startSeconds * 3.1 + clip.durationSeconds * 7.7 + static_cast<double>(clip.lanes.size()) + 1.0;
+        const auto moved = std::abs(signature - state.clipLaneSignature) > 1.0e-9;
+        if (scene == state.clipLaneScene && !moved)
+            continue;
+        const auto before = state.clipLaneScene;
+        state.clipLaneScene = scene;
+        state.clipLaneSignature = signature;
+        if (moved || hasLanes(index, scene) || hasLanes(index, before)) {
+            TrackRef track;
+            track.audioIndex = index;
+            publishParameterAutomation(track);
+        }
+    }
+}
+
+std::vector<Studio::MasterLaneChoice> Studio::clipLaneChoices(const TrackRef& track) const
+{
+    std::vector<MasterLaneChoice> choices;
+    if (!isValid(track) || track.master)
+        return choices;
+    choices.push_back({ clipVolumeLane, ui::Ls("Volume", "Volume"), "dB", -60.0, 12.0, 0.0 });
+    if (!track.midi)
+        choices.push_back({ clipPanLane, ui::Ls("Panoramique", "Pan"), "", -1.0, 1.0, engine_.trackInfo(track.audioIndex).pan });
+    if (const auto* slot = graphFor(track))
+        for (const auto& node : slot->graph().editorNodes()) {
+            if (node.boundary)
+                continue;
+            for (const auto& parameter : node.parameters)
+                if (canAutomate(track, parameter.binding) && !parameter.binding.startsWith("plugin:"))
+                    choices.push_back({ parameter.binding, node.title + juce::String::fromUTF8(" \xc2\xb7 ") + parameter.label, parameter.unit,
+                                        parameter.minimum, parameter.maximum, parameter.value, logarithmicParameter(track, parameter.binding) });
+        }
+    return choices;
+}
+
 void Studio::publishParameterAutomation(const TrackRef& track)
 {
-    const auto* lanes = lanesOf(track);
-    if (lanes == nullptr || !isValid(track))
+    const auto* stored = lanesOf(track);
+    if (stored == nullptr || !isValid(track))
         return;
     std::vector<app::NativeDspRuntime::AutomationLane> out;
     std::vector<app::AudioTrackController::VoiceAutomationLane> voices;
     const auto* slot = graphFor(track);
-    for (const auto& [binding, points] : lanes->lanes) {
+    // Its clips' own lanes: those of the launcher clip that plays (the
+    // track's clock is then that clip's own time) in place of its own; else
+    // its arrangement clips', laid over their spans.
+    auto lanes = *stored;
+    if (!track.midi && !track.master) {
+        std::optional<std::vector<LanePoint>> volume;
+        std::vector<LanePoint> pan;
+        const auto scene = engine_.activeLauncherScene(track.audioIndex);
+        const auto playing = scene >= 0 ? engine_.launcherClip(track.audioIndex, scene) : std::nullopt;
+        const auto knob = [&](const juce::String& binding) {
+            if (slot != nullptr)
+                for (const auto& parameter : slot->graph().editorGraphParameters())
+                    if (parameter.binding == binding)
+                        return static_cast<float>(parameter.value);
+            return 0.0f;
+        };
+        if (playing && !playing->lanes.empty()) {
+            for (const auto& [name, points] : playing->lanes) {
+                if (name == clipVolumeLane)
+                    volume = points;
+                else if (name == clipPanLane)
+                    pan = points;
+                else
+                    lanes.lanes[name] = points;
+            }
+        } else if (const auto* clips = engine_.audioClipsView(track.audioIndex)) {
+            std::map<juce::String, std::vector<ClipSpan>> byLane;
+            for (const auto& clip : *clips)
+                for (const auto& [name, points] : clip.lanes)
+                    if (!points.empty())
+                        byLane[name].push_back({ clip.startSeconds, clip.startSeconds + clip.durationSeconds, &points });
+            for (const auto& [name, spans] : byLane) {
+                if (name == clipVolumeLane)
+                    volume = mergedLane(engine_.automationPoints(track.audioIndex), 0.0f, spans);
+                else if (name == clipPanLane)
+                    pan = mergedLane({}, engine_.trackInfo(track.audioIndex).pan, spans);
+                else
+                    lanes.lanes[name] = mergedLane(lanes.lanes[name], knob(name), spans);
+            }
+        }
+        engine_.setTrackClipAutomation(track.audioIndex, std::move(volume), std::move(pan));
+        if (track.audioIndex < audioTracks_.size())
+            audioTracks_[track.audioIndex].clipLaneScene = scene;
+    }
+    for (const auto& [binding, points] : lanes.lanes) {
         if (points.empty())
             continue;
         const auto toEngine = [&points](const float minimum, const float maximum) {
             std::vector<app::NativeDspRuntime::AutomationPoint> converted;
             for (const auto& point : points)
-                converted.push_back({ point.timeSeconds, std::clamp(point.valueDb, minimum, maximum),
-                                      point.curve == AutomationCurve::linear ? 0 : 1, point.curveAmount });
+                converted.push_back({ point.timeSeconds, std::clamp(point.valueDb, minimum, maximum), static_cast<int>(point.curve),
+                                      point.curveAmount, point.handles });
             return converted;
         };
         if (track.midi && slot != nullptr)
@@ -2078,7 +2227,7 @@ void Studio::publishParameterAutomation(const TrackRef& track)
                         minimum = static_cast<float>(parameter.minimum);
                         maximum = static_cast<float>(parameter.maximum);
                     }
-                voices.push_back({ voice->target, voice->index, logarithmicParameter(track, binding), toEngine(minimum, maximum) });
+                voices.push_back({ voice->target, voice->index, logarithmicParameter(track, binding), toEngine(minimum, maximum), minimum, maximum });
                 continue;
             }
         const auto target = modulation::nativeTargetFor(nativeBinding(slot, binding));
@@ -2089,9 +2238,11 @@ void Studio::publishParameterAutomation(const TrackRef& track)
         lane.field = target->field;
         lane.slot = target->slot;
         lane.logarithmic = logarithmicParameter(track, binding);
+        lane.minimum = target->minimum;
+        lane.maximum = target->maximum;
         for (const auto& point : points)
             lane.points.push_back({ point.timeSeconds, std::clamp(point.valueDb, target->minimum, target->maximum),
-                                    point.curve == AutomationCurve::linear ? 0 : 1, point.curveAmount });
+                                    static_cast<int>(point.curve), point.curveAmount, point.handles });
         out.push_back(std::move(lane));
     }
     if (track.midi) {
@@ -3454,18 +3605,10 @@ float Studio::masterLaneValueAt(const std::vector<MasterClip::Point>& points, co
 {
     if (points.empty())
         return 0.0f;
-    if (beats <= points.front().beats)
-        return points.front().value;
-    for (std::size_t index = 1; index < points.size(); ++index)
-        if (beats < points[index].beats) {
-            const auto& a = points[index - 1];
-            const auto& b = points[index];
-            const auto t = static_cast<float>(b.beats > a.beats ? (beats - a.beats) / (b.beats - a.beats) : 1.0);
-            if (logarithmic && a.value > 0.0f && b.value > 0.0f)
-                return a.value * std::pow(b.value / a.value, t);
-            return a.value + (b.value - a.value) * t;
-        }
-    return points.back().value;
+    const auto onScale = logarithmic && std::all_of(points.begin(), points.end(), [](const MasterClip::Point& point) { return point.value > 0.0f; });
+    return static_cast<float>(engine::curveValueAt(
+        points, [](const MasterClip::Point& point) { return engine::CurveKnot { point.beats, point.value, point.shape, point.bend, point.handles }; },
+        beats, onScale));
 }
 
 void Studio::publishMasterClip()
@@ -3487,8 +3630,16 @@ void Studio::publishMasterClip()
             lane.field = target->field;
             lane.slot = target->slot;
             lane.logarithmic = logarithmicParameter(masterTrack(), binding);
-            for (const auto& point : points)
-                lane.points.push_back({ point.beats * secondsPerBeat, std::clamp(point.value, target->minimum, target->maximum), 0, 0.0f });
+            lane.minimum = target->minimum;
+            lane.maximum = target->maximum;
+            for (const auto& point : points) {
+                // Its handles' beats in seconds too.
+                auto handles = point.handles;
+                handles.inTime = static_cast<float>(handles.inTime * secondsPerBeat);
+                handles.outTime = static_cast<float>(handles.outTime * secondsPerBeat);
+                lane.points.push_back({ point.beats * secondsPerBeat, std::clamp(point.value, target->minimum, target->maximum), point.shape,
+                                        point.bend, handles });
+            }
             lane.clipStartSeconds = masterStartSeconds_;
             lane.clipLengthSeconds = clip->lengthBeats * secondsPerBeat;
             lane.clipLooping = clip->looping;
@@ -5395,6 +5546,7 @@ void Studio::tick()
 {
     engine_.pollPluginWorkers();
     followMasterClip();
+    followClipLanes();
     // A loop auditioned at the tempo keeps in step with the transport.
     engine_.followTempoPreview();
     if (opening_ != nullptr)
@@ -6217,7 +6369,7 @@ juce::Result Studio::flattenAudioClipComp(const TrackRef& track, const std::uint
 }
 
 juce::Result Studio::editAudioEvent(const TrackRef& track, const std::uint64_t clipId, const std::uint64_t eventId,
-                                    const app::AudioEditRequest& request)
+                                    const app::AudioEditRequest& request, const double sourceStart, const double sourceLength)
 {
     if (track.midi || track.master || !isValid(track))
         return juce::Result::fail(ui::Ls("Pas une piste audio", "Not an audio track"));
@@ -6234,15 +6386,55 @@ juce::Result Studio::editAudioEvent(const TrackRef& track, const std::uint64_t c
     (void) folder.createDirectory();
     const auto base = event->sourceFile.getFileNameWithoutExtension().upToLastOccurrenceOf(" ~", false, false);
     const auto destination = folder.getNonexistentChildFile(base + " ~" + juce::Time::getCurrentTime().formatted("%H%M%S"), ".wav", false);
-    // What it plays of its file, edited; the rest of the file as it is.
-    const auto rendered = app::AudioTrackController::renderAudioEdit(event->sourceFile, event->sourceOffsetSeconds,
-                                                                     event->sourceDurationSeconds, request, destination);
+    // What it plays of its file (or the part asked), edited; the rest of
+    // the file as it is.
+    const auto partial = sourceStart >= 0.0 && sourceLength > 0.0;
+    const auto rendered = app::AudioTrackController::renderAudioEdit(event->sourceFile, partial ? sourceStart : event->sourceOffsetSeconds,
+                                                                     partial ? sourceLength : event->sourceDurationSeconds, request,
+                                                                     destination);
     if (rendered.failed())
         return rendered;
     const auto committed = engine_.commitAudioClipEventEdit(track.audioIndex, clipId, eventId, destination);
     if (committed.failed()) {
         (void) destination.deleteFile();
         return committed;
+    }
+    dirty_ = true;
+    return juce::Result::ok();
+}
+
+juce::Result Studio::editLauncherAudioEvent(const TrackRef& track, const int scene, const std::uint64_t eventId,
+                                            const app::AudioEditRequest& request, const double sourceStart, const double sourceLength)
+{
+    if (track.midi || track.master || !isValid(track))
+        return juce::Result::fail(ui::Ls("Pas une piste audio", "Not an audio track"));
+    if (app::changesLength(request.operation))
+        return juce::Result::fail(ui::Ls("Un événement se raccourcit ou se coupe dans la vue des événements",
+                                         "An event is shortened or cut in the events view"));
+    const auto clip = engine_.launcherClip(track.audioIndex, scene);
+    if (!clip)
+        return juce::Result::fail(ui::Ls("Clip du lanceur introuvable", "No such launcher clip"));
+    auto events = clip->events;
+    const auto event = std::find_if(events.begin(), events.end(), [eventId](const auto& candidate) { return candidate.id == eventId; });
+    if (event == events.end())
+        return juce::Result::fail(ui::Ls("Événement introuvable", "No such event"));
+    auto folder = audioEditFolder();
+    (void) folder.createDirectory();
+    const auto base = event->sourceFile.getFileNameWithoutExtension().upToLastOccurrenceOf(" ~", false, false);
+    const auto destination = folder.getNonexistentChildFile(base + " ~" + juce::Time::getCurrentTime().formatted("%H%M%S"), ".wav", false);
+    // What it plays of its file (or the part asked), edited; the rest of
+    // the file as it is: its place in the file does not move.
+    const auto partial = sourceStart >= 0.0 && sourceLength > 0.0;
+    const auto rendered = app::AudioTrackController::renderAudioEdit(event->sourceFile, partial ? sourceStart : event->sourceOffsetSeconds,
+                                                                     partial ? sourceLength : event->sourceDurationSeconds, request,
+                                                                     destination);
+    if (rendered.failed())
+        return rendered;
+    event->sourceFile = destination;
+    const auto replaced = engine_.replaceLauncherClipEvents(track.audioIndex, scene, std::move(events));
+    if (replaced.failed()) {
+        (void) destination.deleteFile();
+        return replaced;
     }
     dirty_ = true;
     return juce::Result::ok();

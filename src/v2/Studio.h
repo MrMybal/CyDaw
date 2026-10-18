@@ -54,6 +54,13 @@ struct MasterClip {
     struct Point {
         double beats {};
         float value {};
+        // Its shape (engine::CurveShape), bend and handles (their time in
+        // beats).
+        int shape {};
+        float bend {};
+        engine::CurveHandles handles {};
+        // Its editor's (0: none yet, one is given when it is edited).
+        std::uint64_t id {};
     };
     // By binding (a master device's knob, or Studio::masterGainLane for its
     // level): points in time order, beats from the clip's start, in the
@@ -111,6 +118,10 @@ struct AudioTrackState {
     int laneHeight { 88 };
     bool automationVisible {};
     ParameterLanes parameterLanes;
+    // Runtime only: the launcher scene and the arrangement clips its clips'
+    // lanes were last published for.
+    int clipLaneScene { -1 };
+    double clipLaneSignature {};
     std::unique_ptr<GraphSlot> graph;
     // The value graph that modulates the track and its assignments, kept as
     // the project stores them.
@@ -265,8 +276,13 @@ public:
     juce::Result flattenAudioClipComp(const TrackRef& track, std::uint64_t clipId);
     // An event of a clip edited in place (normalize, gain, reverse... what
     // keeps its length): a new file, which the event then plays.
+    // `sourceStart` and `sourceLength` (seconds of its file) edit a part of
+    // what it plays; a negative start: all it plays.
     juce::Result editAudioEvent(const TrackRef& track, std::uint64_t clipId, std::uint64_t eventId,
-                                const app::AudioEditRequest& request);
+                                const app::AudioEditRequest& request, double sourceStart = -1.0, double sourceLength = 0.0);
+    // The same for an event of a launcher slot's audio clip.
+    juce::Result editLauncherAudioEvent(const TrackRef& track, int scene, std::uint64_t eventId, const app::AudioEditRequest& request,
+                                        double sourceStart = -1.0, double sourceLength = 0.0);
     // A stretch of a source copied, for paste.
     struct AudioClipboard {
         juce::File file;
@@ -964,6 +980,14 @@ public:
         bool logarithmic {};
     };
     [[nodiscard]] std::vector<MasterLaneChoice> masterLaneChoices() const;
+    // ---- A clip's own automation (an audio clip's lanes) ----
+    // Its volume over the fader (dB), its pan (-1..1), its devices' knobs.
+    static constexpr const char* clipVolumeLane = "volume";
+    static constexpr const char* clipPanLane = "pan";
+    [[nodiscard]] std::vector<MasterLaneChoice> clipLaneChoices(const TrackRef& track) const;
+    // Each tick: a clip with lanes that starts, stops or moves republishes
+    // its track's automation.
+    void followClipLanes();
     // Where a clip's lane stands at a place of it (in beats from its start):
     // the first point's value before it, the last one's after it.
     [[nodiscard]] static float masterLaneValueAt(const std::vector<MasterClip::Point>& points, double beats, bool logarithmic);

@@ -1039,6 +1039,8 @@ void AppUi::undo()
             if (auto* slot = studio_.graphFor(*state_.selectedTrack); slot != nullptr && slot->graph().editorUndo())
                 return;
     }
+    if (state_.focused == Panel::editor && clipEditor_->undoLauncherAudio(false))
+        return;
     if (state_.focused == Panel::editor && engine.canUndoMidiEdit()) {
         (void) engine.undoMidiEdit();
         return;
@@ -1070,6 +1072,8 @@ void AppUi::redo()
             if (auto* slot = studio_.graphFor(*state_.selectedTrack); slot != nullptr && slot->graph().editorRedo())
                 return;
     }
+    if (state_.focused == Panel::editor && clipEditor_->undoLauncherAudio(true))
+        return;
     if (state_.focused == Panel::editor && engine.canRedoMidiEdit()) {
         (void) engine.redoMidiEdit();
         return;
@@ -1128,6 +1132,9 @@ void AppUi::frame()
         }
     }
 
+    // The computer's keys a controllers' device listens to go to it first,
+    // and no further.
+    controllers_->pollKeys();
     // The computer's keys play the picked instrument track, before the
     // shortcuts can take them; not where letters are shortcuts of their own
     // (the graph, the workshop).
@@ -2393,8 +2400,8 @@ void AppUi::applyScriptedInput()
         io.AddMouseWheelEvent(static_cast<float>(static_cast<double>(event.getProperty("dx", 0.0))),
                               static_cast<float>(static_cast<double>(event.getProperty("dy", 0.0))));
     // Typing: {"type":"text","text":"1.5k"}; a key pressed and let go:
-    // {"type":"key","key":"enter"} (enter, escape, tab, backspace, ctrl, shift
-    // down with "down": true, up with false).
+    // {"type":"key","key":"enter"} (enter, escape, tab, backspace, delete,
+    // ctrl, shift, alt down with "down": true, up with false).
     else if (type == "text")
         io.AddInputCharactersUTF8(event.getProperty("text", juce::var()).toString().toRawUTF8());
     else if (type == "key") {
@@ -2403,8 +2410,10 @@ void AppUi::applyScriptedInput()
                          : name == "escape"    ? ImGuiKey_Escape
                          : name == "tab"       ? ImGuiKey_Tab
                          : name == "backspace" ? ImGuiKey_Backspace
+                         : name == "delete"    ? ImGuiKey_Delete
                          : name == "ctrl"      ? ImGuiMod_Ctrl
                          : name == "shift"     ? ImGuiMod_Shift
+                         : name == "alt"       ? ImGuiMod_Alt
                          : name.length() == 1 && name[0] >= 'a' && name[0] <= 'z'
                              ? static_cast<ImGuiKey>(ImGuiKey_A + (name[0] - 'a'))
                          : name.length() == 1 && name[0] >= '0' && name[0] <= '9'

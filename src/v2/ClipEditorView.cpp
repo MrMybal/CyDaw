@@ -104,7 +104,7 @@ int ClipEditorView::yToNote(const float y) const
 
 double ClipEditorView::snapBeat(const double beat) const
 {
-    if (ImGui::GetIO().KeyAlt || gridBeats_ <= 0.0)
+    if (!ui::snapping(state_.pianoRollSnap) || gridBeats_ <= 0.0)
         return beat;
     return std::round(beat / gridBeats_) * gridBeats_;
 }
@@ -137,12 +137,19 @@ void ClipEditorView::draw()
     }
     if (!state_.editedClip) {
         ui::emptyState(L("Aucun clip ouvert", "No clip open"),
-                       L("Double-cliquez un clip dans l'arrangement, ou une piste instrument vide pour en créer un.",
-                         "Double click a clip in the arrangement, or an empty instrument lane to create one."));
+                       L("Double-cliquez un clip de l'arrangement ou du lanceur, ou une piste instrument vide pour en créer un.",
+                         "Double click a clip of the arrangement or the launcher, or an empty instrument lane to create one."));
         return;
     }
     const auto ref = *state_.editedClip;
-    if (ref.track.midi) {
+    if (ref.launcherAudio()) {
+        const auto clip = engine.launcherClip(ref.track.audioIndex, ref.scene);
+        if (!studio_.isValid(ref.track) || !clip) {
+            state_.editedClip.reset();
+            return;
+        }
+        drawLauncherAudio(ref.track, ref.scene, *clip);
+    } else if (ref.track.midi) {
         const auto* clip = findMidiClip(engine, ref.track.midiId, ref.clipId);
         if (clip == nullptr) {
             state_.editedClip.reset();
@@ -192,12 +199,14 @@ void ClipEditorView::drawMidiToolbar(const TrackRef& track, const MidiClip& clip
     }
     ImGui::SameLine();
     auto looping = clip.looping;
-    if (ui::toggle(L("Boucle", "Loop"), &looping, p.accent)) {
+    if (ui::loopToggle("midiClipLoop", &looping, L("Boucle : le clip boucle", "Loop: the clip loops"))) {
         (void) engine.setMidiClipLooping(track.midiId, clip.id, looping);
         studio_.markDirty();
     }
 
     ui::toolbarSeparator();
+    (void) ui::snapToggle("pianoRollSnap", &state_.pianoRollSnap);
+    ImGui::SameLine(0.0f, dp(4.0f));
     ImGui::TextDisabled("%s", L("Grille", "Grid"));
     ImGui::SameLine();
     static constexpr double grids[] = { 1.0, 0.5, 0.25, 0.125, 1.0 / 3.0, 1.0 / 6.0, 0.0 };
@@ -275,6 +284,202 @@ void ClipEditorView::drawMidiToolbar(const TrackRef& track, const MidiClip& clip
     ImGui::TextDisabled("%d %s", static_cast<int>(clip.notes.size()), L("notes", "notes"));
 }
 
+std::optional<double> ClipEditorView::noteField(const char* id, const int field, const std::uint64_t note, const double current,
+                                                const float speed, const double minimum, const double maximum, const char* format,
+                                                const float width)
+{
+    auto value = editField_ == field && editNote_ == note ? editBuffer_ : current;
+    ImGui::SetNextItemWidth(width);
+    ImGui::DragScalar(id, ImGuiDataType_Double, &value, speed, &minimum, &maximum, format);
+    if (ImGui::IsItemDeactivatedAfterEdit()) {
+        editField_ = -1;
+        return std::clamp(value, minimum, maximum);
+    }
+    if (ImGui::IsItemActive()) {
+        editField_ = field;
+        editNote_ = note;
+        editBuffer_ = value;
+    } else if (editField_ == field && editNote_ == note) {
+        editField_ = -1;
+    }
+    return std::nullopt;
+}
+
+// Under the toolbar, its row always there (the roll does not move when a
+// note is picked): one note's values, typed or dragged; several, edited
+// together, each change one step of the history.
+void ClipEditorView::drawNoteBar(const TrackRef& track, const MidiClip& clip)
+{
+    const auto& p = theme::palette();
+    auto& engine = studio_.engine();
+    std::vector<MidiNote> picked;
+    for (const auto& note : clip.notes)
+        if (selection_.contains(note.id))
+            picked.push_back(note);
+    std::sort(picked.begin(), picked.end(), [](const MidiNote& a, const MidiNote& b) {
+        return a.startBeats < b.startBeats || (a.startBeats == b.startBeats && a.noteNumber < b.noteNumber);
+    });
+    ImGui::AlignTextToFramePadding();
+    if (picked.empty()) {
+        ImGui::TextDisabled("%s", L("Notes : choisissez-en (clic, cadre, Ctrl+A) pour lire et modifier leurs valeurs, plusieurs à la fois.",
+                                    "Notes: pick some (click, frame, Ctrl+A) to read and edit their values, several at once."));
+        return;
+    }
+    // Each picked note changed by `change` (it, its rank in time), as one
+    // step of the history.
+    const auto apply = [&](auto&& change) {
+        (void) engine.beginMidiEdit(track.midiId, clip.id);
+        for (std::size_t index = 0; index < picked.size(); ++index) {
+            auto note = picked[index];
+            change(note, index);
+            (void) engine.updateMidiNote(track.midiId, clip.id, note.id, std::clamp(note.noteNumber, 0, 127), std::max(0.0, note.startBeats),
+                                         std::max(1.0 / 64.0, note.durationBeats), std::clamp(note.velocity, 1.0f / 127.0f, 1.0f));
+        }
+        (void) engine.endMidiEdit();
+        studio_.markDirty();
+    };
+    if (picked.size() == 1) {
+        const auto note = picked.front();
+        ImGui::TextColored(theme::vec(p.textDim), "%s", L("Note", "Note"));
+        ImGui::SameLine();
+        if (const auto key = noteField("##noteKey", 0, note.id, note.noteNumber, 0.15f, 0.0, 127.0, "%.0f", dp(54.0f)))
+            apply([&](MidiNote& edited, std::size_t) { edited.noteNumber = static_cast<int>(std::lround(*key)); });
+        ui::tooltip(L("Sa hauteur (numéro MIDI) : glisser, ou Ctrl+clic pour la taper", "Its pitch (MIDI number): drag, or Ctrl+click to type it"));
+        ImGui::SameLine(0.0f, dp(4.0f));
+        ImGui::TextDisabled("%s", noteName(editField_ == 0 && editNote_ == note.id ? static_cast<int>(std::lround(editBuffer_)) : note.noteNumber).c_str());
+        ImGui::SameLine(0.0f, dp(12.0f));
+        ImGui::TextColored(theme::vec(p.textDim), "%s", L("Début", "Start"));
+        ImGui::SameLine();
+        if (const auto start = noteField("##noteStart", 1, note.id, note.startBeats, 0.01f, 0.0, 65'536.0, L("%.3f temps", "%.3f beats"), dp(100.0f)))
+            apply([&](MidiNote& edited, std::size_t) { edited.startBeats = *start; });
+        ImGui::SameLine(0.0f, dp(12.0f));
+        ImGui::TextColored(theme::vec(p.textDim), "%s", L("Durée", "Length"));
+        ImGui::SameLine();
+        if (const auto length = noteField("##noteLength", 2, note.id, note.durationBeats, 0.01f, 1.0 / 64.0, 4'096.0,
+                                          L("%.3f temps", "%.3f beats"), dp(100.0f)))
+            apply([&](MidiNote& edited, std::size_t) { edited.durationBeats = *length; });
+        ImGui::SameLine(0.0f, dp(12.0f));
+        ImGui::TextColored(theme::vec(p.textDim), "%s", L("Vélocité", "Velocity"));
+        ImGui::SameLine();
+        if (const auto velocity = noteField("##noteVelocity", 3, note.id, std::round(note.velocity * 127.0f), 0.5f, 1.0, 127.0, "%.0f", dp(60.0f)))
+            apply([&](MidiNote& edited, std::size_t) { edited.velocity = static_cast<float>(*velocity / 127.0); });
+        ui::tooltip(L("De 1 à 127 : glisser, ou Ctrl+clic pour la taper", "From 1 to 127: drag, or Ctrl+click to type it"));
+        return;
+    }
+
+    // Several: Bitwig's multi-edit.
+    ImGui::TextColored(theme::vec(p.textDim), "%d %s", static_cast<int>(picked.size()), L("notes", "notes"));
+    auto lowest = 127;
+    auto highest = 0;
+    auto meanVelocity = 0.0f;
+    for (const auto& note : picked) {
+        lowest = std::min(lowest, note.noteNumber);
+        highest = std::max(highest, note.noteNumber);
+        meanVelocity += note.velocity;
+    }
+    meanVelocity /= static_cast<float>(picked.size());
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s-%s", noteName(lowest).c_str(), noteName(highest).c_str());
+    ImGui::SameLine(0.0f, dp(10.0f));
+    // Moved together, applied when let go.
+    ImGui::SetNextItemWidth(dp(78.0f));
+    ImGui::DragInt("##pitchShift", &pitchShift_, 0.1f, -48, 48, L("hauteur %+d", "pitch %+d"));
+    ui::tooltip(L("Transpose toutes les notes (demi-tons) ; appliqué en lâchant", "Transposes every note (semitones); applied when let go"));
+    if (ImGui::IsItemDeactivatedAfterEdit() && pitchShift_ != 0) {
+        const auto shift = pitchShift_;
+        apply([shift](MidiNote& note, std::size_t) { note.noteNumber += shift; });
+        pitchShift_ = 0;
+    }
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(dp(86.0f));
+    ImGui::DragFloat("##startShift", &startShift_, 0.01f, -64.0f, 64.0f, L("début %+.2f", "start %+.2f"));
+    ui::tooltip(L("Déplace toutes les notes (temps) ; appliqué en lâchant", "Moves every note (beats); applied when let go"));
+    if (ImGui::IsItemDeactivatedAfterEdit() && std::abs(startShift_) > 1.0e-6f) {
+        const auto shift = static_cast<double>(startShift_);
+        apply([shift](MidiNote& note, std::size_t) { note.startBeats += shift; });
+        startShift_ = 0.0f;
+    }
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(dp(78.0f));
+    ImGui::DragFloat("##lengthScale", &lengthScale_, 0.005f, 0.05f, 8.0f, L("durée x%.2f", "length x%.2f"));
+    ui::tooltip(L("Allonge ou raccourcit toutes les notes ; appliqué en lâchant", "Lengthens or shortens every note; applied when let go"));
+    if (ImGui::IsItemDeactivatedAfterEdit() && std::abs(lengthScale_ - 1.0f) > 1.0e-4f) {
+        const auto scale = static_cast<double>(lengthScale_);
+        apply([scale](MidiNote& note, std::size_t) { note.durationBeats *= scale; });
+        lengthScale_ = 1.0f;
+    }
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(dp(70.0f));
+    ImGui::DragFloat("##velocityShift", &velocityShift_, 0.25f, -127.0f, 127.0f, L("vél. %+.0f", "vel. %+.0f"));
+    ui::tooltip(L("Monte ou baisse toutes les vélocités ; appliqué en lâchant", "Raises or lowers every velocity; applied when let go"));
+    if (ImGui::IsItemDeactivatedAfterEdit() && std::abs(velocityShift_) > 0.01f) {
+        const auto shift = velocityShift_ / 127.0f;
+        apply([shift](MidiNote& note, std::size_t) { note.velocity += shift; });
+        velocityShift_ = 0.0f;
+    }
+    ImGui::SameLine(0.0f, dp(10.0f));
+    // The velocities' spread around their middle.
+    ImGui::SetNextItemWidth(dp(56.0f));
+    ImGui::DragFloat("##velocityScale", &velocityScale_, 0.01f, 0.0f, 4.0f, "x%.2f");
+    ImGui::SameLine(0.0f, dp(2.0f));
+    if (ImGui::SmallButton(L("Écart vél.", "Vel. spread"))) {
+        const auto scale = velocityScale_;
+        apply([=](MidiNote& note, std::size_t) { note.velocity = meanVelocity + (note.velocity - meanVelocity) * scale; });
+    }
+    ui::tooltip(L("Écarte (x>1) ou resserre (x<1) les vélocités autour de leur milieu", "Spreads (x>1) or narrows (x<1) the velocities around their middle"));
+    ImGui::SameLine(0.0f, dp(8.0f));
+    ImGui::SetNextItemWidth(dp(48.0f));
+    ImGui::DragFloat("##velocityRandom", &velocityRandom_, 0.25f, 0.0f, 127.0f, "%.0f");
+    ImGui::SameLine(0.0f, dp(2.0f));
+    if (ImGui::SmallButton(L("Hasard vél.", "Random vel."))) {
+        auto& random = juce::Random::getSystemRandom();
+        const auto amount = velocityRandom_ / 127.0f;
+        apply([&random, amount](MidiNote& note, std::size_t) { note.velocity += (random.nextFloat() * 2.0f - 1.0f) * amount; });
+    }
+    ui::tooltip(L("Ajoute à chaque vélocité un écart au hasard (sur 127)", "Adds a random offset to each velocity (out of 127)"));
+    ImGui::SameLine(0.0f, dp(8.0f));
+    ImGui::SetNextItemWidth(dp(56.0f));
+    ImGui::DragFloat("##timingRandom", &timingRandom_, 0.25f, 0.0f, 200.0f, "%.0f ms");
+    ImGui::SameLine(0.0f, dp(2.0f));
+    if (ImGui::SmallButton(L("Hasard temps", "Random time"))) {
+        auto& random = juce::Random::getSystemRandom();
+        const auto beats = timingRandom_ / 1'000.0 / (60.0 / std::max(1.0, engine.tempo()));
+        apply([&random, beats](MidiNote& note, std::size_t) { note.startBeats += (random.nextDouble() * 2.0 - 1.0) * beats; });
+    }
+    ui::tooltip(L("Décale chaque note d'un écart au hasard (millisecondes)", "Moves each note by a random offset (milliseconds)"));
+    ImGui::SameLine(0.0f, dp(8.0f));
+    ImGui::SetNextItemWidth(dp(48.0f));
+    ImGui::DragFloat("##velocityTilt", &velocityTilt_, 0.25f, -127.0f, 127.0f, "%+.0f");
+    ImGui::SameLine(0.0f, dp(2.0f));
+    if (ImGui::SmallButton(L("Rampe", "Ramp"))) {
+        const auto first = picked.front().startBeats;
+        const auto span = std::max(1.0e-9, picked.back().startBeats - first);
+        const auto tilt = velocityTilt_ / 127.0f;
+        apply([=](MidiNote& note, std::size_t) {
+            note.velocity += tilt * static_cast<float>((note.startBeats - first) / span * 2.0 - 1.0);
+        });
+    }
+    ui::tooltip(L("Incline les vélocités : le début baisse, la fin monte (crescendo), ou l'inverse",
+                  "Tilts the velocities: the start goes down, the end up (crescendo), or the other way"));
+    ImGui::SameLine(0.0f, dp(8.0f));
+    if (ImGui::SmallButton(L("Inverser", "Flip")))
+        apply([=](MidiNote& note, std::size_t) { note.velocity = 2.0f * meanVelocity - note.velocity; });
+    ui::tooltip(L("Les fortes deviennent douces, autour de leur milieu", "Loud ones become soft, around their middle"));
+    ImGui::SameLine(0.0f, dp(4.0f));
+    if (ImGui::SmallButton("Legato")) {
+        // Each note held to the next one's start (chords: to the next
+        // start after theirs).
+        apply([&picked](MidiNote& note, std::size_t) {
+            for (const auto& other : picked)
+                if (other.startBeats > note.startBeats + 1.0e-6) {
+                    note.durationBeats = other.startBeats - note.startBeats;
+                    return;
+                }
+        });
+    }
+    ui::tooltip(L("Chaque note tenue jusqu'au début de la suivante", "Each note held until the next one starts"));
+}
+
 void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
 {
     const auto& p = theme::palette();
@@ -288,6 +493,7 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
         (void) engine.setLiveMidiTrack(track.midiId);
     }
     drawMidiToolbar(track, clip);
+    drawNoteBar(track, clip);
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
     ImGui::PushStyleColor(ImGuiCol_ChildBg, p.bg0);
@@ -647,7 +853,7 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
             selection_.erase(under->id);
             under = nullptr;
         } else {
-            const auto start = std::max(0.0, gridBeats_ > 0.0 && !io.KeyAlt ? std::floor(mouseBeat / gridBeats_) * gridBeats_ : mouseBeat);
+            const auto start = std::max(0.0, gridBeats_ > 0.0 && ui::snapping(state_.pianoRollSnap) ? std::floor(mouseBeat / gridBeats_) * gridBeats_ : mouseBeat);
             beginEdit();
             const auto id = engine.addMidiNote(track.midiId, clip.id, mouseNote, start, lastLength_, defaultVelocity_);
             endEdit();
@@ -1340,6 +1546,18 @@ void ClipEditorView::drawAudio(const TrackRef& track, const app::AudioTrackContr
     if (audio_ == nullptr)
         audio_ = std::make_unique<AudioEditorView>(studio_, state_, waveforms_, host_);
     audio_->draw(track, clip);
+}
+
+bool ClipEditorView::undoLauncherAudio(const bool redo)
+{
+    return audio_ != nullptr && state_.editedClip && state_.editedClip->launcherAudio() && audio_->undoLauncher(redo);
+}
+
+void ClipEditorView::drawLauncherAudio(const TrackRef& track, const int scene, const app::AudioTrackController::LauncherClip& clip)
+{
+    if (audio_ == nullptr)
+        audio_ = std::make_unique<AudioEditorView>(studio_, state_, waveforms_, host_);
+    audio_->drawLauncher(track, scene, clip);
 }
 
 } // namespace cydaw::v2

@@ -47,6 +47,7 @@ int windowFor(const StretchAlgorithm algorithm, const double rate) noexcept
 {
     const auto seconds = algorithm == StretchAlgorithm::beats     ? 0.043
                          : algorithm == StretchAlgorithm::texture ? 0.17
+                         : algorithm == StretchAlgorithm::complex ? 0.06
                                                                   : 0.085;
     auto size = 512;
     while (size < 32'768 && static_cast<double>(size) < rate * seconds)
@@ -65,20 +66,41 @@ void TimeStretcher::prepare(const StretchSettings& settings)
     settings_.sourceRate = std::max(1'000.0, settings_.sourceRate);
     settings_.outputRate = std::max(1'000.0, settings_.outputRate);
     const auto rates = settings_.sourceRate / settings_.outputRate;
+    const auto curved = settings_.algorithm != StretchAlgorithm::repitch && settings_.pitchCurve != nullptr
+                        && !settings_.pitchCurve->empty();
     if (settings_.algorithm == StretchAlgorithm::repitch) {
         direct_ = true;
         step_ = settings_.speed * rates;
-    } else if (std::abs(settings_.pitch - 1.0) < 1.0e-9 && std::abs(settings_.speed - 1.0) < 1.0e-9) {
+    } else if (!curved && std::abs(settings_.pitch - 1.0) < 1.0e-9 && std::abs(settings_.speed - 1.0) < 1.0e-9) {
         direct_ = true;
         step_ = rates;
     } else {
         direct_ = false;
         step_ = settings_.pitch * rates;
     }
+    // A pitch moving over time: the stretched frames each knot of the curve
+    // reaches, its steps added up (trapezoids).
+    reached_.clear();
+    auto fastest = step_;
+    if (curved && !direct_) {
+        const auto& semitones = *settings_.pitchCurve;
+        curveFrames_ = std::max(1.0, std::max(1.0e-4, settings_.pitchCurveSeconds) * settings_.outputRate);
+        const auto stepAt = [&](const std::size_t index) {
+            return step_ * std::pow(2.0, std::clamp(static_cast<double>(semitones[index]), -48.0, 48.0) / 12.0);
+        };
+        reached_.resize(semitones.size());
+        reached_[0] = 0.0;
+        for (std::size_t index = 1; index < semitones.size(); ++index)
+            reached_[index] = reached_[index - 1] + curveFrames_ * 0.5 * (stepAt(index - 1) + stepAt(index));
+        firstStep_ = stepAt(0);
+        lastStep_ = stepAt(semitones.size() - 1);
+        for (std::size_t index = 0; index < semitones.size(); ++index)
+            fastest = std::max(fastest, stepAt(index));
+    }
     copy_ = direct_ && std::abs(step_ - 1.0) < 1.0e-12 && settings_.sourceStart == std::floor(settings_.sourceStart);
     slices_ = !direct_ && settings_.algorithm == StretchAlgorithm::beats;
     // Read faster than the rate: the band above the new Nyquist goes first.
-    cutoff_ = step_ > 1.0 ? 0.97 / step_ : 0.97;
+    cutoff_ = fastest > 1.0 ? 0.97 / fastest : 0.97;
     reach_ = std::min(1'024, static_cast<int>(std::ceil(kernelZeroCrossings / cutoff_)) + 1);
     if (kernel_.empty()) {
         kernel_.resize(static_cast<std::size_t>(kernelZeroCrossings * kernelResolution + 2));
@@ -165,7 +187,7 @@ void TimeStretcher::restartAt(const std::int64_t intermediate)
         base_ = intermediate;
         complete_ = intermediate;
         sliceAt_ = intermediate;
-        sliceStart_ = settings_.sourceStart + static_cast<double>(intermediate) * settings_.speed / settings_.pitch;
+        sliceStart_ = sourceAtOutput(outputAt(static_cast<double>(intermediate)));
         sliceFadesIn_ = true;
         crossfading_ = false;
         nextSliceAt_ = -1;
@@ -176,6 +198,41 @@ void TimeStretcher::restartAt(const std::int64_t intermediate)
     nextFrame_ = floorDivide(intermediate - size_ / 2, hop_) + 1;
     base_ = nextFrame_ * hop_ - size_ / 2;
     complete_ = base_;
+}
+
+double TimeStretcher::intermediateAt(const double output) const noexcept
+{
+    if (reached_.empty())
+        return output * step_;
+    if (output <= 0.0)
+        return output * firstStep_;
+    const auto knot = output / curveFrames_;
+    const auto index = static_cast<std::size_t>(knot);
+    if (index + 1 >= reached_.size())
+        return reached_.back() + (output - static_cast<double>(reached_.size() - 1) * curveFrames_) * lastStep_;
+    const auto fraction = knot - static_cast<double>(index);
+    return reached_[index] + (reached_[index + 1] - reached_[index]) * fraction;
+}
+
+double TimeStretcher::outputAt(const double intermediate) const noexcept
+{
+    if (reached_.empty())
+        return intermediate / step_;
+    if (intermediate <= 0.0)
+        return intermediate / firstStep_;
+    if (intermediate >= reached_.back())
+        return static_cast<double>(reached_.size() - 1) * curveFrames_ + (intermediate - reached_.back()) / lastStep_;
+    const auto after = std::upper_bound(reached_.begin(), reached_.end(), intermediate);
+    const auto index = static_cast<std::size_t>(std::distance(reached_.begin(), after)) - 1;
+    const auto span = reached_[index + 1] - reached_[index];
+    const auto fraction = span > 0.0 ? (intermediate - reached_[index]) / span : 0.0;
+    return (static_cast<double>(index) + fraction) * curveFrames_;
+}
+
+double TimeStretcher::sourceAtOutput(const double output) const noexcept
+{
+    // Time goes on at the speed asked, whatever the pitch does.
+    return settings_.sourceStart + output * settings_.speed * settings_.sourceRate / settings_.outputRate;
 }
 
 void TimeStretcher::keepFrom(const std::int64_t intermediate)
@@ -337,14 +394,17 @@ double TimeStretcher::alignedCut(StretchSource& source, const double continuing,
 
 void TimeStretcher::layOutSlices(StretchSource& source, const std::int64_t to)
 {
-    const auto ratio = settings_.pitch / settings_.speed; // stretched frames per file frame of the layout
+    // Where a frame of the file lands in the stretched sound.
+    const auto landing = [this](const double file) {
+        return intermediateAt((file - settings_.sourceStart) / (settings_.speed * settings_.sourceRate / settings_.outputRate));
+    };
     const auto fadeIn = 32;
     const auto fadeOut = static_cast<std::int64_t>(std::max(16.0, settings_.sourceRate * 0.004));
     std::array<float*, 8> pointers {};
     while (complete_ < to) {
         if (nextSliceAt_ < 0) {
             nextSlice_ = nextAttack(source, sliceStart_);
-            nextSliceAt_ = static_cast<std::int64_t>(std::llround((nextSlice_ - settings_.sourceStart) * ratio));
+            nextSliceAt_ = static_cast<std::int64_t>(std::llround(landing(nextSlice_)));
             if (nextSliceAt_ <= sliceAt_)
                 nextSliceAt_ = sliceAt_ + 1;
             // A mere cut in a held sound: the next slice starts where its
@@ -419,7 +479,7 @@ void TimeStretcher::synthesiseFrame(StretchSource& source)
     const auto bins = size_ / 2;
     const auto channels = settings_.channels;
     const auto centre = nextFrame_ * hop_;
-    const auto sourceCentre = settings_.sourceStart + static_cast<double>(centre) * settings_.speed / settings_.pitch;
+    const auto sourceCentre = sourceAtOutput(outputAt(static_cast<double>(centre)));
     const auto start = static_cast<std::int64_t>(std::llround(sourceCentre)) - size_ / 2;
     std::array<float*, 8> pointers {};
     for (int channel = 0; channel < channels; ++channel)
@@ -448,8 +508,12 @@ void TimeStretcher::synthesiseFrame(StretchSource& source)
     for (int j = firstHigh; j < lastHigh; ++j)
         high += magnitude_[static_cast<std::size_t>(j)] * magnitude_[static_cast<std::size_t>(j)];
     const auto audible = high > 1.0e-7f * static_cast<float>(size_);
-    const auto attack = havePrevious_ && audible
-                        && high > (settings_.algorithm == StretchAlgorithm::beats ? 4.0f : 40.0f) * previousHighEnergy_;
+    // beats starts afresh at every attack, complex at clear ones, the
+    // others only at sudden bursts.
+    const auto attackRatio = settings_.algorithm == StretchAlgorithm::beats     ? 4.0f
+                             : settings_.algorithm == StretchAlgorithm::complex ? 8.0f
+                                                                                : 40.0f;
+    const auto attack = havePrevious_ && audible && high > attackRatio * previousHighEnergy_;
     const auto hop = static_cast<float>(hop_);
     if (settings_.algorithm == StretchAlgorithm::texture) {
         // Phases at random: no partial lines up with the last window.
@@ -563,14 +627,14 @@ void TimeStretcher::render(StretchSource& source, const std::int64_t position, c
     // Where in the stretched sound the block reads (direct: the file, from
     // the whole frame under sourceStart).
     const auto fraction = direct_ ? settings_.sourceStart - std::floor(settings_.sourceStart) : 0.0;
-    const auto x0 = static_cast<double>(position) * step_ + fraction;
-    const auto x1 = static_cast<double>(position + count - 1) * step_ + fraction;
+    const auto x0 = intermediateAt(static_cast<double>(position)) + fraction;
+    const auto x1 = intermediateAt(static_cast<double>(position + count - 1)) + fraction;
     const auto from = static_cast<std::int64_t>(std::floor(x0)) - reach_ - 1;
     const auto to = static_cast<std::int64_t>(std::ceil(x1)) + reach_ + 2;
     if (position != expected_ || from < base_)
         restartAt(from);
     ensureStretched(source, from, to);
-    const auto exact = std::abs(step_ - 1.0) < 1.0e-12 && fraction == 0.0;
+    const auto exact = reached_.empty() && std::abs(step_ - 1.0) < 1.0e-12 && fraction == 0.0;
     for (int channel = 0; channel < settings_.channels; ++channel) {
         auto* out = output[channel];
         if (exact) {
@@ -579,7 +643,7 @@ void TimeStretcher::render(StretchSource& source, const std::int64_t position, c
             continue;
         }
         for (int i = 0; i < count; ++i)
-            out[i] = sincAt(channel, static_cast<double>(position + i) * step_ + fraction - static_cast<double>(base_));
+            out[i] = sincAt(channel, intermediateAt(static_cast<double>(position + i)) + fraction - static_cast<double>(base_));
     }
     expected_ = position + count;
 }

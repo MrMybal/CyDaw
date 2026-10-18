@@ -248,13 +248,14 @@ void InspectorView::draw()
                 }
                 // Stretch.
                 auto tempo = static_cast<float>(clip->sourceTempoBpm);
-                const char* modes[] = { L("Repitch", "Repitch"), L("Tonal", "Tonal"), L("Rythmique", "Beats"), L("Texture", "Texture") };
+                const char* modes[] = { L("Vitesse", "Repitch"), L("Tonal", "Tonal"), L("Rythme", "Beats"),
+                                        L("Texture", "Texture"),  L("Brut", "Raw"),   L("Complexe", "Complex") };
                 auto mode = static_cast<int>(clip->stretchMode);
                 auto stretch = false;
                 row(L("Tempo src.", "Source BPM"));
                 stretch |= ImGui::DragFloat("##sourceTempo", &tempo, 0.1f, 0.0f, 300.0f, tempo > 0.0f ? "%.1f BPM" : L("non défini", "not set"));
                 row(L("Étirement", "Stretch"));
-                stretch |= ImGui::Combo("##mode", &mode, modes, 4);
+                stretch |= ImGui::Combo("##mode", &mode, modes, app::AudioTrackController::stretchModeCount);
                 if (stretch) {
                     (void) engine.setAudioClipStretchSettings(ref.track.audioIndex, ref.clipId, tempo,
                                                               static_cast<app::AudioTrackController::StretchMode>(mode));
@@ -300,6 +301,29 @@ void InspectorView::draw()
     } else if (state_.selectedClips.size() > 1) {
         ImGui::Separator();
         ImGui::TextDisabled("%d %s", static_cast<int>(state_.selectedClips.size()), L("clips sélectionnés", "clips selected"));
+    } else if (state_.selectedSlots.size() == 1 && !state_.selectedSlots.front().track.midi && studio_.isValid(state_.selectedSlots.front().track)) {
+        // An audio slot of the launcher: its clip.
+        const auto slot = state_.selectedSlots.front();
+        if (const auto clip = engine.launcherClip(slot.track.audioIndex, slot.scene)) {
+            ImGui::Separator();
+            ui::sectionTitle(L("CLIP AUDIO DU LANCEUR", "LAUNCHER AUDIO CLIP"));
+            ImGui::TextUnformatted((clip->name.isNotEmpty() ? clip->name : clip->sourceFile.getFileNameWithoutExtension()).toRawUTF8());
+            row(L("Scène", "Scene"));
+            ImGui::TextDisabled("%d", slot.scene + 1);
+            row(L("Durée", "Length"));
+            ImGui::TextDisabled("%.3f s", clip->durationSeconds);
+            row(L("Boucle", "Loop"));
+            ImGui::TextDisabled("%s", clip->looping ? L("oui", "yes") : L("non", "no"));
+            row(L("Sons", "Sounds"));
+            ImGui::TextDisabled("%d", static_cast<int>(clip->usesEventTimeline ? clip->events.size() : 1));
+            ImGui::PushTextWrapPos(0.0f);
+            ImGui::TextDisabled("%s", clip->sourceFile.getFullPathName().toRawUTF8());
+            ImGui::PopTextWrapPos();
+            if (ui::primaryButton(L("Ouvrir dans l'éditeur", "Open in the editor"), ImVec2(-1.0f, 0.0f))) {
+                state_.editedClip = ClipRef { slot.track, 0, slot.scene };
+                state_.bringToFront = Panel::editor;
+            }
+        }
     }
 
     // ---- Project --------------------------------------------------------------------

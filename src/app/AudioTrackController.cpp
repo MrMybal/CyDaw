@@ -21,18 +21,27 @@ namespace cydaw::app {
 namespace {
 constexpr double transportHorizonSeconds = 24.0 * 60.0 * 60.0;
 
-float shapedAutomationAmount(const float raw, const int curve,
-                             const float curveAmount) noexcept
+// Each lane's points as the shared curve reads them (engine/AutomationCurve.h).
+cydaw::engine::CurveKnot knotOf(const GainAutomationPoint& point) noexcept
 {
-    const auto amount = juce::jlimit(0.0f, 1.0f, raw);
-    if (curve == 0)
-        return amount;
-    // A bounded cubic bend.  It remains monotonic at the extrema and maps
-    // the editor's single Bezier handle to a realtime-safe interpolation.
-    return juce::jlimit(
-        0.0f, 1.0f,
-        amount + juce::jlimit(-1.0f, 1.0f, curveAmount)
-                     * 2.0f * amount * (1.0f - amount));
+    return { point.timeSeconds, point.valueDb, point.curve, point.curveAmount, point.handles };
+}
+
+cydaw::engine::CurveKnot knotOf(const PluginParameterAutomationPoint& point) noexcept
+{
+    return { point.timeSeconds, point.normalisedValue, point.curve, point.curveAmount, point.handles };
+}
+
+cydaw::engine::CurveKnot knotOf(const AudioTrackController::AutomationPoint& point) noexcept
+{
+    return { point.timeSeconds, point.valueDb, static_cast<int>(point.curve), point.curveAmount, point.handles };
+}
+
+template <typename Points>
+double laneValueAt(const Points& points, const double time, std::size_t* hint = nullptr)
+{
+    return cydaw::engine::curveValueAt(
+        points, [](const auto& point) { return knotOf(point); }, time, false, hint);
 }
 
 bool sameAutomation(
@@ -49,7 +58,8 @@ bool sameAutomation(
             || std::abs(left.timeSeconds - right.timeSeconds) > tolerance
             || std::abs(left.valueDb - right.valueDb) > 0.000001f
             || left.curve != right.curve
-            || std::abs(left.curveAmount - right.curveAmount) > 0.000001f)
+            || std::abs(left.curveAmount - right.curveAmount) > 0.000001f
+            || !(left.handles == right.handles))
             return false;
     }
     return true;
@@ -61,23 +71,7 @@ float automationValueAt(
 {
     if (points.empty())
         return 0.0f;
-    if (timeSeconds <= points.front().timeSeconds)
-        return points.front().valueDb;
-    for (std::size_t index = 1; index < points.size(); ++index) {
-        if (timeSeconds > points[index].timeSeconds)
-            continue;
-        const auto& first = points[index - 1];
-        const auto& second = points[index];
-        const auto raw = static_cast<float>(
-            (timeSeconds - first.timeSeconds)
-            / std::max(0.000001,
-                       second.timeSeconds - first.timeSeconds));
-        const auto amount = shapedAutomationAmount(
-            raw, static_cast<int>(first.curve), first.curveAmount);
-        return first.valueDb
-               + (second.valueDb - first.valueDb) * amount;
-    }
-    return points.back().valueDb;
+    return static_cast<float>(laneValueAt(points, timeSeconds));
 }
 
 void shiftAutomation(
@@ -86,6 +80,12 @@ void shiftAutomation(
 {
     for (auto& point : points)
         point.timeSeconds += deltaSeconds;
+}
+
+void shiftLanes(std::map<juce::String, std::vector<AudioTrackController::AutomationPoint>>& lanes, const double deltaSeconds)
+{
+    for (auto& [name, points] : lanes)
+        shiftAutomation(points, deltaSeconds);
 }
 
 bool sameAudioTakes(
@@ -124,6 +124,14 @@ bool sameStretchMarkers(
     return true;
 }
 
+bool sameLanes(const std::map<juce::String, std::vector<AudioTrackController::AutomationPoint>>& first,
+               const std::map<juce::String, std::vector<AudioTrackController::AutomationPoint>>& second)
+{
+    return first.size() == second.size()
+           && std::equal(first.begin(), first.end(), second.begin(),
+                         [](const auto& a, const auto& b) { return a.first == b.first && sameAutomation(a.second, b.second); });
+}
+
 bool sameAudioEvents(
     const std::vector<AudioTrackController::AudioEvent>& first,
     const std::vector<AudioTrackController::AudioEvent>& second)
@@ -149,6 +157,8 @@ bool sameAudioEvents(
             || std::abs(left.sourceTempoBpm - right.sourceTempoBpm) > tolerance
             || std::abs(left.gainDb - right.gainDb) > 0.000001f
             || left.stretchMode != right.stretchMode
+            || std::abs(left.pitchSemitones - right.pitchSemitones) > tolerance
+            || !sameLanes(left.lanes, right.lanes)
             || !sameStretchMarkers(left.stretchMarkers,
                                    right.stretchMarkers))
             return false;
@@ -286,6 +296,9 @@ bool sameArrangement(
                                    right.stretchMarkers)
             || !sameAudioEvents(left.events, right.events)
             || !sameAutomation(left.automation, right.automation)
+            || left.lanes.size() != right.lanes.size()
+            || !std::equal(left.lanes.begin(), left.lanes.end(), right.lanes.begin(),
+                           [](const auto& a, const auto& b) { return a.first == b.first && sameAutomation(a.second, b.second); })
             || std::abs(left.playStartSeconds
                         - right.playStartSeconds) > tolerance
             || std::abs(left.playEndSeconds
@@ -557,6 +570,14 @@ void GainPanAudioSource::setAutomation(
     std::shared_ptr<const std::vector<GainAutomationPoint>> automation)
 {
     automation_.store(std::move(automation));
+}
+
+void GainPanAudioSource::setPanAutomation(
+    std::shared_ptr<const std::vector<GainAutomationPoint>> lane)
+{
+    const auto on = lane != nullptr && !lane->empty();
+    panAutomation_.store(std::move(lane));
+    panAutomated_.store(on, std::memory_order_relaxed);
 }
 
 void GainPanAudioSource::setPluginAutomation(
@@ -923,7 +944,16 @@ void GainPanAudioSource::getNextAudioBlock(const juce::AudioSourceChannelInfo& b
     }
     nativeGraph_.setExtraInputs(routedInputs_.data() + 1, maximumBuses - 1);
     const auto gain = gain_.load(std::memory_order_relaxed);
-    const auto pan = pan_.load(std::memory_order_relaxed);
+    auto pan = pan_.load(std::memory_order_relaxed);
+    // A clip's pan lane: read once a block, on the volume lane's clock.
+    if (const auto lane = panAutomation_.read(); lane != nullptr && !lane->empty()
+                                                 && (transport_ != nullptr || timelinePosition_ != nullptr)) {
+        const auto time = modeTimeline_ != nullptr ? modeTimeline_->load(std::memory_order_relaxed)
+                          : transport_ != nullptr  ? transport_->getCurrentPosition()
+                                                   : timelinePosition_->load(std::memory_order_relaxed);
+        pan = juce::jlimit(-1.0f, 1.0f, static_cast<float>(laneValueAt(*lane, time)));
+        automatedPan_.store(pan, std::memory_order_relaxed);
+    }
     const auto channels = bufferToFill.buffer->getNumChannels();
     // The balance turns down the far side's speakers, whatever the format;
     // a mono track's is applied where the mixer spreads it.
@@ -986,27 +1016,7 @@ void GainPanAudioSource::getNextAudioBlock(const juce::AudioSourceChannelInfo& b
                                 || valueCount >= values.size())
                                 continue;
 
-                            auto pointIndex = std::size_t {};
-                            while (pointIndex + 1 < lane.points.size()
-                                   && lane.points[pointIndex + 1].timeSeconds <= blockStart)
-                                ++pointIndex;
-                            auto value = lane.points.front().normalisedValue;
-                            if (blockStart >= lane.points.back().timeSeconds) {
-                                value = lane.points.back().normalisedValue;
-                            } else if (blockStart > lane.points.front().timeSeconds
-                                       && pointIndex + 1 < lane.points.size()) {
-                                const auto& first = lane.points[pointIndex];
-                                const auto& second = lane.points[pointIndex + 1];
-                                const auto range = std::max(1.0e-9,
-                                                            second.timeSeconds - first.timeSeconds);
-                                const auto rawAmount = static_cast<float>(
-                                    (blockStart - first.timeSeconds) / range);
-                                const auto amount = shapedAutomationAmount(
-                                    rawAmount, first.curve,
-                                    first.curveAmount);
-                                value = first.normalisedValue
-                                        + (second.normalisedValue - first.normalisedValue) * amount;
-                            }
+                            const auto value = static_cast<float>(laneValueAt(lane.points, blockStart));
                             values[valueCount++] = { lane.parameterIndex,
                                                      juce::jlimit(0.0f, 1.0f, value) };
                         }
@@ -1063,22 +1073,8 @@ void GainPanAudioSource::getNextAudioBlock(const juce::AudioSourceChannelInfo& b
         std::size_t pointIndex = 0;
         for (int sample = 0; sample < bufferToFill.numSamples; ++sample) {
             const auto time = blockStart + static_cast<double>(sample) / sampleRate_;
-            while (pointIndex + 1 < automation->size()
-                   && (*automation)[pointIndex + 1].timeSeconds <= time)
-                ++pointIndex;
-
-            auto automationDb = automation->front().valueDb;
-            if (time >= automation->back().timeSeconds) {
-                automationDb = automation->back().valueDb;
-            } else if (time > automation->front().timeSeconds && pointIndex + 1 < automation->size()) {
-                const auto& first = (*automation)[pointIndex];
-                const auto& second = (*automation)[pointIndex + 1];
-                const auto range = std::max(1.0e-9, second.timeSeconds - first.timeSeconds);
-                const auto amount = shapedAutomationAmount(
-                    static_cast<float>((time - first.timeSeconds) / range),
-                    first.curve, first.curveAmount);
-                automationDb = first.valueDb + (second.valueDb - first.valueDb) * amount;
-            }
+            // A curve swinging past its points stays in the lane's range.
+            const auto automationDb = juce::jlimit(-60.0f, 12.0f, static_cast<float>(laneValueAt(*automation, time, &pointIndex)));
 
             const auto automationGain = juce::Decibels::decibelsToGain(automationDb, -60.0f);
             for (int channel = 0; channel < channels; ++channel)
@@ -1953,6 +1949,83 @@ void MasterOutputAudioSource::getNextAudioBlock(
 // TimeStretch.h), its channels converted into those it is asked for: a mono
 // file spreads on a stereo track, a 5.1 one folds onto it, each as
 // ChannelLayout.h says.
+namespace {
+
+// The stretcher a mode plays with: raw plays the file at its speed (a
+// repitch never sped up), the others their own.
+cydaw::engine::StretchAlgorithm algorithmFor(const AudioTrackController::StretchMode mode) noexcept
+{
+    using Mode = AudioTrackController::StretchMode;
+    using Algorithm = cydaw::engine::StretchAlgorithm;
+    switch (mode) {
+    case Mode::tonal: return Algorithm::tonal;
+    case Mode::beats: return Algorithm::beats;
+    case Mode::texture: return Algorithm::texture;
+    case Mode::complex: return Algorithm::complex;
+    default: return Algorithm::repitch;
+    }
+}
+
+// A sound's pitch lane as the stretcher reads it: its semitones every 5 ms
+// of the region from its start (none: no lane, or a mode whose pitch is its
+// speed's).
+std::shared_ptr<const std::vector<float>> soundPitchCurve(const AudioTrackController::AudioClip& clip, const double seconds)
+{
+    using Mode = AudioTrackController::StretchMode;
+    if (clip.stretchMode == Mode::repitch || clip.stretchMode == Mode::raw)
+        return {};
+    const auto lane = clip.soundLanes.find(AudioTrackController::soundPitchLane);
+    if (lane == clip.soundLanes.end() || lane->second.empty())
+        return {};
+    constexpr auto step = 0.005;
+    const auto count = std::min<std::size_t>(static_cast<std::size_t>(std::ceil(std::max(0.0, seconds) / step)) + 2, 8'000'000);
+    auto curve = std::make_shared<std::vector<float>>(count);
+    std::size_t hint {};
+    for (std::size_t index = 0; index < count; ++index)
+        (*curve)[index] = static_cast<float>(laneValueAt(lane->second, static_cast<double>(index) * step, &hint));
+    return curve;
+}
+
+// A sound's own volume and pan lanes over a block of it (`relative`: the
+// block's first frame from its region's start): the volume on every
+// channel, the pan as a balance of the first two.
+void applySoundLanes(juce::AudioBuffer<float>& buffer, const int channels, const int samples, const juce::int64 relative,
+                     const double rate, const AudioTrackController::AudioClip& clip) noexcept
+{
+    if (clip.soundLanes.empty() || samples <= 0 || rate <= 0.0)
+        return;
+    const auto volume = clip.soundLanes.find(AudioTrackController::soundVolumeLane);
+    const auto pan = clip.soundLanes.find(AudioTrackController::soundPanLane);
+    const auto* volumePoints = volume != clip.soundLanes.end() && !volume->second.empty() ? &volume->second : nullptr;
+    const auto* panPoints = pan != clip.soundLanes.end() && !pan->second.empty() && channels >= 2 ? &pan->second : nullptr;
+    if (volumePoints == nullptr && panPoints == nullptr)
+        return;
+    std::size_t volumeHint {};
+    std::size_t panHint {};
+    for (int sample = 0; sample < samples; ++sample) {
+        const auto seconds = static_cast<double>(relative + sample) / rate;
+        auto left = 1.0f;
+        auto right = 1.0f;
+        if (volumePoints != nullptr) {
+            const auto gain = juce::Decibels::decibelsToGain(
+                juce::jlimit(-60.0f, 12.0f, static_cast<float>(laneValueAt(*volumePoints, seconds, &volumeHint))), -60.0f);
+            left *= gain;
+            right *= gain;
+        }
+        if (panPoints != nullptr) {
+            const auto balance = juce::jlimit(-1.0f, 1.0f, static_cast<float>(laneValueAt(*panPoints, seconds, &panHint)));
+            if (balance > 0.0f)
+                left *= 1.0f - balance;
+            else
+                right *= 1.0f + balance;
+        }
+        for (int channel = 0; channel < channels; ++channel)
+            buffer.getWritePointer(channel)[sample] *= channel == 1 ? right : channel == 0 ? left : 0.5f * (left + right);
+    }
+}
+
+} // namespace
+
 class SegmentReaderSource final : public juce::PositionableAudioSource {
 public:
     explicit SegmentReaderSource(std::unique_ptr<juce::AudioFormatReader> reader)
@@ -1982,8 +2055,10 @@ public:
                           const bool shouldLoop,
                           const AudioTrackController::StretchMode stretchMode
                               = AudioTrackController::StretchMode::repitch,
-                          const double pitchSemitones = 0.0) noexcept
+                          const double pitchSemitones = 0.0,
+                          std::shared_ptr<const std::vector<float>> pitchCurve = {}) noexcept
     {
+        pitchCurve_.store(std::move(pitchCurve), std::memory_order_release);
         const auto sourceLengthSeconds = static_cast<double>(
             sourceLengthSamples_) / readerSampleRate_;
         const auto minimumSourceDuration = 1.0 / readerSampleRate_;
@@ -2059,13 +2134,18 @@ public:
         const auto shouldLoop = looping_.load(std::memory_order_acquire);
         // The stretcher follows the settings (made again when they change).
         cydaw::engine::StretchSettings settings;
-        settings.algorithm = static_cast<cydaw::engine::StretchAlgorithm>(stretchMode_.load(std::memory_order_acquire));
+        const auto mode = static_cast<AudioTrackController::StretchMode>(stretchMode_.load(std::memory_order_acquire));
+        settings.algorithm = algorithmFor(mode);
         settings.sourceRate = readerSampleRate_;
         settings.outputRate = std::max(1.0, outputSampleRate_.load(std::memory_order_acquire));
         settings.sourceStart = sourceOffsetSeconds_.load(std::memory_order_acquire) * readerSampleRate_;
-        settings.speed = sourceDurationSeconds_.load(std::memory_order_acquire)
-                         / std::max(0.001, timelineDurationSeconds_.load(std::memory_order_acquire));
+        // Raw: the file at its own speed, whatever the length.
+        settings.speed = mode == AudioTrackController::StretchMode::raw
+                             ? 1.0
+                             : sourceDurationSeconds_.load(std::memory_order_acquire)
+                                   / std::max(0.001, timelineDurationSeconds_.load(std::memory_order_acquire));
         settings.pitch = std::pow(2.0, pitchSemitones_.load(std::memory_order_acquire) / 12.0);
+        settings.pitchCurve = pitchCurve_.load(std::memory_order_acquire);
         settings.channels = fileChannels_;
         if (!stretcherReady_ || !(settings == stretcherSettings_)) {
             stretcher_.prepare(settings);
@@ -2179,6 +2259,8 @@ private:
         static_cast<int>(AudioTrackController::StretchMode::repitch)
     };
     std::atomic<double> pitchSemitones_ {};
+    // A sound's pitch lane, its semitones every 5 ms (soundPitchCurve).
+    std::atomic<std::shared_ptr<const std::vector<float>>> pitchCurve_;
     std::atomic<juce::int64> durationSamples_ { 1 };
     std::atomic<juce::int64> nextReadPosition_ {};
     std::atomic<juce::int64> samplesReadAhead_ {};
@@ -2590,14 +2672,15 @@ private:
                               const double sampleRate,
                               const AudioTrackController::StretchMode stretchMode
                                   = AudioTrackController::StretchMode::repitch,
-                              const double pitchSemitones = 0.0)
+                              const double pitchSemitones = 0.0,
+                              std::shared_ptr<const std::vector<float>> pitchCurve = {})
         {
             if (prepared)
                 buffer->releaseResources();
             segment->configureSeconds(sourceOffsetSeconds,
                                       sourceDurationSeconds,
                                       timelineDurationSeconds,
-                                      looping, stretchMode, pitchSemitones);
+                                      looping, stretchMode, pitchSemitones, std::move(pitchCurve));
             buffer->setNextReadPosition(0);
             if (prepared)
                 buffer->prepareToPlay(blockSize, sampleRate);
@@ -2656,7 +2739,8 @@ private:
                                   sourceDurationSeconds,
                                   timelineDurationSeconds,
                                   false, false, blockSize, sampleRate,
-                                  clip.stretchMode, clip.pitchSemitones);
+                                  clip.stretchMode, clip.pitchSemitones,
+                                  soundPitchCurve(clip, timelineDurationSeconds));
             if (prepared)
                 deck.prepare(blockSize, sampleRate);
         }
@@ -2998,6 +3082,7 @@ private:
                                 *= automationGain;
                     }
                 }
+                applySoundLanes(arrangementScratch_, channelCount, samplesToRead, relativePosition, sampleRate_, region->clip);
                 for (int channel = 0; channel < channelCount; ++channel)
                     output.buffer->addFrom(
                         channel,
@@ -3328,6 +3413,7 @@ void ClipAudioSource::renderLauncherPlan(
                             *= automationGain;
                 }
             }
+            applySoundLanes(arrangementScratch_, channels, samplesToRead, relative, sampleRate_, region->clip);
             for (auto channel = 0; channel < channels; ++channel)
                 output.buffer->addFrom(
                     channel,
@@ -4637,7 +4723,7 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
                 voiceModulation.indices[voiceModulation.count] = lane.index;
                 voiceModulation.depths[voiceModulation.count] = 0.0f;
                 voiceModulation.values[voiceModulation.count]
-                    = NativeDspRuntime::automationValueAt(lane.points, seconds, lane.logarithmic);
+                    = std::clamp(NativeDspRuntime::automationValueAt(lane.points, seconds, lane.logarithmic), lane.minimum, lane.maximum);
                 ++voiceModulation.count;
             }
         const auto routes = voiceModulations.read();
@@ -5940,6 +6026,8 @@ struct AudioTrackController::PlaybackTrack final {
     float filterCutoffHz { 20'000.0f };
     std::vector<AutomationPoint> automation;
     std::uint64_t nextAutomationId { 1 };
+    // Its clips' volume automation while they drive it (none: its own).
+    std::optional<std::vector<AutomationPoint>> clipVolume;
     std::vector<PluginAutomationLane> pluginAutomation;
     std::uint64_t nextPluginAutomationId { 1 };
     std::vector<AudioClip> audioClips;
@@ -6509,6 +6597,7 @@ juce::Result AudioTrackController::rebuildArrangementPlan(PlaybackTrack& track)
             render.pitchSemitones = event.pitchSemitones;
             render.stretchMarkers = event.stretchMarkers;
             render.eventGainDb = event.gainDb;
+            render.soundLanes = event.lanes;
             // Container automation remains expressed in clip-local time.
             // Rendering this event uses event-local time, so translate the
             // immutable render copy without touching the editor model.
@@ -6586,6 +6675,9 @@ juce::Result AudioTrackController::rebuildArrangementPlan(PlaybackTrack& track)
         const auto sourceEnd = clip.sourceOffsetSeconds
                                + clip.sourceDurationSeconds;
         for (const auto& marker : clip.stretchMarkers) {
+            // Raw: never stretched, its points (if any) left aside.
+            if (clip.stretchMode == StretchMode::raw)
+                break;
             if (marker.sourceSeconds <= previousSource + minimumDuration
                 || marker.sourceSeconds >= sourceEnd - minimumDuration
                 || marker.timelineSeconds <= previousTimeline + 0.0005
@@ -6658,6 +6750,7 @@ juce::Result AudioTrackController::rebuildArrangementPlan(PlaybackTrack& track)
                 segment.fadeInSeconds = from <= passage.from + 1.0e-9 ? passage.fadeIn : 0.0;
                 segment.fadeOutSeconds = to >= passage.to - 1.0e-9 ? passage.fadeOut : 0.0;
                 shiftAutomation(segment.automation, -from);
+                shiftLanes(segment.soundLanes, -from);
                 auto segmentReader = std::unique_ptr<juce::AudioFormatReader>(formatManager_.createReaderFor(file));
                 if (segmentReader == nullptr)
                     return juce::Result::fail(tr("error.openAudio", "file", file.getFileName()));
@@ -6713,9 +6806,11 @@ juce::Result AudioTrackController::rebuildLauncherPlans(PlaybackTrack& track)
             render.pitchSemitones = event.pitchSemitones;
             render.stretchMarkers = event.stretchMarkers;
             render.eventGainDb = event.gainDb;
+            render.soundLanes = event.lanes;
             render.automation = clip.automation;
             shiftAutomation(render.automation, -event.startSeconds);
-            if (event.stretchMarkers.empty()) {
+            // Raw: never stretched, its points (if any) left aside.
+            if (event.stretchMarkers.empty() || event.stretchMode == StretchMode::raw) {
                 prepared.push_back({ std::move(render),
                                      std::move(reader) });
                 continue;
@@ -6752,6 +6847,7 @@ juce::Result AudioTrackController::rebuildLauncherPlans(PlaybackTrack& track)
                                              ? render.fadeOutSeconds : 0.0;
                 shiftAutomation(segment.automation,
                                 -points[index - 1].timeline);
+                shiftLanes(segment.soundLanes, -points[index - 1].timeline);
                 auto segmentReader = index == 1
                                          ? std::move(reader)
                                          : std::unique_ptr<
@@ -8948,6 +9044,14 @@ bool AudioTrackController::setAudioClipEventProperties(
     event->gainDb = juce::jlimit(-60.0f, 24.0f, gainDb);
     event->sourceTempoBpm = juce::jlimit(0.0, 400.0, sourceTempoBpm);
     event->stretchMode = mode;
+    if (mode == StretchMode::raw) {
+        // Never stretched: as long as its part of the file, no stretch
+        // point left.
+        event->durationSeconds = std::max(0.001, event->sourceDurationSeconds);
+        event->stretchMarkers.clear();
+        event->fadeInSeconds = std::min(event->fadeInSeconds, event->durationSeconds * 0.5);
+        event->fadeOutSeconds = std::min(event->fadeOutSeconds, event->durationSeconds * 0.5);
+    }
     const auto wasPlaying = track->transportSource.isPlaying();
     if (wasPlaying)
         track->transportSource.stop();
@@ -9093,6 +9197,45 @@ AudioTrackController::audioClipAutomationPoints(
     const auto clip = audioClip(index, clipId);
     return clip.has_value() ? clip->automation
                             : std::vector<AutomationPoint> {};
+}
+
+bool AudioTrackController::setAudioClipLanes(
+    const std::size_t index, const std::uint64_t clipId,
+    std::map<juce::String, std::vector<AutomationPoint>> lanes)
+{
+    auto* track = findTrack(index);
+    if (track == nullptr)
+        return false;
+    auto clip = std::find_if(
+        track->audioClips.begin(), track->audioClips.end(),
+        [clipId](const auto& value) { return value.id == clipId; });
+    if (clip == track->audioClips.end())
+        return false;
+    auto previous = track->audioClips;
+    for (auto& [name, points] : lanes)
+        std::sort(points.begin(), points.end(), [](const auto& a, const auto& b) { return a.timeSeconds < b.timeSeconds; });
+    std::erase_if(lanes, [](const auto& lane) { return lane.second.empty(); });
+    clip->lanes = std::move(lanes);
+    recordArrangementEdit(*track, std::move(previous));
+    return true;
+}
+
+void AudioTrackController::setTrackClipAutomation(
+    const std::size_t index,
+    std::optional<std::vector<AutomationPoint>> volume,
+    std::vector<AutomationPoint> pan)
+{
+    auto* track = findTrack(index);
+    if (track == nullptr)
+        return;
+    track->clipVolume = std::move(volume);
+    publishTrackAutomation(*track);
+    std::sort(pan.begin(), pan.end(), [](const auto& a, const auto& b) { return a.timeSeconds < b.timeSeconds; });
+    auto lane = std::make_shared<std::vector<GainAutomationPoint>>();
+    for (const auto& point : pan)
+        lane->push_back({ point.timeSeconds, juce::jlimit(-1.0f, 1.0f, point.valueDb), static_cast<int>(point.curve), point.curveAmount,
+                          point.handles });
+    track->gainPanSource.setPanAutomation(std::move(lane));
 }
 
 bool AudioTrackController::setAudioClipTimelineBounds(
@@ -13350,6 +13493,39 @@ AudioTrackController::midiAutomationPoints(
     return {};
 }
 
+namespace {
+
+// A lane's points made ready to keep: ids unique (0 or taken: a fresh one),
+// times and values in range, in time order.
+template <typename Point, typename Value>
+void tidyLane(std::vector<Point>& points, std::uint64_t& nextId, const double length, Value&& value)
+{
+    std::unordered_set<std::uint64_t> seen;
+    for (auto& point : points) {
+        if (point.id == 0 || seen.contains(point.id))
+            point.id = nextId++;
+        seen.insert(point.id);
+        nextId = std::max(nextId, point.id + 1);
+        point.timeSeconds = juce::jlimit(0.0, std::max(0.001, length), point.timeSeconds);
+        value(point);
+        point.curveAmount = juce::jlimit(-1.0f, 1.0f, point.curveAmount);
+    }
+    std::stable_sort(points.begin(), points.end(), [](const auto& a, const auto& b) { return a.timeSeconds < b.timeSeconds; });
+}
+
+} // namespace
+
+void AudioTrackController::replaceMidiAutomationPoints(const std::uint64_t trackId, std::vector<AutomationPoint> points)
+{
+    auto* track = findMidiTrack(trackId);
+    if (track == nullptr)
+        return;
+    tidyLane(points, track->nextAutomationId, std::max(track->synth.length(), length()),
+             [](AutomationPoint& point) { point.valueDb = juce::jlimit(-60.0f, 12.0f, point.valueDb); });
+    track->automation = std::move(points);
+    publishMidiTrackAutomation(*track);
+}
+
 std::uint64_t AudioTrackController::addMidiClipAutomationPoint(
     const std::uint64_t trackId, const std::uint64_t clipId,
     const double timeSeconds, const float valueDb)
@@ -14080,6 +14256,46 @@ AudioTrackController::automationPoints(const std::size_t trackIndex) const
     return {};
 }
 
+void AudioTrackController::replaceAutomationPoints(const std::size_t trackIndex, std::vector<AutomationPoint> points)
+{
+    auto* track = findTrack(trackIndex);
+    if (track == nullptr)
+        return;
+    tidyLane(points, track->nextAutomationId, track->clipSource->arrangementLengthSeconds(),
+             [](AutomationPoint& point) { point.valueDb = juce::jlimit(-60.0f, 12.0f, point.valueDb); });
+    track->automation = std::move(points);
+    publishTrackAutomation(*track);
+}
+
+void AudioTrackController::replacePluginAutomationPoints(const std::size_t trackIndex, const std::size_t pluginIndex,
+                                                         const std::uint32_t parameterIndex, juce::String parameterName,
+                                                         std::vector<PluginAutomationPoint> points)
+{
+    auto* track = findTrack(trackIndex);
+    if (track == nullptr || pluginIndex >= track->gainPanSource.pluginCount())
+        return;
+    auto lane = std::find_if(track->pluginAutomation.begin(), track->pluginAutomation.end(),
+                             [pluginIndex, parameterIndex](const auto& candidate) {
+                                 return candidate.pluginIndex == pluginIndex && candidate.parameterIndex == parameterIndex;
+                             });
+    if (points.empty()) {
+        if (lane != track->pluginAutomation.end())
+            track->pluginAutomation.erase(lane);
+        publishTrackPluginAutomation(*track);
+        return;
+    }
+    if (lane == track->pluginAutomation.end()) {
+        track->pluginAutomation.push_back({ pluginIndex, parameterIndex, std::move(parameterName), {} });
+        lane = std::prev(track->pluginAutomation.end());
+    } else if (parameterName.isNotEmpty()) {
+        lane->parameterName = std::move(parameterName);
+    }
+    tidyLane(points, track->nextPluginAutomationId, track->clipSource->arrangementLengthSeconds(),
+             [](PluginAutomationPoint& point) { point.normalisedValue = juce::jlimit(0.0f, 1.0f, point.normalisedValue); });
+    lane->points = std::move(points);
+    publishTrackPluginAutomation(*track);
+}
+
 std::uint64_t AudioTrackController::addPluginAutomationPoint(
     const std::size_t trackIndex,
     const std::size_t pluginIndex,
@@ -14606,6 +14822,14 @@ bool AudioTrackController::setLauncherClipEventProperties(
     event->gainDb = juce::jlimit(-60.0f, 24.0f, gainDb);
     event->sourceTempoBpm = juce::jlimit(0.0, 400.0, sourceTempoBpm);
     event->stretchMode = mode;
+    if (mode == StretchMode::raw) {
+        // Never stretched: as long as its part of the file, no stretch
+        // point left.
+        event->durationSeconds = std::max(0.001, event->sourceDurationSeconds);
+        event->stretchMarkers.clear();
+        event->fadeInSeconds = std::min(event->fadeInSeconds, event->durationSeconds * 0.5);
+        event->fadeOutSeconds = std::min(event->fadeOutSeconds, event->durationSeconds * 0.5);
+    }
     if (rebuildLauncherPlans(*track).failed()) {
         track->launcherClips = previous;
         (void) rebuildLauncherPlans(*track);
@@ -15005,6 +15229,55 @@ bool AudioTrackController::clearLauncherClip(const std::size_t trackIndex,
         track->clipSource->clearLauncherClip();
     }
     track->clipSource->clearLauncherSceneSource(sceneIndex);
+    return true;
+}
+
+bool AudioTrackController::setLauncherClipLanes(
+    const std::size_t trackIndex, const int sceneIndex,
+    std::map<juce::String, std::vector<AutomationPoint>> lanes)
+{
+    auto* track = findTrack(trackIndex);
+    if (track == nullptr)
+        return false;
+    auto clip = std::find_if(track->launcherClips.begin(), track->launcherClips.end(),
+                             [sceneIndex](const auto& value) { return value.sceneIndex == sceneIndex; });
+    if (clip == track->launcherClips.end())
+        return false;
+    for (auto& [name, points] : lanes)
+        std::sort(points.begin(), points.end(), [](const auto& a, const auto& b) { return a.timeSeconds < b.timeSeconds; });
+    std::erase_if(lanes, [](const auto& lane) { return lane.second.empty(); });
+    clip->lanes = std::move(lanes);
+    return true;
+}
+
+bool AudioTrackController::restoreLauncherClip(const std::size_t trackIndex,
+                                               const LauncherClip& clip)
+{
+    auto* track = findTrack(trackIndex);
+    if (track == nullptr || clip.sceneIndex < 0
+        || clip.sceneIndex >= maximumLauncherScenes)
+        return false;
+    const auto previous = track->launcherClips;
+    auto slot = std::find_if(track->launcherClips.begin(),
+                             track->launcherClips.end(),
+                             [&clip](const auto& candidate) {
+                                 return candidate.sceneIndex == clip.sceneIndex;
+                             });
+    if (slot == track->launcherClips.end())
+        slot = track->launcherClips.insert(track->launcherClips.end(), clip);
+    else
+        *slot = clip;
+    for (const auto& event : slot->events) {
+        nextAudioEventId_ = std::max(nextAudioEventId_, event.id + 1);
+        for (const auto& marker : event.stretchMarkers)
+            nextStretchMarkerId_ = std::max(nextStretchMarkerId_, marker.id + 1);
+    }
+    normaliseLauncherClipTimeline(*slot);
+    if (rebuildLauncherPlans(*track).failed()) {
+        track->launcherClips = previous;
+        (void) rebuildLauncherPlans(*track);
+        return false;
+    }
     return true;
 }
 
@@ -16288,7 +16561,7 @@ void AudioTrackController::publishMidiTrackAutomation(
     for (const auto& point : track.automation)
         published->push_back({ point.timeSeconds, point.valueDb,
                                static_cast<int>(point.curve),
-                               point.curveAmount });
+                               point.curveAmount, point.handles });
     track.gainPanSource.setAutomation(std::move(published));
 }
 
@@ -16301,7 +16574,7 @@ void AudioTrackController::publishMidiClipAutomation(
     for (const auto& point : clip.automation)
         published->push_back({ point.timeSeconds, point.valueDb,
                                static_cast<int>(point.curve),
-                               point.curveAmount });
+                               point.curveAmount, point.handles });
     std::sort(published->begin(), published->end(),
               [](const auto& first, const auto& second) {
                   return first.timeSeconds < second.timeSeconds;
@@ -16360,12 +16633,14 @@ void AudioTrackController::publishTrackAutomation(PlaybackTrack& track)
     std::sort(track.automation.begin(), track.automation.end(), [](const auto& first, const auto& second) {
         return first.timeSeconds < second.timeSeconds;
     });
+    // Its clips' volume lanes, when they drive it, in place of its own.
+    const auto& points = track.clipVolume ? *track.clipVolume : track.automation;
     auto published = std::make_shared<std::vector<GainAutomationPoint>>();
-    published->reserve(track.automation.size());
-    for (const auto& point : track.automation)
+    published->reserve(points.size());
+    for (const auto& point : points)
         published->push_back({ point.timeSeconds, point.valueDb,
                                static_cast<int>(point.curve),
-                               point.curveAmount });
+                               point.curveAmount, point.handles });
     track.gainPanSource.setAutomation(std::move(published));
 }
 
@@ -16385,7 +16660,7 @@ void AudioTrackController::publishTrackPluginAutomation(PlaybackTrack& track)
             publishedLane.points.push_back({ point.timeSeconds,
                                               point.normalisedValue,
                                               static_cast<int>(point.curve),
-                                              point.curveAmount });
+                                              point.curveAmount, point.handles });
         published->push_back(std::move(publishedLane));
     }
     track.gainPanSource.setPluginAutomation(std::move(published));

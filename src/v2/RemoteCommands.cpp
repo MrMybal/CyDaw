@@ -756,8 +756,7 @@ private:
                 set(entry, "looping", clip.looping);
                 set(entry, "sourceDuration", clip.sourceDurationSeconds);
                 set(entry, "source", clip.sourceFile.getFullPathName());
-                static const char* modes[] = { "repitch", "tonal", "beats", "texture" };
-                set(entry, "stretchMode", juce::String(modes[std::clamp(static_cast<int>(clip.stretchMode), 0, 3)]));
+                set(entry, "stretchMode", stretchModeName(clip.stretchMode));
                 set(entry, "sourceTempo", clip.sourceTempoBpm);
                 set(entry, "pitch", clip.pitchSemitones);
                 set(entry, "takes", static_cast<int>(clip.takes.size()));
@@ -767,9 +766,73 @@ private:
                 set(entry, "version", static_cast<int>(clip.version));
                 clips.add(entry);
             }
+        // The launcher's slots, by their scene.
+        juce::Array<juce::var> launcher;
+        for (const auto& clip : engine_.launcherClips(index)) {
+            auto entry = object();
+            set(entry, "scene", clip.sceneIndex);
+            set(entry, "name", clip.name);
+            set(entry, "duration", clip.durationSeconds);
+            set(entry, "offset", clip.sourceOffsetSeconds);
+            set(entry, "looping", clip.looping);
+            set(entry, "loopStart", clip.loopStartSeconds);
+            set(entry, "loopEnd", clip.loopEndSeconds);
+            set(entry, "source", clip.sourceFile.getFullPathName());
+            set(entry, "events", static_cast<int>(clip.usesEventTimeline ? clip.events.size() : 1));
+            set(entry, "usesEvents", clip.usesEventTimeline);
+            auto points = 0;
+            for (const auto& event : clip.events)
+                points += static_cast<int>(event.stretchMarkers.size());
+            set(entry, "stretchPoints", points);
+            set(entry, "playStart", clip.playStartSeconds);
+            set(entry, "playEnd", clip.playEndSeconds);
+            // Its sounds: their ids (clip_lanes event), modes and own lanes.
+            juce::Array<juce::var> sounds;
+            for (const auto& event : clip.events) {
+                auto sound = object();
+                set(sound, "id", idOf(event.id));
+                set(sound, "name", event.name);
+                set(sound, "start", event.startSeconds);
+                set(sound, "duration", event.durationSeconds);
+                set(sound, "stretchMode", stretchModeName(event.stretchMode));
+                if (!event.lanes.empty())
+                    set(sound, "lanes", lanesToVar(event.lanes));
+                sounds.add(sound);
+            }
+            set(entry, "sounds", sounds);
+            launcher.add(entry);
+        }
         auto result = object();
         set(result, "clips", clips);
+        set(result, "launcherClips", launcher);
         return result;
+    }
+
+    // The playing modes by name, and back (anything else: `fallback`).
+    static juce::String stretchModeName(const Engine::StretchMode mode)
+    {
+        static const char* const names[] = { "repitch", "tonal", "beats", "texture", "raw", "complex" };
+        return names[std::clamp(static_cast<int>(mode), 0, Engine::stretchModeCount - 1)];
+    }
+    static Engine::StretchMode stretchModeNamed(const juce::String& text, const Engine::StretchMode fallback)
+    {
+        const auto name = text.trim().toLowerCase();
+        for (auto mode = 0; mode < Engine::stretchModeCount; ++mode)
+            if (name == stretchModeName(static_cast<Engine::StretchMode>(mode)))
+                return static_cast<Engine::StretchMode>(mode);
+        return fallback;
+    }
+    // Lanes as {name: [[seconds, value], ...]}.
+    static juce::var lanesToVar(const std::map<juce::String, std::vector<Engine::AutomationPoint>>& lanes)
+    {
+        auto shown = object();
+        for (const auto& [name, points] : lanes) {
+            juce::Array<juce::var> list;
+            for (const auto& point : points)
+                list.add(juce::Array<juce::var> { point.timeSeconds, static_cast<double>(point.valueDb) });
+            set(shown, name.toRawUTF8(), list);
+        }
+        return shown;
     }
 
     [[nodiscard]] juce::var describeAutomation(const RemoteTrack& track) const
@@ -780,11 +843,54 @@ private:
             set(entry, "id", idOf(point.id));
             set(entry, "time", point.timeSeconds);
             set(entry, "valueDb", point.valueDb);
+            describeShape(entry, point);
             entries.add(entry);
         }
         auto result = object();
         set(result, "points", entries);
         return result;
+    }
+
+    // A point's shape when it has one: shape (0 straight, 1 bent, 2 a
+    // B-spline's, 3 a Bezier one with one tangent, 4 with two), bend, and
+    // handles [inTime, inValue, outTime, outValue].
+    static void describeShape(juce::var& entry, const Studio::AutomationPoint& point)
+    {
+        if (point.curve != Studio::AutomationCurve::linear) {
+            set(entry, "shape", static_cast<int>(point.curve));
+            set(entry, "bend", point.curveAmount);
+        }
+        if (point.handles != engine::CurveHandles {}) {
+            juce::Array<juce::var> handles;
+            for (const auto value : { point.handles.inTime, point.handles.inValue, point.handles.outTime, point.handles.outValue })
+                handles.add(static_cast<double>(value));
+            set(entry, "handles", handles);
+        }
+    }
+
+    // The shapes a request's points asked for, put on the points just added.
+    void applyShapes(const TrackRef& ref, const juce::String& lane, const std::vector<std::pair<std::uint64_t, juce::var>>& shaped)
+    {
+        if (shaped.empty())
+            return;
+        auto points = studio_.lanePoints(ref, lane);
+        for (auto& point : points)
+            for (const auto& [id, spec] : shaped)
+                if (point.id == id) {
+                    if (spec.hasProperty("shape"))
+                        point.curve = static_cast<Studio::AutomationCurve>(engine::clampedCurveShape(static_cast<int>(spec.getProperty("shape", 0))));
+                    if (spec.hasProperty("bend"))
+                        point.curveAmount = juce::jlimit(-1.0f, 1.0f, static_cast<float>(static_cast<double>(spec.getProperty("bend", 0.0))));
+                    if (const auto* handles = spec.getProperty("handles", juce::var()).getArray(); handles != nullptr && handles->size() >= 4)
+                        point.handles = { static_cast<float>(static_cast<double>((*handles)[0])), static_cast<float>(static_cast<double>((*handles)[1])),
+                                          static_cast<float>(static_cast<double>((*handles)[2])), static_cast<float>(static_cast<double>((*handles)[3])) };
+                }
+        studio_.setLanePoints(ref, lane, points);
+    }
+
+    [[nodiscard]] static bool asksShape(const juce::var& point)
+    {
+        return point.hasProperty("shape") || point.hasProperty("handles") || point.hasProperty("bend");
     }
 
     // ---- The commands -------------------------------------------------------------------
@@ -834,6 +940,7 @@ private:
     juce::var onEditNotes();
     juce::var onRemoveClip();
     juce::var onAudioClips();
+    juce::var onClipLanes();
     juce::var onAutomation();
     juce::var onModulate();
     juce::var onLaunchScene();
@@ -1722,6 +1829,8 @@ juce::var Commands::run()
     if (command == "list_audio_clips" || command == "add_audio_clip" || command == "move_audio_clip"
         || command == "duplicate_audio_clip")
         return onAudioClips();
+    if (command == "clip_lanes")
+        return onClipLanes();
     if (command == "list_automation" || command == "add_automation" || command == "clear_automation")
         return onAutomation();
     if (command == "modulate" || command == "remove_modulation")
@@ -2036,6 +2145,16 @@ juce::var Commands::onSetView()
         const auto face = text("face").trim().toLowerCase();
         ui_.editClip(track->ref(), idFrom(request_.getProperty("clipId", {})),
                      face == "takes" ? 1 : face == "stretch" ? 2 : face == "events" ? 3 : 0);
+    }
+    // "launcherScene" (with "track"): an audio track's launcher clip in the editor.
+    if (has("launcherScene")) {
+        std::optional<RemoteTrack> track;
+        if (auto error = trackOrFail(track); !error.isVoid())
+            return error;
+        const auto scene = static_cast<int>(number("launcherScene", 0.0));
+        if (track->ref().midi || !engine_.launcherClip(track->ref().audioIndex, scene))
+            return fail("no audio launcher clip in that slot");
+        ui_.editLauncherClip(track->ref(), scene);
     }
     if (has("device") && !ui_.showDeviceEditor(static_cast<std::uint64_t>(number("device", 0.0)),
                                                 static_cast<int>(number("pane", -1.0)), flag("detached", false)))
@@ -4990,6 +5109,111 @@ juce::var Commands::onNodes()
 
 // ---- Audio clips and automation ------------------------------------------------------------------
 
+juce::var Commands::onClipLanes()
+{
+    // clip_lanes {track, scene | clipId, event?, lanes?: {name: [[seconds, value], ...]}}:
+    // an audio clip's automation lanes ("volume" dB, "pan" -1..1, a card's
+    // knob by its binding), read, or set lane by lane (an empty list removes
+    // one); seconds of the clip's content. With event (a sound's id,
+    // audio_events / list_audio_clips give them): that sound's own lanes
+    // ("volume" dB, "pan" -1..1, "pitch" semitones), in its own seconds.
+    std::optional<RemoteTrack> track;
+    if (auto error = trackOrFail(track); !error.isVoid())
+        return error;
+    if (track->midi)
+        return fail("clip lanes are on audio clips");
+    const auto index = track->index;
+    const auto launcher = has("scene");
+    const auto scene = static_cast<int>(number("scene", -1.0));
+    const auto clipId = idFrom(request_.getProperty("clipId", juce::var()));
+    std::map<juce::String, std::vector<Engine::AutomationPoint>> lanes;
+    if (has("event")) {
+        // A sound's own lanes.
+        const auto eventId = idFrom(request_.getProperty("event", juce::var()));
+        std::vector<Engine::AudioEvent> events;
+        if (launcher) {
+            const auto clip = engine_.launcherClip(index, scene);
+            if (!clip)
+                return fail("no launcher clip in that slot");
+            events = clip->events;
+        } else {
+            events = engine_.audioClipEvents(index, clipId);
+        }
+        auto sound = std::find_if(events.begin(), events.end(), [eventId](const auto& e) { return e.id == eventId; });
+        if (sound == events.end())
+            return fail("no sound " + idOf(eventId).toString() + " in that clip (a clip of one sound gets its sounds when edited)");
+        if (const auto* given = request_.getProperty("lanes", juce::var()).getDynamicObject()) {
+            for (const auto& property : given->getProperties()) {
+                std::vector<Engine::AutomationPoint> points;
+                std::uint64_t id = 1;
+                if (const auto* list = property.value.getArray())
+                    for (const auto& pair : *list)
+                        if (const auto* values = pair.getArray(); values != nullptr && values->size() >= 2)
+                            points.push_back({ id++, static_cast<double>((*values)[0]), static_cast<float>(static_cast<double>((*values)[1])) });
+                if (points.empty())
+                    sound->lanes.erase(property.name.toString());
+                else
+                    sound->lanes[property.name.toString()] = std::move(points);
+            }
+            const auto kept = sound->lanes;
+            const auto done = launcher ? engine_.replaceLauncherClipEvents(index, scene, std::move(events))
+                                       : engine_.replaceAudioClipEvents(index, clipId, std::move(events));
+            if (done.failed())
+                return fail(done.getErrorMessage());
+            studio_.markDirty();
+            auto result = object();
+            set(result, "lanes", lanesToVar(kept));
+            return ok(result);
+        }
+        auto result = object();
+        set(result, "lanes", lanesToVar(sound->lanes));
+        return ok(result);
+    }
+    if (launcher) {
+        const auto clip = engine_.launcherClip(index, scene);
+        if (!clip)
+            return fail("no launcher clip in that slot");
+        lanes = clip->lanes;
+    } else {
+        const auto* clips = engine_.audioClipsView(index);
+        if (clips == nullptr)
+            return fail("no audio clips on that track");
+        const auto found = std::find_if(clips->begin(), clips->end(), [clipId](const auto& c) { return c.id == clipId; });
+        if (found == clips->end())
+            return fail("no audio clip " + idOf(clipId).toString() + "; list_audio_clips gives them");
+        lanes = found->lanes;
+    }
+    if (const auto* given = request_.getProperty("lanes", juce::var()).getDynamicObject()) {
+        for (const auto& property : given->getProperties()) {
+            std::vector<Engine::AutomationPoint> points;
+            std::uint64_t id = 1;
+            if (const auto* list = property.value.getArray())
+                for (const auto& pair : *list)
+                    if (const auto* values = pair.getArray(); values != nullptr && values->size() >= 2)
+                        points.push_back({ id++, static_cast<double>((*values)[0]), static_cast<float>(static_cast<double>((*values)[1])) });
+            if (points.empty())
+                lanes.erase(property.name.toString());
+            else
+                lanes[property.name.toString()] = std::move(points);
+        }
+        const auto done = launcher ? engine_.setLauncherClipLanes(index, scene, lanes) : engine_.setAudioClipLanes(index, clipId, lanes);
+        if (!done)
+            return fail("the lanes could not be set");
+        studio_.publishParameterAutomation(track->ref());
+        studio_.markDirty();
+    }
+    auto result = object();
+    auto shown = object();
+    for (const auto& [name, points] : lanes) {
+        juce::Array<juce::var> list;
+        for (const auto& point : points)
+            list.add(juce::Array<juce::var> { point.timeSeconds, static_cast<double>(point.valueDb) });
+        set(shown, name.toRawUTF8(), list);
+    }
+    set(result, "lanes", shown);
+    return ok(result);
+}
+
 juce::var Commands::onAudioClips()
 {
     std::optional<RemoteTrack> track;
@@ -5212,12 +5436,7 @@ juce::var Commands::onEditAudioClip()
                 return fail(done.getErrorMessage());
         } else if (action == "set") {
             if (has("gainDb") || has("stretchMode")) {
-                const auto mode = text("stretchMode").trim().toLowerCase();
-                const auto stretch = mode == "tonal"   ? Engine::StretchMode::tonal
-                                     : mode == "beats"   ? Engine::StretchMode::beats
-                                     : mode == "texture" ? Engine::StretchMode::texture
-                                     : mode == "repitch" ? Engine::StretchMode::repitch
-                                                         : event->stretchMode;
+                const auto stretch = stretchModeNamed(text("stretchMode"), event->stretchMode);
                 if (!engine_.setAudioClipEventProperties(index, clipId, eventId, static_cast<float>(number("gainDb", event->gainDb)),
                                                          event->sourceTempoBpm, stretch))
                     return fail("the event refused those settings");
@@ -5271,6 +5490,9 @@ juce::var Commands::onEditAudioClip()
             set(entry, "fadeIn", item.fadeInSeconds);
             set(entry, "fadeOut", item.fadeOutSeconds);
             set(entry, "pitch", item.pitchSemitones);
+            set(entry, "stretchMode", stretchModeName(item.stretchMode));
+            if (!item.lanes.empty())
+                set(entry, "lanes", lanesToVar(item.lanes));
             list.add(entry);
         }
         set(result, "events", list);
@@ -5390,12 +5612,7 @@ juce::var Commands::onEditAudioClip()
                 return fail("a warp marker was refused (inside the clip, in order with the others)");
     if (has("gainDb") || has("sourceTempo") || has("stretchMode")) {
         using StretchMode = Engine::StretchMode;
-        const auto modeText = text("stretchMode");
-        const auto mode = modeText == "tonal"     ? StretchMode::tonal
-                          : modeText == "beats"   ? StretchMode::beats
-                          : modeText == "texture" ? StretchMode::texture
-                          : modeText == "repitch" ? StretchMode::repitch
-                                                  : clip->stretchMode;
+        const auto mode = stretchModeNamed(text("stretchMode"), clip->stretchMode);
         const auto tempo = number("sourceTempo", clip->sourceTempoBpm);
         if (clip->events.empty()) {
             if (!engine_.setAudioClipStretchSettings(index, clipId, tempo, mode))
@@ -5460,6 +5677,7 @@ juce::var Commands::onAutomation()
                 return fail("points must be a non-empty array of {time, value}");
             const auto low = std::min(parameter->minimum, parameter->maximum);
             const auto high = std::max(parameter->minimum, parameter->maximum);
+            std::vector<std::pair<std::uint64_t, juce::var>> shaped;
             for (const auto& point : *points) {
                 const auto id = studio_.addLanePoint(ref, key, std::max(0.0, numberOf(point, "time", 0.0)),
                                                      static_cast<float>(juce::jlimit(low, high, numberOf(point, "value", parameter->value))));
@@ -5468,8 +5686,11 @@ juce::var Commands::onAutomation()
                     if (numberOf(point, "curve", 0.0) != 0.0)
                         (void) studio_.setLanePointCurve(ref, key, id, Studio::AutomationCurve::bezier,
                                                          static_cast<float>(numberOf(point, "curve", 0.0)));
+                    if (asksShape(point))
+                        shaped.emplace_back(id, point);
                 }
             }
+            applyShapes(ref, key, shaped);
         }
         if (command_ != "list_automation") {
             studio_.setShownLane(ref, key);
@@ -5482,6 +5703,7 @@ juce::var Commands::onAutomation()
             set(entry, "id", idOf(point.id));
             set(entry, "time", point.timeSeconds);
             set(entry, "value", point.valueDb);
+            describeShape(entry, point);
             entries.add(entry);
         }
         auto result = object();
@@ -5504,6 +5726,7 @@ juce::var Commands::onAutomation()
         const auto* points = request_.getProperty("points", juce::var()).getArray();
         if (points == nullptr || points->isEmpty())
             return fail("points must be a non-empty array of {time, valueDb}");
+        std::vector<std::pair<std::uint64_t, juce::var>> shaped;
         for (const auto& point : *points) {
             const auto time = std::max(0.0, numberOf(point, "time", 0.0));
             std::uint64_t id = 0;
@@ -5517,7 +5740,10 @@ juce::var Commands::onAutomation()
             }
             if (id != 0)
                 ++added;
+            if (id != 0 && asksShape(point))
+                shaped.emplace_back(id, point);
         }
+        applyShapes(ref, pluginTarget ? Studio::pluginLaneName(pluginTarget->first, pluginTarget->second) : juce::String(), shaped);
     }
     if (command_ != "list_automation") {
         // The lane shows what was written.

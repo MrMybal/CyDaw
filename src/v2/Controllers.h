@@ -34,6 +34,9 @@ public:
     void drawButton(bool& visible);
     // Learn mode over the whole interface: after every other window.
     void drawLearnOverlay();
+    // Each frame, before the shortcuts: the computer's keys a device
+    // listens to.
+    void pollKeys();
     // On or off (Ctrl+M).
     void setLearning(bool on);
     [[nodiscard]] bool learning() const;

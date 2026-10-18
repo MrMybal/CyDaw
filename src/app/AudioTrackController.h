@@ -6,6 +6,7 @@
 #include "IsolatedPluginHost.h"
 #include "VirtualAudioBus.h"
 
+#include <cydaw/engine/AutomationCurve.h>
 #include <cydaw/engine/AudioBuffer.h>
 #include <cydaw/engine/AudioAnalysis.h>
 #include <cydaw/engine/NativeDspGraph.h>
@@ -22,16 +23,21 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <limits>
+#include <map>
 #include <optional>
 #include <vector>
 
 namespace cydaw::app {
 
+// The points the audio thread reads: their shape (engine::CurveShape), its
+// bend and its handles (engine/AutomationCurve.h).
 struct GainAutomationPoint {
     double timeSeconds {};
     float valueDb {};
     int curve {};
     float curveAmount {};
+    cydaw::engine::CurveHandles handles {};
 };
 
 struct PluginParameterAutomationPoint {
@@ -39,6 +45,7 @@ struct PluginParameterAutomationPoint {
     float normalisedValue {};
     int curve {};
     float curveAmount {};
+    cydaw::engine::CurveHandles handles {};
 };
 
 struct PluginParameterAutomationLane {
@@ -121,7 +128,12 @@ public:
     void setExternalInput(juce::AudioSource* source) noexcept { externalInput_.store(source); }
     void setGain(float linearGain) noexcept;
     void setPan(float pan) noexcept;
-    [[nodiscard]] float pan() const noexcept { return pan_.load(std::memory_order_relaxed); }
+    // Its pan as it is now: a clip's pan lane moves it, else its knob.
+    [[nodiscard]] float pan() const noexcept
+    {
+        return panAutomated_.load(std::memory_order_relaxed) ? automatedPan_.load(std::memory_order_relaxed)
+                                                              : pan_.load(std::memory_order_relaxed);
+    }
     // Its track's format: the channels its devices, its sends before the
     // fader and its input delay carry. Taken at the next prepare: set while
     // it is out of the mixer. The pan turns down the far side's speakers; a
@@ -129,6 +141,9 @@ public:
     void setChannelCount(int channels) noexcept;
     [[nodiscard]] int channelCount() const noexcept { return graphChannelCount_; }
     void setAutomation(std::shared_ptr<const std::vector<GainAutomationPoint>> automation);
+    // A pan lane (values -1..1 in the points' valueDb), on the same clock as
+    // the volume's; empty: the pan knob.
+    void setPanAutomation(std::shared_ptr<const std::vector<GainAutomationPoint>> lane);
     void setPluginAutomation(
         std::shared_ptr<const std::vector<PluginParameterAutomationLane>> automation);
     void setDrive(float driveDb) noexcept;
@@ -260,6 +275,9 @@ private:
     // callback: a lane edit during playback must never free the old vector
     // inside the block that is still reading it.
     cydaw::realtime::RtPublisher<std::vector<GainAutomationPoint>> automation_;
+    cydaw::realtime::RtPublisher<std::vector<GainAutomationPoint>> panAutomation_;
+    std::atomic<float> automatedPan_ {};
+    std::atomic<bool> panAutomated_ {};
     cydaw::realtime::RtPublisher<std::vector<PluginParameterAutomationLane>>
         pluginAutomation_;
     std::atomic<float> driveDb_ {};
@@ -598,9 +616,14 @@ public:
         std::vector<NoteExpressionPoint> gain;
     };
 
+    // A point's shape, as engine::CurveShape: straight, bent (bezier, by
+    // curveAmount), a B-spline's, a Bezier point with one tangent or two.
     enum class AutomationCurve : int {
         linear = 0,
-        bezier = 1
+        bezier = 1,
+        spline = 2,
+        tangent = 3,
+        tangents = 4
     };
 
     struct AutomationPoint {
@@ -609,6 +632,9 @@ public:
         float valueDb {};
         AutomationCurve curve { AutomationCurve::linear };
         float curveAmount {};
+        // A Bezier point's handles: seconds before and after it, values in
+        // the lane's units.
+        cydaw::engine::CurveHandles handles {};
     };
 
     struct MidiClip {
@@ -666,6 +692,7 @@ public:
         float normalisedValue {};
         AutomationCurve curve { AutomationCurve::linear };
         float curveAmount {};
+        cydaw::engine::CurveHandles handles {};
     };
 
     struct PluginAutomationLane {
@@ -703,12 +730,19 @@ public:
         double sourceLengthSeconds {};
     };
 
+    // How a sound is played when its speed is not the file's (Ableton's
+    // warp modes, Bitwig's stretch modes): repitch (the pitch follows the
+    // speed), tonal, beats, texture, raw (never stretched: played at the
+    // file's speed, whatever its length says), complex (whole mixes).
     enum class StretchMode {
         repitch = 0,
         tonal = 1,
         beats = 2,
-        texture = 3
+        texture = 3,
+        raw = 4,
+        complex = 5
     };
+    static constexpr int stretchModeCount = 6;
 
     struct TempoDetectionResult {
         double bpm {};
@@ -744,7 +778,15 @@ public:
         float gainDb {};
         // Transposed without changing its length (not with repitch).
         double pitchSemitones {};
+        // Its own lanes, in its own seconds (from its start, so they move
+        // with it): soundVolumeLane (dB over its gain), soundPanLane
+        // (-1..1), soundPitchLane (semitones over its transposition; not
+        // with repitch or raw, whose pitch is their speed's).
+        std::map<juce::String, std::vector<AutomationPoint>> lanes;
     };
+    static constexpr const char* soundVolumeLane = "volume";
+    static constexpr const char* soundPanLane = "pan";
+    static constexpr const char* soundPitchLane = "pitch";
 
     struct AudioClip {
         std::uint64_t id {};
@@ -780,6 +822,9 @@ public:
         // Internal render gain.  Container clips normally remain at 0 dB;
         // materialised AudioEvents copy their per-sample gain here.
         float eventGainDb {};
+        // Internal too: a rendered sound's own lanes (AudioEvent::lanes),
+        // from this region's start.
+        std::map<juce::String, std::vector<AutomationPoint>> soundLanes;
         // Clip-local gain automation, expressed on the container timeline.
         std::vector<AutomationPoint> automation;
         // Transposed without changing its length (not with repitch).
@@ -790,6 +835,10 @@ public:
         // Destructive edits: every version of the source, and the one played.
         std::vector<SourceVersion> versions;
         std::size_t version {};
+        // Its automation of the track's values, played with it: by lane
+        // ("volume" in dB over the fader, "pan" -1..1, a device's knob by its
+        // binding in its own units), points in the clip's content seconds.
+        std::map<juce::String, std::vector<AutomationPoint>> lanes;
     };
 
     struct LauncherClip {
@@ -809,6 +858,8 @@ public:
         bool usesEventTimeline {};
         // Clip-local gain automation, expressed on the launcher clip timeline.
         std::vector<AutomationPoint> automation;
+        // Its automation of the track's values (as AudioClip::lanes).
+        std::map<juce::String, std::vector<AutomationPoint>> lanes;
     };
 
     enum class ArrangementRangeOperation {
@@ -1156,6 +1207,16 @@ public:
         double durationSeconds, double playStartSeconds,
         double playEndSeconds, double loopStartSeconds,
         double loopEndSeconds, bool looping);
+    // A clip's automation lanes (AudioClip::lanes), one undo step.
+    [[nodiscard]] bool setAudioClipLanes(
+        std::size_t index, std::uint64_t clipId,
+        std::map<juce::String, std::vector<AutomationPoint>> lanes);
+    // What a track's volume automation and pan follow while its clips drive
+    // them: a volume lane in place of its own (none: its own), a pan lane
+    // (empty: its pan knob).
+    void setTrackClipAutomation(std::size_t index,
+                                std::optional<std::vector<AutomationPoint>> volume,
+                                std::vector<AutomationPoint> pan);
     [[nodiscard]] std::uint64_t splitAudioClipEvent(
         std::size_t index, std::uint64_t clipId, std::uint64_t eventId,
         double localTimelineSeconds);
@@ -1506,6 +1567,9 @@ public:
         std::uint64_t trackId, std::uint64_t id);
     [[nodiscard]] std::vector<AutomationPoint> midiAutomationPoints(
         std::uint64_t trackId) const;
+    // A whole lane at once (a curve editor's edit): its points' ids kept (0:
+    // a fresh one), their shapes and handles too, in time order.
+    void replaceMidiAutomationPoints(std::uint64_t trackId, std::vector<AutomationPoint> points);
     [[nodiscard]] std::uint64_t addMidiClipAutomationPoint(
         std::uint64_t trackId, std::uint64_t clipId,
         double timeSeconds, float valueDb);
@@ -1557,6 +1621,9 @@ public:
         std::uint16_t index {};
         bool logarithmic {};
         std::vector<NativeDspRuntime::AutomationPoint> points;
+        // The setting's range: a curve swinging past its points stays in it.
+        float minimum { -std::numeric_limits<float>::max() };
+        float maximum { std::numeric_limits<float>::max() };
     };
     void setMidiTrackVoiceAutomation(std::uint64_t trackId, std::vector<VoiceAutomationLane> lanes);
     // The control cables of an instrument's graph that move its voices.
@@ -1662,6 +1729,7 @@ public:
     [[nodiscard]] bool removeAutomationPoint(std::size_t trackIndex, std::uint64_t id);
     void clearAutomation(std::size_t trackIndex);
     [[nodiscard]] std::vector<AutomationPoint> automationPoints(std::size_t trackIndex) const;
+    void replaceAutomationPoints(std::size_t trackIndex, std::vector<AutomationPoint> points);
     [[nodiscard]] std::uint64_t addPluginAutomationPoint(std::size_t trackIndex,
                                                           std::size_t pluginIndex,
                                                           std::uint32_t parameterIndex,
@@ -1685,6 +1753,11 @@ public:
     void clearPluginAutomation(std::size_t trackIndex,
                                std::size_t pluginIndex,
                                std::uint32_t parameterIndex);
+    void replacePluginAutomationPoints(std::size_t trackIndex,
+                                       std::size_t pluginIndex,
+                                       std::uint32_t parameterIndex,
+                                       juce::String parameterName,
+                                       std::vector<PluginAutomationPoint> points);
     [[nodiscard]] std::vector<PluginAutomationPoint> pluginAutomationPoints(
         std::size_t trackIndex,
         std::size_t pluginIndex,
@@ -1752,6 +1825,13 @@ public:
         std::size_t trackIndex, int sceneIndex, std::uint64_t eventId,
         std::uint64_t markerId);
     [[nodiscard]] bool clearLauncherClip(std::size_t trackIndex, int sceneIndex);
+    // A launcher clip put back whole, as it was (an editor's undo): the slot
+    // of its scene takes it.
+    [[nodiscard]] bool restoreLauncherClip(std::size_t trackIndex, const LauncherClip& clip);
+    // A launcher clip's automation lanes (LauncherClip::lanes).
+    [[nodiscard]] bool setLauncherClipLanes(
+        std::size_t trackIndex, int sceneIndex,
+        std::map<juce::String, std::vector<AutomationPoint>> lanes);
     [[nodiscard]] bool transferLauncherClip(
         std::size_t sourceTrackIndex, int sourceSceneIndex,
         std::size_t targetTrackIndex, int targetSceneIndex,

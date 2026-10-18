@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CurveEditor.h"
 #include "DeviceVisuals.h"
 #include "Studio.h"
 #include "UiState.h"
@@ -62,8 +63,7 @@ private:
         juce::String lane;
         LaneScale scale;
     };
-    enum class Drag { none, move, trimLeft, trimRight, fadeIn, fadeOut, seek, loop, box, resizeLane, scrollbar, automationPoint, automationCurve,
-                      navigate };
+    enum class Drag { none, move, trimLeft, trimRight, fadeIn, fadeOut, seek, loop, box, resizeLane, scrollbar, navigate };
     struct AutomationEdit {
         TrackRef track;
         juce::String lane;
@@ -85,14 +85,20 @@ private:
     void handleLaneInput(const std::vector<ClipHit>& clips, const std::vector<LaneHit>& lanes, bool clicksTaken);
     void drawAutomation(ImDrawList* list, const LaneHit& lane);
     bool handleAutomationInput(const std::vector<LaneHit>& lanes);
-    void automationContextMenu();
     void laneChooserMenu();
     void rememberAutomation(const TrackRef& track, const juce::String& lane);
     [[nodiscard]] LaneScale laneScale(const TrackRef& track, juce::String& lane) const;
-    [[nodiscard]] float automationY(float value, const LaneHit& lane) const;
-    [[nodiscard]] float automationValueAt(float y, const LaneHit& lane) const;
-    [[nodiscard]] static float clampToLane(float value, const LaneScale& scale);
     [[nodiscard]] static juce::String formatLaneValue(float value, const LaneScale& scale);
+    // The lanes' curve editors (CurveEditor.h): a lane as one sees it, the
+    // timeline, a lane's points and back, and the bar of the picked points
+    // over the canvas.
+    [[nodiscard]] static juce::String curveKey(const TrackRef& track, const juce::String& lane);
+    [[nodiscard]] curves::Lane curveLane(const TrackRef& track, const juce::String& lane, const LaneScale& scale) const;
+    [[nodiscard]] curves::View curveView() const;
+    [[nodiscard]] std::vector<curves::Point> laneCurve(const TrackRef& track, const juce::String& lane) const;
+    void setLaneCurve(const TrackRef& track, const juce::String& lane, const std::vector<curves::Point>& points);
+    void drawCurveBar();
+    void unfocusCurves();
     // Where the lane's name is drawn, a button that chooses the lane.
     [[nodiscard]] ImRect laneLabelRect(const LaneHit& lane) const;
     void handleKeys();
@@ -147,7 +153,6 @@ private:
     bool followPaused_ {};
     ImGuiID clipPopupId_ {};
     ImGuiID trackPopupId_ {};
-    ImGuiID automationPopupId_ {};
     ImGuiID laneChooserId_ {};
     std::optional<TrackRef> laneChooserTrack_;
     // A plugin's parameters as its worker last reported them, for the lane
@@ -159,14 +164,15 @@ private:
     mutable std::map<juce::String, PluginParameters> pluginParameters_;
     const std::vector<app::IsolatedPluginHost::ParameterSnapshot>& pluginParameters(std::size_t trackIndex,
                                                                                    std::size_t plugin, bool refresh) const;
-    // Automation editing.
-    TrackRef automationTrack_ {};
-    std::uint64_t automationPoint_ {};
-    std::uint64_t hoveredAutomationPoint_ {};
-    float automationCurveStart_ {};
-    std::optional<TrackRef> automationContextTrack_;
-    juce::String automationContextLane_;
-    std::uint64_t automationContextPoint_ {};
+    // Automation editing: each lane's curve editor (by curveKey), the one
+    // last clicked (it has the keys), whether the canvas has the pointer,
+    // and a lane whose chooser its menu asked for.
+    std::map<juce::String, curves::Editor> curveEditors_;
+    juce::String focusedCurve_;
+    std::optional<TrackRef> focusedCurveTrack_;
+    juce::String focusedCurveLane_;
+    bool canvasHovered_ {};
+    std::optional<TrackRef> chooseLaneFor_;
     std::vector<AutomationEdit> automationUndo_;
     std::vector<AutomationEdit> automationRedo_;
     bool automationLastEdit_ {};

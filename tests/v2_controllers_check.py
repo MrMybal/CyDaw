@@ -14,7 +14,12 @@ injected through the control port (no MIDI port is needed).
   the target.
 * /cydaw/<target> moves a target directly and is answered when it moves.
 * Learning: a target picked, a raw control moved: a virtual control is made
-  and assigned.
+  in the device whose input it is, and assigned.
+* Devices: a new device finds its hardware when something on it moves
+  (named after it), learns a control per new address moved on its input
+  (a key's let go teaches nothing, another input is not heard), follows its
+  input when it changes, and copies wait for hardware of their own. The
+  computer's keyboard is a raw device whose keys drive rules.
 * A card's knob and a deck's EQ are targets too.
 * The track's assignments go with the project (saved, a new project, opened).
 
@@ -230,11 +235,16 @@ def scenario(scratch: Path) -> None:
     ctl("inject", action="inject", device=osc, address="/learnt", value=0.25)
     status = ctl("status", action="status")
     learnt = [a for a in status["assignments"] if a["target"] == pan]
-    check(len(learnt) == 1 and learnt[0]["device"].startswith("auto-") and not status["learnTarget"],
-          f"learning: the moved control is made a virtual control and takes the target ({learnt})")
+    check(len(learnt) == 1 and learnt[0]["device"] == box and not status["learnTarget"],
+          f"learning: the moved control is made a control of the device the endpoint feeds, and takes the target ({learnt})")
+    boxed = next(d for d in status["virtual"] if d["id"] == box)
+    check(boxed["input"] == osc and boxed["output"] == osc,
+          f"the device took its first control's endpoint as its input and feedback ({boxed['input']}, {boxed['output']})")
     ctl("learn", action="learn", on=False)
     ctl("inject", action="inject", device=osc, address="/learnt", value=0.25)
     check(abs(value_of(pan) - 0.25) < 0.01, f"the learnt control moves the pan ({value_of(pan):.3f})")
+
+    devices_scenario(osc, mute)
 
     # ---- A card's knob, a deck ----
     parameters = [t for t in ctl("params", action="targets", filter="param/")["targets"] if t["target"].startswith(f"param/{key}/")]
@@ -279,6 +289,84 @@ def scenario(scratch: Path) -> None:
           "the monitor shows what came in and what went back")
     listener.close()
     sender.close()
+
+
+def device_of(device_id: str) -> dict:
+    return next(d for d in ctl("status", action="status")["virtual"] if d["id"] == device_id)
+
+
+def devices_scenario(osc: str, mute: str) -> None:
+    """A device made around its hardware: found, its controls learnt, moved."""
+    pad_port = free_udp_port()
+    pads = ctl("pads", action="add_osc", name="Test pads", port=pad_port)["device"]
+    made = ctl("new device", action="add_virtual")["device"]
+    fresh = device_of(made)
+    check(fresh["input"] == "" and fresh["name"].startswith(("New device", "Nouveau périphérique")),
+          f"a new device has no hardware yet and a name to change ({fresh['name']})")
+    # Its hardware: what moves next.
+    ctl("learn hardware", action="learn_hardware", device=made)
+    ctl("let go", action="inject", device=pads, address="note/1/40", value=0.0)
+    check(device_of(made)["input"] == "", "a key let go does not say what the device is")
+    ctl("pad", action="inject", device=pads, address="/pad/1", value=1.0)
+    found = device_of(made)
+    status = ctl("status", action="status")
+    check(found["input"] == pads and found["name"] == "Test pads" and not status["learnHardware"],
+          f"something moved on the hardware makes it the device's input, and names it ({found['input']}, {found['name']})")
+    # Its controls: one per new address moved on its input.
+    ctl("learn controls", action="learn_controls", device=made)
+    ctl("pad 1", action="inject", device=pads, address="/pad/1", value=1.0)
+    ctl("pad 1 again", action="inject", device=pads, address="/pad/1", value=0.4)
+    ctl("let go", action="inject", device=pads, address="note/1/41", value=0.0)
+    ctl("pressed", action="inject", device=pads, address="note/1/41", value=0.8)
+    ctl("elsewhere", action="inject", device=osc, address="/elsewhere", value=0.5)
+    controls = device_of(made)["controls"]
+    addresses = sorted(c["sourceAddress"] for c in controls)
+    check(addresses == ["/pad/1", "note/1/41"] and all(c["sourceDevice"] == pads for c in controls),
+          f"learning its controls: one per new address on its input, none for a let go or another input ({addresses})")
+    pad = next((c for c in controls if c["sourceAddress"] == "note/1/41"), {})
+    check(pad.get("kind") == "pad", f"a key learnt is a pad ({pad.get('kind')})")
+    ctl("learn off", action="learn_controls", on=False)
+    ctl("after", action="inject", device=pads, address="/pad/2", value=1.0)
+    check(len(device_of(made)["controls"]) == 2, "learning stopped: nothing more is made")
+    # Another box: its controls follow the input.
+    other_port = free_udp_port()
+    other = ctl("other pads", action="add_osc", name="Other pads", port=other_port)["device"]
+    ctl("other input", action="set_virtual", device=made, input=other)
+    moved = device_of(made)
+    check(moved["input"] == other and all(c["sourceDevice"] == other for c in moved["controls"]),
+          f"the device's input changed: its controls listen to the new one ({moved['input']})")
+    # A copy waits for its own hardware, and keeps what the rules move.
+    first = moved["controls"][0]["id"]
+    ctl("assign pad", action="assign", device=made, control=first, target="transport/play")
+    copy = ctl("copy", action="duplicate_virtual", device=made)["device"]
+    copied = device_of(copy)
+    assigned = [a for a in ctl("status", action="status")["assignments"] if a["device"] == copy]
+    check(copied["input"] == "" and len(copied["controls"]) == 2 and all(c["sourceDevice"] == "" for c in copied["controls"])
+          and [a["target"] for a in assigned] == ["transport/play"],
+          f"a copy has the rules and what they move, and waits for hardware ({copied['input']!r}, {len(assigned)})")
+    ctl("unassign", action="unassign", target="transport/play")
+    ctl("remove copy", action="remove_virtual", device=copy)
+    ctl("remove made", action="remove_virtual", device=made)
+    ctl("remove pads", action="remove_raw", device=pads)
+    ctl("remove other", action="remove_raw", device=other)
+    # The computer's keyboard: a raw device; its keys drive rules.
+    raws = ctl("status", action="status")["raw"]
+    keyboard = next((r for r in raws if r["kind"] == "keyboard"), None)
+    check(keyboard is not None and keyboard["id"] == "keyboard:computer" and keyboard["present"],
+          f"the computer's keyboard is a raw device ({keyboard})")
+    keys = ctl("keys", action="add_virtual", input="keyboard:computer")["device"]
+    check(device_of(keys)["output"] == "", "the computer's keyboard answers nothing")
+    key = ctl("key", action="add_control", device=keys, kind="button", sourceAddress="key/F2")["control"]
+    check(next(c for c in device_of(keys)["controls"] if c["id"] == key)["sourceDevice"] == "keyboard:computer",
+          "a rule added to the device listens to its input")
+    ctl("assign key", action="assign", device=keys, control=key, target=mute)
+    before = value_of(mute)
+    ctl("press", action="inject", device="keyboard:computer", address="key/F2", value=1.0)
+    ctl("let go", action="inject", device="keyboard:computer", address="key/F2", value=0.0)
+    check(value_of(mute) != before, f"a key of the computer's keyboard toggles the mute ({before} -> {value_of(mute)})")
+    ctl("press", action="inject", device="keyboard:computer", address="key/F2", value=1.0)
+    ctl("let go", action="inject", device="keyboard:computer", address="key/F2", value=0.0)
+    ctl("remove keys", action="remove_virtual", device=keys)
 
 
 def main() -> int:

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cydaw/engine/AudioAnalysis.h>
+#include <cydaw/engine/AutomationCurve.h>
 #include <cydaw/engine/Modulators.h>
 #include <cydaw/engine/NativeDspGraph.h>
 #include <cydaw/realtime/RtPublisher.h>
@@ -127,9 +128,13 @@ class NativeDspRuntime
         double timeSeconds{};
         // In the parameter's own units (Hz, dB...).
         float value{};
-        // 0 straight to the next point, 1 bent by curveAmount (-1..1).
+        // Its shape (engine::CurveShape): 0 straight to the next point, 1
+        // bent by curveAmount (-1..1), 2 a B-spline's, 3 and 4 Bezier ones
+        // with their handles (time in seconds, values in the parameter's
+        // units, their natural log on a logarithmic lane).
         int curve{};
         float curveAmount{};
+        cydaw::engine::CurveHandles handles{};
     };
     struct AutomationLane
     {
@@ -141,6 +146,10 @@ class NativeDspRuntime
         // turns: a straight line in the lane is what is heard.
         bool logarithmic{};
         std::vector<AutomationPoint> points;
+        // The parameter's range: a curve that swings past its points (a
+        // Bezier's) stays inside it.
+        float minimum{-std::numeric_limits<float>::max()};
+        float maximum{std::numeric_limits<float>::max()};
         // A launcher clip's lane: its points count from `clipStartSeconds`
         // on the timeline (before it, the knob's own value) and, past
         // `clipLengthSeconds`, loop (`clipLooping`) or hold the last value.

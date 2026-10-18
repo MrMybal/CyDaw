@@ -979,32 +979,16 @@ float NativeDspRuntime::automationValueAt(const std::vector<AutomationPoint> &po
 {
     if (points.empty())
         return 0.0f;
-    if (seconds <= points.front().timeSeconds)
-        return points.front().value;
-    if (seconds >= points.back().timeSeconds)
-        return points.back().value;
-    // The segment holding the time, by halving: lanes can be long.
-    std::size_t low = 0;
-    std::size_t high = points.size() - 1;
-    while (high - low > 1)
-    {
-        const auto middle = (low + high) / 2;
-        if (points[middle].timeSeconds <= seconds)
-            low = middle;
-        else
-            high = middle;
-    }
-    const auto &first = points[low];
-    const auto &second = points[high];
-    const auto span = std::max(1.0e-9, second.timeSeconds - first.timeSeconds);
-    auto amount = static_cast<float>(std::clamp((seconds - first.timeSeconds) / span, 0.0, 1.0));
-    if (first.curve != 0)
-        // The bounded cubic bend the volume lane uses.
-        amount = std::clamp(amount + std::clamp(first.curveAmount, -1.0f, 1.0f) * 2.0f * amount * (1.0f - amount), 0.0f,
-                            1.0f);
-    if (logarithmic && first.value > 0.0f && second.value > 0.0f)
-        return first.value * std::pow(second.value / first.value, amount);
-    return first.value + (second.value - first.value) * amount;
+    // A logarithmic lane glides on its scale while its values allow it.
+    const auto onScale = logarithmic && std::all_of(points.begin(), points.end(), [](const AutomationPoint &point) {
+                             return point.value > 0.0f;
+                         });
+    return static_cast<float>(cydaw::engine::curveValueAt(
+        points,
+        [](const AutomationPoint &point) {
+            return cydaw::engine::CurveKnot{point.timeSeconds, point.value, point.curve, point.curveAmount, point.handles};
+        },
+        seconds, onScale));
 }
 
 void NativeDspRuntime::setAutomation(std::vector<AutomationLane> lanes)
@@ -1065,7 +1049,7 @@ void NativeDspRuntime::applyParameters(const RuntimeState &runtime, const double
                                                : std::min(seconds, lane.clipLengthSeconds);
             }
             auto &parameters = parametersOf(found->second);
-            const auto value = automationValueAt(lane.points, seconds, lane.logarithmic);
+            const auto value = std::clamp(automationValueAt(lane.points, seconds, lane.logarithmic), lane.minimum, lane.maximum);
             if (lane.field != nullptr)
                 parameters.*lane.field = value;
             else if (lane.slot >= 0 && static_cast<std::size_t>(lane.slot) < parameters.eqBands.size())

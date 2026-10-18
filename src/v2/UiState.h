@@ -20,11 +20,15 @@ namespace cydaw::v2 {
 struct ClipRef {
     TrackRef track;
     std::uint64_t clipId {};
+    // An audio track's launcher clip has no id: its slot's scene (-1: a clip
+    // of the arrangement, or any MIDI clip).
+    int scene { -1 };
 
     [[nodiscard]] bool operator==(const ClipRef& other) const noexcept
     {
-        return track == other.track && clipId == other.clipId;
+        return track == other.track && clipId == other.clipId && scene == other.scene;
     }
+    [[nodiscard]] bool launcherAudio() const noexcept { return scene >= 0 && !track.midi; }
 };
 
 // Drag-and-drop payload carrying a file path between panels.
@@ -236,6 +240,14 @@ struct UiState {
     double scrollSeconds {};
     float scrollY {};
     double snapBeats { 1.0 };   // 0: off
+    // The editors' magnets (their grids kept when off).
+    bool arrangementSnap { true };
+    bool pianoRollSnap { true };
+    bool masterClipSnap { true };
+    bool audioClipSnap { true };
+    // The audio clip editor's automation lanes, as tall as dragged (dp; 0:
+    // as tall as they need).
+    float audioClipLanesHeight {};
     bool followPlayhead { true };
 
     // Status line: the last thing the interface has to say.

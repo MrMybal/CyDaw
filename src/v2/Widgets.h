@@ -130,6 +130,22 @@ void meter(const char* id, ImVec2 size, float peakLeft, float peakRight, float r
 // A small rounded toggle: M, S, R, an icon, a word.
 bool toggle(const char* label, bool* value, ImU32 onColour, ImVec2 size = ImVec2(0.0f, 0.0f),
             const char* tooltip = nullptr);
+// A toggle showing a little drawing rather than a word, its name in its
+// tooltip: `picture` paints it in the box it is given, in the colour given.
+using Picture = void (*)(ImDrawList* list, ImVec2 min, ImVec2 max, ImU32 colour);
+bool pictureToggle(const char* id, bool* value, ImU32 onColour, Picture picture, const char* tooltip, float width = 0.0f);
+// The pictures the editors share.
+namespace picture {
+void magnet(ImDrawList* list, ImVec2 min, ImVec2 max, ImU32 colour);
+void loop(ImDrawList* list, ImVec2 min, ImVec2 max, ImU32 colour);
+} // namespace picture
+// The magnet of an editor (snapping on the grid), the same everywhere; Alt
+// held does the other during a gesture.
+bool snapToggle(const char* id, bool* on);
+// A clip's loop, the same in every editor (its tooltip says what loops).
+bool loopToggle(const char* id, bool* on, const char* tooltip);
+// Whether a magnet holds now: on, unless Alt is held (or off, Alt held).
+[[nodiscard]] bool snapping(bool on);
 
 // ---- Controllers: learning ------------------------------------------------------------------
 // What a controller can move, drawn this frame: a target (ControlTargets.h),

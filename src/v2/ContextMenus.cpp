@@ -290,6 +290,10 @@ void ContextMenus::slotMenu(const TrackRef& track, const int scene)
         (void) studio_.launchSlot(track, scene);
     if (ImGui::MenuItem(L("Arrêter la piste", "Stop the track")))
         stopTrack();
+    if (ImGui::MenuItem(L("Ouvrir dans l'éditeur", "Open in the editor"), L("Double-clic", "Double click"))) {
+        state_.editedClip = ClipRef { track, 0, scene };
+        state_.bringToFront = Panel::editor;
+    }
     ImGui::Separator();
     if (ImGui::MenuItem(L("Inverser le clip (Reverse)", "Reverse clip"))) {
         const auto result = studio_.reverseLauncherClip(track, scene);
@@ -304,8 +308,11 @@ void ContextMenus::slotMenu(const TrackRef& track, const int scene)
     ImGui::Separator();
     if (ImGui::MenuItem(L("Supprimer le clip", "Delete the clip"))) {
         (void) engine.stopLauncherTrack(track.audioIndex, false);
-        if (engine.clearLauncherClip(track.audioIndex, scene))
+        if (engine.clearLauncherClip(track.audioIndex, scene)) {
+            if (state_.editedClip && *state_.editedClip == ClipRef { track, 0, scene })
+                state_.editedClip.reset();
             studio_.markDirty();
+        }
     }
 }
 

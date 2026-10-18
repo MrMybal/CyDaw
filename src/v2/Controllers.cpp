@@ -14,6 +14,7 @@ namespace {
 
 constexpr std::size_t monitorLength = 400;
 constexpr const char* cydawPrefix = "/cydaw/";
+using RawKind = Controllers::Impl::RawKind;
 
 // " · " between two names, as a juce::String (inline text is UTF-8).
 juce::String middleDot()
@@ -112,8 +113,52 @@ std::optional<control::Assignment> assignmentFrom(const juce::var& value, const 
     return assignment;
 }
 
+const char* rawKindName(const RawKind kind)
+{
+    switch (kind) {
+    case RawKind::midiIn: return "midi-in";
+    case RawKind::midiOut: return "midi-out";
+    case RawKind::osc: return "osc";
+    case RawKind::plugin: return "plugin";
+    case RawKind::keyboard: return "keyboard";
+    }
+    return "plugin";
+}
+
+RawKind rawKindNamed(const juce::String& name)
+{
+    return name == "midi-in" ? RawKind::midiIn : name == "midi-out" ? RawKind::midiOut : name == "osc" ? RawKind::osc
+           : name == "keyboard"                                                                          ? RawKind::keyboard
+                                                                                                         : RawKind::plugin;
+}
+
+// The device most of its controls listen to (or answer), for settings made
+// before a device had its own hardware.
+std::string mostUsed(const control::VirtualDevice& device, const bool feedback)
+{
+    std::map<std::string, int> counts;
+    for (const auto& control : device.controls)
+        if (const auto& id = feedback ? control.feedbackDevice : control.sourceDevice; !id.empty())
+            ++counts[id];
+    std::string best;
+    auto most = 0;
+    for (const auto& [id, count] : counts)
+        if (count > most)
+            best = id, most = count;
+    return best;
+}
+
+// A new device's name until it is given one ("New device 2").
+bool defaultDeviceName(const std::string& name)
+{
+    const auto text = juce::String::fromUTF8(name.c_str());
+    return text.startsWith(juce::String::fromUTF8("Nouveau p\xc3\xa9riph\xc3\xa9rique")) || text.startsWith("New device");
+}
+
+} // namespace
+
 // A raw address as a person reads it: "CC 74 · ch. 1", "Note C3 · ch. 10".
-juce::String readable(const std::string& address)
+juce::String readableAddress(const std::string& address)
 {
     const auto parts = juce::StringArray::fromTokens(juce::String(address), "/", "");
     if (parts.size() >= 3 && parts[0] == "cc")
@@ -127,8 +172,21 @@ juce::String readable(const std::string& address)
         return ui::Ls("Pression · ch. ", "Pressure · ch. ") + parts[1];
     if (parts.size() >= 3 && parts[0] == "pc")
         return ui::Ls("Programme ", "Program ") + parts[2] + middleDot() + "ch. " + parts[1];
+    if (parts.size() >= 2 && parts[0] == "key")
+        return ui::Ls("Touche ", "Key ") + address.substr(4);
+    if (parts.size() >= 2 && parts[0] == "button")
+        return ui::Ls("Bouton ", "Button ") + parts[1].toUpperCase();
+    if (parts.size() >= 2 && parts[0] == "trigger")
+        return parts[1] == "left" ? ui::Ls("Gâchette gauche", "Left trigger") : ui::Ls("Gâchette droite", "Right trigger");
+    if (parts.size() >= 2 && parts[0] == "axis") {
+        const auto& name = parts[1];
+        const auto side = name.startsWith("left") ? ui::Ls("Stick gauche ", "Left stick ") : ui::Ls("Stick droit ", "Right stick ");
+        return side + name.getLastCharacters(1);
+    }
     return juce::String(address);
 }
+
+namespace {
 
 // A raw device's id that can go into another id.
 std::string slug(const std::string& id)
@@ -253,6 +311,17 @@ Controllers::Impl::Impl(Studio& studioIn, UiState& state, ImGuiHost& hostIn, con
     : targets(studioIn, state), studio(studioIn), uiState(state), host(hostIn), keepSettings(keep)
 {
     restoreGlobal(juce::JSON::parse(studio.settings().getValue("controllers")));
+    // The computer's keyboard: always there.
+    if (rawDevice(computerKeyboardId) == nullptr) {
+        raw.push_back(std::make_unique<RawDevice>());
+        raw.back()->id = computerKeyboardId;
+        raw.back()->kind = RawKind::keyboard;
+    }
+    if (auto* keyboard = rawDevice(computerKeyboardId)) {
+        keyboard->name = "Computer keyboard";
+        keyboard->notes = false;
+        keyboard->present = true;
+    }
     scanMidi();
     loadPlugins();
     restoreProject(studio.controllerAssignments());
@@ -463,6 +532,29 @@ void Controllers::Impl::removeRaw(const std::string_view id)
             changed(true, false);
             return;
         }
+}
+
+juce::String Controllers::Impl::nameOf(const std::string_view id) const
+{
+    if (id == computerKeyboardId)
+        return ui::Ls("Clavier de l'ordinateur", "Computer keyboard");
+    if (const auto* device = rawDevice(id))
+        return device->name;
+    return juce::String(std::string(id));
+}
+
+juce::String Controllers::Impl::familyOf(const RawDevice& device) const
+{
+    switch (device.kind) {
+    case RawKind::midiIn:
+    case RawKind::midiOut: return "MIDI";
+    case RawKind::osc: return ui::Ls("OSC (r\xc3\xa9seau)", "OSC (network)");
+    case RawKind::keyboard: return ui::Ls("Cet ordinateur", "This computer");
+    case RawKind::plugin: break;
+    }
+    if (device.plugin >= 0 && device.plugin < static_cast<int>(plugins.size()))
+        return plugins[static_cast<std::size_t>(device.plugin)]->name;
+    return ui::Ls("Plug-ins d'application", "Application plug-ins");
 }
 
 std::string Controllers::Impl::feedbackFor(const std::string_view inputDevice) const
@@ -683,6 +775,8 @@ void Controllers::Impl::process(const Incoming& incoming)
             ordered[key] = { std::clamp(message.value, 0.0, 1.0), secondsNow() };
         return;
     }
+    if (learnDevice(*device, message))
+        return;
     if (learnSource || (learnMode && !learnTarget.empty())) {
         learnFrom(device->id, message);
         return;
@@ -747,6 +841,10 @@ void Controllers::Impl::feedback(const bool force)
         told[key] = *value;
         const auto mine = ordered.find(key);
         const auto byThis = mine != ordered.end() && std::abs(mine->second.first - *value) < 0.01 && now - mine->second.second < 1.0;
+        // Seen elsewhere: what this router ordered is no echo to wait for any
+        // more (back at that value later, it was moved by something else).
+        if (mine != ordered.end() && !byThis)
+            ordered.erase(mine);
         const auto answers = router.targetMoved(key, *value, byThis);
         if (byThis && !force)
             continue;
@@ -760,17 +858,93 @@ void Controllers::Impl::feedback(const bool force)
 
 // ---- Virtual controllers and assignments --------------------------------------------------------------
 
-std::string Controllers::Impl::addVirtualDevice(const juce::String& name)
+std::string Controllers::Impl::addVirtualDevice(const juce::String& name, const std::string& input, const std::string& output)
 {
     std::vector<std::string> taken;
-    for (const auto& device : router.devices)
+    std::set<std::string> names;
+    for (const auto& device : router.devices) {
         taken.push_back(device.id);
+        names.insert(device.name);
+    }
     control::VirtualDevice device;
     device.id = control::Router::freshId("virtual", taken);
-    device.name = (name.isNotEmpty() ? name : ui::Ls("Contrôleur virtuel", "Virtual controller")).toStdString();
+    if (name.isNotEmpty()) {
+        device.name = name.toStdString();
+    } else {
+        // Named after its hardware, or "New device"; a name of its own ("… 2").
+        const auto base = input.empty() ? ui::Ls("Nouveau p\xc3\xa9riph\xc3\xa9rique", "New device") : nameOf(input);
+        auto unique = base;
+        for (auto number = 2; names.contains(unique.toStdString()); ++number)
+            unique = base + " " + juce::String(number);
+        device.name = unique.toStdString();
+    }
+    device.input = input;
+    device.output = output.empty() && !input.empty() ? feedbackFor(input) : output;
     router.devices.push_back(device);
     changed(true, false);
     return device.id;
+}
+
+std::string Controllers::Impl::duplicateVirtualDevice(const std::string& id)
+{
+    const auto* original = router.findDevice(id);
+    if (original == nullptr)
+        return {};
+    std::vector<std::string> taken;
+    for (const auto& device : router.devices)
+        taken.push_back(device.id);
+    // The copy waits for hardware of its own (another box of the same kind):
+    // until then its controls hear nothing.
+    auto copy = *original;
+    copy.id = control::Router::freshId("virtual", taken);
+    copy.name = (juce::String::fromUTF8(original->name.c_str()) + ui::Ls(" (copie)", " (copy)")).toStdString();
+    for (auto& control : copy.controls) {
+        if (control.sourceDevice == copy.input)
+            control.sourceDevice.clear();
+        if (control.feedbackDevice == copy.output)
+            control.feedbackDevice.clear();
+    }
+    copy.input.clear();
+    copy.output.clear();
+    std::vector<control::Assignment> assignments;
+    for (const auto& assignment : router.assignments)
+        if (assignment.device == id) {
+            auto again = assignment;
+            again.device = copy.id;
+            assignments.push_back(again);
+        }
+    const auto project = std::any_of(assignments.begin(), assignments.end(), [](const auto& a) { return a.project; });
+    router.devices.push_back(std::move(copy));
+    router.assignments.insert(router.assignments.end(), assignments.begin(), assignments.end());
+    changed(true, project);
+    return router.devices.back().id;
+}
+
+void Controllers::Impl::setDeviceInput(control::VirtualDevice& device, const std::string& input)
+{
+    const auto before = device.input;
+    for (auto& control : device.controls)
+        if (control.sourceDevice == before || control.sourceDevice.empty())
+            control.sourceDevice = input;
+    device.input = input;
+    // The output that answered the old input answers the new one.
+    if (device.output.empty() || device.output == feedbackFor(before))
+        setDeviceOutput(device, feedbackFor(input));
+    changed(true, false);
+}
+
+void Controllers::Impl::setDeviceOutput(control::VirtualDevice& device, const std::string& output)
+{
+    for (auto& control : device.controls)
+        if (control.feedbackDevice == device.output || control.feedbackDevice.empty()) {
+            control.feedbackDevice = output;
+            if (output.empty())
+                control.feedbackAddress.clear();
+            else if (control.feedbackAddress.empty())
+                control.feedbackAddress = control.sourceAddress;
+        }
+    device.output = output;
+    changed(true, false);
 }
 
 std::string Controllers::Impl::addControl(const std::string& deviceId, const juce::String& name, const control::ControlKind kind,
@@ -782,18 +956,26 @@ std::string Controllers::Impl::addControl(const std::string& deviceId, const juc
     std::vector<std::string> taken;
     for (const auto& control : device->controls)
         taken.push_back(control.id);
+    // A control listens to its device's hardware; a device without any
+    // takes the first control's source as its own.
+    const auto source = sourceDevice.empty() ? device->input : sourceDevice;
+    if (device->input.empty() && !source.empty()) {
+        device->input = source;
+        if (device->output.empty())
+            device->output = feedbackFor(source);
+    }
     control::VirtualControl control;
     control.id = control::Router::freshId(control::controlKindName(kind), taken);
     control.kind = kind;
     control.chain = control::defaultChain(kind);
-    control.sourceDevice = sourceDevice;
+    control.sourceDevice = source;
     control.sourceAddress = sourceAddress;
-    control.feedbackDevice = feedbackFor(sourceDevice);
+    control.feedbackDevice = source == device->input ? device->output : feedbackFor(source);
     if (!control.feedbackDevice.empty())
         control.feedbackAddress = sourceAddress;
     control.name = (name.isNotEmpty() ? name
                     : sourceAddress.empty() ? juce::String(control.id)
-                                            : readable(sourceAddress)).toStdString();
+                                            : readableAddress(sourceAddress)).toStdString();
     device->controls.push_back(control);
     changed(true, false);
     return control.id;
@@ -830,6 +1012,8 @@ void Controllers::Impl::unassign(const std::size_t index)
 
 void Controllers::Impl::removeVirtualDevice(const std::string& id)
 {
+    if (learnHardware == id || learnControls == id)
+        stopLearning();
     auto& list = router.assignments;
     const auto project = std::any_of(list.begin(), list.end(), [&](const auto& a) { return a.device == id && a.project; });
     list.erase(std::remove_if(list.begin(), list.end(), [&](const auto& a) { return a.device == id; }), list.end());
@@ -854,14 +1038,10 @@ void Controllers::Impl::removeControl(const std::string& deviceId, const std::st
 
 std::string Controllers::Impl::virtualDeviceFor(const RawDevice& device)
 {
-    const auto id = "auto-" + slug(device.id);
-    if (router.findDevice(id) == nullptr) {
-        control::VirtualDevice made;
-        made.id = id;
-        made.name = device.name.toStdString();
-        router.devices.push_back(made);
-    }
-    return id;
+    for (const auto& made : router.devices)
+        if (made.input == device.id)
+            return made.id;
+    return addVirtualDevice({}, device.id, {});
 }
 
 // ---- Learning ----------------------------------------------------------------------------------------
@@ -869,7 +1049,7 @@ std::string Controllers::Impl::virtualDeviceFor(const RawDevice& device)
 void Controllers::Impl::learnFrom(const std::string& rawId, const control::RawMessage& message)
 {
     // A key let go teaches nothing (its press did).
-    if (control::isNoteAddress(message.address) && message.value <= 0.0)
+    if (control::isPressAddress(message.address) && message.value <= 0.0)
         return;
     const auto* device = rawDevice(rawId);
     if (device == nullptr)
@@ -882,8 +1062,8 @@ void Controllers::Impl::learnFrom(const std::string& rawId, const control::RawMe
                 control->feedbackDevice = feedbackFor(rawId);
                 control->feedbackAddress = control->feedbackDevice.empty() ? std::string() : message.address;
             }
-            learnStatus = juce::String(control->name) + juce::String::fromUTF8(" \xe2\x86\x90 ") + device->name + middleDot()
-                          + readable(message.address);
+            learnStatus = juce::String::fromUTF8(control->name.c_str()) + juce::String::fromUTF8(" \xe2\x86\x90 ") + nameOf(rawId)
+                          + middleDot() + readableAddress(message.address);
             changed(true, false);
         }
         learnSource.reset();
@@ -901,12 +1081,70 @@ void Controllers::Impl::learnFrom(const std::string& rawId, const control::RawMe
     }
     assign(deviceId, controlId, learnTarget, true);
     if (auto* control = router.findControl(deviceId, controlId))
-        learnStatus = learnTargetLabel + juce::String::fromUTF8(" \xe2\x86\x90 ") + juce::String(control->name);
+        learnStatus = learnTargetLabel + juce::String::fromUTF8(" \xe2\x86\x90 ") + juce::String::fromUTF8(control->name.c_str());
     selectedDevice = deviceId;
     selectedControl = controlId;
     learnTarget.clear();
     learnTargetLabel.clear();
     refreshGate();
+}
+
+bool Controllers::Impl::learnDevice(const RawDevice& source, const control::RawMessage& message)
+{
+    const auto letGo = control::isPressAddress(message.address) && message.value <= 0.0;
+    if (!learnHardware.empty()) {
+        if (!isInput(source.kind))
+            return false;
+        if (letGo)
+            return true;
+        if (auto* device = router.findDevice(learnHardware)) {
+            setDeviceInput(*device, source.id);
+            // A new device is named after what it is.
+            if (device->controls.empty() && defaultDeviceName(device->name)) {
+                std::set<std::string> names;
+                for (const auto& other : router.devices)
+                    if (other.id != device->id)
+                        names.insert(other.name);
+                const auto base = nameOf(source.id);
+                auto unique = base;
+                for (auto number = 2; names.contains(unique.toStdString()); ++number)
+                    unique = base + " " + juce::String(number);
+                device->name = unique.toStdString();
+            }
+            learnStatus = juce::String::fromUTF8(device->name.c_str()) + juce::String::fromUTF8(" \xe2\x86\x90 ") + nameOf(source.id);
+        }
+        learnHardware.clear();
+        return true;
+    }
+    if (!learnControls.empty()) {
+        auto* device = router.findDevice(learnControls);
+        if (device == nullptr) {
+            learnControls.clear();
+            return false;
+        }
+        if (device->input != source.id || letGo)
+            return false;
+        const auto known = std::any_of(device->controls.begin(), device->controls.end(), [&](const auto& control) {
+            return control.sourceDevice == source.id && control.sourceAddress == message.address;
+        });
+        if (!known) {
+            selectedDevice = device->id;
+            selectedControl = addControl(device->id, {}, control::kindForAddress(message.address), source.id, message.address);
+            learnStatus = juce::String::fromUTF8(device->name.c_str()) + ui::Ls(" : nouvelle r\xc3\xa8gle ", ": new rule ")
+                          + readableAddress(message.address);
+        }
+        // And it moves what it already moves.
+        return false;
+    }
+    return false;
+}
+
+void Controllers::Impl::stopLearning()
+{
+    learnHardware.clear();
+    learnControls.clear();
+    learnSource.reset();
+    pickTarget.reset();
 }
 
 // ---- Files ---------------------------------------------------------------------------------------------
@@ -920,10 +1158,7 @@ juce::var Controllers::Impl::globalState() const
         auto item = object();
         set(item, "id", juce::String(device->id));
         set(item, "name", device->name);
-        set(item, "kind", device->kind == RawKind::midiIn    ? "midi-in"
-                          : device->kind == RawKind::midiOut ? "midi-out"
-                          : device->kind == RawKind::osc     ? "osc"
-                                                             : "plugin");
+        set(item, "kind", rawKindName(device->kind));
         set(item, "enabled", device->enabled);
         set(item, "notes", device->notes);
         if (device->kind == RawKind::osc) {
@@ -940,6 +1175,8 @@ juce::var Controllers::Impl::globalState() const
         auto item = object();
         set(item, "id", juce::String(device.id));
         set(item, "name", juce::String(device.name));
+        set(item, "input", juce::String(device.input));
+        set(item, "output", juce::String(device.output));
         juce::Array<juce::var> controls;
         for (const auto& control : device.controls) {
             auto entry = object();
@@ -979,8 +1216,7 @@ void Controllers::Impl::restoreGlobal(const juce::var& state)
             auto& device = *raw.back();
             device.id = id;
             device.name = text(item, "name", juce::String(id));
-            device.kind = kind == "midi-in" ? RawKind::midiIn : kind == "midi-out" ? RawKind::midiOut : kind == "osc" ? RawKind::osc
-                                                                                                                       : RawKind::plugin;
+            device.kind = rawKindNamed(kind);
             device.enabled = static_cast<bool>(item.getProperty("enabled", true));
             device.notes = static_cast<bool>(item.getProperty("notes", true));
             if (device.kind == RawKind::osc) {
@@ -996,6 +1232,8 @@ void Controllers::Impl::restoreGlobal(const juce::var& state)
             control::VirtualDevice device;
             device.id = text(item, "id").toStdString();
             device.name = text(item, "name").toStdString();
+            device.input = text(item, "input").toStdString();
+            device.output = text(item, "output").toStdString();
             if (device.id.empty() || router.findDevice(device.id) != nullptr)
                 continue;
             if (const auto* controls = item.getProperty("controls", {}).getArray())
@@ -1013,6 +1251,11 @@ void Controllers::Impl::restoreGlobal(const juce::var& state)
                     control.chain = chainFrom(entry.getProperty("chain", {}));
                     device.controls.push_back(control);
                 }
+            // Settings made before a device had its own hardware.
+            if (!item.hasProperty("input")) {
+                device.input = mostUsed(device, false);
+                device.output = mostUsed(device, true);
+            }
             router.devices.push_back(device);
         }
     if (const auto* list = state.getProperty("assignments", {}).getArray())
@@ -1070,10 +1313,8 @@ juce::var Controllers::Impl::describe() const
         auto item = object();
         set(item, "id", juce::String(device->id));
         set(item, "name", device->name);
-        set(item, "kind", device->kind == RawKind::midiIn    ? "midi-in"
-                          : device->kind == RawKind::midiOut ? "midi-out"
-                          : device->kind == RawKind::osc     ? "osc"
-                                                             : "plugin");
+        set(item, "kind", rawKindName(device->kind));
+        set(item, "family", familyOf(*device));
         set(item, "enabled", device->enabled);
         set(item, "present", device->present);
         set(item, "notes", device->notes);
@@ -1095,6 +1336,8 @@ juce::var Controllers::Impl::describe() const
         auto item = object();
         set(item, "id", juce::String(device.id));
         set(item, "name", juce::String(device.name));
+        set(item, "input", juce::String(device.input));
+        set(item, "output", juce::String(device.output));
         juce::Array<juce::var> controls;
         for (const auto& control : device.controls) {
             auto entry = object();
@@ -1136,6 +1379,8 @@ juce::var Controllers::Impl::describe() const
     set(result, "plugins", loaded);
     set(result, "learning", learnMode);
     set(result, "learnTarget", juce::String(learnTarget));
+    set(result, "learnHardware", juce::String(learnHardware));
+    set(result, "learnControls", juce::String(learnControls));
     set(result, "learnStatus", learnStatus);
     return result;
 }
@@ -1146,7 +1391,21 @@ juce::var Controllers::Impl::command(const juce::var& request)
     const auto fail = [](const juce::String& message) { return juce::var(message); };
     const auto device = text(request, "device").toStdString();
     const auto controlId = text(request, "control").toStdString();
-    if (action == "status" || action == "show")
+    if (action == "show") {
+        // The window on a tab, a device, a rule.
+        if (static_cast<bool>(request.getProperty("center", false)))
+            centreWindow = true;
+        const auto tabName = text(request, "tab");
+        if (tabName.isNotEmpty())
+            requestedTab = tabName == "hardware" ? 1 : tabName == "assignments" ? 2 : 0;
+        if (router.findDevice(device) != nullptr) {
+            selectedDevice = device;
+            selectedControl = router.findControl(device, controlId) != nullptr ? controlId : std::string();
+            requestedTab = 0;
+        }
+        return describe();
+    }
+    if (action == "status")
         return describe();
     if (action == "scan") {
         scanMidi();
@@ -1195,9 +1454,56 @@ juce::var Controllers::Impl::command(const juce::var& request)
         return describe();
     }
     if (action == "add_virtual") {
+        const auto input = text(request, "input").toStdString();
+        const auto output = text(request, "output").toStdString();
+        if (!input.empty() && (rawDevice(input) == nullptr || !isInput(rawDevice(input)->kind)))
+            return fail("no raw input \"" + juce::String(input) + "\"");
+        if (!output.empty() && (rawDevice(output) == nullptr || !isOutput(rawDevice(output)->kind)))
+            return fail("no raw output \"" + juce::String(output) + "\"");
         auto result = object();
-        set(result, "device", juce::String(addVirtualDevice(text(request, "name"))));
+        set(result, "device", juce::String(addVirtualDevice(text(request, "name"), input, output)));
         return result;
+    }
+    if (action == "set_virtual") {
+        auto* found = router.findDevice(device);
+        if (found == nullptr)
+            return fail("no virtual device \"" + juce::String(device) + "\"");
+        if (request.hasProperty("input")) {
+            const auto input = text(request, "input").toStdString();
+            if (!input.empty() && (rawDevice(input) == nullptr || !isInput(rawDevice(input)->kind)))
+                return fail("no raw input \"" + juce::String(input) + "\"");
+            setDeviceInput(*found, input);
+        }
+        if (request.hasProperty("output")) {
+            const auto output = text(request, "output").toStdString();
+            if (!output.empty() && (rawDevice(output) == nullptr || !isOutput(rawDevice(output)->kind)))
+                return fail("no raw output \"" + juce::String(output) + "\"");
+            setDeviceOutput(*found, output);
+        }
+        if (request.hasProperty("name") && text(request, "name").isNotEmpty())
+            found->name = text(request, "name").toStdString();
+        changed(true, false);
+        return describe();
+    }
+    if (action == "duplicate_virtual") {
+        const auto made = duplicateVirtualDevice(device);
+        if (made.empty())
+            return fail("no virtual device \"" + juce::String(device) + "\"");
+        auto result = object();
+        set(result, "device", juce::String(made));
+        return result;
+    }
+    if (action == "learn_hardware" || action == "learn_controls") {
+        const auto on = static_cast<bool>(request.getProperty("on", true));
+        const auto* found = router.findDevice(device);
+        if (on && found == nullptr)
+            return fail("no virtual device \"" + juce::String(device) + "\"");
+        if (on && action == "learn_controls" && found->input.empty())
+            return fail("the device has no input yet: learn_hardware or set_virtual first");
+        stopLearning();
+        if (on)
+            (action == "learn_hardware" ? learnHardware : learnControls) = device;
+        return describe();
     }
     if (action == "remove_virtual") {
         removeVirtualDevice(device);
@@ -1328,8 +1634,9 @@ juce::var Controllers::Impl::command(const juce::var& request)
         set(result, "messages", list);
         return result;
     }
-    return fail("action is status, scan, add_osc, set_raw, remove_raw, inject, add_virtual, remove_virtual, add_control, "
-                "set_control, remove_control, assign, unassign, learn, targets, value, apply, feedback or monitor");
+    return fail("action is status, scan, add_osc, set_raw, remove_raw, inject, add_virtual, set_virtual, duplicate_virtual, "
+                "remove_virtual, learn_hardware, learn_controls, add_control, set_control, remove_control, assign, unassign, learn, "
+                "targets, value, apply, feedback or monitor");
 }
 
 // ---- The public face ---------------------------------------------------------------------------------
@@ -1356,6 +1663,11 @@ void Controllers::drawLearnOverlay()
     impl_->drawOverlay();
 }
 
+void Controllers::pollKeys()
+{
+    impl_->pollKeys();
+}
+
 void Controllers::setLearning(const bool on)
 {
     impl_->learnMode = on;
@@ -1363,6 +1675,7 @@ void Controllers::setLearning(const bool on)
     if (!on) {
         impl_->learnTarget.clear();
         impl_->learnSource.reset();
+        impl_->pickTarget.reset();
     }
 }
 

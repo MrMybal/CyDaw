@@ -48,6 +48,8 @@ const juce::Identifier clips("clips");
 const juce::Identifier colour("colour");
 const juce::Identifier connections("connections");
 const juce::Identifier curve("curve");
+// A Bezier point's handles: [inTime, inValue, outTime, outValue].
+const juce::Identifier handles("handles");
 const juce::Identifier curveAmount("curveAmount");
 const juce::Identifier cutoffHz("cutoffHz");
 const juce::Identifier destination("destination");
@@ -70,6 +72,7 @@ const juce::Identifier filterCutoffHz("filterCutoffHz");
 const juce::Identifier format("format");
 const juce::Identifier gain("gain");
 const juce::Identifier gainAutomation("gainAutomation");
+const juce::Identifier clipLanes("lanes");
 const juce::Identifier gainDb("gainDb");
 const juce::Identifier id("id");
 const juce::Identifier inline_("inline");
@@ -184,7 +187,31 @@ std::uint64_t idOf(const juce::var& value)
 
 Engine::AutomationCurve curveOf(const juce::DynamicObject& point)
 {
-    return static_cast<Engine::AutomationCurve>(juce::jlimit(0, 1, static_cast<int>(point.getProperty(keys::curve))));
+    return static_cast<Engine::AutomationCurve>(engine::clampedCurveShape(static_cast<int>(point.getProperty(keys::curve))));
+}
+
+// A point's handles, written only when it has some.
+void writeHandles(juce::DynamicObject& point, const engine::CurveHandles& handles)
+{
+    if (handles == engine::CurveHandles {})
+        return;
+    juce::Array<juce::var> values;
+    for (const auto value : { handles.inTime, handles.inValue, handles.outTime, handles.outValue })
+        values.add(static_cast<double>(value));
+    point.setProperty(keys::handles, values);
+}
+
+engine::CurveHandles handlesOf(const juce::DynamicObject& point)
+{
+    engine::CurveHandles handles;
+    if (const auto* values = point.getProperty(keys::handles).getArray(); values != nullptr && values->size() >= 4) {
+        const auto read = [values](const int index) {
+            const auto value = static_cast<float>(static_cast<double>((*values)[index]));
+            return std::isfinite(value) ? value : 0.0f;
+        };
+        handles = { read(0), read(1), read(2), read(3) };
+    }
+    return handles;
 }
 
 float curveAmountOf(const juce::DynamicObject& point)
@@ -530,6 +557,7 @@ juce::var automationPointsToVar(const std::vector<Engine::AutomationPoint>& poin
         value->setProperty(keys::valueDb, point.valueDb);
         value->setProperty(keys::curve, static_cast<int>(point.curve));
         value->setProperty(keys::curveAmount, point.curveAmount);
+        writeHandles(*value, point.handles);
         values.add(juce::var(value.get()));
     }
     return values;
@@ -552,12 +580,56 @@ juce::var parameterLanesToVar(const ParameterLanes& lanes)
             item->setProperty(keys::value, point.valueDb);
             item->setProperty(keys::curve, static_cast<int>(point.curve));
             item->setProperty(keys::curveAmount, point.curveAmount);
+            writeHandles(*item, point.handles);
             list.add(juce::var(item.get()));
         }
         lane->setProperty(keys::points, list);
         values.add(juce::var(lane.get()));
     }
     return values;
+}
+
+// A clip's automation lanes: [{binding, points:[{time, value, curve, curveAmount}]}].
+juce::var clipLanesToVar(const std::map<juce::String, std::vector<Engine::AutomationPoint>>& lanes)
+{
+    ParameterLanes shaped;
+    shaped.lanes = lanes;
+    return parameterLanesToVar(shaped);
+}
+
+std::map<juce::String, std::vector<Engine::AutomationPoint>> readClipLanes(const juce::DynamicObject& clip)
+{
+    std::map<juce::String, std::vector<Engine::AutomationPoint>> lanes;
+    const auto* list = clip.getProperty(keys::clipLanes).getArray();
+    if (list == nullptr)
+        return lanes;
+    std::uint64_t nextId = 1;
+    for (const auto& laneValue : *list) {
+        const auto* lane = laneValue.getDynamicObject();
+        if (lane == nullptr)
+            continue;
+        const auto name = lane->getProperty(keys::binding).toString();
+        const auto* points = lane->getProperty(keys::points).getArray();
+        if (name.isEmpty() || points == nullptr)
+            continue;
+        auto& stored = lanes[name];
+        for (const auto& pointValue : *points)
+            if (const auto* item = pointValue.getDynamicObject()) {
+                Engine::AutomationPoint point;
+                point.id = nextId++;
+                point.timeSeconds = static_cast<double>(item->getProperty(keys::time));
+                point.valueDb = static_cast<float>(static_cast<double>(item->getProperty(keys::value)));
+                point.curve = curveOf(*item);
+                point.curveAmount = static_cast<float>(static_cast<double>(item->getProperty(keys::curveAmount)));
+                point.handles = handlesOf(*item);
+                if (std::isfinite(point.valueDb) && std::isfinite(point.timeSeconds))
+                    stored.push_back(point);
+            }
+        std::stable_sort(stored.begin(), stored.end(), [](const auto& a, const auto& b) { return a.timeSeconds < b.timeSeconds; });
+        if (stored.empty())
+            lanes.erase(name);
+    }
+    return lanes;
 }
 
 void readParameterLanes(const juce::DynamicObject& track, ParameterLanes& lanes)
@@ -580,9 +652,9 @@ void readParameterLanes(const juce::DynamicObject& track, ParameterLanes& lanes)
                     point.id = lanes.nextId++;
                     point.timeSeconds = std::max(0.0, static_cast<double>(item->getProperty(keys::time)));
                     point.valueDb = static_cast<float>(static_cast<double>(item->getProperty(keys::value)));
-                    point.curve = static_cast<int>(item->getProperty(keys::curve)) != 0 ? Engine::AutomationCurve::bezier
-                                                                                     : Engine::AutomationCurve::linear;
+                    point.curve = curveOf(*item);
                     point.curveAmount = static_cast<float>(static_cast<double>(item->getProperty(keys::curveAmount)));
+                    point.handles = handlesOf(*item);
                     if (std::isfinite(point.valueDb) && std::isfinite(point.timeSeconds))
                         stored.push_back(point);
                 }
@@ -671,6 +743,8 @@ juce::var eventsToVar(const std::vector<Engine::AudioEvent>& events, const juce:
         value->setProperty(keys::stretchMarkers, stretchMarkersToVar(event.stretchMarkers, true));
         if (event.pitchSemitones != 0.0)
             value->setProperty("pitch", event.pitchSemitones);
+        if (!event.lanes.empty())
+            value->setProperty(keys::clipLanes, clipLanesToVar(event.lanes));
         values.add(juce::var(value.get()));
     }
     return values;
@@ -695,6 +769,8 @@ juce::var audioClipToVar(const Engine::AudioClip& clip, const juce::File& projec
     value->setProperty(keys::stretchMarkers, stretchMarkersToVar(clip.stretchMarkers, false));
     value->setProperty(keys::events, eventsToVar(clip.events, projectFile));
     value->setProperty(keys::gainAutomation, automationPointsToVar(clip.automation));
+    if (!clip.lanes.empty())
+        value->setProperty(keys::clipLanes, clipLanesToVar(clip.lanes));
     value->setProperty(keys::fadeIn, clip.fadeInSeconds);
     value->setProperty(keys::fadeOut, clip.fadeOutSeconds);
     value->setProperty(keys::colour, static_cast<juce::int64>(clip.colour));
@@ -759,6 +835,8 @@ juce::var launcherClipToVar(const Engine::LauncherClip& clip, const juce::File& 
     value->setProperty(keys::eventTimeline, clip.usesEventTimeline);
     value->setProperty(keys::events, eventsToVar(clip.events, projectFile));
     value->setProperty(keys::gainAutomation, automationPointsToVar(clip.automation));
+    if (!clip.lanes.empty())
+        value->setProperty(keys::clipLanes, clipLanesToVar(clip.lanes));
     return juce::var(value.get());
 }
 
@@ -791,6 +869,7 @@ juce::var pluginsToVar(Engine& engine, const std::size_t trackIndex, const Engin
                 pointValue->setProperty(keys::value, point.normalisedValue);
                 pointValue->setProperty(keys::curve, static_cast<int>(point.curve));
                 pointValue->setProperty(keys::curveAmount, point.curveAmount);
+                writeHandles(*pointValue, point.handles);
                 points.add(juce::var(pointValue.get()));
             }
             laneValue->setProperty(keys::points, points);
@@ -844,6 +923,25 @@ juce::File resolveAsset(const juce::String& path, const juce::File& projectFile,
     return folder.getChildFile(normalised);
 }
 
+// A volume lane as saved: its points, their shapes and handles.
+std::vector<Engine::AutomationPoint> readGainPoints(const juce::var& points)
+{
+    std::vector<Engine::AutomationPoint> read;
+    if (const auto* values = points.getArray())
+        for (const auto& value : *values)
+            if (const auto* point = value.getDynamicObject()) {
+                Engine::AutomationPoint item;
+                item.timeSeconds = number(*point, keys::time);
+                item.valueDb = toFloat(point->getProperty(keys::valueDb));
+                item.curve = curveOf(*point);
+                item.curveAmount = curveAmountOf(*point);
+                item.handles = handlesOf(*point);
+                if (std::isfinite(item.timeSeconds) && std::isfinite(item.valueDb))
+                    read.push_back(item);
+            }
+    return read;
+}
+
 template <typename Add, typename SetCurve>
 void restoreGainPoints(const juce::var& points, Add&& add, SetCurve&& setCurve)
 {
@@ -889,8 +987,9 @@ bool readEvents(const juce::Array<juce::var>& saved, const juce::File& fallbackS
         restored.sourceTempoBpm = number(*event, keys::sourceTempo);
         restored.gainDb = event->hasProperty(keys::gainDb) ? toFloat(event->getProperty(keys::gainDb)) : 0.0f;
         restored.stretchMode = static_cast<Engine::StretchMode>(
-            juce::jlimit(0, 3, static_cast<int>(event->getProperty(keys::stretchMode))));
+            juce::jlimit(0, Engine::stretchModeCount - 1, static_cast<int>(event->getProperty(keys::stretchMode))));
         restored.pitchSemitones = numberOr(*event, "pitch", 0.0);
+        restored.lanes = readClipLanes(*event);
         if (const auto* markers = event->getProperty(keys::stretchMarkers).getArray())
             for (const auto& markerValue : *markers)
                 if (const auto* marker = markerValue.getDynamicObject())
@@ -976,7 +1075,7 @@ void restoreAudioClip(Engine& engine, const std::size_t trackIndex, const juce::
     if (clipId != 0) {
         (void) engine.updateAudioClip(trackIndex, clipId, startSeconds, offsetSeconds, durationSeconds, fadeInSeconds,
                                       fadeOutSeconds, numberOr(clip, keys::sourceDuration, durationSeconds));
-        const auto stretchMode = juce::jlimit(0, 3, clip.hasProperty(keys::stretchMode)
+        const auto stretchMode = juce::jlimit(0, Engine::stretchModeCount - 1, clip.hasProperty(keys::stretchMode)
                                                         ? static_cast<int>(clip.getProperty(keys::stretchMode))
                                                         : 0);
         (void) engine.setAudioClipStretchSettings(trackIndex, clipId, numberOr(clip, keys::sourceTempo, 0.0),
@@ -1065,6 +1164,8 @@ void restoreAudioClip(Engine& engine, const std::size_t trackIndex, const juce::
         [&](const std::uint64_t pointId, const Engine::AutomationCurve curve, const float amount) {
             (void) engine.setAudioClipAutomationPointCurve(trackIndex, clipId, pointId, curve, amount);
         });
+    if (auto lanes = readClipLanes(clip); !lanes.empty())
+        (void) engine.setAudioClipLanes(trackIndex, clipId, std::move(lanes));
 }
 
 void restorePlugin(Engine& engine, const std::size_t trackIndex, const juce::String& path,
@@ -1104,15 +1205,13 @@ void restorePlugin(Engine& engine, const std::size_t trackIndex, const juce::Str
         const auto* points = lane->getProperty(keys::points).getArray();
         if (points == nullptr)
             continue;
+        std::vector<Engine::PluginAutomationPoint> restored;
         for (const auto& pointValue : *points)
-            if (const auto* point = pointValue.getDynamicObject()) {
-                const auto pointId = engine.addPluginAutomationPoint(trackIndex, pluginIndex, parameterIndex,
-                                                                     parameterName, number(*point, keys::time),
-                                                                     toFloat(point->getProperty(keys::value)));
-                if (pointId != 0 && point->hasProperty(keys::curve))
-                    (void) engine.setPluginAutomationPointCurve(trackIndex, pluginIndex, parameterIndex, pointId,
-                                                                curveOf(*point), curveAmountOf(*point));
-            }
+            if (const auto* point = pointValue.getDynamicObject())
+                restored.push_back({ 0, number(*point, keys::time), toFloat(point->getProperty(keys::value)), curveOf(*point),
+                                     curveAmountOf(*point), handlesOf(*point) });
+        if (!restored.empty())
+            engine.replacePluginAutomationPoints(trackIndex, pluginIndex, parameterIndex, parameterName, std::move(restored));
     }
 }
 
@@ -1152,6 +1251,8 @@ void restoreLauncherClip(Engine& engine, const std::size_t trackIndex, const juc
         [&](const std::uint64_t pointId, const Engine::AutomationCurve curve, const float amount) {
             (void) engine.setLauncherClipAutomationPointCurve(trackIndex, sceneIndex, pointId, curve, amount);
         });
+    if (auto lanes = readClipLanes(clip); !lanes.empty())
+        (void) engine.setLauncherClipLanes(trackIndex, sceneIndex, std::move(lanes));
     if (!usesTimeline || savedEvents == nullptr)
         return;
     std::vector<Engine::AudioEvent> events;
@@ -1300,14 +1401,8 @@ std::optional<std::size_t> restoreAudioTrack(Studio& studio, const SavedAudioTra
     } else {
         restorePlugin(engine, trackIndex, saved.legacyPluginPath, saved.legacyPluginState, {}, projectFile, warnings);
     }
-    restoreGainPoints(
-        saved.automation,
-        [&](const double seconds, const float valueDb) {
-            return engine.addAutomationPoint(trackIndex, seconds, valueDb);
-        },
-        [&](const std::uint64_t pointId, const Engine::AutomationCurve curve, const float amount) {
-            (void) engine.setAutomationPointCurve(trackIndex, pointId, curve, amount);
-        });
+    if (auto points = readGainPoints(saved.automation); !points.empty())
+        engine.replaceAutomationPoints(trackIndex, std::move(points));
     if (const auto* clips = saved.launcherClips.getArray())
         for (const auto& clipValue : *clips)
             if (const auto* clip = clipValue.getDynamicObject())
@@ -1486,12 +1581,8 @@ std::uint64_t restoreMidiTrack(Studio& studio, const juce::DynamicObject& saved,
                 restoreMidiClip(engine, trackId, *clip);
     engine.setMidiTrackMixer(trackId, toFloat(saved.getProperty(keys::gainDb)), toFloat(saved.getProperty(keys::pan)),
                              static_cast<bool>(saved.getProperty(keys::mute)), static_cast<bool>(saved.getProperty(keys::solo)));
-    restoreGainPoints(
-        saved.getProperty(keys::gainAutomation),
-        [&](const double seconds, const float valueDb) { return engine.addMidiAutomationPoint(trackId, seconds, valueDb); },
-        [&](const std::uint64_t pointId, const Engine::AutomationCurve curve, const float amount) {
-            (void) engine.setMidiAutomationPointCurve(trackId, pointId, curve, amount);
-        });
+    if (auto points = readGainPoints(saved.getProperty(keys::gainAutomation)); !points.empty())
+        engine.replaceMidiAutomationPoints(trackId, std::move(points));
     const auto graph = saved.getProperty(keys::nodeGraph);
     auto& state = studio.adoptMidiTrack(trackId, graph.getDynamicObject() != nullptr ? graph : juce::var());
     // CyDAW 2's own keys; CyDAW 1 ignores them.
@@ -1778,6 +1869,10 @@ juce::var buildDocument(Studio& studio, const juce::File& projectFile, const boo
                     juce::Array<juce::var> pair;
                     pair.add(point.beats);
                     pair.add(static_cast<double>(point.value));
+                    if (point.shape != 0 || point.handles != engine::CurveHandles {})
+                        for (const auto value : { static_cast<float>(point.shape), point.bend, point.handles.inTime, point.handles.inValue,
+                                                  point.handles.outTime, point.handles.outValue })
+                            pair.add(static_cast<double>(value));
                     list.add(pair);
                 }
                 auto* lane = new juce::DynamicObject();
@@ -2003,8 +2098,16 @@ bool DocumentLoad::next()
                             std::vector<MasterClip::Point> points;
                             if (const auto* values = lane.getProperty("points", juce::var()).getArray())
                                 for (const auto& value : *values)
-                                    if (const auto* pair = value.getArray(); pair != nullptr && pair->size() >= 2)
-                                        points.push_back({ static_cast<double>((*pair)[0]), static_cast<float>(static_cast<double>((*pair)[1])) });
+                                    if (const auto* pair = value.getArray(); pair != nullptr && pair->size() >= 2) {
+                                        MasterClip::Point point { static_cast<double>((*pair)[0]), static_cast<float>(static_cast<double>((*pair)[1])) };
+                                        if (pair->size() >= 8) {
+                                            const auto at = [pair](const int index) { return static_cast<float>(static_cast<double>((*pair)[index])); };
+                                            point.shape = engine::clampedCurveShape(static_cast<int>((*pair)[2]));
+                                            point.bend = std::clamp(at(3), -1.0f, 1.0f);
+                                            point.handles = { at(4), at(5), at(6), at(7) };
+                                        }
+                                        points.push_back(point);
+                                    }
                             std::sort(points.begin(), points.end(), [](const auto& a, const auto& b) { return a.beats < b.beats; });
                             if (binding.isNotEmpty() && !points.empty())
                                 clip.lanes[binding] = std::move(points);

@@ -856,6 +856,97 @@ void meter(const char* id, const ImVec2 size, const float peakLeft, const float 
     ImGui::PopID();
 }
 
+bool pictureToggle(const char* id, bool* value, const ImU32 onColour, const Picture picture, const char* tip, float width)
+{
+    const auto& p = theme::palette();
+    const auto height = ImGui::GetFrameHeight();
+    if (width <= 0.0f)
+        width = std::round(height * 1.5f);
+    const auto origin = ImGui::GetCursorScreenPos();
+    const auto clicked = ImGui::InvisibleButton(id, ImVec2(width, height));
+    learnItem();
+    if (clicked)
+        *value = !*value;
+    const auto hovered = ImGui::IsItemHovered();
+    auto* list = ImGui::GetWindowDrawList();
+    const auto on = *value;
+    list->AddRectFilled(origin, ImVec2(origin.x + width, origin.y + height), on ? onColour : (hovered ? p.bg4 : p.bg3),
+                        ImGui::GetStyle().FrameRounding);
+    // Its drawing inside, clear of the edges.
+    const auto insetY = std::round(height * 0.22f);
+    const auto insetX = std::round(std::max(insetY, (width - (height - insetY * 2.0f) * 1.6f) * 0.5f));
+    picture(list, ImVec2(origin.x + insetX, origin.y + insetY), ImVec2(origin.x + width - insetX, origin.y + height - insetY),
+            on ? p.bg0 : (hovered ? p.text : p.textDim));
+    if (tip != nullptr)
+        tooltip(tip);
+    return clicked;
+}
+
+namespace picture {
+
+// A horseshoe magnet tilted as the usual sign, its two poles apart.
+void magnet(ImDrawList* list, const ImVec2 min, const ImVec2 max, const ImU32 colour)
+{
+    // Drawn in its own units (a U opening upwards, radius 1, legs to
+    // -1.45), turned 45 degrees and fitted in the box.
+    const auto size = std::min(max.x - min.x, max.y - min.y);
+    const auto scale = size / 2.9f;
+    const auto thickness = std::max(1.5f, scale * 0.95f);
+    const ImVec2 centre((min.x + max.x) * 0.5f, (min.y + max.y) * 0.5f);
+    const auto place = [&](const float x, const float y) {
+        // Its middle (0, -0.22) on the box's, turned 45 degrees.
+        constexpr auto turn = 0.70710678f;
+        const auto dx = x;
+        const auto dy = y + 0.22f;
+        return ImVec2(centre.x + (dx * turn - dy * turn) * scale, centre.y + (dx * turn + dy * turn) * scale);
+    };
+    constexpr auto legTop = -1.45f;
+    constexpr auto poleEnd = -0.55f;
+    list->PathLineTo(place(1.0f, poleEnd));
+    for (auto step = 0; step <= 12; ++step) {
+        const auto angle = IM_PI * static_cast<float>(step) / 12.0f;
+        list->PathLineTo(place(std::cos(angle), std::sin(angle) * 1.0f));
+    }
+    list->PathLineTo(place(-1.0f, poleEnd));
+    list->PathStroke(colour, thickness);
+    // The poles, apart from the body.
+    for (const auto side : { -1.0f, 1.0f })
+        list->AddLine(place(side, legTop), place(side, poleEnd - 0.45f), colour, thickness);
+}
+
+// Two arrows turning round: the font's loop glyph.
+void loop(ImDrawList* list, const ImVec2 min, const ImVec2 max, const ImU32 colour)
+{
+    const auto size = ImGui::GetFontSize();
+    const auto extent = ImGui::GetFont()->CalcTextSizeA(size, FLT_MAX, 0.0f, icon::loop);
+    list->AddText(ImGui::GetFont(), size, ImVec2((min.x + max.x - extent.x) * 0.5f, (min.y + max.y - extent.y) * 0.5f), colour, icon::loop);
+}
+
+} // namespace picture
+
+bool snapToggle(const char* id, bool* on)
+{
+    ImGui::PushID(id);
+    const auto changed = pictureToggle("##snap", on, theme::palette().accent, picture::magnet,
+                                       L("Aimant : les points, les sons et les bornes se calent sur la grille. Alt pendant un geste : l'inverse.",
+                                         "Snap: points, sounds and bounds land on the grid. Alt during a gesture: the other way."));
+    ImGui::PopID();
+    return changed;
+}
+
+bool loopToggle(const char* id, bool* on, const char* tip)
+{
+    ImGui::PushID(id);
+    const auto changed = pictureToggle("##loop", on, theme::palette().accent, picture::loop, tip);
+    ImGui::PopID();
+    return changed;
+}
+
+bool snapping(const bool on)
+{
+    return on != ImGui::GetIO().KeyAlt;
+}
+
 bool toggle(const char* label, bool* value, const ImU32 onColour, ImVec2 size, const char* tip)
 {
     const auto& p = theme::palette();

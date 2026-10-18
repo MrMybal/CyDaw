@@ -80,10 +80,12 @@ sons intégrée.
   d’une vidéo devient automatiquement un clip audio éditable dans son propre bus.
 
 **Piloter avec du matériel**
-- Les **contrôleurs MIDI / OSC** : ports MIDI, points OSC (local ou réseau) et appareils apportés par
-  des plug-ins d'application (une manette). Des appareils virtuels faits à partir d'eux, avec une
-  chaîne de modifications dans les deux sens (plage, courbe, encodeur, bascule, zone morte), et le
-  mode **Apprendre** : cliquer une commande de CyDAW, bouger un contrôle.
+- Les **contrôleurs MIDI / OSC**, faits autour de périphériques : votre clavier MIDI, une manette,
+  une tablette OSC (locale ou réseau), le clavier de l'ordinateur. On crée le périphérique, on bouge
+  un de ses contrôles pour que CyDAW reconnaisse le matériel, puis on apprend ses règles en bougeant
+  ses contrôles un par un : chacune a sa chaîne de modifications dans les deux sens (plage, courbe,
+  encodeur, bascule, zone morte) et ce qu'elle pilote, choisi d'un clic dans l'interface. Le mode
+  **Apprendre** marche aussi dans l'autre sens : cliquer une commande de CyDAW, bouger un contrôle.
 
 **Créer ses périphériques**
 - L'**Atelier Plugin** assemble des périphériques à partir de graphes de modules, leur dessine une
@@ -137,7 +139,7 @@ Les tests se lancent avec `ctest -C Release` dans le dossier de compilation.
 - [Édition audio](docs/EDITION_AUDIO.md) · [Architecture](docs/ARCHITECTURE.md)
 - [Cinéma : vidéo, montage audio et bus](docs/CINEMA.md)
 - [Synchronisation du transport : MIDI, JACK, Link](docs/TRANSPORT_SYNC.md)
-- [Contrôleurs MIDI / OSC : appareils RAW, virtuels, apprentissage](docs/CONTROLEURS.md)
+- [Contrôleurs MIDI / OSC : périphériques, règles, apprentissage](docs/CONTROLEURS.md)
 - [Modulateurs : LFO, pas, enveloppes, macros sur chaque périphérique](docs/MODULATEURS.md)
 - [Conteneurs : couches, sélecteur, mid-side, bandes, pavé XY, remplacement](docs/CONTENEURS.md)
 - [Serveur MCP](tools/mcp/README.md)

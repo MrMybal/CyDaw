@@ -198,6 +198,12 @@ public:
     void showDeviceCatalogue() override { state_.openDeviceCatalogue = true; }
     void showModulationGraph(const bool modulation) override { state_.graphShowsModulation = modulation; }
     void openRackPad(const std::optional<std::pair<TrackRef, int>>& pad) override { state_.openRackPad = pad; }
+    void editLauncherClip(const TrackRef& track, const int scene) override
+    {
+        state_.selectedTrack = track;
+        state_.editedClip = ClipRef { track, 0, scene };
+        state_.bringToFront = Panel::editor;
+    }
     void editClip(const TrackRef& track, const std::uint64_t clipId, const int face) override
     {
         state_.selectedTrack = track;

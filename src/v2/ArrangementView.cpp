@@ -40,15 +40,6 @@ float automationValue(const float position)
     return std::sqrt(std::clamp(position, 0.0f, 1.0f)) * (kAutomationMaximumDb - kAutomationMinimumDb) + kAutomationMinimumDb;
 }
 
-// The engine's curve between two points (AudioTrackController).
-float shapedAmount(const float raw, const app::AudioTrackController::AutomationCurve curve, const float curveAmount)
-{
-    const auto amount = std::clamp(raw, 0.0f, 1.0f);
-    if (curve == app::AudioTrackController::AutomationCurve::linear)
-        return amount;
-    return std::clamp(amount + std::clamp(curveAmount, -1.0f, 1.0f) * 2.0f * amount * (1.0f - amount), 0.0f, 1.0f);
-}
-
 const AudioClip* findAudioClip(const app::AudioTrackController& engine, const std::size_t index,
                                const std::uint64_t id)
 {
@@ -96,7 +87,7 @@ double ArrangementView::secondsPerBeat() const
 
 double ArrangementView::snap(const double seconds, const bool force) const
 {
-    if ((state_.snapBeats <= 0.0 || ImGui::GetIO().KeyAlt) && !force)
+    if ((state_.snapBeats <= 0.0 || !ui::snapping(state_.arrangementSnap)) && !force)
         return std::max(0.0, seconds);
     const auto step = std::max(0.25, state_.snapBeats > 0.0 ? state_.snapBeats : 1.0) * secondsPerBeat();
     return std::max(0.0, std::round(seconds / step) * step);
@@ -167,13 +158,17 @@ void ArrangementView::draw()
     // The menus open from inside the canvas child but live at window level.
     clipPopupId_ = ImGui::GetID("##clipContext");
     trackPopupId_ = ImGui::GetID("##trackContext");
-    automationPopupId_ = ImGui::GetID("##automationContext");
     laneChooserId_ = ImGui::GetID("##laneChooser");
     drawToolbar();
+    drawCurveBar();
     drawCanvas();
     clipContextMenu();
     trackContextMenu();
-    automationContextMenu();
+    // A lane's menu asked for its chooser.
+    if (const auto track = std::exchange(chooseLaneFor_, std::nullopt)) {
+        laneChooserTrack_ = *track;
+        ImGui::OpenPopup(laneChooserId_);
+    }
     laneChooserMenu();
     if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows))
         handleKeys();
@@ -188,6 +183,8 @@ void ArrangementView::drawToolbar()
     ImGui::TextDisabled("%s", L("Piste", "Track"));
 
     ui::toolbarSeparator();
+    (void) ui::snapToggle("arrangementSnap", &state_.arrangementSnap);
+    ImGui::SameLine(0.0f, dp(4.0f));
     ImGui::TextDisabled("%s", L("Grille", "Grid"));
     ImGui::SameLine();
     static constexpr double snaps[] = { 0.0, 4.0, 2.0, 1.0, 0.5, 0.25 };
@@ -292,7 +289,9 @@ void ArrangementView::drawCanvas()
     for (const auto& track : tracks) {
         const auto height = laneDisplayHeight(track);
         const auto automation = studio_.automationVisible(track);
-        const auto band = automation ? std::clamp(height * 0.55f, dp(72.0f), dp(130.0f)) : 0.0f;
+        // The automation band grows with the track (drag its bottom edge),
+        // its clips keeping a row above it.
+        const auto band = automation ? std::clamp(height * 0.55f, dp(72.0f), std::max(dp(72.0f), height - dp(40.0f))) : 0.0f;
         LaneHit hit { track, y, y + height, y + height - band, automation, {}, {} };
         if (automation) {
             hit.scale = laneScale(track, hit.lane);
@@ -367,6 +366,7 @@ void ArrangementView::drawCanvas()
     ImGui::SetCursorScreenPos(lanesMin_);
     ImGui::InvisibleButton("##lanes", ImVec2(std::max(1.0f, lanesMax_.x - lanesMin_.x), std::max(1.0f, lanesMax_.y - lanesMin_.y)),
                            ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight | ImGuiButtonFlags_MouseButtonMiddle);
+    canvasHovered_ = ImGui::IsItemHovered();
     // A sample dragged from the browser.
     if (ImGui::BeginDragDropTarget()) {
         if (const auto* payload = ImGui::AcceptDragDropPayload(kFilePayload)) {
@@ -1120,8 +1120,7 @@ void ArrangementView::handleLaneInput(const std::vector<ClipHit>& clips, const s
         }
     }
 
-    if (drag_ != Drag::none && drag_ != Drag::seek && drag_ != Drag::loop && drag_ != Drag::automationPoint
-        && drag_ != Drag::automationCurve && drag_ != Drag::navigate) {
+    if (drag_ != Drag::none && drag_ != Drag::seek && drag_ != Drag::loop && drag_ != Drag::navigate) {
         if (ImGui::IsMouseDown(ImGuiMouseButton_Left))
             applyDrag(lanes);
         else
@@ -1296,7 +1295,8 @@ void ArrangementView::endDrag(const std::vector<LaneHit>&)
 void ArrangementView::handleKeys()
 {
     const auto& io = ImGui::GetIO();
-    if (io.WantTextInput)
+    // An automation lane clicked last has the keys (its points).
+    if (io.WantTextInput || !focusedCurve_.isEmpty())
         return;
     if (ImGui::IsKeyPressed(ImGuiKey_Delete, false) || ImGui::IsKeyPressed(ImGuiKey_Backspace, false))
         deleteSelection();
@@ -1618,14 +1618,6 @@ ArrangementView::LaneScale ArrangementView::laneScale(const TrackRef& track, juc
     return scale;
 }
 
-float ArrangementView::clampToLane(const float value, const LaneScale& scale)
-{
-    if (scale.volume)
-        return std::clamp(value, kAutomationMinimumDb, kAutomationMaximumDb);
-    return static_cast<float>(std::clamp(static_cast<double>(value), std::min(scale.parameter.minimum, scale.parameter.maximum),
-                                         std::max(scale.parameter.minimum, scale.parameter.maximum)));
-}
-
 juce::String ArrangementView::formatLaneValue(const float value, const LaneScale& scale)
 {
     if (scale.volume)
@@ -1633,25 +1625,121 @@ juce::String ArrangementView::formatLaneValue(const float value, const LaneScale
     return visual::formatValue(scale.parameter, value);
 }
 
-float ArrangementView::automationY(const float value, const LaneHit& lane) const
+juce::String ArrangementView::curveKey(const TrackRef& track, const juce::String& lane)
 {
-    // The lane's name keeps the top row.
-    const auto padding = dp(6.0f);
-    const auto top = lane.clipBottom + dp(17.0f);
-    const auto bottom = lane.bottom - padding;
-    const auto position = lane.scale.volume ? automationPosition(value)
-                                            : static_cast<float>(visual::positionOf(lane.scale.parameter, value));
-    return bottom - position * std::max(1.0f, bottom - top);
+    const auto owner = track.master ? juce::String("master")
+                       : track.midi ? "midi" + juce::String(static_cast<juce::int64>(track.midiId))
+                                    : "audio" + juce::String(static_cast<juce::int64>(track.audioIndex));
+    return owner + "|" + lane;
 }
 
-float ArrangementView::automationValueAt(const float y, const LaneHit& lane) const
+curves::Lane ArrangementView::curveLane(const TrackRef& track, const juce::String& name, const LaneScale& scale) const
 {
-    const auto padding = dp(6.0f);
-    const auto top = lane.clipBottom + dp(17.0f);
-    const auto bottom = lane.bottom - padding;
-    const auto position = std::clamp((bottom - y) / std::max(1.0f, bottom - top), 0.0f, 1.0f);
-    return lane.scale.volume ? automationValue(position)
-                             : static_cast<float>(visual::valueAtPosition(lane.scale.parameter, position));
+    const auto& p = theme::palette();
+    curves::Lane lane;
+    if (scale.volume) {
+        // The volume on its squared scale, as the band always showed it.
+        lane.minimum = kAutomationMinimumDb;
+        lane.maximum = kAutomationMaximumDb;
+        lane.toPart = [](const double value) { return static_cast<double>(automationPosition(static_cast<float>(value))); };
+        lane.fromPart = [](const double part) { return static_cast<double>(automationValue(static_cast<float>(part))); };
+        lane.fallback = studio_.trackMix(track).gainDb;
+        lane.colour = p.control;
+    } else {
+        const auto parameter = scale.parameter;
+        lane.minimum = std::min(parameter.minimum, parameter.maximum);
+        lane.maximum = std::max(parameter.minimum, parameter.maximum);
+        lane.toPart = [parameter](const double value) { return visual::positionOf(parameter, value); };
+        lane.fromPart = [parameter](const double part) { return visual::valueAtPosition(parameter, part); };
+        // It glides as the engine plays it: a frequency, a time on their
+        // logarithmic scale.
+        lane.logarithmic = !name.startsWith("plugin:") && studio_.parameterIsLogarithmic(track, name);
+        lane.fallback = parameter.value;
+        lane.colour = p.modulation;
+    }
+    lane.formatValue = [scale](const double value) { return formatLaneValue(static_cast<float>(value), scale); };
+    const auto secondsPerBeat = this->secondsPerBeat();
+    const auto beatsPerBar = std::max(1.0, static_cast<double>(studio_.engine().beatsPerBar()));
+    lane.formatTime = [secondsPerBeat, beatsPerBar](const double seconds) {
+        const auto beats = seconds / std::max(1.0e-9, secondsPerBeat);
+        const auto bar = std::floor(beats / beatsPerBar + 1.0e-9);
+        const auto inBar = beats - bar * beatsPerBar;
+        const auto beat = std::floor(inBar + 1.0e-6);
+        const auto sixteenth = std::floor((inBar - beat) * 4.0 + 1.0e-6);
+        return juce::String(static_cast<int>(bar) + 1) + "." + juce::String(static_cast<int>(beat) + 1) + "."
+               + juce::String(static_cast<int>(sixteenth) + 1) + "  (" + juce::String(seconds, 3) + " s)";
+    };
+    return lane;
+}
+
+curves::View ArrangementView::curveView() const
+{
+    curves::View view;
+    view.xOf = [this](const double seconds) { return timeToX(seconds); };
+    view.timeAt = [this](const float x) { return xToTime(x); };
+    view.snap = [this](const double seconds) { return snap(seconds); };
+    view.cursor = studio_.engine().position();
+    view.minimumTime = 0.0;
+    view.hostInput = true;
+    return view;
+}
+
+std::vector<curves::Point> ArrangementView::laneCurve(const TrackRef& track, const juce::String& lane) const
+{
+    std::vector<curves::Point> points;
+    for (const auto& point : studio_.lanePoints(track, lane))
+        points.push_back({ point.id, point.timeSeconds, point.valueDb, static_cast<int>(point.curve), point.curveAmount, point.handles });
+    return points;
+}
+
+void ArrangementView::setLaneCurve(const TrackRef& track, const juce::String& lane, const std::vector<curves::Point>& points)
+{
+    rememberAutomation(track, lane);
+    std::vector<Studio::AutomationPoint> stored;
+    for (const auto& point : points)
+        stored.push_back({ point.id, std::max(0.0, point.time), static_cast<float>(point.value),
+                           static_cast<Studio::AutomationCurve>(engine::clampedCurveShape(point.shape)), point.bend, point.handles });
+    studio_.setLanePoints(track, lane, stored);
+}
+
+void ArrangementView::unfocusCurves()
+{
+    for (auto& [key, editor] : curveEditors_)
+        editor.setFocused(false);
+    focusedCurve_.clear();
+    focusedCurveTrack_.reset();
+    focusedCurveLane_.clear();
+}
+
+// Over the canvas while lanes are shown: the points picked in the lane last
+// clicked, their values to read and edit (the row stays, so the lanes do
+// not move under the pointer when one is clicked).
+void ArrangementView::drawCurveBar()
+{
+    const auto& p = theme::palette();
+    const auto tracks = studio_.tracks();
+    if (std::none_of(tracks.begin(), tracks.end(), [this](const TrackRef& track) { return studio_.automationVisible(track); })) {
+        unfocusCurves();
+        return;
+    }
+    ImGui::AlignTextToFramePadding();
+    const auto found = curveEditors_.find(focusedCurve_);
+    if (found == curveEditors_.end() || !focusedCurveTrack_ || !studio_.isValid(*focusedCurveTrack_)
+        || !studio_.automationVisible(*focusedCurveTrack_)) {
+        ImGui::TextDisabled("%s", L("Automation : cliquez un point d'un couloir pour lire et modifier ses valeurs, encadrez-en plusieurs pour les modifier ensemble.",
+                                    "Automation: click a lane's point to read and edit its values, frame several to edit them together."));
+        return;
+    }
+    const auto track = *focusedCurveTrack_;
+    auto shown = focusedCurveLane_;
+    const auto scale = laneScale(track, shown);
+    ImGui::TextColored(theme::vec(scale.volume ? p.control : p.modulation), "%s",
+                       (studio_.trackName(track) + juce::String::fromUTF8(" \xc2\xb7 ") + scale.label).toRawUTF8());
+    ImGui::SameLine(0.0f, dp(10.0f));
+    auto points = laneCurve(track, focusedCurveLane_);
+    const auto gridSeconds = state_.snapBeats > 0.0 ? state_.snapBeats * secondsPerBeat() : secondsPerBeat();
+    if (found->second.drawBar(points, curveLane(track, focusedCurveLane_, scale), gridSeconds))
+        setLaneCurve(track, focusedCurveLane_, points);
 }
 
 ImRect ArrangementView::laneLabelRect(const LaneHit& lane) const
@@ -1663,84 +1751,71 @@ ImRect ArrangementView::laneLabelRect(const LaneHit& lane) const
     return { min, ImVec2(min.x + width + dp(8.0f), min.y + size + dp(3.0f)) };
 }
 
-// The lane over time: a line through the points, flat before the first and
-// after the last, curved where a point says so. Its name, top left, is the
-// button that chooses which lane the track shows.
+// The lane over time, its curve editor: the curve as the engine plays it,
+// its points to pick, move, shape. Its name, top left, is the button that
+// chooses which lane the track shows.
 void ArrangementView::drawAutomation(ImDrawList* list, const LaneHit& lane)
 {
     const auto& p = theme::palette();
     const ImVec2 min(lanesMin_.x, lane.clipBottom);
     const ImVec2 max(lanesMax_.x, lane.bottom - 1.0f);
+    // The editor under the lane's name.
+    const ImVec2 editorMin(min.x, lane.clipBottom + dp(12.0f));
     list->AddRectFilled(min, max, theme::alpha(0xff000000u, 0.22f));
     list->AddLine(min, ImVec2(max.x, min.y), p.grid);
+    const auto description = curveLane(lane.track, lane.lane, lane.scale);
     if (lane.scale.volume) {
-        const auto zero = automationY(0.0f, lane);
+        // 0 dB, dashed.
+        const auto pad = dp(5.0f);
+        const auto zero = max.y - pad - static_cast<float>(curves::Editor::partOf(description, 0.0)) * std::max(1.0f, max.y - editorMin.y - pad * 2.0f);
         for (auto x = min.x; x < max.x; x += dp(8.0f))
             list->AddLine(ImVec2(x, zero), ImVec2(std::min(max.x, x + dp(4.0f)), zero), theme::alpha(p.textFaint, 0.35f));
     }
 
     // A device's lane in its own colour, so it reads apart from the volume.
     const auto colour = lane.scale.volume ? p.control : p.modulation;
-    const auto points = studio_.lanePoints(lane.track, lane.lane);
-    // The lane's name, over the curve: the button that chooses the lane.
-    const auto drawLabel = [&] {
-        const auto label = laneLabelRect(lane);
-        const auto labelHovered = (laneChooserTrack_ && *laneChooserTrack_ == lane.track && ImGui::IsPopupOpen(laneChooserId_, 0))
-                                  || ImGui::IsMouseHoveringRect(label.Min, label.Max);
-        list->AddRectFilled(label.Min, label.Max, labelHovered ? theme::mix(p.bg2, colour, 0.35f) : theme::alpha(p.bg1, 0.92f),
-                            dp(3.0f));
-        ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 0.78f);
-        const auto text = lane.scale.label + "  " + juce::String::fromUTF8(icon::chevronDown);
-        list->AddText(ImVec2(label.Min.x + dp(4.0f), label.Min.y + dp(1.0f)), labelHovered ? p.text : theme::alpha(colour, 0.95f),
-                      text.toRawUTF8());
-        if (points.empty())
-            list->AddText(ImVec2(label.Max.x + dp(8.0f), label.Min.y + dp(1.0f)), p.textFaint,
-                          L("clic : ajouter un point", "click: add a point"));
-        ImGui::PopFont();
+    auto points = laneCurve(lane.track, lane.lane);
+    const auto label = laneLabelRect(lane);
+    const auto key = curveKey(lane.track, lane.lane);
+    auto& editor = curveEditors_[key];
+    auto view = curveView();
+    view.hostHovered = canvasHovered_ && drag_ == Drag::none && !label.Contains(ImGui::GetIO().MousePos);
+    view.menu = [this, track = lane.track, name = lane.lane] {
+        if (ImGui::MenuItem(L("Effacer l'automation", "Clear automation"), nullptr, false, !studio_.lanePoints(track, name).empty())) {
+            rememberAutomation(track, name);
+            studio_.setLanePoints(track, name, {});
+        }
+        if (ImGui::MenuItem(L("Choisir le paramètre…", "Choose the parameter…")))
+            chooseLaneFor_ = track;
+        if (ImGui::MenuItem(L("Masquer le couloir", "Hide the lane")))
+            studio_.setAutomationVisible(track, false);
     };
-    if (points.empty()) {
-        const auto value = lane.scale.volume ? studio_.trackMix(lane.track).gainDb : static_cast<float>(lane.scale.parameter.value);
-        const auto level = automationY(value, lane);
-        list->AddLine(ImVec2(min.x, level), ImVec2(max.x, level), theme::alpha(colour, 0.35f), dp(1.0f));
-        drawLabel();
-        return;
+    const auto wasFocused = editor.focused();
+    if (editor.draw(key.toRawUTF8(), editorMin, max, points, description, view))
+        setLaneCurve(lane.track, lane.lane, points);
+    // One lane takes the keys at a time: the one last clicked.
+    if (editor.focused() && (!wasFocused || focusedCurve_ != key)) {
+        for (auto& [other, otherEditor] : curveEditors_)
+            if (other != key)
+                otherEditor.setFocused(false);
+        focusedCurve_ = key;
+        focusedCurveTrack_ = lane.track;
+        focusedCurveLane_ = lane.lane;
+        state_.focused = Panel::arrangement;
+        state_.selectTrack(lane.track);
     }
 
-    list->PushClipRect(min, max, true);
-    list->PathLineTo(ImVec2(min.x, automationY(points.front().valueDb, lane)));
-    for (std::size_t index = 0; index < points.size(); ++index) {
-        const auto& point = points[index];
-        const auto x = timeToX(point.timeSeconds);
-        if (index > 0 && points[index - 1].curve != Studio::AutomationCurve::linear) {
-            const auto& previous = points[index - 1];
-            const auto x0 = timeToX(previous.timeSeconds);
-            const auto steps = std::clamp(static_cast<int>((x - x0) / dp(4.0f)), 2, 64);
-            // On the lane's own scale, as the engine glides.
-            const auto y0 = automationY(previous.valueDb, lane);
-            const auto y1 = automationY(point.valueDb, lane);
-            for (auto step = 1; step < steps; ++step) {
-                const auto raw = static_cast<float>(step) / static_cast<float>(steps);
-                const auto amount = shapedAmount(raw, previous.curve, previous.curveAmount);
-                list->PathLineTo(ImVec2(x0 + (x - x0) * raw,
-                                        lane.scale.volume ? automationY(previous.valueDb + (point.valueDb - previous.valueDb) * amount, lane)
-                                                          : y0 + (y1 - y0) * amount));
-            }
-        }
-        list->PathLineTo(ImVec2(x, automationY(point.valueDb, lane)));
-    }
-    list->PathLineTo(ImVec2(max.x, automationY(points.back().valueDb, lane)));
-    list->PathStroke(colour, dp(1.6f), ImDrawFlags_None);
-    for (const auto& point : points) {
-        const ImVec2 centre(timeToX(point.timeSeconds), automationY(point.valueDb, lane));
-        const auto active = (drag_ == Drag::automationPoint || drag_ == Drag::automationCurve) && automationPoint_ == point.id
-                            && automationTrack_ == lane.track;
-        const auto hovered = hoveredAutomationPoint_ == point.id && automationTrack_ == lane.track;
-        const auto radius = active || hovered ? dp(4.5f) : dp(3.2f);
-        list->AddCircleFilled(centre, radius, active ? p.text : colour, 12);
-        list->AddCircle(centre, radius, p.bg0, 12, 1.0f);
-    }
-    list->PopClipRect();
-    drawLabel();
+    // The lane's name, over the curve: the button that chooses the lane.
+    const auto labelHovered = (laneChooserTrack_ && *laneChooserTrack_ == lane.track && ImGui::IsPopupOpen(laneChooserId_, 0))
+                              || ImGui::IsMouseHoveringRect(label.Min, label.Max);
+    list->AddRectFilled(label.Min, label.Max, labelHovered ? theme::mix(p.bg2, colour, 0.35f) : theme::alpha(p.bg1, 0.92f), dp(3.0f));
+    ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 0.78f);
+    const auto text = lane.scale.label + "  " + juce::String::fromUTF8(icon::chevronDown);
+    list->AddText(ImVec2(label.Min.x + dp(4.0f), label.Min.y + dp(1.0f)), labelHovered ? p.text : theme::alpha(colour, 0.95f), text.toRawUTF8());
+    if (points.empty())
+        list->AddText(ImVec2(label.Max.x + dp(8.0f), label.Min.y + dp(1.0f)), p.textFaint,
+                      L("double-clic : ajouter un point", "double click: add a point"));
+    ImGui::PopFont();
 }
 
 void ArrangementView::rememberAutomation(const TrackRef& track, const juce::String& lane)
@@ -1781,57 +1856,14 @@ bool ArrangementView::redoAutomation()
     return true;
 }
 
-// Clicks on an automation band: a point is dragged (Alt frees it from the
-// grid), a click elsewhere adds one, Alt+drag on a segment bends it, a
-// double click on a point removes it, a click on the lane's name chooses
-// the lane. True when the band took the click.
+// Clicks on an automation band: its name chooses the lane; the rest is its
+// curve editor's (drawn with the lane). True when the band took the click.
 bool ArrangementView::handleAutomationInput(const std::vector<LaneHit>& lanes)
 {
-    const auto& io = ImGui::GetIO();
-    const auto mouse = io.MousePos;
-    const auto laneOf = [&lanes](const TrackRef& track) -> const LaneHit* {
-        for (const auto& lane : lanes)
-            if (lane.track == track)
-                return &lane;
-        return nullptr;
-    };
-
-    if (drag_ == Drag::automationPoint || drag_ == Drag::automationCurve) {
-        const auto* lane = laneOf(automationTrack_);
-        if (!ImGui::IsMouseDown(ImGuiMouseButton_Left) || lane == nullptr || !lane->automation) {
-            drag_ = Drag::none;
-            return true;
-        }
-        const auto points = studio_.lanePoints(automationTrack_, lane->lane);
-        const auto found = std::find_if(points.begin(), points.end(), [this](const auto& point) { return point.id == automationPoint_; });
-        if (found == points.end()) {
-            drag_ = Drag::none;
-            return true;
-        }
-        const auto index = static_cast<std::size_t>(std::distance(points.begin(), found));
-        if (drag_ == Drag::automationPoint) {
-            auto time = io.KeyAlt ? xToTime(mouse.x) : snap(xToTime(mouse.x));
-            const auto low = index > 0 ? points[index - 1].timeSeconds : 0.0;
-            const auto high = index + 1 < points.size() ? points[index + 1].timeSeconds : 1.0e9;
-            time = std::clamp(time, low, high);
-            const auto value = clampToLane(automationValueAt(mouse.y, *lane), lane->scale);
-            (void) studio_.updateLanePoint(automationTrack_, lane->lane, automationPoint_, time, value);
-            ImGui::SetTooltip("%s", formatLaneValue(value, lane->scale).toRawUTF8());
-        } else {
-            const auto height = std::max(dp(20.0f), lane->bottom - lane->clipBottom);
-            auto amount = std::clamp(automationCurveStart_ + (dragStartMouse_.y - mouse.y) / height * 2.0f, -1.0f, 1.0f);
-            // Rising segments bend up with the pointer, falling ones too.
-            if (index + 1 < points.size() && automationY(points[index + 1].valueDb, *lane) > automationY(found->valueDb, *lane))
-                amount = std::clamp(automationCurveStart_ - (dragStartMouse_.y - mouse.y) / height * 2.0f, -1.0f, 1.0f);
-            const auto curve = std::abs(amount) < 0.02f ? Studio::AutomationCurve::linear : Studio::AutomationCurve::bezier;
-            (void) studio_.setLanePointCurve(automationTrack_, lane->lane, automationPoint_, curve,
-                                             curve == Studio::AutomationCurve::linear ? 0.0f : amount);
-            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
-        }
+    const auto mouse = ImGui::GetIO().MousePos;
+    // A curve editor in a gesture keeps the pointer.
+    if (std::any_of(curveEditors_.begin(), curveEditors_.end(), [](const auto& entry) { return entry.second.busy(); }))
         return true;
-    }
-
-    hoveredAutomationPoint_ = 0;
     if (!ImGui::IsItemHovered())
         return false;
     const LaneHit* lane = nullptr;
@@ -1840,8 +1872,12 @@ bool ArrangementView::handleAutomationInput(const std::vector<LaneHit>& lanes)
             lane = &candidate;
             break;
         }
-    if (lane == nullptr)
+    if (lane == nullptr) {
+        // A click among the clips: the keys go back to them.
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+            unfocusCurves();
         return false;
+    }
 
     // The lane's name chooses the lane.
     if (const auto label = laneLabelRect(*lane); label.Contains(mouse)) {
@@ -1853,123 +1889,9 @@ bool ArrangementView::handleAutomationInput(const std::vector<LaneHit>& lanes)
         }
         return true;
     }
-
-    const auto points = studio_.lanePoints(lane->track, lane->lane);
-    const auto reach = dp(6.0f);
-    const Studio::AutomationPoint* hovered = nullptr;
-    auto best = reach * reach;
-    for (const auto& point : points) {
-        const auto dx = timeToX(point.timeSeconds) - mouse.x;
-        const auto dy = automationY(point.valueDb, *lane) - mouse.y;
-        if (dx * dx + dy * dy <= best) {
-            best = dx * dx + dy * dy;
-            hovered = &point;
-        }
-    }
-    automationTrack_ = lane->track;
-    if (hovered != nullptr) {
-        hoveredAutomationPoint_ = hovered->id;
-        ImGui::SetTooltip("%s", formatLaneValue(hovered->valueDb, lane->scale).toRawUTF8());
-    }
-
-    if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
-        if (hovered != nullptr) {
-            rememberAutomation(lane->track, lane->lane);
-            (void) studio_.removeLanePoint(lane->track, lane->lane, hovered->id);
-            hoveredAutomationPoint_ = 0;
-        }
-        return true;
-    }
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-        state_.focused = Panel::arrangement;
+    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
         state_.selectTrack(lane->track);
-        dragStartMouse_ = mouse;
-        if (hovered != nullptr) {
-            rememberAutomation(lane->track, lane->lane);
-            automationPoint_ = hovered->id;
-            drag_ = Drag::automationPoint;
-            return true;
-        }
-        const auto time = xToTime(mouse.x);
-        if (io.KeyAlt && points.size() >= 2) {
-            for (std::size_t index = 0; index + 1 < points.size(); ++index)
-                if (points[index].timeSeconds <= time && time < points[index + 1].timeSeconds) {
-                    rememberAutomation(lane->track, lane->lane);
-                    automationPoint_ = points[index].id;
-                    automationCurveStart_ = points[index].curve == Studio::AutomationCurve::linear ? 0.0f : points[index].curveAmount;
-                    drag_ = Drag::automationCurve;
-                    return true;
-                }
-            return true;
-        }
-        rememberAutomation(lane->track, lane->lane);
-        const auto value = clampToLane(automationValueAt(mouse.y, *lane), lane->scale);
-        if (const auto id = studio_.addLanePoint(lane->track, lane->lane, snap(std::max(0.0, time)), value); id != 0) {
-            automationPoint_ = id;
-            drag_ = Drag::automationPoint;
-        }
-        return true;
-    }
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
-        state_.selectTrack(lane->track);
-        automationContextTrack_ = lane->track;
-        automationContextLane_ = lane->lane;
-        automationContextPoint_ = hovered != nullptr ? hovered->id : 0;
-        ImGui::OpenPopup(automationPopupId_);
-        return true;
-    }
-    return false;
-}
-
-void ArrangementView::automationContextMenu()
-{
-    if (!ImGui::BeginPopup("##automationContext"))
-        return;
-    if (automationContextTrack_ && studio_.isValid(*automationContextTrack_)) {
-        const auto track = *automationContextTrack_;
-        const auto& lane = automationContextLane_;
-        juce::String shown;
-        const auto scale = laneScale(track, shown);
-        ImGui::TextDisabled("%s", (studio_.trackName(track) + juce::String::fromUTF8(" \xc2\xb7 ") + scale.label).toRawUTF8());
-        ImGui::Separator();
-        if (automationContextPoint_ != 0) {
-            const auto points = studio_.lanePoints(track, lane);
-            const auto found = std::find_if(points.begin(), points.end(),
-                                            [this](const auto& point) { return point.id == automationContextPoint_; });
-            if (found != points.end()) {
-                const auto curved = found->curve != Studio::AutomationCurve::linear;
-                if (ImGui::MenuItem(L("Segment droit", "Straight segment"), nullptr, !curved)) {
-                    rememberAutomation(track, lane);
-                    (void) studio_.setLanePointCurve(track, lane, found->id, Studio::AutomationCurve::linear, 0.0f);
-                }
-                if (ImGui::MenuItem(L("Segment courbe", "Curved segment"), "Alt+glisser", curved)) {
-                    rememberAutomation(track, lane);
-                    (void) studio_.setLanePointCurve(track, lane, found->id, Studio::AutomationCurve::bezier,
-                                                     curved ? found->curveAmount : 0.5f);
-                }
-                if (ImGui::MenuItem(L("Supprimer le point", "Delete point"), L("Double-clic", "Double-click"))) {
-                    rememberAutomation(track, lane);
-                    (void) studio_.removeLanePoint(track, lane, found->id);
-                }
-                ImGui::Separator();
-            }
-        }
-        if (ImGui::MenuItem(L("Effacer l'automation", "Clear automation"), nullptr, false,
-                            !studio_.lanePoints(track, lane).empty())) {
-            rememberAutomation(track, lane);
-            studio_.setLanePoints(track, lane, {});
-        }
-        if (ImGui::MenuItem(L("Choisir le paramètre…", "Choose the parameter…"))) {
-            laneChooserTrack_ = track;
-            ImGui::CloseCurrentPopup();
-            ImGui::EndPopup();
-            ImGui::OpenPopup(laneChooserId_);
-            return;
-        }
-        if (ImGui::MenuItem(L("Masquer le couloir", "Hide the lane")))
-            studio_.setAutomationVisible(track, false);
-    }
-    ImGui::EndPopup();
+    return true;
 }
 
 // The lanes a track can show: its volume, the parameters already automated,

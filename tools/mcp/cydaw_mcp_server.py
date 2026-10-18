@@ -399,24 +399,33 @@ TOOLS = [
     },
     {
         "name": "controllers",
-        "description": ("Les controleurs MIDI / OSC : appareils RAW (ports MIDI, points OSC "
-                        "local/reseau, appareils des plug-ins d'application .cyctl), appareils "
-                        "virtuels faits depuis eux (chaque controle : une source RAW, une chaine de "
-                        "modifications range|invert|curve|relative|toggle|threshold|deadzone|steps|"
-                        "scale {kind, a, b}, un retour), et leurs assignations aux cibles de CyDAW "
-                        "(transport/play|stop|record|loop|tempo, track/<cle>/volume|pan|mute|solo|arm, "
-                        "track/selected/..., master/volume, param/<cle>/<binding>, dj/A..D/play|cue|"
-                        "sync|gain|high|mid|low|filter|fader|killHigh|killMid|killLow|pfl, "
-                        "dj/crossfader, dj/master). action : status (defaut), scan, add_osc {name, "
-                        "port, host, sendPort}, set_raw {device, enabled, notes, port, host, sendPort, "
-                        "cydawAddresses}, remove_raw, inject {device, address, value} (comme recu), "
-                        "add_virtual {name}, add_control {device, name, kind knob|fader|encoder|button|"
-                        "toggle|pad|axis, sourceDevice, sourceAddress, feedbackDevice, "
-                        "feedbackAddress, chain}, set_control, remove_control, remove_virtual, assign "
-                        "{device, control, target, minimum, maximum, takeover, replace}, unassign "
-                        "{target}, learn {on, target}, targets {filter}, value {target}, apply "
-                        "{target, value 0..1}, feedback, monitor {count}, show. OSC : "
-                        "/cydaw/<cible> valeur bouge la cible directement."),
+        "description": ("Les controleurs MIDI / OSC, faits autour de peripheriques. Le materiel "
+                        "RAW : ports MIDI, clavier de l'ordinateur (keyboard:computer, adresses "
+                        "key/<touche>), appareils des plug-ins d'application .cyctl (manettes : "
+                        "button/a, axis/leftX, trigger/left), points OSC local/reseau. Un "
+                        "peripherique (appareil virtuel) a une entree (input) et un retour (output) "
+                        "RAW, et des regles : chaque controle a une source (par defaut l'entree du "
+                        "peripherique), une chaine de modifications range|invert|curve|relative|"
+                        "toggle|threshold|deadzone|steps|scale {kind, a, b}, un retour ; ses "
+                        "assignations aux cibles de CyDAW (transport/play|stop|record|loop|tempo, "
+                        "track/<cle>/volume|pan|mute|solo|arm, track/selected/..., master/volume, "
+                        "param/<cle>/<binding>, dj/A..D/play|cue|sync|gain|high|mid|low|filter|"
+                        "fader|killHigh|killMid|killLow|pfl, dj/crossfader, dj/master). action : "
+                        "status (defaut), scan, add_osc {name, port, host, sendPort}, set_raw "
+                        "{device, enabled, notes, port, host, sendPort, cydawAddresses}, remove_raw, "
+                        "inject {device, address, value} (comme recu), add_virtual {name, input, "
+                        "output} (sans nom : celui du materiel), set_virtual {device, name, input, "
+                        "output} (les regles suivent l'entree), duplicate_virtual {device} (la copie "
+                        "attend son materiel), remove_virtual, learn_hardware {device, on} (le "
+                        "prochain controle bouge devient l'entree), learn_controls {device, on} "
+                        "(chaque nouvelle adresse bougee sur l'entree devient une regle), "
+                        "add_control {device, name, kind knob|fader|encoder|button|toggle|pad|axis, "
+                        "sourceDevice, sourceAddress, feedbackDevice, feedbackAddress, chain}, "
+                        "set_control, remove_control, assign {device, control, target, minimum, "
+                        "maximum, takeover, replace}, unassign {target}, learn {on, target}, "
+                        "targets {filter}, value {target}, apply {target, value 0..1}, feedback, "
+                        "monitor {count}, show {tab devices|hardware|assignments, device, control, "
+                        "center}. OSC : /cydaw/<cible> valeur bouge la cible directement."),
         "inputSchema": {"type": "object",
                         "properties": {"action": {"type": "string"}, "device": {"type": "string"},
                                        "control": {"type": "string"}, "target": {"type": "string"},
@@ -430,7 +439,9 @@ TOOLS = [
                                        "chain": {"type": "array"}, "minimum": {"type": "number"},
                                        "maximum": {"type": "number"}, "takeover": {"type": "boolean"},
                                        "replace": {"type": "boolean"}, "filter": {"type": "string"},
-                                       "count": {"type": "integer"}, "cydawAddresses": {"type": "boolean"}}},
+                                       "count": {"type": "integer"}, "cydawAddresses": {"type": "boolean"},
+                                       "input": {"type": "string"}, "output": {"type": "string"},
+                                       "tab": {"type": "string"}, "center": {"type": "boolean"}}},
     },
     {
         "name": "foundry",
@@ -975,7 +986,8 @@ TOOLS = [
                                        "graph": {"type": "string", "description": "sound ou modulation : ce que l'editeur de graphe montre de la piste"},
                                        "track": TRACK,
                                        "clipId": {"type": "string", "description": "ce clip dans l'editeur (avec track)"},
-                                       "face": {"type": "string", "description": "un clip audio : sample, takes, stretch ou events"}},
+                                       "face": {"type": "string", "description": "un clip audio : sample, takes, stretch ou events"},
+                                       "launcherScene": {"type": "integer", "description": "le clip audio de cette scene du lanceur dans l'editeur (avec track)"}},
                         "required": ["mode"]},
     },
     {
@@ -1232,6 +1244,21 @@ TOOLS = [
                         "required": ["track"]},
     },
     {
+        "name": "clip_lanes",
+        "description": ("L'automation d'un clip audio (jouee avec lui, sa boucle comprise) : track, "
+                        "scene (un clip du lanceur) ou clipId (de l'arrangement) ; lanes {nom: "
+                        "[[secondes du clip, valeur], ...]} les pose couloir par couloir (une liste "
+                        "vide en retire un). Noms : volume (dB sur le fader), pan (-1..1), le binding "
+                        "d'un potard de carte. Sans lanes : les lit. event (id d'un son du clip) : les "
+                        "couloirs propres a ce son, en ses secondes : volume (dB), pan (-1..1), pitch "
+                        "(demi-tons ; sans effet en repitch et raw)."),
+        "inputSchema": {"type": "object",
+                        "properties": {"track": TRACK, "scene": {"type": "integer"},
+                                       "clipId": {"type": "string"}, "event": {"type": "string"},
+                                       "lanes": {"type": "object"}},
+                        "required": ["track"]},
+    },
+    {
         "name": "add_audio_clip",
         "description": ("Pose un clip audio sur une piste audio : file (ou le "
                         "fichier de la piste), start en secondes, duration, "
@@ -1282,7 +1309,12 @@ TOOLS = [
                         "cle de list_parameters, points avec value dans ses unites, "
                         "curve -1..1 pour courber le segment suivant) ou d'un "
                         "parametre de plugin (plugin, parameter, points avec value "
-                        "0..1) ; clear: true efface d'abord."),
+                        "0..1) ; clear: true efface d'abord. Chaque point peut "
+                        "dire sa forme : shape 0 droit, 1 courbe (bend -1..1), "
+                        "2 B-Spline, 3 Bezier a une tangente, 4 Bezier a deux "
+                        "tangentes, handles [inTime, inValue, outTime, outValue] "
+                        "(secondes ; valeurs dans les unites du couloir, leur log "
+                        "naturel sur un couloir logarithmique)."),
         "inputSchema": {"type": "object",
                         "properties": {"track": TRACK,
                                        "key": {"type": "string"},
@@ -1295,7 +1327,10 @@ TOOLS = [
                                                                 "time": {"type": "number"},
                                                                 "valueDb": {"type": "number"},
                                                                 "value": {"type": "number"},
-                                                                "curve": {"type": "number"}},
+                                                                "curve": {"type": "number"},
+                                                                "shape": {"type": "integer"},
+                                                                "bend": {"type": "number"},
+                                                                "handles": {"type": "array", "items": {"type": "number"}}},
                                                             "required": ["time"]}}},
                         "required": ["track", "points"]},
     },
@@ -1598,7 +1633,7 @@ TOOLS = [
         "name": "set_audio_clip",
         "description": ("Regle un clip audio : start, offset, duration, fadeIn, "
                         "fadeOut, sourceDuration (secondes), gainDb, sourceTempo, "
-                        "stretchMode (repitch, tonal, beats, texture)."),
+                        "stretchMode (repitch, tonal, beats, texture, raw = jamais etire, complex = mixages)."),
         "inputSchema": {"type": "object",
                         "properties": {"track": TRACK, "clipId": {"type": "string"},
                                        "start": {"type": "number"},
@@ -1671,7 +1706,7 @@ TOOLS = [
                         "debut) : action list, add (file, start), move (eventId, start), trim (eventId, "
                         "start, end : ses bords, le son reste en place), split (eventId, at), remove, "
                         "duplicate (start ?), set (gainDb, fadeIn, fadeOut, pitch en demi-tons, stretchMode "
-                        "repitch|tonal|beats|texture), edit (operation normalize|reverse|polarity|gain|dc, level). Un "
+                        "repitch|tonal|beats|texture|raw|complex), edit (operation normalize|reverse|polarity|gain|dc, level). Un "
                         "clip d'un seul son liste ce son ; le changer en fait un clip d'evenements."),
         "inputSchema": {"type": "object",
                         "properties": {"track": TRACK, "clipId": {"type": "string"},

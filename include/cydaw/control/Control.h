@@ -45,6 +45,9 @@ struct RawMessage {
 [[nodiscard]] int midi7(double value) noexcept;
 // Whether an address names a key (its note-ons and note-offs are a press).
 [[nodiscard]] bool isNoteAddress(std::string_view address) noexcept;
+// A press and a let go: a key (a MIDI one, "note/…", or the computer's,
+// "key/…"), a gamepad's "button/…". Its let go (0) teaches nothing.
+[[nodiscard]] bool isPressAddress(std::string_view address) noexcept;
 
 // ---- Modifiers ------------------------------------------------------------------------------
 
@@ -120,6 +123,10 @@ struct VirtualControl {
 struct VirtualDevice {
     std::string id;
     std::string name;
+    // The hardware it is: the raw device its controls listen to, and the
+    // one their values go back to (empty: not chosen yet).
+    std::string input;
+    std::string output;
     std::vector<VirtualControl> controls;
 };
 

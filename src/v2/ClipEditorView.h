@@ -7,11 +7,14 @@
 
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 
 // The clip being edited. For a MIDI clip, a piano roll: a keyboard that
 // plays the instrument, notes added with a double click, moved and stretched
-// on the grid, a velocity lane below. Its expression modes draw on the notes
+// on the grid, a velocity lane below; under its toolbar, the picked notes'
+// bar (one note's values typed or dragged, several edited together with
+// spreads, random, ramps, as Bitwig's inspector does). Its expression modes draw on the notes
 // themselves, as Bitwig does: how a note's pitch moves along it (a scoop, a
 // vibrato, a fall; a semitone a row) and its gain (in the lane below). For an
 // audio clip, its waveform with its bounds, fades and gain.
@@ -27,6 +30,8 @@ public:
     ClipEditorView(Studio& studio, UiState& state, WaveformCache& waveforms, ImGuiHost& host);
     ~ClipEditorView();
     void draw();
+    // Ctrl+Z (Ctrl+Y) on the launcher's audio clip shown: whether it did.
+    bool undoLauncherAudio(bool redo);
 
 private:
     using MidiNote = app::AudioTrackController::MidiNote;
@@ -41,7 +46,13 @@ private:
 
     void drawMidi(const TrackRef& track, const MidiClip& clip);
     void drawAudio(const TrackRef& track, const app::AudioTrackController::AudioClip& clip);
+    void drawLauncherAudio(const TrackRef& track, int scene, const app::AudioTrackController::LauncherClip& clip);
     void drawMidiToolbar(const TrackRef& track, const MidiClip& clip);
+    void drawNoteBar(const TrackRef& track, const MidiClip& clip);
+    // A number of the picked note's, dragged or typed: kept aside while it
+    // moves, given back when let go.
+    std::optional<double> noteField(const char* id, int field, std::uint64_t note, double current, float speed, double minimum,
+                                    double maximum, const char* format, float width);
     void handleMidiKeys(const TrackRef& track, const MidiClip& clip);
     void drawMidiPopups(const TrackRef& track, const MidiClip& clip);
     // Adds a shape to the notes it is for (the one right-clicked, or the
@@ -104,6 +115,19 @@ private:
     Expression curveKind_ { Expression::none };
     std::uint64_t shapeTarget_ {};
     bool openShapes_ {};
+    // The note bar: the field being dragged or typed, and the multi-edit's
+    // moves and amounts.
+    std::uint64_t editNote_ {};
+    int editField_ { -1 };
+    double editBuffer_ {};
+    int pitchShift_ {};
+    float startShift_ {};
+    float lengthScale_ { 1.0f };
+    float velocityShift_ {};
+    float velocityScale_ { 1.0f };
+    float velocityRandom_ { 15.0f }; // of 127
+    float timingRandom_ { 10.0f };   // ms
+    float velocityTilt_ { 30.0f };   // of 127
     float humanTiming_ { 12.0f };   // ms
     float humanVelocity_ { 12.0f }; // %
     float humanLength_ { 10.0f };   // %
