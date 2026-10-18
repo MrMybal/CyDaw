@@ -544,6 +544,37 @@ void restoreRouting(Studio& studio, const juce::DynamicObject& root, const BusId
     if (const auto* tracks = root.getProperty(keys::midiTracks).getArray())
         for (int index = 0; index < tracks->size() && index < static_cast<int>(summaries.size()); ++index)
             apply(TrackRef { true, 0, summaries[static_cast<std::size_t>(index)].id }, (*tracks)[index]);
+    // Its hybrid tracks: each track's companion (before the order: the
+    // companions are not shown).
+    if (const auto* hybrids = root.getProperty("hybrids").getArray())
+        for (const auto& item : *hybrids) {
+            const auto track = keyOf(item.getProperty("track", juce::var()));
+            const auto companion = keyOf(item.getProperty("companion", juce::var()));
+            if (track && companion)
+                studio.restoreCompanion(*track, *companion, static_cast<bool>(item.getProperty("recordsAudio", false)));
+        }
+    // Its groups: each group's track, its tracks, folded or not.
+    if (const auto* groups = root.getProperty("groups").getArray())
+        for (const auto& item : *groups) {
+            const auto group = keyOf(item.getProperty("group", juce::var()));
+            if (!group || *group == 0)
+                continue;
+            std::vector<std::uint64_t> members;
+            if (const auto* list = item.getProperty("members", juce::var()).getArray())
+                for (const auto& member : *list)
+                    if (const auto key = keyOf(member); key && *key != 0)
+                        members.push_back(*key);
+            studio.restoreGroup(*group, members, static_cast<bool>(item.getProperty("folded", false)));
+        }
+    // The order shown, every kind together (an older project: the audio
+    // tracks, then the instruments).
+    if (const auto* order = root.getProperty("trackOrder").getArray()) {
+        std::vector<std::uint64_t> keys;
+        for (const auto& item : *order)
+            if (const auto key = keyOf(item); key && *key != 0)
+                keys.push_back(*key);
+        studio.setTrackOrder(std::move(keys));
+    }
     studio.publishRouting();
 }
 
@@ -705,6 +736,14 @@ juce::var midiNotesToVar(const std::vector<Engine::MidiNote>& notes)
             value->setProperty(keys::pitch, expressionToVar(noteInfo.pitch));
         if (!noteInfo.gain.empty())
             value->setProperty(keys::gain, expressionToVar(noteInfo.gain));
+        if (!noteInfo.timbre.empty())
+            value->setProperty("timbre", expressionToVar(noteInfo.timbre));
+        if (!noteInfo.pressure.empty())
+            value->setProperty("pressure", expressionToVar(noteInfo.pressure));
+        if (!noteInfo.pan.empty())
+            value->setProperty("pan", expressionToVar(noteInfo.pan));
+        if (noteInfo.chance < 1.0f)
+            value->setProperty("chance", noteInfo.chance);
         values.add(juce::var(value.get()));
     }
     return values;
@@ -1550,6 +1589,14 @@ void restoreMidiClip(Engine& engine, const std::uint64_t trackId, const juce::Dy
                 if (noteId != 0 && (note->hasProperty(keys::pitch) || note->hasProperty(keys::gain)))
                     (void) engine.setMidiNoteExpression(trackId, clipId, noteId, expressionFromVar(note->getProperty(keys::pitch)),
                                                         expressionFromVar(note->getProperty(keys::gain)));
+                // Its timbre, pressure, pan and chance.
+                using Curve = Engine::NoteCurve;
+                for (const auto& [name, curve] : { std::pair { "timbre", Curve::timbre }, std::pair { "pressure", Curve::pressure },
+                                                   std::pair { "pan", Curve::pan } })
+                    if (noteId != 0 && note->hasProperty(name))
+                        (void) engine.setMidiNoteCurve(trackId, clipId, noteId, curve, expressionFromVar(note->getProperty(name)));
+                if (noteId != 0 && note->hasProperty("chance"))
+                    (void) engine.setMidiNoteChance(trackId, clipId, noteId, toFloat(note->getProperty("chance")));
             }
     restoreGainPoints(
         clip.getProperty(keys::gainAutomation),
@@ -1856,6 +1903,63 @@ juce::var buildDocument(Studio& studio, const juce::File& projectFile, const boo
         midiTracks.add(juce::var(track.get()));
     }
     document->setProperty(keys::midiTracks, midiTracks);
+    {
+        // The order shown: each track by its kind and its place among them.
+        const auto summaries = engine.midiTrackSummaries();
+        juce::Array<juce::var> order;
+        for (const auto& track : studio.tracks()) {
+            auto value = makeObject();
+            value->setProperty("midi", track.midi);
+            auto position = static_cast<int>(track.audioIndex);
+            if (track.midi)
+                for (std::size_t index = 0; index < summaries.size(); ++index)
+                    if (summaries[index].id == track.midiId)
+                        position = static_cast<int>(index);
+            value->setProperty("position", position);
+            order.add(juce::var(value.get()));
+        }
+        document->setProperty("trackOrder", order);
+        // The groups: each group's track and its tracks, by kind and place.
+        const auto placeOf = [&](const TrackRef& track) {
+            auto value = makeObject();
+            value->setProperty("midi", track.midi);
+            auto position = static_cast<int>(track.audioIndex);
+            if (track.midi)
+                for (std::size_t index = 0; index < summaries.size(); ++index)
+                    if (summaries[index].id == track.midiId)
+                        position = static_cast<int>(index);
+            value->setProperty("position", position);
+            return juce::var(value.get());
+        };
+        juce::Array<juce::var> groups;
+        for (const auto& track : studio.tracks())
+            if (studio.isGroupTrack(track)) {
+                auto value = makeObject();
+                value->setProperty("group", placeOf(track));
+                juce::Array<juce::var> members;
+                for (const auto& member : studio.groupMembers(track))
+                    members.add(placeOf(member));
+                value->setProperty("members", members);
+                if (studio.isFolded(track))
+                    value->setProperty("folded", true);
+                groups.add(juce::var(value.get()));
+            }
+        if (!groups.isEmpty())
+            document->setProperty("groups", groups);
+        // The hybrid tracks: each track and its companion, by kind and place.
+        juce::Array<juce::var> hybrids;
+        for (const auto& track : studio.tracks())
+            if (const auto companion = studio.companionOf(track)) {
+                auto value = makeObject();
+                value->setProperty("track", placeOf(track));
+                value->setProperty("companion", placeOf(*companion));
+                if (studio.recordsHybridAudio(track))
+                    value->setProperty("recordsAudio", true);
+                hybrids.add(juce::var(value.get()));
+            }
+        if (!hybrids.isEmpty())
+            document->setProperty("hybrids", hybrids);
+    }
 
     // The first MIDI clip's notes, for projects read by CyDAW 0.7.
     document->setProperty(keys::midiNotes, midiNotesToVar(engine.midiNotes()));

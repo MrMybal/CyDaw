@@ -283,8 +283,8 @@ void ArrangementView::drawCanvas()
     const auto scrollBefore = state_.scrollSeconds;
     const auto zoomBefore = state_.pixelsPerSecond;
 
-    // Lanes and their content height.
-    const auto tracks = studio_.tracks();
+    // Lanes and their content height (a folded group's tracks left out).
+    const auto tracks = studio_.shownTracks();
     std::vector<LaneHit> lanes;
     auto y = lanesMin_.y - state_.scrollY;
     for (const auto& track : tracks) {
@@ -310,16 +310,59 @@ void ArrangementView::drawCanvas()
     // Backgrounds.
     list->AddRectFilled(ImVec2(origin.x, lanesMin_.y), ImVec2(headersRight, lanesMax_.y), p.bg1);
     list->PushClipRect(lanesMin_, lanesMax_, true);
+    // A folded group's clips of its tracks, drawn over the grid.
+    struct Shadow {
+        ImVec2 min, max;
+        ImU32 colour;
+    };
+    std::vector<Shadow> shadows;
     for (std::size_t index = 0; index < lanes.size(); ++index) {
         const auto& lane = lanes[index];
         if (lane.bottom < lanesMin_.y || lane.top > lanesMax_.y)
             continue;
         const auto selected = state_.selectedTrack && *state_.selectedTrack == lane.track;
-        list->AddRectFilled(ImVec2(lanesMin_.x, lane.top), ImVec2(lanesMax_.x, lane.bottom),
-                            selected ? theme::mix(p.bg0, p.bg2, 0.8f) : (index % 2 == 0 ? p.bg0 : theme::mix(p.bg0, p.bg1, 0.5f)));
+        auto fill = selected ? theme::mix(p.bg0, p.bg2, 0.8f) : (index % 2 == 0 ? p.bg0 : theme::mix(p.bg0, p.bg1, 0.5f));
+        // A group's lane and its tracks' take its colour, lightly.
+        const auto group = studio_.isGroupTrack(lane.track);
+        if (const auto owner = group ? std::optional<TrackRef>(lane.track) : studio_.groupOf(lane.track))
+            fill = theme::mix(fill, theme::fromArgb(studio_.trackColour(*owner)) | 0xff000000u, group ? 0.1f : 0.05f);
+        list->AddRectFilled(ImVec2(lanesMin_.x, lane.top), ImVec2(lanesMax_.x, lane.bottom), fill);
         list->AddLine(ImVec2(lanesMin_.x, lane.bottom - 0.5f), ImVec2(lanesMax_.x, lane.bottom - 0.5f), p.grid);
+        // Folded: its tracks' clips, as shadows, so the group says what it holds.
+        if (group && studio_.isFolded(lane.track)) {
+            const auto members = studio_.groupMembers(lane.track);
+            const auto rows = static_cast<float>(std::max<std::size_t>(1, members.size()));
+            const auto rowHeight = (lane.clipBottom - lane.top - dp(4.0f)) / rows;
+            const auto beat = secondsPerBeat();
+            for (std::size_t row = 0; row < members.size(); ++row) {
+                const auto shade = theme::alpha(theme::fromArgb(studio_.trackColour(members[row])), 0.45f);
+                const auto rowTop = lane.top + dp(2.0f) + static_cast<float>(row) * rowHeight;
+                const auto shadow = [&](const double start, const double length) {
+                    const auto x0 = timeToX(start);
+                    const auto x1 = timeToX(start + length);
+                    if (x1 >= lanesMin_.x && x0 <= lanesMax_.x)
+                        shadows.push_back({ ImVec2(x0, rowTop + 1.0f), ImVec2(std::max(x0 + 2.0f, x1), rowTop + rowHeight - 1.0f), shade });
+                };
+                std::vector<TrackRef> parts { members[row] };
+                if (const auto companion = studio_.companionOf(members[row]))
+                    parts.push_back(*companion);
+                for (const auto& part : parts) {
+                    if (!part.midi) {
+                        if (const auto* clips = engine.audioClipsView(part.audioIndex))
+                            for (const auto& clip : *clips)
+                                shadow(clip.startSeconds, clip.durationSeconds);
+                    } else if (const auto* clips = engine.midiClipsView(part.midiId)) {
+                        for (const auto& clip : *clips)
+                            if (clip.launcherScene < 0)
+                                shadow(clip.startBeats * beat, clip.lengthBeats * beat);
+                    }
+                }
+            }
+        }
     }
     drawGrid(list, lanesMin_, lanesMax_);
+    for (const auto& shadow : shadows)
+        list->AddRectFilled(shadow.min, shadow.max, shadow.colour, dp(2.0f));
 
     // Loop region over the lanes.
     if (studio_.loopEnabled() && engine.hasExplicitLoopRange()) {
@@ -336,29 +379,49 @@ void ArrangementView::drawCanvas()
             continue;
         const auto top = lane.top + dp(1.0f);
         const auto bottom = lane.clipBottom - dp(1.0f);
-        if (!lane.track.midi) {
-            if (const auto* clips = engine.audioClipsView(lane.track.audioIndex))
+        // A hybrid track's lane: its companion's clips (the other kind) too;
+        // with both kinds in it, the audio clips above, the notes below.
+        std::vector<TrackRef> parts { lane.track };
+        if (const auto companion = studio_.companionOf(lane.track))
+            parts.push_back(*companion);
+        auto hasAudio = false;
+        auto hasNotes = false;
+        for (const auto& part : parts) {
+            if (!part.midi) {
+                const auto* clips = engine.audioClipsView(part.audioIndex);
+                hasAudio = hasAudio || (clips != nullptr && !clips->empty());
+            } else if (const auto* clips = engine.midiClipsView(part.midiId)) {
+                hasNotes = hasNotes
+                           || std::any_of(clips->begin(), clips->end(), [](const auto& clip) { return clip.launcherScene < 0; });
+            }
+        }
+        const auto split = parts.size() > 1 && hasAudio && hasNotes;
+        const auto middle = (top + bottom) * 0.5f;
+        for (const auto& part : parts) {
+            if (!part.midi) {
+                if (const auto* clips = engine.audioClipsView(part.audioIndex))
+                    for (const auto& clip : *clips) {
+                        const auto x0 = timeToX(clip.startSeconds);
+                        const auto x1 = timeToX(clip.startSeconds + clip.durationSeconds);
+                        if (x1 < lanesMin_.x || x0 > lanesMax_.x)
+                            continue;
+                        hits.push_back({ { part, clip.id }, ImVec2(x0, top), ImVec2(std::max(x0 + 3.0f, x1), split ? middle - 1.0f : bottom),
+                                         clip.startSeconds, clip.durationSeconds, false });
+                    }
+            } else if (const auto* clips = engine.midiClipsView(part.midiId)) {
                 for (const auto& clip : *clips) {
-                    const auto x0 = timeToX(clip.startSeconds);
-                    const auto x1 = timeToX(clip.startSeconds + clip.durationSeconds);
+                    // The launcher's clips live in its slots, not here.
+                    if (clip.launcherScene >= 0)
+                        continue;
+                    const auto start = clip.startBeats * spb;
+                    const auto duration = clip.lengthBeats * spb;
+                    const auto x0 = timeToX(start);
+                    const auto x1 = timeToX(start + duration);
                     if (x1 < lanesMin_.x || x0 > lanesMax_.x)
                         continue;
-                    hits.push_back({ { lane.track, clip.id }, ImVec2(x0, top), ImVec2(std::max(x0 + 3.0f, x1), bottom),
-                                     clip.startSeconds, clip.durationSeconds, false });
+                    hits.push_back({ { part, clip.id }, ImVec2(x0, split ? middle + 1.0f : top), ImVec2(std::max(x0 + 3.0f, x1), bottom),
+                                     start, duration, true });
                 }
-        } else if (const auto* clips = engine.midiClipsView(lane.track.midiId)) {
-            for (const auto& clip : *clips) {
-                // The launcher's clips live in its slots, not here.
-                if (clip.launcherScene >= 0)
-                    continue;
-                const auto start = clip.startBeats * spb;
-                const auto duration = clip.lengthBeats * spb;
-                const auto x0 = timeToX(start);
-                const auto x1 = timeToX(start + duration);
-                if (x1 < lanesMin_.x || x0 > lanesMax_.x)
-                    continue;
-                hits.push_back({ { lane.track, clip.id }, ImVec2(x0, top), ImVec2(std::max(x0 + 3.0f, x1), bottom), start,
-                                 duration, true });
             }
         }
     }
@@ -412,7 +475,7 @@ void ArrangementView::drawCanvas()
 
     // Moving between lanes: where the clips will land.
     if (drag_ == Drag::move && dragLaneTrack_ && !dragOrigins_.empty()
-        && !(*dragLaneTrack_ == dragOrigins_.front().ref.track))
+        && !(*dragLaneTrack_ == studio_.shownTrackOf(dragOrigins_.front().ref.track)))
         if (const auto* lane = laneAt(lanes, mouse.y)) {
             for (const auto& origin : dragOrigins_) {
                 const auto* hit = std::find_if(hits.data(), hits.data() + hits.size(),
@@ -901,8 +964,21 @@ void ArrangementView::drawHeader(const TrackRef& track, const ImVec2 min, const 
     auto* list = ImGui::GetWindowDrawList();
     const auto selected = state_.selectedTrack && *state_.selectedTrack == track;
     const auto colour = theme::fromArgb(studio_.trackColour(track));
-    list->AddRectFilled(min, max, selected ? p.bg3 : p.bg2);
-    list->AddRectFilled(min, ImVec2(min.x + dp(4.0f), max.y), colour);
+    // A group: tinted with its colour; its tracks one step in, its colour
+    // on their left.
+    const auto group = studio_.isGroupTrack(track);
+    const auto inGroup = studio_.groupOf(track);
+    const auto groupColour = group ? colour : inGroup ? theme::fromArgb(studio_.trackColour(*inGroup)) : colour;
+    auto fill = selected ? p.bg3 : p.bg2;
+    if (group || inGroup)
+        fill = theme::mix(fill, groupColour | 0xff000000u, group ? 0.26f : 0.1f);
+    list->AddRectFilled(min, max, fill);
+    if (inGroup) {
+        list->AddRectFilled(min, ImVec2(min.x + dp(4.0f), max.y), groupColour);
+        list->AddRectFilled(ImVec2(min.x + dp(8.0f), min.y + dp(3.0f)), ImVec2(min.x + dp(11.0f), max.y - dp(3.0f)), colour, dp(1.5f));
+    } else {
+        list->AddRectFilled(min, ImVec2(min.x + dp(4.0f), max.y), colour);
+    }
     list->AddLine(ImVec2(min.x, max.y - 0.5f), ImVec2(max.x, max.y - 0.5f), p.line);
 
     ImGui::PushID(index);
@@ -912,11 +988,16 @@ void ArrangementView::drawHeader(const TrackRef& track, const ImVec2 min, const 
     ImGui::SetNextItemAllowOverlap();
     ImGui::InvisibleButton("##headerSelect", ImVec2(max.x - min.x, std::max(1.0f, max.y - min.y)));
     if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
-        state_.selectTrack(track);
+        // Ctrl: one more or one less; Shift: one more (Ctrl+G groups them).
+        if (ImGui::GetIO().KeyCtrl || ImGui::GetIO().KeyShift)
+            state_.pickTrack(track, ImGui::GetIO().KeyCtrl);
+        else
+            state_.selectTrack(track);
         state_.focused = Panel::arrangement;
     }
     if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
-        state_.selectTrack(track);
+        if (!state_.isTrackPicked(track))
+            state_.selectTrack(track);
         state_.contextRequest = ContextRequest { ContextRequest::Kind::track, track };
     }
     if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
@@ -925,7 +1006,7 @@ void ArrangementView::drawHeader(const TrackRef& track, const ImVec2 min, const 
         std::snprintf(renameBuffer_, sizeof(renameBuffer_), "%s", studio_.trackName(track).toRawUTF8());
     }
 
-    const auto padding = dp(10.0f);
+    const auto padding = dp(inGroup ? 17.0f : 10.0f);
     const auto name = studio_.trackName(track);
     if (renamingTrack_ && *renamingTrack_ == track) {
         ImGui::SetCursorScreenPos(ImVec2(min.x + padding, min.y + dp(4.0f)));
@@ -942,14 +1023,46 @@ void ArrangementView::drawHeader(const TrackRef& track, const ImVec2 min, const 
             renamingTrack_.reset();
         }
     } else {
+        auto nameLeft = min.x + padding;
+        auto nameRight = max.x - dp(30.0f);
+        if (group) {
+            // Its folder; on the right, how many tracks it holds and its fold.
+            const auto folded = studio_.isFolded(track);
+            ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 0.85f);
+            list->AddText(ImVec2(nameLeft, min.y + dp(6.0f)), p.text, icon::folder);
+            nameLeft += ImGui::CalcTextSize(icon::folder).x + dp(5.0f);
+            const auto count = std::to_string(studio_.groupMembers(track).size());
+            const auto countWidth = ImGui::CalcTextSize(count.c_str()).x;
+            const ImVec2 badge(max.x - dp(26.0f) - countWidth - dp(6.0f), min.y + dp(5.0f));
+            list->AddRectFilled(badge, ImVec2(badge.x + countWidth + dp(6.0f), badge.y + ImGui::GetFontSize() + dp(2.0f)),
+                                colour | 0xff000000u, dp(3.0f));
+            list->AddText(ImVec2(badge.x + dp(3.0f), badge.y + dp(1.0f)), p.bg0 | 0xff000000u, count.c_str());
+            ImGui::PopFont();
+            nameRight = badge.x - dp(4.0f);
+            ImGui::SetCursorScreenPos(ImVec2(max.x - dp(24.0f), min.y + dp(2.0f)));
+            if (ImGui::InvisibleButton("##fold", ImVec2(dp(20.0f), dp(20.0f))))
+                studio_.setFolded(track, !folded);
+            const auto foldHovered = ImGui::IsItemHovered();
+            ui::tooltip(folded ? L("Montrer les pistes du groupe", "Show the group's tracks")
+                               : L("Replier les pistes du groupe", "Fold the group's tracks"));
+            const ImVec2 c(max.x - dp(14.0f), min.y + dp(12.0f));
+            const auto r = dp(4.0f);
+            const auto ink = foldHovered ? p.accent : p.text;
+            if (folded)
+                list->AddTriangleFilled(ImVec2(c.x - r * 0.6f, c.y - r), ImVec2(c.x - r * 0.6f, c.y + r), ImVec2(c.x + r, c.y), ink);
+            else
+                list->AddTriangleFilled(ImVec2(c.x - r, c.y - r * 0.6f), ImVec2(c.x + r, c.y - r * 0.6f), ImVec2(c.x, c.y + r), ink);
+        }
         ImGui::PushFont(theme::boldFont(), 0.0f);
-        ui::clippedText(list, ImVec2(min.x + padding, min.y + dp(5.0f)), max.x - min.x - padding - dp(30.0f), p.text,
-                        name.toRawUTF8());
+        ui::clippedText(list, ImVec2(nameLeft, min.y + dp(5.0f)), nameRight - nameLeft, p.text, name.toRawUTF8());
         ImGui::PopFont();
-        ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 0.78f);
-        list->AddText(ImVec2(max.x - dp(30.0f), min.y + dp(7.0f)), track.midi ? p.midi : p.audio,
-                      track.midi ? "MIDI" : "AUDIO");
-        ImGui::PopFont();
+        if (!group) {
+            ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 0.78f);
+            const auto hybrid = studio_.companionOf(track).has_value();
+            list->AddText(ImVec2(max.x - dp(30.0f), min.y + dp(7.0f)), hybrid ? p.accent : track.midi ? p.midi : p.audio,
+                          hybrid ? "HYB" : track.midi ? "MIDI" : "AUDIO");
+            ImGui::PopFont();
+        }
     }
 
     // Mute, solo, arm and a level, when the lane is tall enough.
@@ -1213,7 +1326,10 @@ void ArrangementView::applyDrag(const std::vector<LaneHit>& lanes)
             else
                 (void) engine.setMidiClipStartBeats(origin.ref.track.midiId, origin.ref.clipId, (origin.start + delta) / spb);
         }
-        if (const auto* lane = laneAt(lanes, io.MousePos.y); lane != nullptr && lane->track.midi == lead.ref.track.midi)
+        // Any track's lane takes the clips (a hybrid track's companion the
+        // other kind); a bus, its own kind only.
+        if (const auto* lane = laneAt(lanes, io.MousePos.y);
+            lane != nullptr && (lane->track.midi == lead.ref.track.midi || !studio_.isBusTrack(lane->track)))
             dragLaneTrack_ = lane->track;
         studio_.markDirty();
     } else if (drag_ == Drag::trimRight) {
@@ -1254,11 +1370,18 @@ void ArrangementView::applyDrag(const std::vector<LaneHit>& lanes)
 void ArrangementView::endDrag(const std::vector<LaneHit>&)
 {
     auto& engine = studio_.engine();
+    // Clips moved to another lane: onto that track's part of their kind (its
+    // companion made when it has none: the track becomes hybrid).
+    std::optional<TrackRef> landing;
     if (drag_ == Drag::move && dragLaneTrack_ && !dragOrigins_.empty()
-        && !(*dragLaneTrack_ == dragOrigins_.front().ref.track) && !dragLaneTrack_->midi) {
+        && !(*dragLaneTrack_ == studio_.shownTrackOf(dragOrigins_.front().ref.track)))
+        if (const auto part = studio_.makePartFor(*dragLaneTrack_, dragOrigins_.front().ref.track.midi);
+            part && !(*part == dragOrigins_.front().ref.track))
+            landing = part;
+    if (landing && !landing->midi) {
         // Audio clips moved to another audio track.
         const auto from = static_cast<int>(dragOrigins_.front().ref.track.audioIndex);
-        const auto to = static_cast<int>(dragLaneTrack_->audioIndex);
+        const auto to = static_cast<int>(landing->audioIndex);
         std::vector<std::vector<std::uint64_t>> byTrack(engine.trackCount());
         for (const auto& origin : dragOrigins_)
             if (!origin.ref.track.midi && origin.ref.track.audioIndex < byTrack.size())
@@ -1270,26 +1393,27 @@ void ArrangementView::endDrag(const std::vector<LaneHit>&)
                 for (const auto id : moved.clipIdsByTrack[index])
                     state_.selectedClips.push_back({ { false, index, 0 }, id });
         }
-    } else if (drag_ == Drag::move && dragLaneTrack_ && !dragOrigins_.empty()
-               && !(*dragLaneTrack_ == dragOrigins_.front().ref.track) && dragLaneTrack_->midi) {
+    } else if (landing && landing->midi) {
         // MIDI clips moved to another instrument track: copied, then removed.
         std::vector<ClipRef> moved;
         for (const auto& origin : dragOrigins_) {
+            if (!origin.ref.track.midi)
+                continue;
             const auto* clip = findMidiClip(engine, origin.ref.track.midiId, origin.ref.clipId);
             if (clip == nullptr)
                 continue;
             const auto copy = *clip;
-            const auto id = engine.addMidiClip(dragLaneTrack_->midiId, copy.name, copy.startBeats, copy.lengthBeats,
+            const auto id = engine.addMidiClip(landing->midiId, copy.name, copy.startBeats, copy.lengthBeats,
                                                copy.looping, copy.colour);
             if (id == 0)
                 continue;
-            (void) engine.setMidiClipTimelineBounds(dragLaneTrack_->midiId, id, copy.lengthBeats, copy.playStartBeats,
+            (void) engine.setMidiClipTimelineBounds(landing->midiId, id, copy.lengthBeats, copy.playStartBeats,
                                                     copy.playEndBeats, copy.loopStartBeats, copy.loopEndBeats,
                                                     copy.looping);
             for (const auto& note : copy.notes)
-                (void) engine.copyMidiNote(dragLaneTrack_->midiId, id, note, note.startBeats);
+                (void) engine.copyMidiNote(landing->midiId, id, note, note.startBeats);
             (void) engine.removeMidiClip(origin.ref.track.midiId, origin.ref.clipId);
-            moved.push_back({ *dragLaneTrack_, id });
+            moved.push_back({ *landing, id });
         }
         if (!moved.empty())
             state_.selectedClips = moved;
@@ -1388,7 +1512,7 @@ void ArrangementView::selectAll()
 {
     auto& engine = studio_.engine();
     state_.selectedClips.clear();
-    for (const auto& track : studio_.tracks()) {
+    for (const auto& track : studio_.allTracks()) {
         if (!track.midi) {
             if (const auto* clips = engine.audioClipsView(track.audioIndex))
                 for (const auto& clip : *clips)
@@ -1406,11 +1530,15 @@ void ArrangementView::createMidiClipAt(const TrackRef& track, const double secon
     const auto spb = secondsPerBeat();
     const auto barBeats = studio_.engine().beatsPerBar();
     const auto startBeats = std::floor(snap(seconds, true) / spb / barBeats) * barBeats;
-    const auto id = engine.addMidiClip(track.midiId, {}, std::max(0.0, startBeats), 4.0, false,
+    // An audio track's: on its companion instrument (made: it becomes hybrid).
+    const auto part = studio_.makePartFor(track, true);
+    if (!part)
+        return;
+    const auto id = engine.addMidiClip(part->midiId, {}, std::max(0.0, startBeats), 4.0, false,
                                        studio_.trackColour(track));
     if (id == 0)
         return;
-    const ClipRef ref { track, id };
+    const ClipRef ref { *part, id };
     state_.selectedClips = { ref };
     openInEditor(ref);
     studio_.markDirty();
@@ -1433,10 +1561,30 @@ void ArrangementView::createAutomationClipAt(const TrackRef& track, const double
     studio_.markDirty();
 }
 
+void ArrangementView::createAudioClipAt(const TrackRef& track, const double seconds)
+{
+    auto& engine = studio_.engine();
+    const auto part = studio_.makePartFor(track, false);
+    if (!part)
+        return;
+    const auto spb = secondsPerBeat();
+    const auto bar = spb * std::max(1.0, static_cast<double>(engine.beatsPerBar()));
+    const auto start = std::max(0.0, std::floor(snap(seconds, true) / bar) * bar);
+    // No sound yet: a bar to record or paste into.
+    const auto id = engine.addAudioClip(part->audioIndex, start, 0.0, bar, ui::Ls("Clip audio", "Audio clip"), studio_.trackColour(track),
+                                        {}, 0.0, 0.0);
+    if (id == 0)
+        return;
+    const ClipRef ref { *part, id };
+    state_.selectedClips = { ref };
+    openInEditor(ref);
+    studio_.markDirty();
+}
+
 void ArrangementView::openInEditor(const ClipRef& clip)
 {
     state_.editedClip = clip;
-    state_.selectTrack(clip.track);
+    state_.selectTrack(studio_.shownTrackOf(clip.track));
     state_.bringToFront = Panel::editor;
 }
 
@@ -1447,16 +1595,20 @@ bool ArrangementView::dropFiles(const juce::StringArray& files, const ImVec2 scr
         return false;
     auto& engine = studio_.engine();
     const auto time = snap(xToTime(screenPoint.x), true);
-    // The lane under the drop, when it is an audio track; a new track below
-    // otherwise.
-    std::optional<std::size_t> target;
+    // The lane under the drop (an instrument track's companion holds the
+    // audio: it becomes hybrid); a new track below otherwise.
+    std::optional<TrackRef> lane;
     auto y = lanesMin_.y - state_.scrollY;
-    for (const auto& track : studio_.tracks()) {
+    for (const auto& track : studio_.shownTracks()) {
         const auto height = laneDisplayHeight(track);
-        if (screenPoint.y >= y && screenPoint.y < y + height && !track.midi)
-            target = track.audioIndex;
+        if (screenPoint.y >= y && screenPoint.y < y + height)
+            lane = track;
         y += height;
     }
+    std::optional<std::size_t> target;
+    if (lane)
+        if (const auto part = studio_.makePartFor(*lane, false))
+            target = part->audioIndex;
     auto added = false;
     for (const auto& path : files) {
         const juce::File file(path);
@@ -2080,6 +2232,19 @@ void ArrangementView::trackContextMenu()
             (void) studio_.moveTrack(track, 1);
         if (track.midi && ImGui::MenuItem(L("Nouveau clip à la tête de lecture", "New clip at the playhead")))
             createMidiClipAt(track, studio_.engine().position());
+        if (!track.midi && !studio_.isBusTrack(track)) {
+            if (ImGui::MenuItem(L("Nouveau clip MIDI à la tête de lecture", "New MIDI clip at the playhead")))
+                createMidiClipAt(track, studio_.engine().position());
+            ui::tooltip(L("La piste devient hybride : un instrument joue les notes, son son passe dans les effets de la piste.",
+                          "The track becomes hybrid: an instrument plays the notes, its sound goes through the track's effects."));
+        }
+        if (!studio_.isBusTrack(track)) {
+            if (ImGui::MenuItem(L("Nouveau clip audio à la tête de lecture", "New audio clip at the playhead")))
+                createAudioClipAt(track, studio_.engine().position());
+            if (track.midi)
+                ui::tooltip(L("Un clip audio vide. La piste devient hybride : ses clips audio jouent dans ses effets, après l'instrument.",
+                              "An empty audio clip. The track becomes hybrid: its audio clips play into its effects, after the instrument."));
+        }
         if (ImGui::MenuItem(L("Automation du volume", "Volume automation"), nullptr, studio_.automationVisible(track)))
             studio_.setAutomationVisible(track, !studio_.automationVisible(track));
         ImGui::Separator();

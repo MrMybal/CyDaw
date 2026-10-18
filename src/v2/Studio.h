@@ -418,7 +418,89 @@ public:
     [[nodiscard]] bool keepsSettings() const noexcept { return autosaveEnabled_; }
 
     // ---- Tracks -----------------------------------------------------------------
+    // Every track in the order shown: one order for every kind, a new
+    // track at its end. Set from a project (its tracks' routing keys).
     [[nodiscard]] std::vector<TrackRef> tracks() const;
+    void setTrackOrder(std::vector<std::uint64_t> keys);
+    // The tracks shown: those a folded group hides left out.
+    [[nodiscard]] std::vector<TrackRef> shownTracks() const;
+
+    // ---- Groups ---------------------------------------------------------------
+    // Tracks gathered under a group track, as Bitwig's: a bus their sound
+    // goes to (then the master), shown before them, folding them away; its
+    // launcher slots launch theirs. Made from the tracks given (in the order
+    // shown), undone with its bus taken away (they go to the master again).
+    std::optional<TrackRef> groupTracks(const std::vector<TrackRef>& tracks);
+    bool ungroup(const TrackRef& group);
+    [[nodiscard]] bool isGroupTrack(const TrackRef& track) const;
+    // A bus beside the master (an effect's): a bus track that is no group.
+    [[nodiscard]] bool isEffectBus(const TrackRef& track) const { return isBusTrack(track) && !isGroupTrack(track); }
+    [[nodiscard]] std::optional<TrackRef> groupOf(const TrackRef& track) const;
+    [[nodiscard]] std::vector<TrackRef> groupMembers(const TrackRef& group) const;
+    [[nodiscard]] bool isFolded(const TrackRef& group) const;
+    void setFolded(const TrackRef& group, bool folded);
+    [[nodiscard]] bool hiddenByFold(const TrackRef& track) const;
+    // A group's slot: whether one of its tracks has a clip there, plays it,
+    // waits to.
+    [[nodiscard]] bool groupHasClips(const TrackRef& group, int scene) const;
+    [[nodiscard]] bool groupPlaysScene(const TrackRef& group, int scene) const;
+    [[nodiscard]] bool groupWaitsScene(const TrackRef& group, int scene) const;
+    // A launcher clip dragged to another slot, of a track of its kind
+    // (copy: it stays where it was too); the slot it lands on loses what it
+    // had.
+    juce::Result moveLauncherClip(const TrackRef& from, int fromScene, const TrackRef& to, int toScene, bool copy);
+    // From a project: a group track and its tracks (routing keys).
+    void restoreGroup(std::uint64_t group, const std::vector<std::uint64_t>& members, bool folded);
+
+    // ---- Hybrid tracks --------------------------------------------------------------
+    // Every track takes clips of both kinds, as Bitwig's: those of the other
+    // kind live on a companion track the interface never lists, routed into
+    // the track's main input (an audio companion into an instrument track,
+    // mixed after its instrument; an instrument companion, its instrument and
+    // its notes, into an audio track). It is made with the first such clip,
+    // goes with its track, takes its name and colour, follows its solo.
+    [[nodiscard]] std::optional<TrackRef> companionOf(const TrackRef& track) const;
+    [[nodiscard]] bool isCompanion(const TrackRef& track) const;
+    // The track a companion belongs to; any other track itself.
+    [[nodiscard]] TrackRef shownTrackOf(const TrackRef& track) const;
+    // Where a track's clips of a kind live: itself or its companion; none
+    // yet (or a bus, a group: their own kind only).
+    [[nodiscard]] std::optional<TrackRef> partFor(const TrackRef& track, bool midi) const;
+    // The same, its companion made when it has none (an instrument
+    // companion gets the default instrument).
+    std::optional<TrackRef> makePartFor(const TrackRef& track, bool midi);
+    // What holds a slot's clip: the track or its companion.
+    [[nodiscard]] std::optional<TrackRef> slotPart(const TrackRef& track, int scene) const;
+    // Every track, the companions with them: what plays, what is published.
+    [[nodiscard]] std::vector<TrackRef> allTracks() const;
+    // From a project (routing keys).
+    void restoreCompanion(std::uint64_t track, std::uint64_t companion, bool recordsAudio = false);
+    // A hybrid instrument track records its sound too (its transport
+    // recording): only once an audio input was chosen for it (none at
+    // first: never the microphone unasked).
+    [[nodiscard]] bool recordsHybridAudio(const TrackRef& track) const;
+    void setRecordsHybridAudio(const TrackRef& track, bool records);
+    // A new MIDI clip, a bar of 4/4 looping, in a slot of any track (an audio
+    // track's companion holds it): that track and the clip's id. What the
+    // slot had goes.
+    std::optional<std::pair<TrackRef, std::uint64_t>> newSlotMidiClip(const TrackRef& track, int scene);
+    // An audio file put into a slot of any track (an instrument track's
+    // companion holds it), what the slot had replaced.
+    juce::Result placeSlotAudio(const TrackRef& track, int scene, const juce::File& file);
+    // A new empty audio clip, a bar long, looping, in a slot of any track
+    // (an instrument track's companion holds it): that track. What the slot
+    // had goes.
+    std::optional<TrackRef> newSlotAudioClip(const TrackRef& track, int scene);
+
+    // An armed track's empty slot recorded into (its round button): a new
+    // clip there from the next bar (the bar it is on when stopped), its MIDI
+    // notes or its audio input; the same button stops it, the clip then as
+    // long as what was played (whole bars), looping, launched.
+    // `midi`: the kind recorded (a hybrid track records the other one into
+    // its companion); none: the track's own.
+    juce::Result recordIntoSlot(const TrackRef& track, int scene, std::optional<bool> midi = std::nullopt);
+    juce::Result stopSlotRecording(bool keep = true);
+    [[nodiscard]] std::optional<std::pair<TrackRef, int>> slotRecording() const { return slotRecording_; }
     [[nodiscard]] std::size_t trackCount() const;
     [[nodiscard]] bool isValid(const TrackRef& track) const override;
     [[nodiscard]] juce::String trackName(const TrackRef& track) const override;
@@ -1025,6 +1107,10 @@ public:
     // `before` (0: where it goes by itself). One that cannot go there (a
     // sound before an instrument) stays where it went.
     juce::Result insertDeviceBefore(const TrackRef& track, const juce::String& key, std::uint64_t before);
+    // The whole instrument a synth's own card is the heart of ("opale-synth"
+    // → "opale-instrument"): what an instrument track gets for that card.
+    // Empty for any other card.
+    [[nodiscard]] static juce::String instrumentOfCard(const juce::String& key);
     juce::Result insertLibraryDeviceBefore(const TrackRef& track, const juce::File& file, std::uint64_t before);
     // Recompiles and publishes a track's graph to the engine.
     juce::Result publishGraph(const TrackRef& track, bool structural);
@@ -1073,7 +1159,10 @@ public:
     // A MIDI track records into the clip given (or a new one at the
     // playhead); an audio track records a take from its input bus. The
     // track armed wins over the one given. Playback starts if it was stopped.
-    juce::Result startRecording(std::optional<TrackRef> track, std::uint64_t midiClip);
+    // `withCompanion`: a hybrid track's other part records with it (its
+    // notes; its sound when an audio input was chosen for it). A slot's
+    // recording takes one kind alone.
+    juce::Result startRecording(std::optional<TrackRef> track, std::uint64_t midiClip, bool withCompanion = true);
     // Keeps or discards the take; the transport stops if recording started it.
     juce::Result stopRecording(bool keep);
     [[nodiscard]] bool isRecording() const noexcept;
@@ -1116,6 +1205,39 @@ public:
     juce::var interfaceState;
 
 private:
+    // The tracks' order on screen, by routing key (kept up to date by
+    // tracks(): one gone is dropped, one new comes at the end).
+    mutable std::vector<std::uint64_t> trackOrder_;
+    // The groups: each track's group (routing keys), the groups, the folded.
+    std::map<std::uint64_t, std::uint64_t> groupOf_;
+    std::set<std::uint64_t> groups_;
+    std::set<std::uint64_t> foldedGroups_;
+    // The hybrid tracks: each track's companion (routing keys), and the
+    // instrument tracks whose audio part records.
+    std::map<std::uint64_t, std::uint64_t> companions_;
+    std::set<std::uint64_t> hybridAudioRecords_;
+    // A hybrid track's other part recording with it: the companion, its MIDI
+    // clip (0: its sound), the audio track armed before it.
+    std::optional<TrackRef> companionRecording_;
+    std::uint64_t companionRecordClip_ {};
+    std::optional<std::size_t> armedBeforeCompanion_;
+    void startCompanionRecording(const TrackRef& owner, const TrackRef& companion);
+    void stopCompanionRecording(bool keep);
+    [[nodiscard]] juce::File newRecordingFile(const TrackRef& track) const;
+    // A track's own clips alone (not its companion's): the scene playing,
+    // the one waiting, stopping them.
+    [[nodiscard]] int partPlayingScene(const TrackRef& part) const;
+    [[nodiscard]] int partPendingScene(const TrackRef& part) const;
+    void stopPart(const TrackRef& part);
+    // The slot being recorded into, from what beat, its MIDI clip.
+    std::optional<std::pair<TrackRef, int>> slotRecording_;
+    // A companion armed for a slot's recording, and the audio track armed
+    // before it (audio arming is one track at a time): put back after.
+    bool slotRecordArmedPart_ {};
+    std::optional<std::size_t> armedBeforeSlotRecording_;
+    void disarmSlotRecordingPart(const TrackRef& part);
+    double slotRecordStartBeats_ {};
+    std::uint64_t slotRecordClip_ {};
     std::unique_ptr<GraphSlot> makeSlot(GraphSlot::Owner owner);
     // The one card a device made on the chain (the ids before are `had`),
     // moved before `before`.

@@ -180,6 +180,14 @@ void DevicesView::draw()
         return;
     }
     auto track = *state_.selectedTrack;
+    // A hybrid audio track's instrument opened: its companion's chain.
+    if (state_.openCompanion) {
+        const auto companion = *state_.openCompanion == track ? studio_.companionOf(track) : std::nullopt;
+        if (companion && companion->midi)
+            track = *companion;
+        else
+            state_.openCompanion.reset();
+    }
     // A rack's pad opened: its own chain (its instrument and effects).
     if (state_.openRackPad) {
         auto opened = track;
@@ -262,14 +270,19 @@ void DevicesView::draw()
         if (!track.master && !track.isBus() && track.pad < 0) {
             auto& engine = studio_.engine();
             const auto prefix = (track.midi ? "m" : "a") + std::to_string(track.midi ? track.midiId : track.audioIndex) + ":";
-            if (track.midi) {
-                const auto hears = engine.midiTrackHearsInputs(track.midiId);
-                const auto inputs = engine.midiTrackInputs(track.midiId);
+            // A hybrid track: the notes reach its instrument part (its
+            // companion's, for an audio track), its sound its audio part.
+            const auto companion = studio_.companionOf(track);
+            const auto notesPart = track.midi ? std::optional<TrackRef>(track)
+                                              : companion && companion->midi ? companion : std::optional<TrackRef> {};
+            if (notesPart) {
+                const auto hears = engine.midiTrackHearsInputs(notesPart->midiId);
+                const auto inputs = engine.midiTrackInputs(notesPart->midiId);
                 for (const auto& input : inputs) {
                     Light light;
                     light.key = prefix + input.toStdString();
                     light.heard = hears;
-                    light.counter = routing_ui::midiInputActivity(studio_, track, input);
+                    light.counter = routing_ui::midiInputActivity(studio_, *notesPart, input);
                     light.tip = ui::Ls("Entrée MIDI : ", "MIDI input: ") + routing_ui::midiInputName(input)
                                 + ui::Ls("\nS'allume quand des notes arrivent : de ses clips, ou de cette entrée",
                                          "\nLights up as notes arrive: from its clips, or from this input")
@@ -280,7 +293,7 @@ void DevicesView::draw()
                 if (inputs.empty())
                     lights.push_back({ ui::Ls("Aucune entrée MIDI : la lumière suit les notes de ses clips (Routage pour en choisir une)",
                                               "No MIDI input: the light follows its clips' notes (Routing to pick one)"),
-                                       engine.midiTrackClipActivity(track.midiId), false, prefix + "clips" });
+                                       engine.midiTrackClipActivity(notesPart->midiId), false, prefix + "clips" });
             }
             const auto levels = track.midi ? engine.midiTrackInputLevels(track.midiId) : engine.trackInputLevels(track.audioIndex);
             if (!track.midi && !studio_.isBusTrack(track)) {
@@ -292,6 +305,10 @@ void DevicesView::draw()
                 meters.emplace_back(bus ? bus->name : ui::Ls("Entrée principale", "Main input"), std::max({ card[0], card[1], levels[0] }));
             } else if (!track.midi) {
                 meters.emplace_back(ui::Ls("Ce qui y est routé", "What is routed into it"), levels[0]);
+            } else if (companion) {
+                // A hybrid instrument track: its audio clips, with what is
+                // routed into it.
+                meters.emplace_back(ui::Ls("Ses clips audio (piste hybride)", "Its audio clips (a hybrid track)"), levels[0]);
             }
             const auto inputs = studio_.trackInputs(track);
             for (std::size_t index = 0; index < inputs.size() && index + 1 < levels.size(); ++index)
@@ -345,11 +362,32 @@ void DevicesView::draw()
             }
             ImGui::SetCursorScreenPos(origin);
         }
+        // A hybrid audio track: its instrument (what plays its MIDI clips),
+        // over its preset; from there, back to the track's effects.
+        const auto opened = track.pad < 0 && state_.openCompanion && studio_.isCompanion(track);
+        const auto companion = track.pad < 0 && !track.midi && !track.master ? studio_.companionOf(track) : std::nullopt;
+        const auto hybridButton = opened || (companion && companion->midi);
+        if (hybridButton) {
+            ImGui::SetCursorScreenPos(ImVec2(origin.x + dp(3.0f), presetsTop - dp(24.0f)));
+            if (opened) {
+                if (ui::iconButton(icon::back, L("Revenir aux effets de la piste audio", "Back to the audio track's effects"), false, p.accent,
+                                   ImVec2(dp(20.0f), dp(20.0f))))
+                    state_.openCompanion.reset();
+            } else if (ui::iconButton(icon::note,
+                                      L("L'instrument de la piste (piste hybride) : il joue ses clips MIDI, son son passe dans ses effets",
+                                        "The track's instrument (a hybrid track): it plays its MIDI clips, its sound goes through its effects"),
+                                      false, p.midi, ImVec2(dp(20.0f), dp(20.0f)))) {
+                state_.openCompanion = track;
+                state_.openRackPad.reset();
+            }
+            ImGui::SetCursorScreenPos(origin);
+        }
         // Vertical name, above them.
         const auto name = track.pad >= 0 ? studio_.padName(track) : studio_.trackName(track);
         ImGui::PushFont(theme::boldFont(), ui::currentFontBase() * 0.85f);
         auto y = origin.y + dp(8.0f);
-        for (auto index = 0; index < name.length() && y < presetsTop - dp(14.0f); ++index) {
+        const auto nameBottom = presetsTop - dp(hybridButton ? 38.0f : 14.0f);
+        for (auto index = 0; index < name.length() && y < nameBottom; ++index) {
             const auto glyph = juce::String::charToString(name[index]).toUpperCase();
             const auto glyphSize = ImGui::CalcTextSize(glyph.toRawUTF8());
             list->AddText(ImVec2(origin.x + (size.x - glyphSize.x) * 0.5f + dp(2.0f), y), p.textDim, glyph.toRawUTF8());

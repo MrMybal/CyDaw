@@ -49,6 +49,13 @@ Reading read()
     PROCESS_MEMORY_COUNTERS counters {};
     if (GetProcessMemoryInfo(GetCurrentProcess(), &counters, sizeof(counters)))
         last.memoryBytes = static_cast<double>(counters.WorkingSetSize);
+    MEMORYSTATUSEX status {};
+    status.dwLength = sizeof(status);
+    if (GlobalMemoryStatusEx(&status) && status.ullTotalPhys > 0) {
+        last.totalMemoryBytes = static_cast<double>(status.ullTotalPhys);
+        if (last.memoryBytes >= 0.0)
+            last.memoryPercent = std::clamp(last.memoryBytes / last.totalMemoryBytes * 100.0, 0.0, 100.0);
+    }
 #endif
     return last;
 }

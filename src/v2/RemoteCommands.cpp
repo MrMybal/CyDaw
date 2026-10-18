@@ -249,6 +249,9 @@ private:
             set(entry, "outputs", outputsSummary(ref));
             if (const auto inputs = studio_.trackInputs(ref); !inputs.empty())
                 set(entry, "inputs", inputsSummary(ref));
+            // A hybrid track's companion: the track it holds the clips of.
+            if (studio_.isCompanion(ref))
+                set(entry, "companionOf", studio_.trackName(studio_.shownTrackOf(ref)));
             audioTracks.add(entry);
         }
         juce::Array<juce::var> midiTracks;
@@ -296,11 +299,33 @@ private:
                 clips.add(clipEntry);
             }
             set(entry, "clips", clips);
+            if (studio_.isCompanion(ref))
+                set(entry, "companionOf", studio_.trackName(studio_.shownTrackOf(ref)));
             midiTracks.add(entry);
         }
         auto result = object();
         set(result, "audioTracks", audioTracks);
         set(result, "midiTracks", midiTracks);
+        // Every track in the order shown (every kind together), by name; a
+        // group track and the group each is in.
+        juce::Array<juce::var> order;
+        for (const auto& shown : studio_.tracks()) {
+            auto entry = object();
+            set(entry, "name", studio_.trackName(shown));
+            set(entry, "kind", shown.midi ? juce::String("midi") : studio_.isBusTrack(shown) ? juce::String("bus") : juce::String("audio"));
+            if (studio_.isGroupTrack(shown)) {
+                set(entry, "group", true);
+                set(entry, "folded", studio_.isFolded(shown));
+            }
+            if (const auto group = studio_.groupOf(shown))
+                set(entry, "inGroup", studio_.trackName(*group));
+            // A hybrid track: its companion's kind, named "<name>@midi" or
+            // "<name>@audio" by the commands.
+            if (const auto companion = studio_.companionOf(shown))
+                set(entry, "hybrid", companion->midi ? juce::String("midi") : juce::String("audio"));
+            order.add(entry);
+        }
+        set(result, "order", order);
         return result;
     }
 
@@ -409,9 +434,31 @@ private:
         return result;
     }
 
+    // A track of the session as the commands name it.
+    [[nodiscard]] RemoteTrack remoteOf(const TrackRef& track) const
+    {
+        if (!track.midi)
+            return RemoteTrack { false, track.audioIndex, 0, track.audioIndex };
+        const auto summaries = engine_.midiTrackSummaries();
+        for (std::size_t position = 0; position < summaries.size(); ++position)
+            if (summaries[position].id == track.midiId)
+                return RemoteTrack { true, position, track.midiId, engine_.trackCount() + position };
+        return RemoteTrack { true, 0, track.midiId, engine_.trackCount() };
+    }
+
     // ---- Tracks by index (audio first, then MIDI), by name, or a bus --------------
+    // "<name>@midi" / "<name>@audio": a hybrid track's clips of that kind
+    // (the track itself, or its companion).
     [[nodiscard]] std::optional<RemoteTrack> resolveTrack(const juce::var& spec) const
     {
+        if (const auto named = spec.toString().trim(); spec.isString()
+                                                       && (named.endsWithIgnoreCase("@midi") || named.endsWithIgnoreCase("@audio"))) {
+            const auto owner = resolveTrack(named.upToLastOccurrenceOf("@", false, false).trim());
+            if (!owner || owner->master || owner->bus)
+                return std::nullopt;
+            const auto part = studio_.partFor(owner->ref(), named.endsWithIgnoreCase("@midi"));
+            return part ? std::optional<RemoteTrack>(remoteOf(*part)) : std::nullopt;
+        }
         const auto summaries = engine_.midiTrackSummaries();
         const auto audioCount = engine_.trackCount();
         const auto byIndex = [&summaries, audioCount](const int index) -> std::optional<RemoteTrack> {
@@ -453,7 +500,11 @@ private:
             return byIndex(name.getIntValue());
         std::optional<RemoteTrack> loose;
         auto looseMatches = 0;
+        // By name: the tracks shown (a hybrid track's companion bears its
+        // name, "<name>@midi" or "@audio" reaches it).
         for (std::size_t index = 0; index < audioCount; ++index) {
+            if (studio_.isCompanion(TrackRef { false, index, 0 }))
+                continue;
             const auto candidate = studio_.trackName(TrackRef { false, index, 0 });
             if (candidate.equalsIgnoreCase(name))
                 return RemoteTrack { false, index, 0, index };
@@ -464,6 +515,8 @@ private:
         }
         for (std::size_t position = 0; position < summaries.size(); ++position) {
             const auto channel = audioCount + position;
+            if (studio_.isCompanion(TrackRef { true, 0, summaries[position].id }))
+                continue;
             if (summaries[position].name.equalsIgnoreCase(name))
                 return RemoteTrack { true, position, summaries[position].id, channel };
             if (summaries[position].name.containsIgnoreCase(name)) {
@@ -2435,33 +2488,18 @@ juce::var Commands::onMoveTrack()
         return error;
     if (track->bus || track->master)
         return fail("buses and the master do not move");
+    // In the order shown, every kind together (status's "order").
+    const auto shown = studio_.tracks();
     const auto to = static_cast<int>(number("to", -1.0));
-    const auto audioCount = static_cast<int>(engine_.trackCount());
-    const auto total = audioCount + static_cast<int>(engine_.midiTrackSummaries().size());
+    const auto total = static_cast<int>(shown.size());
     if (to < 0 || to >= total)
-        return fail("to is an index from 0 to " + juce::String(total - 1));
-    // Audio tracks move among audio tracks, MIDI among MIDI: the combined
-    // index keeps audio first.
-    if (track->midi != (to >= audioCount))
-        return fail(track->midi ? "a MIDI track moves to an index from " + juce::String(audioCount) + " to "
-                                      + juce::String(total - 1)
-                                : "an audio track moves to an index from 0 to " + juce::String(audioCount - 1));
-    const auto from = static_cast<int>(track->channel);
-    const auto selected = ui_.selectedTrack();
-    if (to != from && studio_.moveTrack(track->ref(), to - from) && !track->midi) {
-        // Audio indices moved: the selection follows its track.
-        ui_.tracksChanged();
-        if (selected && !selected->midi) {
-            auto index = static_cast<int>(selected->audioIndex);
-            if (index == from)
-                index = to;
-            else if (from < to && index > from && index <= to)
-                --index;
-            else if (to < from && index >= to && index < from)
-                ++index;
-            ui_.selectTrack(TrackRef { false, static_cast<std::size_t>(index), 0 });
-        }
-    }
+        return fail("to is an index from 0 to " + juce::String(total - 1) + " in the order shown");
+    const auto found = std::find(shown.begin(), shown.end(), track->ref());
+    if (found == shown.end())
+        return fail("no such track");
+    const auto from = static_cast<int>(std::distance(shown.begin(), found));
+    if (to != from)
+        (void) studio_.moveTrack(track->ref(), to - from);
     return ok(describeTracks());
 }
 
@@ -2497,6 +2535,19 @@ std::vector<Engine::NoteExpressionPoint> expressionFrom(const juce::var& value)
                 points.push_back({ static_cast<float>(position), static_cast<float>(level), std::isfinite(bend) ? static_cast<float>(bend) : 0.0f });
         }
     return points;
+}
+
+// A note's timbre, pressure and pan curves and its chance, as given (a
+// curve given replaces the note's; []: none).
+void noteExtras(Engine& engine, const std::uint64_t trackId, const std::uint64_t clipId, const std::uint64_t noteId, const juce::var& given)
+{
+    using Curve = Engine::NoteCurve;
+    for (const auto& [name, curve] : { std::pair { "timbre", Curve::timbre }, std::pair { "pressure", Curve::pressure },
+                                       std::pair { "pan", Curve::pan } })
+        if (given.hasProperty(name))
+            (void) engine.setMidiNoteCurve(trackId, clipId, noteId, curve, expressionFrom(given.getProperty(name, juce::var())));
+    if (given.hasProperty("chance"))
+        (void) engine.setMidiNoteChance(trackId, clipId, noteId, static_cast<float>(static_cast<double>(given.getProperty("chance", 1.0))));
 }
 
 juce::var expressionVar(const std::vector<Engine::NoteExpressionPoint>& points)
@@ -2538,6 +2589,14 @@ juce::var Commands::onNotes()
                     set(entry, "pitch", expressionVar(note.pitch));
                 if (!note.gain.empty())
                     set(entry, "gain", expressionVar(note.gain));
+                if (!note.timbre.empty())
+                    set(entry, "timbre", expressionVar(note.timbre));
+                if (!note.pressure.empty())
+                    set(entry, "pressure", expressionVar(note.pressure));
+                if (!note.pan.empty())
+                    set(entry, "pan", expressionVar(note.pan));
+                if (note.chance < 1.0f)
+                    set(entry, "chance", note.chance);
                 entries.add(entry);
             }
             auto clipEntry = object();
@@ -2545,6 +2604,13 @@ juce::var Commands::onNotes()
             set(clipEntry, "name", clip.name);
             set(clipEntry, "startBeats", clip.startBeats);
             set(clipEntry, "lengthBeats", clip.lengthBeats);
+            // Where it plays and loops, in its own beats (an end of 0: its
+            // length).
+            set(clipEntry, "playStartBeats", clip.playStartBeats);
+            set(clipEntry, "playEndBeats", clip.playEndBeats);
+            set(clipEntry, "loopStartBeats", clip.loopStartBeats);
+            set(clipEntry, "loopEndBeats", clip.loopEndBeats);
+            set(clipEntry, "looping", clip.looping);
             set(clipEntry, "notes", entries);
             clips.add(clipEntry);
         }
@@ -2609,6 +2675,7 @@ juce::var Commands::onNotes()
         if (note.hasProperty("pitch") || note.hasProperty("gain"))
             (void) engine_.setMidiNoteExpression(track->id, clip->id, noteId, expressionFrom(note.getProperty("pitch", juce::var())),
                                                  expressionFrom(note.getProperty("gain", juce::var())));
+        noteExtras(engine_, track->id, clip->id, noteId, note);
     }
     // The track written to is the one shown, as a MIDI recording expects.
     ui_.selectTrack(track->ref());
@@ -2705,6 +2772,7 @@ juce::var Commands::onEditNotes()
                                 track->id, clip.id, noteId,
                                 change.hasProperty("pitch") ? expressionFrom(change.getProperty("pitch", juce::var())) : note.pitch,
                                 change.hasProperty("gain") ? expressionFrom(change.getProperty("gain", juce::var())) : note.gain);
+                        noteExtras(engine_, track->id, clip.id, noteId, change);
                     }
         }
     } else {
@@ -2741,8 +2809,14 @@ juce::var Commands::onAddMidiClip()
     std::optional<RemoteTrack> track;
     if (auto error = trackOrFail(track); !error.isVoid())
         return error;
-    if (!track->midi)
-        return fail("MIDI clips go on MIDI tracks");
+    if (!track->midi) {
+        // An audio track's MIDI clips: on its companion instrument (made: the
+        // track becomes hybrid).
+        const auto part = track->master || track->bus ? std::nullopt : studio_.makePartFor(track->ref(), true);
+        if (!part)
+            return fail("that track takes no MIDI clip");
+        track = remoteOf(*part);
+    }
     // {scene}: in that launcher slot; else in the arrangement at startBeats.
     const auto colour = colourFrom(text("colour"));
     const auto scene = has("scene") ? static_cast<int>(number("scene", -1.0)) : -1;
@@ -2880,6 +2954,16 @@ juce::var Commands::onInsertDevice()
     const auto notes = device->input == "midi" && device->output == "midi";
     if (notes && !track->midi)
         return fail("\"" + key + "\" works on notes; put it on a MIDI track");
+    // A synth's own card (Opale's, Prisme's) on an instrument track: its
+    // whole instrument, in place of the one it plays (as the device panel).
+    // An instrument too: as the device panel puts it (a loose synth card
+    // cleared, a container's pads made).
+    if (track->midi && !track->master && !track->bus
+        && ((device->kind == "preset" && device->soundSource) || (device->kind != "preset" && Studio::instrumentOfCard(key).isNotEmpty()))) {
+        if (const auto inserted = studio_.insertDevice(track->ref(), key); inserted.failed())
+            return fail(key + ": " + inserted.getErrorMessage());
+        return ok(graphSummary(*target));
+    }
     auto applied = device->kind == "preset"   ? (track->midi && device->soundSource ? graph.replaceInstrument(key)
                                                                                     : graph.insertFactoryDevice(key))
                    : notes                   ? graph.insertNodeBeforeInstrument(key)
@@ -5247,8 +5331,37 @@ juce::var Commands::onAudioClips()
     std::optional<RemoteTrack> track;
     if (auto error = trackOrFail(track); !error.isVoid())
         return error;
-    if (track->midi)
-        return fail("\"" + text("track") + "\" is a MIDI track; audio clips go on audio tracks");
+    // {scene}: the file into that launcher slot, whatever the track (an
+    // instrument track's companion holds it: it becomes hybrid).
+    if (command_ == "add_audio_clip" && has("scene") && !track->master && !track->bus) {
+        const auto scene = static_cast<int>(number("scene", 0.0));
+        // No file: an empty clip, a bar long.
+        if (!has("file")) {
+            if (!studio_.newSlotAudioClip(track->ref(), scene))
+                return fail("the empty audio clip could not be made there");
+            auto result = object();
+            set(result, "scene", scene);
+            set(result, "empty", true);
+            return ok(result);
+        }
+        const auto file = fileFor(text("file"));
+        if (!file.existsAsFile())
+            return fail("no audio file at " + file.getFullPathName());
+        if (const auto placed = studio_.placeSlotAudio(track->ref(), scene, file); placed.failed())
+            return fail(placed.getErrorMessage());
+        auto result = object();
+        set(result, "scene", scene);
+        set(result, "name", file.getFileNameWithoutExtension());
+        return ok(result);
+    }
+    if (track->midi) {
+        // An instrument track's audio clips: on its companion audio track
+        // (made for a new one: the track becomes hybrid).
+        const auto part = command_ == "add_audio_clip" ? studio_.makePartFor(track->ref(), false) : studio_.partFor(track->ref(), false);
+        if (!part)
+            return fail("\"" + text("track") + "\" is a MIDI track without audio clips; add_audio_clip makes it hybrid");
+        track = remoteOf(*part);
+    }
     const auto index = track->index;
     if (command_ == "list_audio_clips")
         return ok(describeAudioClips(index));
@@ -5836,8 +5949,11 @@ juce::var Commands::onLaunchScene()
         set(entry, "track", studio_.trackName(track));
         set(entry, "scene", studio_.playingScene(track));
         set(entry, "pending", studio_.pendingScene(track));
-        set(entry, "position", track.midi ? engine_.midiLauncherClipPositionSeconds(track.midiId)
-                                          : engine_.launcherClipPositionSeconds(track.audioIndex));
+        // A hybrid track's clip plays on whichever part holds it.
+        const auto scene = studio_.playingScene(track);
+        const auto part = (scene >= 0 ? studio_.slotPart(track, scene) : std::nullopt).value_or(track);
+        set(entry, "position", part.midi ? engine_.midiLauncherClipPositionSeconds(part.midiId)
+                                         : engine_.launcherClipPositionSeconds(part.audioIndex));
         playing.add(entry);
     }
     set(result, "tracks", playing);

@@ -10,6 +10,10 @@
   the project.
 * The transport stopped while clips play: they wait, and play starts them
   again from their start; stop all forgets them.
+* Hybrid tracks: an instrument track takes an audio clip and an audio track a
+  MIDI clip (a companion track the lists never show holds them, routed into
+  the track); one clip plays at a time on a track; saved and opened; gone
+  with its track.
 
 Exit code 0 when all hold.
 """
@@ -23,7 +27,10 @@ import socket
 import subprocess
 import sys
 import tempfile
+import math
+import struct
 import time
+import wave
 from pathlib import Path
 
 failures: list[str] = []
@@ -177,6 +184,96 @@ def scenario(scratch: Path) -> None:
     check(off.get("stops") is False and on.get("stops") is True, "the slots' stops are saved with the project")
 
 
+def tone(path: Path, seconds: float = 4.0) -> None:
+    """A 440 Hz sine at -12 dBFS, stereo 48 kHz."""
+    rate = 48_000
+    with wave.open(str(path), "wb") as file:
+        file.setnchannels(2)
+        file.setsampwidth(2)
+        file.setframerate(rate)
+        frames = bytearray()
+        for index in range(int(rate * seconds)):
+            value = int(0.25 * 32767 * math.sin(2.0 * math.pi * 440.0 * index / rate))
+            frames += struct.pack("<hh", value, value)
+        file.writeframes(bytes(frames))
+
+
+def order() -> list:
+    return need({"cmd": "status"}, "status").get("order", [])
+
+
+def hybrid_scenario(scratch: Path) -> None:
+    need({"cmd": "new_project"}, "new")
+    silent()
+    need({"cmd": "set_tempo", "bpm": 120}, "tempo")
+    sound = scratch / "tone.wav"
+    tone(sound)
+    file = str(sound).replace(os.sep, "/")
+    need({"cmd": "add_midi_track", "name": "H"}, "track H")
+    need({"cmd": "insert_device", "track": "H", "key": "synth-keys"}, "instrument H")
+    # An audio clip in an instrument track's slot: the track becomes hybrid,
+    # its companion is not listed.
+    need({"cmd": "add_audio_clip", "track": "H", "file": file, "scene": 1}, "audio clip on H")
+    need({"cmd": "add_midi_clip", "track": "H", "name": "H0", "scene": 0, "lengthBeats": 4, "looping": True}, "clip H0")
+    shown = order()
+    check([entry.get("hybrid") for entry in shown if entry["name"] == "H"] == ["audio"]
+          and sum(1 for track in need({"cmd": "status"}, "status").get("audioTracks", []) if track.get("companionOf") == "H") == 1,
+          f"an instrument track with an audio clip is one hybrid track, its companion not shown ({shown})")
+    check(need({"cmd": "slot_stop", "track": "H", "scene": 1}, "slot").get("hasClip") is True,
+          "its slot holds the audio clip")
+    # The audio clip plays through the track.
+    launched = need({"cmd": "launch_clip", "track": "H", "scene": 1}, "launch audio")
+    check(launched.get("launched") is True, "the audio clip of the instrument track launches")
+    level = peak("H", 3.0)
+    check(level > -30.0, f"the audio clip sounds through the instrument track ({level:.1f} dB)")
+    # Its MIDI clip launched: the audio clip stops (one clip at a time).
+    need({"cmd": "launch_clip", "track": "H", "scene": 0}, "launch MIDI")
+    time.sleep(2.6)
+    playing = scenes(need({"cmd": "launch_scene", "query": True}, "read"))
+    quiet = peak("H", 0.6)
+    check(playing.get("H") == 0 and quiet < -50.0,
+          f"launching its MIDI clip stops its audio clip (scene {playing.get('H')}, {quiet:.1f} dB)")
+    need({"cmd": "stop_launcher"}, "stop all")
+    need({"cmd": "transport", "action": "stop"}, "stop")
+    # An instrument track without an instrument: its audio clips still sound.
+    need({"cmd": "add_midi_track", "name": "Bare"}, "track Bare")
+    need({"cmd": "add_audio_clip", "track": "Bare", "file": file, "scene": 0}, "audio clip on Bare")
+    need({"cmd": "launch_clip", "track": "Bare", "scene": 0}, "launch Bare")
+    bare = peak("Bare", 2.5)
+    check(bare > -30.0, f"an instrument track without an instrument lets its audio clips through ({bare:.1f} dB)")
+    need({"cmd": "stop_launcher"}, "stop all")
+    need({"cmd": "transport", "action": "stop"}, "stop")
+    # « + audio »: an empty audio clip, a bar long.
+    need({"cmd": "add_audio_clip", "track": "Bare", "scene": 2}, "empty audio clip")
+    check(need({"cmd": "slot_stop", "track": "Bare", "scene": 2}, "slot").get("hasClip") is True,
+          "an empty audio clip is made in an instrument track's slot")
+    # A MIDI clip on an audio track: an instrument plays it there.
+    need({"cmd": "add_audio_track", "file": file}, "audio track")
+    need({"cmd": "add_midi_clip", "track": "tone", "name": "W2", "scene": 2, "lengthBeats": 4, "looping": True}, "clip W2")
+    companions = [track for track in midi_tracks().values() if track.get("companionOf") == "tone"]
+    check(len(companions) == 1 and companions[0].get("devices"),
+          "a MIDI clip on an audio track gets it a companion instrument")
+    notes = request({"cmd": "list_notes", "track": "tone@midi", "clip": "W2"})
+    check(bool(notes.get("ok")), f"\"<name>@midi\" names the audio track's MIDI clips ({notes.get('error', '')})")
+    # Saved and opened: the same hybrid tracks.
+    before = order()
+    project = scratch / "hybrid-check.cydaw"
+    need({"cmd": "save_project", "path": str(project).replace(os.sep, "/")}, "save")
+    need({"cmd": "new_project"}, "new")
+    need({"cmd": "open_project", "path": str(project).replace(os.sep, "/")}, "open")
+    silent()
+    after = order()
+    check(after == before, f"hybrid tracks are saved with the project ({after})")
+    check(need({"cmd": "slot_stop", "track": "H", "scene": 1}, "slot").get("hasClip") is True,
+          "the instrument track's audio clip is still in its slot")
+    # A hybrid track removed: its companion goes with it.
+    need({"cmd": "remove_track", "track": "H"}, "remove H")
+    status = need({"cmd": "status"}, "status")
+    left = [track for track in status.get("audioTracks", []) if track.get("companionOf") == "H"]
+    names = [entry["name"] for entry in status.get("order", [])]
+    check(not left and "H" not in names and "tone" in names, f"a hybrid track removed takes its companion with it ({names})")
+
+
 def main() -> int:
     global port
     parser = argparse.ArgumentParser()
@@ -197,6 +294,7 @@ def main() -> int:
             except OSError:
                 time.sleep(0.2)
         scenario(scratch)
+        hybrid_scenario(scratch)
     except Exception as error:  # noqa: BLE001 - reported as a failure
         failures.append(str(error))
         print("FAIL", error, flush=True)

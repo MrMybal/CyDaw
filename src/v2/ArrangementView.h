@@ -111,6 +111,9 @@ private:
     // A bus track's clip of automation alone (its lanes move the bus's
     // volume, pan, effects), four bars from the bar under `seconds`.
     void createAutomationClipAt(const TrackRef& track, double seconds);
+    // An empty audio clip, a bar long, at that time (an instrument track's
+    // companion holds it: the track becomes hybrid).
+    void createAudioClipAt(const TrackRef& track, double seconds);
     void openInEditor(const ClipRef& clip);
 
     [[nodiscard]] double secondsPerBeat() const;

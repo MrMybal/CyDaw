@@ -152,6 +152,25 @@ void ContextMenus::trackMenu(const TrackRef& track)
         }
     }
     ImGui::Separator();
+    // Groups: the picked tracks gathered; a group folded, undone.
+    {
+        const auto picked = state_.pickedTracks.empty() ? std::vector<TrackRef> { track } : state_.pickedTracks;
+        const auto label = picked.size() > 1 ? (ui::Ls("Grouper les ", "Group the ") + juce::String(static_cast<int>(picked.size()))
+                                                + ui::Ls(" pistes choisies", " picked tracks"))
+                                              : ui::Ls("Mettre dans un groupe", "Put in a group");
+        if (!studio_.isGroupTrack(track) && ImGui::MenuItem(label.toRawUTF8(), "Ctrl+G"))
+            if (const auto group = studio_.groupTracks(picked))
+                state_.selectTrack(*group);
+        if (studio_.isGroupTrack(track)) {
+            const auto folded = studio_.isFolded(track);
+            if (ImGui::MenuItem(folded ? L("Montrer les pistes du groupe", "Show the group's tracks")
+                                       : L("Replier les pistes du groupe", "Fold the group's tracks")))
+                studio_.setFolded(track, !folded);
+            if (ImGui::MenuItem(L("Dégrouper", "Ungroup")))
+                (void) studio_.ungroup(track);
+        }
+    }
+    ImGui::Separator();
     if (ImGui::MenuItem(L("Monter", "Move up")))
         (void) studio_.moveTrack(track, -1);
     if (ImGui::MenuItem(L("Descendre", "Move down")))
@@ -191,51 +210,92 @@ void ContextMenus::trackMenu(const TrackRef& track)
     }
 }
 
-void ContextMenus::slotMenu(const TrackRef& track, const int scene)
+void ContextMenus::slotMenu(const TrackRef& owner, const int scene)
 {
     auto& engine = studio_.engine();
     char title[96];
-    std::snprintf(title, sizeof(title), "%s · %s %d", studio_.trackName(track).toRawUTF8(), L("scène", "scene"), scene + 1);
+    std::snprintf(title, sizeof(title), "%s · %s %d", studio_.trackName(owner).toRawUTF8(), L("scène", "scene"), scene + 1);
     ImGui::TextDisabled("%s", title);
     ImGui::Separator();
-    const auto stopTrack = [&] { studio_.stopTrackClips(track); };
+    const auto stopTrack = [&] { studio_.stopTrackClips(owner); };
     // An empty slot's stop (the selected empty slots' with it): a scene
     // launched stops the track there, unless it is taken off.
     const auto stopItem = [&] {
-        const auto stops = studio_.slotStops(track, scene);
-        if (ImGui::MenuItem(L("Stop dans la case (au lancement d'une scène)", "Stop in the slot (when a scene launches)"),
-                            "Ctrl+E", stops)) {
+        const auto stops = studio_.slotStops(owner, scene);
+        // Its button: a stop, or on an armed track the record button.
+        const auto armed = !studio_.isBusTrack(owner) && studio_.trackMix(owner).armed;
+        const auto* label = armed ? (stops ? L("Retirer le bouton d'enregistrement", "Remove the record button")
+                                           : L("Remettre le bouton d'enregistrement", "Put the record button back"))
+                                  : (stops ? L("Retirer le bouton stop", "Remove the stop button")
+                                           : L("Remettre le bouton stop", "Put the stop button back"));
+        if (ImGui::MenuItem(label, "Ctrl+E")) {
             std::vector<SlotRef> slots;
             for (const auto& slot : state_.selectedSlots)
                 if (studio_.isValid(slot.track) && !studio_.slotHasClip(slot.track, slot.scene))
                     slots.push_back(slot);
-            if (std::find(slots.begin(), slots.end(), SlotRef { track, scene }) == slots.end())
-                slots = { SlotRef { track, scene } };
+            if (std::find(slots.begin(), slots.end(), SlotRef { owner, scene }) == slots.end())
+                slots = { SlotRef { owner, scene } };
             for (const auto& slot : slots)
                 studio_.setSlotStops(slot.track, slot.scene, !stops);
         }
         ui::tooltip(L("Avec ce stop, lancer une scène arrête la piste quand sa case est vide ; sans lui, la piste continue.",
                       "With this stop, launching a scene stops the track where its slot is empty; without it, the track goes on."));
     };
+    // The slot's clip: on the track, or on its companion (a hybrid track's
+    // other kind). An empty slot takes either kind.
+    const auto part = studio_.slotPart(owner, scene);
+    if (!part) {
+        if (!studio_.isBusTrack(owner)) {
+            if (ImGui::MenuItem(L("Nouveau clip MIDI", "New MIDI clip"), owner.midi ? L("Double-clic", "Double click") : nullptr))
+                if (const auto made = studio_.newSlotMidiClip(owner, scene)) {
+                    state_.editedClip = ClipRef { made->first, made->second };
+                    state_.bringToFront = Panel::editor;
+                }
+            if (!owner.midi)
+                ui::tooltip(L("La piste devient hybride : un instrument joue les notes, son son passe dans les effets de la piste.",
+                              "The track becomes hybrid: an instrument plays the notes, its sound goes through the track's effects."));
+            if (ImGui::MenuItem(L("Nouveau clip audio", "New audio clip")))
+                if (const auto made = studio_.newSlotAudioClip(owner, scene)) {
+                    state_.editedClip = ClipRef { *made, 0, scene };
+                    state_.bringToFront = Panel::editor;
+                }
+            if (owner.midi)
+                ui::tooltip(L("Un clip audio vide. La piste devient hybride : ses clips audio jouent dans ses effets, après l'instrument.",
+                              "An empty audio clip. The track becomes hybrid: its audio clips play into its effects, after the instrument."));
+            // Armed: either kind recorded here (the other one into its
+            // companion: it becomes hybrid).
+            if (studio_.trackMix(owner).armed) {
+                ImGui::Separator();
+                const auto record = [&](const bool midi) {
+                    if (const auto started = studio_.recordIntoSlot(owner, scene, midi); started.failed()) {
+                        state_.status = started.getErrorMessage();
+                        state_.statusIsError = true;
+                        state_.statusTime = ImGui::GetTime();
+                    }
+                };
+                if (ImGui::MenuItem(L("Enregistrer des notes ici", "Record notes here")))
+                    record(true);
+                if (ImGui::MenuItem(L("Enregistrer de l'audio ici", "Record audio here")))
+                    record(false);
+                ui::tooltip(L("Depuis l'entrée audio de la piste (Entrées / sorties)", "From the track's audio input (Inputs / outputs)"));
+            }
+        }
+        if (ImGui::MenuItem(L("Arrêter la piste", "Stop the track")))
+            stopTrack();
+        stopItem();
+        if (!studio_.isBusTrack(owner))
+            ImGui::TextDisabled("%s", L("Ou glissez un sample du Navigateur ici.", "Or drag a sample from the Browser here."));
+        return;
+    }
+    const auto track = *part;
+    const auto nextFree = !studio_.slotHasClip(owner, scene + 1);
     if (track.midi) {
         const auto* clip = midiClipForScene(engine, track.midiId, scene);
-        if (clip == nullptr) {
-            if (ImGui::MenuItem(L("Nouveau clip MIDI", "New MIDI clip"), L("Double-clic", "Double click"))) {
-                const auto id = engine.addMidiClip(track.midiId, {}, 0.0, 4.0, true, studio_.trackColour(track), scene);
-                if (id != 0) {
-                    state_.editedClip = ClipRef { track, id };
-                    state_.bringToFront = Panel::editor;
-                    studio_.markDirty();
-                }
-            }
-            if (ImGui::MenuItem(L("Arrêter la piste", "Stop the track")))
-                stopTrack();
-            stopItem();
+        if (clip == nullptr)
             return;
-        }
         const auto clipId = clip->id;
         if (ImGui::MenuItem(L("Lancer", "Launch"), "\xe2\x96\xb6"))
-            (void) studio_.launchSlot(track, scene);
+            (void) studio_.launchSlot(owner, scene);
         if (ImGui::MenuItem(L("Arrêter la piste", "Stop the track")))
             stopTrack();
         if (ImGui::MenuItem(L("Ouvrir dans l'éditeur", "Open in the editor"), L("Double-clic", "Double click"))) {
@@ -253,7 +313,6 @@ void ContextMenus::slotMenu(const TrackRef& track, const int scene)
             (void) engine.setMidiClipPresentation(track.midiId, clipId, {}, colour);
             studio_.markDirty();
         });
-        const auto nextFree = midiClipForScene(engine, track.midiId, scene + 1) == nullptr;
         if (ImGui::MenuItem(L("Dupliquer dans la scène suivante", "Duplicate into the next scene"), nullptr, false, nextFree)) {
             const auto copy = *clip;
             const auto id = engine.addMidiClip(track.midiId, copy.name, 0.0, copy.lengthBeats, copy.looping, copy.colour, scene + 1);
@@ -278,15 +337,10 @@ void ContextMenus::slotMenu(const TrackRef& track, const int scene)
         return;
     }
     const auto clip = engine.launcherClip(track.audioIndex, scene);
-    if (!clip) {
-        if (ImGui::MenuItem(L("Arrêter la piste", "Stop the track")))
-            stopTrack();
-        stopItem();
-        ImGui::TextDisabled("%s", L("Glissez un sample du Navigateur ici.", "Drag a sample from the Browser here."));
+    if (!clip)
         return;
-    }
     if (ImGui::MenuItem(L("Lancer", "Launch"), "\xe2\x96\xb6"))
-        (void) studio_.launchSlot(track, scene);
+        (void) studio_.launchSlot(owner, scene);
     if (ImGui::MenuItem(L("Arrêter la piste", "Stop the track")))
         stopTrack();
     if (ImGui::MenuItem(L("Ouvrir dans l'éditeur", "Open in the editor"), L("Double-clic", "Double click"))) {
@@ -300,7 +354,6 @@ void ContextMenus::slotMenu(const TrackRef& track, const int scene)
         state_.statusIsError = result.failed();
         state_.statusTime = ImGui::GetTime();
     }
-    const auto nextFree = !engine.launcherClip(track.audioIndex, scene + 1).has_value();
     if (ImGui::MenuItem(L("Dupliquer dans la scène suivante", "Duplicate into the next scene"), nullptr, false, nextFree))
         if (engine.transferLauncherClip(track.audioIndex, scene, track.audioIndex, scene + 1, true))
             studio_.markDirty();

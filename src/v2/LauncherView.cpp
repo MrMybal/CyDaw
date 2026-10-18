@@ -39,7 +39,8 @@ void LauncherView::draw()
     dropSlots_.clear();
     const auto& p = theme::palette();
     auto& engine = studio_.engine();
-    const auto tracks = studio_.tracks();
+
+    const auto tracks = studio_.shownTracks();
     // The scenes in use and two more (eight at least): a large project's
     // hundreds scroll.
     const auto scenes = studio_.launcherSceneCount();
@@ -95,7 +96,8 @@ void LauncherView::draw()
     // column), the tracks sideways.
     const auto available = ImGui::GetContentRegionAvail();
     const auto gap = dp(3.0f);
-    const auto cellWidth = dp(100.0f);
+    // As narrow as a strip lets it (Bitwig's columns).
+    const auto cellWidth = std::max(dp(86.0f), mixer_strip::naturalWidth());
     const auto headerHeight = dp(26.0f);
     const auto stopHeight = dp(24.0f);
     const auto scrollbar = ImGui::GetStyle().ScrollbarSize;
@@ -109,11 +111,15 @@ void LauncherView::draw()
     const auto showClips = state_.launcherShowClips;
     std::vector<TrackRef> buses;
     for (const auto& track : tracks)
-        if (studio_.isBusTrack(track))
+        if (studio_.isEffectBus(track))
             buses.push_back(track);
     const auto devicesHeight = state_.launcherShowDevices ? dp(84.0f) : 0.0f;
     const auto sendsHeight = state_.launcherShowSends ? static_cast<float>(std::max<std::size_t>(1, buses.size())) * dp(26.0f) + dp(6.0f) : 0.0f;
-    const auto ioHeight = state_.launcherShowIo ? dp(58.0f) : 0.0f;
+    // A hybrid track has two inputs (its notes, its sound): a row more.
+    const auto anyHybrid = std::any_of(tracks.begin(), tracks.end(), [this](const TrackRef& track) {
+        return studio_.companionOf(track).has_value();
+    });
+    const auto ioHeight = state_.launcherShowIo ? dp(anyHybrid ? 83.0f : 58.0f) : 0.0f;
     auto sectionsHeight = 0.0f;
     for (const auto height : { devicesHeight, sendsHeight, ioHeight })
         sectionsHeight += height > 0.0f ? height + gap : 0.0f;
@@ -215,7 +221,7 @@ void LauncherView::draw()
     // tracks), each column drawn the same way.
     std::vector<TrackRef> plain;
     for (const auto& track : tracks)
-        if (!studio_.isBusTrack(track))
+        if (!studio_.isEffectBus(track))
             plain.push_back(track);
     const auto busesWidth = buses.empty() ? 0.0f
                                           : std::min(static_cast<float>(buses.size()) * (cellWidth + gap) - gap,
@@ -233,12 +239,21 @@ void LauncherView::draw()
         }
         if (grid && shown.empty())
             ui::emptyState(L("Aucune piste", "No shown"), L("Les clips du lanceur appartiennent aux pistes.", "Launcher clips belong to shown."));
+        // Each column's group (a group track's own, its tracks'): its colour
+        // tints them, a frame holds them together.
+        std::vector<std::optional<TrackRef>> columnGroup(shown.size());
+        std::vector<ImU32> columnGroupColour(shown.size());
+        for (std::size_t column = 0; column < shown.size(); ++column) {
+            columnGroup[column] = studio_.isGroupTrack(shown[column]) ? std::optional<TrackRef>(shown[column]) : studio_.groupOf(shown[column]);
+            if (columnGroup[column])
+                columnGroupColour[column] = theme::fromArgb(studio_.trackColour(*columnGroup[column]));
+        }
 
         for (std::size_t column = 0; column < shown.size(); ++column) {
             const auto& track = shown[column];
             const ImVec2 min(origin.x + column * (cellWidth + gap), origin.y);
             const ImVec2 max(min.x + cellWidth, min.y + headerHeight);
-            const auto selected = state_.selectedTrack && *state_.selectedTrack == track;
+            const auto selected = (state_.selectedTrack && *state_.selectedTrack == track) || state_.isTrackPicked(track);
             ImGui::PushID(static_cast<int>(column));
             // The header selects its track, which the device panel and the graph
             // then show; a double click brings the devices to the front. The stop
@@ -248,25 +263,73 @@ void LauncherView::draw()
             ImGui::InvisibleButton("##header", ImVec2(cellWidth, headerHeight));
             const auto headerHovered = ImGui::IsItemHovered();
             if (ImGui::IsItemClicked()) {
-                state_.selectTrack(track);
+                // Ctrl: one more or one less; Shift: one more (a group takes them).
+                if (io.KeyCtrl || io.KeyShift)
+                    state_.pickTrack(track, io.KeyCtrl);
+                else
+                    state_.selectTrack(track);
                 state_.focused = Panel::launcher;
             }
             if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
-                state_.selectTrack(track);
+                if (!state_.isTrackPicked(track))
+                    state_.selectTrack(track);
                 state_.contextRequest = ContextRequest { ContextRequest::Kind::track, track };
             }
             if (headerHovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
                 state_.bringToFront = Panel::devices;
             if (headerHovered)
-                ui::tooltip(L("Clic : choisir la piste (Périphériques, Graphe). Double-clic : ses périphériques. Clic droit : son menu.",
-                              "Click: pick the track (Devices, Graph). Double click: its devices. Right click: its menu."));
-            list->AddRectFilled(min, max, selected ? p.bg4 : headerHovered ? p.bg3 : p.bg2, dp(3.0f));
-            list->AddRectFilled(min, ImVec2(min.x + cellWidth, min.y + dp(3.0f)), theme::fromArgb(studio_.trackColour(track)), dp(3.0f),
-                                ImDrawFlags_RoundCornersTop);
+                ui::tooltip(L("Clic : choisir la piste (Périphériques, Graphe) ; Ctrl, Maj : plusieurs (Ctrl+G les groupe). Double-clic : "
+                              "ses périphériques. Clic droit : son menu.",
+                              "Click: pick the track (Devices, Graph); Ctrl, Shift: several (Ctrl+G groups them). Double click: its devices. "
+                              "Right click: its menu."));
+            const auto group = studio_.isGroupTrack(track);
+            const auto inGroup = studio_.groupOf(track);
+            auto headerFill = selected ? p.bg4 : headerHovered ? p.bg3 : p.bg2;
+            if (columnGroup[column])
+                headerFill = theme::mix(headerFill, columnGroupColour[column] | 0xff000000u, group ? 0.3f : 0.14f);
+            list->AddRectFilled(min, max, headerFill, dp(3.0f));
+            // A group's tracks carry its colour over theirs.
+            if (inGroup)
+                list->AddRectFilled(min, ImVec2(min.x + cellWidth, min.y + dp(3.0f)), theme::fromArgb(studio_.trackColour(*inGroup)), dp(3.0f),
+                                    ImDrawFlags_RoundCornersTop);
+            const auto bandTop = inGroup ? min.y + dp(3.0f) : min.y;
+            list->AddRectFilled(ImVec2(min.x, bandTop), ImVec2(min.x + cellWidth, bandTop + dp(3.0f)), theme::fromArgb(studio_.trackColour(track)),
+                                inGroup ? 0.0f : dp(3.0f), inGroup ? ImDrawFlags_None : ImDrawFlags_RoundCornersTop);
             if (selected)
                 list->AddRect(min, max, theme::fromArgb(studio_.trackColour(track)), dp(3.0f), dp(1.5f));
+            auto nameLeft = min.x + dp(6.0f);
+            auto nameRoom = cellWidth - dp(12.0f);
+            if (group) {
+                // A group: its folder, and its tracks folded or not.
+                const auto folded = studio_.isFolded(track);
+                ImGui::SetCursorScreenPos(ImVec2(max.x - dp(18.0f), min.y + dp(5.0f)));
+                if (ImGui::InvisibleButton("##fold", ImVec2(dp(16.0f), headerHeight - dp(8.0f))))
+                    studio_.setFolded(track, !folded);
+                const auto foldHovered = ImGui::IsItemHovered();
+                ui::tooltip(folded ? L("Montrer les pistes du groupe", "Show the group's tracks")
+                                   : L("Replier les pistes du groupe", "Fold the group's tracks"));
+                const ImVec2 c(max.x - dp(10.0f), (min.y + max.y) * 0.5f + dp(1.0f));
+                const auto r = dp(3.5f);
+                const auto ink = foldHovered ? p.accent : p.textDim;
+                if (folded)
+                    list->AddTriangleFilled(ImVec2(c.x - r * 0.6f, c.y - r), ImVec2(c.x - r * 0.6f, c.y + r), ImVec2(c.x + r, c.y), ink);
+                else
+                    list->AddTriangleFilled(ImVec2(c.x - r, c.y - r * 0.6f), ImVec2(c.x + r, c.y - r * 0.6f), ImVec2(c.x, c.y + r), ink);
+                ImGui::PushFont(nullptr, ui::currentFontBase() * 0.8f);
+                list->AddText(ImVec2(nameLeft, min.y + dp(6.0f)), p.text, icon::folder);
+                nameLeft += ImGui::CalcTextSize(icon::folder).x + dp(4.0f);
+                // How many tracks it holds, before its fold.
+                const auto count = std::to_string(studio_.groupMembers(track).size());
+                const auto countWidth = ImGui::CalcTextSize(count.c_str()).x;
+                const ImVec2 badge(max.x - dp(22.0f) - countWidth - dp(6.0f), min.y + dp(5.0f));
+                list->AddRectFilled(badge, ImVec2(badge.x + countWidth + dp(6.0f), badge.y + ImGui::GetFontSize() + dp(2.0f)),
+                                    columnGroupColour[column] | 0xff000000u, dp(3.0f));
+                list->AddText(ImVec2(badge.x + dp(3.0f), badge.y + dp(1.0f)), p.bg0 | 0xff000000u, count.c_str());
+                ImGui::PopFont();
+                nameRoom = badge.x - dp(3.0f) - nameLeft;
+            }
             ImGui::PushFont(theme::boldFont(), ui::currentFontBase() * 0.88f);
-            ui::clippedText(list, ImVec2(min.x + dp(6.0f), min.y + dp(6.0f)), cellWidth - dp(12.0f), p.text, studio_.trackName(track).toRawUTF8());
+            ui::clippedText(list, ImVec2(nameLeft, min.y + dp(6.0f)), nameRoom, p.text, studio_.trackName(track).toRawUTF8());
             ImGui::PopFont();
             ImGui::PopID();
         }
@@ -300,25 +363,50 @@ void LauncherView::draw()
                 auto exists = false;
                 auto progress = 0.0f;
                 std::uint64_t midiClip {};
-                if (!track.midi) {
-                    if (const auto clip = engine.launcherClip(track.audioIndex, scene)) {
+                // A group's slot: its tracks' clips there, launched together.
+                const auto group = studio_.isGroupTrack(track);
+                // A hybrid track's clip: on the track, or on its companion.
+                const auto part = group ? std::optional<TrackRef> {} : studio_.slotPart(track, scene);
+                if (group) {
+                    exists = studio_.groupHasClips(track, scene);
+                    colour = studio_.trackColour(track);
+                } else if (part && !part->midi) {
+                    if (const auto clip = engine.launcherClip(part->audioIndex, scene)) {
                         exists = true;
                         name = clip->name.isNotEmpty() ? clip->name : clip->sourceFile.getFileNameWithoutExtension();
                         colour = clip->colour;
                     }
-                } else if (const auto* clip = midiClipForScene(engine, track.midiId, scene)) {
+                } else if (const auto* clip = part ? midiClipForScene(engine, part->midiId, scene) : nullptr) {
                     exists = true;
                     name = clip->name;
                     colour = clip->colour;
                     midiClip = clip->id;
                 }
-                const auto playing = exists && studio_.playingScene(track) == scene;
-                const auto pending = exists && studio_.pendingScene(track) == scene;
-                if (playing)
-                    progress = track.midi ? engine.midiLauncherClipProgress(track.midiId) : engine.launcherClipProgress(track.audioIndex);
+                const auto clipMidi = part ? part->midi : track.midi;
+                const auto playing = exists && (group ? studio_.groupPlaysScene(track, scene) : studio_.playingScene(track) == scene);
+                const auto pending = exists && (group ? studio_.groupWaitsScene(track, scene) : studio_.pendingScene(track) == scene);
+                if (playing && part)
+                    progress = part->midi ? engine.midiLauncherClipProgress(part->midiId) : engine.launcherClipProgress(part->audioIndex);
                 const auto stops = !exists && studio_.slotStops(track, scene);
+                // An armed track's empty slots record (a round button in
+                // place of the stop); the one recording into, red.
+                const auto armed = !studio_.isBusTrack(track) && studio_.trackMix(track).armed;
+                const auto recordingHere = studio_.slotRecording() && studio_.shownTrackOf(studio_.slotRecording()->first) == track
+                                           && studio_.slotRecording()->second == scene;
                 const ImVec2 centre((min.x + max.x) * 0.5f, (min.y + max.y) * 0.5f);
                 const auto inPlay = [&](const ImVec2 point) { return exists && point.x < min.x + playWidth; };
+                // An empty slot of a track: « + MIDI » on its left, « + audio »
+                // on its right (shown on hover), clips of either kind.
+                const auto canAdd = !exists && !group && !recordingHere && !studio_.isBusTrack(track);
+                const auto addHeight = std::min(dp(17.0f), cellHeight - dp(4.0f));
+                const auto addWidth = dp(25.0f);
+                const ImVec2 addMidiMin(min.x + dp(3.0f), centre.y - addHeight * 0.5f);
+                const ImVec2 addAudioMin(max.x - dp(3.0f) - addWidth, centre.y - addHeight * 0.5f);
+                const auto inBox = [&](const ImVec2 point, const ImVec2 box) {
+                    return point.x >= box.x && point.x < box.x + addWidth && point.y >= box.y && point.y < box.y + addHeight;
+                };
+                const auto inAddMidi = [&](const ImVec2 point) { return canAdd && inBox(point, addMidiMin); };
+                const auto inAddAudio = [&](const ImVec2 point) { return canAdd && inBox(point, addAudioMin); };
                 const auto inStop = [&](const ImVec2 point) {
                     return stops && std::abs(point.x - centre.x) <= stopSize && std::abs(point.y - centre.y) <= stopSize;
                 };
@@ -326,15 +414,41 @@ void LauncherView::draw()
                 ImGui::PushID(static_cast<int>(column) * 1'024 + scene);
                 ImGui::SetCursorScreenPos(min);
                 ImGui::InvisibleButton("##cell", ImVec2(cellWidth, cellHeight), ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
+                // A clip dragged to another slot (Ctrl when let go: copied).
+                if (exists && !group && ImGui::BeginDragDropSource()) {
+                    ImGui::SetDragDropPayload(kLauncherClipPayload, &slot, sizeof(slot));
+                    ImGui::TextUnformatted(name.isNotEmpty() ? name.toRawUTF8() : L("Clip", "Clip"));
+                    ImGui::TextDisabled("%s", L("Lâchez-le dans une case (Ctrl : une copie)", "Drop it in a slot (Ctrl: a copy)"));
+                    ImGui::EndDragDropSource();
+                }
                 dropSlots_.push_back({slot, min, max});
                 if (ImGui::BeginDragDropTarget()) {
                     if (const auto* payload = ImGui::AcceptDragDropPayload(kFilePayload); payload && payload->DataSize > 1)
                         dropFiles(juce::StringArray(juce::String::fromUTF8(static_cast<const char*>(payload->Data))), io.MousePos);
+                    if (!group)
+                        if (const auto* payload = ImGui::AcceptDragDropPayload(kLauncherClipPayload, ImGuiDragDropFlags_AcceptNoDrawDefaultRect);
+                            payload != nullptr && payload->DataSize == sizeof(SlotRef)) {
+                            SlotRef from;
+                            std::memcpy(&from, payload->Data, sizeof(from));
+                            if (const auto moved = studio_.moveLauncherClip(from.track, from.scene, track, scene, io.KeyCtrl); moved.failed()) {
+                                state_.status = moved.getErrorMessage();
+                                state_.statusIsError = true;
+                                state_.statusTime = ImGui::GetTime();
+                            } else {
+                                state_.selectedSlots = { slot };
+                            }
+                        }
                     ImGui::EndDragDropTarget();
                 }
+                // Where a dragged clip would land: outlined.
+                if (const auto* dragged = ImGui::GetDragDropPayload(); dragged != nullptr && dragged->IsDataType(kLauncherClipPayload)
+                                                                      && ImGui::IsMouseHoveringRect(min, max) && !group)
+                    list->AddRect(ImVec2(min.x - 1.0f, min.y - 1.0f), ImVec2(max.x + 1.0f, max.y + 1.0f), p.accent, dp(3.0f), dp(2.0f));
                 const auto hovered = ImGui::IsItemHovered();
                 const auto overPlay = hovered && inPlay(io.MousePos);
                 const auto overStop = hovered && inStop(io.MousePos);
+                const auto overAddMidi = hovered && inAddMidi(io.MousePos);
+                const auto overAddAudio = hovered && inAddAudio(io.MousePos);
                 if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
                     state_.selectTrack(track);
                     if (!state_.isSlotSelected(slot))
@@ -344,12 +458,41 @@ void LauncherView::draw()
                 if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
                     state_.focused = Panel::launcher;
                     const auto at = io.MouseClickedPos[0];
-                    if (inPlay(at)) {
+                    if (recordingHere && (inPlay(at) || inStop(at) || !exists)) {
+                        // Its recording stopped: the clip kept, launched.
+                        if (const auto done = studio_.stopSlotRecording(true); done.failed())
+                            state_.status = done.getErrorMessage();
+                    } else if (inAddMidi(at)) {
+                        // A new MIDI clip there, opened (an audio track's
+                        // companion instrument holds it).
+                        if (const auto made = studio_.newSlotMidiClip(track, scene)) {
+                            state_.selectTrack(track);
+                            state_.selectedSlots = { slot };
+                            state_.editedClip = ClipRef { made->first, made->second };
+                            state_.bringToFront = Panel::editor;
+                        }
+                    } else if (inAddAudio(at)) {
+                        // An empty audio clip there, opened (an instrument
+                        // track's companion holds it).
+                        if (const auto made = studio_.newSlotAudioClip(track, scene)) {
+                            state_.selectTrack(track);
+                            state_.selectedSlots = { slot };
+                            state_.editedClip = ClipRef { *made, 0, scene };
+                            state_.bringToFront = Panel::editor;
+                        }
+                    } else if (inPlay(at)) {
                         // The clip's button: launch it, or stop it while it plays.
                         if (playing || pending)
                             studio_.stopTrackClips(track);
                         else
                             (void) studio_.launchSlot(track, scene);
+                    } else if (inStop(at) && armed) {
+                        // Armed: its round button records into it (Shift: the
+                        // other kind, a hybrid track's).
+                        if (const auto started = studio_.recordIntoSlot(track, scene, io.KeyShift ? std::optional<bool>(!track.midi)
+                                                                                               : std::nullopt);
+                            started.failed())
+                            state_.status = started.getErrorMessage();
                     } else if (inStop(at)) {
                         studio_.stopTrackClips(track);
                     } else {
@@ -368,14 +511,14 @@ void LauncherView::draw()
                         }
                         // The inspector shows the clip picked: a MIDI one by its id;
                         // an audio slot's through the slot (no MIDI clip left picked).
-                        if (track.midi && exists)
-                            state_.selectedClips = { ClipRef { track, midiClip } };
+                        if (part && part->midi && exists)
+                            state_.selectedClips = { ClipRef { *part, midiClip } };
                         else
                             state_.selectedClips.clear();
                     }
                 }
                 if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && !track.midi && !exists && !overStop
-                    && studio_.isBusTrack(track)) {
+                    && studio_.isEffectBus(track)) {
                     // A bus's slot: a clip of automation alone (its lanes move the
                     // bus's volume, pan, effects), four bars long.
                     const auto bar = 60.0 / std::max(1.0, engine.tempo()) * std::max(1.0, static_cast<double>(engine.beatsPerBar()));
@@ -385,31 +528,62 @@ void LauncherView::draw()
                         state_.bringToFront = Panel::editor;
                         studio_.markDirty();
                     }
-                } else if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && track.midi && !exists && !overStop) {
+                } else if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && track.midi && !exists && !overStop
+                           && !overAddMidi && !overAddAudio) {
                     // A new MIDI clip in this scene.
-                    const auto id = engine.addMidiClip(track.midiId, {}, 0.0, 4.0, true, studio_.trackColour(track), scene);
-                    if (id != 0) {
-                        state_.editedClip = ClipRef { track, id };
+                    if (const auto made = studio_.newSlotMidiClip(track, scene)) {
+                        state_.editedClip = ClipRef { made->first, made->second };
                         state_.bringToFront = Panel::editor;
-                        studio_.markDirty();
                     }
-                } else if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && exists && !overPlay) {
+                } else if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) && exists && !overPlay && !group && part) {
                     // The clip in the editor: a MIDI one by its id, an audio one by its slot.
-                    state_.editedClip = track.midi ? ClipRef { track, midiClip } : ClipRef { track, 0, scene };
+                    state_.editedClip = part->midi ? ClipRef { *part, midiClip } : ClipRef { *part, 0, scene };
                     state_.bringToFront = Panel::editor;
                 }
-                if (overPlay)
+                if (recordingHere && hovered)
+                    ui::tooltip(L("Arrêter l'enregistrement : le clip est gardé, en mesures entières, et joué en boucle",
+                                  "Stop recording: the clip is kept, in whole bars, and played looping"));
+                else if (overPlay)
                     ui::tooltip(playing || pending ? L("Arrêter", "Stop") : L("Lancer", "Launch"));
+                else if (overAddMidi)
+                    ui::tooltip(track.midi ? L("Nouveau clip MIDI dans cette case", "New MIDI clip in this slot")
+                                           : L("Nouveau clip MIDI dans cette case : la piste devient hybride (un instrument joue ses notes, "
+                                               "son son passe dans les effets de la piste)",
+                                               "New MIDI clip in this slot: the track becomes hybrid (an instrument plays its notes, "
+                                               "its sound goes through the track's effects)"));
+                else if (overAddAudio)
+                    ui::tooltip(track.midi ? L("Nouveau clip audio vide dans cette case. La piste devient hybride : ses clips audio jouent "
+                                               "dans ses effets, après l'instrument.",
+                                               "New empty audio clip in this slot. The track becomes hybrid: its audio clips play into its "
+                                               "effects, after the instrument.")
+                                           : L("Nouveau clip audio vide dans cette case", "New empty audio clip in this slot"));
+                else if (overStop && armed)
+                    ui::tooltip(track.midi ? L("Enregistrer des notes dans cette case (la piste est armée) : à la mesure suivante ; recliquez "
+                                               "pour arrêter. Maj+clic : de l'audio (piste hybride). Clic droit : retirer ce bouton.",
+                                               "Record notes into this slot (the track is armed): from the next bar; click again to stop. "
+                                               "Shift+click: audio (a hybrid track). Right click: take this button off.")
+                                           : L("Enregistrer de l'audio dans cette case (la piste est armée) : à la mesure suivante ; recliquez "
+                                               "pour arrêter. Maj+clic : des notes (piste hybride). Clic droit : retirer ce bouton.",
+                                               "Record audio into this slot (the track is armed): from the next bar; click again to stop. "
+                                               "Shift+click: notes (a hybrid track). Right click: take this button off."));
                 else if (overStop)
-                    ui::tooltip(L("Arrêter la piste. Une scène lancée l'arrête aussi (Ctrl+E retire ce stop).",
-                                  "Stop the track. A scene launched stops it too (Ctrl+E takes this stop off)."));
+                    ui::tooltip(L("Arrêter la piste. Une scène lancée l'arrête aussi. Clic droit : retirer ce bouton (Ctrl+E).",
+                                  "Stop the track. A scene launched stops it too. Right click: take this button off (Ctrl+E)."));
                 else if (hovered && !exists && !track.midi && studio_.isBusTrack(track))
                     ui::tooltip(L("Double-clic : un clip d'automation du bus (son volume, son panoramique, ses effets) joué avec cette scène",
                                   "Double click: an automation clip of the bus (its level, pan, effects) played with this scene"));
 
                 const auto selectedSlot = state_.isSlotSelected(slot);
-                if (exists) {
-                    const auto fill = theme::fromArgb(colour != 0 ? colour : (track.midi ? 0xff4fd3aeu : 0xffff9b2fu));
+                if (recordingHere) {
+                    // Being recorded into: red, its round button lit.
+                    const auto pulse = 0.55f + 0.45f * std::sin(static_cast<float>(ImGui::GetTime()) * 6.0f);
+                    list->AddRectFilled(min, max, theme::mix(p.record, p.bg0 | 0xff000000u, 0.6f), dp(3.0f));
+                    list->AddRect(min, max, p.record, dp(3.0f), 1.5f);
+                    list->AddCircleFilled(ImVec2(min.x + playWidth * 0.5f, centre.y), dp(4.5f), theme::alpha(p.record, pulse));
+                    ui::clippedText(list, ImVec2(min.x + playWidth + dp(2.0f), min.y + (cellHeight - ImGui::GetFontSize()) * 0.5f),
+                                    cellWidth - playWidth - dp(6.0f), p.text, L("Enreg.", "Rec."));
+                } else if (exists) {
+                    const auto fill = theme::fromArgb(colour != 0 ? colour : (clipMidi ? 0xff4fd3aeu : 0xffff9b2fu));
                     list->AddRectFilled(min, max, theme::mix(fill, p.bg0 | 0xff000000u, hovered ? 0.4f : 0.5f), dp(3.0f));
                     if (progress > 0.0f)
                         list->AddRectFilled(ImVec2(min.x, max.y - dp(3.0f)), ImVec2(min.x + cellWidth * std::clamp(progress, 0.0f, 1.0f), max.y),
@@ -430,11 +604,49 @@ void LauncherView::draw()
                     if (pending)
                         list->AddRect(min, max, p.accent, dp(3.0f), 1.5f);
                 } else {
-                    list->AddRectFilled(min, max, hovered ? p.bg3 : p.bg1, dp(3.0f));
-                    // Its stop, when it has it.
-                    if (stops)
+                    const auto emptyFill = hovered ? p.bg3 : p.bg1;
+                    list->AddRectFilled(min, max,
+                                        columnGroup[column] ? theme::mix(emptyFill, columnGroupColour[column] | 0xff000000u, 0.1f) : emptyFill,
+                                        dp(3.0f));
+                    // Its stop, when it has it; an armed track's, a round
+                    // button to record.
+                    if (stops && armed)
+                        list->AddCircle(centre, dp(4.5f), overStop ? p.record : theme::alpha(p.record, 0.7f), 0, overStop ? 1.8f : 1.3f);
+                    else if (stops)
                         list->AddRect(ImVec2(centre.x - dp(4.0f), centre.y - dp(4.0f)), ImVec2(centre.x + dp(4.0f), centre.y + dp(4.0f)),
                                       overStop ? p.text : p.textFaint, 0.0f, overStop ? 1.6f : 1.0f);
+                    // Hovered: « + MIDI » and « + audio ».
+                    if (canAdd && hovered) {
+                        // A plus, then a note (MIDI) or a waveform (audio).
+                        const auto addButton = [&](const ImVec2 at, const bool midiKind, const ImU32 tint, const bool over) {
+                            const ImVec2 to(at.x + addWidth, at.y + addHeight);
+                            list->AddRectFilled(at, to, over ? theme::mix(p.bg2, tint, 0.35f) : p.bg2, dp(3.0f));
+                            list->AddRect(at, to, over ? tint : theme::alpha(tint, 0.6f), dp(3.0f), 1.0f);
+                            const auto ink = over ? p.text : tint;
+                            const ImVec2 plus(at.x + dp(6.5f), (at.y + to.y) * 0.5f);
+                            const auto arm = dp(3.5f);
+                            list->AddLine(ImVec2(plus.x - arm, plus.y), ImVec2(plus.x + arm, plus.y), ink, dp(1.6f));
+                            list->AddLine(ImVec2(plus.x, plus.y - arm), ImVec2(plus.x, plus.y + arm), ink, dp(1.6f));
+                            const ImVec2 mark(at.x + dp(17.5f), (at.y + to.y) * 0.5f);
+                            if (midiKind) {
+                                ImGui::PushFont(nullptr, ui::currentFontBase() * 0.78f);
+                                const auto glyphSize = ImGui::CalcTextSize(icon::note);
+                                list->AddText(ImVec2(mark.x - glyphSize.x * 0.5f, mark.y - glyphSize.y * 0.5f), ink, icon::note);
+                                ImGui::PopFont();
+                            } else {
+                                static constexpr float heights[] = { 0.3f, 0.75f, 0.45f, 1.0f, 0.55f, 0.8f, 0.35f };
+                                const auto step = dp(1.25f);
+                                const auto half = addHeight * 0.32f;
+                                for (std::size_t index = 0; index < std::size(heights); ++index) {
+                                    const auto x = mark.x + (static_cast<float>(index) - 3.0f) * step;
+                                    list->AddLine(ImVec2(x, mark.y - half * heights[index]), ImVec2(x, mark.y + half * heights[index]), ink,
+                                                  dp(0.9f));
+                                }
+                            }
+                        };
+                        addButton(addMidiMin, true, p.midi, overAddMidi);
+                        addButton(addAudioMin, false, p.audio, overAddAudio);
+                    }
                 }
                 if (selectedSlot)
                     list->AddRect(ImVec2(min.x + 0.5f, min.y + 0.5f), ImVec2(max.x - 0.5f, max.y - 0.5f), p.text, dp(3.0f), 1.5f);
@@ -483,10 +695,14 @@ void LauncherView::draw()
         }
 
         // Each track's mixer strip, under its clips.
+        std::vector<float> lefts;
         for (std::size_t column = 0; column < shown.size(); ++column) {
-            ImGui::SetCursorScreenPos(ImVec2(origin.x + column * (cellWidth + gap), origin.y + mixerTop));
+            lefts.push_back(origin.x + static_cast<float>(column) * (cellWidth + gap));
+            ImGui::SetCursorScreenPos(ImVec2(lefts.back(), origin.y + mixerTop));
             mixer_strip::track(studio_, state_, shown[column], static_cast<int>(column), cellWidth, stripHeight);
         }
+        // A group and its tracks: one frame of its colour, names to strips.
+        mixer_strip::groupFrames(studio_, list, shown, lefts, cellWidth, origin.y, origin.y + mixerTop + stripHeight, gap);
         ImGui::SetCursorScreenPos(origin);
         // As wide as its columns (the tracks' group: and its "+").
         ImGui::Dummy(ImVec2(grid ? static_cast<float>(shown.size()) * (cellWidth + gap) + addWidth + gap
@@ -629,19 +845,19 @@ bool LauncherView::dropFiles(const juce::StringArray& files, const ImVec2 point)
         const juce::File file(path);
         if (!file.existsAsFile() || !file.hasFileExtension("wav;aif;aiff;flac;ogg;mp3;wv"))
             continue;
-        if (target && !target->track.midi) {
-            auto& engine = studio_.engine();
-            juce::AudioFormatManager formats;
-            formats.registerBasicFormats();
-            std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
-            if (!reader || reader->sampleRate <= 0) continue;
-            if (engine.setLauncherClip(target->track.audioIndex, target->scene, file.getFileNameWithoutExtension(), 0,
-                    reader->lengthInSamples / reader->sampleRate, true, studio_.trackColour(target->track), file)) {
-                state_.selectTrack(target->track);
-                state_.selectedSlots = {*target};
-                ++target->scene;
-                added = true;
+        if (target && !studio_.isGroupTrack(target->track) && (!target->track.midi || !studio_.isBusTrack(target->track))) {
+            // A slot: the file plays there (an instrument track's companion
+            // holds it: the track is hybrid).
+            if (const auto placed = studio_.placeSlotAudio(target->track, target->scene, file); placed.failed()) {
+                state_.status = placed.getErrorMessage();
+                state_.statusIsError = true;
+                state_.statusTime = ImGui::GetTime();
+                continue;
             }
+            state_.selectTrack(target->track);
+            state_.selectedSlots = {*target};
+            ++target->scene;
+            added = true;
         } else {
             juce::String error;
             if (const auto track = studio_.newSamplerTrack({file}, error)) {
@@ -893,9 +1109,25 @@ void LauncherView::ioCell(const TrackRef& track, const ImVec2 min, const ImVec2 
         ui::centredText(list, at, ImVec2(at.x + pictureWidth, at.y + ImGui::GetFrameHeight()), colour, glyph);
         ImGui::SameLine(0.0f, dp(2.0f));
     };
-    // What comes in.
-    ImGui::SetCursorScreenPos(ImVec2(min.x + dp(4.0f), min.y + dp(4.0f)));
-    if (track.midi) {
+    // What comes in: a hybrid track's notes and sound, each into its part.
+    const auto rowY = [&](const int row) { return min.y + dp(4.0f) + static_cast<float>(row) * (ImGui::GetFrameHeight() + dp(4.0f)); };
+    const auto companion = studio_.companionOf(track);
+    ImGui::SetCursorScreenPos(ImVec2(min.x + dp(4.0f), rowY(0)));
+    if (companion) {
+        const auto midiPart = track.midi ? track : *companion;
+        const auto audioPart = track.midi ? *companion : track;
+        picture(icon::note, p.midi, L("Entrée MIDI : les notes qu'elle joue et enregistre", "MIDI input: the notes it plays and records"));
+        routing_ui::midiInputCombo(studio_, midiPart, width);
+        ImGui::SetCursorScreenPos(ImVec2(min.x + dp(4.0f), rowY(1)));
+        picture(icon::microphone, p.audio, L("Entrée audio : ce qu'elle enregistre dans ses clips audio",
+                                             "Audio input: what it records into its audio clips"));
+        ImGui::PushID("hybridAudio");
+        if (track.midi)
+            routing_ui::hybridAudioInputCombo(studio_, track, audioPart, width);
+        else
+            routing_ui::recordInputCombo(studio_, audioPart, width);
+        ImGui::PopID();
+    } else if (track.midi) {
         picture(icon::note, p.midi, L("Entrée MIDI", "MIDI input"));
         routing_ui::midiInputCombo(studio_, track, width);
     } else if (bus) {
@@ -911,8 +1143,8 @@ void LauncherView::ioCell(const TrackRef& track, const ImVec2 min, const ImVec2 
         picture(icon::microphone, p.audio, L("Entrée audio : ce qu'elle enregistre", "Audio input: what it records"));
         routing_ui::recordInputCombo(studio_, track, width);
     }
-    // Where it goes.
-    ImGui::SetCursorScreenPos(ImVec2(min.x + dp(4.0f), min.y + dp(8.0f) + ImGui::GetFrameHeight()));
+    // Where it goes: on the last row.
+    ImGui::SetCursorScreenPos(ImVec2(min.x + dp(4.0f), rowY(size.y > dp(70.0f) ? 2 : 1)));
     picture(icon::volume, p.play, L("Sortie : où va son son", "Output: where its sound goes"));
     juce::String error;
     routing_ui::mainOutputCombo(studio_, track, width, error);

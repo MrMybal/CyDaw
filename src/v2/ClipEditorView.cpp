@@ -76,6 +76,97 @@ std::vector<float>& velocityClipboard()
     return clipboard;
 }
 
+// The editing modes' pictures: notes on rows; a note's pitch bending up; a
+// level rising (the gain).
+void pictureNotes(ImDrawList* list, const ImVec2 min, const ImVec2 max, const ImU32 colour)
+{
+    const auto w = max.x - min.x;
+    const auto h = max.y - min.y;
+    const auto thick = std::max(2.0f, h * 0.24f);
+    const struct {
+        float from;
+        float to;
+        float y;
+    } bars[] = { { 0.0f, 0.42f, 0.14f }, { 0.3f, 0.72f, 0.5f }, { 0.58f, 1.0f, 0.86f } };
+    for (const auto& bar : bars)
+        list->AddRectFilled(ImVec2(min.x + w * bar.from, min.y + h * bar.y - thick * 0.5f), ImVec2(min.x + w * bar.to, min.y + h * bar.y + thick * 0.5f),
+                            colour, thick * 0.3f);
+}
+
+void picturePitch(ImDrawList* list, const ImVec2 min, const ImVec2 max, const ImU32 colour)
+{
+    const auto w = max.x - min.x;
+    const auto h = max.y - min.y;
+    const auto thick = std::max(1.5f, h * 0.16f);
+    // A held note, then a glide up, settling.
+    std::vector<ImVec2> line { ImVec2(min.x, max.y - h * 0.12f), ImVec2(min.x + w * 0.38f, max.y - h * 0.12f) };
+    for (auto step = 1; step <= 10; ++step) {
+        const auto u = static_cast<float>(step) / 10.0f;
+        const auto bent = 1.0f - std::pow(1.0f - u, 2.6f);
+        line.emplace_back(min.x + w * (0.38f + 0.62f * u), max.y - h * 0.12f - h * 0.76f * bent);
+    }
+    list->AddPolyline(line.data(), static_cast<int>(line.size()), colour, thick);
+    list->AddCircleFilled(line.back(), thick * 1.1f, colour);
+}
+
+void pictureGain(ImDrawList* list, const ImVec2 min, const ImVec2 max, const ImU32 colour)
+{
+    // A level rising from nothing to full: a wedge.
+    list->AddTriangleFilled(ImVec2(min.x, max.y), ImVec2(max.x, max.y), ImVec2(max.x, min.y), colour);
+}
+
+// The lane's pictures: a velocity's stalk, a die, a wave, a press, a level,
+// left and right.
+void pictureVelocity(ImDrawList* list, const ImVec2 min, const ImVec2 max, const ImU32 colour)
+{
+    const auto x = (min.x + max.x) * 0.5f;
+    const auto thick = std::max(1.5f, (max.y - min.y) * 0.16f);
+    list->AddLine(ImVec2(x, max.y), ImVec2(x, min.y + (max.y - min.y) * 0.3f), colour, thick);
+    list->AddCircleFilled(ImVec2(x, min.y + (max.y - min.y) * 0.25f), thick * 1.5f, colour);
+}
+
+void pictureChance(ImDrawList* list, const ImVec2 min, const ImVec2 max, const ImU32 colour)
+{
+    const auto size = std::min(max.x - min.x, max.y - min.y);
+    const ImVec2 a((min.x + max.x - size) * 0.5f, (min.y + max.y - size) * 0.5f);
+    const ImVec2 b(a.x + size, a.y + size);
+    list->AddRect(a, b, colour, size * 0.2f, std::max(1.2f, size * 0.1f));
+    const auto dot = std::max(1.2f, size * 0.1f);
+    for (const auto& [u, v] : { std::pair { 0.3f, 0.3f }, std::pair { 0.5f, 0.5f }, std::pair { 0.7f, 0.7f } })
+        list->AddCircleFilled(ImVec2(a.x + size * u, a.y + size * v), dot, colour);
+}
+
+void pictureTimbre(ImDrawList* list, const ImVec2 min, const ImVec2 max, const ImU32 colour)
+{
+    std::vector<ImVec2> line;
+    for (auto step = 0; step <= 16; ++step) {
+        const auto u = static_cast<float>(step) / 16.0f;
+        line.emplace_back(min.x + (max.x - min.x) * u,
+                          (min.y + max.y) * 0.5f - (max.y - min.y) * 0.42f * std::sin(u * 6.2832f) * (1.0f - 0.6f * u));
+    }
+    list->AddPolyline(line.data(), static_cast<int>(line.size()), colour, std::max(1.4f, (max.y - min.y) * 0.13f));
+}
+
+void picturePressure(ImDrawList* list, const ImVec2 min, const ImVec2 max, const ImU32 colour)
+{
+    const auto x = (min.x + max.x) * 0.5f;
+    const auto h = max.y - min.y;
+    const auto thick = std::max(1.4f, h * 0.13f);
+    list->AddLine(ImVec2(x, min.y), ImVec2(x, max.y - h * 0.35f), colour, thick);
+    list->AddTriangleFilled(ImVec2(x - h * 0.25f, max.y - h * 0.42f), ImVec2(x + h * 0.25f, max.y - h * 0.42f), ImVec2(x, max.y - h * 0.15f), colour);
+    list->AddLine(ImVec2(min.x, max.y - thick * 0.5f), ImVec2(max.x, max.y - thick * 0.5f), colour, thick);
+}
+
+void picturePan(ImDrawList* list, const ImVec2 min, const ImVec2 max, const ImU32 colour)
+{
+    const auto y = (min.y + max.y) * 0.5f;
+    const auto h = max.y - min.y;
+    const auto thick = std::max(1.4f, h * 0.13f);
+    list->AddLine(ImVec2(min.x + h * 0.3f, y), ImVec2(max.x - h * 0.3f, y), colour, thick);
+    list->AddTriangleFilled(ImVec2(min.x, y), ImVec2(min.x + h * 0.4f, y - h * 0.3f), ImVec2(min.x + h * 0.4f, y + h * 0.3f), colour);
+    list->AddTriangleFilled(ImVec2(max.x, y), ImVec2(max.x - h * 0.4f, y + h * 0.3f), ImVec2(max.x - h * 0.4f, y - h * 0.3f), colour);
+}
+
 // The picked notes in time order (a chord low to high).
 std::vector<app::AudioTrackController::MidiNote> pickedInOrder(const app::AudioTrackController::MidiClip& clip,
                                                                 const std::set<std::uint64_t>& selection)
@@ -265,23 +356,24 @@ void ClipEditorView::drawMidiToolbar(const TrackRef& track, const MidiClip& clip
 
     ui::toolbarSeparator();
     {
-        const char* names[] = { L("Notes", "Notes"), L("Hauteur", "Pitch"), L("Volume", "Gain") };
+        // The modes, as pictures (their names in their tooltips).
         const char* tips[] = {
-            L("Éditer les notes", "Edit the notes"),
-            L("Dessiner la hauteur sur les notes (un demi-ton par rangée) : cliquez une note pour poser un point, "
-              "glissez-le, double-cliquez pour l'ôter ; clic droit : formes (scoop, vibrato, chute…). "
-              "Ctrl : demi-tons entiers, Maj : fin.",
-              "Draw the pitch on the notes (a semitone a row): click a note to place a point, drag it, double click to "
-              "remove it; right click: shapes (scoop, vibrato, fall…). Ctrl: whole semitones, Shift: fine."),
-            L("Dessiner le volume des notes dans la bande du bas (dB) ; clic droit : formes (souffle, accent…).",
-              "Draw the notes' gain in the lane below (dB); right click: shapes (swell, accent…).")
+            L("Notes : les placer, les déplacer, les allonger", "Notes: place, move and stretch them"),
+            L("Hauteur : dessiner la hauteur sur les notes (un demi-ton par rangée). Clic : un point, glisser : sa hauteur au "
+              "demi-ton (Maj : libre), Alt+glisser entre deux points : courber, double-clic : l'ôter ; clic droit : glisser vers "
+              "la note suivante, vibrato, chute…",
+              "Pitch: draw the pitch on the notes (a semitone a row). Click: a point, drag: its pitch by semitones (Shift: free), "
+              "Alt+drag between two points: bend, double click: remove it; right click: glide to the next note, vibrato, fall…"),
+            L("Volume : dessiner le volume des notes dans la bande du bas (dB) ; clic droit : formes (souffle, accent…)",
+              "Gain: draw the notes' gain in the lane below (dB); right click: shapes (swell, accent…)")
         };
-        for (auto index = 0; index < 3; ++index) {
+        const ui::Picture pictures[] = { pictureNotes, picturePitch };
+        const char* ids[] = { "##exprNotes", "##exprPitch" };
+        for (auto index = 0; index < 2; ++index) {
             if (index > 0)
                 ImGui::SameLine(0.0f, dp(2.0f));
             auto on = static_cast<int>(expression_) == index;
-            if (ui::toggle(ui::labelId(names[index], index == 0 ? "exprNotes" : index == 1 ? "exprPitch" : "exprGain").c_str(), &on,
-                           p.accent, ImVec2(0.0f, 0.0f), tips[index]))
+            if (ui::pictureToggle(ids[index], &on, p.accent, pictures[index], tips[index], ImGui::GetFrameHeight(), ImGui::GetFrameHeight()))
                 expression_ = static_cast<Expression>(index);
         }
     }
@@ -551,14 +643,19 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
     // the notes, the one for their height, as the eye goes from one to the
     // other.
     const auto navigatorHeight = dp(14.0f);
-    const auto rulerHeight = navigatorHeight + dp(18.0f);
+    // Under the band, the clip's bar (its loop, its start and stop), then
+    // the times.
+    const auto clipBarHeight = dp(24.0f);
+    const auto rulerHeight = navigatorHeight + clipBarHeight + dp(18.0f);
     const auto rowsBandWidth = dp(16.0f);
     const auto keysRight = origin.x + keyboardWidth;
     // The lane under the notes as tall as dragged, else its usual height.
     const auto splitter = dp(6.0f);
-    const auto usualLane = expression_ == Expression::gain ? std::min(dp(150.0f), size.y * 0.36f) : std::min(dp(70.0f), size.y * 0.22f);
+    // Room for its picker (three rows) at the least; a curve's lane taller.
+    const auto usualLane = laneExpression() != Expression::none ? std::max(dp(72.0f), std::min(dp(150.0f), size.y * 0.36f))
+                                                                : std::max(dp(72.0f), std::min(dp(80.0f), size.y * 0.24f));
     const auto velocityHeight = state_.velocityLaneHeight > 0.0f
-                                    ? std::clamp(dp(state_.velocityLaneHeight), dp(36.0f), std::max(dp(36.0f), size.y * 0.6f))
+                                    ? std::clamp(dp(state_.velocityLaneHeight), dp(72.0f), std::max(dp(72.0f), size.y * 0.6f))
                                     : usualLane;
     gridMin_ = ImVec2(keysRight + rowsBandWidth, origin.y + rulerHeight);
     gridMax_ = ImVec2(origin.x + size.x, origin.y + size.y - velocityHeight - splitter);
@@ -643,6 +740,18 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
     list->AddRectFilled(ImVec2(clipEnd, gridMin_.y), gridMax_, IM_COL32(0, 0, 0, 90));
     list->AddRectFilled(gridMin_, ImVec2(beatToX(0.0), gridMax_.y), IM_COL32(0, 0, 0, 90));
     list->AddLine(ImVec2(clipEnd, gridMin_.y), ImVec2(clipEnd, gridMax_.y), theme::alpha(colour, 0.9f), dp(1.5f));
+    {
+        // What it plays: before its start and after its stop dimmed, its
+        // loop tinted.
+        const auto bounds = shownBounds(clip);
+        if (bounds.playStart > 0.0)
+            list->AddRectFilled(ImVec2(beatToX(0.0), gridMin_.y), ImVec2(beatToX(bounds.playStart), gridMax_.y), IM_COL32(0, 0, 0, 55));
+        if (bounds.playEnd < bounds.length)
+            list->AddRectFilled(ImVec2(beatToX(bounds.playEnd), gridMin_.y), ImVec2(beatToX(bounds.length), gridMax_.y), IM_COL32(0, 0, 0, 55));
+        if (bounds.looping)
+            list->AddRectFilled(ImVec2(beatToX(bounds.loopStart), gridMin_.y), ImVec2(beatToX(bounds.loopEnd), gridMax_.y),
+                                theme::alpha(p.accent, 0.045f));
+    }
 
     // Input over the grid.
     ImGui::SetCursorScreenPos(gridMin_);
@@ -675,14 +784,29 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
     // ---- Expressions: the curves on the notes ----
     // A pitch curve is drawn over its note, a semitone a row; a gain curve
     // in the lane below, -48..+12 dB.
-    const auto curveOf = [](const MidiNote& note, const Expression kind) -> const std::vector<NotePoint>& {
-        return kind == Expression::pitch ? note.pitch : note.gain;
+    using Curve = app::AudioTrackController::NoteCurve;
+    const auto curveKindOf = [](const Expression kind) {
+        return kind == Expression::pitch    ? Curve::pitch
+               : kind == Expression::timbre ? Curve::timbre
+               : kind == Expression::pressure ? Curve::pressure
+               : kind == Expression::pan    ? Curve::pan
+                                            : Curve::gain;
+    };
+    const auto curveOf = [&curveKindOf](const MidiNote& note, const Expression kind) -> const std::vector<NotePoint>& {
+        return app::AudioTrackController::noteCurveOf(note, curveKindOf(kind));
+    };
+    // A note without a curve of that kind: its rest (the timbre's middle).
+    const auto restOf = [](const Expression kind) { return kind == Expression::timbre ? 0.5f : 0.0f; };
+    const auto curveValue = [&](const MidiNote& note, const Expression kind, const float position) {
+        const auto& points = curveOf(note, kind);
+        return points.empty() ? restOf(kind) : curveAt(points, position);
     };
     const auto laneSpan = std::max(1.0f, laneMax.y - laneMin.y - dp(8.0f));
     const auto valueToY = [&](const MidiNote& note, const Expression kind, const float value) {
         if (kind == Expression::pitch)
             return noteToY(note.noteNumber) + rowH * 0.5f - value * rowH;
-        return laneMax.y - dp(3.0f) - (value + 48.0f) / 60.0f * laneSpan;
+        const auto [low, high] = app::AudioTrackController::noteCurveRange(curveKindOf(kind));
+        return laneMax.y - dp(3.0f) - (value - low) / (high - low) * laneSpan;
     };
     const auto yToValue = [&](const MidiNote& note, const Expression kind, const float y) {
         if (kind == Expression::pitch) {
@@ -692,13 +816,17 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
             value = io.KeyShift ? value : io.KeyCtrl ? std::round(value * 20.0f) / 20.0f : std::round(value);
             return std::clamp(value, -24.0f, 24.0f);
         }
-        auto value = (laneMax.y - dp(3.0f) - y) / laneSpan * 60.0f - 48.0f;
-        value = io.KeyCtrl ? std::round(value / 3.0f) * 3.0f : io.KeyShift ? value : std::round(value * 2.0f) / 2.0f;
-        return std::clamp(value, -48.0f, 12.0f);
+        const auto [low, high] = app::AudioTrackController::noteCurveRange(curveKindOf(kind));
+        auto value = low + (laneMax.y - dp(3.0f) - y) / laneSpan * (high - low);
+        if (kind == Expression::gain)
+            value = io.KeyCtrl ? std::round(value / 3.0f) * 3.0f : io.KeyShift ? value : std::round(value * 2.0f) / 2.0f;
+        else
+            // By hundredths (Ctrl: tenths; Shift: free).
+            value = io.KeyCtrl ? std::round(value * 10.0f) / 10.0f : io.KeyShift ? value : std::round(value * 100.0f) / 100.0f;
+        return std::clamp(value, low, high);
     };
     const auto setCurve = [&](const MidiNote& note, const Expression kind, std::vector<NotePoint> points) {
-        (void) engine.setMidiNoteExpression(track.midiId, clip.id, note.id, kind == Expression::pitch ? points : note.pitch,
-                                            kind == Expression::gain ? points : note.gain);
+        (void) engine.setMidiNoteCurve(track.midiId, clip.id, note.id, curveKindOf(kind), std::move(points));
     };
     const auto noteById = [&](const std::uint64_t id) -> const MidiNote* {
         if (const auto* now = findMidiClip(engine, track.midiId, clip.id))
@@ -738,7 +866,7 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
             if (mouseBeat < note.startBeats || mouseBeat > note.startBeats + note.durationBeats)
                 continue;
             const auto position = static_cast<float>((mouseBeat - note.startBeats) / std::max(1.0e-6, note.durationBeats));
-            const auto distance = std::abs(mouse.y - valueToY(note, kind, curveAt(curveOf(note, kind), position)))
+            const auto distance = std::abs(mouse.y - valueToY(note, kind, curveValue(note, kind, position)))
                                   - (selection_.contains(note.id) ? dp(4.0f) : 0.0f);
             if (distance < best) {
                 best = distance;
@@ -783,8 +911,8 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
                 std::clamp((mouseBeat - hit.note->startBeats) / std::max(1.0e-6, hit.note->durationBeats), 0.0, 1.0));
             // A first point keeps the note where it is elsewhere.
             if (points.empty()) {
-                points.push_back({ 0.0f, 0.0f });
-                points.push_back({ 1.0f, 0.0f });
+                points.push_back({ 0.0f, restOf(kind) });
+                points.push_back({ 1.0f, restOf(kind) });
             }
             const auto at = std::upper_bound(points.begin(), points.end(), position,
                                              [](const float value, const NotePoint& point) { return value < point.position; });
@@ -853,7 +981,7 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
         const auto x1 = std::max(x0 + 2.0f, beatToX(note.startBeats + note.durationBeats));
         std::vector<ImVec2> line;
         line.reserve(points.size() + 2);
-        line.emplace_back(x0, valueToY(note, kind, points.empty() ? 0.0f : points.front().value));
+        line.emplace_back(x0, valueToY(note, kind, points.empty() ? restOf(kind) : points.front().value));
         for (std::size_t index = 0; index < points.size(); ++index) {
             const auto& point = points[index];
             line.emplace_back(x0 + point.position * (x1 - x0), valueToY(note, kind, point.value));
@@ -868,7 +996,7 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
                 }
             }
         }
-        line.emplace_back(x1, valueToY(note, kind, points.empty() ? 0.0f : points.back().value));
+        line.emplace_back(x1, valueToY(note, kind, points.empty() ? restOf(kind) : points.back().value));
         list->AddPolyline(line.data(), static_cast<int>(line.size()), lineColour, thickness);
         if (withPoints && points.size() < 64)
             for (std::size_t index = 0; index < points.size(); ++index) {
@@ -897,6 +1025,11 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
             const auto value = points[static_cast<std::size_t>(curvePoint_)].value;
             if (curveKind_ == Expression::gain)
                 std::snprintf(text, sizeof(text), "%+.1f dB", value);
+            else if (curveKind_ == Expression::timbre || curveKind_ == Expression::pressure)
+                std::snprintf(text, sizeof(text), "%.0f %%", value * 100.0f);
+            else if (curveKind_ == Expression::pan)
+                std::snprintf(text, sizeof(text), "%s %.0f", value < -0.005f ? L("G", "L") : value > 0.005f ? L("D", "R") : "C",
+                              std::abs(value) * 100.0f);
             else if (std::abs(value - std::round(value)) < 1.0e-3f)
                 std::snprintf(text, sizeof(text), "%+d  \xc2\xb7  %s", static_cast<int>(std::lround(value)),
                               noteName(note->noteNumber + static_cast<int>(std::lround(value))).c_str());
@@ -1237,8 +1370,10 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
         }
         list->AddRectFilled(ImVec2(keysRight, origin.y + navigatorHeight), ImVec2(gridMin_.x, gridMin_.y), p.bg1);
     }
+    // The clip's bar.
+    drawClipBar(track, clip, ImVec2(gridMin_.x, origin.y + navigatorHeight), ImVec2(gridMax_.x, origin.y + navigatorHeight + clipBarHeight));
     // Ruler.
-    const auto rulerTop = origin.y + navigatorHeight;
+    const auto rulerTop = origin.y + navigatorHeight + clipBarHeight;
     list->AddRectFilled(ImVec2(gridMin_.x, rulerTop), ImVec2(gridMax_.x, gridMin_.y), p.bg1);
     ImGui::PushFont(nullptr, ui::currentFontBase() * 0.78f);
     list->PushClipRect(ImVec2(gridMin_.x, rulerTop), ImVec2(gridMax_.x, gridMin_.y), true);
@@ -1330,41 +1465,62 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
                                   hot ? p.accent : p.textFaint);
     }
 
-    // Velocity lane (the gain lane in that mode).
+    // The lane under the notes: what it shows picked on its left (as
+    // Bitwig's expressions), a value a note or a curve along each.
     list->AddRectFilled(ImVec2(origin.x, laneMin.y), laneMax, p.bg1);
-    if (expression_ == Expression::gain) {
-        ImGui::PushFont(nullptr, ui::currentFontBase() * 0.72f);
-        list->AddText(ImVec2(origin.x + dp(6.0f), laneMin.y + dp(4.0f)), p.textFaint, L("VOLUME", "GAIN"));
-        for (const auto db : { 12.0f, 0.0f, -12.0f, -24.0f, -36.0f }) {
-            const auto y = laneMax.y - dp(3.0f) - (db + 48.0f) / 60.0f * laneSpan;
-            char text[16];
-            std::snprintf(text, sizeof(text), "%+.0f", db);
-            list->AddText(ImVec2(laneMin.x - dp(24.0f), y - ImGui::GetFontSize() * 0.5f), p.textFaint, text);
-            list->AddLine(ImVec2(laneMin.x, y), ImVec2(laneMax.x, y), db == 0.0f ? p.gridStrong : p.grid);
+    drawLanePicker(ImVec2(origin.x, laneMin.y), ImVec2(keysRight, laneMax.y));
+    if (const auto laneKind = laneExpression(); laneKind != Expression::none) {
+        // Its scale, read beside it.
+        const auto [low, high] = app::AudioTrackController::noteCurveRange(curveKindOf(laneKind));
+        ImGui::PushFont(nullptr, ui::currentFontBase() * 0.68f);
+        const auto mark = [&](const float value, const char* text, const bool strong) {
+            const auto y = std::round(laneMax.y - dp(3.0f) - (value - low) / (high - low) * laneSpan);
+            list->AddText(ImVec2(laneMin.x - dp(4.0f) - ImGui::CalcTextSize(text).x, y - ImGui::GetFontSize() * 0.5f), p.textFaint, text);
+            list->AddLine(ImVec2(laneMin.x, y), ImVec2(laneMax.x, y), strong ? p.gridStrong : p.grid);
+        };
+        if (laneKind == Expression::gain)
+            for (const auto db : { 12.0f, 0.0f, -12.0f, -24.0f, -36.0f }) {
+                char text[16];
+                std::snprintf(text, sizeof(text), "%+.0f", db);
+                mark(db, text, db == 0.0f);
+            }
+        else if (laneKind == Expression::pan) {
+            mark(1.0f, L("D", "R"), false);
+            mark(0.0f, "C", true);
+            mark(-1.0f, L("G", "L"), false);
+        } else {
+            mark(1.0f, "100", false);
+            mark(0.5f, "50", true);
+            mark(0.0f, "0", false);
         }
         ImGui::PopFont();
         ImGui::SetCursorScreenPos(laneMin);
-        ImGui::InvisibleButton("##gainLane", ImVec2(std::max(1.0f, laneMax.x - laneMin.x), std::max(1.0f, laneMax.y - laneMin.y)),
+        ImGui::InvisibleButton("##curveLane", ImVec2(std::max(1.0f, laneMax.x - laneMin.x), std::max(1.0f, laneMax.y - laneMin.y)),
                                ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
         const auto laneHovered = ImGui::IsItemHovered();
-        CurveHit gainHit;
+        CurveHit laneHit;
         if (laneHovered && drag_ == Drag::none)
-            gainHit = hitCurve(Expression::gain);
-        if (laneHovered && gainHit.note != nullptr)
-            ImGui::SetMouseCursor(gainHit.point >= 0 ? ImGuiMouseCursor_ResizeAll : ImGuiMouseCursor_Hand);
-        if (laneHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && gainHit.note != nullptr) {
+            laneHit = hitCurve(laneKind);
+        if (laneHovered && laneHit.note != nullptr)
+            ImGui::SetMouseCursor(laneHit.point >= 0 ? ImGuiMouseCursor_ResizeAll : ImGuiMouseCursor_Hand);
+        if (laneHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && laneHit.note != nullptr) {
             state_.focused = Panel::editor;
-            pressCurve(Expression::gain, gainHit);
+            pressCurve(laneKind, laneHit);
         }
         if (laneHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
-            shapeTarget_ = gainHit.note != nullptr ? gainHit.note->id : 0;
+            shapeTarget_ = laneHit.note != nullptr ? laneHit.note->id : 0;
             openShapes_ = true;
         }
-        if (drag_ == Drag::curve && curveKind_ == Expression::gain)
+        if (laneHovered && laneHit.note == nullptr && drag_ == Drag::none)
+            ui::tooltip(L("Clic sur la ligne d'une note : un point ; glisser : sa valeur ; Alt+glisser entre deux points : courber ; "
+                          "double-clic : l'ôter ; clic droit : formes.",
+                          "Click a note's line: a point; drag: its value; Alt+drag between two points: bend; double click: remove it; "
+                          "right click: shapes."));
+        if (drag_ == Drag::curve && curveKind_ == laneKind)
             dragCurve();
-        if (drag_ == Drag::bend && curveKind_ == Expression::gain)
+        if (drag_ == Drag::bend && curveKind_ == laneKind)
             dragBend();
-        if (curveKind_ == Expression::gain)
+        if (curveKind_ == laneKind)
             dragLabel();
         const auto* now = findMidiClip(engine, track.midiId, clip.id);
         list->PushClipRect(laneMin, laneMax, true);
@@ -1374,9 +1530,9 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
             if (x1 < laneMin.x || x0 > laneMax.x)
                 continue;
             const auto selected = selection_.contains(note.id);
-            const auto hot = gainHit.note != nullptr && gainHit.note->id == note.id;
-            drawCurve(note, Expression::gain,
-                      selected || hot ? p.text : note.gain.empty() ? theme::alpha(colour, 0.45f) : theme::brighter(colour, 0.3f),
+            const auto hot = laneHit.note != nullptr && laneHit.note->id == note.id;
+            drawCurve(note, laneKind,
+                      selected || hot ? p.text : curveOf(note, laneKind).empty() ? theme::alpha(colour, 0.45f) : theme::brighter(colour, 0.3f),
                       selected || hot ? dp(2.0f) : dp(1.3f), true);
         }
         list->PopClipRect();
@@ -1392,6 +1548,276 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
     drawMidiPopups(track, clip);
     if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows))
         handleMidiKeys(track, clip);
+}
+
+// ---- The lane's picker ----------------------------------------------------------------------
+
+ClipEditorView::Expression ClipEditorView::laneExpression() const noexcept
+{
+    switch (laneKind_) {
+    case LaneKind::gain: return Expression::gain;
+    case LaneKind::timbre: return Expression::timbre;
+    case LaneKind::pressure: return Expression::pressure;
+    case LaneKind::pan: return Expression::pan;
+    case LaneKind::velocity:
+    case LaneKind::chance: break;
+    }
+    return Expression::none;
+}
+
+void ClipEditorView::drawLanePicker(const ImVec2 min, const ImVec2 max)
+{
+    const auto& p = theme::palette();
+    // Two columns, three rows, as Bitwig's expressions.
+    const struct {
+        LaneKind kind;
+        ui::Picture picture;
+        const char* french;
+        const char* english;
+    } kinds[] = {
+        { LaneKind::velocity, pictureVelocity, "Vélocité : la force de chaque note", "Velocity: each note's strength" },
+        { LaneKind::chance, pictureChance, "Chance : la probabilité que chaque note joue à chaque passage",
+          "Chance: how likely each note plays each time it comes" },
+        { LaneKind::timbre, pictureTimbre, "Timbre : une courbe sur chaque note (MPE, CC 74 ; une source des modulateurs Expressions)",
+          "Timbre: a curve on each note (MPE, CC 74; a source of the Expressions modulators)" },
+        { LaneKind::pressure, picturePressure, "Pression : une courbe sur chaque note (la pression de son canal, l'aftertouch)",
+          "Pressure: a curve on each note (its channel's pressure, the aftertouch)" },
+        { LaneKind::gain, pictureGain, "Volume : une courbe sur chaque note (dB)", "Gain: a curve on each note (dB)" },
+        { LaneKind::pan, picturePan, "Pan : une courbe sur chaque note, de gauche à droite", "Pan: a curve on each note, left to right" },
+    };
+    const auto gap = dp(3.0f);
+    const auto width = std::min(dp(28.0f), (max.x - min.x - dp(8.0f) - gap) * 0.5f);
+    const auto height = std::min(dp(19.0f), (max.y - min.y - dp(6.0f) - gap * 2.0f) / 3.0f);
+    for (auto index = 0; index < 6; ++index) {
+        const auto& item = kinds[index];
+        const ImVec2 at(min.x + dp(4.0f) + static_cast<float>(index % 2) * (width + gap),
+                        min.y + dp(4.0f) + static_cast<float>(index / 2) * (height + gap));
+        ImGui::SetCursorScreenPos(at);
+        auto on = laneKind_ == item.kind;
+        ImGui::PushID(index);
+        if (ui::pictureToggle("##laneKind", &on, p.accent, item.picture, L(item.french, item.english), width, height))
+            laneKind_ = item.kind;
+        ImGui::PopID();
+    }
+}
+
+// ---- The clip's bar --------------------------------------------------------------------------
+
+ClipEditorView::ClipBounds ClipEditorView::clipBounds(const MidiClip& clip)
+{
+    // As the engine reads them: an end of 0 is the clip's length, the loop
+    // inside where it plays.
+    ClipBounds bounds;
+    bounds.length = std::max(0.25, clip.lengthBeats);
+    bounds.playStart = std::clamp(clip.playStartBeats, 0.0, std::max(0.0, bounds.length - 0.03125));
+    bounds.playEnd = std::clamp(clip.playEndBeats > bounds.playStart ? clip.playEndBeats : bounds.length, bounds.playStart + 0.03125,
+                                bounds.length);
+    bounds.loopStart = std::clamp(clip.loopStartBeats, bounds.playStart, std::max(bounds.playStart, bounds.playEnd - 0.03125));
+    bounds.loopEnd = std::clamp(clip.loopEndBeats > bounds.loopStart ? clip.loopEndBeats : bounds.playEnd, bounds.loopStart + 0.03125,
+                                bounds.playEnd);
+    bounds.looping = clip.looping;
+    return bounds;
+}
+
+ClipEditorView::ClipBounds ClipEditorView::shownBounds(const MidiClip& clip) const
+{
+    return boundsDrag_ != BoundsDrag::none ? boundsDraft_ : clipBounds(clip);
+}
+
+void ClipEditorView::commitBounds(const TrackRef& track, const MidiClip& clip, const ClipBounds& bounds)
+{
+    // One step of the history.
+    auto& engine = studio_.engine();
+    (void) engine.beginMidiEdit(track.midiId, clip.id);
+    (void) engine.setMidiClipTimelineBounds(track.midiId, clip.id, bounds.length, bounds.playStart, bounds.playEnd, bounds.loopStart,
+                                            bounds.loopEnd, bounds.looping);
+    (void) engine.endMidiEdit();
+    studio_.markDirty();
+}
+
+void ClipEditorView::drawClipBar(const TrackRef& track, const MidiClip& clip, const ImVec2 min, const ImVec2 max)
+{
+    const auto& p = theme::palette();
+    auto* list = ImGui::GetWindowDrawList();
+    const auto& io = ImGui::GetIO();
+    const auto loopBottom = min.y + std::round((max.y - min.y) * 0.42f);
+    const auto shown = shownBounds(clip);
+    list->PushClipRect(min, max, true);
+    list->AddRectFilled(min, max, p.bg1);
+    // The loop, on top: a bracket over its part (dim when off).
+    const auto loopA = beatToX(shown.loopStart);
+    const auto loopB = beatToX(shown.loopEnd);
+    const auto loopColour = shown.looping ? p.accent : theme::alpha(p.textFaint, 0.5f);
+    list->AddRectFilled(ImVec2(loopA, min.y + dp(2.0f)), ImVec2(loopB, loopBottom - dp(1.0f)), theme::alpha(loopColour, shown.looping ? 0.9f : 0.35f));
+    list->AddRectFilled(ImVec2(loopA, min.y + dp(1.0f)), ImVec2(loopA + dp(3.0f), loopBottom), loopColour);
+    list->AddRectFilled(ImVec2(loopB - dp(3.0f), min.y + dp(1.0f)), ImVec2(loopB, loopBottom), loopColour);
+    // Below: the clip, where it plays, its flags (the start pointing in,
+    // the stop).
+    const auto colour = theme::fromArgb(clip.colour != 0 ? clip.colour : 0xff4fd3aeu);
+    list->AddRectFilled(ImVec2(beatToX(0.0), loopBottom + dp(3.0f)), ImVec2(beatToX(shown.length), max.y - dp(3.0f)), p.bg3);
+    const auto startX = beatToX(shown.playStart);
+    const auto stopX = beatToX(shown.playEnd);
+    list->AddRectFilled(ImVec2(startX, loopBottom + dp(4.0f)), ImVec2(stopX, max.y - dp(4.0f)), theme::alpha(colour, 0.65f));
+    const auto flag = dp(8.0f);
+    const auto middle = (loopBottom + max.y) * 0.5f;
+    list->AddTriangleFilled(ImVec2(startX, loopBottom + dp(1.0f)), ImVec2(startX, max.y - dp(1.0f)), ImVec2(startX + flag, middle), p.text);
+    list->AddTriangleFilled(ImVec2(stopX, loopBottom + dp(1.0f)), ImVec2(stopX - flag, middle), ImVec2(stopX, max.y - dp(1.0f)), p.text);
+    list->PopClipRect();
+
+    ImGui::SetCursorScreenPos(min);
+    ImGui::InvisibleButton("##clipBar", ImVec2(std::max(1.0f, max.x - min.x), std::max(1.0f, max.y - min.y)),
+                           ImGuiButtonFlags_MouseButtonLeft | ImGuiButtonFlags_MouseButtonRight);
+    const auto mouse = io.MousePos;
+    const auto at = xToBeat(mouse.x);
+    const auto near = [&](const float x) { return std::abs(mouse.x - x) <= dp(7.0f); };
+    const auto onLoop = mouse.y < loopBottom;
+    const auto dragging = boundsDrag_ != BoundsDrag::none;
+    if (ImGui::IsItemHovered() && !dragging) {
+        const char* tip = nullptr;
+        if (onLoop)
+            tip = near(loopA)                                    ? L("Début de la boucle : glissez", "Loop start: drag")
+                  : near(loopB)                                  ? L("Fin de la boucle : glissez", "Loop end: drag")
+                  : at > shown.loopStart && at < shown.loopEnd ? L("La boucle : glissez pour la déplacer ; clic droit : son menu",
+                                                                   "The loop: drag to move it; right click: its menu")
+                                                               : L("La boucle (clic droit : son menu)", "The loop (right click: its menu)");
+        else
+            tip = near(startX)  ? L("Début : où le clip commence à jouer. Glissez-le.", "Start: where the clip starts playing. Drag it.")
+                  : near(stopX) ? L("Fin : où le clip s'arrête (sans boucle). Glissez-la, au-delà : le clip s'allonge.",
+                                    "Stop: where the clip stops (without its loop). Drag it; further: the clip gets longer.")
+                                : L("Début et fin du clip (drapeaux) ; la boucle au-dessus. Clic droit : le menu.",
+                                    "The clip's start and stop (flags); its loop above. Right click: the menu.");
+        ui::tooltip(tip);
+        if ((onLoop && (near(loopA) || near(loopB))) || (!onLoop && (near(startX) || near(stopX))))
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+        else if (onLoop && at > shown.loopStart && at < shown.loopEnd)
+            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+    }
+    if (ImGui::IsItemActivated() && ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+        boundsGrab_ = at;
+        boundsDraft_ = clipBounds(clip);
+        boundsOrigin_ = boundsDraft_.loopStart;
+        boundsSpan_ = boundsDraft_.loopEnd - boundsDraft_.loopStart;
+        if (onLoop && near(loopA) && !(near(loopB) && mouse.x > loopA + dp(3.0f)))
+            boundsDrag_ = BoundsDrag::loopStart;
+        else if (onLoop && near(loopB))
+            boundsDrag_ = BoundsDrag::loopEnd;
+        else if (onLoop && at > boundsDraft_.loopStart && at < boundsDraft_.loopEnd)
+            boundsDrag_ = BoundsDrag::loopMove;
+        else if (!onLoop && near(startX) && !(near(stopX) && mouse.x > startX + flag * 0.5f))
+            boundsDrag_ = BoundsDrag::playStart;
+        else if (!onLoop && near(stopX))
+            boundsDrag_ = BoundsDrag::playEnd;
+    }
+    if (ImGui::IsItemActive() && boundsDrag_ != BoundsDrag::none) {
+        // On the grid (Alt: free), never before the clip's own start; the
+        // loop inside where it plays, as the engine keeps it.
+        auto d = clipBounds(clip);
+        const auto value = std::max(0.0, snapBeat(at));
+        const auto least = 0.03125;
+        switch (boundsDrag_) {
+        case BoundsDrag::playStart:
+            d.playStart = std::min(value, d.playEnd - least);
+            d.loopStart = std::max(d.loopStart, d.playStart);
+            if (d.loopEnd <= d.loopStart + least)
+                d.loopEnd = d.playEnd;
+            break;
+        case BoundsDrag::playEnd:
+            d.playEnd = std::max(value, d.playStart + least);
+            d.length = std::max(d.length, d.playEnd);
+            d.loopEnd = std::min(d.loopEnd, d.playEnd);
+            if (d.loopStart >= d.loopEnd - least)
+                d.loopStart = d.playStart;
+            break;
+        case BoundsDrag::loopStart:
+            d.loopStart = std::min(value, d.loopEnd - least);
+            d.playStart = std::min(d.playStart, d.loopStart);
+            break;
+        case BoundsDrag::loopEnd:
+            d.loopEnd = std::max(value, d.loopStart + least);
+            d.playEnd = std::max(d.playEnd, d.loopEnd);
+            d.length = std::max(d.length, d.playEnd);
+            break;
+        case BoundsDrag::loopMove: {
+            const auto start = std::max(0.0, snapBeat(boundsOrigin_ + (at - boundsGrab_)));
+            d.loopStart = start;
+            d.loopEnd = start + boundsSpan_;
+            d.playStart = std::min(d.playStart, d.loopStart);
+            d.playEnd = std::max(d.playEnd, d.loopEnd);
+            d.length = std::max(d.length, d.playEnd);
+            break;
+        }
+        case BoundsDrag::none: break;
+        }
+        boundsDraft_ = d;
+        // Where it is now, by the pointer.
+        const auto beatsPerBar = std::max(1.0, static_cast<double>(studio_.engine().beatsPerBar()));
+        const auto edge = boundsDrag_ == BoundsDrag::playStart ? d.playStart
+                          : boundsDrag_ == BoundsDrag::playEnd ? d.playEnd
+                          : boundsDrag_ == BoundsDrag::loopEnd ? d.loopEnd
+                                                               : d.loopStart;
+        const auto bar = static_cast<int>(std::floor(edge / beatsPerBar + 1.0e-9));
+        char text[48];
+        std::snprintf(text, sizeof(text), "%d.%d  (%.2f)", bar + 1, static_cast<int>(edge - bar * beatsPerBar + 1.0e-9) + 1, edge);
+        ImGui::SetTooltip("%s", text);
+    }
+    if (ImGui::IsItemDeactivated() && boundsDrag_ != BoundsDrag::none) {
+        const auto draft = boundsDraft_;
+        boundsDrag_ = BoundsDrag::none;
+        commitBounds(track, clip, draft);
+    }
+    if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+        ImGui::OpenPopup("##clipBarMenu");
+    if (ImGui::BeginPopup("##clipBarMenu")) {
+        auto now = clipBounds(clip);
+        // The picked notes' span, on the grid.
+        auto first = 1.0e18;
+        auto last = -1.0e18;
+        for (const auto& note : clip.notes)
+            if (selection_.contains(note.id)) {
+                first = std::min(first, note.startBeats);
+                last = std::max(last, note.startBeats + note.durationBeats);
+            }
+        const auto picked = last > first;
+        const auto grid = gridBeats_ > 0.0 ? gridBeats_ : 0.25;
+        if (picked) {
+            first = std::floor(first / grid + 1.0e-9) * grid;
+            last = std::ceil(last / grid - 1.0e-9) * grid;
+        }
+        if (ImGui::MenuItem(L("Boucle", "Loop"), nullptr, now.looping)) {
+            now.looping = !now.looping;
+            commitBounds(track, clip, now);
+        }
+        if (ImGui::MenuItem(L("Boucle sur les notes choisies", "Loop the picked notes"), nullptr, false, picked)) {
+            now.loopStart = std::max(0.0, first);
+            now.loopEnd = last;
+            now.looping = true;
+            now.playStart = std::min(now.playStart, now.loopStart);
+            now.playEnd = std::max(now.playEnd, now.loopEnd);
+            now.length = std::max(now.length, now.playEnd);
+            commitBounds(track, clip, now);
+        }
+        if (ImGui::MenuItem(L("Jouer les notes choisies seules", "Play the picked notes alone"), nullptr, false, picked)) {
+            now.playStart = now.loopStart = std::max(0.0, first);
+            now.playEnd = now.loopEnd = last;
+            now.length = std::max(now.length, now.playEnd);
+            commitBounds(track, clip, now);
+        }
+        if (ImGui::MenuItem(L("Tout le clip joue", "The whole clip plays"))) {
+            now.playStart = 0.0;
+            now.playEnd = now.length;
+            if (!now.looping) {
+                now.loopStart = 0.0;
+                now.loopEnd = now.length;
+            }
+            commitBounds(track, clip, now);
+        }
+        if (ImGui::MenuItem(L("La boucle sur tout le clip", "The loop over the whole clip"))) {
+            now.playStart = now.loopStart = 0.0;
+            now.playEnd = now.loopEnd = now.length;
+            commitBounds(track, clip, now);
+        }
+        ImGui::EndPopup();
+    }
 }
 
 // ---- The velocity lane ----------------------------------------------------------------------
@@ -1411,24 +1837,28 @@ void ClipEditorView::drawVelocityLane(const TrackRef& track, const MidiClip& cli
     auto& io = ImGui::GetIO();
     auto* list = ImGui::GetWindowDrawList();
     const auto mouse = io.MousePos;
-    // 127 at the top, nothing at the bottom.
+    // Each note's velocity, or its chance: full at the top, nothing at the
+    // bottom.
+    const auto chance = laneKind_ == LaneKind::chance;
     const auto top = laneMin.y + dp(8.0f);
     const auto bottom = laneMax.y - dp(2.0f);
     const auto span = std::max(1.0f, bottom - top);
-    const auto yOf = [&](const float velocity) { return bottom - span * velocity; };
+    const auto yOf = [&](const float value) { return bottom - span * value; };
     const auto stalkX = [&](const MidiNote& note) { return beatToX(note.startBeats) + dp(1.5f); };
-    const auto readable = [](const float velocity) { return static_cast<int>(std::lround(velocity * 127.0f)); };
+    const auto valueOf = [chance](const MidiNote& note) { return chance ? note.chance : note.velocity; };
+    const auto least = chance ? 0.0f : 1.0f / 127.0f;
+    // As read: 1..127, or a percent.
+    const auto readable = [chance](const float value) { return static_cast<int>(std::lround(value * (chance ? 100.0f : 127.0f))); };
     const auto* current = findMidiClip(engine, track.midiId, clip.id);
     const auto notes = current != nullptr ? current->notes : clip.notes;
 
-    // Its name, at the foot of the keys' column; its scale beside the lane.
+    // Its scale beside the lane.
     ImGui::PushFont(nullptr, ui::currentFontBase() * 0.68f);
-    list->AddText(ImVec2(laneMin.x - dp(66.0f), laneMax.y - ImGui::GetFontSize() - dp(4.0f)), p.textFaint, L("VÉLOCITÉ", "VELOCITY"));
-    for (const auto value : { 127, 96, 64, 32 }) {
-        const auto y = std::round(yOf(static_cast<float>(value) / 127.0f));
-        list->AddLine(ImVec2(laneMin.x, y), ImVec2(laneMax.x, y), value == 64 ? p.gridStrong : p.grid);
+    for (const auto part : { 1.0f, 0.75f, 0.5f, 0.25f }) {
+        const auto y = std::round(yOf(part));
+        list->AddLine(ImVec2(laneMin.x, y), ImVec2(laneMax.x, y), part == 0.5f ? p.gridStrong : p.grid);
         char text[8];
-        std::snprintf(text, sizeof(text), "%d", value);
+        std::snprintf(text, sizeof(text), "%d", static_cast<int>(std::lround(part * (chance ? 100.0f : 127.0f))));
         list->AddText(ImVec2(laneMin.x - dp(4.0f) - ImGui::CalcTextSize(text).x, y - ImGui::GetFontSize() * 0.5f), p.textFaint, text);
     }
     ImGui::PopFont();
@@ -1446,16 +1876,19 @@ void ClipEditorView::drawVelocityLane(const TrackRef& track, const MidiClip& cli
             const auto dx = std::abs(stalkX(note) - mouse.x);
             if (dx > dp(5.0f))
                 continue;
-            const auto score = dx + std::abs(yOf(note.velocity) - mouse.y) * 0.2f - (selection_.contains(note.id) ? 1.0f : 0.0f);
+            const auto score = dx + std::abs(yOf(valueOf(note)) - mouse.y) * 0.2f - (selection_.contains(note.id) ? 1.0f : 0.0f);
             if (score < best) {
                 best = score;
                 hit = &note;
             }
         }
     }
-    const auto setVelocity = [&](const MidiNote& note, const float velocity) {
-        (void) engine.updateMidiNote(track.midiId, clip.id, note.id, note.noteNumber, note.startBeats, note.durationBeats,
-                                     std::clamp(velocity, 1.0f / 127.0f, 1.0f));
+    const auto setValue = [&](const MidiNote& note, const float value) {
+        if (chance)
+            (void) engine.setMidiNoteChance(track.midiId, clip.id, note.id, std::clamp(value, 0.0f, 1.0f));
+        else
+            (void) engine.updateMidiNote(track.midiId, clip.id, note.id, note.noteNumber, note.startBeats, note.durationBeats,
+                                         std::clamp(value, 1.0f / 127.0f, 1.0f));
     };
     // One step of the history, from the first change.
     const auto startChange = [&] {
@@ -1526,7 +1959,7 @@ void ClipEditorView::drawVelocityLane(const TrackRef& track, const MidiClip& cli
             if (velocityMoved_ || ImGui::IsMouseDragging(ImGuiMouseButton_Left, 2.0f)) {
                 startChange();
                 for (const auto& [id, origin] : velocityOrigins_)
-                    setVelocity(origin, origin.velocity + velocityDelta_);
+                    setValue(origin, valueOf(origin) + velocityDelta_);
             }
         } else {
             // A click without a move on one of several picked: that one alone.
@@ -1548,10 +1981,10 @@ void ClipEditorView::drawVelocityLane(const TrackRef& track, const MidiClip& cli
                 const auto along = std::abs(mouse.x - velocityLast_.x) > 0.5f
                                        ? std::clamp((x - velocityLast_.x) / (mouse.x - velocityLast_.x), 0.0f, 1.0f)
                                        : 1.0f;
-                const auto value = std::clamp((bottom - (velocityLast_.y + (mouse.y - velocityLast_.y) * along)) / span, 1.0f / 127.0f, 1.0f);
-                if (std::abs(value - note.velocity) > 1.0e-4f) {
+                const auto value = std::clamp((bottom - (velocityLast_.y + (mouse.y - velocityLast_.y) * along)) / span, least, 1.0f);
+                if (std::abs(value - valueOf(note)) > 1.0e-4f) {
                     startChange();
-                    setVelocity(note, value);
+                    setValue(note, value);
                 }
             }
             velocityLast_ = mouse;
@@ -1568,7 +2001,7 @@ void ClipEditorView::drawVelocityLane(const TrackRef& track, const MidiClip& cli
             selection_ = velocityBase_;
             for (const auto& note : notes) {
                 const auto x = stalkX(note);
-                if (x >= a.x && x <= b.x && yOf(note.velocity) - dp(3.0f) <= b.y && bottom >= a.y)
+                if (x >= a.x && x <= b.x && yOf(valueOf(note)) - dp(3.0f) <= b.y && bottom >= a.y)
                     selection_.insert(note.id);
             }
             list->AddRectFilled(a, b, theme::alpha(p.accent, 0.08f));
@@ -1602,7 +2035,7 @@ void ClipEditorView::drawVelocityLane(const TrackRef& track, const MidiClip& cli
             const auto x = stalkX(note);
             if (x < laneMin.x - dp(6.0f) || x > laneMax.x + dp(6.0f))
                 continue;
-            const auto head = yOf(note.velocity);
+            const auto head = yOf(valueOf(note));
             const auto hot = hit != nullptr && hit->id == note.id;
             const auto ink = selected ? p.accent : hot ? theme::brighter(colour, 0.35f) : colour;
             list->AddLine(ImVec2(x, bottom), ImVec2(x, head), ink, selected ? dp(2.5f) : dp(2.0f));
@@ -1610,7 +2043,7 @@ void ClipEditorView::drawVelocityLane(const TrackRef& track, const MidiClip& cli
             if (selected)
                 list->AddCircle(ImVec2(x, head), dp(4.5f), p.text, 0, 1.2f);
             if (selected || hot)
-                labels.push_back({ x, head, readable(note.velocity), hot });
+                labels.push_back({ x, head, readable(valueOf(note)), hot });
         }
     // Their values over them, where there is room (the one under the pointer
     // always).
@@ -1618,8 +2051,8 @@ void ClipEditorView::drawVelocityLane(const TrackRef& track, const MidiClip& cli
     ImGui::PushFont(theme::boldFont(), ui::currentFontBase() * 0.68f);
     auto lastRight = -1.0e9f;
     for (const auto& label : labels) {
-        char text[8];
-        std::snprintf(text, sizeof(text), "%d", label.value);
+        char text[12];
+        std::snprintf(text, sizeof(text), chance ? "%d%%" : "%d", label.value);
         const auto size = ImGui::CalcTextSize(text);
         auto at = ImVec2(label.x - size.x * 0.5f, label.head - size.y - dp(5.0f));
         if (at.y < laneMin.y + dp(1.0f))
@@ -1634,7 +2067,8 @@ void ClipEditorView::drawVelocityLane(const TrackRef& track, const MidiClip& cli
     ImGui::PopFont();
     list->PopClipRect();
     if (hit != nullptr && velocityDrag_ == VelocityDrag::none && !ImGui::IsPopupOpen("##velocityMenu"))
-        ImGui::SetTooltip("%s  \xc2\xb7  %s %d", noteName(hit->noteNumber).c_str(), L("vélocité", "velocity"), readable(hit->velocity));
+        ImGui::SetTooltip(chance ? "%s  \xc2\xb7  %s %d %%" : "%s  \xc2\xb7  %s %d", noteName(hit->noteNumber).c_str(),
+                          chance ? L("chance", "chance") : L("vélocité", "velocity"), readable(valueOf(*hit)));
     else if (laneHovered && hit == nullptr)
         ui::tooltip(L("Clic : choisir un point (Ctrl, Maj : plusieurs ; cadre dans le vide). Glisser : monter ou baisser les choisis "
                       "(Maj : finement). Alt+glisser : dessiner. Ctrl+C / Ctrl+V : copier, coller leurs valeurs. Clic droit : menu.",
@@ -1644,9 +2078,12 @@ void ClipEditorView::drawVelocityLane(const TrackRef& track, const MidiClip& cli
     if (ImGui::BeginPopup("##velocityMenu")) {
         const auto picked = std::count_if(shown.begin(), shown.end(), [this](const MidiNote& note) { return selection_.contains(note.id); });
         ImGui::TextDisabled("%d %s", static_cast<int>(picked), L("point(s) choisi(s)", "point(s) picked"));
-        if (ImGui::MenuItem(L("Copier les vélocités", "Copy the velocities"), "Ctrl+C", false, picked > 0) && current != nullptr)
+        if (ImGui::MenuItem(chance ? L("Copier les chances", "Copy the chances") : L("Copier les vélocités", "Copy the velocities"), "Ctrl+C",
+                            false, picked > 0)
+            && current != nullptr)
             copyVelocities(*current);
-        if (ImGui::MenuItem(L("Coller les vélocités", "Paste the velocities"), "Ctrl+V", false, picked > 0 && !velocityClipboard().empty())
+        if (ImGui::MenuItem(chance ? L("Coller les chances", "Paste the chances") : L("Coller les vélocités", "Paste the velocities"), "Ctrl+V",
+                            false, picked > 0 && !velocityClipboard().empty())
             && current != nullptr)
             pasteVelocities(track, *current);
         if (ImGui::MenuItem(L("Tout choisir", "Pick all"), "Ctrl+A"))
@@ -1668,9 +2105,11 @@ void ClipEditorView::copyVelocities(const MidiClip& clip)
         return;
     auto& values = velocityClipboard();
     values.clear();
+    const auto chance = laneKind_ == LaneKind::chance;
     for (const auto& note : picked)
-        values.push_back(note.velocity);
-    report(juce::String(static_cast<int>(values.size())) + ui::Ls(" vélocités copiées", " velocities copied"));
+        values.push_back(chance ? note.chance : note.velocity);
+    report(juce::String(static_cast<int>(values.size())) + (chance ? ui::Ls(" chances copiées", " chances copied")
+                                                                   : ui::Ls(" vélocités copiées", " velocities copied")));
 }
 
 void ClipEditorView::pasteVelocities(const TrackRef& track, const MidiClip& clip)
@@ -1682,11 +2121,16 @@ void ClipEditorView::pasteVelocities(const TrackRef& track, const MidiClip& clip
     // In time order, the copied values again from the first when there are
     // fewer of them.
     auto& engine = studio_.engine();
+    const auto chance = laneKind_ == LaneKind::chance;
     (void) engine.beginMidiEdit(track.midiId, clip.id);
     for (std::size_t index = 0; index < picked.size(); ++index) {
         const auto& note = picked[index];
-        (void) engine.updateMidiNote(track.midiId, clip.id, note.id, note.noteNumber, note.startBeats, note.durationBeats,
-                                     std::clamp(values[index % values.size()], 1.0f / 127.0f, 1.0f));
+        const auto value = values[index % values.size()];
+        if (chance)
+            (void) engine.setMidiNoteChance(track.midiId, clip.id, note.id, std::clamp(value, 0.0f, 1.0f));
+        else
+            (void) engine.updateMidiNote(track.midiId, clip.id, note.id, note.noteNumber, note.startBeats, note.durationBeats,
+                                         std::clamp(value, 1.0f / 127.0f, 1.0f));
     }
     (void) engine.endMidiEdit();
     studio_.markDirty();
@@ -1699,10 +2143,15 @@ void ClipEditorView::nudgeVelocities(const TrackRef& track, const MidiClip& clip
     if (picked.empty())
         return;
     auto& engine = studio_.engine();
+    // By what the lane counts: of 127, or percent.
+    const auto chance = laneKind_ == LaneKind::chance;
     (void) engine.beginMidiEdit(track.midiId, clip.id);
     for (const auto& note : picked)
-        (void) engine.updateMidiNote(track.midiId, clip.id, note.id, note.noteNumber, note.startBeats, note.durationBeats,
-                                     std::clamp(note.velocity + amount / 127.0f, 1.0f / 127.0f, 1.0f));
+        if (chance)
+            (void) engine.setMidiNoteChance(track.midiId, clip.id, note.id, std::clamp(note.chance + amount / 100.0f, 0.0f, 1.0f));
+        else
+            (void) engine.updateMidiNote(track.midiId, clip.id, note.id, note.noteNumber, note.startBeats, note.durationBeats,
+                                         std::clamp(note.velocity + amount / 127.0f, 1.0f / 127.0f, 1.0f));
     (void) engine.endMidiEdit();
     studio_.markDirty();
 }
@@ -1797,6 +2246,18 @@ void ClipEditorView::drawMidiPopups(const TrackRef& track, const MidiClip& clip)
             for (const auto& item : gainShapes)
                 if (ImGui::MenuItem(L(item.french, item.english)))
                     applyShape(track, clip, item.shape);
+            // The lane's curve (timbre, pressure, pan): a rise, a fall, none.
+            if (const auto kind = laneExpression(); kind == Expression::timbre || kind == Expression::pressure || kind == Expression::pan) {
+                ui::sectionTitle(kind == Expression::timbre     ? L("TIMBRE", "TIMBRE")
+                                 : kind == Expression::pressure ? L("PRESSION", "PRESSURE")
+                                                                : "PAN");
+                if (ImGui::MenuItem(kind == Expression::pan ? L("De gauche à droite", "Left to right") : L("Montée", "Rise")))
+                    applyShape(track, clip, Shape::rampUp);
+                if (ImGui::MenuItem(kind == Expression::pan ? L("De droite à gauche", "Right to left") : L("Descente", "Fall")))
+                    applyShape(track, clip, Shape::rampDown);
+                if (ImGui::MenuItem(L("Effacer la courbe", "Clear the curve")))
+                    applyShape(track, clip, Shape::clearLane);
+            }
         }
         ImGui::EndPopup();
     }
@@ -1941,6 +2402,25 @@ void ClipEditorView::applyShape(const TrackRef& track, const MidiClip& clip, con
         case Shape::clearGain:
             (void) engine.setMidiNoteExpression(track.midiId, clip.id, note.id, note.pitch, {});
             continue;
+        case Shape::rampUp:
+        case Shape::rampDown:
+        case Shape::clearLane: {
+            // The lane's curve: from its low to its high (or back), or none.
+            using Curve = app::AudioTrackController::NoteCurve;
+            const auto kind = laneExpression();
+            const auto curve = kind == Expression::timbre ? Curve::timbre : kind == Expression::pressure ? Curve::pressure : Curve::pan;
+            if (kind != Expression::timbre && kind != Expression::pressure && kind != Expression::pan)
+                continue;
+            if (shape == Shape::clearLane) {
+                (void) engine.setMidiNoteCurve(track.midiId, clip.id, note.id, curve, {});
+                continue;
+            }
+            const auto [low, high] = app::AudioTrackController::noteCurveRange(curve);
+            const auto up = shape == Shape::rampUp;
+            (void) engine.setMidiNoteCurve(track.midiId, clip.id, note.id, curve,
+                                           { { 0.0f, up ? low : high }, { 1.0f, up ? high : low } });
+            continue;
+        }
         }
         if (add.empty())
             continue;

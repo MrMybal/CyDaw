@@ -2071,7 +2071,7 @@ void cardFileRow(const ImVec2 at, const bool large, const ImU32 colour)
     ImGui::PushFont(nullptr, ui::currentFontBase() * (large ? 0.86f : 0.74f));
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(dp(5.0f), dp(1.0f)));
     if (cardFile->name.isEmpty()) {
-        if (ImGui::Button(L("IRâ¦##loadIr", "IRâ¦##loadIr")) && cardFile->load)
+        if (ImGui::Button(L("IR…##loadIr", "IR…##loadIr")) && cardFile->load)
             cardFile->load();
         ui::tooltip(L("Charger une réponse impulsionnelle (.wav) : un baffle enregistré avec son micro, joué à la place des modèles",
                       "Load an impulse response (.wav): a cabinet recorded with its microphone, played instead of the models"));

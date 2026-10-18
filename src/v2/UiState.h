@@ -33,6 +33,8 @@ struct ClipRef {
 
 // Drag-and-drop payload carrying a file path between panels.
 inline constexpr const char* kFilePayload = "CYDAW_FILE";
+// A launcher clip being dragged: its slot (a SlotRef).
+inline constexpr const char* kLauncherClipPayload = "CYDAW_LAUNCHER_CLIP";
 
 enum class Panel { none, arrangement, launcher, devices, graph, mixer, editor, browser, inspector, workshop, routing, dj,
                    foundry, cinema };
@@ -181,6 +183,9 @@ struct UiState {
     // A rack's pad opened in the device panel (its instrument and effects):
     // its track, its index.
     std::optional<std::pair<TrackRef, int>> openRackPad;
+    // A hybrid audio track whose instrument (its companion's chain, which
+    // plays its MIDI clips) the device panel shows.
+    std::optional<TrackRef> openCompanion;
     bool openLocations {};
     // The semantic sound search's window (its models, licences, index).
     bool showSemantic {};
@@ -272,6 +277,27 @@ struct UiState {
     void selectTrack(const TrackRef& track)
     {
         selectedTrack = track;
+        pickedTracks = { track };
+    }
+    // Tracks picked together (Ctrl or Shift on their headers): what a group
+    // gathers. The selected one is among them.
+    std::vector<TrackRef> pickedTracks;
+    void pickTrack(const TrackRef& track, const bool toggle)
+    {
+        const auto found = std::find(pickedTracks.begin(), pickedTracks.end(), track);
+        if (toggle && found != pickedTracks.end()) {
+            pickedTracks.erase(found);
+            if (!pickedTracks.empty())
+                selectedTrack = pickedTracks.back();
+            return;
+        }
+        if (found == pickedTracks.end())
+            pickedTracks.push_back(track);
+        selectedTrack = track;
+    }
+    [[nodiscard]] bool isTrackPicked(const TrackRef& track) const
+    {
+        return std::find(pickedTracks.begin(), pickedTracks.end(), track) != pickedTracks.end();
     }
     // The device panel's catalogue asked open (the control port).
     bool openDeviceCatalogue {};

@@ -83,7 +83,7 @@ MixerView::MixerView(Studio& studio, UiState& state) : studio_(studio), state_(s
 void MixerView::draw()
 {
     const auto& p = theme::palette();
-    const auto tracks = studio_.tracks();
+    const auto tracks = studio_.shownTracks();
     const auto height = ImGui::GetContentRegionAvail().y;
     const auto stripWidth = dp(kStripWidth);
     const auto masterWidth = stripWidth + dp(12.0f);
@@ -92,7 +92,7 @@ void MixerView::draw()
     std::vector<TrackRef> plain;
     std::vector<TrackRef> buses;
     for (const auto& track : tracks)
-        (studio_.isBusTrack(track) ? buses : plain).push_back(track);
+        (studio_.isEffectBus(track) ? buses : plain).push_back(track);
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(dp(3.0f), dp(3.0f)));
     const auto busesWidth = buses.empty() ? 0.0f
                                           : std::min(static_cast<float>(buses.size()) * (stripWidth + dp(3.0f)),
@@ -101,12 +101,16 @@ void MixerView::draw()
                       ImGuiChildFlags_None, ImGuiWindowFlags_HorizontalScrollbar);
     if (tracks.empty())
         ui::emptyState(L("Aucune piste", "No tracks"), L("Ajoutez une piste avec le +.", "Add a track with the +."));
+    std::vector<float> lefts;
+    const auto stripsTop = ImGui::GetCursorScreenPos().y;
+    const auto stripHeight = height - ImGui::GetStyle().ScrollbarSize - dp(4.0f);
     for (std::size_t index = 0; index < plain.size(); ++index) {
         if (index > 0)
             ImGui::SameLine();
-        mixer_strip::track(studio_, state_, plain[index], static_cast<int>(index), stripWidth,
-                           height - ImGui::GetStyle().ScrollbarSize - dp(4.0f));
+        lefts.push_back(ImGui::GetCursorScreenPos().x);
+        mixer_strip::track(studio_, state_, plain[index], static_cast<int>(index), stripWidth, stripHeight);
     }
+    mixer_strip::groupFrames(studio_, ImGui::GetWindowDrawList(), plain, lefts, stripWidth, stripsTop, stripsTop + stripHeight, dp(3.0f));
     // After the last strip: a "+" that adds a track.
     if (!plain.empty())
         ImGui::SameLine();
@@ -134,6 +138,29 @@ void MixerView::draw()
 float mixer_strip::naturalWidth()
 {
     return dp(kStripWidth);
+}
+
+void mixer_strip::groupFrames(Studio& studio, ImDrawList* list, const std::vector<TrackRef>& shown, const std::vector<float>& lefts,
+                              const float width, const float top, const float bottom, const float gap)
+{
+    for (std::size_t first = 0; first < shown.size() && first < lefts.size(); ++first) {
+        if (!studio.isGroupTrack(shown[first]))
+            continue;
+        // The group, then its tracks next to it (folded: the group alone).
+        auto last = first;
+        while (last + 1 < shown.size() && last + 1 < lefts.size()) {
+            const auto group = studio.groupOf(shown[last + 1]);
+            if (!group || !(*group == shown[first]))
+                break;
+            ++last;
+        }
+        const auto colour = theme::fromArgb(studio.trackColour(shown[first]));
+        const auto half = std::max(1.0f, gap * 0.5f);
+        const ImVec2 min(lefts[first] - half, top - half);
+        const ImVec2 max(lefts[last] + width + half, bottom + half);
+        list->AddRectFilled(min, ImVec2(max.x, min.y + dp(4.0f) + half), colour, dp(4.0f), ImDrawFlags_RoundCornersTop);
+        list->AddRect(min, max, theme::alpha(colour, 0.9f), dp(4.0f), dp(1.6f));
+    }
 }
 
 void mixer_strip::track(Studio& studio_, UiState& state_, const TrackRef& track, const int index, const float width,
@@ -213,10 +240,12 @@ void mixer_strip::track(Studio& studio_, UiState& state_, const TrackRef& track,
         ImGui::PopFont();
         ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 0.7f);
         const auto bus = studio_.isBusTrack(track);
-        const auto* kind = track.midi ? "MIDI" : bus ? "BUS" : "AUDIO";
+        const auto group = studio_.isGroupTrack(track);
+        const auto hybrid = !track.master && studio_.companionOf(track).has_value();
+        const auto* kind = group ? L("GRP", "GRP") : hybrid ? "HYB" : track.midi ? "MIDI" : bus ? "BUS" : "AUDIO";
         const auto kindWidth = ImGui::CalcTextSize(kind).x;
-        list->AddText(ImVec2(origin.x + width - kindWidth - dp(6.0f), at.y + dp(3.0f)), track.midi ? p.midi : bus ? p.accent : p.audio,
-                      kind);
+        list->AddText(ImVec2(origin.x + width - kindWidth - dp(6.0f), at.y + dp(3.0f)),
+                      group ? colour : hybrid ? p.accent : track.midi ? p.midi : bus ? p.accent : p.audio, kind);
         ImGui::PopFont();
     }
 

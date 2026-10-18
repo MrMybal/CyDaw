@@ -9,8 +9,11 @@ namespace cydaw::v2::system_load {
 struct Reading {
     // Percent of the whole machine's processors (-1: unknown here).
     double cpuPercent { -1.0 };
-    // Bytes of memory it holds (its working set; -1: unknown here).
+    // Bytes of memory it holds (its working set; -1: unknown here), and
+    // that as a percent of the machine's memory.
     double memoryBytes { -1.0 };
+    double totalMemoryBytes { -1.0 };
+    double memoryPercent { -1.0 };
 };
 
 [[nodiscard]] Reading read();

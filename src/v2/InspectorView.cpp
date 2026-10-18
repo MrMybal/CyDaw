@@ -302,9 +302,12 @@ void InspectorView::draw()
     } else if (state_.selectedClips.size() > 1) {
         ImGui::Separator();
         ImGui::TextDisabled("%d %s", static_cast<int>(state_.selectedClips.size()), L("clips sélectionnés", "clips selected"));
-    } else if (state_.selectedSlots.size() == 1 && !state_.selectedSlots.front().track.midi && studio_.isValid(state_.selectedSlots.front().track)) {
-        // An audio slot of the launcher: its clip.
-        const auto slot = state_.selectedSlots.front();
+    } else if (const auto part = state_.selectedSlots.size() == 1 ? studio_.slotPart(state_.selectedSlots.front().track, state_.selectedSlots.front().scene)
+                                                                   : std::nullopt;
+               part && !part->midi) {
+        // An audio slot of the launcher (a hybrid track's on its companion): its clip.
+        auto slot = state_.selectedSlots.front();
+        slot.track = *part;
         if (const auto clip = engine.launcherClip(slot.track.audioIndex, slot.scene)) {
             ImGui::Separator();
             ui::sectionTitle(L("CLIP AUDIO DU LANCEUR", "LAUNCHER AUDIO CLIP"));
@@ -354,7 +357,7 @@ void InspectorView::draw()
             studio_.setLoopRange(loopStart * spb, loopEnd * spb);
     }
     row(L("Pistes", "Tracks"));
-    ImGui::TextDisabled("%d", static_cast<int>(studio_.trackCount()));
+    ImGui::TextDisabled("%d", static_cast<int>(studio_.tracks().size()));
 }
 
 // A virtual input or output of the software: its name, format, level, its

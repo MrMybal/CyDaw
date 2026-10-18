@@ -56,6 +56,12 @@ EXPRESSION_PITCH = {"type": "array",
                                     "point suivant], ...]. Ex. scoop [[0,-1],[0.15,0]] ; "
                                     "glisse vers +5 en fin de note [[0,0],[0.6,0,0.55],[1,5]]."),
                     "items": {"type": "array", "items": {"type": "number"}}}
+EXPRESSION_UNIT = {"type": "array",
+                   "description": ("Courbe sur la note : [[position 0..1, valeur, courbure "
+                                   "facultative], ...] ; timbre et pression 0..1 (MPE : CC 74 "
+                                   "et pression du canal), pan -1..1."),
+                   "items": {"type": "array", "items": {"type": "number"}}}
+NOTE_CHANCE = {"type": "number", "description": "Chance que la note joue a chaque passage, 0..1 (1 : toujours)."}
 EXPRESSION_GAIN = {"type": "array",
                    "description": ("Courbe de volume sur la note : [[position 0..1, "
                                    "dB -48..12, courbure -1..1 facultative], ...]. Ex. swell "
@@ -904,7 +910,11 @@ TOOLS = [
                                                     "length": {"type": "number"},
                                                     "velocity": {"type": "number"},
                                                     "pitch": EXPRESSION_PITCH,
-                                                    "gain": EXPRESSION_GAIN},
+                                                    "gain": EXPRESSION_GAIN,
+                                                    "timbre": EXPRESSION_UNIT,
+                                                    "pressure": EXPRESSION_UNIT,
+                                                    "pan": EXPRESSION_UNIT,
+                                                    "chance": NOTE_CHANCE},
                                                 "required": ["note", "start"]}}},
                         "required": ["track", "notes"]},
     },
@@ -1199,7 +1209,11 @@ TOOLS = [
                                                     "length": {"type": "number"},
                                                     "velocity": {"type": "number"},
                                                     "pitch": EXPRESSION_PITCH,
-                                                    "gain": EXPRESSION_GAIN},
+                                                    "gain": EXPRESSION_GAIN,
+                                                    "timbre": EXPRESSION_UNIT,
+                                                    "pressure": EXPRESSION_UNIT,
+                                                    "pan": EXPRESSION_UNIT,
+                                                    "chance": NOTE_CHANCE},
                                                 "required": ["id"]}}},
                         "required": ["track", "notes"]},
     },
@@ -1267,12 +1281,15 @@ TOOLS = [
     },
     {
         "name": "add_audio_clip",
-        "description": ("Pose un clip audio sur une piste audio : file (ou le "
+        "description": ("Pose un clip audio sur une piste : file (ou le "
                         "fichier de la piste), start en secondes, duration, "
-                        "offset dans la source, name, fadeIn, fadeOut."),
+                        "offset dans la source, name, fadeIn, fadeOut ; ou scene : "
+                        "file dans cette case du lanceur (sans file : un clip vide d'une mesure). Sur une piste instrument, "
+                        "la piste devient hybride (\"<nom>@audio\" designe ses clips audio)."),
         "inputSchema": {"type": "object",
                         "properties": {"track": TRACK,
                                        "file": {"type": "string"},
+                                       "scene": {"type": "integer"},
                                        "start": {"type": "number"},
                                        "duration": {"type": "number"},
                                        "offset": {"type": "number"},
@@ -1429,7 +1446,8 @@ TOOLS = [
     },
     {
         "name": "move_track",
-        "description": "Deplace une piste a l'index to (pistes audio puis MIDI).",
+        "description": ("Deplace une piste a l'index to dans l'ordre affiche (toutes les "
+                        "pistes ensemble, celui de status \"order\")."),
         "inputSchema": {"type": "object",
                         "properties": {"track": TRACK, "to": {"type": "integer"}},
                         "required": ["track", "to"]},
@@ -1439,7 +1457,8 @@ TOOLS = [
         "description": ("Cree un clip MIDI vide : name, startBeats (sa place dans "
                         "l'arrangement) ou scene (la case du lanceur qui le garde, "
                         "0 a 255 ; l'arrangement ne le joue pas), lengthBeats, looping, "
-                        "colour (#rrggbb)."),
+                        "colour (#rrggbb). Sur une piste audio, la piste devient hybride : "
+                        "un instrument compagnon joue ses notes (\"<nom>@midi\" le designe)."),
         "inputSchema": {"type": "object",
                         "properties": {"track": TRACK, "name": {"type": "string"},
                                        "startBeats": {"type": "number"},

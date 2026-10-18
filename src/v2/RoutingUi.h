@@ -50,6 +50,10 @@ void mainOutputItems(Studio& studio, const TrackRef& track, juce::String& error)
 void formatCombo(Studio& studio, const TrackRef& track, float width, juce::String& error);
 // The input bus an audio track records from, as a combo, with its format.
 void recordInputCombo(Studio& studio, const TrackRef& track, float width);
+// A hybrid instrument track's audio input (its audio part's): none at
+// first (its transport recording takes its notes alone), or an input it
+// then records with them.
+void hybridAudioInputCombo(Studio& studio, const TrackRef& owner, const TrackRef& audioPart, float width);
 // An instrument track's MIDI input: its name (every input, the computer
 // keyboard, a device), what its light follows (its messages and the track's
 // clips' notes, a counter), and the combo picking it, one choice, its light

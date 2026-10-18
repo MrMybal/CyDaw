@@ -1118,9 +1118,17 @@ void AppUi::frame()
             state_.selectedTrack = tracks.front();
     }
     studio_.setWatchedGraph(state_.selectedTrack);
-    // The keyboard and MIDI input play the selected instrument.
-    if (state_.selectedTrack != liveTrack_) {
-        liveTrack_ = state_.selectedTrack;
+    // A hybrid track's companion is never picked itself: its track is.
+    if (state_.selectedTrack && !state_.selectedTrack->master && studio_.isCompanion(*state_.selectedTrack))
+        state_.selectTrack(studio_.shownTrackOf(*state_.selectedTrack));
+    // The keyboard and MIDI input play the selected instrument (an audio
+    // track's companion instrument, when it is hybrid).
+    auto live = state_.selectedTrack;
+    if (live && !live->master && !live->midi)
+        if (const auto companion = studio_.companionOf(*live); companion && companion->midi)
+            live = companion;
+    if (live != liveTrack_) {
+        liveTrack_ = live;
         if (liveTrack_ && liveTrack_->midi)
             (void) studio_.engine().setLiveMidiTrack(liveTrack_->midiId);
     }
@@ -2672,6 +2680,14 @@ void AppUi::handleShortcuts()
     // The DJ mix and the Foundry have their own keys (the Foundry's view
     // reads them); the studio's transport keys stay out of them.
     const auto ownKeys = state_.mode == AppMode::dj || foundry;
+    // Ctrl+G: the picked tracks gathered in a group.
+    if (!ownKeys && io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_G, false) && state_.selectedTrack && !state_.selectedTrack->master) {
+        const auto picked = state_.pickedTracks.empty() ? std::vector<TrackRef> { *state_.selectedTrack } : state_.pickedTracks;
+        if (const auto group = studio_.groupTracks(picked)) {
+            state_.selectTrack(*group);
+            notify(ui::Ls("Groupe créé : ", "Group made: ") + studio_.trackName(*group), false);
+        }
+    }
     // Ctrl+M: learn a controller's assignment (click a control, move one).
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_M, false))
         controllers_->setLearning(!controllers_->learning());
@@ -3294,19 +3310,25 @@ void AppUi::drawSystemStatus(const float endX)
     const auto midiOuts = midi_devices::outputs().size();
     const auto plugged = midiIns + midiOuts + (audio != nullptr ? 1 : 0);
     const auto dsp = devices.getCpuUsage() * 100.0;
-    char count[16], cpu[24], ram[32], dspText[24];
+    char count[16], cpu[24], ram[24], dspText[24];
     std::snprintf(count, sizeof(count), "%d", plugged);
+    // Always a percent (the memory: of the machine's), each with its bar.
     if (load.cpuPercent >= 0.0)
         std::snprintf(cpu, sizeof(cpu), "CPU %.0f%%", load.cpuPercent);
     else
-        std::snprintf(cpu, sizeof(cpu), "CPU --");
-    if (load.memoryBytes >= 0.0)
-        std::snprintf(ram, sizeof(ram), load.memoryBytes >= 1.0e9 ? "RAM %.1f %s" : "RAM %.0f %s",
-                      load.memoryBytes >= 1.0e9 ? load.memoryBytes / 1.0e9 : load.memoryBytes / 1.0e6,
-                      load.memoryBytes >= 1.0e9 ? L("Go", "GB") : L("Mo", "MB"));
+        std::snprintf(cpu, sizeof(cpu), "CPU --%%");
+    if (load.memoryPercent >= 0.0)
+        std::snprintf(ram, sizeof(ram), load.memoryPercent < 10.0 ? "RAM %.1f%%" : "RAM %.0f%%", load.memoryPercent);
     else
-        std::snprintf(ram, sizeof(ram), "RAM --");
+        std::snprintf(ram, sizeof(ram), "RAM --%%");
     std::snprintf(dspText, sizeof(dspText), "DSP %.0f%%", dsp);
+    // How much memory, said in its tooltip.
+    const auto sizeText = [](const double bytes) {
+        char text[32];
+        std::snprintf(text, sizeof(text), bytes >= 1.0e9 ? "%.1f %s" : "%.0f %s", bytes >= 1.0e9 ? bytes / 1.0e9 : bytes / 1.0e6,
+                      bytes >= 1.0e9 ? L("Go", "GB") : L("Mo", "MB"));
+        return juce::String(text);
+    };
 
     ImGui::PushFont(nullptr, ui::currentFontBase() * 0.8f);
     const auto light = dp(7.0f);
@@ -3314,8 +3336,10 @@ void AppUi::drawSystemStatus(const float endX)
     const auto gap = dp(12.0f);
     const auto textWidth = [](const char* text) { return ImGui::CalcTextSize(text).x; };
     const auto pairWidth = [&](const char* label) { return textWidth(label) + inner + light + inner + light; };
+    const auto barWidth = dp(26.0f);
+    const auto barHeight = dp(5.0f);
     const auto width = pairWidth("MIDI") + gap + pairWidth("SYNC") + gap + textWidth(icon::connect) + inner + textWidth(count) + gap
-                       + textWidth(cpu) + gap + textWidth(ram) + gap + textWidth(dspText);
+                       + textWidth(cpu) + gap + textWidth(ram) + gap + textWidth(dspText) + 3.0f * (inner + barWidth);
     // Only where the toolbar leaves it room.
     const auto start = endX - width - dp(14.0f);
     if (ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x + dp(12.0f) > start) {
@@ -3395,19 +3419,33 @@ void AppUi::drawSystemStatus(const float endX)
         }
         x += gap - inner;
     }
-    // What CyDAW takes of the computer.
-    const auto reading = [&](const char* text, const ImU32 colour, const char* tip) {
+    // What CyDAW takes of the computer: a percent and a bar, green, then
+    // orange, then red as it fills.
+    const auto reading = [&](const char* text, const double percent, const double orange, const double red, const char* tip) {
         const auto from = x;
-        list->AddText(ImVec2(x, textY), colour, text);
-        x += textWidth(text);
+        const auto level = percent < 0.0 ? 0.0 : std::clamp(percent / 100.0, 0.0, 1.0);
+        const auto colour = percent >= red ? p.record : percent >= orange ? p.warn : p.play;
+        list->AddText(ImVec2(x, textY), percent >= orange ? colour : p.textDim, text);
+        x += textWidth(text) + inner;
+        const ImVec2 barMin(x, origin.y + (height - barHeight) * 0.5f);
+        list->AddRectFilled(barMin, ImVec2(barMin.x + barWidth, barMin.y + barHeight), p.bg0, dp(1.5f));
+        if (level > 0.0)
+            list->AddRectFilled(barMin, ImVec2(barMin.x + std::max(dp(1.5f), barWidth * static_cast<float>(level)), barMin.y + barHeight), colour,
+                                dp(1.5f));
+        list->AddRect(barMin, ImVec2(barMin.x + barWidth, barMin.y + barHeight), theme::alpha(p.line, 0.8f), dp(1.5f));
+        x += barWidth;
         if (hovering(from, x))
             ui::tooltip(tip);
         x += gap;
     };
-    reading(cpu, load.cpuPercent > 80.0 ? p.warn : p.textDim,
+    reading(cpu, load.cpuPercent, 60.0, 85.0,
             L("Processeur : la part de l'ordinateur (tous ses cœurs) que CyDAW utilise", "Processor: the share of the computer (all its cores) CyDAW uses"));
-    reading(ram, p.textDim, L("Mémoire : ce que CyDAW occupe", "Memory: what CyDAW holds"));
-    reading(dspText, dsp > 90.0 ? p.record : dsp > 70.0 ? p.warn : p.textDim,
+    const auto ramTip = load.memoryBytes >= 0.0 && load.totalMemoryBytes > 0.0
+                            ? ui::Ls("Mémoire : ce que CyDAW occupe, ", "Memory: what CyDAW holds, ") + sizeText(load.memoryBytes)
+                                  + ui::Ls(" sur ", " of ") + sizeText(load.totalMemoryBytes)
+                            : ui::Ls("Mémoire : ce que CyDAW occupe", "Memory: what CyDAW holds");
+    reading(ram, load.memoryPercent, 60.0, 85.0, ramTip.toRawUTF8());
+    reading(dspText, dsp, 70.0, 90.0,
             L("Charge audio : la part du temps de chaque bloc que le calcul du son prend ; au-delà de 100 %, le son craque",
               "Audio load: the share of each block's time the sound takes to compute; past 100 %, the sound crackles"));
     ImGui::Dummy(ImVec2(width, height));

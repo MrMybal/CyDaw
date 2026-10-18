@@ -155,6 +155,10 @@ public:
     void setExternalInput(juce::AudioSource* source) noexcept { externalInput_.store(source); }
     void setGain(float linearGain) noexcept;
     void setPan(float pan) noexcept;
+    // What enters it lately (its clips, what it monitors, what is routed
+    // into its main input), before its devices: a falling peak, for its
+    // input meter.
+    [[nodiscard]] float soundInLevel() const noexcept { return soundInLevel_.load(std::memory_order_relaxed); }
     // Its pan as it is now: a clip's pan lane moves it, else its knob.
     [[nodiscard]] float pan() const noexcept
     {
@@ -299,6 +303,7 @@ private:
     const std::atomic<double>* modeTimeline_ {};
     std::atomic<float> gain_ { 1.0f };
     std::atomic<float> pan_ {};
+    std::atomic<float> soundInLevel_ {};
     // Automation lanes are rebuilt on the message thread and borrowed by the
     // callback: a lane edit during playback must never free the old vector
     // inside the block that is still reading it.
@@ -669,11 +674,51 @@ public:
         double durationBeats { 1.0 };
         float velocity { 0.8f };
         // Drawn on the note itself, as Bitwig's note expressions: how its
-        // pitch moves along it (a scoop, a vibrato, a fall) and its gain.
-        // Empty: the note as it is.
+        // pitch moves along it (a scoop, a vibrato, a fall) and its gain;
+        // its timbre (0..1, MPE's CC 74), its pressure (0..1, its channel's
+        // pressure) and its pan (-1..1). Empty: the note as it is.
         std::vector<NoteExpressionPoint> pitch;
         std::vector<NoteExpressionPoint> gain;
+        std::vector<NoteExpressionPoint> timbre;
+        std::vector<NoteExpressionPoint> pressure;
+        std::vector<NoteExpressionPoint> pan;
+        // How likely it plays each time it comes (0..1).
+        float chance { 1.0f };
     };
+    // A note's curves, by what they move.
+    enum class NoteCurve { pitch, gain, timbre, pressure, pan };
+    // A curve's range: semitones, dB, parts, the pan.
+    [[nodiscard]] static std::pair<float, float> noteCurveRange(NoteCurve curve) noexcept
+    {
+        switch (curve) {
+        case NoteCurve::pitch: return { -24.0f, 24.0f };
+        case NoteCurve::gain: return { -48.0f, 12.0f };
+        case NoteCurve::pan: return { -1.0f, 1.0f };
+        case NoteCurve::timbre:
+        case NoteCurve::pressure: return { 0.0f, 1.0f };
+        }
+        return { 0.0f, 1.0f };
+    }
+    // A note's value of each when it has no curve of it.
+    [[nodiscard]] static float noteCurveRest(NoteCurve curve) noexcept
+    {
+        return curve == NoteCurve::timbre ? 0.5f : 0.0f;
+    }
+    [[nodiscard]] static std::vector<NoteExpressionPoint>& noteCurveOf(MidiNote& note, NoteCurve curve) noexcept
+    {
+        switch (curve) {
+        case NoteCurve::pitch: return note.pitch;
+        case NoteCurve::gain: return note.gain;
+        case NoteCurve::timbre: return note.timbre;
+        case NoteCurve::pressure: return note.pressure;
+        case NoteCurve::pan: return note.pan;
+        }
+        return note.pitch;
+    }
+    [[nodiscard]] static const std::vector<NoteExpressionPoint>& noteCurveOf(const MidiNote& note, NoteCurve curve) noexcept
+    {
+        return noteCurveOf(const_cast<MidiNote&>(note), curve);
+    }
 
     // A point's shape, as engine::CurveShape: straight, bent (bezier, by
     // curveAmount), a B-spline's, a Bezier point with one tangent or two.
@@ -1569,6 +1614,11 @@ public:
                                       std::uint64_t noteId);
     // A note copied with all it carries (its expressions too), at a start.
     [[nodiscard]] std::uint64_t copyMidiNote(std::uint64_t trackId, std::uint64_t clipId, MidiNote note, double startBeats);
+    // One of a note's curves (its points kept in order, inside the note and
+    // its range), and how likely it plays.
+    [[nodiscard]] bool setMidiNoteCurve(std::uint64_t trackId, std::uint64_t clipId, std::uint64_t noteId, NoteCurve curve,
+                                        std::vector<NoteExpressionPoint> points);
+    [[nodiscard]] bool setMidiNoteChance(std::uint64_t trackId, std::uint64_t clipId, std::uint64_t noteId, float chance);
     // A note's expressions (pitch in semitones, gain in dB, along it).
     [[nodiscard]] bool setMidiNoteExpression(std::uint64_t trackId, std::uint64_t clipId, std::uint64_t noteId,
                                              std::vector<NoteExpressionPoint> pitch, std::vector<NoteExpressionPoint> gain);
@@ -2177,6 +2227,12 @@ private:
         std::uint64_t clipId {};
         double clipLengthBeats {};
         std::vector<MidiNote> notes;
+        // Its start, stop and loop (an undo brings them back too).
+        double playStartBeats {};
+        double playEndBeats {};
+        double loopStartBeats {};
+        double loopEndBeats {};
+        bool looping {};
     };
     struct MidiRecordingEvent {
         double timelineSeconds {};

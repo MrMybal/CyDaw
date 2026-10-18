@@ -387,7 +387,9 @@ bool sameMidiNotes(
         if (left.id != right.id || left.noteNumber != right.noteNumber
             || std::abs(left.startBeats - right.startBeats) > tolerance
             || std::abs(left.durationBeats - right.durationBeats) > tolerance
-            || std::abs(left.velocity - right.velocity) > 0.000001f)
+            || std::abs(left.velocity - right.velocity) > 0.000001f
+            || std::abs(left.chance - right.chance) > 0.000001f || left.pitch != right.pitch || left.gain != right.gain
+            || left.timbre != right.timbre || left.pressure != right.pressure || left.pan != right.pan)
             return false;
     }
     return true;
@@ -941,6 +943,12 @@ void GainPanAudioSource::getNextAudioBlock(const juce::AudioSourceChannelInfo& b
         const auto sourceChannels = main->getNumChannels();
         for (auto channel = 0; channel < bufferToFill.buffer->getNumChannels() && sourceChannels > 0; ++channel)
             bufferToFill.buffer->addFrom(channel, bufferToFill.startSample, *main, std::min(channel, sourceChannels - 1), 0, count);
+    }
+    // What enters it, before its devices: its meter's falling peak.
+    if (bufferToFill.buffer != nullptr && bufferToFill.numSamples > 0) {
+        const auto fall = std::pow(0.5f, static_cast<float>(bufferToFill.numSamples) / 9'600.0f);
+        const auto now = bufferToFill.buffer->getMagnitude(bufferToFill.startSample, bufferToFill.numSamples);
+        soundInLevel_.store(std::max(soundInLevel_.load(std::memory_order_relaxed) * fall, now), std::memory_order_relaxed);
     }
     nativeGraph_.setExtraInputs(routedInputs_.data() + 1, maximumBuses - 1);
     const auto gain = gain_.load(std::memory_order_relaxed);
@@ -4023,6 +4031,10 @@ public:
         expressionPitch_ = expressive_ ? (static_cast<double>(pitchWheel) - 8'192.0) / 8'192.0 * 24.0 : 0.0;
         expressionGainDb_ = 0.0;
         gainLow_ = 0;
+        // Its pan: centred until its channel says (CC 10, right after it).
+        pan_ = 0.0f;
+        panNow_ = 0.0f;
+        panFresh_ = true;
         voice_.setExpression(expressionPitch_, expressionGainDb_);
         if (!started)
             clearCurrentNote();
@@ -4032,8 +4044,11 @@ public:
     {
         juce::SynthesiserVoice::setCurrentPlaybackSampleRate(rate);
         // Off the audio thread: sizes the string's delay line and builds the
-        // wavetable bank before any note can ask for either.
+        // wavetable bank before any note can ask for either; and the room a
+        // panned note is rendered in.
         voice_.prepare(std::max(1.0, rate));
+        if (scratch_.getNumSamples() == 0)
+            scratch_.setSize(2, 2'048);
     }
 
     void stopNote(float, const bool allowTailOff) override
@@ -4073,6 +4088,11 @@ public:
         } else if (controller == 11) {
             expressionGainDb_ = static_cast<double>((value << 7) | gainLow_) / 16'383.0 * 60.0 - 48.0;
             voice_.setExpression(expressionPitch_, expressionGainDb_);
+        } else if (controller == 10) {
+            pan_ = std::clamp((static_cast<float>(value) - 64.0f) / 63.0f, -1.0f, 1.0f);
+            // Its first: where it starts, no glide from the middle.
+            if (panFresh_)
+                panNow_ = pan_;
         }
     }
 
@@ -4082,6 +4102,35 @@ public:
     {
         if (!voice_.isActive())
             return;
+        panFresh_ = false;
+        // Panned (a note's pan): rendered aside, then into the output.
+        if (output.getNumChannels() >= 2 && (std::abs(pan_) > 1.0e-4f || std::abs(panNow_) > 1.0e-4f)
+            && scratch_.getNumSamples() > 0) {
+            auto rendered = true;
+            for (auto done = 0; done < numSamples && rendered;) {
+                const auto count = std::min(numSamples - done, scratch_.getNumSamples());
+                scratch_.clear(0, count);
+                rendered = withPlan([&](const auto& current) {
+                    return withModulation(current, [&](const auto& plan) {
+                        return voice_.render(plan, scratch_.getArrayOfWritePointers(), 2, 0, count, std::max(1.0, getSampleRate()));
+                    });
+                });
+                const auto* left = scratch_.getReadPointer(0);
+                const auto* right = scratch_.getReadPointer(1);
+                auto* outLeft = output.getWritePointer(0, startSample + done);
+                auto* outRight = output.getWritePointer(1, startSample + done);
+                for (auto sample = 0; sample < count; ++sample) {
+                    panNow_ += (pan_ - panNow_) * 0.002f;
+                    // Balance: the far side lowered, the near one kept.
+                    outLeft[sample] += left[sample] * std::min(1.0f, 1.0f - panNow_);
+                    outRight[sample] += right[sample] * std::min(1.0f, 1.0f + panNow_);
+                }
+                done += count;
+            }
+            if (!rendered)
+                clearCurrentNote();
+            return;
+        }
         const auto rendered = withPlan([&](const auto& current) {
             return withModulation(current, [&](const auto& plan) {
                 return voice_.render(plan, output.getArrayOfWritePointers(), output.getNumChannels(), startSample, numSamples,
@@ -4144,12 +4193,21 @@ private:
     double expressionPitch_ {};
     double expressionGainDb_ {};
     int gainLow_ {};
+    // Its pan (-1..1, from its channel's CC 10), as it moves now; its
+    // first value not glided to.
+    float pan_ {};
+    float panNow_ {};
+    bool panFresh_ {};
+    juce::AudioBuffer<float> scratch_;
 };
 
 // A note's expression as the audio thread reads it.
 struct AudioTrackController::MidiSynthEngineCurves {
     std::vector<NoteExpressionPoint> pitch;
     std::vector<NoteExpressionPoint> gain;
+    std::vector<NoteExpressionPoint> timbre;
+    std::vector<NoteExpressionPoint> pressure;
+    std::vector<NoteExpressionPoint> pan;
 };
 
 struct AudioTrackController::MidiOutQueue {
@@ -4251,6 +4309,10 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
         // where its pitch bend and gain move it alone, as MPE does.
         int channel { 1 };
         std::shared_ptr<const NoteCurves> curves;
+        // How likely it plays each time it comes; whether it was left out
+        // this time (the audio thread's alone, once published).
+        float chance { 1.0f };
+        mutable bool silenced {};
     };
 
     // A curve's value at a time of its note (0..1), between its points
@@ -4450,12 +4512,45 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
                 midi.addEvent(juce::MidiMessage::controllerEvent(note.channel, 43, value & 127), at);
                 midi.addEvent(juce::MidiMessage::controllerEvent(note.channel, 11, value >> 7), at);
             };
-            // Bend before the note-on (the voice starts on it), gain after it.
+            // Its timbre (CC 74), pressure (the channel's) and pan (CC 10),
+            // 0..127: what the curve says, its rest when it has none.
+            const auto partAt = [](const std::vector<NoteExpressionPoint>& points, const ScheduledNote& note, const double time,
+                                   const double rest, const double low, const double high) {
+                const auto position = (time - note.startSeconds) / std::max(1.0e-6, note.endSeconds - note.startSeconds);
+                const auto value = points.empty() ? rest : curveAt(points, position);
+                return juce::jlimit(0, 127, static_cast<int>(std::lround((value - low) / (high - low) * 127.0)));
+            };
+            const auto timbreAt = [&partAt](const ScheduledNote& note, const double time) {
+                return partAt(note.curves->timbre, note, time, 0.5, 0.0, 1.0);
+            };
+            const auto pressureAt = [&partAt](const ScheduledNote& note, const double time) {
+                return partAt(note.curves->pressure, note, time, 0.0, 0.0, 1.0);
+            };
+            const auto panAt = [&partAt](const ScheduledNote& note, const double time) {
+                return partAt(note.curves->pan, note, time, 0.0, -1.0, 1.0);
+            };
+            // Bend and timbre before the note-on (the voice starts on them),
+            // gain, pressure and pan after it (its voice there to take them).
             const auto addExpression = [&](const ScheduledNote& note, const double time, const int at, const bool beforeNote) {
-                if (beforeNote)
+                if (beforeNote) {
                     sendBend(note, bendAt(note, time), at);
-                else
+                    midi.addEvent(juce::MidiMessage::controllerEvent(note.channel, 74, timbreAt(note, time)), at);
+                } else {
                     sendGain(note, gainAt(note, time), at);
+                    midi.addEvent(juce::MidiMessage::channelPressureChange(note.channel, pressureAt(note, time)), at);
+                    midi.addEvent(juce::MidiMessage::controllerEvent(note.channel, 10, panAt(note, time)), at);
+                }
+            };
+            // A note with a chance plays this time or not: rolled as it comes.
+            const auto roll = [this](const ScheduledNote& note) {
+                if (note.chance >= 1.0f) {
+                    note.silenced = false;
+                    return;
+                }
+                chanceSeed ^= chanceSeed << 13;
+                chanceSeed ^= chanceSeed >> 17;
+                chanceSeed ^= chanceSeed << 5;
+                note.silenced = static_cast<float>(chanceSeed & 0xffffffu) / 16'777'216.0f >= note.chance;
             };
             const auto addEvents = [&](const double start, const int count, const int offset, const bool shouldChase) {
                 const auto end = start + static_cast<double>(count) / rate;
@@ -4464,6 +4559,9 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
                         midi.addEvent(juce::MidiMessage::allNotesOff(channel), offset);
                     for (const auto& note : *notes)
                         if (note.startSeconds < start && note.endSeconds > start) {
+                            roll(note);
+                            if (note.silenced)
+                                continue;
                             if (note.curves != nullptr)
                                 addExpression(note, start, offset, true);
                             midi.addEvent(juce::MidiMessage::noteOn(note.channel, note.noteNumber, note.velocity), offset);
@@ -4473,6 +4571,10 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
                 }
 
                 for (const auto& note : *notes) {
+                    if (note.startSeconds >= start && note.startSeconds < end)
+                        roll(note);
+                    if (note.silenced)
+                        continue;
                     if (note.startSeconds >= start && note.startSeconds < end) {
                         const auto eventOffset = offset + juce::jlimit(
                             0, count - 1, static_cast<int>(std::llround((note.startSeconds - start) * rate)));
@@ -4499,6 +4601,15 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
                             if (!note.curves->gain.empty())
                                 if (const auto value = gainAt(note, time); value != gainAt(note, before))
                                     sendGain(note, value, at);
+                            if (!note.curves->timbre.empty())
+                                if (const auto value = timbreAt(note, time); value != timbreAt(note, before))
+                                    midi.addEvent(juce::MidiMessage::controllerEvent(note.channel, 74, value), at);
+                            if (!note.curves->pressure.empty())
+                                if (const auto value = pressureAt(note, time); value != pressureAt(note, before))
+                                    midi.addEvent(juce::MidiMessage::channelPressureChange(note.channel, value), at);
+                            if (!note.curves->pan.empty())
+                                if (const auto value = panAt(note, time); value != panAt(note, before))
+                                    midi.addEvent(juce::MidiMessage::controllerEvent(note.channel, 10, value), at);
                         }
                     }
                     if (note.endSeconds >= start && note.endSeconds < end) {
@@ -4549,10 +4660,12 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
         readVoiceModulations(automationSeconds);
         synthesiser.advance(static_cast<double>(output.numSamples) / std::max(1.0, synthesiser.getSampleRate()),
                             NativeDspRuntime::sessionTempo());
+        auto instrumentPlays = false;
         {
             // The block's one borrow of the plan: the voices, the voicing
             // and the sampler's card read it through heardPlan.
             const auto published = instrumentGraph.read();
+            instrumentPlays = published != nullptr && published->enabled;
             followSamplerCard(published.get());
             // The notes its clips played this block, for the lights.
             {
@@ -4590,12 +4703,20 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
         }
         publishVoiceLive(output.numSamples);
         voicesDelay.process(*output.buffer, output.startSample, output.numSamples);
-        if (const auto* main = routedInputs[0]; main != nullptr) {
-            const auto count = std::min(output.numSamples, routedSamples);
-            const auto sourceChannels = main->getNumChannels();
-            for (auto channel = 0; channel < output.buffer->getNumChannels() && sourceChannels > 0; ++channel)
-                output.buffer->addFrom(channel, output.startSample, *main, std::min(channel, sourceChannels - 1), 0, count);
-        }
+        // What is routed into its main input (a hybrid track's audio clips):
+        // mixed after the instrument, before what follows it. Without an
+        // instrument that chain has no sound to start from (it reads the
+        // instrument's): the routed sound goes past it then.
+        const auto mixRouted = [&] {
+            if (const auto* main = routedInputs[0]; main != nullptr) {
+                const auto count = std::min(output.numSamples, routedSamples);
+                const auto sourceChannels = main->getNumChannels();
+                for (auto channel = 0; channel < output.buffer->getNumChannels() && sourceChannels > 0; ++channel)
+                    output.buffer->addFrom(channel, output.startSample, *main, std::min(channel, sourceChannels - 1), 0, count);
+            }
+        };
+        if (instrumentPlays)
+            mixRouted();
         effects.setExtraInputs(routedInputs.data() + 1, RoutedInputReceiver::maximumBuses - 1);
         effects.setControlNotes(controlNotes);
         // The region was cleared at the top of this block and only this
@@ -4603,6 +4724,8 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
         // can be processed in place. No scratch buffer, no allocation.
         (void) effects.process(*output.buffer, output.startSample,
                                output.numSamples, automationSeconds);
+        if (!instrumentPlays)
+            mixRouted();
     }
 
     // Everything the graph places after the instrument. Compiled here, on the
@@ -5131,6 +5254,8 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
     std::atomic<bool> playing {};
     std::atomic<bool> looping {};
     std::atomic<bool> needsChase {};
+    // The notes' chance: a roll each time one comes (the audio thread's).
+    std::uint32_t chanceSeed { 0x9e3779b9u };
     std::atomic<bool> needsAllNotesOff {};
     std::atomic<bool> liveInput {};
     // The notes and pedals the live input holds (audio thread only).
@@ -13022,7 +13147,62 @@ std::uint64_t AudioTrackController::copyMidiNote(const std::uint64_t trackId, co
     const auto id = addMidiNote(trackId, clipId, note.noteNumber, startBeats, note.durationBeats, note.velocity);
     if (id != 0 && (!note.pitch.empty() || !note.gain.empty()))
         (void) setMidiNoteExpression(trackId, clipId, id, std::move(note.pitch), std::move(note.gain));
+    if (id != 0) {
+        for (const auto curve : { NoteCurve::timbre, NoteCurve::pressure, NoteCurve::pan })
+            if (!noteCurveOf(note, curve).empty())
+                (void) setMidiNoteCurve(trackId, clipId, id, curve, noteCurveOf(note, curve));
+        if (note.chance < 1.0f)
+            (void) setMidiNoteChance(trackId, clipId, id, note.chance);
+    }
     return id;
+}
+
+bool AudioTrackController::setMidiNoteCurve(const std::uint64_t trackId, const std::uint64_t clipId, const std::uint64_t noteId,
+                                            const NoteCurve curve, std::vector<NoteExpressionPoint> points)
+{
+    auto* track = findMidiTrack(trackId);
+    auto* clip = track != nullptr ? findMidiClip(*track, clipId) : nullptr;
+    if (clip == nullptr)
+        return false;
+    const auto note = std::find_if(clip->notes.begin(), clip->notes.end(), [noteId](const auto& item) { return item.id == noteId; });
+    if (note == clip->notes.end())
+        return false;
+    // In order along the note, inside it and its range.
+    const auto [low, high] = noteCurveRange(curve);
+    for (auto& point : points) {
+        point.position = juce::jlimit(0.0f, 1.0f, point.position);
+        point.value = juce::jlimit(low, high, point.value);
+        point.bend = std::isfinite(point.bend) ? juce::jlimit(-1.0f, 1.0f, point.bend) : 0.0f;
+    }
+    std::stable_sort(points.begin(), points.end(), [](const auto& a, const auto& b) { return a.position < b.position; });
+    if (points.size() > 256)
+        points.resize(256);
+    auto& held = noteCurveOf(*note, curve);
+    if (held == points)
+        return true;
+    prepareMidiMutation(trackId, clipId);
+    held = std::move(points);
+    publishMidiSequence(*track);
+    return true;
+}
+
+bool AudioTrackController::setMidiNoteChance(const std::uint64_t trackId, const std::uint64_t clipId, const std::uint64_t noteId,
+                                             const float chance)
+{
+    auto* track = findMidiTrack(trackId);
+    auto* clip = track != nullptr ? findMidiClip(*track, clipId) : nullptr;
+    if (clip == nullptr)
+        return false;
+    const auto note = std::find_if(clip->notes.begin(), clip->notes.end(), [noteId](const auto& item) { return item.id == noteId; });
+    if (note == clip->notes.end())
+        return false;
+    const auto value = std::isfinite(chance) ? juce::jlimit(0.0f, 1.0f, chance) : 1.0f;
+    if (std::abs(note->chance - value) < 1.0e-6f)
+        return true;
+    prepareMidiMutation(trackId, clipId);
+    note->chance = value;
+    publishMidiSequence(*track);
+    return true;
 }
 
 bool AudioTrackController::setMidiNoteExpression(const std::uint64_t trackId, const std::uint64_t clipId,
@@ -13418,10 +13598,15 @@ bool AudioTrackController::endMidiEdit()
     midiEditBatch_.reset();
     const auto current = captureMidiEditState(previous.trackId,
                                               previous.clipId);
+    const auto sameBounds = std::abs(current.playStartBeats - previous.playStartBeats) <= 0.0000001
+                            && std::abs(current.playEndBeats - previous.playEndBeats) <= 0.0000001
+                            && std::abs(current.loopStartBeats - previous.loopStartBeats) <= 0.0000001
+                            && std::abs(current.loopEndBeats - previous.loopEndBeats) <= 0.0000001
+                            && current.looping == previous.looping;
     if (current.trackId == 0
         || (std::abs(current.clipLengthBeats - previous.clipLengthBeats)
                 <= 0.0000001
-            && sameMidiNotes(current.notes, previous.notes)))
+            && sameMidiNotes(current.notes, previous.notes) && sameBounds))
         return false;
     static constexpr std::size_t maximumHistorySize = 32;
     midiEditUndoStates_.push_back(previous);
@@ -14534,9 +14719,12 @@ void AudioTrackController::clearAutomation(const std::size_t trackIndex)
 std::array<float, 4> AudioTrackController::trackInputLevels(const std::size_t trackIndex) const noexcept
 {
     std::array<float, 4> levels {};
-    if (const auto* track = findTrack(trackIndex))
+    if (const auto* track = findTrack(trackIndex)) {
         for (std::size_t bus = 0; bus < levels.size(); ++bus)
             levels[bus] = track->gainPanSource.inputLevel(bus);
+        // The main input: what enters the track, its clips with it.
+        levels[0] = std::max(levels[0], track->gainPanSource.soundInLevel());
+    }
     return levels;
 }
 
@@ -16628,7 +16816,8 @@ AudioTrackController::captureMidiEditState(
     const auto* clip = track != nullptr ? findMidiClip(*track, clipId) : nullptr;
     if (clip == nullptr)
         return {};
-    return { trackId, clipId, clip->lengthBeats, clip->notes };
+    return { trackId, clipId, clip->lengthBeats, clip->notes, clip->playStartBeats, clip->playEndBeats,
+             clip->loopStartBeats, clip->loopEndBeats, clip->looping };
 }
 
 bool AudioTrackController::restoreMidiEditState(const MidiEditState& state)
@@ -16639,9 +16828,18 @@ bool AudioTrackController::restoreMidiEditState(const MidiEditState& state)
         return false;
     clip->lengthBeats = std::max(0.25, state.clipLengthBeats);
     clip->notes = state.notes;
+    clip->playStartBeats = state.playStartBeats;
+    clip->playEndBeats = state.playEndBeats;
+    clip->loopStartBeats = state.loopStartBeats;
+    clip->loopEndBeats = state.loopEndBeats;
+    clip->looping = state.looping;
     for (const auto& note : clip->notes)
         nextMidiNoteId_ = std::max(nextMidiNoteId_, note.id + 1);
     publishMidiSequence(*track);
+    if (track->activeLauncherScene.load(std::memory_order_acquire) >= 0) {
+        publishMidiClipPreviewSequence(*track, *clip);
+        track->synth.setLooping(clip->looping);
+    }
     return true;
 }
 
@@ -16743,11 +16941,14 @@ namespace {
 // A note's curves, shared with the audio thread (null: none).
 std::shared_ptr<const AudioTrackController::MidiSynthEngineCurves> curvesOf(const AudioTrackController::MidiNote& note)
 {
-    if (note.pitch.empty() && note.gain.empty())
+    if (note.pitch.empty() && note.gain.empty() && note.timbre.empty() && note.pressure.empty() && note.pan.empty())
         return nullptr;
     auto curves = std::make_shared<AudioTrackController::MidiSynthEngineCurves>();
     curves->pitch = note.pitch;
     curves->gain = note.gain;
+    curves->timbre = note.timbre;
+    curves->pressure = note.pressure;
+    curves->pan = note.pan;
     return curves;
 }
 
@@ -16828,7 +17029,7 @@ void AudioTrackController::publishMidiSequence(MidiPlaybackTrack& track)
                 note.startBeats + note.durationBeats);
             const auto start = (clip.startBeats + clippedStartBeats) * secondsPerBeat;
             const auto end = (clip.startBeats + clippedEndBeats) * secondsPerBeat;
-            scheduled->push_back({ note.noteNumber, start, end, note.velocity, 1, curvesOf(note) });
+            scheduled->push_back({ note.noteNumber, start, end, note.velocity, 1, curvesOf(note), std::clamp(note.chance, 0.0f, 1.0f) });
             lengthSeconds = std::max(lengthSeconds, end);
         }
     }
@@ -16903,7 +17104,8 @@ void AudioTrackController::publishMidiClipPreviewSequence(
             clippedEndBeats * secondsPerBeat,
             note.velocity,
             1,
-            curvesOf(note)
+            curvesOf(note),
+            std::clamp(note.chance, 0.0f, 1.0f)
         });
     }
     std::sort(scheduled->begin(), scheduled->end(),

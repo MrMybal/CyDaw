@@ -26,6 +26,8 @@
 #include <algorithm>
 #include <cstring>
 #include <set>
+#include <unordered_set>
+#include <unordered_map>
 
 namespace cydaw::v2 {
 namespace {
@@ -1015,7 +1017,8 @@ void Studio::publishRouting()
 {
     std::vector<app::AudioTrackController::TrackRouting> routing;
     publishedInputs_.clear();
-    for (const auto& track : tracks()) {
+    const auto every = allTracks();
+    for (const auto& track : every) {
         std::vector<std::uint64_t> nodes;
         for (const auto& input : trackInputs(track))
             nodes.push_back(input.node);
@@ -1029,7 +1032,7 @@ void Studio::publishRouting()
         route.id = track.midiId;
         return route;
     };
-    for (const auto& track : tracks()) {
+    for (const auto& track : every) {
         app::AudioTrackController::TrackRouting entry;
         entry.track = routeOf(track);
         for (const auto& output : trackOutputs(track)) {
@@ -1397,6 +1400,15 @@ juce::Result Studio::insertDevice(const TrackRef& track, const juce::String& key
     // the effects after it kept.
     if (track.midi && device->kind == "preset" && device->soundSource)
         return replaceInstrument(track, key, device->name);
+    // A synth's own card taken from the modules (Opale, Prisme, Kick, a
+    // Batterie): alone it has no voices for the notes, and nothing wires it
+    // in. On an instrument track, the whole instrument it is the heart of
+    // goes in place of the one it plays (a missing plug-in's too).
+    if (const auto instrument = track.midi && device->kind != "preset" ? instrumentOfCard(key) : juce::String(); instrument.isNotEmpty())
+        if (const auto whole = std::find_if(catalogue.begin(), catalogue.end(),
+                                            [&instrument](const auto& entry) { return entry.key == instrument; });
+            whole != catalogue.end())
+            return replaceInstrument(track, instrument, whole->englishName.isNotEmpty() ? whole->englishName : whole->name);
     // A container: its head and end, its branches empty, before the output.
     if (const auto* effect = engine::effectForType(key.toStdString()); effect != nullptr && effect->container) {
         if (graph.editorInsertContainer(key, 0) == 0)
@@ -1427,6 +1439,19 @@ juce::Result Studio::insertDevice(const TrackRef& track, const juce::String& key
                 return juce::Result::fail(error);
         }
     return publishGraph(track, true);
+}
+
+juce::String Studio::instrumentOfCard(const juce::String& key)
+{
+    if (const auto model = engine::synth::modelForType(key.toStdString()); model != engine::synth::Model::none)
+        return juce::String(engine::synth::info(model).instrument);
+    if (key == "prism-synth")
+        return "prism-instrument";
+    if (key == "kick-synth")
+        return "kick-instrument";
+    if (key == "batterie")
+        return "batterie-instrument";
+    return {};
 }
 
 std::uint64_t Studio::addMissingPlugin(const TrackRef& track, const juce::String& name, const juce::String& vendor,
@@ -1510,6 +1535,20 @@ juce::Result Studio::replaceInstrument(const TrackRef& track, const juce::String
     // Sampler maps and sound models are the instrument's: they go with it.
     if (const auto applied = graph.replaceInstrument(key); applied.failed())
         return applied;
+    // A synth's own card left on its own (no cable in or out: taken from the
+    // modules before, it never played): the instrument now there replaces it.
+    {
+        const auto cables = graph.editorConnections();
+        std::vector<std::uint64_t> loose;
+        for (const auto& node : graph.editorNodes())
+            if (!node.boundary && instrumentOfCard(node.typeKey).isNotEmpty()
+                && std::none_of(cables.begin(), cables.end(), [&node](const auto& cable) {
+                       return cable.source == node.id || cable.destination == node.id;
+                   }))
+                loose.push_back(node.id);
+        if (!loose.empty())
+            (void) graph.editorRemoveNodes(loose);
+    }
     graph_layout::arrange(graph);
     dirty_ = true;
     for (const auto& node : graph.editorNodes())
@@ -1545,13 +1584,436 @@ juce::Result Studio::replaceInstrument(const TrackRef& track, const juce::String
 
 std::vector<TrackRef> Studio::tracks() const
 {
-    std::vector<TrackRef> out;
-    out.reserve(engine_.trackCount() + midiTracks_.size());
+    // Every track, by its key; the hybrid tracks' companions are not shown.
+    std::unordered_set<std::uint64_t> companions;
+    for (const auto& [owner, companion] : companions_)
+        companions.insert(companion);
+    std::vector<std::pair<std::uint64_t, TrackRef>> every;
+    every.reserve(engine_.trackCount() + midiTracks_.size());
     for (std::size_t index = 0; index < engine_.trackCount(); ++index)
-        out.push_back({ false, index, 0 });
+        if (const auto key = routingKey(TrackRef { false, index, 0 }); key == 0 || !companions.contains(key))
+            every.emplace_back(key, TrackRef { false, index, 0 });
     for (const auto& summary : engine_.midiTrackSummaries())
-        out.push_back({ true, 0, summary.id });
+        if (const auto key = routingKey(TrackRef { true, 0, summary.id }); !companions.contains(key))
+            every.emplace_back(key, TrackRef { true, 0, summary.id });
+    // In the order shown: those gone dropped, the new ones at the end.
+    std::unordered_map<std::uint64_t, TrackRef> byKey;
+    for (const auto& [key, track] : every)
+        if (key != 0)
+            byKey.emplace(key, track);
+    std::vector<std::uint64_t> order;
+    order.reserve(every.size());
+    std::unordered_set<std::uint64_t> placed;
+    for (const auto key : trackOrder_)
+        if (byKey.contains(key) && placed.insert(key).second)
+            order.push_back(key);
+    for (const auto& [key, track] : every)
+        if (key != 0 && placed.insert(key).second)
+            order.push_back(key);
+    trackOrder_ = order;
+    std::vector<TrackRef> out;
+    out.reserve(every.size());
+    for (const auto key : order)
+        out.push_back(byKey.at(key));
+    // A track without a key yet (being made): at the very end.
+    for (const auto& [key, track] : every)
+        if (key == 0)
+            out.push_back(track);
     return out;
+}
+
+void Studio::setTrackOrder(std::vector<std::uint64_t> keys)
+{
+    trackOrder_ = std::move(keys);
+    (void) tracks();
+}
+
+std::vector<TrackRef> Studio::shownTracks() const
+{
+    auto shown = tracks();
+    std::erase_if(shown, [this](const TrackRef& track) { return hiddenByFold(track); });
+    return shown;
+}
+
+// ---- Hybrid tracks -----------------------------------------------------------------------
+
+namespace {
+// A track's launcher clip in a scene (further down, with the launcher's).
+const app::AudioTrackController::MidiClip* midiClipInScene(const app::AudioTrackController& engine, std::uint64_t trackId, int scene);
+} // namespace
+
+std::optional<TrackRef> Studio::companionOf(const TrackRef& track) const
+{
+    if (track.master)
+        return std::nullopt;
+    const auto found = companions_.find(routingKey(track.owner()));
+    return found != companions_.end() ? trackForKey(found->second) : std::nullopt;
+}
+
+bool Studio::isCompanion(const TrackRef& track) const
+{
+    if (track.master)
+        return false;
+    const auto key = routingKey(track.owner());
+    return key != 0 && std::any_of(companions_.begin(), companions_.end(), [key](const auto& entry) { return entry.second == key; });
+}
+
+TrackRef Studio::shownTrackOf(const TrackRef& track) const
+{
+    if (track.master)
+        return track;
+    const auto key = routingKey(track.owner());
+    if (key != 0)
+        for (const auto& [owner, companion] : companions_)
+            if (companion == key)
+                if (const auto found = trackForKey(owner))
+                    return *found;
+    return track;
+}
+
+std::optional<TrackRef> Studio::partFor(const TrackRef& track, const bool midi) const
+{
+    if (track.master || !isValid(track))
+        return std::nullopt;
+    if (track.midi == midi)
+        return track.owner();
+    if (const auto companion = companionOf(track); companion && companion->midi == midi)
+        return companion;
+    return std::nullopt;
+}
+
+std::optional<TrackRef> Studio::makePartFor(const TrackRef& track, const bool midi)
+{
+    if (const auto part = partFor(track, midi))
+        return part;
+    const auto owner = track.owner();
+    if (owner.master || !isValid(owner) || isBusTrack(owner) || isCompanion(owner))
+        return std::nullopt;
+    const auto ownerKey = routingKey(owner);
+    if (ownerKey == 0)
+        return std::nullopt;
+    const auto companion = midi ? addMidiTrack(trackName(owner), "opale-instrument") : addAudioTrack({}, 0.0);
+    if (!companion)
+        return std::nullopt;
+    companions_[ownerKey] = routingKey(*companion);
+    setTrackName(*companion, trackName(owner));
+    setTrackColour(*companion, trackColour(owner));
+    // Its sound into the track's main input; its solo the track's.
+    (void) setTrackOutputs(*companion, { TrackOutput { ownerKey, 0.0f } });
+    auto mix = trackMix(*companion);
+    mix.solo = trackMix(owner).solo;
+    setTrackMix(*companion, mix);
+    (void) tracks();
+    publishRouting();
+    dirty_ = true;
+    return companion;
+}
+
+std::optional<TrackRef> Studio::slotPart(const TrackRef& track, const int scene) const
+{
+    if (track.master || !isValid(track))
+        return std::nullopt;
+    const auto has = [this, scene](const TrackRef& part) {
+        return part.midi ? midiClipInScene(engine_, part.midiId, scene) != nullptr : engine_.launcherClip(part.audioIndex, scene).has_value();
+    };
+    if (has(track))
+        return track;
+    if (const auto companion = companionOf(track); companion && has(*companion))
+        return companion;
+    return std::nullopt;
+}
+
+std::vector<TrackRef> Studio::allTracks() const
+{
+    auto all = tracks();
+    for (const auto& [owner, companion] : companions_)
+        if (const auto track = trackForKey(companion); track && trackForKey(owner))
+            all.push_back(*track);
+    return all;
+}
+
+void Studio::restoreCompanion(const std::uint64_t track, const std::uint64_t companion, const bool recordsAudio)
+{
+    if (track != 0 && companion != 0 && track != companion) {
+        companions_[track] = companion;
+        if (recordsAudio)
+            hybridAudioRecords_.insert(track);
+    }
+}
+
+bool Studio::recordsHybridAudio(const TrackRef& track) const
+{
+    return !track.master && hybridAudioRecords_.contains(routingKey(track.owner()));
+}
+
+void Studio::setRecordsHybridAudio(const TrackRef& track, const bool records)
+{
+    const auto key = routingKey(track.owner());
+    if (key == 0)
+        return;
+    if (records)
+        hybridAudioRecords_.insert(key);
+    else
+        hybridAudioRecords_.erase(key);
+    dirty_ = true;
+}
+
+std::optional<TrackRef> Studio::newSlotAudioClip(const TrackRef& track, const int scene)
+{
+    if (scene < 0 || scene >= app::AudioTrackController::maximumLauncherScenes)
+        return std::nullopt;
+    const auto part = makePartFor(track, false);
+    if (!part)
+        return std::nullopt;
+    // One clip a slot: a MIDI clip there goes.
+    if (const auto there = slotPart(track, scene); there && there->midi)
+        if (const auto* clip = midiClipInScene(engine_, there->midiId, scene))
+            (void) engine_.removeMidiClip(there->midiId, clip->id);
+    if (engine_.launcherClip(part->audioIndex, scene))
+        return part;
+    const auto bar = 60.0 / std::max(1.0, engine_.tempo()) * std::max(1.0, static_cast<double>(engine_.beatsPerBar()));
+    if (!engine_.createEmptyLauncherClip(part->audioIndex, scene, ui::Ls("Clip audio", "Audio clip"), bar, trackColour(track)))
+        return std::nullopt;
+    dirty_ = true;
+    return part;
+}
+
+std::optional<std::pair<TrackRef, std::uint64_t>> Studio::newSlotMidiClip(const TrackRef& track, const int scene)
+{
+    if (scene < 0 || scene >= app::AudioTrackController::maximumLauncherScenes)
+        return std::nullopt;
+    const auto part = makePartFor(track, true);
+    if (!part)
+        return std::nullopt;
+    // One clip a slot: an audio clip there goes.
+    if (const auto there = slotPart(track, scene); there && !there->midi)
+        (void) engine_.clearLauncherClip(there->audioIndex, scene);
+    if (const auto* clip = midiClipInScene(engine_, part->midiId, scene))
+        return std::make_pair(*part, clip->id);
+    const auto id = engine_.addMidiClip(part->midiId, {}, 0.0, 4.0, true, trackColour(track), scene);
+    if (id == 0)
+        return std::nullopt;
+    dirty_ = true;
+    return std::make_pair(*part, id);
+}
+
+juce::Result Studio::placeSlotAudio(const TrackRef& track, const int scene, const juce::File& file)
+{
+    if (scene < 0 || scene >= app::AudioTrackController::maximumLauncherScenes)
+        return juce::Result::fail(ui::Ls("Pas de case ici", "No slot there"));
+    juce::AudioFormatManager formats;
+    formats.registerBasicFormats();
+    std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
+    if (!reader || reader->sampleRate <= 0)
+        return juce::Result::fail(ui::Ls("Fichier audio illisible : ", "Unreadable audio file: ") + file.getFileName());
+    const auto part = makePartFor(track, false);
+    if (!part)
+        return juce::Result::fail(ui::Ls("Cette piste ne prend pas de clip audio", "That track takes no audio clip"));
+    // One clip a slot: a MIDI clip there goes.
+    if (const auto there = slotPart(track, scene); there && there->midi)
+        if (const auto* clip = midiClipInScene(engine_, there->midiId, scene))
+            (void) engine_.removeMidiClip(there->midiId, clip->id);
+    if (!engine_.setLauncherClip(part->audioIndex, scene, file.getFileNameWithoutExtension(), 0,
+                                 static_cast<double>(reader->lengthInSamples) / reader->sampleRate, true, trackColour(track), file))
+        return juce::Result::fail(ui::Ls("Le clip n'a pas pu être posé", "The clip could not be placed"));
+    dirty_ = true;
+    return juce::Result::ok();
+}
+
+// ---- Groups ----------------------------------------------------------------------------------
+
+bool Studio::isGroupTrack(const TrackRef& track) const
+{
+    return isBusTrack(track) && groups_.contains(routingKey(track));
+}
+
+std::optional<TrackRef> Studio::groupOf(const TrackRef& track) const
+{
+    const auto found = groupOf_.find(routingKey(track));
+    if (found == groupOf_.end() || !groups_.contains(found->second))
+        return std::nullopt;
+    return trackForKey(found->second);
+}
+
+std::vector<TrackRef> Studio::groupMembers(const TrackRef& group) const
+{
+    std::vector<TrackRef> members;
+    const auto key = routingKey(group);
+    if (key == 0)
+        return members;
+    for (const auto& track : tracks())
+        if (const auto found = groupOf_.find(routingKey(track)); found != groupOf_.end() && found->second == key)
+            members.push_back(track);
+    return members;
+}
+
+bool Studio::isFolded(const TrackRef& group) const
+{
+    return foldedGroups_.contains(routingKey(group));
+}
+
+void Studio::setFolded(const TrackRef& group, const bool folded)
+{
+    if (!isGroupTrack(group))
+        return;
+    if (folded)
+        foldedGroups_.insert(routingKey(group));
+    else
+        foldedGroups_.erase(routingKey(group));
+    dirty_ = true;
+}
+
+bool Studio::hiddenByFold(const TrackRef& track) const
+{
+    const auto group = groupOf(track);
+    return group && isFolded(*group);
+}
+
+bool Studio::groupHasClips(const TrackRef& group, const int scene) const
+{
+    const auto members = groupMembers(group);
+    return std::any_of(members.begin(), members.end(), [&](const TrackRef& track) { return slotHasClip(track, scene); });
+}
+
+bool Studio::groupPlaysScene(const TrackRef& group, const int scene) const
+{
+    const auto members = groupMembers(group);
+    return std::any_of(members.begin(), members.end(), [&](const TrackRef& track) { return playingScene(track) == scene; });
+}
+
+bool Studio::groupWaitsScene(const TrackRef& group, const int scene) const
+{
+    const auto members = groupMembers(group);
+    return std::any_of(members.begin(), members.end(), [&](const TrackRef& track) { return pendingScene(track) == scene; });
+}
+
+std::optional<TrackRef> Studio::groupTracks(const std::vector<TrackRef>& picked)
+{
+    // In the order shown; never the master, a group, or a track twice.
+    std::vector<TrackRef> members;
+    for (const auto& track : tracks())
+        if (std::find(picked.begin(), picked.end(), track) != picked.end() && !track.master && !isGroupTrack(track))
+            members.push_back(track);
+    if (members.empty())
+        return std::nullopt;
+    const auto group = addBusTrack(ui::Ls("Groupe ", "Group ") + juce::String(static_cast<int>(groups_.size() + 1)));
+    if (!group)
+        return std::nullopt;
+    const auto groupKey = routingKey(*group);
+    groups_.insert(groupKey);
+    setTrackColour(*group, trackColour(members.front()));
+    std::vector<std::uint64_t> memberKeys;
+    for (const auto& member : members) {
+        // Its sound into the group (its sends kept).
+        auto outputs = trackOutputs(member);
+        if (outputs.empty())
+            outputs.push_back({});
+        outputs.front().destination = groupKey;
+        outputs.front().input = 0;
+        outputs.front().hardware = 0;
+        (void) setTrackOutputs(member, outputs);
+        groupOf_[routingKey(member)] = groupKey;
+        memberKeys.push_back(routingKey(member));
+    }
+    // Shown where its first track was: it, then its tracks together.
+    (void) tracks();
+    const auto first = std::find(trackOrder_.begin(), trackOrder_.end(), memberKeys.front());
+    auto at = static_cast<std::ptrdiff_t>(std::distance(trackOrder_.begin(), first));
+    std::vector<std::uint64_t> order;
+    for (std::ptrdiff_t index = 0; index < static_cast<std::ptrdiff_t>(trackOrder_.size()); ++index) {
+        const auto key = trackOrder_[static_cast<std::size_t>(index)];
+        if (key == groupKey || std::find(memberKeys.begin(), memberKeys.end(), key) != memberKeys.end()) {
+            if (index < at)
+                --at;
+            continue;
+        }
+        order.push_back(key);
+    }
+    at = std::clamp<std::ptrdiff_t>(at, 0, static_cast<std::ptrdiff_t>(order.size()));
+    order.insert(order.begin() + at, groupKey);
+    order.insert(order.begin() + at + 1, memberKeys.begin(), memberKeys.end());
+    trackOrder_ = std::move(order);
+    dirty_ = true;
+    return group;
+}
+
+bool Studio::ungroup(const TrackRef& group)
+{
+    if (!isGroupTrack(group))
+        return false;
+    const auto key = routingKey(group);
+    for (const auto& member : groupMembers(group)) {
+        auto outputs = trackOutputs(member);
+        for (auto& output : outputs)
+            if (output.destination == key) {
+                output.destination = 0;
+                output.input = 0;
+            }
+        (void) setTrackOutputs(member, outputs);
+        groupOf_.erase(routingKey(member));
+    }
+    groups_.erase(key);
+    foldedGroups_.erase(key);
+    return removeTrack(group);
+}
+
+juce::Result Studio::moveLauncherClip(const TrackRef& from, const int fromScene, const TrackRef& to, const int toScene, const bool copy)
+{
+    if ((from == to && fromScene == toScene) || from.master || to.master || !isValid(from) || !isValid(to))
+        return juce::Result::ok();
+    // The clip's own track (a hybrid track's companion holds the other
+    // kind), and its kind's place on the destination, made if needed.
+    const auto source = slotPart(from, fromScene);
+    if (!source)
+        return juce::Result::fail(ui::Ls("Pas de clip dans cette case", "No clip in that slot"));
+    const auto target = makePartFor(to, source->midi);
+    if (!target)
+        return juce::Result::fail(source->midi ? ui::Ls("Cette piste ne prend pas de clip MIDI", "That track takes no MIDI clip")
+                                               : ui::Ls("Cette piste ne prend pas de clip audio", "That track takes no audio clip"));
+    // What the slot had goes, whatever its kind.
+    if (const auto there = slotPart(to, toScene)) {
+        if (there->midi) {
+            if (const auto* clip = midiClipInScene(engine_, there->midiId, toScene))
+                (void) engine_.removeMidiClip(there->midiId, clip->id);
+        } else if (there->midi != source->midi) {
+            (void) engine_.clearLauncherClip(there->audioIndex, toScene);
+        }
+    }
+    if (source->midi) {
+        const auto* clip = midiClipInScene(engine_, source->midiId, fromScene);
+        if (clip == nullptr)
+            return juce::Result::fail(ui::Ls("Pas de clip dans cette case", "No clip in that slot"));
+        const auto moved = *clip;
+        if (!copy && *source == *target) {
+            (void) engine_.setMidiClipLauncherScene(source->midiId, moved.id, toScene);
+        } else {
+            const auto id = engine_.addMidiClip(target->midiId, moved.name, 0.0, moved.lengthBeats, moved.looping, moved.colour, toScene);
+            if (id == 0)
+                return juce::Result::fail(ui::Ls("Le clip n'a pas pu être créé", "The clip could not be made"));
+            (void) engine_.setMidiClipTimelineBounds(target->midiId, id, moved.lengthBeats, moved.playStartBeats, moved.playEndBeats,
+                                                     moved.loopStartBeats, moved.loopEndBeats, moved.looping);
+            for (const auto& note : moved.notes)
+                (void) engine_.copyMidiNote(target->midiId, id, note, note.startBeats);
+            if (!copy)
+                (void) engine_.removeMidiClip(source->midiId, moved.id);
+        }
+    } else if (!engine_.transferLauncherClip(source->audioIndex, fromScene, target->audioIndex, toScene, copy)) {
+        return juce::Result::fail(ui::Ls("Le clip n'a pas pu être déplacé", "The clip could not be moved"));
+    }
+    dirty_ = true;
+    return juce::Result::ok();
+}
+
+void Studio::restoreGroup(const std::uint64_t group, const std::vector<std::uint64_t>& members, const bool folded)
+{
+    if (group == 0)
+        return;
+    groups_.insert(group);
+    for (const auto member : members)
+        if (member != 0)
+            groupOf_[member] = group;
+    if (folded)
+        foldedGroups_.insert(group);
 }
 
 std::size_t Studio::trackCount() const
@@ -1572,16 +2034,21 @@ juce::String Studio::trackName(const TrackRef& track) const
     }
     if (track.master)
         return "Master";
+    // A hybrid track's companion: the track's name.
+    const auto shown = shownTrackOf(track.owner());
+    const auto ownName = !(shown == track.owner()) ? std::optional<juce::String>(trackName(shown)) : std::nullopt;
     if (track.midi) {
         for (const auto& summary : engine_.midiTrackSummaries())
             if (summary.id == track.midiId) {
                 // A pad: the rack's name, then its own.
                 if (const auto* pad = track.pad >= 0 ? rackPad(track.owner(), static_cast<std::size_t>(track.pad)) : nullptr)
-                    return summary.name + juce::String::fromUTF8(" âº ") + pad->name;
-                return summary.name;
+                    return ownName.value_or(summary.name) + juce::String::fromUTF8(" › ") + pad->name;
+                return ownName.value_or(summary.name);
             }
         return {};
     }
+    if (ownName)
+        return *ownName;
     return track.audioIndex < audioTracks_.size() ? audioTracks_[track.audioIndex].name : juce::String();
 }
 
@@ -1593,6 +2060,8 @@ juce::uint32 Studio::trackColour(const TrackRef& track) const
     }
     if (track.master)
         return 0xffffa726;
+    if (const auto shown = shownTrackOf(track.owner()); !(shown == track.owner()))
+        return trackColour(shown);
     if (track.midi) {
         const auto found = midiTracks_.find(track.midiId);
         return found != midiTracks_.end() ? found->second.colour : 0xff52d1a2;
@@ -3382,17 +3851,24 @@ bool Studio::voiceLive(const TrackRef& track, engine::VoiceLive& out) const
 
 bool Studio::slotHasClip(const TrackRef& track, const int scene) const
 {
-    if (track.master)
-        return false;
-    if (track.midi)
-        return midiClipInScene(engine_, track.midiId, scene) != nullptr;
-    return engine_.launcherClip(track.audioIndex, scene).has_value();
+    return slotPart(track, scene).has_value();
 }
 
 bool Studio::launchSlot(const TrackRef& track, const int scene)
 {
     if (track.master || !isValid(track))
         return false;
+    if (isGroupTrack(track)) {
+        // Its tracks' clips there; a track without one stops, if its slot
+        // has its stop.
+        auto any = false;
+        for (const auto& member : groupMembers(track))
+            if (slotHasClip(member, scene))
+                any = launchSlot(member, scene) || any;
+            else if (slotStops(member, scene))
+                stopTrackClips(member);
+        return any;
+    }
     if (!engine_.isPlaying()) {
         // Stopped: it starts with the clips that played at the stop.
         if (!slotHasClip(track, scene))
@@ -3402,22 +3878,57 @@ bool Studio::launchSlot(const TrackRef& track, const int scene)
         play();
         return true;
     }
-    if (track.midi) {
-        const auto* clip = midiClipInScene(engine_, track.midiId, scene);
-        return clip != nullptr && engine_.startMidiClipPreview(track.midiId, clip->id, scene);
+    const auto part = slotPart(track, scene);
+    if (!part)
+        return false;
+    // A hybrid track plays one clip at a time: the other kind's stops.
+    if (const auto companion = companionOf(track)) {
+        const auto other = *part == track ? *companion : track;
+        if (partPlayingScene(other) >= 0 || partPendingScene(other) >= 0)
+            stopPart(other);
     }
-    return engine_.launchClip(track.audioIndex, scene);
+    if (part->midi) {
+        const auto* clip = midiClipInScene(engine_, part->midiId, scene);
+        return clip != nullptr && engine_.startMidiClipPreview(part->midiId, clip->id, scene);
+    }
+    return engine_.launchClip(part->audioIndex, scene);
 }
 
 void Studio::stopTrackClips(const TrackRef& track)
 {
     if (track.master || !isValid(track))
         return;
+    if (isGroupTrack(track))
+        for (const auto& member : groupMembers(track))
+            stopTrackClips(member);
     forgetClipAtStop(track);
-    if (track.midi)
-        (void) engine_.stopMidiClipPreview(track.midiId);
+    stopPart(track);
+    if (const auto companion = companionOf(track))
+        stopPart(*companion);
+}
+
+void Studio::stopPart(const TrackRef& part)
+{
+    if (part.master || !isValid(part))
+        return;
+    if (part.midi)
+        (void) engine_.stopMidiClipPreview(part.midiId);
     else
-        (void) engine_.stopLauncherTrack(track.audioIndex, true);
+        (void) engine_.stopLauncherTrack(part.audioIndex, true);
+}
+
+int Studio::partPlayingScene(const TrackRef& part) const
+{
+    if (part.master || !isValid(part))
+        return -1;
+    return part.midi ? engine_.activeMidiLauncherScene(part.midiId) : engine_.activeLauncherScene(part.audioIndex);
+}
+
+int Studio::partPendingScene(const TrackRef& part) const
+{
+    if (part.master || part.midi || !isValid(part))
+        return -1;
+    return engine_.pendingLauncherScene(part.audioIndex);
 }
 
 void Studio::launchScene(const int scene)
@@ -3469,9 +3980,12 @@ void Studio::stopAllClips()
 
 int Studio::playingScene(const TrackRef& track) const
 {
-    if (track.master || !isValid(track))
-        return -1;
-    return track.midi ? engine_.activeMidiLauncherScene(track.midiId) : engine_.activeLauncherScene(track.audioIndex);
+    // A hybrid track's: its own clip's, else its companion's.
+    if (const auto own = partPlayingScene(track); own >= 0)
+        return own;
+    if (const auto companion = companionOf(track))
+        return partPlayingScene(*companion);
+    return -1;
 }
 
 int Studio::pendingScene(const TrackRef& track) const
@@ -3480,9 +3994,11 @@ int Studio::pendingScene(const TrackRef& track) const
         for (const auto& [stopped, scene] : clipsAtStop_)
             if (stopped == track)
                 return scene;
-    if (track.master || track.midi || !isValid(track))
-        return -1;
-    return engine_.pendingLauncherScene(track.audioIndex);
+    if (const auto own = partPendingScene(track); own >= 0)
+        return own;
+    if (const auto companion = companionOf(track))
+        return partPendingScene(*companion);
+    return -1;
 }
 
 bool Studio::slotStops(const TrackRef& track, const int scene) const
@@ -4364,7 +4880,7 @@ SoundBanks::Missing Studio::missingSamples(const TrackRef& track)
 
 bool Studio::generateMissingSounds(const std::optional<TrackRef> only)
 {
-    auto all = only ? std::vector<TrackRef> { *only } : tracks();
+    auto all = only ? std::vector<TrackRef> { *only } : allTracks();
     if (!only)
         all.push_back(masterTrack());
     // Only the zones of generated banks: the disk asked for them alone.
@@ -4404,7 +4920,7 @@ bool Studio::generateMissingSounds(const std::optional<TrackRef> only)
 
 void Studio::reloadSamplers(const juce::StringArray& banks)
 {
-    auto all = tracks();
+    auto all = allTracks();
     all.push_back(masterTrack());
     for (const auto& track : all) {
         auto* slot = graphFor(track);
@@ -4965,6 +5481,13 @@ void Studio::setTrackMix(const TrackRef& track, const Mix& mix)
         engine_.setTrackSolo(track.audioIndex, mix.solo);
         engine_.setTrackArmed(track.audioIndex, mix.armed);
     }
+    // A hybrid track's companion is soloed with it (it is upstream: a solo
+    // would silence it).
+    if (const auto companion = companionOf(track))
+        if (auto other = trackMix(*companion); other.solo != mix.solo) {
+            other.solo = mix.solo;
+            setTrackMix(*companion, other);
+        }
     dirty_ = true;
 }
 
@@ -5013,6 +5536,14 @@ bool Studio::removeTrack(const TrackRef& track)
 {
     if (track.master)
         return false;
+    // A hybrid track's companion goes with it (first: it is of the other
+    // kind, the track keeps its place).
+    if (const auto companion = companionOf(track)) {
+        companions_.erase(routingKey(track));
+        hybridAudioRecords_.erase(routingKey(track));
+        (void) removeTrack(*companion);
+    }
+    std::erase_if(companions_, [key = routingKey(track)](const auto& entry) { return entry.second == key; });
     // The tracks after it move: the replacers' instruments are made again
     // from their cards, by the tracks they are on now.
     replacerSlots_.clear();
@@ -5055,39 +5586,20 @@ bool Studio::removeTrack(const TrackRef& track)
 
 bool Studio::moveTrack(const TrackRef& track, const int delta)
 {
-    if (track.master)
+    // In the order shown, whatever their kinds (the engine keeps its own).
+    if (track.master || delta == 0)
         return false;
-    clipsAtStop_.clear();
-    // The indices move: the routing is named again.
-    struct Republish {
-        Studio& studio;
-        ~Republish() { studio.publishRouting(); }
-    } republish { *this };
-    if (delta == 0)
+    (void) tracks();
+    const auto key = routingKey(track);
+    const auto found = std::find(trackOrder_.begin(), trackOrder_.end(), key);
+    if (key == 0 || found == trackOrder_.end())
         return false;
-    if (track.midi) {
-        const auto summaries = engine_.midiTrackSummaries();
-        const auto found = std::find_if(summaries.begin(), summaries.end(),
-                                        [&track](const auto& s) { return s.id == track.midiId; });
-        if (found == summaries.end())
-            return false;
-        const auto from = static_cast<int>(std::distance(summaries.begin(), found));
-        const auto to = juce::jlimit(0, static_cast<int>(summaries.size()) - 1, from + delta);
-        if (to == from)
-            return false;
-        const auto moved = engine_.moveMidiTrack(static_cast<std::size_t>(from), static_cast<std::size_t>(to));
-        dirty_ = dirty_ || moved;
-        return moved;
-    }
-    const auto from = static_cast<int>(track.audioIndex);
-    const auto to = juce::jlimit(0, static_cast<int>(engine_.trackCount()) - 1, from + delta);
-    if (to == from || !engine_.moveAudioTrack(track.audioIndex, static_cast<std::size_t>(to)))
+    const auto from = static_cast<int>(std::distance(trackOrder_.begin(), found));
+    const auto to = juce::jlimit(0, static_cast<int>(trackOrder_.size()) - 1, from + delta);
+    if (to == from)
         return false;
-    if (static_cast<std::size_t>(std::max(from, to)) < audioTracks_.size()) {
-        auto state = std::move(audioTracks_[static_cast<std::size_t>(from)]);
-        audioTracks_.erase(audioTracks_.begin() + from);
-        audioTracks_.insert(audioTracks_.begin() + to, std::move(state));
-    }
+    trackOrder_.erase(trackOrder_.begin() + from);
+    trackOrder_.insert(trackOrder_.begin() + to, key);
     dirty_ = true;
     return true;
 }
@@ -5096,6 +5608,12 @@ bool Studio::moveTrack(const TrackRef& track, const int delta)
 
 void Studio::clearSession()
 {
+    trackOrder_.clear();
+    groupOf_.clear();
+    groups_.clear();
+    foldedGroups_.clear();
+    companions_.clear();
+    hybridAudioRecords_.clear();
     // A device linked to a track of the project closed stays in the
     // workshop, as its own copy: every tab's.
     for (auto& tab : workshops_)
@@ -5164,7 +5682,7 @@ juce::Result Studio::finishApplying(const juce::File& file, const juce::Result& 
 {
     applying_.reset();
     loading_ = false;
-    for (const auto& track : tracks())
+    for (const auto& track : allTracks())
         publishParameterAutomation(track);
     // Projects shipped next to the application are opened as new work: a
     // plain save must not overwrite the template.
@@ -6125,15 +6643,17 @@ void Studio::play()
         return;
     std::vector<app::AudioTrackController::ClipToRestart> clips;
     for (const auto& [track, scene] : clipsAtStop_) {
-        if (!isValid(track) || !slotHasClip(track, scene))
+        // A hybrid track's slot: its clip on whichever part holds it.
+        const auto part = slotPart(track, scene);
+        if (!part)
             continue;
         app::AudioTrackController::ClipToRestart clip;
-        clip.midi = track.midi;
-        clip.trackIndex = track.audioIndex;
-        clip.midiTrackId = track.midiId;
+        clip.midi = part->midi;
+        clip.trackIndex = part->audioIndex;
+        clip.midiTrackId = part->midiId;
         clip.sceneIndex = scene;
-        if (track.midi)
-            clip.midiClipId = midiClipInScene(engine_, track.midiId, scene)->id;
+        if (part->midi)
+            clip.midiClipId = midiClipInScene(engine_, part->midiId, scene)->id;
         clips.push_back(clip);
     }
     clipsAtStop_.clear();
@@ -6188,7 +6708,83 @@ bool Studio::isRecording() const noexcept
     return recordingTrack_.has_value();
 }
 
-juce::Result Studio::startRecording(std::optional<TrackRef> track, const std::uint64_t midiClip)
+juce::File Studio::newRecordingFile(const TrackRef& track) const
+{
+    auto folder = projectFile_ != juce::File {} ? projectFile_.getParentDirectory().getChildFile("recordings")
+                                                : juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
+                                                      .getChildFile("CyDAW")
+                                                      .getChildFile("Recordings");
+    folder.createDirectory();
+    return folder.getNonexistentChildFile(trackName(track) + " " + juce::Time::getCurrentTime().formatted("%Y-%m-%d %H-%M-%S"), ".wav",
+                                          false);
+}
+
+void Studio::startCompanionRecording(const TrackRef& owner, const TrackRef& companion)
+{
+    if (companion.midi) {
+        // An audio track's notes: a clip from the bar, kept if notes came.
+        const auto bar = std::max(1.0, static_cast<double>(engine_.beatsPerBar()));
+        const auto beats = engine_.position() * engine_.tempo() / 60.0;
+        const auto clip = engine_.addMidiClip(companion.midiId, {}, std::floor(beats / bar) * bar, bar * 4.0, false, trackColour(owner));
+        if (clip == 0)
+            return;
+        (void) engine_.setLiveMidiTrack(companion.midiId);
+        if (engine_.startMidiRecording(companion.midiId, clip, true, app::AudioTrackController::MidiRecordQuantization::none).failed()) {
+            (void) engine_.removeMidiClip(companion.midiId, clip);
+            return;
+        }
+        companionRecording_ = companion;
+        companionRecordClip_ = clip;
+        return;
+    }
+    // An instrument track's sound: only with an audio input chosen for it.
+    if (!recordsHybridAudio(owner))
+        return;
+    armedBeforeCompanion_ = engine_.armedAudioTrack();
+    engine_.setTrackArmed(companion.audioIndex, true);
+    recordingFile_ = newRecordingFile(owner);
+    if (engine_.startRecording(recordingFile_).failed()) {
+        if (armedBeforeCompanion_)
+            engine_.setTrackArmed(*armedBeforeCompanion_, true);
+        else
+            engine_.setTrackArmed(companion.audioIndex, false);
+        armedBeforeCompanion_.reset();
+        return;
+    }
+    recordingStart_ = engine_.position();
+    companionRecording_ = companion;
+    companionRecordClip_ = 0;
+}
+
+void Studio::stopCompanionRecording(const bool keep)
+{
+    const auto companion = std::exchange(companionRecording_, std::nullopt);
+    if (!companion || !isValid(*companion))
+        return;
+    if (companion->midi) {
+        engine_.stopMidiRecording(keep);
+        // No note played: no clip.
+        auto notes = false;
+        if (const auto* clips = engine_.midiClipsView(companion->midiId))
+            for (const auto& clip : *clips)
+                notes = notes || (clip.id == companionRecordClip_ && !clip.notes.empty());
+        if (!keep || !notes)
+            (void) engine_.removeMidiClip(companion->midiId, companionRecordClip_);
+        return;
+    }
+    engine_.stopRecording();
+    if (keep)
+        (void) keepRecordedAudio(*companion);
+    else
+        (void) recordingFile_.deleteFile();
+    if (armedBeforeCompanion_)
+        engine_.setTrackArmed(*armedBeforeCompanion_, true);
+    else
+        engine_.setTrackArmed(companion->audioIndex, false);
+    armedBeforeCompanion_.reset();
+}
+
+juce::Result Studio::startRecording(std::optional<TrackRef> track, const std::uint64_t midiClip, const bool withCompanion)
 {
     if (isRecording())
         return juce::Result::fail("already recording");
@@ -6228,18 +6824,17 @@ juce::Result Studio::startRecording(std::optional<TrackRef> track, const std::ui
             return started;
     } else {
         engine_.setTrackArmed(track->audioIndex, true);
-        auto folder = projectFile_ != juce::File {} ? projectFile_.getParentDirectory().getChildFile("recordings")
-                                                    : juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
-                                                          .getChildFile("CyDAW")
-                                                          .getChildFile("Recordings");
-        folder.createDirectory();
-        recordingFile_ = folder.getNonexistentChildFile(
-            trackName(*track) + " " + juce::Time::getCurrentTime().formatted("%Y-%m-%d %H-%M-%S"), ".wav", false);
+        recordingFile_ = newRecordingFile(*track);
         const auto started = engine_.startRecording(recordingFile_);
         if (started.failed())
             return started;
         recordingStart_ = engine_.position();
     }
+    // A hybrid track: its other part too (an audio track's notes, an
+    // instrument track's sound when it has an audio input).
+    if (withCompanion)
+        if (const auto companion = companionOf(*track))
+            startCompanionRecording(*track, *companion);
     recordingTrack_ = track;
     recordingLoopWasOn_ = loopEnabled_;
     // Audio goes on looping: each pass becomes a take of one clip.
@@ -6252,8 +6847,134 @@ juce::Result Studio::startRecording(std::optional<TrackRef> track, const std::ui
     return juce::Result::ok();
 }
 
+juce::Result Studio::recordIntoSlot(const TrackRef& owner, const int scene, const std::optional<bool> midi)
+{
+    if (slotRecording_)
+        return stopSlotRecording(true);
+    if (isRecording())
+        return juce::Result::fail(ui::Ls("Un enregistrement est déjà en cours", "Already recording"));
+    if (owner.master || owner.isBus() || !isValid(owner) || isBusTrack(owner) || !trackMix(owner).armed)
+        return juce::Result::fail(ui::Ls("Armez la piste pour enregistrer dans sa case", "Arm the track to record into its slot"));
+    if (slotHasClip(owner, scene))
+        return juce::Result::fail(ui::Ls("La case a déjà un clip", "The slot already has a clip"));
+    // The kind recorded: the track's own, or the other one into its
+    // companion (made: the track becomes hybrid), armed for the recording.
+    const auto part = midi ? makePartFor(owner, *midi) : std::optional<TrackRef>(owner);
+    if (!part)
+        return juce::Result::fail(ui::Ls("Cette piste n'enregistre pas ce genre de clip", "That track records no clip of that kind"));
+    const auto& track = *part;
+    slotRecordArmedPart_ = !(track == owner);
+    armedBeforeSlotRecording_ = engine_.armedAudioTrack();
+    if (slotRecordArmedPart_) {
+        auto mix = trackMix(track);
+        mix.armed = true;
+        setTrackMix(track, mix);
+    }
+    const auto bar = std::max(1.0, static_cast<double>(engine_.beatsPerBar()));
+    const auto beats = engine_.position() * engine_.tempo() / 60.0;
+    // Playing: from the next bar; stopped: from the bar it is on.
+    const auto start = engine_.isPlaying() ? std::ceil(beats / bar - 1.0e-9) * bar : std::floor(beats / bar + 1.0e-9) * bar;
+    if (track.midi) {
+        // Recorded as a clip of the arrangement from that bar (its notes
+        // placed from its start), put in the slot when it stops (a launcher
+        // clip has no place in time).
+        const auto clip = engine_.addMidiClip(track.midiId, trackName(track), start, bar * 64.0, false, trackColour(track), -1);
+        if (clip == 0)
+            return juce::Result::fail(ui::Ls("Le clip n'a pas pu être créé", "The clip could not be made"));
+        if (const auto started = startRecording(track, clip, false); started.failed()) {
+            (void) engine_.removeMidiClip(track.midiId, clip);
+            disarmSlotRecordingPart(track);
+            return started;
+        }
+        slotRecordClip_ = clip;
+    } else if (const auto started = startRecording(track, 0, false); started.failed()) {
+        disarmSlotRecordingPart(track);
+        return started;
+    }
+    slotRecording_ = std::make_pair(track, scene);
+    slotRecordStartBeats_ = start;
+    dirty_ = true;
+    return juce::Result::ok();
+}
+
+juce::Result Studio::stopSlotRecording(const bool keep)
+{
+    if (!slotRecording_)
+        return juce::Result::ok();
+    const auto [track, scene] = *slotRecording_;
+    slotRecording_.reset();
+    // A companion armed for it: as it was.
+    struct Disarm {
+        Studio& studio;
+        TrackRef part;
+        ~Disarm() { studio.disarmSlotRecordingPart(part); }
+    } disarm { *this, track };
+    const auto secondsPerBeat = 60.0 / std::max(1.0, engine_.tempo());
+    const auto bar = std::max(1.0, static_cast<double>(engine_.beatsPerBar()));
+    const auto endBeats = engine_.position() / secondsPerBeat;
+    const auto length = std::max(bar, std::ceil((endBeats - slotRecordStartBeats_) / bar - 1.0e-9) * bar);
+    // The transport goes on: the clip plays on from there.
+    recordingStartedPlayback_ = false;
+    auto result = juce::Result::ok();
+    if (track.midi) {
+        result = stopRecording(keep);
+        if (!keep) {
+            (void) engine_.removeMidiClip(track.midiId, slotRecordClip_);
+            return result;
+        }
+        (void) engine_.setMidiClipTimelineBounds(track.midiId, slotRecordClip_, length, 0.0, length, 0.0, length, true);
+        (void) engine_.setMidiClipLauncherScene(track.midiId, slotRecordClip_, scene);
+    } else {
+        recordingTrack_.reset();
+        engine_.stopRecording();
+        if (recordingLoopWasOn_)
+            engine_.setLooping(true);
+        if (!keep) {
+            (void) recordingFile_.deleteFile();
+            return result;
+        }
+        // The file from where the recording started: the clip from the bar.
+        juce::AudioFormatManager formats;
+        formats.registerBasicFormats();
+        double recorded {};
+        if (const std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(recordingFile_));
+            reader != nullptr && reader->sampleRate > 0.0)
+            recorded = static_cast<double>(reader->lengthInSamples) / reader->sampleRate;
+        const auto offset = std::max(0.0, slotRecordStartBeats_ * secondsPerBeat - recordingStart_);
+        if (recorded - offset <= 0.01)
+            return juce::Result::fail(ui::Ls("Rien n'a été enregistré", "Nothing was recorded"));
+        const auto duration = std::min(length * secondsPerBeat, recorded - offset);
+        if (!engine_.setLauncherClip(track.audioIndex, scene, trackName(track), offset, duration, true, trackColour(track), recordingFile_))
+            return juce::Result::fail(ui::Ls("Le clip n'a pas pu être créé", "The clip could not be made"));
+    }
+    dirty_ = true;
+    // Launched on its track (a companion's clip stops the track's other one).
+    (void) launchSlot(shownTrackOf(track), scene);
+    return result;
+}
+
+void Studio::disarmSlotRecordingPart(const TrackRef& part)
+{
+    if (!std::exchange(slotRecordArmedPart_, false) || !isValid(part))
+        return;
+    if (part.midi) {
+        auto mix = trackMix(part);
+        mix.armed = false;
+        setTrackMix(part, mix);
+    } else if (armedBeforeSlotRecording_) {
+        engine_.setTrackArmed(*armedBeforeSlotRecording_, true);
+    } else {
+        engine_.setTrackArmed(part.audioIndex, false);
+    }
+    armedBeforeSlotRecording_.reset();
+}
+
 juce::Result Studio::stopRecording(const bool keep)
 {
+    // Recording into a slot: that slot's clip made (the transport stopped
+    // or the record button let go).
+    if (slotRecording_)
+        return stopSlotRecording(keep);
     if (!recordingTrack_)
         return juce::Result::ok();
     const auto track = *recordingTrack_;
@@ -6269,6 +6990,7 @@ juce::Result Studio::stopRecording(const bool keep)
             (void) recordingFile_.deleteFile();
         }
     }
+    stopCompanionRecording(keep);
     if (recordingStartedPlayback_)
         engine_.stop();
     if (recordingLoopWasOn_)

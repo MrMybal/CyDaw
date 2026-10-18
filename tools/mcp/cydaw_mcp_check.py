@@ -423,10 +423,10 @@ def main():
         back = client.tool("set_midi_clip", track="Nappes", clip="Nappes 2", scene=-1, startBeats=16)
         if back["scene"] != -1 or back["startBeats"] != 16:
             failures.append("set_midi_clip back to the arrangement: %s" % back)
-        first_midi = len(client.tool("status")["audioTracks"])
-        moved = client.tool("move_track", track="Nappes", to=first_midi)
-        if moved["midiTracks"][0]["name"] != "Nappes":
-            failures.append("move_track: %s" % [t["name"] for t in moved["midiTracks"]])
+        # In the order shown, every kind together.
+        moved = client.tool("move_track", track="Nappes", to=0)
+        if moved["order"][0]["name"] != "Nappes":
+            failures.append("move_track: %s" % [t["name"] for t in moved["order"]])
 
         test_plugin = os.path.join(ROOT, "build", "agent-graph", "CyDAWTestGain_artefacts",
                                    "Release", "VST3", "CyDAW Test Gain.vst3")

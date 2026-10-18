@@ -242,6 +242,16 @@ def main() -> int:
         need({"cmd": "show_dialog", "name": "colosse"}, "Colosse window")
         colosse_synth(set={"osc2.table": "Metal", "perf.step5": -0.25, "mod3.source": "Sequence"})
 
+        # ---- A synth's own card taken from the modules: its whole instrument ----
+        bare = need({"cmd": "add_midi_track", "name": "Bare card"}, "track")["name"]
+        need({"cmd": "add_node", "track": bare, "key": "opale-synth"}, "a loose Opale card")
+        need({"cmd": "insert_device", "track": bare, "key": "opale-synth"}, "Opale's card")
+        nodes = [node["type"] for node in need({"cmd": "get_track_graph", "track": bare}, "graph")["nodes"]]
+        check(nodes.count("opale-synth") == 1 and "voice-allocator" in nodes,
+              f"Opale's own card on an instrument track: the whole instrument, the loose card gone ({nodes})")
+        played = need({"cmd": "synth", "track": bare, "note": 60, "seconds": 0.5, "tail": 1.0}, "Opale heard")
+        check(played.get("rmsDb", -120.0) > -45.0, f"that instrument plays ({played.get('rmsDb', -120.0):.1f} dB)")
+
         # ---- Mosaïque ----
         mosaique = need({"cmd": "add_midi_track", "name": "Mosaique", "instrument": "mosaique-instrument"}, "Mosaïque")["name"]
 

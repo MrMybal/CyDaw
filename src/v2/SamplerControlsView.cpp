@@ -121,7 +121,7 @@ std::vector<Group> groupsOf(const engine::SamplerMap& map)
         if (labels[index].contains(" ") && !labels[index].startsWith("CC ") && end - index >= 2) {
             const auto title = labels[index].upToFirstOccurrenceOf(" ", false, false);
             // A drum by its size: 18 is 18 inches.
-            Group group { title.containsOnly("0123456789") ? title + juce::String::fromUTF8("â³") : translated(title), {} };
+            Group group { title.containsOnly("0123456789") ? title + juce::String::fromUTF8("″") : translated(title), {} };
             for (auto at = index; at < end; ++at)
                 group.members.emplace_back(at, translated(labels[at].fromFirstOccurrenceOf(" ", false, false)));
             groups.push_back(std::move(group));

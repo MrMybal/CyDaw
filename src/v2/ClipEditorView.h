@@ -39,21 +39,45 @@ private:
     using NotePoint = app::AudioTrackController::NoteExpressionPoint;
 
     enum class Drag { none, move, resize, box, velocity, pan, curve, bend };
-    // What the roll edits: the notes, or a curve drawn on them.
-    enum class Expression { none, pitch, gain };
+    // What the roll edits: the notes, or their pitch drawn on them; the
+    // curves the lane below draws (gain, timbre, pressure, pan).
+    enum class Expression { none, pitch, gain, timbre, pressure, pan };
+    // What the lane under the notes shows, as Bitwig's: a value a note
+    // (velocity, chance) or a curve along each.
+    enum class LaneKind { velocity, chance, gain, timbre, pressure, pan };
     // The ready-made curves the shapes menu adds to notes.
-    enum class Shape { glideNext, glideFrom, scoop, slide, vibrato, wideVibrato, fall, doit, swell, fade, accent, clearPitch, clearGain };
+    enum class Shape { glideNext, glideFrom, scoop, slide, vibrato, wideVibrato, fall, doit, swell, fade, accent, clearPitch, clearGain,
+                       rampUp, rampDown, clearLane };
 
     void drawMidi(const TrackRef& track, const MidiClip& clip);
     void drawAudio(const TrackRef& track, const app::AudioTrackController::AudioClip& clip);
     void drawLauncherAudio(const TrackRef& track, int scene, const app::AudioTrackController::LauncherClip& clip);
     void drawMidiToolbar(const TrackRef& track, const MidiClip& clip);
+    // The clip's bar over the ruler, as the audio editor's: its loop on top
+    // (its ends and its middle dragged), its start and stop flags under it;
+    // a right click: its menu.
+    struct ClipBounds {
+        double length {};
+        double playStart {};
+        double playEnd {};
+        double loopStart {};
+        double loopEnd {};
+        bool looping {};
+    };
+    [[nodiscard]] static ClipBounds clipBounds(const MidiClip& clip);
+    [[nodiscard]] ClipBounds shownBounds(const MidiClip& clip) const;
+    void drawClipBar(const TrackRef& track, const MidiClip& clip, ImVec2 min, ImVec2 max);
+    void commitBounds(const TrackRef& track, const MidiClip& clip, const ClipBounds& bounds);
     void drawNoteBar(const TrackRef& track, const MidiClip& clip);
     // A number of the picked note's, dragged or typed: kept aside while it
     // moves, given back when let go.
     std::optional<double> noteField(const char* id, int field, std::uint64_t note, double current, float speed, double minimum,
                                     double maximum, const char* format, float width);
     void handleMidiKeys(const TrackRef& track, const MidiClip& clip);
+    // The lane's curve (none: it shows velocity or chance).
+    [[nodiscard]] Expression laneExpression() const noexcept;
+    // Its picker, on the keys' column beside it.
+    void drawLanePicker(ImVec2 min, ImVec2 max);
     // The velocity lane: a point a note, picked with it (a click, Ctrl, Shift,
     // a frame), the picked moved together (Shift: finely), drawn over with
     // Alt; their values read on them; copied and pasted onto other notes.
@@ -107,8 +131,17 @@ private:
     double audioPixelsPerSecond_ {};
     std::uint64_t audioShownClip_ {};
 
+    // The clip's bar: what is dragged, from where, as it goes.
+    enum class BoundsDrag { none, playStart, playEnd, loopStart, loopEnd, loopMove };
+    BoundsDrag boundsDrag_ { BoundsDrag::none };
+    ClipBounds boundsDraft_ {};
+    double boundsGrab_ {};
+    double boundsOrigin_ {};
+    double boundsSpan_ {};
+
     // Editing.
     std::set<std::uint64_t> selection_;
+    LaneKind laneKind_ { LaneKind::velocity };
     // The velocity lane's gesture; its keys once it was clicked.
     enum class VelocityDrag { none, move, frame, paint };
     VelocityDrag velocityDrag_ { VelocityDrag::none };

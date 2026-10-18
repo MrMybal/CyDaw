@@ -549,6 +549,46 @@ void recordInputCombo(Studio& studio, const TrackRef& track, const float width)
                   "The inputs are set in the Routing panel."));
 }
 
+void hybridAudioInputCombo(Studio& studio, const TrackRef& owner, const TrackRef& audioPart, const float width)
+{
+    if (audioPart.midi || !studio.isValid(audioPart))
+        return;
+    auto& engine = studio.engine();
+    const auto records = studio.recordsHybridAudio(owner);
+    const auto current = engine.trackMixState(audioPart.audioIndex).inputBusId;
+    const auto label = [](const app::VirtualAudioBus& bus) {
+        return bus.name + "  (" + Studio::formatName(bus.channels) + ", " + deviceChannelsText(bus) + ")";
+    };
+    juce::String shown = ui::Ls("(aucune)", "(none)");
+    const auto brief = width > 0.0f && width < dp(150.0f);
+    if (records)
+        for (const auto& bus : engine.virtualBuses())
+            if (bus.id == current)
+                shown = brief ? bus.name : label(bus);
+    ImGui::SetNextItemWidth(width);
+    ImGui::SetNextWindowSizeConstraints(ImVec2(std::max(width, dp(200.0f)), 0.0f), ImVec2(FLT_MAX, dp(420.0f)));
+    if (ImGui::BeginCombo("##hybridAudioInput", shown.toRawUTF8())) {
+        if (ImGui::Selectable(L("(aucune) : ses notes seules", "(none): its notes alone"), !records))
+            studio.setRecordsHybridAudio(owner, false);
+        for (const auto& bus : engine.virtualBuses()) {
+            if (bus.direction != app::VirtualBusDirection::input)
+                continue;
+            ImGui::PushID(static_cast<int>(bus.id & 0x7fffffff));
+            if (ImGui::Selectable(label(bus).toRawUTF8(), records && bus.id == current)) {
+                if (bus.id != current)
+                    (void) engine.setTrackInputBus(audioPart.audioIndex, bus.id);
+                studio.setRecordsHybridAudio(owner, true);
+            }
+            ImGui::PopID();
+        }
+        ImGui::EndCombo();
+    }
+    ui::tooltip(L("Ce que la piste enregistre en audio avec ses notes (piste hybride) : aucune entrée au départ ; choisissez-en une "
+                  "pour enregistrer aussi le son (un micro, une guitare).",
+                  "What the track records as audio with its notes (a hybrid track): no input at first; pick one to record the sound "
+                  "too (a microphone, a guitar)."));
+}
+
 void channelMeters(const Studio& studio, const TrackRef& track, const ImVec2 size)
 {
     const auto& p = theme::palette();
