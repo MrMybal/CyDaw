@@ -1,7 +1,8 @@
 """The factory instruments as sound models: each recorded note analysed by the companion.
 
     python tools/factory_content/build_factory_models.py [--sources DIR] [--out content/factory]
-           [--only key,key] [--jobs N] [--kind partials|auto|string] [--refine] [--keep-better]
+           [--only key,key] [--jobs N] [--kind partials|auto|string] [--keep-better]
+           [--refine [--refine-seconds S] [--steps N] [--device cuda]]
 
 Run after build_factory_content.py and build_sfz_instruments.py (the catalogue gives each
 instrument's notes and octave; an SFZ instrument's, its map: every velocity layer of each note,
@@ -152,7 +153,9 @@ def build(spec: dict, files: list[dict], sources: Path, octave: int, gain_db: fl
             audio, rate = read_wav(sources / item["file"])
             zone, report = best_zone(audio, rate, AnalysisOptions(note_hint=float(root), velocity=velocity,
                                                                   loop=bool(spec.get("loops"))),
-                                     kind=options["kind"], refine=options["refine"], limit_seconds=JUDGED_SECONDS)
+                                     kind=options["kind"], refine=options["refine"], limit_seconds=JUDGED_SECONDS,
+                                     device=options["device"], steps=options["steps"],
+                                     refine_seconds=options["refineSeconds"])
             zone.root_note = root
             zone.velocity = velocity
             deviation = 1200.0 * math.log2(zone.f0 / midi_to_hz(root)) if zone.f0 > 0 else 0.0
@@ -240,7 +243,9 @@ def build_from_map(entry: dict, out: Path, banks: Path, tool: Path, options: dic
                 audio = audio[start:end if end > start else None]
                 zone, report = best_zone(audio, rate, AnalysisOptions(note_hint=float(root), velocity=velocity,
                                                                       loop=sustained),
-                                         kind=options["kind"], refine=options["refine"], limit_seconds=JUDGED_SECONDS)
+                                         kind=options["kind"], refine=options["refine"], limit_seconds=JUDGED_SECONDS,
+                                         device=options["device"], steps=options["steps"],
+                                         refine_seconds=options["refineSeconds"])
                 zone.root_note = root
                 zone.velocity = velocity
                 zone.gain *= 10 ** (float(item.get("gain", 0.0)) / 20.0)
@@ -273,6 +278,9 @@ def main() -> int:
     parser.add_argument("--jobs", type=int, default=max(1, min(8, (os.cpu_count() or 4) - 2)))
     parser.add_argument("--kind", default="partials", choices=["partials", "auto", "string"])
     parser.add_argument("--refine", action="store_true")
+    parser.add_argument("--refine-seconds", type=float, default=None)
+    parser.add_argument("--steps", type=int, default=300)
+    parser.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
     parser.add_argument("--keep-better", action="store_true")
     parser.add_argument("--tool", type=Path,
                         default=ROOT / "build" / "agent-graph" / "cydaw_sample_tool_artefacts" / "Release"
@@ -282,7 +290,8 @@ def main() -> int:
     from cydaw_companion.setup_env import MARKER, contain  # noqa: PLC0415
     if (Path(sys.prefix) / MARKER).exists():
         contain(Path(sys.prefix))
-    options = {"kind": args.kind, "refine": args.refine, "keepBetter": args.keep_better}
+    options = {"kind": args.kind, "refine": args.refine, "keepBetter": args.keep_better, "device": args.device,
+               "steps": args.steps, "refineSeconds": args.refine_seconds}
     # Hours of work: below normal priority (the jobs inherit it), the computer stays responsive.
     if os.name == "nt":
         import ctypes  # noqa: PLC0415

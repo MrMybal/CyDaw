@@ -41,7 +41,7 @@ def fit(zone, report: dict, audio: np.ndarray, rate: int, limit_seconds: float |
 
 def best_zone(audio: np.ndarray, rate: int, options, kind: str = "auto", refine: bool = False, device: str = "auto",
               steps: int | None = None, progress: Callable[[float, str], None] | None = None,
-              limit_seconds: float | None = None):
+              limit_seconds: float | None = None, refine_seconds: float | None = None):
     """The zone for one recorded note and its report (with `kind`: "partials", "string" or "auto")."""
     from .analysis import analyse  # noqa: PLC0415
 
@@ -80,7 +80,7 @@ def best_zone(audio: np.ndarray, rate: int, options, kind: str = "auto", refine:
         report["refine"] = {"skipped": "a string is played, not its partials"}
     elif refine:
         from .refine import refine as refine_zone  # noqa: PLC0415
-        report["refine"] = refine_zone(zone, audio, rate, device=device, steps=steps,
-                                       progress=progress or (lambda fraction, message: None))
+        report["refine"] = refine_zone(zone, audio, rate, device=device, steps=steps or 300,
+                                       progress=progress or (lambda fraction, message: None), max_seconds=refine_seconds)
         report.update(fit(zone, report, audio, rate, limit_seconds))
     return zone, report

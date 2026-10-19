@@ -60,12 +60,18 @@ def _source(audio: np.ndarray, rate: int) -> np.ndarray:
 
 
 def refine(zone: Zone, audio: np.ndarray, rate: int, device: str = "auto", steps: int = 300,
-           progress: Callable[[float, str], None] | None = None) -> dict:
+           progress: Callable[[float, str], None] | None = None, max_seconds: float | None = None) -> dict:
+    """With `max_seconds`, only the note's first seconds are heard and learnt (a long note in a
+    fraction of the time): the partials' change fades out over the window's last half second, the
+    frames after it kept as they were."""
     import torch  # noqa: PLC0415
 
     report = {"steps": 0, "device": "none", "kept": False}
     source = _source(audio, rate)
     length = min(len(source), int(round(zone.frames * zone.frame_seconds * RATE)))
+    whole = length
+    if max_seconds is not None:
+        length = min(length, int(round(max_seconds * RATE)))
     if length < 2048 or zone.frames < 4:
         report["skipped"] = "too short"
         return report
@@ -289,7 +295,16 @@ def refine(zone: Zone, audio: np.ndarray, rate: int, device: str = "auto", steps
     report["lossAfter"] = round(expected_after, 4)
 
     refined = Zone(**zone.__dict__)
-    refined.harmonics = np.exp(log_harmonics.detach().cpu().numpy().astype(np.float64))
+    learnt_log = log_harmonics.detach().cpu().numpy().astype(np.float64)
+    if length < whole:
+        # Heard only so far: the change faded out at the window's end, none after it.
+        start_log = initial_harmonics.cpu().numpy().astype(np.float64)
+        end = length / RATE
+        times = np.arange(zone.frames) * zone.frame_seconds
+        weight = np.clip((end - times) / 0.5, 0.0, 1.0)[:, None]
+        learnt_log = start_log + (learnt_log - start_log) * weight
+        report["seconds"] = round(end, 2)
+    refined.harmonics = np.exp(learnt_log)
     refined.harmonics[refined.harmonics <= floor * 1.01] = 0.0
     refined.inharmonicity = 0.0 if free else float(math.exp(float(log_b.detach())))
     if refined.inharmonicity < 2e-7:
