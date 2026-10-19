@@ -9,7 +9,7 @@ Aucune dependance en dehors de la bibliotheque standard.
 
 Variables d'environnement :
   CYDAW_CONTROL_PORT  port du DAW (defaut 47820)
-  CYDAW_EXE           chemin de CyDAW 2.exe (ou CyDAW.exe), lance a la demande s'il ne
+  CYDAW_EXE           chemin de CyDAW 2.exe, lance a la demande s'il ne
                       repond pas (defaut : le build agent-graph du projet)
   CYDAW_CONTROL_TOKEN jeton partage avec le DAW (facultatif) : le DAW lance
                       par ce serveur l'exige dans chaque requete
@@ -26,14 +26,10 @@ SERVER_INFO = {"name": "cydaw", "version": "0.77.0"}
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("CYDAW_CONTROL_PORT", "47820"))
 HERE = os.path.dirname(os.path.abspath(__file__))
-# CyDAW 2 (the Dear ImGui interface) when it is built, CyDAW 1 otherwise.
+# CyDAW 2 as built in build/agent-graph.
 DEFAULT_EXE = os.path.normpath(os.path.join(
     HERE, "..", "..", "build", "agent-graph", "CyDAW2_artefacts", "Release",
     "CyDAW 2.exe"))
-if not os.path.isfile(DEFAULT_EXE):
-    DEFAULT_EXE = os.path.normpath(os.path.join(
-        HERE, "..", "..", "build", "agent-graph", "CyDAW_artefacts", "Release",
-        "CyDAW.exe"))
 EXE = os.environ.get("CYDAW_EXE", DEFAULT_EXE)
 TOKEN = os.environ.get("CYDAW_CONTROL_TOKEN", "")
 

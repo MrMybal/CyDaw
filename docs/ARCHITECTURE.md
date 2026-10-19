@@ -1,5 +1,10 @@
 # Architecture technique
 
+> L'ancienne interface JUCE (`CyDAW.exe`, ses composants `*Component` d'écran, l'éditeur de graphe autonome
+> et `cydaw_desktop_tests`) a été retirée le 19 octobre 2026 : l'application est CyDAW 2 (`src/v2`). Le
+> moteur décrit ici (`src/app` : pistes, graphes, runtime natif, import, plug-ins isolés) est celui qu'elle
+> utilise ; les passages sur les écrans et les tests de l'ancienne interface sont historiques.
+
 ## Séparation des responsabilités
 
 ```text

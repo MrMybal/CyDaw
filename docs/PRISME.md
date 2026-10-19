@@ -137,7 +137,6 @@ des flèches) revient aux tables de Prisme. Port de contrôle : `prism {importTa
   passe-bas qui assombrit, le passe-haut qui éclaircit, « impairs » qui retire les harmoniques paires, chaque
   spectre borné en grave et en aigu, un LFO stéréo qui sépare la gauche et la droite ; les nouveaux réglages
   rangés après les anciens (un projet, un préréglage ou un plug-in d'avant se relisent pareil).
-- `cydaw_desktop_tests` : 4 notes en poly, limite de 2 voix, une voix en mono, legato qui glisse sur une voix.
 - Le rendu par le chemin d'export (`instrument_export_check`) de chaque son d'usine ; `cydaw2_roundtrip_13-prisme`
   et `cydaw2_device_taps_13-prisme`.
 

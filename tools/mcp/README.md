@@ -8,7 +8,7 @@ capturer la fenêtre, exporter le mix.
 ## Comment ça marche
 
 - CyDAW écoute un **port de contrôle local** (`127.0.0.1:47820`) : une
-  requête JSON par ligne, une réponse par ligne. `CyDAW.exe --control-port=N`
+  requête JSON par ligne, une réponse par ligne. `CyDAW 2.exe --control-port=N`
   change le port, `--control-port=0` le désactive.
 - `cydaw_mcp_server.py` parle MCP (JSON-RPC sur stdin/stdout) avec l'agent
   et traduit chaque outil en requête sur ce port. Pas de dépendance :

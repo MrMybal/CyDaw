@@ -1199,8 +1199,7 @@ l'export (qui joue le projet en temps réel par le master) continuent, la carte 
   `cydaw2_routing_check` vérifie les formats de piste (fichier 5.1, mono, quad), les niveaux de chaque
   canal, un bus de sortie quad sans le master et une sortie directe, relus avec le projet (master et bus
   coupés) ; `cydaw2_banks_check` télécharge une banque d'un serveur local dans des dossiers à lui et
-  déplace un emplacement (hors ligne, silencieux). Le ctest complet
-  lance aussi les tests de la v1, qui ouvrent l'ancienne fenêtre : utiliser
+  déplace un emplacement (hors ligne, silencieux). Pour la suite :
   `ctest -C Release -R "cydaw2|cydaw_core_tests|cydaw_engine_tests"`.
 - Sondes : `--demo`, `--snapshot=<png> --snapshot-delay=<ms> --quit`, `--view=<1..6>`,
   `--track=<n>`, `--dump-graphs=<txt>`, `--save-as=<cydaw>`, `--audio-settings`, `--silent`,

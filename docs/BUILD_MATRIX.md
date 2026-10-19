@@ -85,7 +85,6 @@ conservant les ressources de la bundle. Une absence de worker, un protocole
 incompatible, un test en échec ou une erreur d'installation empêche la
 publication de l'artefact.
 
-La suite desktop couvre aussi l'enregistrement MIDI sans périphérique matériel :
-horodatage note-on/note-off, vélocité 7 bits, clip décalé, quantification, overdub,
-remplacement, annulation de prise, historique atomique et démarrage d'un transport
-dans un projet MIDI vide. Le même code est compilé avec les variantes WASAPI et ASIO.
+L'application est CyDAW 2, construite sous Windows (`CYDAW_BUILD_V2`) ; l'ancienne
+interface multiplateforme a été retirée le 19 octobre 2026. Sous Linux et macOS, ces
+presets construisent les bibliothèques, le worker, la sonde audio et leurs tests.

@@ -140,7 +140,8 @@ factory verrouillés ou tiers devront autoriser explicitement la redistribution.
   traiter les formats exacts de un à huit canaux ;
 - `planVst3Export`, qui produit bus, paramètres, rôle, catégorie, identité et
   empreinte vérifiés sans dépendre de l'interface CyDAW ;
-- application autonome `CyDAW Graph Editor` utilisant le même composant ;
+- application autonome `CyDAW Graph Editor` utilisant le même composant (retirée avec l'ancienne interface le
+  19 octobre 2026 : le graphe s'édite dans CyDAW 2) ;
 - premier effet `CyDAW Graph Runtime.vst3` avec éditeur nodal embarqué, état
   visuel et programme DSP restaurables par l'hôte ;
 - validation hors processus du VST3 : instanciation, traitement stéréo,

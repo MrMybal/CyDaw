@@ -162,7 +162,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=0,
                         help="port de controle (defaut : celui du serveur)")
-    parser.add_argument("--exe", default="", help="CyDAW.exe a lancer")
+    parser.add_argument("--exe", default="", help="CyDAW 2.exe a lancer")
     parser.add_argument("--quit", action="store_true",
                         help="ferme le DAW a la fin")
     options = parser.parse_args()
