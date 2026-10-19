@@ -28,7 +28,17 @@ sys.path.insert(0, str(HERE))
 import build_v2_examples as ex  # noqa: E402
 
 MODELS = "content/factory/Sound Models"
-ex.PORT = 47832
+
+
+def free_port() -> int:
+    """A port nothing listens on (another program may hold any fixed one)."""
+    import socket  # noqa: PLC0415
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        return probe.getsockname()[1]
+
+
+ex.PORT = free_port()
 
 
 def git(*arguments, data=None):
