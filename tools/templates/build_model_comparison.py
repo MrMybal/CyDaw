@@ -1,6 +1,6 @@
 """A project to hear the factory sound models before and after a rebuild, side by side.
 
-    python tools/templates/build_model_comparison.py [--old REV] [--out FILE] [--exe "<CyDAW 2.exe>"]
+    python tools/templates/build_model_comparison.py --out FILE [--old REV] [--exe "<CyDAW 2.exe>"]
 
 For every factory instrument whose model changed since REV (a git revision; default: the commit
 before the last rebuild of the models), two instrument tracks next to each other: "<name>
@@ -11,8 +11,8 @@ phrase on the old model (bars 1-2) then on the new (3-4); in the launcher's firs
 phrase on each, looping, to play one then the other.
 
 The old models are read from git (LFS) into <out folder>/Anciens modeles. The project holds both
-models of every instrument (a few hundred megabytes): it is written outside the repository (by
-default D:/CyDAW/Comparaison des modeles). The session is silent and hidden; nothing plays.
+models of every instrument (a few hundred megabytes): it is written outside the repository, where
+--out says. The session is silent and hidden; nothing plays.
 """
 import argparse
 import os
@@ -66,8 +66,8 @@ def old_models(revision: str, folder: pathlib.Path) -> dict[str, pathlib.Path]:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--old", default="")
-    parser.add_argument("--out", type=pathlib.Path,
-                        default=pathlib.Path("D:/CyDAW/Comparaison des modeles/Comparaison des modeles.cydaw"))
+    parser.add_argument("--out", type=pathlib.Path, required=True,
+                        help="the project to write (outside the repository)")
     parser.add_argument("--exe", default=str(ex.DEFAULT_EXE))
     arguments = parser.parse_args()
     # Default: the commit before the one that rebuilt the factory models.
