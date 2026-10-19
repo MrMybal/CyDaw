@@ -206,6 +206,7 @@ struct Studio::Opening {
         std::atomic<bool> done {};
         juce::var document;
         juce::Result result { juce::Result::ok() };
+        juce::StringArray missingModels;
     };
     juce::File file;
     std::shared_ptr<Read> read;
@@ -5840,7 +5841,10 @@ juce::Result Studio::loadProject(const juce::File& file)
         return read;
     if (document.getProperty("format", juce::var()).toString() != "CyDAW Project")
         return juce::Result::fail("not a CyDAW project: " + file.getFullPathName());
+    juce::StringArray missingModels;
+    app::expandFactoryModelReferences(document, missingModels);
     beginApplying(file, document);
+    noteMissingModels(missingModels);
     while (applying_->next()) {
     }
     return finishApplying(file, applying_->result());
@@ -5852,6 +5856,13 @@ void Studio::beginApplying(const juce::File& file, const juce::var& document)
     clearSession();
     loadWarnings_.clear();
     applying_ = std::make_unique<project_io::DocumentLoad>(*this, document, file, loadWarnings_);
+}
+
+void Studio::noteMissingModels(const juce::StringArray& missing)
+{
+    for (const auto& stored : missing)
+        loadWarnings_.add(ui::Ls("Modèle de son d'usine introuvable : ", "Factory sound model not found: ")
+                          + stored.fromFirstOccurrenceOf(":", false, false));
 }
 
 juce::Result Studio::finishApplying(const juce::File& file, const juce::Result& applied)
@@ -5889,6 +5900,8 @@ bool Studio::startOpeningProject(const juce::File& file)
         auto result = app::ProjectRecovery::readDocument(file, document);
         if (result.wasOk() && document.getProperty("format", juce::var()).toString() != "CyDAW Project")
             result = juce::Result::fail("not a CyDAW project: " + file.getFullPathName());
+        if (result.wasOk())
+            app::expandFactoryModelReferences(document, read->missingModels);
         read->document = std::move(document);
         read->result = result;
         read->done.store(true, std::memory_order_release);
@@ -5955,6 +5968,7 @@ std::optional<juce::Result> Studio::continueOpeningProject(const double budgetMs
         }
         // The session goes now, the project's tracks come in the next frames.
         beginApplying(opening.file, opening.read->document);
+        noteMissingModels(opening.read->missingModels);
         opening.read->document = juce::var();
         return std::nullopt;
     }
@@ -6013,7 +6027,7 @@ juce::Result Studio::saveProject(const juce::File& file)
 {
     if (engine_.isMidiRecording())
         engine_.stopMidiRecording(true);
-    const auto document = project_io::buildDocument(*this, file, true);
+    const auto document = app::withFactoryModelReferences(project_io::buildDocument(*this, file, true));
     const auto written = app::ProjectRecovery::writeDocumentAtomically(file, document);
     if (written.failed())
         return written;
@@ -6236,7 +6250,7 @@ void Studio::autosaveIfDue()
     lastAutosaveSeconds_ = now;
     // Built here, copied whole so the writer thread shares nothing with the
     // session, written in the background.
-    auto document = app::cloneJsonValue(project_io::buildDocument(*this, projectFile_, false));
+    auto document = app::cloneJsonValue(app::withFactoryModelReferences(project_io::buildDocument(*this, projectFile_, false)));
     document = app::ProjectRecovery::makeRecoveryDocument(document, projectFile_);
     autosaveWriting_.store(true);
     juce::Thread::launch([this, document] {
@@ -6252,7 +6266,7 @@ void Studio::finishRecovery()
     if (!autosaveEnabled_)
         return;
     if (dirty_ && trackCount() > 0) {
-        auto document = project_io::buildDocument(*this, projectFile_, false);
+        auto document = app::withFactoryModelReferences(project_io::buildDocument(*this, projectFile_, false));
         document = app::ProjectRecovery::makeRecoveryDocument(document, projectFile_);
         (void) app::ProjectRecovery::writeDocumentAtomically(recoveryFile(), document, false);
     } else {

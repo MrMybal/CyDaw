@@ -21,6 +21,19 @@ namespace cydaw::app {
 [[nodiscard]] cydaw::engine::SoundModelRef soundModelFromVar(const juce::var& value, juce::String& error);
 [[nodiscard]] cydaw::engine::SoundModelRef loadSoundModelFile(const juce::File& file, juce::var& json,
                                                               juce::String& error);
+
+// ---- Factory models named, not copied, in a project ---------------------------------------
+// A sound-model card holds its whole model, and so does every state made of
+// it (a preset, an exported plug-in). A project file names a factory model
+// instead ("soundModelFile": "factory:Sound Models/….cysound"): a factory
+// file is read once and its JSON shared (loadSoundModelFile), so a card still
+// holding that very JSON has its model as it came from the file.
+[[nodiscard]] juce::String factoryModelReference(const juce::var& json);
+// The document with each such model named instead (copied where it changes,
+// the rest shared with it).
+[[nodiscard]] juce::var withFactoryModelReferences(const juce::var& document);
+// The named models read back into it (in place); the names not found listed.
+void expandFactoryModelReferences(juce::var& document, juce::StringArray& missing);
 // A short line about it: "brass-c4 · 1 zone · C4 · 82 partials".
 [[nodiscard]] juce::String describeSoundModel(const cydaw::engine::SoundModel& model);
 

@@ -1446,6 +1446,8 @@ private:
     bool importStep(ImportBuild& build);
     juce::String importSummary_;
     void beginApplying(const juce::File& file, const juce::var& document);
+    // The factory models a project names that could not be read, among its warnings.
+    void noteMissingModels(const juce::StringArray& missing);
     juce::Result finishApplying(const juce::File& file, const juce::Result& applied);
     std::unique_ptr<project_io::DocumentLoad> applying_;
     bool loopEnabled_ {};

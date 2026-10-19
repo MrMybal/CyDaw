@@ -218,6 +218,13 @@ Navigateur › Instruments, clic droit › Modèle de son. Le projet modèle **1
 tous : pour chaque instrument, une piste de ses échantillons et à côté celle de son modèle, la même phrase sur
 l'une puis sur l'autre.
 
+Un projet **nomme** les modèles d'usine au lieu de les recopier : une carte dont le modèle est resté celui du
+fichier d'usine est enregistrée avec `"soundModelFile": "factory:Sound Models/….cysound"`, relu à
+l'ouverture (un fichier d'usine est lu une fois, son modèle partagé par toutes les cartes). Un modèle à soi,
+ou un modèle d'usine changé, reste copié en entier ; un préréglage et un plug-in exporté gardent toujours le
+modèle entier. Un modèle d'usine introuvable à l'ouverture est signalé dans les avertissements du projet.
+Le projet 12 est passé ainsi de 194 à 43 Mo (il joue maintenant les modèles reconstruits).
+
 Le constructeur passe chaque note par le même chemin que « Recréer un son » (`cydaw_companion/pipeline.py` :
 rapports libres essayés pour une note presque harmonique, le plus juste gardé ; corde avec `--kind` ; affinage
 avec `--refine`). Avec `--keep-better`, chaque zone est aussi écoutée contre son enregistrement, à sa hauteur,

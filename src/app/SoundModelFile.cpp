@@ -7,6 +7,8 @@
 #include <cstring>
 #include <functional>
 #include <map>
+#include <mutex>
+#include <optional>
 #include <set>
 
 namespace cydaw::app {
@@ -303,6 +305,118 @@ cydaw::engine::SoundModelRef soundModelFromVar(const juce::var& value, juce::Str
     return model;
 }
 
+namespace {
+
+// The factory models read, by their stored name ("factory:…"), while
+// something holds them (a card, a document being read).
+struct FactoryModel {
+    juce::var json;
+    juce::Time modified;
+    juce::int64 size {};
+};
+std::mutex& factoryModelsLock()
+{
+    static std::mutex lock;
+    return lock;
+}
+std::map<juce::String, FactoryModel>& factoryModels()
+{
+    static std::map<juce::String, FactoryModel> models;
+    return models;
+}
+const juce::Identifier soundModelKey("soundModel");
+const juce::Identifier soundModelFileKey("soundModelFile");
+
+juce::var shallowCopy(const juce::DynamicObject& object)
+{
+    auto copy = juce::DynamicObject::Ptr(new juce::DynamicObject());
+    for (const auto& property : object.getProperties())
+        copy->setProperty(property.name, property.value);
+    return juce::var(copy.get());
+}
+
+// The value with its factory models named; `changed` when anything was.
+juce::var referenced(const juce::var& value, bool& changed)
+{
+    if (const auto* array = value.getArray()) {
+        std::optional<juce::Array<juce::var>> copy;
+        for (int i = 0; i < array->size(); ++i) {
+            const auto& item = array->getReference(i);
+            if (!item.isObject() && !item.isArray())
+                continue;
+            auto itemChanged = false;
+            auto next = referenced(item, itemChanged);
+            if (!itemChanged)
+                continue;
+            if (!copy)
+                copy = *array;
+            copy->getReference(i) = std::move(next);
+        }
+        if (!copy)
+            return value;
+        changed = true;
+        return juce::var(*copy);
+    }
+    const auto* object = value.getDynamicObject();
+    if (object == nullptr)
+        return value;
+    juce::var copy;
+    for (const auto& property : object->getProperties()) {
+        if (property.name == soundModelKey) {
+            // A model holds no other: not looked into.
+            if (const auto stored = factoryModelReference(property.value); stored.isNotEmpty()) {
+                if (copy.isVoid())
+                    copy = shallowCopy(*object);
+                copy.getDynamicObject()->removeProperty(soundModelKey);
+                copy.getDynamicObject()->setProperty(soundModelFileKey, stored);
+            }
+            continue;
+        }
+        if (!property.value.isObject() && !property.value.isArray())
+            continue;
+        auto itemChanged = false;
+        auto next = referenced(property.value, itemChanged);
+        if (!itemChanged)
+            continue;
+        if (copy.isVoid())
+            copy = shallowCopy(*object);
+        copy.getDynamicObject()->setProperty(property.name, next);
+    }
+    if (copy.isVoid())
+        return value;
+    changed = true;
+    return copy;
+}
+
+void expanded(const juce::var& value, juce::StringArray& missing)
+{
+    if (const auto* array = value.getArray()) {
+        for (const auto& item : *array)
+            if (item.isObject() || item.isArray())
+                expanded(item, missing);
+        return;
+    }
+    auto* object = value.getDynamicObject();
+    if (object == nullptr)
+        return;
+    if (const auto stored = object->getProperty(soundModelFileKey).toString();
+        stored.startsWith("factory:") && !object->getProperty(soundModelKey).isObject()) {
+        juce::var json;
+        juce::String error;
+        if (loadSoundModelFile(resolveSamplePath(stored), json, error) != nullptr) {
+            object->setProperty(soundModelKey, json);
+            object->removeProperty(soundModelFileKey);
+        } else {
+            missing.addIfNotAlreadyThere(stored);
+        }
+    }
+    for (const auto& property : object->getProperties())
+        if (property.name != soundModelKey && (property.value.isObject() || property.value.isArray()))
+            expanded(property.value, missing);
+}
+
+} // namespace
+
 cydaw::engine::SoundModelRef loadSoundModelFile(const juce::File& file, juce::var& json, juce::String& error)
 {
     if (!file.existsAsFile()) {
@@ -313,12 +427,59 @@ cydaw::engine::SoundModelRef loadSoundModelFile(const juce::File& file, juce::va
         error = "the sound model is too large";
         return {};
     }
+    // A factory model: read once, the same JSON for every card.
+    const auto stored = storedSamplePath(file);
+    const auto factory = stored.startsWith("factory:");
+    const auto modified = file.getLastModificationTime();
+    const auto size = file.getSize();
+    if (factory) {
+        const std::scoped_lock lock(factoryModelsLock());
+        if (const auto found = factoryModels().find(stored);
+            found != factoryModels().end() && found->second.modified == modified && found->second.size == size) {
+            json = found->second.json;
+            return soundModelFromVar(json, error);
+        }
+    }
     json = juce::JSON::parse(file.loadFileAsString());
     if (!json.isObject()) {
         error = "not JSON: " + file.getFileName();
         return {};
     }
-    return soundModelFromVar(json, error);
+    auto model = soundModelFromVar(json, error);
+    if (model != nullptr && factory) {
+        const std::scoped_lock lock(factoryModelsLock());
+        auto& models = factoryModels();
+        // The ones nothing holds any more let go.
+        for (auto it = models.begin(); it != models.end();)
+            it = it->second.json.getDynamicObject() != nullptr && it->second.json.getDynamicObject()->getReferenceCount() <= 1
+                     ? models.erase(it)
+                     : std::next(it);
+        models[stored] = { json, modified, size };
+    }
+    return model;
+}
+
+juce::String factoryModelReference(const juce::var& json)
+{
+    const auto* object = json.getDynamicObject();
+    if (object == nullptr)
+        return {};
+    const std::scoped_lock lock(factoryModelsLock());
+    for (const auto& [stored, model] : factoryModels())
+        if (model.json.getDynamicObject() == object)
+            return stored;
+    return {};
+}
+
+juce::var withFactoryModelReferences(const juce::var& document)
+{
+    auto changed = false;
+    return referenced(document, changed);
+}
+
+void expandFactoryModelReferences(juce::var& document, juce::StringArray& missing)
+{
+    expanded(document, missing);
 }
 
 VoiceAssets voiceAssetsFromGraphState(const juce::var& state)

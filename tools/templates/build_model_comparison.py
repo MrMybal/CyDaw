@@ -1,16 +1,18 @@
 """A project to hear the factory sound models before and after a rebuild, side by side.
 
-    python tools/templates/build_model_comparison.py --out FILE [--old REV] [--exe "<CyDAW 2.exe>"]
+    python tools/templates/build_model_comparison.py --out FILE --old-models DIR [--exe "<CyDAW 2.exe>"]
+    python tools/templates/build_model_comparison.py --out FILE --old REV [--exe "<CyDAW 2.exe>"]
 
-For every factory instrument whose model changed since REV (a git revision; default: the commit
-before the last rebuild of the models), two instrument tracks next to each other: "<name>
-(ancien)", the model as it was at REV, and "<name> (nouveau)", the model in content/factory now,
+For every factory instrument whose model differs from an older one (the .cysound files of DIR, by
+file name; or, with --old, the models at a git revision), two instrument tracks next to each other:
+"<name> (ancien)", the older model, and "<name> (nouveau)", the model in content/factory now,
 each on the factory instrument's own card (its settings), so only the model differs. Both play the
 same phrase (as in "12-tous-les-instruments"): in the arrangement four bars each instrument, the
 phrase on the old model (bars 1-2) then on the new (3-4); in the launcher's first scene, the same
 phrase on each, looping, to play one then the other.
 
-The old models are read from git (LFS) into <out folder>/Anciens modeles. The project holds both
+With --old, the old models are read from git (LFS) into <out folder>/Anciens modeles (the first
+models are no longer in the history: keep them in a folder and give it with --old-models). The project holds both
 models of every instrument (a few hundred megabytes): it is written outside the repository, where
 --out says. The session is silent and hidden; nothing plays.
 """
@@ -63,17 +65,32 @@ def old_models(revision: str, folder: pathlib.Path) -> dict[str, pathlib.Path]:
     return found
 
 
+def folder_models(folder: pathlib.Path) -> dict[str, pathlib.Path]:
+    """The models of a folder that differ from the factory's of the same name: by file name."""
+    found = {}
+    for path in sorted(folder.glob("*.cysound")):
+        current = ROOT / MODELS / path.name
+        if current.is_file() and current.read_bytes() != path.read_bytes():
+            found[path.name] = path
+    return found
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--old", default="")
+    parser.add_argument("--old", default="", help="a git revision whose models are the old ones")
+    parser.add_argument("--old-models", type=pathlib.Path, help="a folder of the old models (.cysound)")
     parser.add_argument("--out", type=pathlib.Path, required=True,
                         help="the project to write (outside the repository)")
     parser.add_argument("--exe", default=str(ex.DEFAULT_EXE))
     arguments = parser.parse_args()
-    # Default: the commit before the one that rebuilt the factory models.
-    revision = arguments.old or git("log", "-1", "--format=%H", "--grep=modèles de son d'usine refaits").decode().strip() + "^"
-    old = old_models(revision, arguments.out.parent / "Anciens modeles")
-    print(f"{len(old)} models changed since {revision}", flush=True)
+    if arguments.old_models:
+        old = folder_models(arguments.old_models)
+        print(f"{len(old)} models differ from those of {arguments.old_models}", flush=True)
+    elif arguments.old:
+        old = old_models(arguments.old, arguments.out.parent / "Anciens modeles")
+        print(f"{len(old)} models changed since {arguments.old}", flush=True)
+    else:
+        parser.error("--old-models DIR or --old REV")
 
     environment = dict(os.environ, CYDAW_NO_RECOVERY="1")
     process = subprocess.Popen([arguments.exe, "--control-port=%d" % ex.PORT, "--silent", "--window-size=1400x900"],
