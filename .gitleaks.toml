@@ -4,11 +4,12 @@ title = "CyDAW"
 useDefault = true
 
 # Values the generic rule takes for keys: factory instrument names, the FNV-1a
-# offset basis, an ImGui key code.
+# offset basis, an ImGui key code, a SIMD intrinsic (zstd's xxhash.h).
 [allowlist]
 description = "Names and constants that are not secrets"
 regexes = [
   '''^harpsichord-flemish-[12]$''',
   '''^0xcbf29ce484222325ULL$''',
   '''^ImGuiKey_[A-Za-z0-9]+$''',
+  '''^_mm512_[a-z0-9_]+$''',
 ]
