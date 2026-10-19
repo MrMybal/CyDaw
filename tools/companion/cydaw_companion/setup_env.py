@@ -59,7 +59,7 @@ def contain(folder: Path) -> None:
         "TMP": temporary, "TEMP": temporary, "TMPDIR": temporary,
         "PIP_CACHE_DIR": cache / "pip", "XDG_CACHE_HOME": cache, "TORCH_HOME": cache / "torch",
         "HF_HOME": cache / "huggingface", "NUMBA_CACHE_DIR": cache / "numba", "LIBROSA_DATA_DIR": cache / "librosa",
-        "MPLCONFIGDIR": cache / "matplotlib",
+        "MPLCONFIGDIR": cache / "matplotlib", "CUDA_CACHE_PATH": cache / "cuda",
     }
     for name, value in places.items():
         os.environ[name] = str(value)

@@ -1,7 +1,7 @@
 """The factory instruments as sound models: each recorded note analysed by the companion.
 
     python tools/factory_content/build_factory_models.py [--sources DIR] [--out content/factory]
-           [--only key,key] [--jobs N]
+           [--only key,key] [--jobs N] [--kind partials|auto|string] [--refine] [--keep-better]
 
 Run after build_factory_content.py and build_sfz_instruments.py (the catalogue gives each
 instrument's notes and octave; an SFZ instrument's, its map: every velocity layer of each note,
@@ -13,6 +13,13 @@ its mean only), placed at its layer's velocity and, for a bank whose layers were
 same peak, given its level back. The zones are written compact (key frames) into
 <out>/Sound Models/<folder>.cysound, and the catalogue entry learns its model and the sound-model
 card's settings ("model", "modelSettings").
+
+Each note goes through the companion's pipeline (cydaw_companion/pipeline.py: free ratios tried
+for a nearly harmonic note, the closer kept; a plucked string with --kind; the refinement with
+--refine). With --keep-better, every zone is also heard against its recording at its own pitch,
+level matched (third-octave band error over its first 6 s), the model already there too: a model
+is replaced only when its zones play closer on average (by 0.05 dB at least); the report says
+both.
 """
 from __future__ import annotations
 
@@ -62,9 +69,67 @@ def model_settings(spec: dict) -> tuple[dict, float]:
     return {"velocity-db": velocity_db, "release": release}, 0.0
 
 
-def build(spec: dict, files: list[dict], sources: Path, octave: int, gain_db: float) -> tuple[dict, dict]:
+JUDGED_SECONDS = 6.0
+
+
+def timbre_error(zone, audio, rate: int, note: float) -> float:
+    """The zone rendered at `note` against its recording, brought to its level: the mean
+    third-octave band error (dB) over its first seconds."""
     import numpy as np  # noqa: PLC0415
-    from cydaw_companion.analysis import AnalysisOptions, analyse  # noqa: PLC0415
+    from cydaw_companion.audio_io import mono, resample  # noqa: PLC0415
+    from cydaw_companion.loss import band_error_db  # noqa: PLC0415
+    from cydaw_companion.synth import render  # noqa: PLC0415
+
+    source = mono(audio)
+    if rate != 48000:
+        source = resample(source, rate, 48000)
+    peak = float(np.max(np.abs(source)))
+    if peak <= 0.0:
+        return 0.0
+    loud = np.nonzero(np.abs(source) > peak * 10 ** (-50 / 20))[0]
+    source = source[max(0, loud[0] - int(0.002 * 48000)):]
+    seconds = min(len(source) / 48000.0, JUDGED_SECONDS)
+    held = zone.release * zone.frame_seconds if zone.release is not None else None
+    played = render(zone, note, zone.velocity, 48000, seconds, held)
+    length = min(len(source), len(played))
+    source, played = source[:length], played[:length]
+    level = float(np.sqrt(np.mean(played ** 2)))
+    if level > 0.0:
+        played = played * (float(np.sqrt(np.mean(source ** 2))) / level)
+    return band_error_db(source, played)
+
+
+def compare(zones: list, takes: list[dict], old_path: Path) -> dict:
+    """Each new zone and the model already there heard against the recordings: the old zone of
+    the same note nearest in velocity (a map may have changed its layers since); both means over
+    the notes the old model has."""
+    from cydaw_companion.model import SoundModel  # noqa: PLC0415
+
+    old = SoundModel.load(old_path).zones if old_path.exists() else []
+    new_errors = []
+    old_errors = []
+    compared_new = []
+    for zone, take in zip(zones, takes):
+        error = timbre_error(zone, take["audio"], take["rate"], take["note"])
+        new_errors.append(error)
+        same_note = [z for z in old if z.root_note == zone.root_note]
+        if same_note:
+            before = min(same_note, key=lambda z: abs(z.velocity - zone.velocity))
+            old_errors.append(timbre_error(before, take["audio"], take["rate"], take["note"]))
+            compared_new.append(error)
+    result = {"newDb": round(float(sum(new_errors) / max(1, len(new_errors))), 3)}
+    if old_errors:
+        result["comparedZones"] = len(old_errors)
+        result["oldDb"] = round(float(sum(old_errors) / len(old_errors)), 3)
+        result["newOnThoseDb"] = round(float(sum(compared_new) / len(compared_new)), 3)
+    return result
+
+
+def build(spec: dict, files: list[dict], sources: Path, octave: int, gain_db: float, options: dict,
+          old_path: Path) -> tuple[dict, dict]:
+    import numpy as np  # noqa: PLC0415
+    from cydaw_companion.analysis import AnalysisOptions  # noqa: PLC0415
+    from cydaw_companion.pipeline import best_zone  # noqa: PLC0415
     from cydaw_companion.audio_io import read_wav  # noqa: PLC0415
     from cydaw_companion.model import SoundModel  # noqa: PLC0415
     from cydaw_companion.pitch import midi_to_hz  # noqa: PLC0415
@@ -78,19 +143,23 @@ def build(spec: dict, files: list[dict], sources: Path, octave: int, gain_db: fl
     settings, normalised_db = model_settings(spec)
     zones = []
     reports = []
+    takes = []
     for root in sorted(by_note):
         layers = sorted(by_note[root], key=lambda item: layer_rank(item["layer"]))
         for rank, item in enumerate(layers):
             # The middle of the velocities the sampler gives this layer.
             velocity = 0.8 if len(layers) == 1 else (rank + 0.5) / len(layers)
             audio, rate = read_wav(sources / item["file"])
-            zone, report = analyse(audio, rate, AnalysisOptions(note_hint=float(root), velocity=velocity,
-                                                                 loop=bool(spec.get("loops"))))
+            zone, report = best_zone(audio, rate, AnalysisOptions(note_hint=float(root), velocity=velocity,
+                                                                  loop=bool(spec.get("loops"))),
+                                     kind=options["kind"], refine=options["refine"], limit_seconds=JUDGED_SECONDS)
             zone.root_note = root
             zone.velocity = velocity
             deviation = 1200.0 * math.log2(zone.f0 / midi_to_hz(root)) if zone.f0 > 0 else 0.0
             reports.append({"root": root, "velocity": velocity, "deviation": deviation, "seconds": report["seconds"],
-                            "harmonics": report["harmonics"]})
+                            "harmonics": report["harmonics"], "partials": report.get("partials"),
+                            "kind": report.get("kind")})
+            takes.append({"audio": audio, "rate": rate, "note": root + deviation / 100.0})
             zones.append(zone)
             # The sampler's level (its loudest layer near the same peak).
             zone.gain *= 10 ** (gain_db / 20.0)
@@ -107,8 +176,13 @@ def build(spec: dict, files: list[dict], sources: Path, octave: int, gain_db: fl
                        source=[f"{'VSCO 2 CE' if item['bank'] == 'vsco' else 'VCSL'}: {Path(item['path']).name}"
                                for item in chosen],
                        musical={}, analysis={"factory": spec["key"], "seconds": round(time.time() - started, 1)})
-    return model.to_json(), {"key": spec["key"], "zones": len(zones), "meanDeviationCents": round(mean, 1),
-                             "settings": settings, "seconds": round(time.time() - started, 1)}
+    summary = {"key": spec["key"], "zones": len(zones), "meanDeviationCents": round(mean, 1), "settings": settings,
+               "inharmonic": sum(1 for r in reports if r["partials"] == "inharmonic"),
+               "strings": sum(1 for r in reports if r["kind"] == "string")}
+    if options["keepBetter"]:
+        summary.update(compare(zones, takes, old_path))
+    summary["seconds"] = round(time.time() - started, 1)
+    return model.to_json(), summary
 
 
 # SFZ instruments whose notes are held (their models loop).
@@ -122,10 +196,11 @@ def note_number(name: str) -> int:
     return NOTE_NAMES.index(pitch) + 12 * (int(name[len(pitch):]) + 1)
 
 
-def build_from_map(entry: dict, out: Path, banks: Path, tool: Path) -> tuple[dict, dict]:
+def build_from_map(entry: dict, out: Path, banks: Path, tool: Path, options: dict, old_path: Path) -> tuple[dict, dict]:
     """An instrument made from an SFZ: its map's notes, the softest and loudest layer of each."""
     import numpy as np  # noqa: PLC0415
-    from cydaw_companion.analysis import AnalysisOptions, analyse  # noqa: PLC0415
+    from cydaw_companion.analysis import AnalysisOptions  # noqa: PLC0415
+    from cydaw_companion.pipeline import best_zone  # noqa: PLC0415
     from cydaw_companion.audio_io import read_wav  # noqa: PLC0415
     from cydaw_companion.model import SoundModel  # noqa: PLC0415
     from cydaw_companion.pitch import midi_to_hz  # noqa: PLC0415
@@ -146,6 +221,7 @@ def build_from_map(entry: dict, out: Path, banks: Path, tool: Path) -> tuple[dic
     zones = []
     reports = []
     sources = []
+    takes = []
     with tempfile.TemporaryDirectory(prefix="cydaw-model-") as scratch:
         for root in sorted(by_root):
             layers = [by_root[root][velocities] for velocities in sorted(by_root[root])]
@@ -162,12 +238,15 @@ def build_from_map(entry: dict, out: Path, banks: Path, tool: Path) -> tuple[dic
                 start = int(item.get("start", 0))
                 end = int(item.get("end", -1))
                 audio = audio[start:end if end > start else None]
-                zone, report = analyse(audio, rate, AnalysisOptions(note_hint=float(root), velocity=velocity, loop=sustained))
+                zone, report = best_zone(audio, rate, AnalysisOptions(note_hint=float(root), velocity=velocity,
+                                                                      loop=sustained),
+                                         kind=options["kind"], refine=options["refine"], limit_seconds=JUDGED_SECONDS)
                 zone.root_note = root
                 zone.velocity = velocity
                 zone.gain *= 10 ** (float(item.get("gain", 0.0)) / 20.0)
                 deviation = 1200.0 * math.log2(zone.f0 / midi_to_hz(root)) if zone.f0 > 0 else 0.0
-                reports.append({"deviation": deviation})
+                reports.append({"deviation": deviation, "partials": report.get("partials"), "kind": report.get("kind")})
+                takes.append({"audio": audio, "rate": rate, "note": root + deviation / 100.0})
                 zones.append(zone)
                 sources.append(f"{entry['bank']}: {Path(item['file']).name}")
     # Each note to equal temperament (its map's own tuning set aside: the model hears the note).
@@ -177,8 +256,13 @@ def build_from_map(entry: dict, out: Path, banks: Path, tool: Path) -> tuple[dic
         zone.f0 /= 2.0 ** ((report["deviation"] if abs(report["deviation"]) < 60.0 else mean) / 1200.0)
     model = SoundModel(name=entry["names"]["en"], zones=zones, source=sources, musical={},
                        analysis={"factory": entry["key"], "seconds": round(time.time() - started, 1)})
-    return model.to_json(), {"key": entry["key"], "zones": len(zones), "meanDeviationCents": round(mean, 1),
-                             "settings": settings, "seconds": round(time.time() - started, 1)}
+    summary = {"key": entry["key"], "zones": len(zones), "meanDeviationCents": round(mean, 1), "settings": settings,
+               "inharmonic": sum(1 for r in reports if r["partials"] == "inharmonic"),
+               "strings": sum(1 for r in reports if r["kind"] == "string")}
+    if options["keepBetter"]:
+        summary.update(compare(zones, takes, old_path))
+    summary["seconds"] = round(time.time() - started, 1)
+    return model.to_json(), summary
 
 
 def main() -> int:
@@ -187,10 +271,22 @@ def main() -> int:
     parser.add_argument("--out", type=Path, default=ROOT / "content" / "factory")
     parser.add_argument("--only", default="")
     parser.add_argument("--jobs", type=int, default=max(1, min(8, (os.cpu_count() or 4) - 2)))
+    parser.add_argument("--kind", default="partials", choices=["partials", "auto", "string"])
+    parser.add_argument("--refine", action="store_true")
+    parser.add_argument("--keep-better", action="store_true")
     parser.add_argument("--tool", type=Path,
                         default=ROOT / "build" / "agent-graph" / "cydaw_sample_tool_artefacts" / "Release"
                         / "cydaw_sample_tool.exe")
     args = parser.parse_args()
+    # Run from CyDAW's own companion environment: its caches stay in it.
+    from cydaw_companion.setup_env import MARKER, contain  # noqa: PLC0415
+    if (Path(sys.prefix) / MARKER).exists():
+        contain(Path(sys.prefix))
+    options = {"kind": args.kind, "refine": args.refine, "keepBetter": args.keep_better}
+    # Hours of work: below normal priority (the jobs inherit it), the computer stays responsive.
+    if os.name == "nt":
+        import ctypes  # noqa: PLC0415
+        ctypes.windll.kernel32.SetPriorityClass(ctypes.windll.kernel32.GetCurrentProcess(), 0x4000)
     files = json.loads((args.sources / "manifest.json").read_text(encoding="utf-8"))["files"]
     catalogue_path = args.out / "catalogue.json"
     catalogue = json.loads(catalogue_path.read_text(encoding="utf-8"))
@@ -204,11 +300,13 @@ def main() -> int:
               and (not only or entry["key"] in only)]
     with concurrent.futures.ProcessPoolExecutor(max_workers=args.jobs) as pool:
         jobs = {pool.submit(build, spec, files, args.sources, int(entries[spec["key"]]["report"]["octaveShift"]),
-                            float(entries[spec["key"]].get("gainDb", 0.0))): spec
+                            float(entries[spec["key"]].get("gainDb", 0.0)), options,
+                            folder / f"{spec['folder']}.cysound"): spec
                 for spec in specs}
         for entry in mapped:
-            jobs[pool.submit(build_from_map, entry, args.out, args.sources, args.tool)] = {
-                "key": entry["key"], "folder": Path(entry["map"]).parent.name}
+            target = Path(entry["map"]).parent.name
+            jobs[pool.submit(build_from_map, entry, args.out, args.sources, args.tool, options,
+                             folder / f"{target}.cysound")] = {"key": entry["key"], "folder": target}
         for done in concurrent.futures.as_completed(jobs):
             spec = jobs[done]
             try:
@@ -217,6 +315,12 @@ def main() -> int:
                 print(json.dumps({"key": spec["key"], "error": str(error)[:300]}), flush=True)
                 continue
             path = folder / f"{spec['folder']}.cysound"
+            # Kept only when it plays closer than the model already there.
+            if args.keep_better and "oldDb" in report and report["newOnThoseDb"] > report["oldDb"] - 0.05:
+                report["kept"] = "old"
+                print(json.dumps(report), flush=True)
+                continue
+            report["kept"] = "new"
             path.write_text(json.dumps(model, separators=(",", ":")), encoding="utf-8")
             entry = entries[spec["key"]]
             entry["model"] = f"Sound Models/{spec['folder']}.cysound"

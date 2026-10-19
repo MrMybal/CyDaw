@@ -218,6 +218,18 @@ Navigateur › Instruments, clic droit › Modèle de son. Le projet modèle **1
 tous : pour chaque instrument, une piste de ses échantillons et à côté celle de son modèle, la même phrase sur
 l'une puis sur l'autre.
 
+Le constructeur passe chaque note par le même chemin que « Recréer un son » (`cydaw_companion/pipeline.py` :
+rapports libres essayés pour une note presque harmonique, le plus juste gardé ; corde avec `--kind` ; affinage
+avec `--refine`). Avec `--keep-better`, chaque zone est aussi écoutée contre son enregistrement, à sa hauteur,
+au même niveau (écart par tiers d'octave sur ses 6 premières secondes), et le modèle déjà là de même : un
+modèle n'est remplacé que s'il joue plus près en moyenne (0,05 dB au moins). Reconstruits ainsi le 19/10/2026
+(sans corde ni affinage) : 71 des 80 remplacés, gain moyen 1,7 dB (médiane 0,5) ; cloches tubulaires
+9,9 -> 2,0 dB, glockenspiel 8,5 -> 1,8, marimba 3,2 -> 1,5, steel drum 3,2 -> 1,9, basses électriques ~8 -> ~1,
+et quelques modèles dont les cartes avaient changé depuis (Caveman Cosmonaut 14,6 -> 1,2, saxophone baryton
+13,5 -> 2,2). Les 9 gardés (trombone, basson, hautbois, tuba, cor, violons, alto, violoncelles en section)
+ne gagnaient rien. 199 Mo pour les 80. L'affinage (GPU) n'y est pas passé : environ 1,5 min par note, 3 668
+notes.
+
 ## Limites connues
 
 - Monophonique : un enregistrement long est découpé en notes successives, pas d'accords.

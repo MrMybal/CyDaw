@@ -87,31 +87,11 @@ def command_clap_worker(arguments: argparse.Namespace) -> int:
     return serve(Path(arguments.model), arguments.device, arguments.idle)
 
 
-def _fit(zone, report: dict, audio, rate: int) -> dict:
-    """How close the model plays to the note it came from: the spectral loss, the level and the
-    third-octave band error of its rendering against the recording."""
-    import numpy as np  # noqa: PLC0415
-    from .audio_io import mono, resample  # noqa: PLC0415
-    from .loss import band_error_db, level_difference_db, spectral_loss  # noqa: PLC0415
-    from .synth import render  # noqa: PLC0415
-
-    source = mono(audio)
-    if rate != 48000:
-        source = resample(source, rate, 48000)
-    peak = np.max(np.abs(source))
-    loud = np.nonzero(np.abs(source) > peak * 10 ** (-50 / 20))[0]
-    source = source[max(0, loud[0] - int(0.002 * 48000)):]
-    held = zone.release * zone.frame_seconds if zone.release is not None else None
-    played = render(zone, zone.root_note + report["cents"] / 100.0, zone.velocity, 48000, report["seconds"], held)
-    return {"spectralLoss": round(spectral_loss(source[:len(played)], played), 4),
-            "levelDb": round(level_difference_db(source[:len(played)], played), 2),
-            "bandErrorDb": round(band_error_db(source[:len(played)], played), 2)}
-
-
 def command_analyse(arguments: argparse.Namespace) -> int:
-    from .analysis import AnalysisOptions, analyse  # noqa: PLC0415
+    from .analysis import AnalysisOptions  # noqa: PLC0415
     from .audio_io import mono, read_wav  # noqa: PLC0415
     from .model import SoundModel  # noqa: PLC0415
+    from .pipeline import best_zone  # noqa: PLC0415
     from .segment import choose_notes, detect_notes  # noqa: PLC0415
 
     files = [Path(f) for f in arguments.files]
@@ -149,49 +129,10 @@ def command_analyse(arguments: argparse.Namespace) -> int:
         progress(0.1 + index / len(takes) * 0.75, f"analyse {label}")
         options = AnalysisOptions(note_hint=take["note"], velocity=take["velocity"], keep_attack=not arguments.no_attack,
                                   loop=None if arguments.loop is None else arguments.loop == "on",
-                                  partials=arguments.partials, string=arguments.kind != "partials")
-        zone, report = analyse(take["audio"], take["rate"], options)
-        # The partials first (the string, if any, set aside and tried after).
-        string = zone.string
-        zone.string = None
-        report.update(_fit(zone, report, take["audio"], take["rate"]))
-        # Nearly harmonic (a marimba's bar under its overtones): the free ratios tried too, the
-        # closer of the two kept.
-        share = report.get("harmonicShare")
-        if arguments.partials == "auto" and report["partials"] == "harmonic" and share is not None and share < 0.99:
-            options.partials = "inharmonic"
-            other, other_report = analyse(take["audio"], take["rate"], options)
-            other.string = None
-            other_report.update(_fit(other, other_report, take["audio"], take["rate"]))
-            if other_report["bandErrorDb"] < report["bandErrorDb"]:
-                other_report["tried"] = {"harmonic": report["bandErrorDb"]}
-                zone, report = other, other_report
-                string = None
-            else:
-                report["tried"] = {"inharmonic": other_report["bandErrorDb"]}
-        # A plucked string: kept when asked, or (auto) when it plays nearly as close as the
-        # partials (it transposes as a string does).
-        if string is not None:
-            if arguments.kind != "partials":
-                partial_fit = dict(report)
-                zone.string = string
-                string_fit = _fit(zone, report, take["audio"], take["rate"])
-                if arguments.kind == "string" or string_fit["bandErrorDb"] <= partial_fit["bandErrorDb"] + 0.5:
-                    report.update(string_fit)
-                    report["kind"] = "string"
-                    report["partialsBandErrorDb"] = partial_fit["bandErrorDb"]
-                else:
-                    zone.string = None
-                    report["stringBandErrorDb"] = string_fit["bandErrorDb"]
-        report.setdefault("kind", "partials")
-        if arguments.refine and zone.string is not None:
-            report["refine"] = {"skipped": "a string is played, not its partials"}
-        elif arguments.refine:
-            from .refine import refine  # noqa: PLC0415
-            progress(0.1 + (index + 0.5) / len(takes) * 0.75, f"refine {label}")
-            report["refine"] = refine(zone, take["audio"], take["rate"], device=arguments.device, steps=arguments.steps,
-                                      progress=lambda f, m: progress(0.1 + (index + 0.5 + 0.5 * f) / len(takes) * 0.75, m))
-            report.update(_fit(zone, report, take["audio"], take["rate"]))
+                                  partials=arguments.partials)
+        zone, report = best_zone(take["audio"], take["rate"], options, kind=arguments.kind, refine=arguments.refine,
+                                 device=arguments.device, steps=arguments.steps,
+                                 progress=lambda f, m: progress(0.1 + (index + 0.5 + 0.5 * f) / len(takes) * 0.75, m))
         report["file"] = str(file)
         if take["at"] is not None:
             report["atSeconds"] = take["at"]
