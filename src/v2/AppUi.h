@@ -44,6 +44,7 @@ class DeviceEditorView;
 class WorkshopView;
 class DjView;
 class FoundryView;
+class ProcessingView;
 class PluginWindows;
 class Vst3Build;
 class ContextMenus;
@@ -195,6 +196,8 @@ public:
     juce::var controllers(const juce::var& request) override;
     juce::var dj(const juce::var& request) override;
     juce::var foundry(const juce::var& request) override;
+    juce::var processing(const juce::var& request) override;
+    bool openProcessing(const TrackRef& track, std::uint64_t clipId) override;
     juce::var cinema(const juce::var& request) override;
     juce::String appMode(const juce::String& mode) override;
     bool showDeviceEditor(std::uint64_t nodeId, int pane, bool detached = false) override;
@@ -378,6 +381,7 @@ private:
     std::unique_ptr<WorkshopView> workshop_;
     std::unique_ptr<DjView> dj_;
     std::unique_ptr<FoundryView> foundry_;
+    std::unique_ptr<ProcessingView> processing_;
     std::unique_ptr<FoundryView> cinema_;
     std::unique_ptr<TransportSync> transportSync_;
     std::unique_ptr<Controllers> controllers_;

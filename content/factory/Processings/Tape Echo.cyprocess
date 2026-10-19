@@ -1,0 +1,27 @@
+{
+  "format": "cydaw-processing",
+  "version": 1,
+  "kind": "audio",
+  "name": "Tape Echo",
+  "description": "A ping-pong echo written in JSFX, its repeats let ring past the end.",
+  "steps": [
+    {
+      "type": "code",
+      "enabled": true,
+      "settings": {
+        "slider1": 350.0,
+        "slider2": 45.0,
+        "slider3": 35.0,
+        "slider4": 4000.0
+      },
+      "code": "desc:Tape Echo\nslider1:350<20,2000,1>Delay (ms)\nslider2:45<0,95,1>Feedback (%)\nslider3:35<0,100,1>Mix (%)\nslider4:4000<500,16000,10>Tone (Hz)\n\n@init\nsize = floor(srate * 2.1);\nbuf = 0;\npos = 0;\nlp0 = lp1 = 0;\n\n@slider\nd = max(1, floor(slider1 * 0.001 * srate));\nfb = slider2 / 100;\nmix = slider3 / 100;\nk = exp(-2 * $pi * slider4 / srate);\n\n@sample\nrd = pos - d;\nrd < 0 ? rd += size;\ne0 = buf[rd * 2];\ne1 = buf[rd * 2 + 1];\nlp0 = e0 + (lp0 - e0) * k;\nlp1 = e1 + (lp1 - e1) * k;\n// Ping-pong: each side's echo comes back on the other.\nbuf[pos * 2] = spl0 + lp1 * fb;\nbuf[pos * 2 + 1] = spl1 + lp0 * fb;\nspl0 = spl0 * (1 - mix * 0.5) + lp0 * mix;\nspl1 = spl1 * (1 - mix * 0.5) + lp1 * mix;\npos += 1;\npos >= size ? pos = 0;\n"
+    }
+  ],
+  "tail": {
+    "allow": true,
+    "thresholdDb": -60.0,
+    "holdSeconds": 0.300000011920929,
+    "maxSeconds": 10.0,
+    "fadeMs": 30.0
+  }
+}

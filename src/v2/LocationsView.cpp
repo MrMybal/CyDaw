@@ -26,6 +26,7 @@ const char* nameOf(const Location location)
     case Location::presets: return L("Préréglages", "Presets");
     case Location::mixes: return L("Mixes DJ", "DJ mixes");
     case Location::foundry: return L("Fonderie", "Foundry");
+    case Location::processings: return L("Traitements", "Processings");
     }
     return "";
 }
@@ -62,6 +63,9 @@ const char* descriptionOf(const Location location)
     case Location::foundry:
         return L("Les nouveaux fichiers de la Fonderie, avant d'être enregistrés ailleurs.",
                  "The Foundry's new files, until they are saved elsewhere.");
+    case Location::processings:
+        return L("Les traitements audio et MIDI faits dans le mode Traitements.",
+                 "The audio and MIDI processings made in the Processings mode.");
     }
     return "";
 }

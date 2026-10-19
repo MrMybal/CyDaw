@@ -1,0 +1,57 @@
+{
+  "format": "cydaw-processing",
+  "version": 1,
+  "kind": "audio",
+  "name": "Voice Clean-up",
+  "description": "A spoken or sung recording: rumble cut, hum and clicks taken out, noise lowered, level set.",
+  "steps": [
+    {
+      "type": "highpass",
+      "enabled": true,
+      "settings": {
+        "cutoff": 80.0,
+        "slope": 0.0
+      }
+    },
+    {
+      "type": "hum",
+      "enabled": true,
+      "settings": {
+        "fundamental": 0.0,
+        "harmonics": 6.0,
+        "width": 35.0
+      }
+    },
+    {
+      "type": "declick",
+      "enabled": true,
+      "settings": {
+        "maxClick": 1.5,
+        "sensitivity": 0.4
+      }
+    },
+    {
+      "type": "denoise",
+      "enabled": true,
+      "settings": {
+        "reduction": 12.0,
+        "sensitivity": 1.3,
+        "smoothing": 0.6
+      }
+    },
+    {
+      "type": "normalise",
+      "enabled": true,
+      "settings": {
+        "peak": -1.0
+      }
+    }
+  ],
+  "tail": {
+    "allow": false,
+    "thresholdDb": -60.0,
+    "holdSeconds": 0.300000011920929,
+    "maxSeconds": 10.0,
+    "fadeMs": 30.0
+  }
+}

@@ -73,6 +73,13 @@ sons intégrée.
   couper, coller, fondus, normaliser, étirer et transposer, traiter avec les effets du studio, mesurer
   (crête, RMS, LUFS, spectre), enregistrer en WAV, FLAC, AIFF ou Ogg, exporter le mixage.
 
+**Fabriquer ses traitements**
+- Le mode **Traitements** : des traitements audio faits d'étapes (une chaîne d'effets comme une piste,
+  du code JSFX, débruitage, anti-ronflement, anti-clics, filtres, normalisation) qui peuvent laisser
+  sonner une réverbe au-delà de la fin du son, et des traitements MIDI écrits en script (humaniser,
+  swing, strum, échos de notes…). Chacun s'essaie en écoutant avant / après, puis s'applique à un clip
+  en un pas d'annulation.
+
 **Travailler le son à l’image**
 - Le mode **Cinéma** : vidéo de référence facultative, bus en lignes comme dans l’arrangement,
   conteneurs temporels de sous-pistes avec des clips audio/MIDI, liste avec cadrage, effets natifs,
@@ -138,6 +145,7 @@ Les tests se lancent avec `ctest -C Release` dans le dossier de compilation.
 - [Bibliothèque de sons](docs/BANQUE_DE_SONS.md) · [Modèles de son](docs/SOUND_MATCHING.md)
 - [Édition audio](docs/EDITION_AUDIO.md) · [Architecture](docs/ARCHITECTURE.md)
 - [Cinéma : vidéo, montage audio et bus](docs/CINEMA.md)
+- [Traitements audio et MIDI : étapes, code, avant / après](docs/TRAITEMENTS.md)
 - [Synchronisation du transport : MIDI, JACK, Link](docs/TRANSPORT_SYNC.md)
 - [Contrôleurs MIDI / OSC : périphériques, règles, apprentissage](docs/CONTROLEURS.md)
 - [Modulateurs : LFO, pas, enveloppes, macros sur chaque périphérique](docs/MODULATEURS.md)

@@ -371,6 +371,7 @@ Ctrl+Y travaillent sur ses sessions.
 
 - [Mix DJ](MIX_DJ.md) : deux ou quatre platines, table de mixage, collection.
 - [Fonderie](FONDERIE.md) : un éditeur de sons multipiste.
+- [Traitements](TRAITEMENTS.md) : ses traitements audio et MIDI, essayés avant / après, appliqués aux clips.
 
 Leur son rejoint le mixeur du master comme celui des pistes (le simulateur de l'Atelier fait de même).
 Le clic droit d'un clip audio ou d'un son du navigateur les ouvre directement.

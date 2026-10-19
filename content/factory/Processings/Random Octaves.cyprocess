@@ -1,0 +1,8 @@
+{
+  "format": "cydaw-processing",
+  "version": 1,
+  "kind": "midi",
+  "name": "Random Octaves",
+  "description": "Some notes moved an octave, at random.",
+  "script": "param1:20<0,100,1>Chance (%)\nparam2:0<0,1,1>Direction (0 = both, 1 = up only)\n\n@note\nrandom() * 100 < param1 ? (\n  up = param2 > 0.5 || random() < 0.5;\n  pitch += up ? 12 : -12;\n);\n"
+}

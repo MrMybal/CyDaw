@@ -386,6 +386,11 @@ void ClipEditorView::drawMidiToolbar(const TrackRef& track, const MidiClip& clip
     if (ui::iconButton(icon::shuffle, L("Humaniser : petites variations de placement, vélocité et longueur",
                                         "Humanise: small changes of timing, velocity and length")))
         ImGui::OpenPopup("##humanise");
+    ImGui::SameLine(0.0f, dp(2.0f));
+    if (ImGui::Button(L("Traitement…", "Processing…")) && state_.editedClip)
+        state_.processingRequest = *state_.editedClip;
+    ui::tooltip(L("Appliquer un traitement MIDI (mode Traitements) : variations, décalages, swing… avant / après à l'écoute",
+                  "Apply a MIDI processing (Processings mode): variations, offsets, swing… before / after by ear"));
 
     ui::toolbarSeparator();
     ImGui::BeginDisabled(selection_.empty());

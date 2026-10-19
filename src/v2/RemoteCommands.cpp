@@ -971,6 +971,7 @@ private:
     juce::var onRemoveTrack();
     juce::var onGetTrackGraph();
     juce::var onSoundMatching();
+    juce::var onProcessing();
     juce::var onSampler();
     juce::var onBanks();
     juce::var onPresets();
@@ -1895,6 +1896,8 @@ juce::var Commands::run()
         return onVoiceLive();
     if (command == "slot_stop")
         return onSlotStop();
+    if (command == "processing")
+        return onProcessing();
     if (command == "jsfx" || command == "dj" || command == "foundry" || command == "cinema" || command == "transport_sync"
         || command == "controllers") {
         // Their own actions ({"action": ...}); app_mode shows them.
@@ -4019,6 +4022,195 @@ juce::var Commands::onLocations()
 }
 
 // Sound matching: recorded notes into a playable model (the companion).
+// processing: the Traitements mode's processings (audio, MIDI). Default: the
+// list {kind}. {writeFactory: folder?}; {check: source, language: jsfx|notes};
+// {save: processing JSON}; {delete: name}; {render: name, file, out, values,
+// tail}: a sound file through it into another; {apply: name, track, clip,
+// values, tail, seed}: on a clip (one undo step); {open: track, clip}: the
+// apply window; {show, select, testFile, reload}: the mode's window.
+juce::var Commands::onProcessing()
+{
+    namespace proc = processing;
+    if (flag("show", false) || has("select") || has("testFile") || has("reload") || has("state")) {
+        const auto answer = ui_.processing(request_);
+        if (!answer.isObject())
+            return fail("no interface");
+        return ok(answer);
+    }
+    if (has("writeFactory")) {
+        const auto folder = text("writeFactory").isNotEmpty() ? fileFor(text("writeFactory")) : proc::factoryFolder();
+        if (const auto written = proc::writeFactory(folder); written.failed())
+            return fail(written.getErrorMessage());
+        auto result = object();
+        set(result, "folder", folder.getFullPathName());
+        set(result, "count", static_cast<int>(folder.findChildFiles(juce::File::findFiles, false, juce::String("*") + proc::fileExtension).size()));
+        return ok(result);
+    }
+    if (has("check")) {
+        auto result = object();
+        if (text("language") == "jsfx") {
+            const auto info = proc::inspectJsfx(text("check"));
+            set(result, "ok", info.ok);
+            set(result, "error", info.error);
+            juce::Array<juce::var> sliders;
+            for (const auto& slider : info.sliders)
+                sliders.add(slider.name);
+            set(result, "sliders", sliders);
+        } else {
+            const auto error = proc::checkNoteScript(text("check"));
+            set(result, "ok", error.isEmpty());
+            set(result, "error", error);
+            juce::Array<juce::var> settings;
+            for (const auto& setting : proc::noteScriptSettings(text("check")))
+                settings.add(setting.name);
+            set(result, "settings", settings);
+        }
+        return ok(result);
+    }
+    if (has("save")) {
+        juce::String error;
+        auto processing = proc::fromJson(request_.getProperty("save", {}), error);
+        if (!processing)
+            return fail(error);
+        const auto file = proc::userFolder().getChildFile(juce::File::createLegalFileName(processing->name) + proc::fileExtension);
+        if (const auto saved = proc::save(*processing, file); saved.failed())
+            return fail(saved.getErrorMessage());
+        (void) ui_.processing(juce::JSON::parse("{\"reload\": true}"));
+        auto result = object();
+        set(result, "file", file.getFullPathName());
+        return ok(result);
+    }
+    if (has("delete")) {
+        const auto found = proc::find(text("delete"));
+        if (!found || found->factory)
+            return fail("no processing of mine named \"" + text("delete") + "\"");
+        (void) found->file.moveToTrash();
+        (void) ui_.processing(juce::JSON::parse("{\"reload\": true}"));
+        return ok(object());
+    }
+    if (has("open")) {
+        std::optional<RemoteTrack> track;
+        if (auto error = trackOrFail(track); !error.isVoid())
+            return error;
+        if (!ui_.openProcessing(track->ref(), idFrom(request_.getProperty("clip", request_.getProperty("clipId", {})))))
+            return fail("no interface");
+        return ok(object());
+    }
+    if (has("render") || has("apply")) {
+        const auto name = text(has("render") ? "render" : "apply");
+        auto found = proc::find(name);
+        if (!found)
+            return fail("no processing named \"" + name + "\"");
+        proc::Values values;
+        if (const auto* given = request_.getProperty("values", {}).getDynamicObject())
+            for (const auto& [id, value] : given->getProperties())
+                values[id.toString()] = static_cast<double>(value);
+        if (const auto tail = request_.getProperty("tail", {}); tail.isObject()) {
+            found->tail.allow = static_cast<bool>(tail.getProperty("allow", found->tail.allow));
+            found->tail.thresholdDb = static_cast<float>(static_cast<double>(tail.getProperty("thresholdDb", found->tail.thresholdDb)));
+            found->tail.maxSeconds = static_cast<float>(static_cast<double>(tail.getProperty("maxSeconds", found->tail.maxSeconds)));
+            found->tail.holdSeconds = static_cast<float>(static_cast<double>(tail.getProperty("holdSeconds", found->tail.holdSeconds)));
+        }
+        auto result = object();
+        const auto report = [&](const proc::AudioResult& rendered, const double rate, const std::int64_t before) {
+            set(result, "framesBefore", static_cast<juce::int64>(before));
+            set(result, "framesAfter", static_cast<juce::int64>(rendered.channels.empty() ? 0 : rendered.channels.front().size()));
+            set(result, "tailSeconds", static_cast<double>(rendered.tailFrames) / rate);
+            set(result, "endless", rendered.endless);
+            set(result, "channels", static_cast<int>(rendered.channels.size()));
+            juce::Array<juce::var> notes;
+            for (const auto& note : rendered.notes)
+                notes.add(note);
+            set(result, "notes", notes);
+        };
+        if (has("render")) {
+            engine::repair::Channels channels;
+            double rate {};
+            if (const auto read = proc::readAudioFile(fileFor(text("file")), channels, rate); read.failed())
+                return fail(read.getErrorMessage());
+            const auto before = static_cast<std::int64_t>(channels.front().size());
+            const auto rendered = proc::renderAudio(proc::prepare(*found, values), std::move(channels), rate);
+            if (!rendered.ok)
+                return fail(rendered.error);
+            if (const auto written = proc::writeAudioFile(fileFor(text("out")), rendered.channels, rate); written.failed())
+                return fail(written.getErrorMessage());
+            report(rendered, rate, before);
+            return ok(result);
+        }
+        std::optional<RemoteTrack> track;
+        if (auto error = trackOrFail(track); !error.isVoid())
+            return error;
+        const auto ref = track->ref();
+        const auto clipId = idFrom(request_.getProperty("clip", request_.getProperty("clipId", {})));
+        if (found->kind == proc::Kind::midi) {
+            if (!ref.midi)
+                return fail("a MIDI processing goes on a MIDI clip");
+            double length {};
+            const auto notes = studio_.midiClipNotes(ref, clipId, length);
+            const auto rendered = proc::renderNotes(*found, values, notes, engine_.tempo(), length,
+                                                    static_cast<std::uint32_t>(number("seed", 1.0)));
+            if (!rendered.ok)
+                return fail(rendered.error);
+            if (const auto applied = studio_.setMidiClipNotes(ref, clipId, rendered.notes, true); applied.failed())
+                return fail(applied.getErrorMessage());
+            set(result, "notesBefore", static_cast<int>(notes.size()));
+            set(result, "notesAfter", static_cast<int>(rendered.notes.size()));
+            return ok(result);
+        }
+        if (ref.midi)
+            return fail("an audio processing goes on an audio clip");
+        engine::repair::Channels channels;
+        double rate {};
+        if (const auto read = studio_.readAudioClipSound(ref, clipId, channels, rate); read.failed())
+            return fail(read.getErrorMessage());
+        const auto before = static_cast<std::int64_t>(channels.front().size());
+        const auto rendered = proc::renderAudio(proc::prepare(*found, values), std::move(channels), rate);
+        if (!rendered.ok)
+            return fail(rendered.error);
+        if (const auto applied = studio_.applyAudioProcessing(ref, clipId, rendered, rate, before, ui::Ls("Traitement : ", "Processing: ") + found->name);
+            applied.failed())
+            return fail(applied.getErrorMessage());
+        report(rendered, rate, before);
+        return ok(result);
+    }
+    // The list.
+    std::optional<proc::Kind> kind;
+    if (text("kind") == "audio")
+        kind = proc::Kind::audio;
+    else if (text("kind") == "midi")
+        kind = proc::Kind::midi;
+    juce::Array<juce::var> list;
+    for (const auto& item : proc::library(kind)) {
+        auto entry = object();
+        set(entry, "name", item.name);
+        set(entry, "kind", item.kind == proc::Kind::midi ? "midi" : "audio");
+        set(entry, "factory", item.factory);
+        set(entry, "file", item.file.getFullPathName());
+        set(entry, "description", item.description);
+        juce::Array<juce::var> steps;
+        for (const auto& step : item.steps)
+            steps.add(juce::String(proc::keyOf(step.type)));
+        set(entry, "steps", steps);
+        juce::Array<juce::var> parameters;
+        for (const auto& parameter : proc::parametersOf(item)) {
+            auto p = object();
+            set(p, "id", parameter.id);
+            set(p, "label", parameter.label);
+            set(p, "min", parameter.minimum);
+            set(p, "max", parameter.maximum);
+            set(p, "value", parameter.value);
+            parameters.add(p);
+        }
+        set(entry, "parameters", parameters);
+        list.add(entry);
+    }
+    auto result = object();
+    set(result, "processings", list);
+    set(result, "userFolder", proc::userFolder().getFullPathName());
+    set(result, "factoryFolder", proc::factoryFolder().getFullPathName());
+    return ok(result);
+}
+
 juce::var Commands::onSoundMatching()
 {
     const auto statusOf = [this] {

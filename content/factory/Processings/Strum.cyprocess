@@ -1,0 +1,8 @@
+{
+  "format": "cydaw-processing",
+  "version": 1,
+  "kind": "midi",
+  "name": "Strum",
+  "description": "Notes struck together played one after another, as a strummed guitar.",
+  "script": "param1:25<0,120,1>Spread (ms)\nparam2:0<0,1,1>Direction (0 = up, 1 = down)\n\n@init\nlast = -1;\nk = 0;\nsize = 1;\n\n@note\n// The notes struck together (the same start, lowest first), one after another.\nhere = start;\nhere != last ? (\n  k = 0;\n  last = here;\n  size = 0;\n  t = index;\n  go = 1;\n  loop(count - index,\n    go ? (note_start(t) == here ? (size += 1; t += 1;) : go = 0;);\n  );\n) : (\n  k += 1;\n);\norder = param2 < 0.5 ? k : size - 1 - k;\nstart = here + order * ms_to_beats(param1);\n"
+}

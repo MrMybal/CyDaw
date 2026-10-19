@@ -217,9 +217,9 @@ def main():
         if not banks.get("banks"):
             failures.append("banks lists no bank")
         # Banks, downloads, cache, companion, AI models, sound models, devices,
-        # presets, plug-in exports, DJ mixes, the Foundry.
-        if len(places) != 11:
-            failures.append("locations gives %d folders, expected 11" % len(places))
+        # presets, plug-in exports, DJ mixes, the Foundry, the processings.
+        if len(places) != 12:
+            failures.append("locations gives %d folders, expected 12" % len(places))
         status = client.tool("load_template", name="basse-et-nappes")
         print("loaded:", os.path.basename(status["project"]), "tempo", status["tempo"],
               "midi tracks", [t["name"] for t in status["midiTracks"]])

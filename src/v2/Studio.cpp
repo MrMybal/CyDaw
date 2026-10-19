@@ -7313,6 +7313,165 @@ juce::Result Studio::editAudioClip(const TrackRef& track, const std::uint64_t cl
     return juce::Result::ok();
 }
 
+// ---- Processings ------------------------------------------------------------------------
+
+juce::Result Studio::readAudioClipSound(const TrackRef& track, const std::uint64_t clipId, engine::repair::Channels& channels,
+                                        double& rate) const
+{
+    if (track.midi || track.master || !isValid(track))
+        return juce::Result::fail(ui::Ls("Pas une piste audio", "Not an audio track"));
+    const auto clip = engine_.audioClip(track.audioIndex, clipId);
+    if (!clip)
+        return juce::Result::fail(ui::Ls("Clip introuvable", "No such clip"));
+    if (const auto problem = engine_.audioClipEditProblem(track.audioIndex, clipId, app::AudioEditOperation::amplify); problem.isNotEmpty())
+        return juce::Result::fail(problem);
+    juce::AudioFormatManager formats;
+    formats.registerBasicFormats();
+    std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(clip->sourceFile));
+    if (reader == nullptr || reader->lengthInSamples <= 0)
+        return juce::Result::fail(ui::Ls("Fichier illisible : ", "Unreadable file: ") + clip->sourceFile.getFileName());
+    if (reader->lengthInSamples > static_cast<juce::int64>(reader->sampleRate * 60.0 * 30.0))
+        return juce::Result::fail(ui::Ls("Son trop long (30 minutes au plus)", "Sound too long (30 minutes at most)"));
+    const auto frames = static_cast<int>(reader->lengthInSamples);
+    const auto count = static_cast<int>(std::clamp(reader->numChannels, 1u, 2u));
+    juce::AudioBuffer<float> buffer(count, frames);
+    reader->read(&buffer, 0, frames, 0, true, count > 1);
+    channels.assign(static_cast<std::size_t>(count), std::vector<float>(static_cast<std::size_t>(frames)));
+    for (int c = 0; c < count; ++c)
+        std::copy_n(buffer.getReadPointer(c), frames, channels[static_cast<std::size_t>(c)].begin());
+    rate = reader->sampleRate;
+    return juce::Result::ok();
+}
+
+juce::Result Studio::applyAudioProcessing(const TrackRef& track, const std::uint64_t clipId, const processing::AudioResult& result,
+                                          const double rate, const std::int64_t sourceFrames, const juce::String& label)
+{
+    if (track.midi || track.master || !isValid(track))
+        return juce::Result::fail(ui::Ls("Pas une piste audio", "Not an audio track"));
+    const auto clip = engine_.audioClip(track.audioIndex, clipId);
+    if (!clip)
+        return juce::Result::fail(ui::Ls("Clip introuvable", "No such clip"));
+    if (!result.ok || result.channels.empty() || result.channels.front().empty())
+        return juce::Result::fail(result.error.isNotEmpty() ? result.error : ui::Ls("Pas de son", "No sound"));
+    auto folder = audioEditFolder();
+    (void) folder.createDirectory();
+    const auto base = clip->sourceFile.getFileNameWithoutExtension().upToLastOccurrenceOf(" ~", false, false);
+    const auto destination = folder.getNonexistentChildFile(base + " ~" + juce::Time::getCurrentTime().formatted("%H%M%S"), ".wav", false);
+    {
+        const auto frames = static_cast<int>(result.channels.front().size());
+        juce::AudioBuffer<float> buffer(static_cast<int>(result.channels.size()), frames);
+        for (int c = 0; c < buffer.getNumChannels(); ++c)
+            std::copy_n(result.channels[static_cast<std::size_t>(c)].data(), frames, buffer.getWritePointer(c));
+        juce::WavAudioFormat wav;
+        std::unique_ptr<juce::OutputStream> stream(destination.createOutputStream());
+        std::unique_ptr<juce::AudioFormatWriter> writer(
+            stream != nullptr ? wav.createWriterFor(stream.get(), rate, static_cast<unsigned>(buffer.getNumChannels()), 24, {}, 0) : nullptr);
+        if (writer == nullptr)
+            return juce::Result::fail(ui::Ls("Impossible d'écrire ", "Cannot write ") + destination.getFullPathName());
+        (void) stream.release();
+        if (!writer->writeFromAudioSampleBuffer(buffer, 0, frames))
+            return juce::Result::fail(ui::Ls("Impossible d'écrire ", "Cannot write ") + destination.getFullPathName());
+    }
+    // How the clip follows: shorter (trimmed: what is left), longer (its tail
+    // past the source's end, heard when the clip played to that end).
+    const auto frames = static_cast<std::int64_t>(result.channels.front().size());
+    auto operation = app::AudioEditOperation::amplify;
+    auto selectionStart = 0.0;
+    auto selection = 0.0;
+    if (result.trimmedStart > 0 || frames < sourceFrames) {
+        operation = app::AudioEditOperation::crop;
+        selectionStart = static_cast<double>(result.trimmedStart) / rate;
+        selection = static_cast<double>(frames) / rate;
+    } else if (frames > sourceFrames) {
+        operation = app::AudioEditOperation::insertSilence;
+        selectionStart = static_cast<double>(sourceFrames) / rate;
+        selection = static_cast<double>(frames - sourceFrames) / rate;
+    }
+    const auto committed = engine_.commitAudioClipSourceEdit(track.audioIndex, clipId, destination, label, operation, selectionStart, selection);
+    if (committed.failed()) {
+        (void) destination.deleteFile();
+        return committed;
+    }
+    dirty_ = true;
+    return juce::Result::ok();
+}
+
+std::vector<processing::ScriptNote> Studio::midiClipNotes(const TrackRef& track, const std::uint64_t clipId, double& clipLength) const
+{
+    std::vector<processing::ScriptNote> notes;
+    clipLength = 0.0;
+    if (!track.midi || !isValid(track))
+        return notes;
+    if (const auto* clips = engine_.midiClipsView(track.midiId))
+        for (const auto& clip : *clips)
+            if (clip.id == clipId)
+                clipLength = clip.lengthBeats;
+    const auto source = midiPreview_ && midiPreview_->trackId == track.midiId && midiPreview_->clipId == clipId
+                            ? midiPreview_->notes
+                            : engine_.midiNotes(track.midiId, clipId);
+    for (std::size_t i = 0; i < source.size(); ++i) {
+        const auto& note = source[i];
+        notes.push_back({ note.noteNumber, note.startBeats, note.durationBeats, note.velocity, note.chance, static_cast<int>(i) });
+    }
+    return notes;
+}
+
+juce::Result Studio::setMidiClipNotes(const TrackRef& track, const std::uint64_t clipId, const std::vector<processing::ScriptNote>& notes,
+                                      const bool undoable)
+{
+    if (!track.midi || !isValid(track))
+        return juce::Result::fail(ui::Ls("Pas une piste MIDI", "Not a MIDI track"));
+    // The notes as they were (before any preview): each processed one carries
+    // its source's expressions.
+    if (!midiPreview_ || midiPreview_->trackId != track.midiId || midiPreview_->clipId != clipId) {
+        restoreMidiClipNotes(track, clipId);
+        midiPreview_ = MidiPreview { track.midiId, clipId, engine_.midiNotes(track.midiId, clipId) };
+    }
+    const auto& original = midiPreview_->notes;
+    std::vector<app::AudioTrackController::MidiNote> made;
+    made.reserve(notes.size());
+    for (const auto& note : notes) {
+        app::AudioTrackController::MidiNote out;
+        if (note.source >= 0 && note.source < static_cast<int>(original.size()))
+            out = original[static_cast<std::size_t>(note.source)];
+        out.id = 0;
+        out.noteNumber = note.pitch;
+        out.startBeats = note.start;
+        out.durationBeats = note.length;
+        out.velocity = note.velocity;
+        out.chance = note.chance;
+        made.push_back(std::move(out));
+    }
+    if (undoable) {
+        // Back to the notes as they were, then the change as one step.
+        const auto before = original;
+        midiPreview_.reset();
+        (void) engine_.replaceMidiNotes(track.midiId, clipId, before);
+        if (!engine_.beginMidiEdit(track.midiId, clipId))
+            return juce::Result::fail(ui::Ls("Clip introuvable", "No such clip"));
+        const auto replaced = engine_.replaceMidiNotes(track.midiId, clipId, std::move(made));
+        (void) engine_.endMidiEdit();
+        if (!replaced)
+            return juce::Result::fail(ui::Ls("Les notes n'ont pas pu être changées", "The notes could not be changed"));
+        dirty_ = true;
+        return juce::Result::ok();
+    }
+    if (!engine_.replaceMidiNotes(track.midiId, clipId, std::move(made)))
+        return juce::Result::fail(ui::Ls("Les notes n'ont pas pu être changées", "The notes could not be changed"));
+    return juce::Result::ok();
+}
+
+void Studio::restoreMidiClipNotes(const TrackRef& track, const std::uint64_t clipId)
+{
+    if (!midiPreview_)
+        return;
+    if (track.midi && midiPreview_->trackId == track.midiId && midiPreview_->clipId == clipId)
+        (void) engine_.replaceMidiNotes(midiPreview_->trackId, midiPreview_->clipId, midiPreview_->notes);
+    else
+        (void) engine_.replaceMidiNotes(midiPreview_->trackId, midiPreview_->clipId, midiPreview_->notes);
+    midiPreview_.reset();
+}
+
 juce::Result Studio::reverseLauncherClip(const TrackRef& track, int scene)
 {
     if(track.midi || track.master || !isValid(track))return juce::Result::fail("No audio track");

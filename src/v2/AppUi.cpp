@@ -14,6 +14,7 @@
 #include "WorkshopView.h"
 #include "DjView.h"
 #include "FoundryView.h"
+#include "ProcessingView.h"
 #include "TransportSync.h"
 #include "Controllers.h"
 #include "ControlTargets.h"
@@ -205,6 +206,7 @@ AppUi::AppUi(Studio& studio, ImGuiHost& host)
     dj_ = std::make_unique<DjView>(studio_, state_, host_);
     foundry_ = std::make_unique<FoundryView>(studio_, state_, host_);
     cinema_ = std::make_unique<FoundryView>(studio_, state_, host_, true);
+    processing_ = std::make_unique<ProcessingView>(studio_, state_, host_);
     transportSync_ = std::make_unique<TransportSync>(studio_.settings(),studio_.engine().deviceManager(),studio_.keepsSettings(),
         [this](int target) {
             TransportSync::State s;
@@ -985,6 +987,8 @@ void AppUi::filesDropped(const juce::StringArray& files, const float x, const fl
         return;
     if (state_.mode == AppMode::foundry && foundry_->dropFiles(files, x, y))
         return;
+    if (state_.mode == AppMode::processing && processing_->dropFiles(files))
+        return;
     // Onto a sampler: its zones. A project opens; a sound model, an SFZ
     // become instruments; audio lands where it is dropped.
     if (const auto& drop = state_.samplerDrop; drop && x >= drop->x0 && x < drop->x1 && y >= drop->y0 && y < drop->y1) {
@@ -1215,7 +1219,8 @@ void AppUi::frame()
     // The workshop's device plays in the simulator while the workshop shows it.
     studio_.setSimulatorActive(state_.inWorkshop() && studio_.workshopRoot() != nullptr);
     host_.setAnimating(studio_.engine().isPlaying() || studio_.engine().isSamplePreviewing() || studio_.simulating()
-                       || studio_.engine().dj().anyPlaying() || studio_.engine().foundryPlayer().playing() || studio_.engine().cinemaPlayer().playing());
+                       || studio_.engine().dj().anyPlaying() || studio_.engine().foundryPlayer().playing() || studio_.engine().cinemaPlayer().playing()
+                       || studio_.engine().processingPlayer().playing());
     saveLayoutIfNeeded();
 }
 
@@ -1297,11 +1302,13 @@ void AppUi::resolveMode()
     // Asked for (a panel's request, the port), the workshop, the DJ mix or
     // the Foundry takes the whole window; a studio panel asked for gives it
     // back.
-    if (state_.bringToFront == Panel::workshop || state_.bringToFront == Panel::dj || state_.bringToFront == Panel::foundry || state_.bringToFront == Panel::cinema) {
-        state_.mode = state_.bringToFront == Panel::workshop ? AppMode::workshop
-                      : state_.bringToFront == Panel::dj     ? AppMode::dj
-                      : state_.bringToFront == Panel::cinema ? AppMode::cinema
-                                                             : AppMode::foundry;
+    if (state_.bringToFront == Panel::workshop || state_.bringToFront == Panel::dj || state_.bringToFront == Panel::foundry || state_.bringToFront == Panel::cinema
+        || state_.bringToFront == Panel::processing) {
+        state_.mode = state_.bringToFront == Panel::workshop       ? AppMode::workshop
+                      : state_.bringToFront == Panel::dj           ? AppMode::dj
+                      : state_.bringToFront == Panel::cinema       ? AppMode::cinema
+                      : state_.bringToFront == Panel::processing   ? AppMode::processing
+                                                                   : AppMode::foundry;
         state_.bringToFront = Panel::none;
     } else if (state_.mode != AppMode::studio && state_.bringToFront != Panel::none) {
         state_.mode = AppMode::studio;
@@ -1335,6 +1342,17 @@ juce::var AppUi::foundry(const juce::var& request)
     return foundry_->command(request);
 }
 
+juce::var AppUi::processing(const juce::var& request)
+{
+    return processing_->command(request);
+}
+
+bool AppUi::openProcessing(const TrackRef& track, const std::uint64_t clipId)
+{
+    state_.processingRequest = ClipRef { track, clipId };
+    return true;
+}
+
 juce::var AppUi::cinema(const juce::var& request)
 {
     if(static_cast<bool>(request.getProperty("show",false)))state_.mode=AppMode::cinema;
@@ -1346,7 +1364,8 @@ juce::String AppUi::appMode(const juce::String& mode)
     static constexpr std::pair<const char*, AppMode> modes[] { { "studio", AppMode::studio },
                                                                 { "dj", AppMode::dj },
                                                                 { "foundry", AppMode::foundry },
-                                                                { "workshop", AppMode::workshop }, { "cinema", AppMode::cinema } };
+                                                                { "workshop", AppMode::workshop }, { "cinema", AppMode::cinema },
+                                                                { "processing", AppMode::processing } };
     if (mode.isNotEmpty()) {
         auto found = false;
         for (const auto& [name, value] : modes)
@@ -1374,7 +1393,8 @@ void AppUi::drawWorkshopMode()
     constexpr auto flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize
                            | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoBringToFrontOnFocus
                            | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
-    const auto* name = state_.mode == AppMode::dj ? "##djMode" : state_.mode == AppMode::foundry ? "##foundryMode" : state_.mode == AppMode::cinema ? "##cinemaMode" : "##workshopMode";
+    const auto* name = state_.mode == AppMode::dj ? "##djMode" : state_.mode == AppMode::foundry ? "##foundryMode" : state_.mode == AppMode::cinema ? "##cinemaMode"
+                       : state_.mode == AppMode::processing ? "##processingMode" : "##workshopMode";
     if (ImGui::Begin(name, nullptr, flags)) {
         if (state_.mode == AppMode::dj) {
             dj_->draw();
@@ -1382,6 +1402,8 @@ void AppUi::drawWorkshopMode()
             foundry_->draw();
         } else if(state_.mode==AppMode::cinema){
             state_.focused=Panel::cinema;cinema_->draw();
+        } else if (state_.mode == AppMode::processing) {
+            processing_->draw();
         } else {
             if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows))
                 state_.focused = Panel::workshop;
@@ -1420,6 +1442,13 @@ void AppUi::drawModeSwitch()
                L("Éditer des fichiers son : couper, coller, traiter, analyser, enregistrer (F11)",
                  "Edit sound files: cut, paste, process, analyse, save (F11)")))
         state_.mode = AppMode::foundry;
+    ImGui::SameLine(0.0f, dp(2.0f));
+    if (button(L("Traitements", "Processings"), state_.mode == AppMode::processing,
+               L("Créer ses traitements audio (chaîne d'effets, code JSFX, débruitage…) et MIDI (scripts de notes), "
+                 "les essayer avant / après, puis les appliquer aux clips",
+                 "Make your own audio processings (effect chain, JSFX code, noise reduction…) and MIDI ones (note "
+                 "scripts), try them before / after, then apply them to clips")))
+        state_.mode = AppMode::processing;
     ImGui::SameLine(0.0f, dp(2.0f));
     if (button(L("Atelier Plugin", "Plugin workshop"), state_.inWorkshop(),
                L("Fabriquer ses propres effets et instruments avec un graphe, et les exporter en VST3 (F7)",
@@ -2217,6 +2246,13 @@ void AppUi::drawDialogs()
     controllers_->draw(showControllers_);
     drawCompanionWindow();
     locations_->draw();
+    // A clip's menu asked for a processing on it: the window that applies one.
+    if (state_.processingRequest) {
+        const auto clip = *state_.processingRequest;
+        state_.processingRequest.reset();
+        processing_->openApply(clip);
+    }
+    processing_->drawApply();
     banks_->draw();
     themes_->draw();
     semanticView_->draw();
@@ -3060,6 +3096,8 @@ void AppUi::drawMenuBar()
         if (ImGui::MenuItem(L("Cinéma (son à l'image)", "Cinema (sound to picture)"),nullptr,state_.mode==AppMode::cinema))state_.mode=AppMode::cinema;
         if (ImGui::MenuItem(L("Fonderie (plein écran)", "Foundry (whole window)"), "F11", state_.mode == AppMode::foundry))
             state_.mode = state_.mode == AppMode::foundry ? AppMode::studio : AppMode::foundry;
+        if (ImGui::MenuItem(L("Traitements (plein écran)", "Processings (whole window)"), nullptr, state_.mode == AppMode::processing))
+            state_.mode = state_.mode == AppMode::processing ? AppMode::studio : AppMode::processing;
         if (ImGui::MenuItem(L("Atelier Plugin (plein écran)", "Plugin workshop (whole window)"), "F7", state_.inWorkshop()))
             state_.mode = state_.inWorkshop() ? AppMode::studio : AppMode::workshop;
         ImGui::Separator();

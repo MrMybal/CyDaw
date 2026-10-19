@@ -1,0 +1,25 @@
+{
+  "format": "cydaw-processing",
+  "version": 1,
+  "kind": "audio",
+  "name": "Remove Noise",
+  "description": "Background noise (hiss, hum of fans) measured in the quietest moments and taken out.",
+  "steps": [
+    {
+      "type": "denoise",
+      "enabled": true,
+      "settings": {
+        "reduction": 18.0,
+        "sensitivity": 1.5,
+        "smoothing": 0.5
+      }
+    }
+  ],
+  "tail": {
+    "allow": false,
+    "thresholdDb": -60.0,
+    "holdSeconds": 0.300000011920929,
+    "maxSeconds": 10.0,
+    "fadeMs": 30.0
+  }
+}

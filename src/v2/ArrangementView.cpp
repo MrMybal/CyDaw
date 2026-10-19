@@ -1641,6 +1641,9 @@ void ArrangementView::clipContextMenu()
     if (contextClip_) {
         if (contextClip_->track.midi && ImGui::MenuItem(L("Ouvrir dans l'éditeur", "Open in the editor"), "Double-clic"))
             openInEditor(*contextClip_);
+        if (ImGui::MenuItem(contextClip_->track.midi ? L("Appliquer un traitement MIDI…", "Apply a MIDI processing…")
+                                                     : L("Appliquer un traitement…", "Apply a processing…")))
+            state_.processingRequest = *contextClip_;
         if (!contextClip_->track.midi)
             if (const auto* clip = findAudioClip(engine, contextClip_->track.audioIndex, contextClip_->clipId)) {
                 const auto index = contextClip_->track.audioIndex;

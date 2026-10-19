@@ -11,6 +11,7 @@
 #include "AudioEdit.h"
 #include "DeviceHost.h"
 #include "TrackModulation.h"
+#include "Processing.h"
 
 #include <juce_data_structures/juce_data_structures.h>
 
@@ -272,6 +273,25 @@ public:
     // Where destructive edits' results are written: the project's folder
     // ("edits"), else Documents/CyDAW/Edits.
     [[nodiscard]] juce::File audioEditFolder() const;
+    // ---- Processings (Processing.h, the Traitements mode) ----------------------------
+    // An audio clip's sound (its source, the take it plays) to process.
+    juce::Result readAudioClipSound(const TrackRef& track, std::uint64_t clipId, engine::repair::Channels& channels,
+                                    double& rate) const;
+    // A processing's result (of that whole sound) as the clip's new version
+    // (its history keeps the others; one undo step): the clip longer when the
+    // processing rang past the end it played to, shorter when it trimmed.
+    juce::Result applyAudioProcessing(const TrackRef& track, std::uint64_t clipId, const processing::AudioResult& result,
+                                      double rate, std::int64_t sourceFrames, const juce::String& label);
+    // A MIDI clip's notes (and its length, in beats) for a note script.
+    [[nodiscard]] std::vector<processing::ScriptNote> midiClipNotes(const TrackRef& track, std::uint64_t clipId,
+                                                                    double& clipLength) const;
+    // Its notes made the processed ones (each keeping what it carries: its
+    // expressions). With `undoable`, one undo step; without, a preview to put
+    // back (restoreMidiClipNotes).
+    juce::Result setMidiClipNotes(const TrackRef& track, std::uint64_t clipId, const std::vector<processing::ScriptNote>& notes,
+                                  bool undoable);
+    void restoreMidiClipNotes(const TrackRef& track, std::uint64_t clipId);
+
     // A destructive edit of a clip's selection (seconds in its source):
     // rendered to a new file, which the clip then plays; its history keeps
     // every version. One undo step (Ctrl+Z).
@@ -1350,6 +1370,13 @@ private:
     std::map<juce::String, juce::String> presetNames_;
     void reloadSamplers(const juce::StringArray& banks);
     SoundMatching soundMatching_;
+    // A MIDI clip's notes while a processing is heard on it (put back unless applied).
+    struct MidiPreview {
+        std::uint64_t trackId {};
+        std::uint64_t clipId {};
+        std::vector<app::AudioTrackController::MidiNote> notes;
+    };
+    std::optional<MidiPreview> midiPreview_;
     // The synth patch being searched for (matchSynth): its thread, its end.
     struct SynthSearch;
     std::unique_ptr<SynthSearch> synthSearch_;

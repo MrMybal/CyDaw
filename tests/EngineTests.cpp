@@ -9,6 +9,7 @@
 #include <cydaw/engine/PolyVoiceOscillator.h>
 #include <cydaw/engine/SoundModel.h>
 #include <cydaw/engine/SynthMatch.h>
+#include <cydaw/engine/AudioRepair.h>
 #include <cydaw/engine/VoiceAssetsFile.h>
 #include <cydaw/control/Control.h>
 #include <cydaw/engine/PrismSynth.h>
@@ -1470,6 +1471,127 @@ void soundModelPlaysFreeRatios()
 
 // A synth patch found for a note Opale played itself (a dark plucked bass):
 // the search comes close to it, and much closer than Opale's defaults.
+// The Processing mode's built-in steps: noise, hum and clicks taken out of a
+// tone without harming it; a tail that rings ends when it is quiet, one that
+// never ends is cut where it stopped decaying.
+void audioRepairMends()
+{
+    namespace repair = cydaw::engine::repair;
+    constexpr double rate = 48'000.0;
+    const auto frames = static_cast<std::size_t>(rate * 3.0);
+    const auto rms = [](const std::vector<float>& signal, const std::size_t from, const std::size_t to) {
+        auto sum = 0.0;
+        for (auto i = from; i < to; ++i)
+            sum += static_cast<double>(signal[i]) * signal[i];
+        return 10.0 * std::log10(sum / static_cast<double>(to - from) + 1e-20);
+    };
+    const auto tonePower = [&](const std::vector<float>& signal, const double hz, const std::size_t from, const std::size_t to) {
+        auto re = 0.0;
+        auto im = 0.0;
+        for (auto i = from; i < to; ++i) {
+            re += signal[i] * std::cos(2.0 * std::numbers::pi * hz * static_cast<double>(i) / rate);
+            im += signal[i] * std::sin(2.0 * std::numbers::pi * hz * static_cast<double>(i) / rate);
+        }
+        const auto amplitude = 2.0 * std::sqrt(re * re + im * im) / static_cast<double>(to - from);
+        return 20.0 * std::log10(amplitude + 1e-20);
+    };
+    std::uint32_t state = 12'345;
+    const auto noise = [&state] {
+        state = state * 1'664'525u + 1'013'904'223u;
+        return static_cast<float>(state >> 8) / static_cast<float>(1u << 24) * 2.0f - 1.0f;
+    };
+
+    // Noise: a tone over its second second only, white noise throughout.
+    repair::Channels noisy(2, std::vector<float>(frames));
+    for (std::size_t i = 0; i < frames; ++i) {
+        const auto tone = i >= frames / 3 && i < 2 * frames / 3 ? 0.4f * static_cast<float>(std::sin(2.0 * std::numbers::pi * 440.0 * i / rate)) : 0.0f;
+        noisy[0][i] = tone + 0.02f * noise();
+        noisy[1][i] = tone + 0.02f * noise();
+    }
+    const auto noiseBefore = rms(noisy[0], 1'000, frames / 3 - 1'000);
+    const auto toneBefore = tonePower(noisy[0], 440.0, frames / 3 + 5'000, 2 * frames / 3 - 5'000);
+    repair::denoise(noisy, rate, {});
+    const auto noiseAfter = rms(noisy[0], 1'000, frames / 3 - 1'000);
+    const auto toneAfter = tonePower(noisy[0], 440.0, frames / 3 + 5'000, 2 * frames / 3 - 5'000);
+    expect(noiseAfter < noiseBefore - 12.0, "noise reduction takes the noise down (" + std::to_string(noiseBefore) + " -> "
+                                                + std::to_string(noiseAfter) + " dB)");
+    expect(std::abs(toneAfter - toneBefore) < 1.0, "noise reduction keeps the tone (" + std::to_string(toneBefore) + " -> "
+                                                        + std::to_string(toneAfter) + " dB)");
+
+    // Hum: 50 Hz and its harmonics under a 1 kHz tone.
+    repair::Channels hum(1, std::vector<float>(frames));
+    for (std::size_t i = 0; i < frames; ++i) {
+        const auto t = static_cast<double>(i) / rate;
+        hum[0][i] = static_cast<float>(0.2 * std::sin(2.0 * std::numbers::pi * 50.0 * t) + 0.1 * std::sin(2.0 * std::numbers::pi * 100.0 * t)
+                                       + 0.05 * std::sin(2.0 * std::numbers::pi * 150.0 * t) + 0.3 * std::sin(2.0 * std::numbers::pi * 1'000.0 * t));
+    }
+    const auto humBefore = tonePower(hum[0], 50.0, frames / 4, 3 * frames / 4);
+    const auto found = repair::removeHum(hum, rate, {});
+    expect(found == 50.0f, "hum removal finds 50 Hz (" + std::to_string(found) + ")");
+    const auto humAfter = tonePower(hum[0], 50.0, frames / 4, 3 * frames / 4);
+    const auto harmonicAfter = tonePower(hum[0], 150.0, frames / 4, 3 * frames / 4);
+    const auto kept = tonePower(hum[0], 1'000.0, frames / 4, 3 * frames / 4);
+    expect(humAfter < humBefore - 30.0 && harmonicAfter < -50.0, "hum removal notches the hum and its harmonics ("
+                                                                       + std::to_string(humBefore) + " -> " + std::to_string(humAfter) + " dB)");
+    expect(std::abs(kept - 20.0 * std::log10(0.3)) < 0.5, "hum removal keeps the tone (" + std::to_string(kept) + " dB)");
+
+    // Clicks: twenty spikes on a tone.
+    repair::Channels clicks(1, std::vector<float>(frames));
+    for (std::size_t i = 0; i < frames; ++i)
+        clicks[0][i] = static_cast<float>(0.3 * std::sin(2.0 * std::numbers::pi * 220.0 * i / rate));
+    const auto clean = clicks[0];
+    for (int k = 0; k < 20; ++k)
+        clicks[0][static_cast<std::size_t>(5'000 + k * 6'000)] += (k % 2 ? 0.8f : -0.8f);
+    auto errorBefore = 0.0;
+    for (std::size_t i = 0; i < frames; ++i)
+        errorBefore = std::max(errorBefore, static_cast<double>(std::abs(clicks[0][i] - clean[i])));
+    const auto mended = repair::declick(clicks, rate, {});
+    auto errorAfter = 0.0;
+    for (std::size_t i = 0; i < frames; ++i)
+        errorAfter = std::max(errorAfter, static_cast<double>(std::abs(clicks[0][i] - clean[i])));
+    expect(mended >= 18 && mended <= 30, "click removal finds the clicks (" + std::to_string(mended) + ")");
+    expect(errorAfter < 0.05, "click removal mends them (worst error " + std::to_string(errorBefore) + " -> "
+                                  + std::to_string(errorAfter) + ")");
+
+    // Tails: one second of sound, then a decaying tail; then a noise that never ends.
+    const auto second = static_cast<std::size_t>(rate);
+    repair::Channels decaying(1, std::vector<float>(second * 6, 0.0f));
+    for (std::size_t i = 0; i < second * 6; ++i) {
+        const auto t = static_cast<double>(i) / rate;
+        const auto envelope = t < 1.0 ? 1.0 : std::pow(10.0, -40.0 * (t - 1.0) / 20.0); // 40 dB a second
+        decaying[0][i] = static_cast<float>(0.5 * envelope * noise());
+    }
+    bool endless = true;
+    const auto end = repair::tailEnd(decaying, static_cast<std::int64_t>(second), rate, {}, &endless);
+    const auto tailSeconds = static_cast<double>(end) / rate - 1.0;
+    expect(!endless && tailSeconds > 1.2 && tailSeconds < 1.8, "a decaying tail ends when quiet (" + std::to_string(tailSeconds) + " s)");
+    repair::Channels steady(1, std::vector<float>(second * 12, 0.0f));
+    for (auto& sample : steady[0])
+        sample = 0.2f * noise();
+    const auto cut = repair::tailEnd(steady, static_cast<std::int64_t>(second), rate, {}, &endless);
+    const auto steadySeconds = static_cast<double>(cut) / rate - 1.0;
+    expect(endless && steadySeconds < 1.5, "a tail that never ends is cut early (" + std::to_string(steadySeconds) + " s)");
+    repair::TailSettings none;
+    none.allow = false;
+    expect(repair::tailEnd(steady, static_cast<std::int64_t>(second), rate, none) == static_cast<std::int64_t>(second),
+           "no tail allowed: the sound's own length");
+    repair::cutWithFade(steady, cut, rate, 30.0f);
+    expect(static_cast<std::int64_t>(steady[0].size()) == cut && std::abs(steady[0].back()) < 1e-6f, "the cut fades out");
+
+    // Trim and normalise.
+    repair::Channels padded(1, std::vector<float>(second * 3, 0.0f));
+    for (std::size_t i = second; i < 2 * second; ++i)
+        padded[0][i] = 0.1f * noise();
+    repair::trimSilence(padded, rate, -60.0f, 20.0f);
+    const auto trimmed = static_cast<double>(padded[0].size()) / rate;
+    expect(trimmed > 0.99 && trimmed < 1.06, "silence trimmed (" + std::to_string(trimmed) + " s)");
+    repair::normalise(padded, -1.0f);
+    auto peak = 0.0f;
+    for (const auto sample : padded[0])
+        peak = std::max(peak, std::abs(sample));
+    expect(std::abs(20.0 * std::log10(peak) + 1.0) < 0.01, "normalised to -1 dBFS");
+}
+
 void synthMatchFindsAPatch()
 {
     namespace synth = cydaw::engine::synth;
@@ -4756,6 +4878,7 @@ int main()
     soundModelVoicePlaysItsPartials();
     soundModelPlaysFreeRatios();
     synthMatchFindsAPatch();
+    audioRepairMends();
     soundModelPlaysStereoHeadAndLayers();
     prismSynthPlays();
     samplerPlaysItsZones();

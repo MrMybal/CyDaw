@@ -2676,6 +2676,10 @@ void AudioEditorView::drawDetails(const TrackRef& track, const AudioClip& clip, 
 void AudioEditorView::drawProcesses(const TrackRef& track, const AudioClip& clip, const std::vector<AudioEvent>& events)
 {
     const auto& p = theme::palette();
+    if (ImGui::Button(L("Appliquer un traitement (Traitements)…", "Apply a processing (Processings)…")))
+        state_.processingRequest = ClipRef { track, clip.id };
+    ui::tooltip(L("Débruitage, anti-ronflement, chaîne d'effets, code JSFX… réglages et écoute avant / après.",
+                  "Noise reduction, hum removal, an effect chain, JSFX code… settings and listening before / after."));
     if (ImGui::BeginListBox("##audioProcesses", ImVec2(-1.0f, ImGui::GetTextLineHeightWithSpacing() * 9.4f))) {
         for (int i = 0; i < processCount; ++i)
             if (ImGui::Selectable(L(processAt(i).french, processAt(i).english), process_ == i))

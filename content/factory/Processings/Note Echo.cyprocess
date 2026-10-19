@@ -1,0 +1,8 @@
+{
+  "format": "cydaw-processing",
+  "version": 1,
+  "kind": "midi",
+  "name": "Note Echo",
+  "description": "Each note repeated after it, softer each time.",
+  "script": "param1:3<1,8,1>Echoes\nparam2:0.5<0.0625,2,0.0625>Delay (beats)\nparam3:60<10,95,1>Decay (%)\n\n@note\nj = 1;\nloop(param1,\n  add_note(pitch, start + param2 * j, length, velocity * (param3 / 100) ^ j);\n  j += 1;\n);\n"
+}

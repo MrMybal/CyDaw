@@ -37,12 +37,12 @@ inline constexpr const char* kFilePayload = "CYDAW_FILE";
 inline constexpr const char* kLauncherClipPayload = "CYDAW_LAUNCHER_CLIP";
 
 enum class Panel { none, arrangement, launcher, devices, graph, mixer, editor, browser, inspector, workshop, routing, dj,
-                   foundry, cinema };
+                   foundry, cinema, processing };
 
 // What the whole window is for: the studio (tracks, arrangement, launcher,
 // their panels), the DJ mix, the Foundry (sound files edited), the VST
 // workshop. The modes but the studio take the whole window.
-enum class AppMode { studio, dj, foundry, workshop, cinema };
+enum class AppMode { studio, dj, foundry, workshop, cinema, processing };
 
 // What the device workshop is asked to open (a track's device, a file of My
 // devices, a new device). It asks first when the device it holds is not
@@ -122,6 +122,8 @@ struct UiState {
     // Each container's branch shown after it (the track's key, its head).
     std::map<std::pair<std::uint64_t, std::uint64_t>, int> containerBranch;
     std::vector<ClipRef> selectedClips;
+    // A clip's menu asked for the processing window (Traitements) on it.
+    std::optional<ClipRef> processingRequest;
     // The launcher's slots picked (a click; Ctrl or Shift adds): what its
     // menu and Ctrl+E act on.
     std::vector<SlotRef> selectedSlots;
@@ -143,7 +145,7 @@ struct UiState {
     // (graph, its tools, the plugin export); no tracks, no arrangement.
     AppMode mode { AppMode::studio };
     // Kept separately for Studio, DJ and Foundry; the workshop has its own layout.
-    std::array<bool, 5> bottomPanelsVisible { true, true, true, true, true };
+    std::array<bool, 6> bottomPanelsVisible { true, true, true, true, true, true };
     [[nodiscard]] bool bottomPanelVisible() const noexcept
     {
         return mode != AppMode::workshop && bottomPanelsVisible[static_cast<std::size_t>(mode)];

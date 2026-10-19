@@ -2132,6 +2132,8 @@ public:
     [[nodiscard]] DjEngine& dj() noexcept { return *dj_; }
     [[nodiscard]] FoundryPlayer& foundryPlayer() noexcept { return *foundryPlayer_; }
     [[nodiscard]] FoundryPlayer& cinemaPlayer() noexcept { return *cinemaPlayer_; }
+    // The Processing mode's: a sound before or after its processing.
+    [[nodiscard]] FoundryPlayer& processingPlayer() noexcept { return *processingPlayer_; }
 
     // ---- The workshop's simulator ------------------------------------------
     // A device tried on its own, apart from the tracks: test signals into an
@@ -2185,6 +2187,7 @@ private:
     std::unique_ptr<DjEngine> dj_;
     std::unique_ptr<FoundryPlayer> foundryPlayer_;
     std::unique_ptr<FoundryPlayer> cinemaPlayer_;
+    std::unique_ptr<FoundryPlayer> processingPlayer_;
     std::vector<SimulationNote> simulationPattern_;
     double simulationPatternBeats_ {};
     void publishSimulationPattern();

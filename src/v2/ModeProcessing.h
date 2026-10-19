@@ -39,6 +39,8 @@ class ModeProcessing final : public app::ModeProcessor
         float minimum{}, maximum{1}, value{};
     };
     std::vector<Parameter> parameters(std::uint64_t id) const;
+    // An input's effects as a graph that renders on any thread (createVst3RuntimeState); void when none.
+    [[nodiscard]] juce::var inputRuntimeState(std::uint64_t id) const;
     void selectMaster();
     void showEditor()
     {

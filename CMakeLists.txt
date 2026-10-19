@@ -160,6 +160,7 @@ add_library(cydaw_core STATIC
     src/engine/WavetableShape.cpp
     src/engine/SoundModel.cpp
     src/engine/SynthMatch.cpp
+    src/engine/AudioRepair.cpp
     src/engine/PrismSynth.cpp
     src/engine/SynthFamily.cpp
     src/engine/AmbreSynth.cpp
@@ -1075,9 +1076,19 @@ if(CYDAW_BUILD_DESKTOP)
                 APPEND
                 DEPENDS "${CYDAW2_JUCE_INFO_FILE}")
             target_link_libraries(CyDAW2 PRIVATE cydaw_zstd)
+            # The Processing mode runs JSFX (ysfx) and note scripts (its EEL2) offline.
+            target_link_libraries(CyDAW2 PRIVATE ysfx::ysfx)
+            target_include_directories(CyDAW2 PRIVATE third_party/ysfx/thirdparty/WDL/source)
             target_sources(CyDAW2 PRIVATE
                 src/v2/Main.cpp
                 src/v2/HiddenDesktop.cpp
+                src/v2/Processing.cpp
+                src/v2/Processing.h
+                src/v2/ProcessingCode.cpp
+                src/v2/ProcessingCode.h
+                src/v2/ProcessingFactory.cpp
+                src/v2/ProcessingView.cpp
+                src/v2/ProcessingView.h
                 src/v2/CinemaVideo.cpp
                 src/v2/CinemaVideo.h
                 src/v2/CinemaEditing.inc
@@ -1515,6 +1526,13 @@ if(CYDAW_BUILD_DESKTOP)
                              COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/v2_foundry_check.py"
                                      --port 47855 --exe "$<TARGET_FILE:CyDAW2>")
                     set_tests_properties(cydaw2_foundry_check PROPERTIES TIMEOUT 300)
+                    # The Traitements mode: audio processings (noise, hum, tails
+                    # that ring past the end, endless noise cut) and MIDI ones on
+                    # clips, undone; code checked; the apply window. Silent.
+                    add_test(NAME cydaw2_processing_check
+                             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/v2_processing_check.py"
+                                     --port 47871 --exe "$<TARGET_FILE:CyDAW2>")
+                    set_tests_properties(cydaw2_processing_check PROPERTIES TIMEOUT 300)
                     # The controllers: an OSC endpoint in and back on this
                     # machine's sockets, virtual controls through modifiers,
                     # learning, a project's assignments. Silent.

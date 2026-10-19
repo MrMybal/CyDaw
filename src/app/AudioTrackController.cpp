@@ -6523,6 +6523,8 @@ AudioTrackController::AudioTrackController()
     mixerSource_.addInputSource(foundryPlayer_.get(), false);
     cinemaPlayer_ = std::make_unique<FoundryPlayer>();
     mixerSource_.addInputSource(cinemaPlayer_.get(), false);
+    processingPlayer_ = std::make_unique<FoundryPlayer>();
+    mixerSource_.addInputSource(processingPlayer_.get(), false);
     // The clock around the mix: it starts before it, ends with the loop
     // auditioned after it.
     auditionMixer_.addInputSource(&loopAudition_.clockStart(), false);
@@ -6556,6 +6558,7 @@ AudioTrackController::~AudioTrackController()
     mixerSource_.removeInputSource(dj_.get());
     mixerSource_.removeInputSource(foundryPlayer_.get());
     mixerSource_.removeInputSource(cinemaPlayer_.get());
+    mixerSource_.removeInputSource(processingPlayer_.get());
     clearTracks();
     clearMidiTracks();
     readAheadThread_.stopThread(3'000);

@@ -70,6 +70,7 @@ const char* key(const Location location)
     case Location::presets: return "presets";
     case Location::mixes: return "mixes";
     case Location::foundry: return "foundry";
+    case Location::processings: return "processings";
     }
     return "";
 }
@@ -101,6 +102,7 @@ juce::File defaultFolder(const Location location)
     case Location::presets: return documents().getChildFile("Presets");
     case Location::mixes: return documents().getChildFile("Mixes");
     case Location::foundry: return documents().getChildFile("Foundry");
+    case Location::processings: return documents().getChildFile("Processings");
     }
     return localData();
 }
@@ -218,6 +220,9 @@ juce::Array<juce::File> contentOf(const Location location, const juce::File& whe
         for (const auto* kind : { "device", "plugin", "chain" })
             if (const auto folder = where.getChildFile(kind); folder.isDirectory())
                 items.add(folder);
+        break;
+    case Location::processings:
+        items.addArray(where.findChildFiles(juce::File::findFiles, false, "*.cyprocess"));
         break;
     case Location::mixes:
     case Location::foundry:

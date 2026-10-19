@@ -1,0 +1,8 @@
+{
+  "format": "cydaw-processing",
+  "version": 1,
+  "kind": "midi",
+  "name": "Velocity Variation",
+  "description": "Velocities varied at random, the beats a little louder.",
+  "script": "param1:12<0,50,1>Variation (%)\nparam2:10<0,40,1>Accent on beats (%)\n\n@note\nvelocity *= 1 + (random() * 2 - 1) * param1 / 100;\n// On a beat: a little louder.\nabs(start - floor(start + 0.001)) < 0.01 ? velocity *= 1 + param2 / 100;\n"
+}

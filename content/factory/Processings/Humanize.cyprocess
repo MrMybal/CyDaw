@@ -1,0 +1,8 @@
+{
+  "format": "cydaw-processing",
+  "version": 1,
+  "kind": "midi",
+  "name": "Humanize",
+  "description": "Small random shifts of timing, velocity and length, as a player's.",
+  "script": "param1:12<0,60,1>Timing (ms)\nparam2:10<0,50,1>Velocity (%)\nparam3:5<0,50,1>Length (%)\n\n@note\nstart += gauss() * ms_to_beats(param1) / 2;\nvelocity *= 1 + gauss() * param2 / 200;\nlength *= 1 + gauss() * param3 / 200;\n"
+}

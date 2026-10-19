@@ -1,0 +1,8 @@
+{
+  "format": "cydaw-processing",
+  "version": 1,
+  "kind": "midi",
+  "name": "Swing",
+  "description": "The off-beats of the grid later (100 %: a triplet feel).",
+  "script": "param1:50<0,100,1>Amount (%)\nparam2:0<0,1,1>Grid (0 = 1/8, 1 = 1/16)\n\n@note\ngrid = param2 < 0.5 ? 0.5 : 0.25;\npos = start / grid;\nstep = floor(pos + 0.001);\n// The notes on an off-beat of the grid, later: 100 % is a triplet feel.\n(step % 2) == 1 && abs(pos - step) < 0.02 ? start += grid / 3 * param1 / 100;\n"
+}

@@ -1,0 +1,8 @@
+{
+  "format": "cydaw-processing",
+  "version": 1,
+  "kind": "midi",
+  "name": "Legato",
+  "description": "Each note held until the next one.",
+  "script": "param1:0<0,0.5,0.01>Overlap (beats)\n\n@note\n// Each note held until the next one starts (the last as it was).\nnext_start > 0 ? length = next_start - start + param1;\n"
+}

@@ -298,6 +298,8 @@ void ContextMenus::slotMenu(const TrackRef& owner, const int scene)
             (void) studio_.launchSlot(owner, scene);
         if (ImGui::MenuItem(L("Arrêter la piste", "Stop the track")))
             stopTrack();
+        if (ImGui::MenuItem(L("Appliquer un traitement MIDI…", "Apply a MIDI processing…")))
+            state_.processingRequest = ClipRef { track, clipId };
         if (ImGui::MenuItem(L("Ouvrir dans l'éditeur", "Open in the editor"), L("Double-clic", "Double click"))) {
             state_.editedClip = ClipRef { track, clipId };
             state_.bringToFront = Panel::editor;

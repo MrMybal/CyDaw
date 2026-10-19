@@ -360,6 +360,14 @@ juce::Result ModeProcessing::loadSample(std::uint64_t id, const juce::File &file
         return juce::Result::fail(error);
     return juce::Result::ok();
 }
+juce::var ModeProcessing::inputRuntimeState(std::uint64_t id) const
+{
+    const auto track = inputTrack(id);
+    if (!track)
+        return {};
+    const auto *slot = studio_.graphFor(*track);
+    return slot != nullptr ? slot->graph().createVst3RuntimeState() : juce::var();
+}
 std::vector<ModeProcessing::Parameter> ModeProcessing::parameters(std::uint64_t id) const
 {
     std::vector<Parameter> result{{"", ui::Ls("Volume", "Volume").toStdString(), -60, 12, 0}};
@@ -659,6 +667,41 @@ juce::var ModeProcessing::serialise() const
     put(state, "masterMute", studio_.engine().isMasterMuted());
     return state;
 }
+namespace
+{
+// The library's classes a graph state does not carry, added to it (those it
+// carries kept as they are).
+juce::var withMissingClasses(const juce::var &graphState, const juce::var &library)
+{
+    const auto *graph = graphState.getDynamicObject();
+    const auto *shared = library.getArray();
+    if (graph == nullptr || shared == nullptr)
+        return graphState;
+    std::set<juce::String> present;
+    juce::Array<juce::var> modules;
+    if (const auto *local = graph->getProperty("modules").getArray())
+        for (const auto &module : *local)
+        {
+            present.insert(module.getProperty("key", {}).toString());
+            modules.add(module);
+        }
+    auto added = false;
+    for (const auto &module : *shared)
+        if (present.insert(module.getProperty("key", {}).toString()).second)
+        {
+            modules.add(module);
+            added = true;
+        }
+    if (!added)
+        return graphState;
+    auto copy = juce::DynamicObject::Ptr(new juce::DynamicObject());
+    for (const auto &property : graph->getProperties())
+        copy->setProperty(property.name, property.value);
+    copy->setProperty("modules", juce::var(modules));
+    return juce::var(copy.get());
+}
+} // namespace
+
 void ModeProcessing::restore(const juce::var &state)
 {
     if (!state.getDynamicObject())
@@ -687,7 +730,8 @@ void ModeProcessing::restore(const juce::var &state)
             mapping[static_cast<std::uint64_t>(num(t, "key"))] = *track;
             if (auto *slot = studio_.graphFor(*track))
             {
-                slot->restore(t.getProperty("graph", {}));
+                // A state may carry only the classes its cards use: the library's others put back.
+                slot->restore(withMissingClasses(t.getProperty("graph", {}), studio_.sharedNodeModules()));
                 (void)studio_.publishGraph(*track, true);
             }
             Studio::Mix mix;
@@ -720,7 +764,7 @@ void ModeProcessing::restore(const juce::var &state)
     if (auto master = state.getProperty("master", {}); master.getDynamicObject())
     {
         auto *slot = studio_.graphFor(Studio::masterTrack());
-        slot->restore(master);
+        slot->restore(withMissingClasses(master, studio_.sharedNodeModules()));
         (void)studio_.publishGraph(Studio::masterTrack(), true);
     }
     studio_.engine().setMasterGain(static_cast<float>(num(state, "masterGain")));

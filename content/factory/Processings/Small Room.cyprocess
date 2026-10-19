@@ -1,0 +1,26 @@
+{
+  "format": "cydaw-processing",
+  "version": 1,
+  "kind": "audio",
+  "name": "Small Room",
+  "description": "A small room written in JSFX (Freeverb's design), its tail let ring.",
+  "steps": [
+    {
+      "type": "code",
+      "enabled": true,
+      "settings": {
+        "slider1": 1.2,
+        "slider2": 30.0,
+        "slider3": 6000.0
+      },
+      "code": "desc:Small Room\nslider1:1.2<0.2,8,0.1>Decay (s)\nslider2:30<0,100,1>Mix (%)\nslider3:6000<1000,16000,10>Damping (Hz)\n\n@init\n// Eight combs (four a side) and four all-passes (two a side), as Freeverb.\n// EEL2's names ignore case: each table has a name of its own.\ns = srate / 44100;\ncombLen = 0; combPos = 8; combLp = 16; combBuf = 24; combGain = 32;\napLen = 40; apBuf = 44; apPos = 48;\nnext = 1000;\ni = 0;\nloop(8,\n  base = (i % 4) == 0 ? 1116 : (i % 4) == 1 ? 1188 : (i % 4) == 2 ? 1277 : 1356;\n  combLen[i] = floor((base + (i >= 4 ? 23 : 0)) * s);\n  combBuf[i] = next; next += combLen[i] + 4;\n  combPos[i] = 0; combLp[i] = 0;\n  i += 1;\n);\nj = 0;\nloop(4,\n  apLen[j] = floor(((j % 2) == 0 ? 556 : 441) * s + (j >= 2 ? 23 * s : 0));\n  apBuf[j] = next; next += apLen[j] + 4;\n  apPos[j] = 0;\n  j += 1;\n);\n\n\n@slider\nmix = slider2 / 100;\ndamp = exp(-2 * $pi * slider3 / srate);\ni = 0;\nloop(8,\n  combGain[i] = 10 ^ (-3 * combLen[i] / (slider1 * srate));\n  i += 1;\n);\n\n@sample\nin = (spl0 + spl1) * 0.015;\noutL = 0;\noutR = 0;\ni = 0;\nloop(8,\n  buf = combBuf[i];\n  at = combPos[i];\n  y = buf[at];\n  combLp[i] = y + (combLp[i] - y) * damp;\n  buf[at] = in + combLp[i] * combGain[i];\n  at += 1;\n  at >= combLen[i] ? at = 0;\n  combPos[i] = at;\n  i < 4 ? outL += y : outR += y;\n  i += 1;\n);\nj = 0;\nloop(4,\n  buf = apBuf[j];\n  at = apPos[j];\n  x = j < 2 ? outL : outR;\n  held = buf[at];\n  buf[at] = x + held * 0.5;\n  y = held - x;\n  j < 2 ? outL = y : outR = y;\n  at += 1;\n  at >= apLen[j] ? at = 0;\n  apPos[j] = at;\n  j += 1;\n);\nspl0 = spl0 * (1 - mix * 0.5) + outL * mix * 3;\nspl1 = spl1 * (1 - mix * 0.5) + outR * mix * 3;\n"
+    }
+  ],
+  "tail": {
+    "allow": true,
+    "thresholdDb": -60.0,
+    "holdSeconds": 0.300000011920929,
+    "maxSeconds": 10.0,
+    "fadeMs": 30.0
+  }
+}

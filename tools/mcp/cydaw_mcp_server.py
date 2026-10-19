@@ -325,10 +325,11 @@ TOOLS = [
         "name": "app_mode",
         "description": ("Le mode de toute la fenetre : studio (pistes, arrangement, lanceur), "
                         "dj (Mix DJ : platines, table de mixage, collection), foundry (la "
-                        "Fonderie : editer des fichiers son), cinema (son a l image) ou workshop (Atelier VST). mode : "
-                        "le mettre ; sans : celui en place."),
+                        "Fonderie : editer des fichiers son), cinema (son a l image), processing (Traitements : "
+                        "traitements audio et MIDI) ou workshop (Atelier VST). mode : le mettre ; sans : celui en place."),
         "inputSchema": {"type": "object",
-                        "properties": {"mode": {"type": "string", "enum": ["studio", "dj", "foundry", "workshop", "cinema"]}}},
+                        "properties": {"mode": {"type": "string", "enum": ["studio", "dj", "foundry", "workshop", "cinema",
+                                                                           "processing"]}}},
     },
     {
         "name": "dj",
@@ -534,6 +535,30 @@ TOOLS = [
                                        "tracks": {"type": "array"}, "id": {"type": "integer"},
                                        "toTrack": {"type": "integer"}, "duration": {"type": "number"},
                                        "eachTrack": {"type": "boolean"}, "show": {"type": "boolean"}}},
+    },
+    {
+        "name": "processing",
+        "description": ("Les Traitements : des traitements audio (etapes dans l'ordre : chain = une chaine d'effets "
+                        "comme une piste, code = du JSFX, denoise, hum, declick, highpass, lowpass, gain, normalise, "
+                        "trim ; tail = la fin qui sonne au-dela du son, coupee si elle ne retombe pas) et MIDI (un "
+                        "script de notes EEL2 : @init, @note, @end, reglages paramN). Sans argument : la liste "
+                        "{kind: audio|midi} avec les reglages de chacun (id, min, max, value). render {nom, file, out, "
+                        "values {id: valeur}, tail {allow, thresholdDb, maxSeconds, holdSeconds}} : un fichier son "
+                        "traite dans un autre. apply {nom, track, clip (son id), values, tail, seed} : sur un clip "
+                        "(un pas d'annulation : undo scope arrangement pour l'audio, midi pour les notes). open "
+                        "{track, clip} : la fenetre d'application (reglages, avant / apres). check {source, "
+                        "language: jsfx|notes} : le code verifie. save {un traitement en JSON, format "
+                        "cydaw-processing} ; delete {nom} (les miens seulement) ; writeFactory {dossier} ; show, "
+                        "select {nom}, testFile {son}, state : la fenetre du mode."),
+        "inputSchema": {"type": "object", "properties": {
+            "kind": {"type": "string", "enum": ["audio", "midi"]}, "render": {"type": "string"},
+            "apply": {"type": "string"}, "file": {"type": "string"}, "out": {"type": "string"},
+            "values": {"type": "object"}, "tail": {"type": "object"}, "seed": {"type": "integer"},
+            "track": TRACK, "clip": {}, "open": {"type": "boolean"}, "check": {"type": "string"},
+            "language": {"type": "string", "enum": ["jsfx", "notes"]}, "save": {"type": "object"},
+            "delete": {"type": "string"}, "writeFactory": {"type": "string"}, "show": {"type": "boolean"},
+            "select": {"type": "string"}, "testFile": {"type": "string"}, "state": {"type": "boolean"},
+            "reload": {"type": "boolean"}}},
     },
     {
         "name": "cinema",

@@ -1,0 +1,50 @@
+{
+  "format": "cydaw-processing",
+  "version": 1,
+  "kind": "audio",
+  "name": "Vinyl Restoration",
+  "description": "A record: crackle and pops mended, hum and surface noise lowered, the harshest highs tamed.",
+  "steps": [
+    {
+      "type": "declick",
+      "enabled": true,
+      "settings": {
+        "maxClick": 4.0,
+        "sensitivity": 0.7
+      }
+    },
+    {
+      "type": "hum",
+      "enabled": true,
+      "settings": {
+        "fundamental": 0.0,
+        "harmonics": 4.0,
+        "width": 30.0
+      }
+    },
+    {
+      "type": "denoise",
+      "enabled": true,
+      "settings": {
+        "reduction": 10.0,
+        "sensitivity": 1.2,
+        "smoothing": 0.6
+      }
+    },
+    {
+      "type": "lowpass",
+      "enabled": true,
+      "settings": {
+        "cutoff": 15000.0,
+        "slope": 0.0
+      }
+    }
+  ],
+  "tail": {
+    "allow": false,
+    "thresholdDb": -60.0,
+    "holdSeconds": 0.300000011920929,
+    "maxSeconds": 10.0,
+    "fadeMs": 30.0
+  }
+}
