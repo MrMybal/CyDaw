@@ -1,128 +1,123 @@
 # CyDAW
 
-**CyDAW** est une station de travail audio numérique (DAW) pour Windows : composer, arranger, jouer,
-mixer et finaliser un morceau, avec ses propres instruments, ses propres effets et une bibliothèque de
-sons intégrée.
+**CyDAW** is a digital audio workstation (DAW) for Windows: compose, arrange, play, mix and finish a
+track, with its own instruments, its own effects and a built-in sound library.
 
-![CyDAW : l'arrangement, les pistes et les périphériques d'une piste](docs/images/cydaw-studio.png)
+![CyDAW: the arrangement, the tracks and a track's devices](docs/images/cydaw-studio.png)
 
-## Ce qu'il propose
+## What it offers
 
-**Composer et arranger**
-- Arrangement et lanceur de clips (scènes), sur les mêmes pistes.
-- Éditeur de notes avec expressions par note (hauteur, volume), legato pour les instruments
-  monophoniques.
-- Édition audio : étirement temporel sans changer la hauteur, prises et comping, versions de clip.
-- Automation de tous les réglages, modulations (LFO, macros), tempo et métrique.
-- Import des projets d'autres logiciels : Ableton Live, Bitwig, Studio One, Reaper, FL Studio, Ardour,
-  LMMS, Zrythm, DAWproject (Cubase…), AAF (Logic, Pro Tools…), et un fichier MIDI avec ses pistes audio.
+**Compose and arrange**
+- Arrangement and clip launcher (scenes), on the same tracks.
+- Note editor with per-note expressions (pitch, volume), legato for monophonic instruments.
+- Audio editing: time stretching without changing pitch, takes and comping, clip versions.
+- Automation of every setting, modulation (LFOs, macros), tempo and time signature.
+- Import projects from other software: Ableton Live, Bitwig, Studio One, Reaper, FL Studio, Ardour,
+  LMMS, Zrythm, DAWproject (Cubase…), AAF (Logic, Pro Tools…), and a MIDI file with its audio tracks.
 
-**Ses instruments**
-- **Prisme** (tables d'ondes), **Ambre** (analogique), **Colosse** (tables d'ondes modernes),
-  **Mosaïque** (hybride), **Nébuleuse** (couches et grains), **Kick** (grosse caisse synthétique).
-- **Opale** (polyphonique de tous les jours), **Quartz** et **Saphir** (FM), **Tirette** (orgue),
-  **Onyx** (distorsion de phase), **Alliage** (modules), **Argile** et **Dérive** (analogiques),
-  **Bronze** (objets résonants), **Jade** (piano électrique modélisé), **Silex** (boîte à rythmes
-  synthétisée).
-- **Drum Machine** (un pad par touche, chacun un instrument et ses effets), **Instrument Layer** et
-  **Instrument Selector** (des couches d'instruments, ensemble ou une à la fois), et **Nuée**
-  (granulaire sur ses propres sons).
-- **Batterie** : six kits acoustiques, mixage élément par élément, réglages des micros, motifs
-  rythmiques posés en clips MIDI.
-- **Sampler** : zones, couches de vélocité, round robin, import SFZ (contrôleurs, articulations,
-  bruits de relâchement), lecture depuis le disque pour les longs enregistrements.
-- **Plus de 90 instruments d'usine** (pianos, cordes, vents, guitares, basses, batteries,
-  percussions…) à partir de banques libres (CC0), et leurs **modèles de son** (resynthèse).
+**Its instruments**
+- **Prisme** (wavetable), **Ambre** (analogue), **Colosse** (modern wavetable), **Mosaïque** (hybrid),
+  **Nébuleuse** (layers and grains), **Kick** (synthesised kick drum).
+- **Opale** (everyday polyphonic), **Quartz** and **Saphir** (FM), **Tirette** (organ), **Onyx** (phase
+  distortion), **Alliage** (modular), **Argile** and **Dérive** (analogue), **Bronze** (resonant
+  objects), **Jade** (modelled electric piano), **Silex** (synthesised drum machine).
+- **Drum Machine** (one pad per key, each an instrument with its effects), **Instrument Layer** and
+  **Instrument Selector** (layers of instruments, together or one at a time), and **Nuée** (granular, on
+  its own sounds).
+- **Batterie**: six acoustic kits, per-piece mixing, microphone settings, grooves laid down as MIDI
+  clips.
+- **Sampler**: zones, velocity layers, round robin, SFZ import (controllers, articulations, release
+  noises), streaming from disk for long recordings.
+- **More than 90 factory instruments** (pianos, strings, winds, guitars, basses, drums, percussion…) built
+  from free (CC0) sound banks, and their **sound models** (resynthesis).
 
-![Colosse, un des synthés de CyDAW](docs/images/cydaw-colosse.png)
+![Colosse, one of CyDAW's synths](docs/images/cydaw-colosse.png)
 
-**Ses effets**
-- Studio : égaliseur, compresseur, réverbe, limiteur et filtre.
-- Mixage : Pression (compression multibande haut et bas), Fournaise (saturation), Écho Bande,
-  Multibande Pro, Velours (résonances), Patine (usure analogique), Halo (réverbe), Tranche (tranche de
-  console), Finition (mastering) et Sonomètre (loudness).
-- Amplis, baffles et micros pour guitares, basses et voix.
-- Créatifs : vocodeur, changeur de hauteur et harmoniseur, correction de justesse, dé-esseur, réverbe à
-  convolution, gel et flou spectraux, écho granulaire, répétitions en rythme, boucleur, décaleur de
-  fréquence, modulation en anneau, cabine tournante, résonateurs, filtre en peigne, volume en rythme.
-- MIDI : arpégiateur, accords, gamme, écho de notes, humanisation, durée des notes, séquenceur pas à
-  pas, roulement.
-- Utilitaires : accordeur, stéréoscope (goniomètre, corrélation de phase), polarité et graves en mono.
+**Its effects**
+- Studio: equaliser, compressor, reverb, limiter and filter.
+- Mixing: Pression (upward and downward multiband compression), Fournaise (saturation), Écho Bande (tape
+  echo), Multibande Pro, Velours (resonance taming), Patine (analogue wear), Halo (reverb), Tranche
+  (console channel strip), Finition (mastering) and Sonomètre (loudness).
+- Amps, cabinets and microphones for guitars, basses and vocals.
+- Creative: vocoder, pitch shifter and harmoniser, pitch correction, de-esser, convolution reverb,
+  spectral freeze and blur, granular delay, rhythmic repeats, looper, frequency shifter, ring
+  modulation, rotary speaker, resonators, comb filter, rhythmic volume.
+- MIDI: arpeggiator, chords, scale, note echo, humanise, note length, step sequencer, note repeat.
+- Utilities: tuner, stereo scope (goniometer, phase correlation), polarity and mono bass.
 
-**Moduler**
-- Sur chaque périphérique, des **modulateurs** comme dans Bitwig : LFO, Steps, Random, ADSR, Keytrack,
-  Expressions, Macro, Button, Math, Envelope Follower. On glisse leur flèche sur n'importe quel potard,
-  effets et instruments compris ; un anneau montre de combien il bouge, réglable pendant que ça joue.
-- Des **conteneurs** comme dans Bitwig : Chain, FX Layer, FX Selector, Mid-Side Split, Stereo Split,
-  Multiband FX-2 et FX-3, XY FX et Replacer. Leurs chaînes s'affichent dans la bande, on y glisse des
-  périphériques, ils s'imbriquent, leurs branches se renomment, leurs presets gardent tout ce qu'ils
-  contiennent.
+**Modulate**
+- On every device, Bitwig-style **modulators**: LFO, Steps, Random, ADSR, Keytrack, Expressions, Macro,
+  Button, Math, Envelope Follower. Drag their arrow onto any knob, effects and instruments included; a
+  ring shows how far it moves, adjustable while it plays.
+- Bitwig-style **containers**: Chain, FX Layer, FX Selector, Mid-Side Split, Stereo Split, Multiband
+  FX-2 and FX-3, XY FX and Replacer. Their chains show in the device strip, devices drop into them, they
+  nest, their branches can be renamed, and their presets keep everything they hold.
 
-**Mixer et router**
-- Mixeur avec bus, envois, side-chain, compensation de latence.
-- Pistes de mono à 7.1, entrées et sorties virtuelles avec leurs propres effets.
-- Accueil des plug-ins VST3, isolés dans leur propre processus.
+**Mix and route**
+- Mixer with buses, sends, sidechain and latency compensation.
+- Tracks from mono to 7.1, virtual inputs and outputs with their own effects.
+- VST3 plug-in hosting, each plug-in isolated in its own process.
 
-**Mixer en DJ**
-- Le mode **Mix DJ** : deux ou quatre platines (tempo et tonalité gardée, synchro, hot cues, boucles,
-  scratch, un effet par platine), table de mixage (égaliseur à kills, filtre, crossfader, casque,
-  limiteur), collection analysée (tempo, grille, tonalité), mix enregistré.
+**DJ mixing**
+- The **DJ mix** mode: two or four decks (tempo with key lock, sync, hot cues, loops, scratching, one
+  effect per deck), a mixer (kill EQ, filter, crossfader, headphones, limiter), an analysed collection
+  (tempo, beat grid, key), and recorded mixes.
 
-**Éditer des fichiers son**
-- La **Fonderie** : un éditeur de sons multipiste (plusieurs pistes, plusieurs sons sur chacune) —
-  couper, coller, fondus, normaliser, étirer et transposer, traiter avec les effets du studio, mesurer
-  (crête, RMS, LUFS, spectre), enregistrer en WAV, FLAC, AIFF ou Ogg, exporter le mixage.
+**Edit sound files**
+- The **Foundry**: a multitrack sound editor (several tracks, several sounds on each) — cut, paste,
+  fades, normalise, stretch and transpose, process with the studio's effects, measure (peak, RMS, LUFS,
+  spectrum), save as WAV, FLAC, AIFF or Ogg, export the mix.
 
-**Fabriquer ses traitements**
-- Le mode **Traitements** : des traitements audio faits d'étapes (une chaîne d'effets comme une piste,
-  du code JSFX, débruitage, anti-ronflement, anti-clics, filtres, normalisation) qui peuvent laisser
-  sonner une réverbe au-delà de la fin du son, et des traitements MIDI écrits en script (humaniser,
-  swing, strum, échos de notes…). Chacun s'essaie en écoutant avant / après, puis s'applique à un clip
-  en un pas d'annulation.
+**Build your own processing**
+- The **Processings** mode: audio processings made of steps (an effect chain set up like a track, JSFX
+  code, noise reduction, hum removal, click removal, filters, normalisation) that can let a reverb ring
+  past the end of the sound, and MIDI processings written as scripts (humanise, swing, strum, note
+  echoes…). Each one is tried by listening before / after, then applied to a clip as a single undo
+  step.
 
-**Travailler le son à l’image**
-- Le mode **Cinéma** : vidéo de référence facultative, bus en lignes comme dans l’arrangement,
-  conteneurs temporels de sous-pistes avec des clips audio/MIDI, liste avec cadrage, effets natifs,
-  routage et automations. La bande son
-  d’une vidéo devient automatiquement un clip audio éditable dans son propre bus.
+**Sound to picture**
+- The **Cinema** mode: an optional reference video, buses laid out in rows as in the arrangement, time
+  containers of audio/MIDI sub-tracks with their clips, a list with framing, native effects, routing
+  and automation. A video's soundtrack becomes an editable audio clip on its own bus automatically.
 
-**Piloter avec du matériel**
-- Les **contrôleurs MIDI / OSC**, faits autour de périphériques : votre clavier MIDI, une manette,
-  une tablette OSC (locale ou réseau), le clavier de l'ordinateur. On crée le périphérique, on bouge
-  un de ses contrôles pour que CyDAW reconnaisse le matériel, puis on apprend ses règles en bougeant
-  ses contrôles un par un : chacune a sa chaîne de modifications dans les deux sens (plage, courbe,
-  encodeur, bascule, zone morte) et ce qu'elle pilote, choisi d'un clic dans l'interface. Le mode
-  **Apprendre** marche aussi dans l'autre sens : cliquer une commande de CyDAW, bouger un contrôle.
+**Control with hardware**
+- **MIDI / OSC controllers**, organised around devices: your MIDI keyboard, a gamepad, an OSC tablet
+  (local or on the network), the computer keyboard. Create the device, move one of its controls so CyDAW
+  recognises the hardware, then learn its rules by moving its controls one by one: each has its chain of
+  transformations both ways (range, curve, encoder, toggle, dead zone) and what it controls, picked with
+  a click in the interface. **Learn** mode also works the other way: click a CyDAW control, then move a
+  hardware control.
 
-**Créer ses périphériques**
-- L'**Atelier Plugin** assemble des périphériques à partir de graphes de modules, leur dessine une
-  interface, et les exporte en plug-ins **VST3, CLAP et LV2** (Windows et Linux), samplers compris :
-  leurs échantillons voyagent dans le plug-in.
+**Make your own devices**
+- The **Plugin workshop** builds devices from module graphs, draws them an interface, and exports them as
+  **VST3, CLAP and LV2** plug-ins (Windows and Linux), samplers included: their samples travel inside the
+  plug-in.
 
-**Trouver ses sons**
-- Une bibliothèque qui réunit les banques et les dossiers de l'utilisateur : catégories, tonalité,
-  tempo, favoris, filtres par colonnes.
-- Recherche par description en option (modèle CLAP téléchargé depuis le logiciel, avec sa licence).
+**Find your sounds**
+- A library that brings together the sound banks and your own folders: categories, key, tempo,
+  favourites, column filters.
+- Optional search by description (a CLAP model downloaded from within the application, with its
+  licence).
 
-**Le piloter**
-- Un serveur **MCP** (`tools/mcp`) laisse un assistant IA créer des pistes, poser des notes, régler
-  les instruments et effets, ou exporter un mix.
+**Drive it**
+- An **MCP** server (`tools/mcp`) lets an AI assistant create tracks, write notes, set up instruments
+  and effects, or export a mix.
 
-L'interface est en français et en anglais. Des projets d'exemple sont fournis dans
+The interface is available in English and French. Example projects are provided in
 [`templates/`](templates).
 
-## Les sons
+## The sounds
 
-Les échantillons ne sont pas dans ce dépôt : les banques (libres, CC0 ou Unlicense) se téléchargent
-depuis le logiciel, dans **Options › Banques de sons**, à l'emplacement choisi. Le dépôt contient les
-cartes des instruments, leurs modèles de son et la liste des banques. Leurs auteurs et licences sont
-crédités dans [`content/factory/LICENCE.txt`](content/factory/LICENCE.txt).
+The samples are not in this repository: the sound banks (free, CC0 or Unlicense) are downloaded from
+within the application, in **Options › Sound banks**, to the location you choose. The repository holds
+the instruments' maps, their sound models and the list of banks. Their authors and licences are
+credited in [`content/factory/LICENCE.txt`](content/factory/LICENCE.txt).
 
-## Compiler
+## Building
 
-Prérequis : Windows 10 ou 11 (x64), Visual Studio 2022 (C++), CMake 3.24 ou plus récent,
-[Git LFS](https://git-lfs.com) (modèles de son et projets d'exemple), Python 3.11 pour les outils et
-les tests. JUCE 8 est récupéré automatiquement.
+Requirements: Windows 10 or 11 (x64), Visual Studio 2022 (C++), CMake 3.24 or newer,
+[Git LFS](https://git-lfs.com) (sound models and example projects), Python 3.11 for the tools and tests.
+JUCE 8 is fetched automatically.
 
 ```bash
 git lfs install
@@ -132,32 +127,35 @@ cmake --preset desktop-windows-wasapi
 cmake --build build/windows-wasapi --config Release --target CyDAW2
 ```
 
-L'application se trouve ensuite dans `build/windows-wasapi/CyDAW2_artefacts/Release/CyDAW 2.exe`.
-Les tests se lancent avec `ctest -C Release` dans le dossier de compilation.
+The application is then in `build/windows-wasapi/CyDAW2_artefacts/Release/CyDAW 2.exe`. Run the tests
+with `ctest -C Release` in the build folder.
 
 ## Documentation
 
-- [Référence de l'interface et du port de contrôle](docs/V2_INTERFACE.md)
-- [Sampler et instruments d'usine](docs/SAMPLER.md) · [Synthés](docs/SYNTHES.md) ·
+The detailed documentation is written in French.
+
+- [Interface and control port reference](docs/V2_INTERFACE.md)
+- [Sampler and factory instruments](docs/SAMPLER.md) · [Synths](docs/SYNTHES.md) ·
   [Prisme](docs/PRISME.md) · [Batterie](docs/BATTERIE.md) · [Kick](docs/KICK_ET_ELECTRO.md)
-- [Effets de studio](docs/EFFETS_STUDIO.md) · [Effets de mixage](docs/EFFETS_MIXAGE.md) ·
-  [Effets créatifs et MIDI](docs/EFFETS_CREATIFS.md) · [Amplis et micros](docs/AMPLIS_ET_MICROS.md)
-- [Bibliothèque de sons](docs/BANQUE_DE_SONS.md) · [Modèles de son](docs/SOUND_MATCHING.md)
-- [Édition audio](docs/EDITION_AUDIO.md) · [Architecture](docs/ARCHITECTURE.md)
-- [Cinéma : vidéo, montage audio et bus](docs/CINEMA.md)
-- [Traitements audio et MIDI : étapes, code, avant / après](docs/TRAITEMENTS.md)
-- [Synchronisation du transport : MIDI, JACK, Link](docs/TRANSPORT_SYNC.md)
-- [Contrôleurs MIDI / OSC : périphériques, règles, apprentissage](docs/CONTROLEURS.md)
-- [Modulateurs : LFO, pas, enveloppes, macros sur chaque périphérique](docs/MODULATEURS.md)
-- [Conteneurs : couches, sélecteur, mid-side, bandes, pavé XY, remplacement](docs/CONTENEURS.md)
-- [Serveur MCP](tools/mcp/README.md)
+- [Studio effects](docs/EFFETS_STUDIO.md) · [Mixing effects](docs/EFFETS_MIXAGE.md) ·
+  [Creative and MIDI effects](docs/EFFETS_CREATIFS.md) · [Amps and microphones](docs/AMPLIS_ET_MICROS.md)
+- [Sound library](docs/BANQUE_DE_SONS.md) · [Sound models](docs/SOUND_MATCHING.md)
+- [Audio editing](docs/EDITION_AUDIO.md) · [Architecture](docs/ARCHITECTURE.md)
+- [Cinema: video, audio editing and buses](docs/CINEMA.md)
+- [Audio and MIDI processings: steps, code, before / after](docs/TRAITEMENTS.md)
+- [Transport sync: MIDI, JACK, Link](docs/TRANSPORT_SYNC.md)
+- [MIDI / OSC controllers: devices, rules, learning](docs/CONTROLEURS.md)
+- [Modulators: LFOs, steps, envelopes, macros on every device](docs/MODULATEURS.md)
+- [Containers: layers, selector, mid-side, bands, XY pad, replacer](docs/CONTENEURS.md)
+- [MCP server](tools/mcp/README.md)
 
 ## Licence
 
-CyDAW est distribué sous la licence publique générale GNU Affero, version 3 (AGPL-3.0) : voir
-[LICENSE](LICENSE). Maintenance : Cyberalien.
+CyDAW is distributed under the GNU Affero General Public License, version 3 (AGPL-3.0): see
+[LICENSE](LICENSE). Maintained by Cyberalien.
 
-Il s'appuie sur [JUCE 8](https://juce.com) (AGPLv3) et [Dear ImGui](https://github.com/ocornut/imgui)
-(MIT). Les banques de sons gardent leurs propres licences.
+It is built on [JUCE 8](https://juce.com) (AGPLv3) and [Dear ImGui](https://github.com/ocornut/imgui)
+(MIT). The sound banks keep their own licences.
 
-Les formats externes **VST3, CLAP, LV2 et JSFX**, les exports natifs et l’éditeur JSFX sont décrits dans [PLUGIN_FORMATS.md](docs/PLUGIN_FORMATS.md).
+The external **VST3, CLAP, LV2 and JSFX** formats, the native exports and the JSFX editor are described
+in [PLUGIN_FORMATS.md](docs/PLUGIN_FORMATS.md).
