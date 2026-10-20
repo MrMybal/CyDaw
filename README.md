@@ -57,7 +57,8 @@ track, with its own instruments, its own effects and a built-in sound library.
 **Mix and route**
 - Mixer with buses, sends, sidechain and latency compensation.
 - Tracks from mono to 7.1, virtual inputs and outputs with their own effects.
-- VST3 plug-in hosting, each plug-in isolated in its own process.
+- **VST3, CLAP, LV2 and JSFX** plug-in hosting, each instance isolated in its own process, with a built-in
+  JSFX script editor.
 
 **DJ mixing**
 - The **DJ mix** mode: two or four decks (tempo with key lock, sync, hot cues, loops, scratching, one
