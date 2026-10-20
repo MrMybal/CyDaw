@@ -28,6 +28,8 @@ __pycache__/
 
 # The example projects stay local for now (tools/templates builds them).
 /templates/
+# The factory sound models too, until they are ready (tools/factory_content builds them).
+/content/factory/Sound Models/
 
 # A comparison against third-party songs, kept local.
 /tools/templates/audio_compare.py

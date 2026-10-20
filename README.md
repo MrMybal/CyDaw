@@ -29,7 +29,8 @@ track, with its own instruments, its own effects and a built-in sound library.
 - **Sampler**: zones, velocity layers, round robin, SFZ import (controllers, articulations, release
   noises), streaming from disk for long recordings.
 - **More than 90 factory instruments** (pianos, strings, winds, guitars, basses, drums, percussion…) built
-  from free (CC0) sound banks, and their **sound models** (resynthesis).
+  from free (CC0) sound banks.
+- **Sound models**: a recorded note analysed and resynthesised into a playable instrument.
 
 ![Colosse, one of CyDAW's synths](docs/images/cydaw-colosse.png)
 
@@ -109,13 +110,13 @@ The interface is available in English and French.
 
 The samples are not in this repository: the sound banks (free, CC0 or Unlicense) are downloaded from
 within the application, in **Options › Sound banks**, to the location you choose. The repository holds
-the instruments' maps, their sound models and the list of banks. Their authors and licences are
-credited in [`content/factory/LICENCE.txt`](content/factory/LICENCE.txt).
+the instruments' maps and the list of banks. Their authors and licences are credited in
+[`content/factory/LICENCE.txt`](content/factory/LICENCE.txt).
 
 ## Building
 
 Requirements: Windows 10 or 11 (x64), Visual Studio 2022 (C++), CMake 3.24 or newer,
-[Git LFS](https://git-lfs.com) (sound models), Python 3.11 for the tools and tests.
+[Git LFS](https://git-lfs.com) (a few test files), Python 3.11 for the tools and tests.
 JUCE 8 is fetched automatically.
 
 ```bash
