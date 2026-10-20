@@ -26,9 +26,10 @@ __pycache__/
 # Local scratch files.
 /scratch_*
 
-# Recordings and transcriptions of third-party songs, kept local.
-/templates/19-medellin-comparaison-midi.cydaw
-/templates/20-this-old-tune-comparaison-midi.cydaw
+# The example projects stay local for now (tools/templates builds them).
+/templates/
+
+# A comparison against third-party songs, kept local.
 /tools/templates/audio_compare.py
 
 # Pinned binary FFmpeg SDK; populated by tools/setup_ffmpeg.py.

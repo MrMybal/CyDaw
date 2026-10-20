@@ -103,8 +103,7 @@ track, with its own instruments, its own effects and a built-in sound library.
 - An **MCP** server (`tools/mcp`) lets an AI assistant create tracks, write notes, set up instruments
   and effects, or export a mix.
 
-The interface is available in English and French. Example projects are provided in
-[`templates/`](templates).
+The interface is available in English and French.
 
 ## The sounds
 
@@ -116,7 +115,7 @@ credited in [`content/factory/LICENCE.txt`](content/factory/LICENCE.txt).
 ## Building
 
 Requirements: Windows 10 or 11 (x64), Visual Studio 2022 (C++), CMake 3.24 or newer,
-[Git LFS](https://git-lfs.com) (sound models and example projects), Python 3.11 for the tools and tests.
+[Git LFS](https://git-lfs.com) (sound models), Python 3.11 for the tools and tests.
 JUCE 8 is fetched automatically.
 
 ```bash

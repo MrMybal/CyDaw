@@ -1006,10 +1006,13 @@ if(CYDAW_BUILD_DESKTOP)
                              COMMAND CyDAW2 "--roundtrip-test=${template_project}")
                     set_tests_properties(cydaw2_roundtrip_${template_name} PROPERTIES TIMEOUT 120)
                 endforeach()
-                # Track modulation moves the engine's parameters and lets go of them.
-                add_test(NAME cydaw2_modulation
-                         COMMAND CyDAW2 "--modulation-test=${CMAKE_CURRENT_SOURCE_DIR}/templates/06-tipper-glitch.cydaw")
-                set_tests_properties(cydaw2_modulation PROPERTIES TIMEOUT 120)
+                # Track modulation moves the engine's parameters and lets go of them
+                # (on an example project: they stay local, not in the repository).
+                if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/templates/06-tipper-glitch.cydaw")
+                    add_test(NAME cydaw2_modulation
+                             COMMAND CyDAW2 "--modulation-test=${CMAKE_CURRENT_SOURCE_DIR}/templates/06-tipper-glitch.cydaw")
+                    set_tests_properties(cydaw2_modulation PROPERTIES TIMEOUT 120)
+                endif()
                 # Every effect of the catalogue compiles, is editable and sounds right.
                 add_test(NAME cydaw2_effects COMMAND CyDAW2 "--effects-test")
                 set_tests_properties(cydaw2_effects PROPERTIES TIMEOUT 120)
@@ -1026,7 +1029,8 @@ if(CYDAW_BUILD_DESKTOP)
                 endforeach()
                 # The MCP server drives CyDAW 2 through its control port.
                 find_package(Python3 COMPONENTS Interpreter QUIET)
-                if(Python3_Interpreter_FOUND)
+                # It starts from an example project (local, not in the repository).
+                if(Python3_Interpreter_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/templates/02-basse-et-nappes.cydaw")
                     add_test(NAME cydaw2_mcp_check
                              COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/mcp/cydaw_mcp_check.py"
                                      --port 47822 --exe "$<TARGET_FILE:CyDAW2>" --quit)
