@@ -7,8 +7,7 @@ d'atmosphères, granulaire), puis **Opale** (le synthé polyphonique de tous les
 (synthé à modules), **Argile** (analogique tout en double), **Dérive** (analogique simple et vivant), **Bronze**
 (objets résonants : maillet, bruit, deux résonateurs), **Silex** (boîte à rythmes synthétisée) et **Jade**
 (piano électrique modélisé). Chacun a sa carte dans
-Périphériques (courte : trois ou quatre petits panneaux de ses réglages principaux, comme un module de
-Bitwig) et sa grande fenêtre (tous ses panneaux et tous ses réglages, ses préréglages, ses effets). Prisme (tables d'ondes) et Kick restent à part.
+Périphériques (courte : trois ou quatre petits panneaux de ses réglages principaux) et sa grande fenêtre (tous ses panneaux et tous ses réglages, ses préréglages, ses effets). Prisme (tables d'ondes) et Kick restent à part.
 
 | Synthé | Où le trouver | Ce qu'il est |
 |---|---|---|

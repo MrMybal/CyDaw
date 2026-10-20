@@ -2,8 +2,8 @@
 
 CyDAW joue des notes enregistrées de deux façons :
 
-- le **sampler** les rejoue telles qu'elles sont, chacune sur ses touches et ses vélocités (comme le Sampler
-  d'Ableton ou de Bitwig, Kontakt, les lecteurs SFZ) ;
+- le **sampler** les rejoue telles qu'elles sont, chacune sur ses touches et ses vélocités (il lit aussi les
+  cartes SFZ) ;
 - le **modèle de son** (docs/SOUND_MATCHING.md) les analyse en harmoniques et bruit et les resynthétise.
 
 Les **instruments d'usine** (90) existent sous les deux formes, sauf les batteries (échantillons seulement) :

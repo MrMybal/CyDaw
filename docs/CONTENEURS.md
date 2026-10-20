@@ -1,6 +1,6 @@
 # Conteneurs
 
-Un conteneur est un périphérique qui tient des chaînes de périphériques et les remélange, comme dans Bitwig. On l'ajoute avec le **+** de la bande des périphériques, catégorie **Conteneurs**, comme n'importe quel effet. Il y en a douze : neuf d'effets et trois d'instruments.
+Un conteneur est un périphérique qui tient des chaînes de périphériques et les remélange. On l'ajoute avec le **+** de la bande des périphériques, catégorie **Conteneurs**, comme n'importe quel effet. Il y en a douze : neuf d'effets et trois d'instruments.
 
 ## Les neuf conteneurs d'effets
 

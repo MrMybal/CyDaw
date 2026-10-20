@@ -1,6 +1,6 @@
 # Modulateurs
 
-Chaque périphérique a ses modulateurs, comme dans Bitwig : de petites sources (un LFO, une enveloppe, des pas, une macro…) qui font bouger ses potards autour de leur valeur. Ils s'ajoutent en plus des câbles du graphe et de la modulation de piste, qui restent.
+Chaque périphérique a ses modulateurs : de petites sources (un LFO, une enveloppe, des pas, une macro…) qui font bouger ses potards autour de leur valeur. Ils s'ajoutent en plus des câbles du graphe et de la modulation de piste, qui restent.
 
 ## Sur une carte
 

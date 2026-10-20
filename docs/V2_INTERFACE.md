@@ -13,8 +13,8 @@ commandes du port de contrôle, pour qui développe ou pilote le logiciel.
 
 Par défaut : l'arrangement et le lanceur au centre, puis Périphériques, Graphe, Mixeur, Routage et
 Éditeur en dessous ; l'inspecteur à gauche, le navigateur à droite (la disposition a une version : un nouveau
-défaut s'applique une fois aux dispositions enregistrées). Le **lanceur porte son mixeur**, comme
-Bitwig : sous chaque colonne de piste, sa tranche (nom et petit potard de pan en haut, grand fader et
+défaut s'applique une fois aux dispositions enregistrées). Le **lanceur porte son mixeur** :
+sous chaque colonne de piste, sa tranche (nom et petit potard de pan en haut, grand fader et
 grand vu-mètre, M/S/R), et à droite une colonne **Master** fixe (arrêter tout, lancer chaque scène, la
 tranche master avec son vu-mètre et un bouton M qui coupe tout sans perdre le niveau,
 `AudioTrackController::setMasterMuted`). Les noms des pistes restent en haut, la rangée de stops et les
@@ -201,7 +201,7 @@ pistes crée une piste MIDI dont l’instrument est un sampler chargé avec ce s
 avec les fichiers du navigateur interne et ceux de l’Explorateur Windows. Le clic droit sur un clip
 audio propose **Inverser le clip (Reverse)**, également disponible dans l’Arrangement et la Fonderie.
 
-**Lanceur** (`LauncherView.*`, `Studio::launchScene`…) : comme dans Bitwig, la **colonne des scènes est à
+**Lanceur** (`LauncherView.*`, `Studio::launchScene`…) : la **colonne des scènes est à
 gauche** (un bouton par rangée, « Tout » sous elles arrête tous les clips) et la **colonne Master à droite
 a ses propres cases** : des **clips d'automation du master**, un par scène (`MasterClip`, `Studio::masterClips`).
 Double-clic sur une case vide du Master : un clip (« Master n »), ouvert dans l'Éditeur ; il a un nom, une
@@ -229,7 +229,7 @@ pendant l'arrêt les fait partir avec lui ; « Tout arrêter » ou l'arrêt d'un
 **Scènes** : jusqu'à 256 (`maximumLauncherScenes`) ; la grille montre celles qui servent et deux de plus
 (huit au moins), les autres défilent (molette, barre). **Un clip MIDI du lanceur a sa case à lui**
 (`MidiClip::launcherScene` ; -1 : clip de l'arrangement) : l'arrangement ne le joue ni ne le montre, et un
-clip de l'arrangement n'apparaît plus dans le lanceur (comme dans Bitwig ; avant, la scène se déduisait
+clip de l'arrangement n'apparaît plus dans le lanceur (avant, la scène se déduisait
 de la position, une scène tous les 16 temps). Enregistré dans le projet (`launcherScene` du clip). Port
 de contrôle : `add_midi_clip {scene}` crée le clip dans la case, `set_midi_clip {scene}` l'y range (-1 :
 le rend à l'arrangement). Un projet importé (Bitwig, Ableton, DAWproject) garde toutes ses lignes : un
@@ -397,7 +397,7 @@ Le « 4/4 » de la barre de transport se change d'un clic : temps par mesure (1 
 
 ## Expressions par note et jeu legato
 
-**Expressions** (comme dans Bitwig) : chaque note porte deux courbes dessinées sur elle, sa **hauteur**
+**Expressions** : chaque note porte deux courbes dessinées sur elle, sa **hauteur**
 (demi-tons, ±24) et son **volume** (dB, -48 à +12), d'un bout à l'autre de la note. Dans l'éditeur de
 clip, les boutons **Notes / Hauteur / Volume** choisissent ce qu'on dessine : en Hauteur, la courbe passe
 sur la note, un demi-ton par rangée (clic sur une note : un point ; glisser ; double-clic l'ôte ; Ctrl :
@@ -571,7 +571,7 @@ contrôle : `presets` et `workshop` › `programs` ; MCP : `presets`. Vérifié 
 
 ## Clavier de l'ordinateur et entrées MIDI
 
-Comme dans Bitwig, **le clavier de l'ordinateur joue des notes** (activé par défaut ; Ctrl+K, bouton ⌨ de
+**Le clavier de l'ordinateur joue des notes** (activé par défaut ; Ctrl+K, bouton ⌨ de
 la barre de transport, Options › Clavier de l'ordinateur) : la rangée du milieu donne les touches blanches,
 celle du dessus les noires, **selon la place des touches** (AZERTY : Q S D F G H J K L M ù = Do…Fa ; QWERTY :
 A S D F…), lue de la disposition Windows (`MapVirtualKeyEx`) ; les deux premières touches de la rangée du
@@ -586,7 +586,7 @@ vélocité) et le dessin de ses touches. Port de contrôle : `computer_keyboard 
 
 ## Thèmes
 
-**Options › Thème** : *Gris moyen* (par défaut, proche de Bitwig), *Gris clair* (proche d'Ableton Live),
+**Options › Thème** : *Gris moyen* (par défaut), *Gris clair* (proche d'Ableton Live),
 *Sombre (d'origine)*, et les thèmes à soi. **Thèmes et couleurs…** : la liste, et pour un thème à soi ses
 29 couleurs par groupes (fonds, traits et grille, texte, accent et sélection, signaux et transport,
 vu-mètres), qui changent l'interface pendant qu'on les règle ; « Créer à partir de celui-ci » copie
@@ -607,7 +607,7 @@ puis les pistes, puis leurs instruments et effets, quelques-unes par image ; `St
 nom, éditeur, format, plug-in ou périphérique de l'application, instrument, effet de notes, et les réglages
 lisibles — ceux d'un périphérique Bitwig par leur identifiant, « F1FREQ », ceux d'un périphérique Live par leur
 chemin XML). Un **plug-in** (VST, CLAP…) n'est plus remplacé par un instrument : sa place est gardée par une
-carte **« Plugin manquant »** (ou « Instrument manquant ») comme dans Bitwig — un triangle d'avertissement, son
+carte **« Plugin manquant »** (ou « Instrument manquant ») — un triangle d'avertissement, son
 nom, son éditeur et son format (types `missing-plugin`, `missing-instrument` ; le son passe à travers un effet
 manquant, un instrument manquant est muet). Choisir un instrument pour la piste (+, bibliothèque) prend la
 place de l'instrument manquant, ses effets restent (`replaceInstrument`). `Studio::addMissingPlugin`.

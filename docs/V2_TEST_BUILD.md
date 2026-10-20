@@ -136,7 +136,7 @@ Master). Une **case vide** porte un petit carré : un clic arrête la piste, et 
 rangée arrête la piste ; **Ctrl+E** (ou clic droit › « Stop dans la case ») le retire des cases vides
 sélectionnées : la piste continue alors de jouer quand cette scène est lancée. Choisir une piste
 **n'arme plus** rien : armez à la main (R), plusieurs pistes à la fois ; le clavier joue la piste choisie,
-ou les armées quand il y en a. Comme dans Bitwig, chaque colonne a sa tranche de mixage en dessous, et la
+ou les armées quand il y en a. Chaque colonne a sa tranche de mixage en dessous, et la
 colonne **Master** est à droite (lancer une scène, volume master, M pour tout couper).
 
 **Clic droit** : sur une piste (arrangement, lanceur, mixeur) son menu ; sur une case du lanceur

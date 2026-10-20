@@ -47,10 +47,10 @@ track, with its own instruments, its own effects and a built-in sound library.
 - Utilities: tuner, stereo scope (goniometer, phase correlation), polarity and mono bass.
 
 **Modulate**
-- On every device, Bitwig-style **modulators**: LFO, Steps, Random, ADSR, Keytrack, Expressions, Macro,
+- On every device, **modulators**: LFO, Steps, Random, ADSR, Keytrack, Expressions, Macro,
   Button, Math, Envelope Follower. Drag their arrow onto any knob, effects and instruments included; a
   ring shows how far it moves, adjustable while it plays.
-- Bitwig-style **containers**: Chain, FX Layer, FX Selector, Mid-Side Split, Stereo Split, Multiband
+- **Containers**: Chain, FX Layer, FX Selector, Mid-Side Split, Stereo Split, Multiband
   FX-2 and FX-3, XY FX and Replacer. Their chains show in the device strip, devices drop into them, they
   nest, their branches can be renamed, and their presets keep everything they hold.
 
