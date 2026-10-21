@@ -16,16 +16,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Configure Windows worker
-        run: cmake --preset desktop-windows-wasapi
+        # Only the worker: CyDAW 2 (and its FFmpeg SDK) is not built here.
+        run: cmake --preset desktop-windows-wasapi -DCYDAW_BUILD_V2=OFF
       - name: Build isolated worker
         run: cmake --build build/windows-wasapi --config Release --target CyDAWPluginWorker --parallel 3
       - name: Verify worker protocol
         shell: pwsh
         run: |
           $worker = "build/windows-wasapi/CyDAWPluginWorker_artefacts/Release/CyDAWPluginWorker.exe"
+          # The protocol the sources declare (PluginIsolation.h), not a number to keep in step by hand.
+          $expected = [int](Select-String -Path include/cydaw/plugins/PluginIsolation.h -Pattern 'workerProtocolVersion = (\d+)').Matches[0].Groups[1].Value
           $report = (& $worker --self-test) | ConvertFrom-Json
-          if ($LASTEXITCODE -ne 0 -or $report.protocol -ne 4 -or $report.status -ne "ready" -or $report.isolation -ne "per-instance") {
-            throw "CyDAWPluginWorker handshake is incompatible"
+          if ($LASTEXITCODE -ne 0 -or $report.protocol -ne $expected -or $report.status -ne "ready" -or $report.isolation -ne "per-instance") {
+            throw "CyDAWPluginWorker handshake is incompatible (protocol $($report.protocol), expected $expected)"
           }
       - uses: actions/upload-artifact@v4
         with:

@@ -163,9 +163,59 @@ struct alignas(64) SharedPluginAudio {
     return static_cast<std::size_t>(channel) * maximumSharedAudioFrames + frame;
 }
 
+// An atomic view of one field of the shared structure: std::atomic_ref where
+// the standard library has it (MSVC, libstdc++); elsewhere (Apple's libc++,
+// Xcode 15 and 16) the same operations on the compiler's atomic built-ins.
+#if defined(__cpp_lib_atomic_ref)
+template <typename T>
+using SharedAtomic = std::atomic_ref<T>;
+#else
+template <typename T>
+class SharedAtomic {
+public:
+    static constexpr bool is_always_lock_free = __atomic_always_lock_free(sizeof(T), 0);
+
+    explicit SharedAtomic(T& value) noexcept : value_(&value) {}
+
+    [[nodiscard]] T load(const std::memory_order order = std::memory_order_seq_cst) const noexcept
+    {
+        return __atomic_load_n(value_, builtinOrder(order));
+    }
+    void store(const T desired, const std::memory_order order = std::memory_order_seq_cst) const noexcept
+    {
+        __atomic_store_n(value_, desired, builtinOrder(order));
+    }
+    T fetch_add(const T operand, const std::memory_order order = std::memory_order_seq_cst) const noexcept
+    {
+        return __atomic_fetch_add(value_, operand, builtinOrder(order));
+    }
+
+private:
+    static constexpr int builtinOrder(const std::memory_order order) noexcept
+    {
+        switch (order) {
+        case std::memory_order_relaxed: return __ATOMIC_RELAXED;
+        case std::memory_order_consume: return __ATOMIC_CONSUME;
+        case std::memory_order_acquire: return __ATOMIC_ACQUIRE;
+        case std::memory_order_release: return __ATOMIC_RELEASE;
+        case std::memory_order_acq_rel: return __ATOMIC_ACQ_REL;
+        case std::memory_order_seq_cst: break;
+        }
+        return __ATOMIC_SEQ_CST;
+    }
+    T* value_;
+};
+#endif
+
+template <typename T>
+[[nodiscard]] SharedAtomic<T> sharedAtomic(T& value) noexcept
+{
+    return SharedAtomic<T>(value);
+}
+
 static_assert(std::is_trivially_copyable_v<SharedPluginAudio>);
-static_assert(std::atomic_ref<std::uint32_t>::is_always_lock_free);
-static_assert(std::atomic_ref<std::uint64_t>::is_always_lock_free);
+static_assert(SharedAtomic<std::uint32_t>::is_always_lock_free);
+static_assert(SharedAtomic<std::uint64_t>::is_always_lock_free);
 // This layout is a cross-compiler wire ABI shared by GCC/Clang Linux hosts and
 // the MSVC worker launched through Wine/Proton. Any change must bump the
 // protocol version and preserve explicit verification on every platform.

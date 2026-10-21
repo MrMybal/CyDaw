@@ -91,7 +91,7 @@ juce::Result IsolatedPluginHost::startWorker(PluginWorkerLaunch launch,
     shared->protocolVersion = cydaw::plugins::workerProtocolVersion;
     shared->inputChannels = static_cast<std::uint16_t>(channelCount);
     shared->outputChannels = static_cast<std::uint16_t>(channelCount);
-    std::atomic_ref(shared->state).store(
+    cydaw::plugins::sharedAtomic(shared->state).store(
         static_cast<std::uint32_t>(cydaw::plugins::SharedPluginState::loading),
         std::memory_order_release);
 
@@ -117,7 +117,7 @@ juce::Result IsolatedPluginHost::startWorker(PluginWorkerLaunch launch,
     auto state = cydaw::plugins::SharedPluginState::loading;
     for (int waited = 0; waited < 15'000; waited += 10) {
         state = static_cast<cydaw::plugins::SharedPluginState>(
-            std::atomic_ref(shared->state).load(std::memory_order_acquire));
+            cydaw::plugins::sharedAtomic(shared->state).load(std::memory_order_acquire));
         if (state == cydaw::plugins::SharedPluginState::ready
             || state == cydaw::plugins::SharedPluginState::error)
             break;
@@ -159,8 +159,8 @@ void IsolatedPluginHost::stop()
 
     if (mapping_ != nullptr) {
         if (auto* shared = static_cast<cydaw::plugins::SharedPluginAudio*>(mapping_->getData())) {
-            std::atomic_ref(shared->shutdownRequested).store(1, std::memory_order_release);
-            std::atomic_ref(shared->state).store(
+            cydaw::plugins::sharedAtomic(shared->shutdownRequested).store(1, std::memory_order_release);
+            cydaw::plugins::sharedAtomic(shared->state).store(
                 static_cast<std::uint32_t>(cydaw::plugins::SharedPluginState::stopping),
                 std::memory_order_release);
         }
@@ -190,7 +190,7 @@ void IsolatedPluginHost::pollWorkerHealth()
     if (shared == nullptr)
         return;
     const auto state = static_cast<cydaw::plugins::SharedPluginState>(
-        std::atomic_ref(shared->state).load(std::memory_order_acquire));
+        cydaw::plugins::sharedAtomic(shared->state).load(std::memory_order_acquire));
     if (process_.isRunning() && state != cydaw::plugins::SharedPluginState::error) {
         // Parameters set and at rest for a moment: the state kept (what a
         // restarted worker gets back, what an autosave writes) follows.
@@ -229,8 +229,8 @@ juce::Result IsolatedPluginHost::sendCommand(const cydaw::plugins::SharedPluginC
     auto* shared = active_.load(std::memory_order_acquire);
     if (shared == nullptr)
         return juce::Result::fail("Plugin worker is not running");
-    auto request = std::atomic_ref(shared->commandSequence);
-    auto response = std::atomic_ref(shared->commandResponseSequence);
+    auto request = cydaw::plugins::sharedAtomic(shared->commandSequence);
+    auto response = cydaw::plugins::sharedAtomic(shared->commandResponseSequence);
     if (request.load(std::memory_order_acquire) != response.load(std::memory_order_acquire))
         return juce::Result::fail("Plugin control channel is busy");
 
@@ -414,8 +414,8 @@ bool IsolatedPluginHost::processBlock(juce::AudioBuffer<float>& buffer,
                                          static_cast<int>(shared->inputChannels),
                                          static_cast<int>(cydaw::plugins::maximumSharedAudioChannels) });
     const auto callback = ++callbackCounter_;
-    auto request = std::atomic_ref(shared->requestSequence);
-    auto response = std::atomic_ref(shared->responseSequence);
+    auto request = cydaw::plugins::sharedAtomic(shared->requestSequence);
+    auto response = cydaw::plugins::sharedAtomic(shared->responseSequence);
     const auto requestSequence = request.load(std::memory_order_acquire);
     const auto responseSequence = response.load(std::memory_order_acquire);
     auto processed = false;
@@ -434,7 +434,7 @@ bool IsolatedPluginHost::processBlock(juce::AudioBuffer<float>& buffer,
             }
             shared->automationCount = static_cast<std::uint32_t>(
                 pendingRealtimeParameterCount_);
-            std::atomic_ref(shared->automationSequence).fetch_add(1,
+            cydaw::plugins::sharedAtomic(shared->automationSequence).fetch_add(1,
                                                                   std::memory_order_release);
         }
         for (int channel = 0; channel < channelCount; ++channel) {
@@ -492,7 +492,7 @@ std::uint64_t IsolatedPluginHost::missedBlockCount() const noexcept
 int IsolatedPluginHost::latencySamples() const noexcept
 {
     if (auto* shared = active_.load(std::memory_order_acquire)) {
-        const auto pluginLatency = std::atomic_ref(shared->latencySamples)
+        const auto pluginLatency = cydaw::plugins::sharedAtomic(shared->latencySamples)
                                        .load(std::memory_order_acquire);
         return static_cast<int>(pluginLatency)
                + pipelineLatencySamples_.load(std::memory_order_acquire);

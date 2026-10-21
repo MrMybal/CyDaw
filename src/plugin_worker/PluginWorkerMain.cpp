@@ -584,7 +584,7 @@ void setWorkerStatus(cydaw::plugins::SharedPluginAudio& shared,
     const auto length = std::min<std::size_t>(std::strlen(utf8), sizeof(shared.statusMessage) - 1);
     std::memcpy(shared.statusMessage, utf8, length);
     shared.statusMessage[length] = '\0';
-    std::atomic_ref(shared.state).store(static_cast<std::uint32_t>(state),
+    cydaw::plugins::sharedAtomic(shared.state).store(static_cast<std::uint32_t>(state),
                                         std::memory_order_release);
 }
 
@@ -687,7 +687,7 @@ int runRealtimeWorker(const juce::File& pluginFile,
                                                std::max({ processingChannels,
                                                           instance->getTotalNumInputChannels(),
                                                           instance->getTotalNumOutputChannels() }));
-            std::atomic_ref(shared->latencySamples).store(
+            cydaw::plugins::sharedAtomic(shared->latencySamples).store(
                 static_cast<std::uint32_t>(std::max(0, instance->getLatencySamples())),
                 std::memory_order_release);
         }
@@ -698,14 +698,14 @@ int runRealtimeWorker(const juce::File& pluginFile,
         setWorkerStatus(*shared, cydaw::plugins::SharedPluginState::ready,
                         passthrough ? "IPC passthrough ready"
                                     : pluginFormatName + " ready");
-        auto request = std::atomic_ref(shared->requestSequence);
-        auto response = std::atomic_ref(shared->responseSequence);
-        auto heartbeat = std::atomic_ref(shared->heartbeat);
-        auto commandRequest = std::atomic_ref(shared->commandSequence);
-        auto commandResponse = std::atomic_ref(shared->commandResponseSequence);
-        auto automationRequest = std::atomic_ref(shared->automationSequence);
+        auto request = cydaw::plugins::sharedAtomic(shared->requestSequence);
+        auto response = cydaw::plugins::sharedAtomic(shared->responseSequence);
+        auto heartbeat = cydaw::plugins::sharedAtomic(shared->heartbeat);
+        auto commandRequest = cydaw::plugins::sharedAtomic(shared->commandSequence);
+        auto commandResponse = cydaw::plugins::sharedAtomic(shared->commandResponseSequence);
+        auto automationRequest = cydaw::plugins::sharedAtomic(shared->automationSequence);
         std::uint64_t appliedAutomationSequence {};
-        auto shutdown = std::atomic_ref(shared->shutdownRequested);
+        auto shutdown = cydaw::plugins::sharedAtomic(shared->shutdownRequested);
 
         while (shutdown.load(std::memory_order_acquire) == 0) {
             auto didWork = false;
@@ -749,7 +749,7 @@ int runRealtimeWorker(const juce::File& pluginFile,
                     juce::ScopedNoDenormals noDenormals;
                     playHead.update(*shared,sampleRate);
                     instance->processBlock(buffer, midi);
-                    std::atomic_ref(shared->latencySamples).store(
+                    cydaw::plugins::sharedAtomic(shared->latencySamples).store(
                         static_cast<std::uint32_t>(std::max(0, instance->getLatencySamples())),
                         std::memory_order_release);
                 }
