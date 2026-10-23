@@ -544,8 +544,8 @@ juce::Result renderChain(const juce::var& state, engine::repair::Channels& chann
 
 } // namespace
 
-AudioResult renderAudio(const Prepared& prepared, engine::repair::Channels channels, const double rate,
-                        const std::function<void(double)>& progress, const std::atomic<bool>* cancel)
+static AudioResult renderAudioUnguarded(const Prepared& prepared, engine::repair::Channels channels, const double rate,
+                                          const std::function<void(double)>& progress, const std::atomic<bool>* cancel)
 {
     namespace repair = engine::repair;
     AudioResult result;
@@ -654,22 +654,53 @@ AudioResult renderAudio(const Prepared& prepared, engine::repair::Channels chann
     return result;
 }
 
+// A long sound asks for several copies of itself (the steps, the tail): out
+// of memory, or a JSFX that throws, is said, never a crash (renders run on
+// threads of their own).
+AudioResult renderAudio(const Prepared& prepared, engine::repair::Channels channels, const double rate,
+                        const std::function<void(double)>& progress, const std::atomic<bool>* cancel)
+{
+    try {
+        return renderAudioUnguarded(prepared, std::move(channels), rate, progress, cancel);
+    } catch (const std::bad_alloc&) {
+        AudioResult failed;
+        failed.error = ui::Ls("Pas assez de mémoire pour traiter ce son", "Not enough memory to process this sound");
+        return failed;
+    } catch (const std::exception& error) {
+        AudioResult failed;
+        failed.error = juce::String::fromUTF8(error.what());
+        return failed;
+    }
+}
+
 juce::Result readAudioFile(const juce::File& file, engine::repair::Channels& channels, double& rate)
 {
     juce::AudioFormatManager formats;
     formats.registerBasicFormats();
     std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
-    if (reader == nullptr || reader->lengthInSamples <= 0)
+    if (reader == nullptr || reader->lengthInSamples <= 0 || !std::isfinite(reader->sampleRate) || reader->sampleRate < 1'000.0
+        || reader->sampleRate > 384'000.0)
         return juce::Result::fail(ui::Ls("Fichier son illisible : ", "Unreadable sound file: ") + file.getFileName());
+    // The header's word for its length is not trusted further than 30 minutes.
     if (reader->lengthInSamples > static_cast<juce::int64>(reader->sampleRate * 60.0 * 30.0))
         return juce::Result::fail(ui::Ls("Son trop long (30 minutes au plus)", "Sound too long (30 minutes at most)"));
-    const auto frames = static_cast<int>(reader->lengthInSamples);
+    const auto frames = static_cast<juce::int64>(reader->lengthInSamples);
     const auto count = static_cast<int>(std::clamp(reader->numChannels, 1u, 2u));
-    juce::AudioBuffer<float> buffer(count, frames);
-    reader->read(&buffer, 0, frames, 0, true, count > 1);
-    channels.assign(static_cast<std::size_t>(count), std::vector<float>(static_cast<std::size_t>(frames)));
-    for (int c = 0; c < count; ++c)
-        std::copy_n(buffer.getReadPointer(c), frames, channels[static_cast<std::size_t>(c)].begin());
+    try {
+        channels.assign(static_cast<std::size_t>(count), std::vector<float>(static_cast<std::size_t>(frames)));
+        // Read in pieces: the whole sound is held once, not twice.
+        constexpr int piece = 65'536;
+        juce::AudioBuffer<float> buffer(count, piece);
+        for (juce::int64 at = 0; at < frames; at += piece) {
+            const auto n = static_cast<int>(std::min<juce::int64>(piece, frames - at));
+            reader->read(&buffer, 0, n, at, true, count > 1);
+            for (int c = 0; c < count; ++c)
+                std::copy_n(buffer.getReadPointer(c), n, channels[static_cast<std::size_t>(c)].begin() + at);
+        }
+    } catch (const std::bad_alloc&) {
+        channels.clear();
+        return juce::Result::fail(ui::Ls("Pas assez de mémoire pour ce son", "Not enough memory for this sound"));
+    }
     rate = reader->sampleRate;
     return juce::Result::ok();
 }

@@ -192,10 +192,24 @@ void AudioTrial::start()
     job->generation = generation_;
     auto prepared = proc::prepare(processing_, values_);
     auto* raw = job.get();
-    job->thread = std::thread([raw, prepared = std::move(prepared), source = source_, rate = rate_]() mutable {
-        raw->result = proc::renderAudio(prepared, std::move(source), rate, [raw](const double done) { raw->progress = done; }, &raw->cancel);
-        raw->done = true;
-    });
+    try {
+        job->thread = std::thread([raw, prepared = std::move(prepared), source = source_, rate = rate_]() mutable {
+            try {
+                raw->result = proc::renderAudio(prepared, std::move(source), rate, [raw](const double done) { raw->progress = done; },
+                                                &raw->cancel);
+            } catch (...) {
+                raw->result = {};
+                raw->result.error = ui::Ls("Le traitement a échoué", "The processing failed");
+            }
+            raw->done = true;
+        });
+    } catch (const std::exception&) {
+        // No memory for the sound's copy, or no thread: said, nothing started.
+        result_ = {};
+        result_.error = ui::Ls("Pas assez de mémoire pour traiter ce son", "Not enough memory to process this sound");
+        after_.reset();
+        return;
+    }
     jobs_.push_back(std::move(job));
 }
 
@@ -1360,7 +1374,7 @@ void ProcessingView::drawApply()
         ImGui::TextColored(theme::vec(p.record), "%s", applyError_.toRawUTF8());
     ImGui::EndChild();
     ImGui::Separator();
-    const auto ready = midi ? applyMidi_.result().ok : (applyTrial_.result() != nullptr && applyTrial_.result()->ok && !applyTrial_.rendering());
+    const auto ready = midi ? applyMidi_.result().ok : (applyTrial_.result() != nullptr && applyTrial_.result()->ok && !applyTrial_.busy());
     ImGui::BeginDisabled(!ready);
     if (ui::primaryButton(L("Appliquer", "Apply"), ImVec2(dp(120.0f), 0.0f))) {
         juce::Result applied = juce::Result::ok();

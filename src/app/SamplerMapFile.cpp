@@ -528,6 +528,8 @@ void SampleStore::Impl::Streamer::run()
             if (state == SampleStream::wanted) {
                 reader.reset(stream.sample != nullptr ? formats.createReaderFor(juce::File(juce::String::fromUTF8(stream.sample->path.c_str())))
                                                       : nullptr);
+                // Not readable: said so, an offline render does not wait for it.
+                stream.unreadable.store(reader == nullptr, std::memory_order_release);
                 auto expected = static_cast<int>(SampleStream::wanted);
                 state = stream.state.compare_exchange_strong(expected, SampleStream::filling, std::memory_order_acq_rel)
                             ? static_cast<int>(SampleStream::filling)
@@ -1460,7 +1462,7 @@ namespace {
 
 // The text with its #include files in place and its #define names replaced.
 juce::String expandSfz(const juce::File& file, const juce::File& root, std::map<juce::String, juce::String>& defines,
-                       int depth)
+                       int depth, int& includes)
 {
     if (depth > 16 || !file.existsAsFile())
         return {};
@@ -1482,7 +1484,10 @@ juce::String expandSfz(const juce::File& file, const juce::File& root, std::map<
         }
         if (trimmed.startsWith("#include")) {
             const auto name = trimmed.fromFirstOccurrenceOf("\"", false, false).upToLastOccurrenceOf("\"", false, false);
-            out << expandSfz(root.getChildFile(name.replaceCharacter('\\', '/')), root, defines, depth + 1) << "\n";
+            // A budget of includes for the whole map: one including itself
+            // several times would read millions of files before the depth stops it.
+            if (--includes >= 0)
+                out << expandSfz(root.getChildFile(name.replaceCharacter('\\', '/')), root, defines, depth + 1, includes) << "\n";
             continue;
         }
         // Longest names first, so "$A10" is not read as "$A1" then "0".
@@ -1570,7 +1575,8 @@ juce::var samplerMapFromSfz(const juce::File& file, juce::String& error, const s
         return {};
     }
     std::map<juce::String, juce::String> defines;
-    const auto sections = parseSfz(expandSfz(file, file.getParentDirectory(), defines, 0));
+    auto includes = 1'024;
+    const auto sections = parseSfz(expandSfz(file, file.getParentDirectory(), defines, 0, includes));
     // What the instrument opens with: its controllers' starting values
     // (set_ccN; MIDI's own otherwise), their names, its curves, its
     // keyswitches.

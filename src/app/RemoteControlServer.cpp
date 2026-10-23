@@ -61,6 +61,10 @@ void RemoteControlServer::run()
 void RemoteControlServer::serve(juce::StreamingSocket& client)
 {
     std::string buffer;
+    // A connection starts with a JSON object. One that starts otherwise (a web
+    // page's request: "POST / HTTP/1.1"…) is closed before anything it carries
+    // is read, so a page in a browser cannot drive CyDAW through its body.
+    auto first = true;
     while (!threadShouldExit() && client.isConnected()) {
         const auto ready = client.waitUntilReady(true, 200);
         if (ready < 0)
@@ -82,6 +86,8 @@ void RemoteControlServer::serve(juce::StreamingSocket& client)
             buffer.erase(0, newline + 1);
             if (line.trim().isEmpty())
                 continue;
+            if (std::exchange(first, false) && !line.trim().startsWithChar('{'))
+                return;
             const auto reply = respond(line.trim()) + "\n";
             const auto bytes = reply.toRawUTF8();
             const auto length = static_cast<int>(std::char_traits<char>::length(bytes));

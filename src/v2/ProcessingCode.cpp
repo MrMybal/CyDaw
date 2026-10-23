@@ -14,7 +14,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <map>
 #include <mutex>
+#include <set>
 #include <numbers>
 
 namespace cydaw::v2::processing {
@@ -147,6 +149,15 @@ EEL_F NSEEL_CGEN_CALL eelAddNote(void* opaque, INT_PTR count, EEL_F** parms)
 
 // The note scripts' own functions (and none of the JSFX host's: a script
 // calling those would crash).
+// EEL2 keeps global state (its list of global variables, counted by the
+// machines that use it) that ysfx does not lock: machines are made, compiled
+// and freed one at a time, here and in the JSFX renders. They run unlocked.
+std::recursive_mutex& eelLock()
+{
+    static std::recursive_mutex lock;
+    return lock;
+}
+
 eel_function_table& functions()
 {
     static eel_function_table table {};
@@ -167,9 +178,15 @@ eel_function_table& functions()
 struct Machine {
     NSEEL_VMCTX vm {};
     std::vector<NSEEL_CODEHANDLE> code;
-    Machine() : vm(NSEEL_VM_alloc()) { NSEEL_VM_SetFunctionTable(vm, &functions()); }
+    Machine()
+    {
+        const std::scoped_lock lock(eelLock());
+        vm = NSEEL_VM_alloc();
+        NSEEL_VM_SetFunctionTable(vm, &functions());
+    }
     ~Machine()
     {
+        const std::scoped_lock lock(eelLock());
         for (auto* handle : code)
             if (handle != nullptr)
                 NSEEL_code_free(handle);
@@ -183,6 +200,7 @@ struct Machine {
     {
         if (text.trim().isEmpty())
             return nullptr;
+        const std::scoped_lock lock(eelLock());
         auto* handle = NSEEL_code_compile_ex(vm, text.toRawUTF8(), line, 0);
         if (handle == nullptr) {
             const auto* message = NSEEL_code_getcodeerror(vm);
@@ -337,11 +355,18 @@ namespace {
 // The source in a file of its own (ysfx reads files), in the cache.
 juce::File scriptFile(const juce::String& source)
 {
+    const auto text = source.replace("\r\n", "\n");
     const auto folder = locations::folder(Location::cache).getChildFile("processing");
+    const auto file = folder.getChildFile(juce::String::toHexString(text.hashCode64()) + ".jsfx");
+    static std::mutex lock;
+    static std::set<juce::String> written;
+    const std::scoped_lock held(lock);
+    if (written.count(file.getFullPathName()) > 0 && file.existsAsFile())
+        return file;
     (void) folder.createDirectory();
-    const auto file = folder.getChildFile(juce::String::toHexString(source.hashCode64()) + ".jsfx");
-    if (!file.existsAsFile() || file.loadFileAsString() != source)
-        (void) file.replaceWithText(source);
+    if (!file.existsAsFile() || file.loadFileAsString() != text)
+        (void) file.replaceWithText(text, false, false, "\n");
+    written.insert(file.getFullPathName());
     return file;
 }
 
@@ -349,8 +374,18 @@ struct Loaded {
     ysfx_config_u config { ysfx_config_new() };
     ysfx_u fx;
     juce::String log;
+    Loaded() = default;
+    Loaded(const Loaded&) = delete;
+    Loaded& operator=(const Loaded&) = delete;
+    ~Loaded()
+    {
+        const std::scoped_lock lock(eelLock());
+        fx.reset();
+        config.reset();
+    }
     bool load(const juce::String& source, juce::String& error)
     {
+        const std::scoped_lock lock(eelLock());
         ysfx_set_user_data(config.get(), reinterpret_cast<intptr_t>(this));
         ysfx_set_log_reporter(config.get(), [](intptr_t data, ysfx_log_level level, const char* message) {
             auto* self = reinterpret_cast<Loaded*>(data);
@@ -374,10 +409,25 @@ struct Loaded {
 
 JsfxInfo inspectJsfx(const juce::String& source)
 {
+    static std::mutex lock;
+    static std::map<juce::String, JsfxInfo> seen;
+    {
+        const std::scoped_lock held(lock);
+        if (const auto found = seen.find(source); found != seen.end())
+            return found->second;
+    }
     JsfxInfo info;
+    const auto remember = [&] {
+        const std::scoped_lock held(lock);
+        if (seen.size() > 64)
+            seen.clear();
+        seen[source] = info;
+    };
     Loaded loaded;
-    if (!loaded.load(source, info.error))
+    if (!loaded.load(source, info.error)) {
+        remember();
         return info;
+    }
     info.ok = true;
     info.name = juce::String::fromUTF8(ysfx_get_name(loaded.fx.get()));
     for (int i = 0; i < ysfx_max_sliders; ++i)
@@ -396,6 +446,7 @@ JsfxInfo inspectJsfx(const juce::String& source)
                     setting.choices.add(juce::String::fromUTF8(ysfx_slider_get_enum_name(loaded.fx.get(), static_cast<uint32_t>(i), j)));
             info.sliders.push_back(setting);
         }
+    remember();
     return info;
 }
 

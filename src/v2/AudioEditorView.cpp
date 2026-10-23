@@ -644,6 +644,10 @@ void AudioEditorView::drawClip(const TrackRef& track, const AudioClip& clip)
     if (previewEnd_ || engine.isAudioClipPreviewing() || engine.isPlaying() || (launcher() && studio_.playingScene(track) == scene_))
         host_.wake(2);
     drawToolbar(track, clip, events);
+    if (std::exchange(clipReplaced_, false)) {
+        host_.wake(2);
+        return;
+    }
     if (mode_ == Mode::takes) {
         drawTakes(track, clip);
         return;
@@ -807,6 +811,7 @@ void AudioEditorView::drawToolbar(const TrackRef& track, const AudioClip& clip, 
             (void) undoLauncher(false);
         else
             (void) engine.undoArrangementEdit();
+        clipReplaced_ = true;
     }
     ImGui::EndDisabled();
     ImGui::SameLine(0.0f, dp(2.0f));
@@ -816,8 +821,12 @@ void AudioEditorView::drawToolbar(const TrackRef& track, const AudioClip& clip, 
             (void) undoLauncher(true);
         else
             (void) engine.redoArrangementEdit();
+        clipReplaced_ = true;
     }
     ImGui::EndDisabled();
+    // The clip given may be gone now: drawn again from the next frame.
+    if (clipReplaced_)
+        return;
     ui::toolbarSeparator();
     // On the sound picked.
     const auto selected = std::find_if(events.begin(), events.end(), [this](const auto& e) { return e.id == selectedEvent_; });
@@ -874,14 +883,14 @@ void AudioEditorView::drawToolbar(const TrackRef& track, const AudioClip& clip, 
         if (selectionEnd_ - selectionStart_ > 1.0e-4) {
             pixelsPerSecond_ = static_cast<double>(laneWidth_) / (selectionEnd_ - selectionStart_);
             scroll_ = selectionStart_;
-        } else {
+        } else if (pixelsPerSecond_ > 0.0) {
             const auto centre = scroll_ + laneWidth_ * 0.5 / pixelsPerSecond_;
             pixelsPerSecond_ = std::min(96'000.0, pixelsPerSecond_ * 1.6);
             scroll_ = std::max(kScrollFloor, centre - laneWidth_ * 0.5 / pixelsPerSecond_);
         }
     }
     ImGui::SameLine(0.0f, dp(2.0f));
-    if (ui::iconButton(icon::zoomOut, L("Dézoomer", "Zoom out"))) {
+    if (ui::iconButton(icon::zoomOut, L("Dézoomer", "Zoom out")) && pixelsPerSecond_ > 0.0) {
         const auto centre = scroll_ + laneWidth_ * 0.5 / pixelsPerSecond_;
         pixelsPerSecond_ = std::max(static_cast<double>(laneWidth_) / viewLength(clip, events) * 0.5, pixelsPerSecond_ / 1.6);
         scroll_ = std::max(kScrollFloor, centre - laneWidth_ * 0.5 / pixelsPerSecond_);

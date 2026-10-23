@@ -1065,6 +1065,7 @@ void LauncherView::sendsCell(const TrackRef& track, const std::vector<TrackRef>&
         style.format = "%.1f dB";
         style.flags = ui::knobNoLabel;
         style.colour = theme::fromArgb(studio_.trackColour(bus));
+        auto sending = found != outputs.end();
         if (ui::knob("##send", &level, -60.0f, 6.0f, -60.0f, style)) {
             if (found != outputs.end())
                 found->gainDb = level;
@@ -1073,10 +1074,10 @@ void LauncherView::sendsCell(const TrackRef& track, const std::vector<TrackRef>&
                 output.destination = key;
                 output.gainDb = level;
                 outputs.push_back(output);
+                sending = true;
             }
             changed = true;
         }
-        const auto sending = found != outputs.end();
         ui::clippedText(list, ImVec2(min.x + dp(26.0f), y + dp(5.0f)), size.x - dp(30.0f), sending ? p.text : p.textDim,
                         studio_.trackName(bus).toRawUTF8());
         ImGui::PopID();

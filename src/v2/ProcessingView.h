@@ -50,6 +50,8 @@ public:
     // Each frame: a rendering started when due, a finished one taken.
     void tick();
     [[nodiscard]] bool rendering() const noexcept { return !jobs_.empty() && jobs_.back()->generation == generation_; }
+    // A rendering running, or due (a setting just moved): the result shown is not the settings' yet.
+    [[nodiscard]] bool busy() const noexcept { return dueAt_ >= 0.0 || rendering(); }
     [[nodiscard]] double progress() const noexcept;
     [[nodiscard]] const processing::AudioResult* result() const noexcept { return after_ ? &result_ : nullptr; }
     [[nodiscard]] double rate() const noexcept { return rate_; }

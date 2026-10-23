@@ -126,6 +126,7 @@ SampleStream* SampleStreams::claim(const SampleDataRef& sample, const std::int64
         stream.reading.store(from, std::memory_order_relaxed);
         stream.low.store(from, std::memory_order_relaxed);
         stream.high.store(from, std::memory_order_relaxed);
+        stream.unreadable.store(false, std::memory_order_relaxed);
         stream.state.store(SampleStream::wanted, std::memory_order_release);
         return &stream;
     }
@@ -835,7 +836,9 @@ void SamplerVoice::next(const SamplerMap* map, const SamplerValues& values, cons
                 if (lane.stream != nullptr) {
                     lane.stream->reading.store(static_cast<std::int64_t>(std::floor(lane.position)), std::memory_order_release);
                     if (samplerMayWait)
-                        for (auto tries = 0; tries < 20'000 && !framesThere(lane, sample, lane.position); ++tries)
+                        for (auto tries = 0; tries < 20'000 && !framesThere(lane, sample, lane.position)
+                                             && !lane.stream->unreadable.load(std::memory_order_acquire);
+                             ++tries)
                             std::this_thread::sleep_for(std::chrono::microseconds(100));
                 }
                 if (!framesThere(lane, sample, lane.position)) {

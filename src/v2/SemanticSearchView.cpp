@@ -162,11 +162,13 @@ void SemanticSearchView::drawEngine()
         ImGui::PopTextWrapPos();
         if (ImGui::Button(L("Installer le moteur (processeur)", "Install the engine (processor)"))) {
             engineInstall_ = "cpu";
+            engineLicencesAccepted_ = false;
             openConfirm_ = true;
         }
         ImGui::SameLine();
         if (ImGui::Button(L("Installer le moteur (carte NVIDIA)", "Install the engine (NVIDIA card)"))) {
             engineInstall_ = "cuda";
+            engineLicencesAccepted_ = false;
             openConfirm_ = true;
         }
     }
@@ -409,6 +411,23 @@ void SemanticSearchView::drawConfirm()
                              "leurs dépendances).",
                              "Licences: PyTorch BSD-3-Clause, transformers Apache-2.0, numpy BSD-3-Clause (and their "
                              "dependencies')."));
+        // The NVIDIA build carries NVIDIA's libraries: their licences shown, and
+        // accepted, before anything is downloaded (as the companion's window asks).
+        if (cuda) {
+            const auto component = studio_.companion().component("torch-cuda");
+            if (const auto* packages = component.getProperty("packages", {}).getArray())
+                for (const auto& package : *packages) {
+                    ImGui::BulletText("%s", (package.getProperty("name", {}).toString() + " : "
+                                             + package.getProperty("licence", {}).toString()).toRawUTF8());
+                    if (const auto url = package.getProperty("url", {}).toString(); url.isNotEmpty()) {
+                        ImGui::SameLine();
+                        link(ui::Ls("Lire", "Read"), url);
+                    }
+                }
+            ImGui::Checkbox(L("J'accepte ces licences (dont celles de NVIDIA pour CUDA et cuDNN)",
+                              "I accept these licences (NVIDIA's for CUDA and cuDNN among them)"),
+                            &engineLicencesAccepted_);
+        }
     } else if (const auto* model = studio_.aiModels().find(confirming_)) {
         ImGui::PushFont(theme::boldFont(), 0.0f);
         ImGui::TextUnformatted((ui::Ls("Télécharger ", "Download ") + model->title + " ?").toRawUTF8());
@@ -426,13 +445,19 @@ void SemanticSearchView::drawConfirm()
     }
     ImGui::PopTextWrapPos();
     ImGui::Spacing();
-    if (ImGui::Button(engineInstall_.isNotEmpty() ? L("Installer", "Install") : L("Télécharger", "Download"), ImVec2(dp(140.0f), 0.0f))) {
+    ImGui::BeginDisabled(engineInstall_ == "cuda" && !engineLicencesAccepted_);
+    const auto install = ImGui::Button(engineInstall_.isNotEmpty() ? L("Installer", "Install") : L("Télécharger", "Download"),
+                                       ImVec2(dp(140.0f), 0.0f));
+    ImGui::EndDisabled();
+    if (install) {
         if (engineInstall_.isNotEmpty()) {
-            const auto environment = locations::folder(Location::companion);
             // The environment's own Python from now on.
             studio_.companion().setPythonCommand({});
-            if (!studio_.companion().start({ "setup", "--env", environment.getFullPathName(), "--torch", engineInstall_, "--clap" }))
-                report(ui::Ls("Le compagnon est occupé", "The companion is busy"), true);
+            // Through the companion's components: their licences checked, a receipt kept.
+            const auto id = engineInstall_ == "cuda" ? juce::String("torch-cuda") : juce::String("torch-cpu");
+            juce::String error;
+            if (!studio_.companion().install(id, engineInstall_ != "cuda" || engineLicencesAccepted_, error, { "--clap" }))
+                report(error, true);
             else
                 report(ui::Ls("Installation du moteur…", "Installing the engine…"), false);
         } else if (const auto* model = studio_.aiModels().find(confirming_)) {

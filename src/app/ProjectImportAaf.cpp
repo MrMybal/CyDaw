@@ -59,7 +59,12 @@ public:
         miniShift_ = u16(0x20);
         if (sectorShift_ < 7 || sectorShift_ > 16)
             return juce::Result::fail("The AAF file's sectors are of an unknown size");
+        if (miniShift_ < 4 || miniShift_ > sectorShift_)
+            return juce::Result::fail("The AAF file's small sectors are of an unknown size");
         const auto fatSectors = u32(0x2c);
+        // No more FAT sectors than the file holds sectors.
+        if (fatSectors > size_ / sectorSize() + 1)
+            return juce::Result::fail("The AAF file's FAT is larger than the file");
         const auto firstDirectory = u32(0x30);
         miniCutoff_ = u32(0x38);
         const auto firstMiniFat = u32(0x3c);
@@ -69,7 +74,10 @@ public:
         for (int index = 0; index < 109 && fatList.size() < fatSectors; ++index)
             fatList.push_back(u32(0x4c + static_cast<std::size_t>(index) * 4));
         const auto perSector = sectorSize() / 4;
+        std::set<juce::uint32> difatSeen;
         for (auto guard = 0; difatSector < 0xfffffffau && fatList.size() < fatSectors && guard < 1'000'000; ++guard) {
+            if (!difatSeen.insert(difatSector).second)
+                break;
             const auto base = offsetOf(difatSector);
             if (base + sectorSize() > size_)
                 break;
@@ -125,11 +133,12 @@ public:
     [[nodiscard]] std::map<juce::String, int> children(const int storage) const
     {
         std::map<juce::String, int> found;
+        std::set<juce::uint32> visited;
         std::vector<juce::uint32> pending { entries_[static_cast<std::size_t>(storage)].child };
         while (!pending.empty()) {
             const auto at = pending.back();
             pending.pop_back();
-            if (at >= entries_.size() || found.size() > entries_.size())
+            if (at >= entries_.size() || !visited.insert(at).second)
                 continue;
             const auto& item = entries_[at];
             found[item.name.toLowerCase()] = static_cast<int>(at);
@@ -417,6 +426,8 @@ private:
             return object;
         const auto count = static_cast<int>(bytes[2] | (bytes[3] << 8));
         std::size_t value = 4 + static_cast<std::size_t>(count) * 6;
+        if (value > block.getSize())
+            return object;
         for (int index = 0; index < count; ++index) {
             const auto* at = bytes + 4 + index * 6;
             const auto key = at[0] | (at[1] << 8);
@@ -539,7 +550,7 @@ private:
     // The file a mob's slot plays at `offset` seconds into it.
     std::vector<Source> resolve(const juce::MemoryBlock& mobId, const juce::int64 slotId, const double offset, const int depth = 0)
     {
-        if (depth > 8)
+        if (depth > 8 || ++resolveSteps_ > 100'000)
             return {};
         const auto found = mobs_.find(mobId.toBase64Encoding());
         if (found == mobs_.end())
@@ -739,8 +750,10 @@ private:
     }
 
     // A composition slot's segment, from `position` (edit units).
-    juce::int64 walk(const Object& segment, juce::int64 position, const double rate, ImportedTrack& track)
+    juce::int64 walk(const Object& segment, juce::int64 position, const double rate, ImportedTrack& track, const int depth = 0)
     {
+        if (depth > 64)
+            return position;
         if (segment.has(pid::components)) {
             // The clip before (by its place: the list grows), where it ends.
             std::optional<std::size_t> previous;
@@ -759,7 +772,7 @@ private:
                     continue;
                 }
                 const auto before = track.audioClips.size();
-                walk(component, position, rate, track);
+                walk(component, position, rate, track, depth + 1);
                 if (track.audioClips.size() > before) {
                     if (transition > 0)
                         track.audioClips[before].fadeInSeconds = std::max(track.audioClips[before].fadeInSeconds,
@@ -827,6 +840,8 @@ private:
     juce::File folder_;
     CompoundFile cfb_;
     std::map<juce::String, Object> mobs_;
+    // Steps taken resolving sources (a hostile file could branch without end).
+    int resolveSteps_ {};
     std::map<juce::String, Object> essences_;
     std::map<juce::String, juce::File> files_;
     bool gains_ {};

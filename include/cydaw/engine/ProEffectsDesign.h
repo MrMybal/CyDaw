@@ -3,6 +3,7 @@
 #include <cydaw/engine/BiquadDesign.h>
 
 #include <algorithm>
+#include <initializer_list>
 #include <array>
 #include <cmath>
 #include <complex>
@@ -84,12 +85,23 @@ struct ReverbLoop {
     const auto nyquist = rate * 0.45;
     ReverbLoop loop;
     loop.gain = std::pow(10.0, main / 20.0);
-    loop.low = designEqBand(EqBandType::lowShelf, std::min(lowFrequency, nyquist), std::clamp(passDb(t * lowMultiplier) - main, -24.0, 24.0),
-                            0.707, 0, 0, rate);
-    loop.mid = designEqBand(EqBandType::bell, std::min(midFrequency, nyquist), std::clamp(passDb(t * midMultiplier) - main, -24.0, 24.0),
-                            0.8, 0, 0, rate);
-    loop.high = designEqBand(EqBandType::highShelf, std::min(highFrequency, nyquist),
-                             std::clamp(passDb(t * highMultiplier) - main, -24.0, 24.0), 0.707, 0, 0, rate);
+    auto lowDb = std::clamp(passDb(t * lowMultiplier) - main, -24.0, 24.0);
+    auto midDb = std::clamp(passDb(t * midMultiplier) - main, -24.0, 24.0);
+    auto highDb = std::clamp(passDb(t * highMultiplier) - main, -24.0, 24.0);
+    // Where bands overlap their boosts add up: the loop must still lose at
+    // each pass, or the reverb grows without end (to inf, then NaN). The
+    // boosts together keep within 90 % of what a pass loses.
+    const auto budget = -main * 0.9;
+    const auto boosts = std::max(0.0, lowDb) + std::max(0.0, midDb) + std::max(0.0, highDb);
+    if (boosts > budget && boosts > 0.0) {
+        const auto scale = budget / boosts;
+        for (auto* db : { &lowDb, &midDb, &highDb })
+            if (*db > 0.0)
+                *db *= scale;
+    }
+    loop.low = designEqBand(EqBandType::lowShelf, std::min(lowFrequency, nyquist), lowDb, 0.707, 0, 0, rate);
+    loop.mid = designEqBand(EqBandType::bell, std::min(midFrequency, nyquist), midDb, 0.8, 0, 0, rate);
+    loop.high = designEqBand(EqBandType::highShelf, std::min(highFrequency, nyquist), highDb, 0.707, 0, 0, rate);
     return loop;
 }
 

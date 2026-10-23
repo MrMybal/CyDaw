@@ -16,6 +16,8 @@ namespace cydaw::app {
 
 class IsolatedPluginHost final {
 public:
+    // The session's metre, told to every plug-in with the tempo (4/4 until set).
+    static void setSessionMetre(int numerator, int denominator) noexcept;
     struct ParameterSnapshot {
         std::uint32_t index {};
         juce::String name;

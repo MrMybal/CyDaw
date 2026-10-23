@@ -70,6 +70,17 @@ public:
         bytes(&v, sizeof v);
         return v;
     }
+    // A number that must be one: NaN or infinity mark the file unreadable
+    // (std::clamp lets a NaN through, and tables are then indexed with it).
+    float finite()
+    {
+        const auto v = value<float>();
+        if (!std::isfinite(v)) {
+            ok_ = false;
+            return 0.0f;
+        }
+        return v;
+    }
     std::string text()
     {
         const auto size = value<std::uint32_t>();
@@ -356,7 +367,7 @@ SamplerMapRef readSampler(Reader& r, std::string& error)
         map->zones.push_back(std::move(zone));
     }
     for (auto& v : map->controllerStart)
-        v = std::clamp(r.value<float>(), 0.0f, 127.0f);
+        v = std::clamp(r.finite(), 0.0f, 127.0f);
     const auto controlCount = r.value<std::uint32_t>();
     if (!r.ok() || controlCount > 128) {
         error = "the sampler's controls are unreadable";
@@ -490,12 +501,12 @@ SoundModelRef readModel(Reader& r, const std::uint32_t readVersion, std::string&
     for (std::uint32_t index = 0; index < zoneCount; ++index) {
         SoundModelZone zone;
         zone.rootNote = r.value<std::int32_t>();
-        zone.f0 = r.value<float>();
-        zone.velocity = std::clamp(r.value<float>(), 0.0f, 1.0f);
-        zone.gain = r.value<float>();
-        zone.frameSeconds = r.value<float>();
+        zone.f0 = r.finite();
+        zone.velocity = std::clamp(r.finite(), 0.0f, 1.0f);
+        zone.gain = r.finite();
+        zone.frameSeconds = r.finite();
         zone.frames = r.value<std::int32_t>();
-        zone.inharmonicity = r.value<float>();
+        zone.inharmonicity = r.finite();
         zone.keyFrames = r.list<int>();
         zone.harmonicCount = r.value<std::int32_t>();
         zone.harmonics = r.list<float>();
@@ -507,12 +518,12 @@ SoundModelRef readModel(Reader& r, const std::uint32_t readVersion, std::string&
         for (auto* table : { &zone.partialLeft, &zone.partialRight, &zone.phaseCos, &zone.phaseSin, &zone.noiseLeft,
                              &zone.noiseRight, &zone.noiseCoherence, &zone.headLeft, &zone.headRight })
             *table = r.list<float>();
-        zone.headRate = r.value<float>();
+        zone.headRate = r.finite();
         zone.headFade = r.value<std::int32_t>();
         zone.headPhase = r.list<float>();
         zone.attack = r.list<float>();
-        zone.attackRate = r.value<float>();
-        zone.attackGain = r.value<float>();
+        zone.attackRate = r.finite();
+        zone.attackGain = r.finite();
         zone.loopStart = r.value<std::int32_t>();
         zone.loopEnd = r.value<std::int32_t>();
         zone.release = r.value<std::int32_t>();

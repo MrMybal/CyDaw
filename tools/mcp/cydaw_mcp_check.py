@@ -166,8 +166,16 @@ def main():
     parser.add_argument("--quit", action="store_true",
                         help="ferme le DAW a la fin")
     options = parser.parse_args()
-    if options.port:
-        os.environ["CYDAW_CONTROL_PORT"] = str(options.port)
+    # A port of its own (never the person's CyDAW on 47820), the session it
+    # launches hidden and silent (--silent), and closed at the end whatever happens.
+    if not options.port:
+        import socket  # noqa: PLC0415
+        with socket.socket() as probe:
+            probe.bind(("127.0.0.1", 0))
+            options.port = probe.getsockname()[1]
+        options.quit = True
+    os.environ["CYDAW_CONTROL_PORT"] = str(options.port)
+    os.environ["CYDAW_LAUNCH_ARGS"] = "--silent"
     if options.exe:
         os.environ["CYDAW_EXE"] = options.exe
     # The checked session is thrown away: CyDAW 2 keeps no copy to recover.
@@ -671,7 +679,14 @@ def main():
             failures.append("prompt empty")
         if options.quit:
             print("quit:", client.tool("quit"))
+            options.quit = False
     finally:
+        # Closed even when a step failed: no CyDAW left running behind the check.
+        if options.quit:
+            try:
+                client.tool("quit")
+            except Exception:  # noqa: BLE001
+                pass
         client.close()
     if failures:
         print("FAILED:")

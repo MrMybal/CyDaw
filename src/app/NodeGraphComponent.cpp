@@ -309,6 +309,9 @@ void readCardAssets(const juce::DynamicObject& object, Card& card)
         if (auto parsed = cydaw::app::soundModelFromVar(model, error)) {
             card.soundModel = std::move(parsed);
             card.soundModelJson = model;
+        } else if (cydaw::app::isMissingFactoryModel(model)) {
+            // A factory model not on this computer: still named, silent.
+            card.soundModelJson = model;
         }
     }
     if (const auto map = cydaw::app::upgradedSamplerMap(object.getProperty(jsonKeys::sampler)); map.isObject()) {
@@ -7104,6 +7107,9 @@ void NodeGraphComponent::restore(const juce::var& state)
                 juce::String modelError;
                 if (auto parsed = soundModelFromVar(model, modelError)) {
                     restoredNode.soundModel = std::move(parsed);
+                    restoredNode.soundModelJson = model;
+                } else if (isMissingFactoryModel(model)) {
+                    // A factory model not on this computer: still named, silent.
                     restoredNode.soundModelJson = model;
                 }
             }

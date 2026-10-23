@@ -66,7 +66,12 @@ inline void repeatContent(const double contentLength, const double length, const
 inline void placeNotes(const std::vector<ImportedNote>& notes, const double from, const double to, const double at,
                        std::vector<ImportedNote>& into)
 {
+    // A clip's notes are bounded: a hostile file repeating a dense pattern
+    // thousands of times would otherwise ask for gigabytes.
+    constexpr std::size_t mostNotes = 1'000'000;
     for (const auto& note : notes) {
+        if (into.size() >= mostNotes)
+            return;
         if (note.startBeats < from - 1.0e-9 || note.startBeats >= to - 1.0e-9)
             continue;
         auto placed = note;

@@ -956,6 +956,7 @@ public:
             for (auto& comb : unit)
                 comb.clear();
         lfoPhase_ = { 0.0, 0.0 };
+        lfoCycle_ = { -1.0, -1.0 };
         random_ = 0x2545f491u;
         for (auto& lfo : held_)
             lfo = { 0.0, 0.0, 0.0, 0.0 };
@@ -1055,15 +1056,22 @@ private:
             const auto stereo = static_cast<double>(value(base + 3));
             auto& phase = lfoPhase_[static_cast<std::size_t>(index)];
             const auto previous = phase;
+            auto newCycle = false;
             if (division != nullptr && playing) {
-                // In time with the song: its position says where the cycle is.
+                // In time with the song: its position says where the cycle is,
+                // a new random value at each new cycle of the song (not at each
+                // call: the phase kept is the wrapped one).
                 phase = context.transport.quarterNotePosition / division->beats;
+                auto& cycle = lfoCycle_[static_cast<std::size_t>(index)];
+                newCycle = std::floor(phase) != cycle;
+                cycle = std::floor(phase);
             } else {
                 const auto hz = division != nullptr ? tempo / 60.0 / division->beats : static_cast<double>(value(base));
                 phase += hz * step;
+                newCycle = std::floor(phase) != std::floor(previous);
             }
             auto& held = held_[static_cast<std::size_t>(index)];
-            if (std::floor(phase) != std::floor(previous) || held[3] == 0.0) {
+            if (newCycle || held[3] == 0.0) {
                 held[0] = held[1];
                 held[1] = uniform();
                 held[2] = uniform();
@@ -1157,7 +1165,7 @@ private:
         if (design.drive > 1.001)
             x = std::tanh(x * design.drive) / std::sqrt(design.drive);
         if (design.type == filterComb) {
-            auto& comb = combs_[u][std::min<std::uint32_t>(channel, 1)];
+            auto& comb = combs_[u][std::min<std::uint32_t>(channel, 7)];
             const auto y = x + design.combFeedback * comb.read(design.combDelay);
             comb.push(y);
             return y * (1.0 - design.combFeedback);
@@ -1194,9 +1202,12 @@ private:
     double rate_ { 48'000.0 };
     std::array<std::array<Unit, 2>, pro::filterUnits> units_ {};
     std::array<std::array<std::array<SectionState, 4>, 8>, pro::filterUnits> states_ {};
-    std::array<std::array<FractionalDelay, 2>, pro::filterUnits> combs_;
+    // A line per channel (up to 7.1), as the filters' states.
+    std::array<std::array<FractionalDelay, 8>, pro::filterUnits> combs_;
     std::array<bool, pro::filterUnits> on_ {};
     std::array<double, 2> lfoPhase_ {};
+    // In time with the song: the cycle last heard (its random value is drawn once per cycle).
+    std::array<double, 2> lfoCycle_ { -1.0, -1.0 };
     // Each LFO's random values: the last, the next, the right side's, and
     // whether they were drawn.
     std::array<std::array<double, 4>, 2> held_ {};

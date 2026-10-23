@@ -162,7 +162,7 @@ public:
         if (size < 22 || std::memcmp(data, "FLhd", 4) != 0)
             return juce::Result::fail("Not an FL Studio project: " + file_.getFileName());
         const auto headerLength = readU32(data + 4);
-        if (headerLength < 6 || 8 + headerLength + 8 > size)
+        if (headerLength < 6 || static_cast<std::uint64_t>(headerLength) + 16u > static_cast<std::uint64_t>(size))
             return juce::Result::fail("The FL Studio project's header is damaged");
         ppq_ = std::max(1, readU16(data + 12));
         auto at = static_cast<std::size_t>(8 + headerLength);

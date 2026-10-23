@@ -125,15 +125,21 @@ def _setup(folder: Path, torch: str, clap: bool, crepe: bool) -> int:
             emit(error="pip could not install PyTorch (CPU)")
             return 1
     elif torch == "cuda":
-        # A CPU build there first goes (pip would keep it: the same version).
-        if (version := installed_torch(python)) is not None and "+cu" not in version:
-            run([str(python), *PIP, "uninstall", "--yes", "torch", "torchaudio"], 0.3, f"PyTorch {version} (CPU) removed")
+        # A CPU build there is replaced (pip would keep it: the same version),
+        # by a forced reinstall: pip downloads before it removes anything, so
+        # when no CUDA build can be had the CPU one is still there and works.
+        version = installed_torch(python)
+        replacing = version is not None and "+cu" not in version
         for index in CUDA_INDEXES:
-            if run([str(python), *PIP, "install", "--upgrade", "torch", "--index-url",
-                    f"https://download.pytorch.org/whl/{index}"], 0.5, f"PyTorch (CUDA, {index})") == 0:
+            command = [str(python), *PIP, "install", "--upgrade", "torch", "--index-url",
+                       f"https://download.pytorch.org/whl/{index}"]
+            if replacing:
+                command.insert(command.index("--upgrade") + 1, "--force-reinstall")
+            if run(command, 0.5, f"PyTorch (CUDA, {index})") == 0:
                 break
         else:
-            emit(error="pip could not install a CUDA build of PyTorch")
+            emit(error="pip could not install a CUDA build of PyTorch"
+                       + (f" (PyTorch {version} for the processor is still installed)" if replacing else ""))
             return 1
     if clap:
         if run([str(python), *PIP, "install", *CLAP_PACKAGES], 0.85, "transformers (semantic search)") != 0:

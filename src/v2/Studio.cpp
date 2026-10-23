@@ -6221,10 +6221,20 @@ juce::Result Studio::restoreRecovery()
     if (const auto read = app::ProjectRecovery::readDocument(file, document); read.failed())
         return read;
     const auto original = app::ProjectRecovery::originalProject(document);
-    const auto loaded = loadProject(file);
+    const auto known = original != juce::File {} && (original.existsAsFile() || original.getParentDirectory().isDirectory());
+    // Its sounds' paths were written from the project's folder, not the
+    // recovery's: read from there, or the clips beside the project are lost.
+    const auto base = known ? original : file;
+    juce::StringArray missingModels;
+    app::expandFactoryModelReferences(document, missingModels);
+    beginApplying(base, document);
+    noteMissingModels(missingModels);
+    while (applying_->next()) {
+    }
+    const auto loaded = finishApplying(base, applying_->result());
     if (loaded.failed())
         return loaded;
-    projectFile_ = original.existsAsFile() || original.getParentDirectory().isDirectory() ? original : juce::File {};
+    projectFile_ = known ? original : juce::File {};
     dirty_ = true;
     return juce::Result::ok();
 }

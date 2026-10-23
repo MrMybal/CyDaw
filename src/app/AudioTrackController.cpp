@@ -698,8 +698,8 @@ juce::Result GainPanAudioSource::addPlugin(const juce::File& pluginFile,
     if (result.failed())
         return result;
 
-    pluginsAvailable_.store(false, std::memory_order_release);
-    while (pluginCallbacksInFlight_.load(std::memory_order_acquire) != 0)
+    pluginsAvailable_.store(false);
+    while (pluginCallbacksInFlight_.load() != 0)
         std::this_thread::yield();
     pluginHosts_[currentCount] = std::move(host);
     pluginCount_.store(currentCount + 1, std::memory_order_release);
@@ -714,8 +714,8 @@ juce::Result GainPanAudioSource::reloadPlugin(std::size_t index, double rate, in
     auto replacement=std::make_unique<IsolatedPluginHost>();
     auto result=replacement->startPlugin(old->pluginFile(),rate,block,channels);if(result.failed())return result;
     juce::MemoryBlock state;if(old->getState(state).wasOk()&&!state.isEmpty())(void)replacement->setState(state);
-    pluginsAvailable_.store(false,std::memory_order_release);
-    while(pluginCallbacksInFlight_.load(std::memory_order_acquire)!=0)std::this_thread::yield();
+    pluginsAvailable_.store(false);
+    while(pluginCallbacksInFlight_.load()!=0)std::this_thread::yield();
     auto removed=std::move(pluginHosts_[index]);pluginHosts_[index]=std::move(replacement);
     pluginsAvailable_.store(true,std::memory_order_release);removed->stop();return juce::Result::ok();
 }
@@ -726,8 +726,8 @@ void GainPanAudioSource::removePlugin(const std::size_t pluginIndex)
     if (pluginIndex >= currentCount)
         return;
 
-    pluginsAvailable_.store(false, std::memory_order_release);
-    while (pluginCallbacksInFlight_.load(std::memory_order_acquire) != 0)
+    pluginsAvailable_.store(false);
+    while (pluginCallbacksInFlight_.load() != 0)
         std::this_thread::yield();
     auto removed = std::move(pluginHosts_[pluginIndex]);
     for (auto index = pluginIndex; index + 1 < currentCount; ++index)
@@ -741,8 +741,8 @@ void GainPanAudioSource::removePlugin(const std::size_t pluginIndex)
 
 void GainPanAudioSource::clearPlugins()
 {
-    pluginsAvailable_.store(false, std::memory_order_release);
-    while (pluginCallbacksInFlight_.load(std::memory_order_acquire) != 0)
+    pluginsAvailable_.store(false);
+    while (pluginCallbacksInFlight_.load() != 0)
         std::this_thread::yield();
     std::array<std::unique_ptr<IsolatedPluginHost>, maximumPluginCount> removed;
     for (std::size_t index = 0; index < pluginHosts_.size(); ++index)
@@ -763,8 +763,8 @@ bool GainPanAudioSource::movePlugin(const std::size_t pluginIndex, const int dir
     if (destination < 0 || destination >= static_cast<std::ptrdiff_t>(currentCount))
         return false;
 
-    pluginsAvailable_.store(false, std::memory_order_release);
-    while (pluginCallbacksInFlight_.load(std::memory_order_acquire) != 0)
+    pluginsAvailable_.store(false);
+    while (pluginCallbacksInFlight_.load() != 0)
         std::this_thread::yield();
     std::swap(pluginHosts_[pluginIndex], pluginHosts_[static_cast<std::size_t>(destination)]);
     pluginsAvailable_.store(true, std::memory_order_release);
@@ -1001,8 +1001,8 @@ void GainPanAudioSource::getNextAudioBlock(const juce::AudioSourceChannelInfo& b
     }
 
     if (pluginsAvailable_.load(std::memory_order_acquire)) {
-        pluginCallbacksInFlight_.fetch_add(1, std::memory_order_acq_rel);
-        if (pluginsAvailable_.load(std::memory_order_acquire)) {
+        pluginCallbacksInFlight_.fetch_add(1);
+        if (pluginsAvailable_.load()) {
             const auto count = pluginCount_.load(std::memory_order_acquire);
             const auto pluginAutomation = pluginAutomation_.read();
             const auto blockEnd = modeTimeline_ != nullptr ? modeTimeline_->load(std::memory_order_relaxed) : transport_ != nullptr
@@ -1171,8 +1171,8 @@ void InputRecorder::scheduleStop(const double delaySeconds)
 
 void InputRecorder::stop()
 {
-    activeWriter_.store(nullptr, std::memory_order_release);
-    while (callbacksInFlight_.load(std::memory_order_acquire) != 0)
+    activeWriter_.store(nullptr);
+    while (callbacksInFlight_.load() != 0)
         std::this_thread::yield();
     threadedWriter_.reset();
     recordingChannelCount_.store(0, std::memory_order_release);
@@ -1258,8 +1258,8 @@ void InputRecorder::audioDeviceIOCallbackWithContext(const float* const* inputCh
             return;
         }
 
-        callbacksInFlight_.fetch_add(1, std::memory_order_acq_rel);
-        if (writer != activeWriter_.load(std::memory_order_acquire)) {
+        callbacksInFlight_.fetch_add(1);
+        if (writer != activeWriter_.load()) {
             callbacksInFlight_.fetch_sub(1, std::memory_order_release);
             continue;
         }
@@ -1765,8 +1765,8 @@ juce::Result MasterOutputAudioSource::startCapture(
 
 void MasterOutputAudioSource::stopCapture()
 {
-    activeWriter_.store(nullptr, std::memory_order_release);
-    while (callbacksInFlight_.load(std::memory_order_acquire) != 0)
+    activeWriter_.store(nullptr);
+    while (callbacksInFlight_.load() != 0)
         std::this_thread::yield();
     threadedWriter_.reset();
 }
@@ -1907,8 +1907,8 @@ void MasterOutputAudioSource::getNextAudioBlock(
         if (writer == nullptr)
             return;
 
-        callbacksInFlight_.fetch_add(1, std::memory_order_acq_rel);
-        if (writer != activeWriter_.load(std::memory_order_acquire)) {
+        callbacksInFlight_.fetch_add(1);
+        if (writer != activeWriter_.load()) {
             callbacksInFlight_.fetch_sub(1, std::memory_order_release);
             continue;
         }
@@ -2977,8 +2977,8 @@ private:
         if (sampleCount <= 0
             || !arrangementPlanAvailable_.load(std::memory_order_acquire))
             return;
-        arrangementCallbacksInFlight_.fetch_add(1, std::memory_order_acq_rel);
-        if (!arrangementPlanAvailable_.load(std::memory_order_acquire)
+        arrangementCallbacksInFlight_.fetch_add(1);
+        if (!arrangementPlanAvailable_.load()
             || arrangementPlan_ == nullptr
             || arrangementScratch_.getNumSamples() <= 0) {
             arrangementCallbacksInFlight_.fetch_sub(1, std::memory_order_release);
@@ -3235,8 +3235,8 @@ int ClipAudioSource::launcherPlanState(const int sceneIndex) noexcept
         return 0;
     if (!launcherPlansAvailable_.load(std::memory_order_acquire))
         return 1;
-    launcherCallbacksInFlight_.fetch_add(1, std::memory_order_acq_rel);
-    if (!launcherPlansAvailable_.load(std::memory_order_acquire)) {
+    launcherCallbacksInFlight_.fetch_add(1);
+    if (!launcherPlansAvailable_.load()) {
         launcherCallbacksInFlight_.fetch_sub(1, std::memory_order_release);
         return 1;
     }
@@ -3263,9 +3263,9 @@ juce::int64 ClipAudioSource::launcherPlanDurationSamples(
         || sceneIndex >= AudioTrackController::maximumLauncherScenes
         || !launcherPlansAvailable_.load(std::memory_order_acquire))
         return 0;
-    launcherCallbacksInFlight_.fetch_add(1, std::memory_order_acq_rel);
+    launcherCallbacksInFlight_.fetch_add(1);
     auto duration = juce::int64 {};
-    if (launcherPlansAvailable_.load(std::memory_order_acquire)) {
+    if (launcherPlansAvailable_.load()) {
         const auto& plan = launcherPlans_[static_cast<std::size_t>(
             sceneIndex)];
         if (plan != nullptr)
@@ -3282,8 +3282,8 @@ void ClipAudioSource::setLauncherPlanPosition(
         || sceneIndex >= AudioTrackController::maximumLauncherScenes
         || !launcherPlansAvailable_.load(std::memory_order_acquire))
         return;
-    launcherCallbacksInFlight_.fetch_add(1, std::memory_order_acq_rel);
-    if (launcherPlansAvailable_.load(std::memory_order_acquire)) {
+    launcherCallbacksInFlight_.fetch_add(1);
+    if (launcherPlansAvailable_.load()) {
         auto& plan = launcherPlans_[static_cast<std::size_t>(sceneIndex)];
         if (plan != nullptr) {
             const auto safe = juce::jlimit<juce::int64>(
@@ -3306,8 +3306,8 @@ void ClipAudioSource::renderLauncherPlan(
     if (sampleCount <= 0
         || !launcherPlansAvailable_.load(std::memory_order_acquire))
         return;
-    launcherCallbacksInFlight_.fetch_add(1, std::memory_order_acq_rel);
-    if (!launcherPlansAvailable_.load(std::memory_order_acquire)) {
+    launcherCallbacksInFlight_.fetch_add(1);
+    if (!launcherPlansAvailable_.load()) {
         launcherCallbacksInFlight_.fetch_sub(1, std::memory_order_release);
         return;
     }
@@ -3551,8 +3551,8 @@ juce::Result ClipAudioSource::setLauncherSceneRegions(
     }
     next->prepared = isPrepared;
 
-    launcherPlansAvailable_.store(false, std::memory_order_release);
-    while (launcherCallbacksInFlight_.load(std::memory_order_acquire) != 0)
+    launcherPlansAvailable_.store(false);
+    while (launcherCallbacksInFlight_.load() != 0)
         std::this_thread::yield();
     auto& slot = launcherPlans_[static_cast<std::size_t>(sceneIndex)];
     auto retired = std::move(slot);
@@ -3581,8 +3581,8 @@ void ClipAudioSource::clearLauncherSceneSource(const int sceneIndex)
     if (sceneIndex < 0
         || sceneIndex >= AudioTrackController::maximumLauncherScenes)
         return;
-    launcherPlansAvailable_.store(false, std::memory_order_release);
-    while (launcherCallbacksInFlight_.load(std::memory_order_acquire) != 0)
+    launcherPlansAvailable_.store(false);
+    while (launcherCallbacksInFlight_.load() != 0)
         std::this_thread::yield();
     auto& slot = launcherPlans_[static_cast<std::size_t>(sceneIndex)];
     auto retired = std::move(slot);
@@ -3654,8 +3654,8 @@ juce::Result ClipAudioSource::setArrangementRegions(
     }
     next->prepared = isPrepared;
 
-    arrangementPlanAvailable_.store(false, std::memory_order_release);
-    while (arrangementCallbacksInFlight_.load(std::memory_order_acquire) != 0)
+    arrangementPlanAvailable_.store(false);
+    while (arrangementCallbacksInFlight_.load() != 0)
         std::this_thread::yield();
     auto retired = std::move(arrangementPlan_);
     arrangementPlan_ = std::move(next);
@@ -14622,6 +14622,7 @@ void AudioTrackController::setTimeSignature(const int numerator, const int denom
                                         || denominator == 32
                                     ? denominator
                                     : 4;
+    IsolatedPluginHost::setSessionMetre(timeSignatureNumerator_, timeSignatureDenominator_);
 }
 
 void AudioTrackController::setTempo(const double beatsPerMinute)

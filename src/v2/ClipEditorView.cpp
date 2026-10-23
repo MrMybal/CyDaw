@@ -1121,10 +1121,11 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
         // The notes stay put while their curves are drawn.
     } else if (hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
         if (under != nullptr) {
+            const auto removed = under->id;
             beginEdit();
-            (void) engine.removeMidiNote(track.midiId, clip.id, under->id);
+            (void) engine.removeMidiNote(track.midiId, clip.id, removed);
             endEdit();
-            selection_.erase(under->id);
+            selection_.erase(removed);
             under = nullptr;
         } else {
             const auto start = std::max(0.0, gridBeats_ > 0.0 && ui::snapping(state_.pianoRollSnap) ? std::floor(mouseBeat / gridBeats_) * gridBeats_ : mouseBeat);
@@ -1182,10 +1183,11 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
                       "Click: a point (on a point: take it) · drag: its pitch, by semitones (Shift: free) · Alt+drag between two "
                       "points: bend · double click: remove · right click: glide to the next note, vibrato…"));
     if (expression_ == Expression::none && hovered && ImGui::IsMouseDown(ImGuiMouseButton_Right) && under != nullptr) {
+        const auto removed = under->id;
         beginEdit();
-        (void) engine.removeMidiNote(track.midiId, clip.id, under->id);
+        (void) engine.removeMidiNote(track.midiId, clip.id, removed);
         endEdit();
-        selection_.erase(under->id);
+        selection_.erase(removed);
         under = nullptr;
     }
 

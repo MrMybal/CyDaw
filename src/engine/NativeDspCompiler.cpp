@@ -149,11 +149,12 @@ std::unique_ptr<AudioProcessor> makeNativeDspProcessor(
 }
 
 bool updateNativeDspProcessorParameters(
-    AudioProcessor& processor, const NativeDspNode& node) noexcept
+    AudioProcessor& processor, const NativeDspNode& node, const bool withInstrument) noexcept
 {
     // A replacer's instrument, changed (its card's knobs turned): swapped live.
-    if (auto* head = dynamic_cast<ContainerHeadProcessor*>(&processor))
-        head->setInstrument(node.instrument);
+    if (withInstrument)
+        if (auto* head = dynamic_cast<ContainerHeadProcessor*>(&processor))
+            head->setInstrument(node.instrument);
     if (effectForKind(node.kind) != nullptr) {
         // A changed response, like a changed table, is the full compiler's:
         // swapping it here would free the old one on the audio thread.

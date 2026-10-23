@@ -224,7 +224,8 @@ bool Companion::componentInstalled(const juce::String& id, const juce::var& info
     return false;
 }
 
-bool Companion::install(const juce::String& id, const bool licencesAccepted, juce::String& error)
+bool Companion::install(const juce::String& id, const bool licencesAccepted, juce::String& error,
+                        const juce::StringArray& extra)
 {
     const auto item = component(id);
     if (!item.isObject()) {
@@ -237,9 +238,10 @@ bool Companion::install(const juce::String& id, const bool licencesAccepted, juc
     }
     const auto environment = environmentFolder();
     juce::StringArray arguments { "setup", "--env", environment.getFullPathName() };
-    if (const auto* extra = item.getProperty("arguments", {}).getArray())
-        for (const auto& argument : *extra)
+    if (const auto* own = item.getProperty("arguments", {}).getArray())
+        for (const auto& argument : *own)
             arguments.add(argument.toString());
+    arguments.addArray(extra);
     if (!start(arguments)) {
         error = "the companion is busy";
         return false;

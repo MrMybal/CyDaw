@@ -41,6 +41,8 @@ private:
     // The engine's install, confirmed: "cpu" or "cuda".
     juce::String engineInstall_;
     bool openConfirm_ {};
+    // The NVIDIA build's licences (CUDA, cuDNN) accepted in the confirmation.
+    bool engineLicencesAccepted_ {};
     std::unique_ptr<juce::FileChooser> chooser_;
 };
 

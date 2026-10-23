@@ -35,8 +35,10 @@ def main():
     # tools/companion: the Python companion (sound matching), without caches.
     for folder in ("fonts", "i18n", "tools"):
         shutil.copytree(BUILD / folder, target / folder, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-    # The templates from the sources, so the package has the latest ones.
-    shutil.copytree(ROOT / "templates", target / "templates")
+    # The templates from the sources, so the package has the latest ones; not
+    # the comparisons against third-party songs (their transcriptions stay here).
+    shutil.copytree(ROOT / "templates", target / "templates",
+                    ignore=shutil.ignore_patterns("*-comparaison-midi.cydaw", "*.v2-roundtrip.cydaw"))
     # The factory instruments: sampler maps, the sound models, the catalogue,
     # the banks' list and the credits. Not their samples: CyDAW downloads them
     # from each bank's repository (any FLAC left from older builds stays out).

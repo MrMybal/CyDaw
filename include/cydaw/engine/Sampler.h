@@ -122,6 +122,9 @@ struct SampleStream {
     std::atomic<std::int64_t> reading {};
     std::atomic<std::int64_t> low {};
     std::atomic<std::int64_t> high {};
+    // The streamer could not open its file (moved, deleted, a drive gone):
+    // nothing will come, so a lane does not wait for it.
+    std::atomic<bool> unreadable {};
     std::vector<std::int16_t> ring;
 
     [[nodiscard]] bool has(const std::int64_t frame) const noexcept

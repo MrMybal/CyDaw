@@ -748,7 +748,8 @@ int runRealtimeWorker(const juce::File& pluginFile,
                     }
                     juce::ScopedNoDenormals noDenormals;
                     playHead.update(*shared,sampleRate);
-                    instance->processBlock(buffer, midi);
+                    juce::AudioBuffer<float> block(buffer.getArrayOfWritePointers(), buffer.getNumChannels(), frames);
+                    instance->processBlock(block, midi);
                     cydaw::plugins::sharedAtomic(shared->latencySamples).store(
                         static_cast<std::uint32_t>(std::max(0, instance->getLatencySamples())),
                         std::memory_order_release);

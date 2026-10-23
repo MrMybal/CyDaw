@@ -1519,7 +1519,8 @@ void ArrangementView::selectAll()
                     state_.selectedClips.push_back({ track, clip.id });
         } else if (const auto* clips = engine.midiClipsView(track.midiId)) {
             for (const auto& clip : *clips)
-                state_.selectedClips.push_back({ track, clip.id });
+                if (clip.launcherScene < 0)
+                    state_.selectedClips.push_back({ track, clip.id });
         }
     }
 }

@@ -16,6 +16,10 @@ import os
 import sys
 
 CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".clap-cache")
+# The models' downloads stay beside the classifier (next to CyDAW), never in the
+# user's profile on C: (Hugging Face's and torch's default caches).
+for _variable in ("HF_HOME", "HUGGINGFACE_HUB_CACHE", "TRANSFORMERS_CACHE", "TORCH_HOME"):
+    os.environ.setdefault(_variable, CACHE_DIR)
 
 
 def emit(value):

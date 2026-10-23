@@ -24,6 +24,9 @@ constexpr int noiseFloorDb10 = -2'000;
 // (modulo 2^16).
 bool readRows(const juce::var& rows, const int count, const int columns, std::vector<float>& db10)
 {
+    // No larger than a model can be (a length field is not trusted further).
+    if (count < 0 || columns < 0 || static_cast<std::uint64_t>(count) * static_cast<std::uint64_t>(columns) > (1ull << 26))
+        return false;
     db10.assign(static_cast<std::size_t>(count) * static_cast<std::size_t>(columns), 0.0f);
     if (columns == 0)
         return true;
@@ -37,7 +40,9 @@ bool readRows(const juce::var& rows, const int count, const int columns, std::ve
         if (deltas) {
             juce::MemoryInputStream input(bytes.getData(), bytes.getDataSize(), false);
             juce::GZIPDecompressorInputStream unzip(&input, false, juce::GZIPDecompressorInputStream::zlibFormat);
-            (void) raw.writeFromInputStream(unzip, -1);
+            // Unpacked no further than the rows can take (a small stream of
+            // zeros may unpack to gigabytes).
+            (void) raw.writeFromInputStream(unzip, static_cast<juce::int64>(db10.size() * sizeof(std::int16_t)) + 1);
         }
         const auto& source = deltas ? raw : bytes;
         if (source.getDataSize() != db10.size() * sizeof(std::int16_t))
@@ -363,8 +368,12 @@ juce::var referenced(const juce::var& value, bool& changed)
     juce::var copy;
     for (const auto& property : object->getProperties()) {
         if (property.name == soundModelKey) {
-            // A model holds no other: not looked into.
-            if (const auto stored = factoryModelReference(property.value); stored.isNotEmpty()) {
+            // A model holds no other: not looked into. A factory model, or the
+            // stand-in of one not found, is written as its name.
+            auto stored = factoryModelReference(property.value);
+            if (stored.isEmpty() && isMissingFactoryModel(property.value))
+                stored = property.value.getProperty(soundModelFileKey, {}).toString();
+            if (stored.isNotEmpty()) {
                 if (copy.isVoid())
                     copy = shallowCopy(*object);
                 copy.getDynamicObject()->removeProperty(soundModelKey);
@@ -407,6 +416,12 @@ void expanded(const juce::var& value, juce::StringArray& missing)
             object->setProperty(soundModelKey, json);
             object->removeProperty(soundModelFileKey);
         } else {
+            // Not here (another computer, a model not installed): its name kept
+            // on the card, so the next save still names it.
+            auto standIn = juce::DynamicObject::Ptr(new juce::DynamicObject());
+            standIn->setProperty(soundModelFileKey, stored);
+            object->setProperty(soundModelKey, juce::var(standIn.get()));
+            object->removeProperty(soundModelFileKey);
             missing.addIfNotAlreadyThere(stored);
         }
     }
@@ -480,6 +495,13 @@ juce::var withFactoryModelReferences(const juce::var& document)
 void expandFactoryModelReferences(juce::var& document, juce::StringArray& missing)
 {
     expanded(document, missing);
+}
+
+bool isMissingFactoryModel(const juce::var& model)
+{
+    const auto* object = model.getDynamicObject();
+    return object != nullptr && object->getProperties().size() == 1
+           && object->getProperty(soundModelFileKey).toString().startsWith("factory:");
 }
 
 VoiceAssets voiceAssetsFromGraphState(const juce::var& state)

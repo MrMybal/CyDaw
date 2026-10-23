@@ -13,6 +13,8 @@ Variables d'environnement :
                       repond pas (defaut : le build agent-graph du projet)
   CYDAW_CONTROL_TOKEN jeton partage avec le DAW (facultatif) : le DAW lance
                       par ce serveur l'exige dans chaque requete
+  CYDAW_LAUNCH_ARGS   arguments de plus pour le DAW lance par ce serveur
+                      (les tests : --silent, session cachee et muette)
 """
 import json
 import os
@@ -2269,7 +2271,8 @@ def launch_daw(wait_seconds=20.0):
     if os.name == "nt":
         creation = getattr(subprocess, "DETACHED_PROCESS", 0) \
             | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
-    subprocess.Popen([EXE, "--control-port=%d" % PORT], cwd=os.path.dirname(EXE),
+    extra = os.environ.get("CYDAW_LAUNCH_ARGS", "").split()
+    subprocess.Popen([EXE, "--control-port=%d" % PORT, *extra], cwd=os.path.dirname(EXE),
                      close_fds=True,
                      creationflags=creation, stdin=subprocess.DEVNULL,
                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

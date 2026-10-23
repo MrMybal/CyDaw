@@ -720,7 +720,9 @@ void echoed(Stage& stage, const MidiEffectSettings& settings, const Events& in, 
         if (event.isNoteOn()) {
             out.add(event);
             auto& echo = stage.echo.echoes[keyOf(event.channel(), event.data1)];
-            echo = { repeats, pitch, std::max<std::int64_t>(1, spacing), event.data2 };
+            // The echoes started, counted: as many end with the note, whatever
+            // the decay is by then.
+            auto started = 0;
             auto velocity = static_cast<float>(event.data2);
             for (int repeat = 1; repeat <= repeats; ++repeat) {
                 velocity *= 1.0f - decay;
@@ -728,17 +730,17 @@ void echoed(Stage& stage, const MidiEffectSettings& settings, const Events& in, 
                 if (velocity < 1.0f || note < 0 || note > 127)
                     break;
                 stage.pending.add(at + spacing * repeat, noteOn(event.channel(), note, static_cast<int>(std::lround(velocity))));
+                started = repeat;
             }
+            echo = { started, pitch, std::max<std::int64_t>(1, spacing), event.data2 };
             continue;
         }
         if (event.isNoteOff()) {
             out.add(event);
             const auto& echo = stage.echo.echoes[keyOf(event.channel(), event.data1)];
-            auto velocity = static_cast<float>(echo.velocity);
             for (int repeat = 1; repeat <= echo.repeats; ++repeat) {
-                velocity *= 1.0f - decay;
                 const auto note = event.data1 + echo.pitch * repeat;
-                if (velocity < 1.0f || note < 0 || note > 127)
+                if (note < 0 || note > 127)
                     break;
                 stage.pending.add(at + echo.spacing * repeat, noteOff(event.channel(), note));
             }
@@ -843,6 +845,10 @@ void lengthened(Stage& stage, const MidiEffectSettings& settings, const Events& 
         }
         if (event.isNoteOn()) {
             if (mode == 3) {
+                // The same key struck again while its end is still to come:
+                // that end now, before it starts again (or it would never end).
+                if (state.sounding == event.data1 && state.soundingChannel == event.channel() && state.legatoEnd >= 0)
+                    out.add(noteOff(state.soundingChannel, state.sounding), at, block.start);
                 // The one before ends as this one starts (after it: one
                 // voice slides into the next).
                 out.add(event);
@@ -873,6 +879,15 @@ void lengthened(Stage& stage, const MidiEffectSettings& settings, const Events& 
                 started = -1;
             } else if (mode == 3 && state.sounding == event.data1 && state.soundingChannel == event.channel()) {
                 state.legatoEnd = at + fixed;
+            } else if (auto& started = state.started[keyOf(event.channel(), event.data1)]; started >= 0) {
+                // Begun in "as played × factor" before the mode changed: ends now.
+                out.add(event);
+                started = -1;
+            } else if (mode != 3 && state.sounding == event.data1 && state.soundingChannel == event.channel()) {
+                // Begun in legato before the mode changed: ends now.
+                out.add(event);
+                state.sounding = -1;
+                state.legatoEnd = -1;
             }
             continue;
         }
@@ -1129,8 +1144,21 @@ std::size_t MidiEffectChain::process(const MidiEffectEvent* in, const std::size_
             s.kinds[index] = plan->effects[index].kind;
     }
     if (effects == 0) {
-        for (std::size_t index = 0; index < count; ++index)
-            send(in[index]);
+        // Passed through, but counted: a note held while the first effect is
+        // put in is then let go with the others when the chain changes.
+        for (std::size_t index = 0; index < count; ++index) {
+            const auto& event = in[index];
+            if (event.isAllNotesOff()) {
+                s.sounding.fill(0);
+            } else if (event.isNoteOn()) {
+                auto& sounding = s.sounding[keyOf(event.channel(), event.data1)];
+                sounding = static_cast<std::uint8_t>(std::min(255, sounding + 1));
+            } else if (event.isNoteOff()) {
+                if (auto& sounding = s.sounding[keyOf(event.channel(), event.data1)]; sounding > 0)
+                    --sounding;
+            }
+            send(event);
+        }
         return written;
     }
     s.a.clear();

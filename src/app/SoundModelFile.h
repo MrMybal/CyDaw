@@ -33,7 +33,11 @@ namespace cydaw::app {
 // the rest shared with it).
 [[nodiscard]] juce::var withFactoryModelReferences(const juce::var& document);
 // The named models read back into it (in place); the names not found listed.
+// A model not found stays named: its card keeps {"soundModelFile": name} as
+// its model (silent), written back as the name, so a save never loses it.
 void expandFactoryModelReferences(juce::var& document, juce::StringArray& missing);
+// That stand-in for a factory model not found.
+[[nodiscard]] bool isMissingFactoryModel(const juce::var& model);
 // A short line about it: "brass-c4 · 1 zone · C4 · 82 partials".
 [[nodiscard]] juce::String describeSoundModel(const cydaw::engine::SoundModel& model);
 

@@ -398,6 +398,10 @@ void VirtualBusRouter::publishMeter(const std::size_t slot,
 void VirtualBusRouter::getNextAudioBlock(
     const juce::AudioSourceChannelInfo& bufferToFill)
 {
+    // The whole session renders under this call: denormals flushed to zero for
+    // all of it (a reverb's or a resonator's tail decaying in silence would
+    // otherwise keep the processor busy on numbers too small to hear).
+    const juce::ScopedNoDenormals noDenormals;
     if (bufferToFill.buffer == nullptr || bufferToFill.numSamples <= 0)
         return;
     if (bufferToFill.numSamples > sourceBuffer_.getNumSamples()) {

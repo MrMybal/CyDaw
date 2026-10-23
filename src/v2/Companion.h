@@ -53,7 +53,9 @@ public:
     // Installs a component into its environment (setup), refused when its
     // licences ask to be accepted and were not, or when one job runs. What
     // was accepted, and when, is kept in <environment>/receipts/<id>.json.
-    bool install(const juce::String& id, bool licencesAccepted, juce::String& error);
+    // `extra`: arguments of the setup added to the component's own (--clap).
+    bool install(const juce::String& id, bool licencesAccepted, juce::String& error,
+                 const juce::StringArray& extra = {});
 
     // Starts `python -m cydaw_companion <arguments>`; false when one runs.
     bool start(const juce::StringArray& arguments);

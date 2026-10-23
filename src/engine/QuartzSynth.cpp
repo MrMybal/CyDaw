@@ -489,9 +489,11 @@ public:
                     contour.level = 0.0;
                     envelope[op] = 0.0;
                 }
-                sounding = sounding || (levels[op] > 0.0 && (contour.stage == Envelope::Stage::attack || envelope[op] > 1.0e-5));
+                // An operator turned down to 0 for a moment (a fade in, a
+                // modulator) keeps the note: only envelopes that faded end it.
+                sounding = sounding || contour.stage == Envelope::Stage::attack || envelope[op] > 1.0e-5;
             }
-            // Over once every operator heard has faded, even held.
+            // Over once every operator has faded, even held.
             if (!active() || !sounding) {
                 kill();
                 return false;

@@ -33,10 +33,14 @@ juce::String escapedPath(const juce::String& path)
 }
 
 // A folder there, made if need be: another download thread may make the
-// same one at the same instant, and Windows then says it already exists.
+// same one, or one of its parents, at the same instant. JUCE makes the
+// parents first and gives up when one of them appears under it: tried again,
+// what is already there is skipped.
 bool makeFolder(const juce::File& folder)
 {
-    return folder.createDirectory().wasOk() || folder.isDirectory();
+    for (auto attempt = 0; attempt < 8 && !folder.isDirectory(); ++attempt)
+        (void) folder.createDirectory();
+    return folder.isDirectory();
 }
 
 bool isLicenceOrReadme(const juce::String& path)

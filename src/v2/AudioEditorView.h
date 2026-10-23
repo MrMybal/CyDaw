@@ -51,6 +51,8 @@ public:
     // Ctrl+Z on a launcher clip (the engine keeps the arrangement's): whether
     // there was something to take back.
     bool undoLauncher(bool redo);
+    // An undo or a redo from the toolbar replaced the clip being drawn.
+    bool clipReplaced_ {};
 
 private:
     using AudioClip = app::AudioTrackController::AudioClip;

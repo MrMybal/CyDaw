@@ -92,6 +92,8 @@ std::unique_ptr<Block> parse(const juce::String& content)
         if (line.isEmpty())
             continue;
         if (line.startsWithChar('<')) {
+            if (open.size() > 256)
+                break;
             auto block = std::make_unique<Block>();
             block->head = tokenise(line.substring(1));
             auto* made = block.get();

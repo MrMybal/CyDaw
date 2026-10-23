@@ -1083,7 +1083,8 @@ void NativeDspRuntime::applyParameters(const RuntimeState &runtime, const double
         if (node.touched)
         {
             node.touched = false;
-            (void)cydaw::engine::updateNativeDspProcessorParameters(*node.processor, node.scratch);
+            // The audio thread: parameters only (the instrument is the control thread's).
+            (void)cydaw::engine::updateNativeDspProcessorParameters(*node.processor, node.scratch, false);
         }
 }
 

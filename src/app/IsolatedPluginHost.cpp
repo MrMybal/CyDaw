@@ -6,6 +6,17 @@
 
 namespace cydaw::app {
 
+namespace {
+std::atomic<int> sessionNumerator { 4 };
+std::atomic<int> sessionDenominator { 4 };
+} // namespace
+
+void IsolatedPluginHost::setSessionMetre(const int numerator, const int denominator) noexcept
+{
+    sessionNumerator.store(std::max(1, numerator), std::memory_order_relaxed);
+    sessionDenominator.store(std::max(1, denominator), std::memory_order_relaxed);
+}
+
 IsolatedPluginHost::~IsolatedPluginHost()
 {
     stop();
@@ -87,6 +98,8 @@ juce::Result IsolatedPluginHost::startWorker(PluginWorkerLaunch launch,
         return juce::Result::fail("Cannot map the plugin audio transport");
     }
     std::memset(shared, 0, sizeof(*shared));
+    shared->transportNumerator = 4;
+    shared->transportDenominator = 4;
     shared->magic = cydaw::plugins::workerProtocolMagic;
     shared->protocolVersion = cydaw::plugins::workerProtocolVersion;
     shared->inputChannels = static_cast<std::uint16_t>(channelCount);
@@ -108,7 +121,7 @@ juce::Result IsolatedPluginHost::startWorker(PluginWorkerLaunch launch,
                          "--sample-rate", juce::String(sampleRate, 3),
                          "--block-size", juce::String(maximumBlockSize),
                          "--channels", juce::String(channelCount) });
-    if (!process_.start(arguments)) {
+    if (!process_.start(arguments, 0)) {
         mapping_.reset();
         sharedFile_.deleteFile();
         return juce::Result::fail("Cannot start the isolated plugin worker");
@@ -153,8 +166,8 @@ juce::Result IsolatedPluginHost::startWorker(PluginWorkerLaunch launch,
 
 void IsolatedPluginHost::stop()
 {
-    active_.store(nullptr, std::memory_order_release);
-    while (callbacksInFlight_.load(std::memory_order_acquire) != 0)
+    active_.store(nullptr);
+    while (callbacksInFlight_.load() != 0)
         std::this_thread::yield();
 
     if (mapping_ != nullptr) {
@@ -402,8 +415,8 @@ bool IsolatedPluginHost::processBlock(juce::AudioBuffer<float>& buffer,
                                       const int startSample,
                                       const int numSamples, double timelineSeconds, double tempo, bool playing) noexcept
 {
-    callbacksInFlight_.fetch_add(1, std::memory_order_acq_rel);
-    auto* shared = active_.load(std::memory_order_acquire);
+    callbacksInFlight_.fetch_add(1);
+    auto* shared = active_.load();
     if (shared == nullptr || numSamples <= 0
         || numSamples > static_cast<int>(cydaw::plugins::maximumSharedAudioFrames)) {
         callbacksInFlight_.fetch_sub(1, std::memory_order_acq_rel);
@@ -425,6 +438,8 @@ bool IsolatedPluginHost::processBlock(juce::AudioBuffer<float>& buffer,
         shared->transportTempo = std::isfinite(tempo) && tempo > 0 ? tempo : 120.0;
         shared->transportQuarterNotes = shared->transportSeconds * shared->transportTempo / 60.0;
         shared->transportPlaying = playing ? 1u : 0u;
+        shared->transportNumerator = static_cast<std::uint32_t>(sessionNumerator.load(std::memory_order_relaxed));
+        shared->transportDenominator = static_cast<std::uint32_t>(sessionDenominator.load(std::memory_order_relaxed));
         if (pendingRealtimeParameterCount_ > 0) {
             for (std::size_t valueIndex = 0;
                  valueIndex < pendingRealtimeParameterCount_;
@@ -436,6 +451,7 @@ bool IsolatedPluginHost::processBlock(juce::AudioBuffer<float>& buffer,
                 pendingRealtimeParameterCount_);
             cydaw::plugins::sharedAtomic(shared->automationSequence).fetch_add(1,
                                                                   std::memory_order_release);
+            pendingRealtimeParameterCount_ = 0;
         }
         for (int channel = 0; channel < channelCount; ++channel) {
             const auto* source = buffer.getReadPointer(channel, startSample);
