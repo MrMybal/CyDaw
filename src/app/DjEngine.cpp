@@ -337,7 +337,7 @@ void DjEngine::eject(const int index)
     {
         const std::scoped_lock lock(stateLock_);
         deck.state = LoadState::empty;
-        deck.file = {};
+        deck.file = juce::File {};
         deck.title = {};
         deck.artist = {};
         deck.analysis = nullptr;

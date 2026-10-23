@@ -6581,7 +6581,7 @@ void NodeGraphComponent::restore(const juce::var& state)
     restoreReusedModules_ = 0;
     restoreParsedModules_ = 0;
     if (!restoringHistory_)
-        currentGraphPresetFile_ = {};
+        currentGraphPresetFile_ = juce::File {};
     closeModuleGraphEditor();
     closeModuleInterfaceEditor();
     if (const auto* legacyNodes = state.getArray()) {
@@ -13812,7 +13812,7 @@ juce::Result NodeGraphComponent::applyFactoryPreset(const FactoryPreset& preset)
             return juce::Result::fail("Factory preset contains an invalid connection");
 
     nodes_.clear();
-    currentGraphPresetFile_ = {};
+    currentGraphPresetFile_ = juce::File {};
     connections_.clear();
     selectedNodes_.clear();
     graphRole_ = cydaw::graph::GraphRole::generic;
@@ -22414,7 +22414,7 @@ void NodeGraphComponent::forkGraphDefinition()
                                   .toLowerCase().substring(0, 12);
     graphReference_.id = ("user." + slug.substring(0, 96)
                           + "." + uniqueSuffix).toStdString();
-    currentGraphPresetFile_ = {};
+    currentGraphPresetFile_ = juce::File {};
     graphReference_.version = { 1, 0, 0 };
     graphScope_ = cydaw::graph::GraphScope::user;
     graphName_ = tr("nodes.forkedGraphName", "name", previousName)

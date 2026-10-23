@@ -25,6 +25,7 @@
 #include <atomic>
 #include <cmath>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <vector>
 
@@ -136,6 +137,42 @@ struct HostParameterMetadata {
     bool automatable {};
 };
 
+// A snapshot shared by the host's threads (never the audio callback):
+// std::atomic<std::shared_ptr> where the standard library has it, a lock
+// elsewhere (Apple's libc++).
+template <typename T>
+class SharedSnapshot final {
+public:
+#if defined(__cpp_lib_atomic_shared_ptr)
+    void store(std::shared_ptr<const T> next) noexcept
+    {
+        value_.store(std::move(next), std::memory_order_release);
+    }
+    [[nodiscard]] std::shared_ptr<const T> load() const noexcept
+    {
+        return value_.load(std::memory_order_acquire);
+    }
+
+private:
+    std::atomic<std::shared_ptr<const T>> value_;
+#else
+    void store(std::shared_ptr<const T> next)
+    {
+        const std::scoped_lock lock(mutex_);
+        value_.swap(next);
+    }
+    [[nodiscard]] std::shared_ptr<const T> load() const
+    {
+        const std::scoped_lock lock(mutex_);
+        return value_;
+    }
+
+private:
+    mutable std::mutex mutex_;
+    std::shared_ptr<const T> value_;
+#endif
+};
+
 class GraphHostParameter final : public juce::AudioProcessorParameterWithID {
 public:
     GraphHostParameter(const std::size_t slot,
@@ -184,7 +221,7 @@ public:
         initial->active = true;
         if (config == nullptr)
             initial->automatable = true;
-        metadata_.store(std::move(initial), std::memory_order_release);
+        metadata_.store(std::move(initial));
     }
 
     float getValue() const override
@@ -244,12 +281,12 @@ public:
         if (resetValue)
             normalised_.store(shared->defaultNormalised,
                               std::memory_order_relaxed);
-        metadata_.store(std::move(shared), std::memory_order_release);
+        metadata_.store(std::move(shared));
     }
 
     [[nodiscard]] std::shared_ptr<const HostParameterMetadata> metadata() const
     {
-        return metadata_.load(std::memory_order_acquire);
+        return metadata_.load();
     }
 
 private:
@@ -258,7 +295,7 @@ private:
     // its own threads and never from processBlock, so the multi-reader
     // reference count is the right trade-off here. Only the map the callback
     // actually reads is worth publishing lock-free.
-    std::atomic<std::shared_ptr<const HostParameterMetadata>> metadata_;
+    SharedSnapshot<HostParameterMetadata> metadata_;
 };
 
 std::optional<NativeParameterField> fieldForBinding(

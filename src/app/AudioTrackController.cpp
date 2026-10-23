@@ -218,7 +218,7 @@ void normaliseLauncherClipTimeline(
 {
     if (clip.usesEventTimeline) {
         if (clip.events.empty()) {
-            clip.sourceFile = {};
+            clip.sourceFile = juce::File {};
             clip.sourceOffsetSeconds = 0.0;
         } else {
             clip.sourceFile = clip.events.front().sourceFile;
@@ -16501,7 +16501,7 @@ juce::Result AudioTrackController::finishMasterExport()
         setPosition(0.0);
         setLooping(masterExportPreviousLooping_);
     }
-    masterExportDestination_ = {};
+    masterExportDestination_ = juce::File {};
     if (!destination.existsAsFile())
         return juce::Result::fail(tr("error.masterExportCreate", "file",
                                      destination.getFullPathName()));
@@ -16521,7 +16521,7 @@ void AudioTrackController::cancelMasterExport()
         setPosition(0.0);
         setLooping(masterExportPreviousLooping_);
     }
-    masterExportDestination_ = {};
+    masterExportDestination_ = juce::File {};
     if (destination.existsAsFile())
         (void) destination.deleteFile();
 }

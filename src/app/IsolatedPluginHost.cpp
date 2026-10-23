@@ -170,8 +170,8 @@ void IsolatedPluginHost::stop()
     mapping_.reset();
     if (sharedFile_ != juce::File {})
         sharedFile_.deleteFile();
-    sharedFile_ = {};
-    pluginFile_ = {};
+    sharedFile_ = juce::File {};
+    pluginFile_ = juce::File {};
     pluginName_.clear();
     lastStatus_ = "Stopped";
     nextSequence_ = 1;

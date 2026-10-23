@@ -506,11 +506,11 @@ void SampleStore::Impl::Streamer::run()
         // are behind the lane by `margin` at least (it is filled no further).
         if (stream.direction > 0) {
             const auto high = first + count;
-            stream.low.store(std::max(stream.low.load(std::memory_order_relaxed), high - SampleStream::capacity),
+            stream.low.store(std::max<std::int64_t>(stream.low.load(std::memory_order_relaxed), high - SampleStream::capacity),
                              std::memory_order_release);
             stream.high.store(high, std::memory_order_release);
         } else {
-            stream.high.store(std::min(stream.high.load(std::memory_order_relaxed), first + SampleStream::capacity),
+            stream.high.store(std::min<std::int64_t>(stream.high.load(std::memory_order_relaxed), first + SampleStream::capacity),
                               std::memory_order_release);
             stream.low.store(first, std::memory_order_release);
         }
