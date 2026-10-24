@@ -235,10 +235,15 @@ public:
                                          int channelCount,
                                          std::size_t* pluginIndex = nullptr);
     juce::Result reloadPlugin(std::size_t pluginIndex, double sampleRate, int blockSize, int channels);
-    void removePlugin(std::size_t pluginIndex);
+    // whileHeld: run while no block plays the plug-ins (their automation
+    // lanes renumbered with them).
+    void removePlugin(std::size_t pluginIndex, const std::function<void()>& whileHeld = {});
     void clearPlugins();
-    [[nodiscard]] bool movePlugin(std::size_t pluginIndex, int direction);
+    [[nodiscard]] bool movePlugin(std::size_t pluginIndex, int direction, const std::function<void()>& whileHeld = {});
     void pollPluginHealth();
+    // The device's rate or block size changed: the workers started with
+    // others start again (their state kept). Whether one did.
+    bool followDevice(double sampleRate, int blockSize, int channels);
     [[nodiscard]] juce::Result getPluginState(std::size_t pluginIndex,
                                               juce::MemoryBlock& destination);
     [[nodiscard]] juce::Result getCachedPluginState(
@@ -327,6 +332,8 @@ private:
     int maximumBlockSize_ { 512 };
     int graphChannelCount_ { 2 };
     std::array<std::unique_ptr<IsolatedPluginHost>, maximumPluginCount> pluginHosts_;
+    // The device format each slot's worker was last started again for.
+    std::array<std::pair<double, int>, maximumPluginCount> followTried_ {};
     // The loudest each plug-in gave out since asked (two channels), for the
     // device panel's meters.
     std::array<std::atomic<float>, maximumPluginCount * 2> pluginPeaks_ {};

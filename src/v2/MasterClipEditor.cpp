@@ -42,6 +42,14 @@ void MasterClipEditor::draw(const int scene)
     }
     auto clip = *found;
     auto changed = false;
+    // Another project: the steps kept were of its clips.
+    if (refsSerial_ != studio_.trackRefsSerial()) {
+        refsSerial_ = studio_.trackRefsSerial();
+        undo_.clear();
+        redo_.clear();
+        gesture_.reset();
+    }
+    const auto before = clip;
     const auto choices = studio_.masterLaneChoices();
     if (shownScene_ != scene) {
         // Another clip: its first lane with points, else the level.
@@ -256,8 +264,32 @@ void MasterClipEditor::draw(const int scene)
                 stored.push_back({ std::clamp(point.time, 0.0, lengthBeats), static_cast<float>(point.value), engine::clampedCurveShape(point.shape),
                                    point.bend, point.handles, point.id });
         }
+        if (!gesture_)
+            gesture_ = Step { scene, before };
         studio_.setMasterClip(scene, std::move(clip));
     }
+    // The gesture over: one step.
+    if (gesture_ && !ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+        undo_.push_back(std::move(*gesture_));
+        gesture_.reset();
+        if (undo_.size() > 64)
+            undo_.erase(undo_.begin());
+        redo_.clear();
+    }
+}
+
+bool MasterClipEditor::undo(const bool redo)
+{
+    auto& from = redo ? redo_ : undo_;
+    auto& to = redo ? undo_ : redo_;
+    if (from.empty())
+        return false;
+    auto step = std::move(from.back());
+    from.pop_back();
+    if (const auto* now = studio_.masterClip(step.scene))
+        to.push_back({ step.scene, *now });
+    studio_.setMasterClip(step.scene, std::move(step.clip));
+    return true;
 }
 
 } // namespace cydaw::v2

@@ -2609,6 +2609,11 @@ void ClipEditorView::drawAudio(const TrackRef& track, const app::AudioTrackContr
     audio_->draw(track, clip);
 }
 
+bool ClipEditorView::undoMasterClip(const bool redo)
+{
+    return master_ != nullptr && !state_.editedClip && state_.editedMasterScene && master_->undo(redo);
+}
+
 bool ClipEditorView::undoLauncherAudio(const bool redo)
 {
     return audio_ != nullptr && state_.editedClip && state_.editedClip->launcherAudio() && audio_->undoLauncher(redo);

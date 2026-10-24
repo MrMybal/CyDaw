@@ -5,6 +5,7 @@
 #include <cydaw/engine/DjMix.h>
 
 #include <algorithm>
+#include <set>
 
 namespace cydaw::v2 {
 
@@ -263,24 +264,51 @@ void DjLibrary::scan()
                 found.push_back(entry.getFile());
         }
     }
+    // The disk is read without the lock (the interface takes it every
+    // frame): what is new and what is gone, then both applied at once.
+    const auto keyOf = [](const juce::File& file) {
+        return juce::File::areFileNamesCaseSensitive() ? file.getFullPathName() : file.getFullPathName().toLowerCase();
+    };
+    std::set<juce::String> known;
+    std::vector<juce::File> listed;
+    {
+        const std::scoped_lock lock(lock_);
+        for (const auto& track : tracks_) {
+            known.insert(keyOf(track.file));
+            listed.push_back(track.file);
+        }
+    }
+    std::vector<DjTrack> fresh;
+    for (const auto& file : found) {
+        if (threadShouldExit())
+            return;
+        if (!known.insert(keyOf(file)).second)
+            continue;
+        DjTrack track;
+        track.file = file;
+        app::djTrackTags(file, {}, track.title, track.artist);
+        track.size = file.getSize();
+        track.modified = file.getLastModificationTime().toMilliseconds();
+        fresh.push_back(std::move(track));
+    }
+    // Gone from the disk: gone from the collection.
+    std::set<juce::String> gone;
+    for (const auto& file : listed)
+        if (!file.existsAsFile())
+            gone.insert(keyOf(file));
     auto added = false;
     {
         const std::scoped_lock lock(lock_);
-        for (const auto& file : found) {
-            if (indexOf(file) < tracks_.size())
-                continue;
-            DjTrack track;
-            track.file = file;
-            app::djTrackTags(file, {}, track.title, track.artist);
-            track.size = file.getSize();
-            track.modified = file.getLastModificationTime().toMilliseconds();
-            tracks_.push_back(std::move(track));
-            added = true;
-        }
-        // Gone from the disk: gone from the collection.
+        std::set<juce::String> present;
+        for (const auto& track : tracks_)
+            present.insert(keyOf(track.file));
+        for (auto& track : fresh)
+            if (present.insert(keyOf(track.file)).second) {
+                tracks_.push_back(std::move(track));
+                added = true;
+            }
         const auto before = tracks_.size();
-        tracks_.erase(std::remove_if(tracks_.begin(), tracks_.end(), [](const DjTrack& track) { return !track.file.existsAsFile(); }),
-                      tracks_.end());
+        std::erase_if(tracks_, [&gone, &keyOf](const DjTrack& track) { return gone.count(keyOf(track.file)) > 0; });
         added = added || tracks_.size() != before;
     }
     if (added)

@@ -75,10 +75,72 @@ def environment_python(folder: Path) -> Path:
     return windows if windows.exists() or os.name == "nt" else folder / "bin" / "python"
 
 
+_children_bound = False
+
+
+def bind_children() -> None:
+    """CyDAW cancels an install by ending this process, and this process only:
+    pip, its child, would go on downloading and installing. On Windows this
+    process and its children go in a job that ends them all once this one is
+    gone; on Linux each child is told to end with its parent."""
+    global _children_bound
+    if _children_bound or os.name != "nt":
+        return
+    _children_bound = True
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class Basic(ctypes.Structure):
+            _fields_ = [("PerProcessUserTimeLimit", ctypes.c_int64), ("PerJobUserTimeLimit", ctypes.c_int64),
+                        ("LimitFlags", wintypes.DWORD), ("MinimumWorkingSetSize", ctypes.c_size_t),
+                        ("MaximumWorkingSetSize", ctypes.c_size_t), ("ActiveProcessLimit", wintypes.DWORD),
+                        ("Affinity", ctypes.c_size_t), ("PriorityClass", wintypes.DWORD),
+                        ("SchedulingClass", wintypes.DWORD)]
+
+        class Counters(ctypes.Structure):
+            _fields_ = [(name, ctypes.c_uint64) for name in ("ReadOperationCount", "WriteOperationCount",
+                                                              "OtherOperationCount", "ReadTransferCount",
+                                                              "WriteTransferCount", "OtherTransferCount")]
+
+        class Extended(ctypes.Structure):
+            _fields_ = [("BasicLimitInformation", Basic), ("IoInfo", Counters),
+                        ("ProcessMemoryLimit", ctypes.c_size_t), ("JobMemoryLimit", ctypes.c_size_t),
+                        ("PeakProcessMemoryUsed", ctypes.c_size_t), ("PeakJobMemoryUsed", ctypes.c_size_t)]
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.CreateJobObjectW.restype = wintypes.HANDLE
+        kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+        kernel32.SetInformationJobObject.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
+        kernel32.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
+        job = kernel32.CreateJobObjectW(None, None)
+        if not job:
+            return
+        info = Extended()
+        info.BasicLimitInformation.LimitFlags = 0x2000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        if kernel32.SetInformationJobObject(job, 9, ctypes.byref(info), ctypes.sizeof(info)):  # extended limits
+            kernel32.AssignProcessToJobObject(job, kernel32.GetCurrentProcess())
+        # The handle stays open for as long as this process lives.
+    except (OSError, AttributeError):
+        pass
+
+
+def _end_with_parent() -> None:
+    """Linux: the child ends when its parent (this process) does."""
+    try:
+        import ctypes
+        import signal
+        ctypes.CDLL("libc.so.6", use_errno=True).prctl(1, signal.SIGTERM)  # PR_SET_PDEATHSIG
+    except (OSError, AttributeError):
+        pass
+
+
 def run(command: list[str], fraction: float, label: str) -> int:
     emit(progress=fraction, message=label)
+    bind_children()
     process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8",
-                               errors="replace", creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                               errors="replace", creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                               preexec_fn=_end_with_parent if sys.platform.startswith("linux") else None)
     assert process.stdout is not None
     for line in process.stdout:
         line = line.strip()

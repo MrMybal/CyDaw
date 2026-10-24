@@ -32,7 +32,7 @@ public:
                 return juce::Result::fail("The file could not be opened: " + file_.getFullPathName());
             juce::MemoryInputStream compressed(static_cast<const char*>(bytes.getData()) + 4, bytes.getSize() - 4, false);
             juce::GZIPDecompressorInputStream unzipped(&compressed, false, juce::GZIPDecompressorInputStream::zlibFormat);
-            document = juce::XmlDocument::parse(unzipped.readEntireStreamAsString());
+            document = juce::XmlDocument::parse(readBounded(unzipped));
         } else {
             document = juce::XmlDocument::parse(file_);
         }

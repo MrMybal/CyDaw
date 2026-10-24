@@ -36,6 +36,11 @@ public:
     // edit in the arrangement was one.
     bool undoAutomation();
     bool redoAutomation();
+    // MIDI clips moved, duplicated, deleted or made in the arrangement (the
+    // engine's arrangement history keeps audio clips only): these act when the
+    // last edit there was one.
+    bool undoMidiClips();
+    bool redoMidiClips();
 
 private:
     struct ClipHit {
@@ -69,6 +74,21 @@ private:
         juce::String lane;
         std::vector<Studio::AutomationPoint> points;
     };
+    // Instrument tracks' arrangement clips as they were (launcher clips
+    // aside): put back whole.
+    struct MidiClipsEdit {
+        std::vector<std::pair<TrackRef, std::vector<app::AudioTrackController::MidiClip>>> tracks;
+    };
+    [[nodiscard]] MidiClipsEdit midiClipsOf(const std::vector<TrackRef>& tracks) const;
+    void restoreMidiClips(const MidiClipsEdit& edit);
+    // Kept before an edit of these tracks' MIDI clips.
+    void rememberMidiClips(const std::vector<TrackRef>& tracks);
+    // A track the last kept edit also changes (a clip moved onto it).
+    void alsoRememberMidiClips(const TrackRef& track);
+    // The last kept edit, when nothing came of it (a click that moved nothing).
+    void forgetUnchangedMidiClips();
+    // The instrument tracks of the clips picked.
+    [[nodiscard]] std::vector<TrackRef> pickedMidiTracks() const;
 
     void drawToolbar();
     void drawCanvas();
@@ -182,6 +202,13 @@ private:
     std::vector<AutomationEdit> automationUndo_;
     std::vector<AutomationEdit> automationRedo_;
     bool automationLastEdit_ {};
+    std::vector<MidiClipsEdit> midiClipsUndo_;
+    std::vector<MidiClipsEdit> midiClipsRedo_;
+    bool midiClipsLastEdit_ {};
+    // Studio::trackRefsSerial when the edits above and the curve editors
+    // were made: a track gone or another project, and they are dropped.
+    std::uint64_t refsSerial_ {};
+    void dropStaleRefs();
     std::optional<ClipRef> contextClip_;
     std::optional<TrackRef> contextTrack_;
     std::optional<TrackRef> renamingTrack_;

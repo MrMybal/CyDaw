@@ -61,6 +61,7 @@ public:
         currentGain_ = 1.0;
         kickPlaying_ = false;
         familyPlaying_ = false;
+        transposeSemitones_ = plan.transposeSemitones;
         if (plan.waveform == PolyOscillatorWaveform::family && plan.synthModel != synth::Model::none) {
             // A synth of the family plays the whole voice, as Prisme does.
             source_.reset();
@@ -175,14 +176,16 @@ public:
     }
 
     // Where a voice's pitch is now, in semitones (a glide in progress); -1 silent.
+    // As the keys play it, before the plan's transposition: what startNote
+    // takes as glideFrom (it transposes it again).
     [[nodiscard]] double currentPitch() const noexcept
     {
         if (prismPlaying_ && prism_.active())
-            return prism_.currentPitch();
+            return prism_.currentPitch() - transposeSemitones_;
         if (familyPlaying_ && family_.active())
-            return family_.currentPitch();
+            return family_.currentPitch() - transposeSemitones_;
         if (kickPlaying_)
-            return static_cast<double>(kickNote_);
+            return static_cast<double>(kickNote_ - transposeSemitones_);
         return noteFrequency_ > 0.0 ? notePitch_ + glideOffset_ : -1.0;
     }
 
@@ -581,6 +584,8 @@ private:
     kick::Voice kick_;
     bool kickPlaying_ {};
     int kickNote_ {};
+    // The plan's transposition when the note started (currentPitch).
+    int transposeSemitones_ {};
     double kickRate_ { 48'000.0 };
     double kickFade_ { 1.0 };
     double kickFadeStep_ {};

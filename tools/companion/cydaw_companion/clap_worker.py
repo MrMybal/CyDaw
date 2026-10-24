@@ -191,7 +191,10 @@ def handle(clap: Clap, request: dict) -> dict:
     return {"ok": False, "error": f"unknown op {op!r}"}
 
 
-def serve(folder: Path, device: str, idle: float) -> int:
+def serve(folder: Path, device: str, idle: float, token: str = "") -> int:
+    """token: what CyDAW put in every request (given on the command line); a
+    connection that brings another (some other local process, first on the
+    port) is closed unanswered: it could make the worker read and write files."""
     started = time.time()
     clap = Clap(folder, device)
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -228,6 +231,8 @@ def serve(folder: Path, device: str, idle: float) -> int:
                     answer = {"ok": False, "error": f"bad request: {error}"}
                     request = {}
                 else:
+                    if token and request.get("token") != token:
+                        return 1
                     if request.get("op") == "shutdown":
                         connection.sendall(b'{"ok": true}\n')
                         return 0

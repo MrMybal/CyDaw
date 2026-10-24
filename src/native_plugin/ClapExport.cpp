@@ -1,5 +1,6 @@
 #include "NativeProcessor.h"
 #include <array>
+#include <cmath>
 #include <clap/clap.h>
 #include <clap/ext/audio-ports.h>
 #include <clap/ext/gui.h>
@@ -192,7 +193,10 @@ struct ClapExport
                 m.status = uint8_t((e->type == CLAP_EVENT_NOTE_ON ? 0x90 : 0x80) |
                                    std::clamp<int>(v->channel, 0, 15));
                 m.data1 = uint8_t(std::clamp<int>(v->key, 0, 127));
-                m.data2 = uint8_t(std::clamp<int>(int(v->velocity * 127), 0, 127));
+                // Rounded, and a note-on keeps at least 1 (0 would read as a
+                // note-off and the soft note would be lost).
+                const auto velocity = std::clamp<int>(int(std::lround(v->velocity * 127)), 0, 127);
+                m.data2 = uint8_t(e->type == CLAP_EVENT_NOTE_ON ? std::max(1, velocity) : velocity);
             }
             else
                 continue;

@@ -448,12 +448,19 @@ cydaw::engine::SoundModelRef loadSoundModelFile(const juce::File& file, juce::va
     const auto modified = file.getLastModificationTime();
     const auto size = file.getSize();
     if (factory) {
-        const std::scoped_lock lock(factoryModelsLock());
-        if (const auto found = factoryModels().find(stored);
-            found != factoryModels().end() && found->second.modified == modified && found->second.size == size) {
-            json = found->second.json;
-            return soundModelFromVar(json, error);
+        // The shared JSON taken under the lock, parsed after it: an open in
+        // the background does not hold the interface's save meanwhile.
+        auto cached = false;
+        {
+            const std::scoped_lock lock(factoryModelsLock());
+            if (const auto found = factoryModels().find(stored);
+                found != factoryModels().end() && found->second.modified == modified && found->second.size == size) {
+                json = found->second.json;
+                cached = true;
+            }
         }
+        if (cached)
+            return soundModelFromVar(json, error);
     }
     json = juce::JSON::parse(file.loadFileAsString());
     if (!json.isObject()) {

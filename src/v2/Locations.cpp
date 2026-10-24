@@ -1,6 +1,9 @@
 #include "Locations.h"
 
+#include <algorithm>
 #include <map>
+#include <utility>
+#include <vector>
 
 namespace cydaw::v2::locations {
 
@@ -287,10 +290,14 @@ void Move::run()
     };
     std::vector<Copy> copies;
     juce::Array<juce::File> sources;
+    // Renamed at once: renamed back if the move is cancelled or fails.
+    std::vector<std::pair<juce::File, juce::File>> renamed;
     for (const auto& item : items) {
         const auto target = to_.getChildFile(item.getFileName());
-        if (sameDrive && !target.exists() && item.moveFileTo(target))
+        if (sameDrive && !target.exists() && item.moveFileTo(target)) {
+            renamed.emplace_back(item, target);
             continue;
+        }
         sources.add(item);
         if (item.isDirectory()) {
             for (const auto& entry : juce::RangedDirectoryIterator(item, true, "*", juce::File::findFiles))
@@ -308,10 +315,15 @@ void Move::run()
 
     // Copies first: the originals go only once every one is there.
     juce::Array<juce::File> made;
-    const auto undo = [&made] {
+    const auto undo = [&made, &renamed] {
         for (const auto& file : made)
             (void) file.deleteFile();
+        for (const auto& [item, target] : renamed)
+            (void) target.moveFileTo(item);
     };
+    // The originals that may go: those now in the new folder, the same.
+    juce::Array<juce::File> copied;
+    auto kept = 0;
     for (const auto& copy : copies) {
         if (threadShouldExit()) {
             undo();
@@ -323,26 +335,47 @@ void Move::run()
             const std::scoped_lock lock(mutex_);
             progress_.current = copy.source.getFileName();
         }
-        // Already there (a merge): kept as it is.
-        const auto there = copy.target.existsAsFile() && copy.target.getSize() == copy.size;
-        if (!there) {
-            const auto isNew = !copy.target.exists();
+        // Already there (a merge): kept as it is when it is the same file. A
+        // different file of that name is not overwritten, and the original
+        // stays where it was.
+        if (copy.target.exists()) {
+            if (copy.target.existsAsFile() && copy.target.getSize() == copy.size
+                && copy.target.hasIdenticalContentTo(copy.source))
+                copied.add(copy.source);
+            else
+                ++kept;
+        } else {
             const auto ok = copy.target.getParentDirectory().createDirectory().wasOk() && copy.source.copyFileTo(copy.target);
             if (!ok) {
                 undo();
                 fail("cannot copy " + copy.source.getFullPathName());
                 return;
             }
-            if (isNew)
-                made.add(copy.target);
+            made.add(copy.target);
+            copied.add(copy.source);
         }
         const std::scoped_lock lock(mutex_);
         progress_.done += copy.size;
     }
+    for (const auto& file : copied)
+        (void) file.deleteFile();
+    // The folders emptied go, deepest first; one still holding a kept file stays.
     for (const auto& source : sources)
-        (void) (source.isDirectory() ? source.deleteRecursively() : source.deleteFile());
+        if (source.isDirectory()) {
+            juce::Array<juce::File> folders;
+            for (const auto& entry : juce::RangedDirectoryIterator(source, true, "*", juce::File::findDirectories))
+                folders.add(entry.getFile());
+            std::sort(folders.begin(), folders.end(), [](const juce::File& a, const juce::File& b) {
+                return a.getFullPathName().length() > b.getFullPathName().length();
+            });
+            folders.add(source);
+            for (const auto& folder : folders)
+                if (folder.getNumberOfChildFiles(juce::File::findFilesAndDirectories | juce::File::ignoreHiddenFiles) == 0)
+                    (void) folder.deleteRecursively();
+        }
     const std::scoped_lock lock(mutex_);
     progress_.current.clear();
+    progress_.kept = kept;
     progress_.finished = true;
 }
 

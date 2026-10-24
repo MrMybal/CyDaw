@@ -677,6 +677,10 @@ struct LfoState {
     double next {};
     double elapsed {};
     bool finished {};
+    // Free mode: the turns made, read off the session clock once, then moved
+    // by the rate.
+    double cycles {};
+    bool running {};
 };
 
 double lfoWave(const LfoShape shape, const double phase, const LfoState& state, const float* drawn) noexcept
@@ -1589,8 +1593,18 @@ bool Voice::render(const PrismValues& values, const Tables& tables, const Contex
                 const auto shape = static_cast<LfoShape>(std::clamp(pick(base + lfoShape), 0, static_cast<int>(LfoShape::count) - 1));
                 double phase {};
                 if (mode == LfoMode::free) {
-                    const auto clock = context.clockSeconds + static_cast<double>(offset + i) * dt;
-                    const auto cycles = clock * lfoIncrements[lfo] * rate + value(base + lfoPhase);
+                    // From the session clock once (the voices' free LFOs move
+                    // together), then by its rate: a rate turned or modulated
+                    // changes its speed, never jumps its phase.
+                    if (!state.running) {
+                        const auto clock = context.clockSeconds + static_cast<double>(offset + i) * dt;
+                        state.cycles = clock * lfoIncrements[lfo] * rate;
+                        state.running = true;
+                    } else {
+                        state.cycles += lfoIncrements[lfo];
+                    }
+                    state.cycles -= std::floor(state.cycles);
+                    const auto cycles = state.cycles + value(base + lfoPhase);
                     phase = cycles - std::floor(cycles);
                     if (phase < state.phase - 0.5) {
                         state.previous = state.next;

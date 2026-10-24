@@ -2,6 +2,7 @@
 
 #include <juce_events/juce_events.h>
 
+#include <atomic>
 #include <memory>
 #include <utility>
 
@@ -112,14 +113,25 @@ juce::String RemoteControlServer::respond(const juce::String& line) const
     struct Pending {
         juce::var response;
         juce::WaitableEvent done;
+        // Given up on (too late, or CyDAW closing): not run when its turn
+        // comes, so a client trying again does not have it done twice.
+        std::atomic<bool> abandoned { false };
     };
     auto pending = std::make_shared<Pending>();
     juce::MessageManager::callAsync([pending, request, handler = handler_] {
+        if (pending->abandoned.load())
+            return;
         pending->response = handler(request);
         pending->done.signal();
     });
-    if (!pending->done.wait(30'000))
-        return failure("the application did not answer within 30 s");
+    // Waited for in slices: a CyDAW closing does not wait for it.
+    auto answered = false;
+    for (auto waited = 0; waited < 30'000 && !answered && !threadShouldExit(); waited += 100)
+        answered = pending->done.wait(100);
+    if (!answered) {
+        pending->abandoned.store(true);
+        return failure(threadShouldExit() ? "the application is closing" : "the application did not answer within 30 s");
+    }
     if (auto* object = pending->response.getDynamicObject();
         object != nullptr && request.hasProperty("id"))
         object->setProperty("id", request["id"]);

@@ -81,6 +81,9 @@ public:
     [[nodiscard]] juce::String statusMessage() const;
     [[nodiscard]] std::uint64_t missedBlockCount() const noexcept;
     [[nodiscard]] int latencySamples() const noexcept;
+    // The sample rate and block size its worker was started with (0: none).
+    [[nodiscard]] double preparedSampleRate() const noexcept { return sampleRate_; }
+    [[nodiscard]] int preparedBlockSize() const noexcept { return blockSize_; }
 
 private:
     [[nodiscard]] juce::Result startWorker(PluginWorkerLaunch launch,
@@ -91,6 +94,9 @@ private:
                                            int channelCount);
     [[nodiscard]] juce::Result sendCommand(cydaw::plugins::SharedPluginCommand command,
                                            int timeoutMilliseconds = 2'000);
+    // A command still running in the worker (one that timed out): its data in
+    // the shared block is not written over while it reads it.
+    [[nodiscard]] static bool controlBusy(cydaw::plugins::SharedPluginAudio& shared) noexcept;
 
     juce::ChildProcess process_;
     juce::File sharedFile_;
@@ -114,6 +120,15 @@ private:
     std::array<RealtimeParameterValue,
                cydaw::plugins::maximumSharedAutomationParameters> pendingRealtimeParameters_ {};
     std::size_t pendingRealtimeParameterCount_ {};
+    double sampleRate_ {};
+    int blockSize_ {};
+    // The channels the worker was started with: a block may bring fewer, the
+    // next more again (the shared count is what the last block brought).
+    int startedChannels_ { 2 };
+    // The worker's heartbeat (one per block it answers) and since when it
+    // has not moved while blocks wait: a plug-in stuck in its processing.
+    std::uint64_t lastHeartbeat_ {};
+    double heartbeatSince_ {};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(IsolatedPluginHost)
 };

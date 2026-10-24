@@ -18,6 +18,8 @@ def click(x,y,twice=False,button=0):
     e=[dict(type="move",x=x,y=y),dict(type="down",button=button),dict(type="up",button=button)];events(*(e+(e[1:] if twice else [])))
 def undo():events(dict(type="key",key="ctrl",down=True),dict(type="key",key="z"),dict(type="key",key="ctrl",down=False))
 def snapshot(name):q(cmd="snapshot",path=str(folder/(name+".png")))
+# It replaces the session and removes tracks: never on the person's own CyDAW.
+assert q(cmd="status")["speakersSilenced"],"Use an isolated silent instance (--silent)"
 q(cmd="app_mode",mode="foundry");f(action="new",name="UI verification");f(action="add_track",type="midi");f(action="midi_clip",track=1,at=0)
 events(dict(type="wait",frames=3));click(500,950,True)
 notes=tab()["tracks"][1]["clips"][0]["notes"];assert len(notes)==1,"creating MIDI clip must open its editor"

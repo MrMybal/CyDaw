@@ -906,12 +906,17 @@ public:
         // A host rendering offline: a sampler's lane waits for frames still
         // on the disk instead of missing them.
         const juce::ScopedValueSetter<bool> mayWait(cydaw::engine::samplerMayWait, isNonRealtime());
-        auto realtimeInstrumentPlan = instrumentRenderer_.plan();
-        auto instrumentParametersChanged = false;
+        // The instrument's settings the host moves: applied to a copy of its
+        // plan while it plays (renderChanged), never copied every block.
+        struct InstrumentChanges {
+            std::array<std::pair<InstrumentParameterField, float>, hostParameterSlotCount> list {};
+            std::size_t count {};
+        } instrumentChanges;
         if (const auto mapping = hostParameterMap_.read();
             mapping != nullptr && mapping->nodes.size() <= hostParameterSlotCount) {
-            std::array<cydaw::engine::NativeDspNode,
-                       hostParameterSlotCount> nodes;
+            // Kept by the plug-in, not on the audio thread's stack (32 nodes
+            // weigh about 100 KB), their storage reused from block to block.
+            auto& nodes = hostNodes_;
             const auto nodeCount = mapping->nodes.size();
             for (auto index = std::size_t {}; index < nodeCount; ++index)
                 nodes[index] = mapping->nodes[index];
@@ -924,11 +929,9 @@ public:
                 const auto actual = target.minimum
                     + normalised * (target.maximum - target.minimum);
                 if (target.instrumentField
-                    != InstrumentParameterField::none) {
-                    applyInstrumentParameter(realtimeInstrumentPlan,
-                                             target.instrumentField, actual);
-                    instrumentParametersChanged = true;
-                }
+                    != InstrumentParameterField::none)
+                    instrumentChanges.list[instrumentChanges.count++]
+                        = { target.instrumentField, static_cast<float>(actual) };
                 if (target.nodeIndex >= 0
                     && static_cast<std::size_t>(target.nodeIndex) < nodeCount)
                     applyParameter(
@@ -940,10 +943,15 @@ public:
         }
         if (instrumentRenderer_.enabled()) {
             buffer.clear();
-            if (instrumentParametersChanged)
-                instrumentRenderer_.renderWithPlan(
+            if (instrumentChanges.count > 0)
+                instrumentRenderer_.renderChanged(
                     buffer, midi, 0, buffer.getNumSamples(),
-                    realtimeInstrumentPlan);
+                    [](cydaw::engine::PolySynthGraphPlan& plan, const void* context) {
+                        const auto& changes = *static_cast<const InstrumentChanges*>(context);
+                        for (std::size_t index = 0; index < changes.count; ++index)
+                            applyInstrumentParameter(plan, changes.list[index].first, changes.list[index].second);
+                    },
+                    &instrumentChanges);
             else
                 instrumentRenderer_.render(buffer, midi, 0,
                                            buffer.getNumSamples());
@@ -1508,6 +1516,7 @@ private:
     std::vector<cydaw::graph::PublishedParameter> publishedParameters_;
     cydaw::engine::PolySynthGraphPlan instrumentPlan_;
     cydaw::app::GraphPolySynthRenderer instrumentRenderer_;
+    std::array<cydaw::engine::NativeDspNode, hostParameterSlotCount> hostNodes_ {};
     std::array<GraphHostParameter*, hostParameterSlotCount> hostParameters_ {};
     std::size_t parameterCapacity_ { hostParameterSlotCount };
     // Read by processBlock on the host's audio thread every block, so a

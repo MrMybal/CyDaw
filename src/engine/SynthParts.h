@@ -71,13 +71,19 @@ struct Envelope {
         if (stage != Stage::idle)
             stage = Stage::release;
     }
-    // One step of `samples`, its coefficients for that many.
-    double step(const double attack, const double decay, const double sustain, const double release) noexcept
+    // One step of `samples`, its coefficients for that many. part: the
+    // share of a step this one is (a block's last piece, a block cut at a
+    // MIDI event), so it moves only as far.
+    double step(const double attack, const double decay, const double sustain, const double release,
+                const double part = 1.0) noexcept
     {
+        const auto partOf = [part](const double coefficient) {
+            return part < 1.0 ? std::pow(coefficient, std::max(0.0, part)) : coefficient;
+        };
         switch (stage) {
         case Stage::idle: level = 0.0; break;
         case Stage::attack:
-            level = 1.3 + (level - 1.3) * attack;
+            level = 1.3 + (level - 1.3) * partOf(attack);
             if (level >= 1.0) {
                 level = 1.0;
                 stage = Stage::decay;
@@ -85,12 +91,12 @@ struct Envelope {
             break;
         case Stage::decay:
         case Stage::sustain:
-            level = sustain + (level - sustain) * decay;
+            level = sustain + (level - sustain) * partOf(decay);
             if (stage == Stage::decay && std::abs(level - sustain) < 1.0e-4)
                 stage = Stage::sustain;
             break;
         case Stage::release:
-            level *= release;
+            level *= partOf(release);
             if (level < 1.0e-5) {
                 level = 0.0;
                 stage = Stage::idle;

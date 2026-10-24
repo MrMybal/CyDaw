@@ -29,6 +29,14 @@ public:
                         const juce::MidiBuffer& midi,
                         int startSample, int numSamples,
                         const cydaw::engine::PolySynthGraphPlan& plan) noexcept;
+    // The published plan as `change` edits it (a host's automation), copied
+    // and played while the published one is still borrowed: what the copy
+    // shares (a sampler's map, a model) is never freed by the audio thread.
+    using PlanChange = void (*)(cydaw::engine::PolySynthGraphPlan& plan, const void* context);
+    void renderChanged(juce::AudioBuffer<float>& output,
+                       const juce::MidiBuffer& midi,
+                       int startSample, int numSamples,
+                       PlanChange change, const void* context) noexcept;
 
 private:
     struct Impl;

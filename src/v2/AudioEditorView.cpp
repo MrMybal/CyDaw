@@ -306,14 +306,25 @@ void AudioEditorView::remember(const TrackRef& track, const juce::String& label)
             return;
         batchRemembered_ = true;
     }
+    dropStaleSteps();
     undo_.push_back({ track, launcherClip_, label });
     if (undo_.size() > 64)
         undo_.erase(undo_.begin());
     redo_.clear();
 }
 
+void AudioEditorView::dropStaleSteps()
+{
+    if (refsSerial_ == studio_.trackRefsSerial())
+        return;
+    refsSerial_ = studio_.trackRefsSerial();
+    undo_.clear();
+    redo_.clear();
+}
+
 bool AudioEditorView::undoLauncher(const bool redo)
 {
+    dropStaleSteps();
     auto& from = redo ? redo_ : undo_;
     auto& to = redo ? undo_ : redo_;
     if (from.empty() || !launcher())
@@ -602,12 +613,14 @@ std::optional<std::pair<double, double>> AudioEditorView::selectionIn(const Audi
 
 void AudioEditorView::draw(const TrackRef& track, const AudioClip& clip)
 {
+    dropStaleSteps();
     scene_ = -1;
     drawClip(track, clip);
 }
 
 void AudioEditorView::drawLauncher(const TrackRef& track, const int scene, const LauncherClip& clip)
 {
+    dropStaleSteps();
     scene_ = scene;
     launcherClip_ = clip;
     drawClip(track, launcherView(track, scene, clip));

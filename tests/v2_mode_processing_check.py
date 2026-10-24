@@ -51,6 +51,8 @@ def gain_binding(state, **selector):
     return f"node.{node['id']}.gain.db"
 
 # An untouched Studio project must stay untouched while the two modes build their mixes.
+# It plays tones: only on an instance whose speakers are silenced (--silent).
+assert need(cmd="status")["speakersSilenced"], "Use an isolated silent instance (--silent)"
 before = need(cmd="status")["audioTracks"]
 tone = folder / "tone.wav"
 with wave.open(str(tone), "wb") as w:

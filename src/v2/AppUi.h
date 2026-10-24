@@ -315,6 +315,9 @@ private:
     // (in the window).
     void drawSystemStatus(float endX);
     std::uint64_t lastTraffic_ {};
+    // Studio::trackRefsSerial at the last frame: a track gone, and the
+    // interface forgets the tracks it named by their place.
+    std::uint64_t refsSerial_ {};
     void drawDockSpace();
     void drawWindows();
     void toggleBottomPanel();

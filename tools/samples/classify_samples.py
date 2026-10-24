@@ -20,6 +20,12 @@ CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".clap-cach
 # user's profile on C: (Hugging Face's and torch's default caches).
 for _variable in ("HF_HOME", "HUGGINGFACE_HUB_CACHE", "TRANSFORMERS_CACHE", "TORCH_HOME"):
     os.environ.setdefault(_variable, CACHE_DIR)
+# Nothing is downloaded from here: a model comes into CyDAW once its licence
+# has been shown (Options > Modeles d'IA, the semantic search). Without one
+# already in the cache, the answer is "unavailable".
+os.environ["HF_HUB_OFFLINE"] = "1"
+os.environ["TRANSFORMERS_OFFLINE"] = "1"
+LAION_CHECKPOINT = os.path.join(CACHE_DIR, "laion_clap", "630k-audioset-best.pt")
 
 
 def emit(value):
@@ -63,9 +69,12 @@ class LaionClap:
     name = "laion_clap"
 
     def __init__(self):
+        # load_ckpt() without a file downloads one, unverified and unseen.
+        if not os.path.isfile(LAION_CHECKPOINT):
+            raise RuntimeError("no checkpoint at " + LAION_CHECKPOINT)
         import laion_clap  # noqa: F401
         self.model = laion_clap.CLAP_Module(enable_fusion=False)
-        self.model.load_ckpt()
+        self.model.load_ckpt(ckpt=LAION_CHECKPOINT)
 
     def audio(self, files):
         return self.model.get_audio_embedding_from_filelist(x=files, use_tensor=False)
@@ -122,7 +131,7 @@ def main():
     backend, error = load_backend()
     if backend is None:
         emit({"classifier": "unavailable",
-              "message": "CLAP non installe (pip install laion-clap) : " + (error or "")})
+              "message": "aucun modele CLAP installe (Options > Modeles d'IA) : " + (error or "")})
         return
     emit({"classifier": "clap", "message": "CLAP via " + backend.name})
     category_prompts, tag_prompts = prompts_for(categories, tags)

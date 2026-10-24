@@ -145,6 +145,9 @@ private:
 
     std::vector<AiModel> models_;
     std::vector<Package> packages_;
+    // What the catalogue file held when the list was made.
+    juce::String catalogueText_;
+    bool loaded_ {};
     std::unique_ptr<Job> job_;
     mutable std::mutex mutex_;
     Progress progress_;

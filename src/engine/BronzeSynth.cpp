@@ -908,8 +908,9 @@ public:
 
         for (int done = 0; done < count; done += controlStep) {
             const auto length = std::min(controlStep, count - done);
+            const auto part = static_cast<double>(length) / static_cast<double>(controlStep);
             // The slow things, once a step: the noise's envelope, the LFO, the glide, the resonators' coefficients.
-            const auto noiseLevel = noise_.step(attackStep, decayStep, sustain, releaseStep);
+            const auto noiseLevel = noise_.step(attackStep, decayStep, sustain, releaseStep, part);
             lfoPhase_ += lfoHz * static_cast<double>(length) / rate_;
             if (lfoPhase_ >= 1.0) {
                 lfoPhase_ -= std::floor(lfoPhase_);

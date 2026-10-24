@@ -717,12 +717,13 @@ public:
 
         for (int done = 0; done < count; done += step) {
             const auto length = std::min(step, count - done);
+            const auto part = static_cast<double>(length) / static_cast<double>(step);
             // The slow things, once a step: envelopes, LFOs, glide, drift, the pitches and the filters.
-            const std::array<double, 2> ampLevels { amps_[0].step(ampSteps[0].attack, ampSteps[0].decay, ampSteps[0].sustain, ampSteps[0].release),
-                                                    amps_[1].step(ampSteps[1].attack, ampSteps[1].decay, ampSteps[1].sustain, ampSteps[1].release) };
+            const std::array<double, 2> ampLevels { amps_[0].step(ampSteps[0].attack, ampSteps[0].decay, ampSteps[0].sustain, ampSteps[0].release, part),
+                                                    amps_[1].step(ampSteps[1].attack, ampSteps[1].decay, ampSteps[1].sustain, ampSteps[1].release, part) };
             const std::array<double, 2> filterLevels {
-                filterEnvelopes_[0].step(filterSteps[0].attack, filterSteps[0].decay, filterSteps[0].sustain, filterSteps[0].release),
-                filterEnvelopes_[1].step(filterSteps[1].attack, filterSteps[1].decay, filterSteps[1].sustain, filterSteps[1].release)
+                filterEnvelopes_[0].step(filterSteps[0].attack, filterSteps[0].decay, filterSteps[0].sustain, filterSteps[0].release, part),
+                filterEnvelopes_[1].step(filterSteps[1].attack, filterSteps[1].decay, filterSteps[1].sustain, filterSteps[1].release, part)
             };
             if (!active())
                 return false;

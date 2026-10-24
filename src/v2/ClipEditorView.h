@@ -32,6 +32,8 @@ public:
     void draw();
     // Ctrl+Z (Ctrl+Y) on the launcher's audio clip shown: whether it did.
     bool undoLauncherAudio(bool redo);
+    // The master's clip shown: its own history.
+    bool undoMasterClip(bool redo);
 
 private:
     using MidiNote = app::AudioTrackController::MidiNote;

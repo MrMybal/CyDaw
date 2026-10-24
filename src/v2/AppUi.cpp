@@ -981,6 +981,10 @@ void AppUi::chooseImportMidi()
 
 void AppUi::filesDropped(const juce::StringArray& files, const float x, const float y)
 {
+    // A project opening step by step: a track added now would land between
+    // its tracks and shift their routing.
+    if (studio_.openingProject())
+        return;
     if (state_.mode == AppMode::dj && dj_->dropFiles(files))
         return;
     if (state_.mode == AppMode::cinema && cinema_->dropFiles(files, x, y))
@@ -1066,11 +1070,18 @@ void AppUi::undo()
     }
     if (state_.focused == Panel::editor && clipEditor_->undoLauncherAudio(false))
         return;
+    // A master clip open: its history, or nothing (never another edit's).
+    if (state_.focused == Panel::editor && !state_.editedClip && state_.editedMasterScene) {
+        (void) clipEditor_->undoMasterClip(false);
+        return;
+    }
     if (state_.focused == Panel::editor && engine.canUndoMidiEdit()) {
         (void) engine.undoMidiEdit();
         return;
     }
     if (state_.focused == Panel::arrangement && arrangement_->undoAutomation())
+        return;
+    if (state_.focused == Panel::arrangement && arrangement_->undoMidiClips())
         return;
     if (engine.canUndoArrangementEdit())
         (void) engine.undoArrangementEdit();
@@ -1099,10 +1110,16 @@ void AppUi::redo()
     }
     if (state_.focused == Panel::editor && clipEditor_->undoLauncherAudio(true))
         return;
+    if (state_.focused == Panel::editor && !state_.editedClip && state_.editedMasterScene) {
+        (void) clipEditor_->undoMasterClip(true);
+        return;
+    }
     if (state_.focused == Panel::editor && engine.canRedoMidiEdit()) {
         (void) engine.redoMidiEdit();
         return;
     }
+    if (state_.focused == Panel::arrangement && !engine.canRedoArrangementEdit() && arrangement_->redoMidiClips())
+        return;
     if (state_.focused == Panel::arrangement && !engine.canRedoArrangementEdit() && arrangement_->redoAutomation())
         return;
     if (engine.canRedoArrangementEdit())
@@ -1123,6 +1140,10 @@ void AppUi::frame()
             host_.setAnimating(true);
             return;
         }
+    }
+    if (refsSerial_ != studio_.trackRefsSerial()) {
+        refsSerial_ = studio_.trackRefsSerial();
+        state_.forgetTrackRefs();
     }
     // Where a sampler pane is, said again by the panel that draws it.
     state_.samplerDrop.reset();
@@ -1461,6 +1482,7 @@ void AppUi::resetUiState()
     const auto visibility = state_.bottomPanelsVisible;
     state_ = UiState {};
     state_.bottomPanelsVisible = visibility;
+    refsSerial_ = studio_.trackRefsSerial();
 }
 
 void AppUi::toggleBottomPanel()
@@ -2269,7 +2291,7 @@ void AppUi::drawDialogs()
     if (!recoveryChecked_) {
         recoveryChecked_ = true;
         recoveryWhen_ = studio_.pendingRecoveryDescription();
-        if (recoveryWhen_.isNotEmpty() && studio_.trackCount() == 0)
+        if (recoveryWhen_.isNotEmpty())
             ImGui::OpenPopup("##recovery");
     }
     if (ImGui::BeginPopupModal("##recovery", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar)) {

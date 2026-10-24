@@ -13,6 +13,17 @@
 
 namespace cydaw::app::project_import::shared {
 
+// A document read whole from a compressed stream (a gzip'd set, a zip
+// entry), up to a size: a small file can unpack to gigabytes. Empty when
+// it is larger.
+[[nodiscard]] inline juce::String readBounded(juce::InputStream& input, const juce::int64 most = 512LL * 1024 * 1024)
+{
+    juce::MemoryOutputStream read;
+    if (read.writeFromInputStream(input, most + 1) > most)
+        return {};
+    return read.toUTF8();
+}
+
 // A linear gain (1 = 0 dB) in decibels, -96 for silence.
 [[nodiscard]] inline float linearToDb(const double gain)
 {

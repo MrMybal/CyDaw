@@ -1,4 +1,5 @@
 #include "ProjectImport.h"
+#include "ProjectImportShared.h"
 
 #include <algorithm>
 #include <cmath>
@@ -253,7 +254,7 @@ public:
         std::unique_ptr<juce::InputStream> stream(zip_.createStreamForEntry(index));
         if (stream == nullptr)
             return juce::Result::fail("project.xml could not be read");
-        const auto document = juce::XmlDocument::parse(stream->readEntireStreamAsString());
+        const auto document = juce::XmlDocument::parse(shared::readBounded(*stream));
         if (document == nullptr || !document->hasTagName("Project"))
             return juce::Result::fail("project.xml is not a DAWproject document");
 
@@ -588,17 +589,29 @@ private:
                     mediaFolder_ = folder_.getChildFile(file_.getFileNameWithoutExtension() + "-media");
                     (void) mediaFolder_.createDirectory();
                 }
+                // Entries of one name in different folders get files of their own.
                 auto target = mediaFolder_.getChildFile(fileNameOf(path));
+                for (auto n = 2; claimedMedia_.count(target.getFullPathName()) > 0; ++n)
+                    target = mediaFolder_.getChildFile(juce::File(fileNameOf(path)).getFileNameWithoutExtension() + "-"
+                                                       + juce::String(n) + juce::File(fileNameOf(path)).getFileExtension());
+                claimedMedia_.insert(target.getFullPathName());
                 std::unique_ptr<juce::InputStream> stream(zip_.createStreamForEntry(index));
                 if (stream != nullptr) {
+                    // Extracted before from this very entry (same size and
+                    // date): kept. A stem rendered again has another date.
                     const auto* entry = zip_.getEntry(index);
-                    const auto sameSize = target.existsAsFile() && entry != nullptr
-                                          && target.getSize() == entry->uncompressedSize;
-                    if (!sameSize) {
+                    const auto same = target.existsAsFile() && entry != nullptr
+                                      && target.getSize() == entry->uncompressedSize
+                                      && target.getLastModificationTime() == entry->fileTime;
+                    if (!same) {
                         (void) target.deleteFile();
-                        juce::FileOutputStream output(target);
-                        if (output.openedOk())
-                            output.writeFromInputStream(*stream, -1);
+                        {
+                            juce::FileOutputStream output(target);
+                            if (output.openedOk())
+                                output.writeFromInputStream(*stream, -1);
+                        }
+                        if (entry != nullptr)
+                            (void) target.setLastModificationTime(entry->fileTime);
                     }
                     if (target.existsAsFile()) {
                         extracted_[path] = target;
@@ -629,6 +642,7 @@ private:
     juce::File mediaFolder_;
     std::map<juce::String, int> trackIndexById_;
     std::map<juce::String, juce::File> extracted_;
+    std::set<juce::String> claimedMedia_;
     std::vector<bool> kindDecided_;
 };
 
@@ -651,7 +665,7 @@ public:
                 return juce::Result::fail("The file could not be opened: " + file_.getFullPathName());
             juce::GZIPDecompressorInputStream unzipped(
                 &input, false, juce::GZIPDecompressorInputStream::gzipFormat);
-            document = juce::XmlDocument::parse(unzipped.readEntireStreamAsString());
+            document = juce::XmlDocument::parse(shared::readBounded(unzipped));
         }
         if (document == nullptr)
             document = juce::XmlDocument::parse(file_);
@@ -956,7 +970,7 @@ public:
             std::unique_ptr<juce::InputStream> stream(zip.createStreamForEntry(index));
             if (stream == nullptr)
                 continue;
-            if (auto parsed = juce::XmlDocument::parse(stream->readEntireStreamAsString()))
+            if (auto parsed = juce::XmlDocument::parse(shared::readBounded(*stream)))
                 documents.emplace_back(entry->filename, std::move(parsed));
         }
         if (documents.empty())

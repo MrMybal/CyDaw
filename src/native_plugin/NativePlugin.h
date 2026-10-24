@@ -1,11 +1,17 @@
 #pragma once
 #include "NativeProcessor.h"
 #include "public.sdk/source/vst/vstsinglecomponenteffect.h"
+#include "pluginterfaces/vst/ivstmidicontrollers.h"
 namespace cydaw::native
 {
-class Plugin final : public Steinberg::Vst::SingleComponentEffect
+// A VST3 host gives a plug-in its controllers (sustain, pitch bend, mod
+// wheel, aftertouch, every CC) only as parameters it maps them to: hidden
+// ones, one per channel and controller, turned back into MIDI in process().
+class Plugin final : public Steinberg::Vst::SingleComponentEffect, public Steinberg::Vst::IMidiMapping
 {
   public:
+    static constexpr Steinberg::Vst::ParamID midiParameterBase = 0x40000000u;
+    static constexpr int midiControllers = Steinberg::Vst::kCountCtrlNumber; // 0..127, aftertouch, pitch bend
     Plugin();
     static Steinberg::FUnknown *create(void *)
     {
@@ -40,6 +46,14 @@ class Plugin final : public Steinberg::Vst::SingleComponentEffect
         return Steinberg::Vst::kInfiniteTail;
     }
     Steinberg::IPlugView *PLUGIN_API createView(Steinberg::FIDString) override;
+    Steinberg::tresult PLUGIN_API getMidiControllerAssignment(Steinberg::int32 busIndex, Steinberg::int16 channel,
+                                                              Steinberg::Vst::CtrlNumber controller,
+                                                              Steinberg::Vst::ParamID &id) override;
+    OBJ_METHODS(Plugin, Steinberg::Vst::SingleComponentEffect)
+    DEFINE_INTERFACES
+    DEF_INTERFACE(Steinberg::Vst::IMidiMapping)
+    END_DEFINE_INTERFACES(Steinberg::Vst::SingleComponentEffect)
+    REFCOUNT_METHODS(Steinberg::Vst::SingleComponentEffect)
     NativeProcessor &processor()
     {
         return processor_;

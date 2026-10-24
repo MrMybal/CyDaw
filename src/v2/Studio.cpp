@@ -2017,6 +2017,10 @@ juce::Result Studio::moveLauncherClip(const TrackRef& from, const int fromScene,
                                                      moved.loopStartBeats, moved.loopEndBeats, moved.looping);
             for (const auto& note : moved.notes)
                 (void) engine_.copyMidiNote(target->midiId, id, note, note.startBeats);
+            // Its own gain envelope goes with it.
+            for (const auto& point : moved.automation)
+                if (const auto pointId = engine_.addMidiClipAutomationPoint(target->midiId, id, point.timeSeconds, point.valueDb))
+                    (void) engine_.setMidiClipAutomationPointCurve(target->midiId, id, pointId, point.curve, point.curveAmount);
             if (!copy)
                 (void) engine_.removeMidiClip(source->midiId, moved.id);
         }
@@ -5721,6 +5725,7 @@ bool Studio::removeTrack(const TrackRef& track)
         (void) removeTrack(*companion);
     }
     std::erase_if(companions_, [key = routingKey(track)](const auto& entry) { return entry.second == key; });
+    ++trackRefsSerial_;
     // The tracks after it move: the replacers' instruments are made again
     // from their cards, by the tracks they are on now.
     replacerSlots_.clear();
@@ -5785,6 +5790,9 @@ bool Studio::moveTrack(const TrackRef& track, const int delta)
 
 void Studio::clearSession()
 {
+    ++trackRefsSerial_;
+    // The next project opens heard (its own mute, if any, comes with it).
+    engine_.setMasterMuted(false);
     trackOrder_.clear();
     groupOf_.clear();
     groups_.clear();
@@ -6025,14 +6033,17 @@ Studio::ProjectOpening Studio::projectOpening() const
 
 juce::Result Studio::saveProject(const juce::File& file)
 {
+    // A take being recorded goes on: the notes played so far are saved, and
+    // the session is still to be saved once it ends.
+    const auto recording = isRecording();
     if (engine_.isMidiRecording())
-        engine_.stopMidiRecording(true);
+        (void) engine_.pollMidiRecording();
     const auto document = app::withFactoryModelReferences(project_io::buildDocument(*this, file, true));
     const auto written = app::ProjectRecovery::writeDocumentAtomically(file, document);
     if (written.failed())
         return written;
     projectFile_ = file;
-    dirty_ = false;
+    dirty_ = recording;
     discardRecovery();
     return juce::Result::ok();
 }
@@ -6206,8 +6217,20 @@ juce::File Studio::recoveryFile()
     return app::ProjectRecovery::defaultRecoveryFile().getSiblingFile("last-session-v2.cydaw-recovery");
 }
 
+bool Studio::ownsRecovery() const
+{
+    if (recoveryLock_ == nullptr) {
+        recoveryLock_ = std::make_unique<juce::InterProcessLock>("CyDAW2-recovery");
+        ownsRecovery_ = recoveryLock_->enter(0);
+    }
+    return ownsRecovery_;
+}
+
 juce::String Studio::pendingRecoveryDescription() const
 {
+    // A session that keeps nothing (automated runs) leaves it for the next.
+    if (auxiliary_ || !autosaveEnabled_ || !ownsRecovery())
+        return {};
     const auto file = recoveryFile();
     if (!file.existsAsFile())
         return {};
@@ -6241,7 +6264,11 @@ juce::Result Studio::restoreRecovery()
 
 void Studio::discardRecovery()
 {
-    if (auxiliary_) return;
+    // A session that writes none (automated runs) deletes none either.
+    if (auxiliary_ || !autosaveEnabled_ || !ownsRecovery()) return;
+    // A copy being written now would come back after this.
+    while (autosaveWriting_.load())
+        juce::Thread::sleep(5);
     (void) app::ProjectRecovery::discard(recoveryFile());
 }
 
@@ -6255,7 +6282,8 @@ void Studio::autosaveIfDue()
 {
     if (auxiliary_) return;
     const auto now = juce::Time::getMillisecondCounterHiRes() * 0.001;
-    if (!autosaveEnabled_ || !dirty_ || isRecording() || autosaveWriting_.load() || now - lastAutosaveSeconds_ < 45.0)
+    if (!autosaveEnabled_ || !dirty_ || isRecording() || autosaveWriting_.load() || now - lastAutosaveSeconds_ < 45.0
+        || !ownsRecovery())
         return;
     lastAutosaveSeconds_ = now;
     // Built here, copied whole so the writer thread shares nothing with the
@@ -6273,7 +6301,7 @@ void Studio::finishRecovery()
 {
     while (autosaveWriting_.load())
         juce::Thread::sleep(5);
-    if (!autosaveEnabled_)
+    if (!autosaveEnabled_ || !ownsRecovery())
         return;
     if (dirty_ && trackCount() > 0) {
         auto document = app::withFactoryModelReferences(project_io::buildDocument(*this, projectFile_, false));
@@ -6368,6 +6396,11 @@ void Studio::tick()
                 locations::set(location, to);
                 applyLocations();
                 notices_.emplace_back(ui::Ls("Déplacé dans ", "Moved to ") + to.getFullPathName(), false);
+                if (progress.kept > 0)
+                    notices_.emplace_back(juce::String(progress.kept)
+                                              + ui::Ls(" fichier(s) laissé(s) dans l'ancien dossier : un fichier différent du même nom était déjà dans le nouveau",
+                                                       " file(s) left in the old folder: a different file of the same name was already in the new one"),
+                                          true);
             }
         }
     nextLocation();

@@ -1151,18 +1151,21 @@ bool NativeDspRuntime::process(PlanarBuffer &buffer, const int startSample, cons
 
 namespace
 {
-std::atomic<double> sessionTempoBpm{120.0};
-std::atomic<bool> sessionTransportPlaying{false};
+// Per audio thread: an instance sets them at the start of its block and reads
+// them in it, on its host's thread. Two instances whose hosts play at other
+// tempos (two projects, a block without transport) no longer swap values.
+thread_local double sessionTempoBpm{120.0};
+thread_local bool sessionTransportPlaying{false};
 } // namespace
 
 void NativeDspRuntime::setSessionPlaying(const bool playing) noexcept
 {
-    sessionTransportPlaying.store(playing, std::memory_order_relaxed);
+    sessionTransportPlaying = playing;
 }
 
 bool NativeDspRuntime::sessionPlaying() noexcept
 {
-    return sessionTransportPlaying.load(std::memory_order_relaxed);
+    return sessionTransportPlaying;
 }
 
 void NativeDspRuntime::controlValuesNow(const std::uint64_t *nodeIds, float *values,
@@ -1182,12 +1185,12 @@ void NativeDspRuntime::controlValuesNow(const std::uint64_t *nodeIds, float *val
 
 void NativeDspRuntime::setSessionTempo(const double beatsPerMinute) noexcept
 {
-    sessionTempoBpm.store(std::clamp(beatsPerMinute, 20.0, 400.0), std::memory_order_relaxed);
+    sessionTempoBpm = std::clamp(beatsPerMinute, 20.0, 400.0);
 }
 
 double NativeDspRuntime::sessionTempo() noexcept
 {
-    return sessionTempoBpm.load(std::memory_order_relaxed);
+    return sessionTempoBpm;
 }
 
 void NativeDspRuntime::captureTaps(const RuntimeState &runtime, const std::uint32_t frames) noexcept

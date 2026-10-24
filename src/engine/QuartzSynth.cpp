@@ -476,15 +476,16 @@ public:
 
         for (int done = 0; done < count; done += step) {
             const auto length = std::min(step, count - done);
+            const auto part = static_cast<double>(length) / static_cast<double>(step);
             // The slow things, once a step: envelopes, the LFO, the glide, the
             // operators' paces, the matrix, the filter.
-            const auto ampLevel = amp_.step(ampSteps.attack, ampSteps.decay, ampSteps.sustain, ampSteps.release);
-            const auto filterLevel = filterEnvelope_.step(filterSteps.attack, filterSteps.decay, filterSteps.sustain, filterSteps.release);
+            const auto ampLevel = amp_.step(ampSteps.attack, ampSteps.decay, ampSteps.sustain, ampSteps.release, part);
+            const auto filterLevel = filterEnvelope_.step(filterSteps.attack, filterSteps.decay, filterSteps.sustain, filterSteps.release, part);
             Row envelope {};
             auto sounding = false;
             for (std::size_t op = 0; op < operatorCount; ++op) {
                 auto& contour = envelopes_[op];
-                envelope[op] = contour.step(steps[op].attack, steps[op].decay, steps[op].sustain, steps[op].release);
+                envelope[op] = contour.step(steps[op].attack, steps[op].decay, steps[op].sustain, steps[op].release, part);
                 if (envelope[op] < 1.0e-12) {
                     contour.level = 0.0;
                     envelope[op] = 0.0;

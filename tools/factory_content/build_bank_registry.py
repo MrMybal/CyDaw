@@ -143,7 +143,9 @@ def main() -> int:
             "licenceUrl": LICENCE_URLS.get(licence, ""),
             "homepage": f"https://github.com/{repository}",
             "repository": repository,
-            "commit": commit_of(repository, branch),
+            # The commit the files were fetched at (an older download: the
+            # branch's now, as before).
+            "commit": record.get("commit") or commit_of(repository, branch),
             "description": {"fr": french, "en": english},
             "list": list_name,
             "count": len(files),

@@ -153,8 +153,28 @@ void ArrangementView::zoomToFit()
 
 // ---- Drawing ------------------------------------------------------------------------
 
+void ArrangementView::dropStaleRefs()
+{
+    if (refsSerial_ == studio_.trackRefsSerial())
+        return;
+    refsSerial_ = studio_.trackRefsSerial();
+    automationUndo_.clear();
+    automationRedo_.clear();
+    automationLastEdit_ = false;
+    midiClipsUndo_.clear();
+    midiClipsRedo_.clear();
+    midiClipsLastEdit_ = false;
+    curveEditors_.clear();
+    focusedCurve_.clear();
+    focusedCurveTrack_.reset();
+    chooseLaneFor_.reset();
+    contextClip_.reset();
+    contextTrack_.reset();
+}
+
 void ArrangementView::draw()
 {
+    dropStaleRefs();
     // The menus open from inside the canvas child but live at window level.
     clipPopupId_ = ImGui::GetID("##clipContext");
     trackPopupId_ = ImGui::GetID("##trackContext");
@@ -1302,6 +1322,10 @@ void ArrangementView::beginDrag(const Drag drag, const std::vector<ClipHit>&)
         return;
     }
     automationLastEdit_ = false;
+    midiClipsLastEdit_ = false;
+    if (drag != Drag::box)
+        if (const auto tracks = pickedMidiTracks(); !tracks.empty())
+            rememberMidiClips(tracks);
     engine.beginArrangementEditBatch();
 }
 
@@ -1378,6 +1402,14 @@ void ArrangementView::endDrag(const std::vector<LaneHit>&)
         if (const auto part = studio_.makePartFor(*dragLaneTrack_, dragOrigins_.front().ref.track.midi);
             part && !(*part == dragOrigins_.front().ref.track))
             landing = part;
+    // Clips of several tracks keep their tracks: shifted by an offset of the
+    // engine's places they would land on others than shown (a bus, a hybrid
+    // track's hidden part, tracks reordered).
+    if (landing
+        && std::any_of(dragOrigins_.begin(), dragOrigins_.end(), [this](const auto& origin) {
+               return !(origin.ref.track == dragOrigins_.front().ref.track);
+           }))
+        landing.reset();
     if (landing && !landing->midi) {
         // Audio clips moved to another audio track.
         const auto from = static_cast<int>(dragOrigins_.front().ref.track.audioIndex);
@@ -1402,6 +1434,7 @@ void ArrangementView::endDrag(const std::vector<LaneHit>&)
             const auto* clip = findMidiClip(engine, origin.ref.track.midiId, origin.ref.clipId);
             if (clip == nullptr)
                 continue;
+            alsoRememberMidiClips(*landing);
             const auto copy = *clip;
             const auto id = engine.addMidiClip(landing->midiId, copy.name, copy.startBeats, copy.lengthBeats,
                                                copy.looping, copy.colour);
@@ -1412,14 +1445,19 @@ void ArrangementView::endDrag(const std::vector<LaneHit>&)
                                                     copy.looping);
             for (const auto& note : copy.notes)
                 (void) engine.copyMidiNote(landing->midiId, id, note, note.startBeats);
+            for (const auto& point : copy.automation)
+                if (const auto pointId = engine.addMidiClipAutomationPoint(landing->midiId, id, point.timeSeconds, point.valueDb))
+                    (void) engine.setMidiClipAutomationPointCurve(landing->midiId, id, pointId, point.curve, point.curveAmount);
             (void) engine.removeMidiClip(origin.ref.track.midiId, origin.ref.clipId);
             moved.push_back({ *landing, id });
         }
         if (!moved.empty())
             state_.selectedClips = moved;
     }
-    if (drag_ != Drag::box && drag_ != Drag::none)
+    if (drag_ != Drag::box && drag_ != Drag::none) {
         (void) engine.endArrangementEditBatch();
+        forgetUnchangedMidiClips();
+    }
     drag_ = Drag::none;
     dragOrigins_.clear();
     dragLaneTrack_.reset();
@@ -1448,6 +1486,8 @@ void ArrangementView::deleteSelection()
     auto& engine = studio_.engine();
     if (state_.selectedClips.empty())
         return;
+    if (const auto tracks = pickedMidiTracks(); !tracks.empty())
+        rememberMidiClips(tracks);
     engine.beginArrangementEditBatch();
     for (const auto& ref : state_.selectedClips) {
         if (!ref.track.midi)
@@ -1467,6 +1507,8 @@ void ArrangementView::duplicateSelection()
     auto& engine = studio_.engine();
     const auto spb = secondsPerBeat();
     std::vector<ClipRef> copies;
+    if (const auto tracks = pickedMidiTracks(); !tracks.empty())
+        rememberMidiClips(tracks);
     engine.beginArrangementEditBatch();
     for (const auto& ref : state_.selectedClips) {
         if (!ref.track.midi) {
@@ -1486,6 +1528,9 @@ void ArrangementView::duplicateSelection()
                                                     copy.playEndBeats, copy.loopStartBeats, copy.loopEndBeats, copy.looping);
             for (const auto& note : copy.notes)
                 (void) engine.copyMidiNote(ref.track.midiId, id, note, note.startBeats);
+            for (const auto& point : copy.automation)
+                if (const auto pointId = engine.addMidiClipAutomationPoint(ref.track.midiId, id, point.timeSeconds, point.valueDb))
+                    (void) engine.setMidiClipAutomationPointCurve(ref.track.midiId, id, pointId, point.curve, point.curveAmount);
             copies.push_back({ ref.track, id });
         }
     }
@@ -1535,6 +1580,7 @@ void ArrangementView::createMidiClipAt(const TrackRef& track, const double secon
     const auto part = studio_.makePartFor(track, true);
     if (!part)
         return;
+    rememberMidiClips({ *part });
     const auto id = engine.addMidiClip(part->midiId, {}, std::max(0.0, startBeats), 4.0, false,
                                        studio_.trackColour(track));
     if (id == 0)
@@ -2002,15 +2048,152 @@ void ArrangementView::drawAutomation(ImDrawList* list, const LaneHit& lane)
 
 void ArrangementView::rememberAutomation(const TrackRef& track, const juce::String& lane)
 {
+    dropStaleRefs();
     automationUndo_.push_back({ track, lane, studio_.lanePoints(track, lane) });
     if (automationUndo_.size() > 64)
         automationUndo_.erase(automationUndo_.begin());
     automationRedo_.clear();
     automationLastEdit_ = true;
+    midiClipsLastEdit_ = false;
+}
+
+std::vector<TrackRef> ArrangementView::pickedMidiTracks() const
+{
+    std::vector<TrackRef> tracks;
+    for (const auto& ref : state_.selectedClips)
+        if (ref.track.midi && std::find(tracks.begin(), tracks.end(), ref.track) == tracks.end())
+            tracks.push_back(ref.track);
+    return tracks;
+}
+
+ArrangementView::MidiClipsEdit ArrangementView::midiClipsOf(const std::vector<TrackRef>& tracks) const
+{
+    MidiClipsEdit edit;
+    const auto& engine = studio_.engine();
+    for (const auto& track : tracks) {
+        std::vector<MidiClip> clips;
+        if (const auto* all = engine.midiClipsView(track.midiId))
+            for (const auto& clip : *all)
+                if (clip.launcherScene < 0)
+                    clips.push_back(clip);
+        edit.tracks.emplace_back(track, std::move(clips));
+    }
+    return edit;
+}
+
+void ArrangementView::restoreMidiClips(const MidiClipsEdit& edit)
+{
+    auto& engine = studio_.engine();
+    for (const auto& [track, clips] : edit.tracks) {
+        if (!studio_.isValid(track))
+            continue;
+        std::vector<std::uint64_t> now;
+        if (const auto* all = engine.midiClipsView(track.midiId))
+            for (const auto& clip : *all)
+                if (clip.launcherScene < 0)
+                    now.push_back(clip.id);
+        for (const auto id : now)
+            (void) engine.removeMidiClip(track.midiId, id);
+        for (const auto& clip : clips) {
+            const auto id = engine.addMidiClip(track.midiId, clip.name, clip.startBeats, clip.lengthBeats, clip.looping,
+                                               clip.colour);
+            if (id == 0)
+                continue;
+            (void) engine.setMidiClipTimelineBounds(track.midiId, id, clip.lengthBeats, clip.playStartBeats, clip.playEndBeats,
+                                                    clip.loopStartBeats, clip.loopEndBeats, clip.looping);
+            for (const auto& note : clip.notes)
+                (void) engine.copyMidiNote(track.midiId, id, note, note.startBeats);
+            for (const auto& point : clip.automation)
+                if (const auto pointId = engine.addMidiClipAutomationPoint(track.midiId, id, point.timeSeconds, point.valueDb))
+                    (void) engine.setMidiClipAutomationPointCurve(track.midiId, id, pointId, point.curve, point.curveAmount);
+        }
+    }
+    // The clips came back under new numbers: none picked, none open.
+    state_.selectedClips.clear();
+    if (state_.editedClip && state_.editedClip->track.midi)
+        state_.editedClip.reset();
+    studio_.markDirty();
+}
+
+void ArrangementView::rememberMidiClips(const std::vector<TrackRef>& tracks)
+{
+    dropStaleRefs();
+    midiClipsUndo_.push_back(midiClipsOf(tracks));
+    if (midiClipsUndo_.size() > 64)
+        midiClipsUndo_.erase(midiClipsUndo_.begin());
+    midiClipsRedo_.clear();
+    midiClipsLastEdit_ = true;
+    automationLastEdit_ = false;
+}
+
+void ArrangementView::alsoRememberMidiClips(const TrackRef& track)
+{
+    if (midiClipsUndo_.empty())
+        return;
+    auto& tracks = midiClipsUndo_.back().tracks;
+    if (std::none_of(tracks.begin(), tracks.end(), [&track](const auto& kept) { return kept.first == track; }))
+        tracks.push_back(std::move(midiClipsOf({ track }).tracks.front()));
+}
+
+void ArrangementView::forgetUnchangedMidiClips()
+{
+    if (!midiClipsLastEdit_ || midiClipsUndo_.empty())
+        return;
+    const auto& kept = midiClipsUndo_.back();
+    std::vector<TrackRef> tracks;
+    for (const auto& entry : kept.tracks)
+        tracks.push_back(entry.first);
+    const auto now = midiClipsOf(tracks);
+    const auto same = [](const MidiClip& a, const MidiClip& b) {
+        return a.id == b.id && a.startBeats == b.startBeats && a.lengthBeats == b.lengthBeats && a.notes.size() == b.notes.size();
+    };
+    for (std::size_t index = 0; index < kept.tracks.size(); ++index) {
+        const auto& before = kept.tracks[index].second;
+        const auto& after = now.tracks[index].second;
+        if (before.size() != after.size() || !std::equal(before.begin(), before.end(), after.begin(), same))
+            return;
+    }
+    midiClipsUndo_.pop_back();
+    midiClipsLastEdit_ = false;
+}
+
+bool ArrangementView::undoMidiClips()
+{
+    dropStaleRefs();
+    if (!midiClipsLastEdit_ || midiClipsUndo_.empty())
+        return false;
+    auto edit = std::move(midiClipsUndo_.back());
+    midiClipsUndo_.pop_back();
+    std::vector<TrackRef> tracks;
+    for (const auto& entry : edit.tracks)
+        tracks.push_back(entry.first);
+    midiClipsRedo_.push_back(midiClipsOf(tracks));
+    restoreMidiClips(edit);
+    if (midiClipsUndo_.empty())
+        midiClipsLastEdit_ = false;
+    return true;
+}
+
+bool ArrangementView::redoMidiClips()
+{
+    dropStaleRefs();
+    if (midiClipsRedo_.empty())
+        return false;
+    auto edit = std::move(midiClipsRedo_.back());
+    midiClipsRedo_.pop_back();
+    std::vector<TrackRef> tracks;
+    for (const auto& entry : edit.tracks)
+        tracks.push_back(entry.first);
+    midiClipsUndo_.push_back(midiClipsOf(tracks));
+    restoreMidiClips(edit);
+    midiClipsLastEdit_ = true;
+    automationLastEdit_ = false;
+    return true;
 }
 
 bool ArrangementView::undoAutomation()
 {
+    dropStaleRefs();
     if (!automationLastEdit_ || automationUndo_.empty())
         return false;
     auto edit = std::move(automationUndo_.back());
@@ -2026,6 +2209,7 @@ bool ArrangementView::undoAutomation()
 
 bool ArrangementView::redoAutomation()
 {
+    dropStaleRefs();
     if (automationRedo_.empty())
         return false;
     auto edit = std::move(automationRedo_.back());

@@ -37,11 +37,12 @@ struct Lv2Export
     LV2_URID sequence{}, midiType{}, chunk{}, stateKey{}, object{}, position{}, tempo{}, speed{}, frame{},
         beat{}, floating{}, doubling{}, longing{};
     int midiIn{-1}, midiOut{-1}, latencyPort{-1}, outputBus{}, inputCount{};
+    // The longest block the processor was prepared for.
+    int maxBlock{8192};
     double rate{}, seconds{}, bpm{120}, quarter{};
     bool playing{};
     explicit Lv2Export(double sampleRate, const LV2_Feature *const *features) : rate(sampleRate)
     {
-        int maxBlock = 8192;
         if (features)
             for (auto f = features; *f; ++f)
                 if (!std::strcmp((*f)->URI, LV2_URID__map))
@@ -183,27 +184,58 @@ struct Lv2Export
                 }
             }
         }
-        NativeBlock block;
-        block.inputs = {inputs.data(), size_t(inputCount)};
-        block.output = audio[outputBus].data();
+        auto outputChannels = 0;
         for (const auto &b : processor.definition().buses)
             if (!b.input)
-                block.channels = b.channels;
-        block.frames = int(frames);
-        block.midi = {midi.data(), count};
-        block.midiOutput = midiOutput.data();
-        block.midiCapacity = midiOutput.size();
-        block.clock.sampleRate = rate;
-        block.clock.beatsPerMinute = bpm;
-        block.clock.playing = playing;
-        block.clock.quarterNotes = quarter;
-        block.seconds = seconds;
+                outputChannels = b.channels;
         bool connected = true;
-        for (int c = 0; c < block.channels; ++c)
-            connected &= block.output[c] != nullptr;
-        if (connected && !processor.process(block))
-            for (int c = 0; c < block.channels; ++c)
-                std::fill_n(block.output[c], frames, 0.f);
+        for (int c = 0; c < outputChannels; ++c)
+            connected &= audio[outputBus][c] != nullptr;
+        // A host may run blocks longer than the one it announced (the plug-in
+        // does not require it to keep to it): they play in pieces.
+        std::array<std::array<float *, 8>, 16> pieceChannels{};
+        std::array<NativeBlock::Bus, 16> pieceInputs{};
+        std::array<float *, 8> pieceOutput{};
+        size_t midiFrom = 0, midiOutCount = 0;
+        for (uint32_t done = 0; done < frames || (frames == 0 && done == 0);)
+        {
+            const auto length = std::min<uint32_t>(frames - done, uint32_t(maxBlock));
+            for (int i = 0; i < inputCount; ++i)
+            {
+                for (int c = 0; c < inputs[i].count; ++c)
+                    pieceChannels[i][c] = inputs[i].channels[c] != nullptr ? inputs[i].channels[c] + done : nullptr;
+                pieceInputs[i] = {pieceChannels[i].data(), inputs[i].count};
+            }
+            for (int c = 0; c < outputChannels; ++c)
+                pieceOutput[c] = audio[outputBus][c] != nullptr ? audio[outputBus][c] + done : nullptr;
+            // The sequence is in time order: this piece's events, from its start.
+            auto midiTo = midiFrom;
+            while (midiTo < count && (midi[midiTo].offset < done + length || done + length >= frames))
+                midi[midiTo++].offset -= done;
+            NativeBlock block;
+            block.inputs = {pieceInputs.data(), size_t(inputCount)};
+            block.output = pieceOutput.data();
+            block.channels = outputChannels;
+            block.frames = int(length);
+            block.midi = {midi.data() + midiFrom, midiTo - midiFrom};
+            block.midiOutput = midiOutput.data() + midiOutCount;
+            block.midiCapacity = midiOutput.size() - midiOutCount;
+            block.clock.sampleRate = rate;
+            block.clock.beatsPerMinute = bpm;
+            block.clock.playing = playing;
+            block.clock.quarterNotes = quarter + done / rate * bpm / 60;
+            block.seconds = seconds + done / rate;
+            if (connected && !processor.process(block))
+                for (int c = 0; c < block.channels; ++c)
+                    std::fill_n(block.output[c], length, 0.f);
+            for (size_t i = 0; i < block.midiCount; ++i)
+                block.midiOutput[i].offset += done;
+            midiOutCount += block.midiCount;
+            midiFrom = midiTo;
+            done += length;
+            if (length == 0)
+                break;
+        }
         if (midiOut >= 0 && ports[midiOut].data)
         {
             auto *seq = static_cast<LV2_Atom_Sequence *>(ports[midiOut].data);
@@ -211,7 +243,7 @@ struct Lv2Export
             seq->atom.type = sequence;
             seq->atom.size = sizeof(seq->body);
             seq->body = {};
-            for (size_t i = 0; i < block.midiCount; ++i)
+            for (size_t i = 0; i < midiOutCount; ++i)
             {
                 auto m = midiOutput[i];
                 alignas(8) uint8_t bytes[32]{};

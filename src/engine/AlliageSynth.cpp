@@ -550,9 +550,10 @@ public:
 
         for (int done = 0; done < count; done += stepLength) {
             const auto length = std::min(stepLength, count - done);
+            const auto part = static_cast<double>(length) / static_cast<double>(stepLength);
             // The slow things, once a step: envelopes, the LFO, the glide, the pitches and the filter.
-            const auto ampLevel = amp_.step(ampAttackStep, ampDecayStep, v(ampSustain), ampReleaseStep);
-            const auto filterLevel = filterEnvelope_.step(filterAttackStep, filterDecayStep, v(fenvSustain), filterReleaseStep);
+            const auto ampLevel = amp_.step(ampAttackStep, ampDecayStep, v(ampSustain), ampReleaseStep, part);
+            const auto filterLevel = filterEnvelope_.step(filterAttackStep, filterDecayStep, v(fenvSustain), filterReleaseStep, part);
             if (!active())
                 return false;
             const auto seconds = static_cast<double>(length) / rate_;

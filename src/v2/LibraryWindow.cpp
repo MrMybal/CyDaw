@@ -308,6 +308,8 @@ private:
                             while(process.isRunning() && !threadShouldExit() && juce::Time::getMillisecondCounterHiRes()<deadline) wait(30);
                             if(process.isRunning())process.kill();
                             data=juce::JSON::parse(resultFile);
+                            // Read once: what stays is the catalogue's own report.
+                            (void) resultFile.deleteFile();
                             if (auto* entries=data.getArray()) {
                                 auto root=juce::DynamicObject::Ptr(new juce::DynamicObject());root->setProperty("stamp", stamp);root->setProperty("plugins", *entries);data=juce::var(root.get());
                                 (void) report.replaceWithText(juce::JSON::toString(data));

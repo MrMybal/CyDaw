@@ -46,7 +46,18 @@ tresult PLUGIN_API Plugin::initialize(FUnknown *context)
             addAudioOutput(wide(b.name).text16(), layout);
     }
     if (processor_.definition().acceptsMidi)
+    {
         addEventInput(STR16("MIDI"));
+        for (int channel = 0; channel < 16; ++channel)
+            for (int controller = 0; controller < midiControllers; ++controller)
+            {
+                const auto id = midiParameterBase + ParamID(channel * midiControllers + controller);
+                if (processor_.parameterIndex(id) >= 0)
+                    continue;
+                auto *parameter = new Parameter(STR16("MIDI"), id, nullptr, 0.0, 0, ParameterInfo::kIsHidden);
+                parameters.addParameter(parameter);
+            }
+    }
     if (processor_.definition().producesMidi)
         addEventOutput(STR16("MIDI"));
     for (const auto &p : processor_.definition().parameters)
@@ -68,10 +79,20 @@ tresult PLUGIN_API Plugin::initialize(FUnknown *context)
     }
     return kResultOk;
 }
+tresult PLUGIN_API Plugin::getMidiControllerAssignment(int32 busIndex, int16 channel, CtrlNumber controller, ParamID &id)
+{
+    if (busIndex != 0 || channel < 0 || channel > 15 || controller < 0 || controller >= midiControllers ||
+        !processor_.definition().acceptsMidi)
+        return kResultFalse;
+    id = midiParameterBase + ParamID(channel * midiControllers + controller);
+    return processor_.parameterIndex(id) >= 0 ? kResultFalse : kResultTrue;
+}
 tresult PLUGIN_API Plugin::setParamNormalized(ParamID id, ParamValue v)
 {
     if (!std::isfinite(v))
         return kInvalidArgument;
+    if (id >= midiParameterBase && id < midiParameterBase + 16u * midiControllers && processor_.parameterIndex(id) < 0)
+        return SingleComponentEffect::setParamNormalized(id, v);
     if (id == NativeProcessor::programId && !processor_.definition().programs.empty())
     {
         processor_.applyProgram(
@@ -133,12 +154,53 @@ tresult PLUGIN_API Plugin::setupProcessing(ProcessSetup &setup)
 }
 tresult PLUGIN_API Plugin::process(ProcessData &data)
 {
+    size_t count = 0;
+    // A controller as a MIDI event.
+    const auto controllerEvent = [&](const int channel, const int controller, const double value, const int32 at) {
+        if (count >= midi_.size())
+            return;
+        engine::MidiEffectEvent m{};
+        m.offset = uint32_t(std::clamp<int32>(at, 0, std::max(0, data.numSamples - 1)));
+        const auto v = std::clamp(value, 0.0, 1.0);
+        if (controller == kPitchBend)
+        {
+            const auto bend = int(std::lround(v * 16383.0));
+            m.status = uint8_t(0xe0 | channel);
+            m.data1 = uint8_t(bend & 127);
+            m.data2 = uint8_t((bend >> 7) & 127);
+        }
+        else if (controller == kAfterTouch)
+        {
+            m.status = uint8_t(0xd0 | channel);
+            m.data1 = uint8_t(std::lround(v * 127.0));
+        }
+        else if (controller >= 0 && controller < 128)
+        {
+            m.status = uint8_t(0xb0 | channel);
+            m.data1 = uint8_t(controller);
+            m.data2 = uint8_t(std::lround(v * 127.0));
+        }
+        else
+            return;
+        midi_[count++] = m;
+    };
     if (data.inputParameterChanges)
         for (int q = 0; q < data.inputParameterChanges->getParameterCount(); ++q)
         {
             auto *queue = data.inputParameterChanges->getParameterData(q);
             int32 offset;
             ParamValue value;
+            // A mapped controller: each of its points, where it is.
+            if (queue && queue->getParameterId() >= midiParameterBase &&
+                queue->getParameterId() < midiParameterBase + 16u * midiControllers &&
+                processor_.parameterIndex(queue->getParameterId()) < 0)
+            {
+                const auto index = int(queue->getParameterId() - midiParameterBase);
+                for (int32 point = 0; point < queue->getPointCount(); ++point)
+                    if (queue->getPoint(point, offset, value) == kResultTrue && std::isfinite(value))
+                        controllerEvent(index / midiControllers, index % midiControllers, value, offset);
+                continue;
+            }
             if (queue && queue->getPointCount() > 0 &&
                 queue->getPoint(queue->getPointCount() - 1, offset, value) == kResultTrue)
             {
@@ -168,7 +230,6 @@ tresult PLUGIN_API Plugin::process(ProcessData &data)
     block.output = data.outputs[0].channelBuffers32;
     block.channels = data.outputs[0].numChannels;
     block.frames = data.numSamples;
-    size_t count = 0;
     if (data.inputEvents)
         for (int i = 0; i < data.inputEvents->getEventCount() && count < midi_.size(); ++i)
         {
@@ -190,9 +251,28 @@ tresult PLUGIN_API Plugin::process(ProcessData &data)
             }
             else if (e.type == Event::kLegacyMIDICCOutEvent)
             {
-                m.status = uint8_t(0xb0 | std::clamp<int>(e.midiCCOut.channel, 0, 15));
-                m.data1 = e.midiCCOut.controlNumber;
-                m.data2 = e.midiCCOut.value;
+                // A host that sends them anyway: pitch bend and aftertouch
+                // have numbers of their own past 127.
+                const auto channel = std::clamp<int>(e.midiCCOut.channel, 0, 15);
+                if (e.midiCCOut.controlNumber == kPitchBend)
+                {
+                    m.status = uint8_t(0xe0 | channel);
+                    m.data1 = uint8_t(e.midiCCOut.value & 127);
+                    m.data2 = uint8_t(e.midiCCOut.value2 & 127);
+                }
+                else if (e.midiCCOut.controlNumber == kAfterTouch)
+                {
+                    m.status = uint8_t(0xd0 | channel);
+                    m.data1 = uint8_t(e.midiCCOut.value & 127);
+                }
+                else if (e.midiCCOut.controlNumber < 128)
+                {
+                    m.status = uint8_t(0xb0 | channel);
+                    m.data1 = e.midiCCOut.controlNumber;
+                    m.data2 = uint8_t(e.midiCCOut.value & 127);
+                }
+                else
+                    continue;
             }
             else
                 continue;

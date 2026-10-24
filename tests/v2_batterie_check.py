@@ -97,7 +97,8 @@ def main() -> int:
     banks = banks_folder()
     if banks is None:
         print("skip: the drum banks are not on this computer (Options > Banques de sons downloads them)")
-        return 0
+        # CTest reports it skipped (SKIP_RETURN_CODE), not passed.
+        return 77
     scratch = Path(tempfile.mkdtemp(prefix="cydaw-batterie-check-"))
     locations = scratch / "Locations.json"
     locations.write_text(json.dumps({"format": "CyDAW Locations", "version": 1, "folders": {

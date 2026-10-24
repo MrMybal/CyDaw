@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <map>
+#include <new>
 
 namespace cydaw::v2 {
 
@@ -56,8 +57,23 @@ std::shared_ptr<const engine::foundry::Sound> FoundryDocument::readSound(const j
         error = ui::Ls("Fichier trop long pour être édité en mémoire", "File too long to be edited in memory");
         return nullptr;
     }
+    // An uncompressed file holds what its header says: one claiming more
+    // than its size (a broken or forged header) is not believed.
+    if (const auto format = reader->getFormatName(); format.containsIgnoreCase("WAV") || format.containsIgnoreCase("AIFF")) {
+        const auto bytes = static_cast<double>(frames) * std::max(1u, reader->numChannels) * std::max(1u, reader->bitsPerSample / 8u);
+        if (bytes > static_cast<double>(file.getSize()) + 1'048'576.0) {
+            error = ui::Ls("Fichier abîmé : ", "Damaged file: ") + file.getFileName();
+            return nullptr;
+        }
+    }
     const auto channels = static_cast<int>(std::clamp<unsigned>(reader->numChannels, 1u, static_cast<unsigned>(engine::foundry::maximumChannels)));
-    std::vector<std::vector<float>> data(static_cast<std::size_t>(channels), std::vector<float>(static_cast<std::size_t>(std::max<juce::int64>(0, frames))));
+    std::vector<std::vector<float>> data;
+    try {
+        data.assign(static_cast<std::size_t>(channels), std::vector<float>(static_cast<std::size_t>(std::max<juce::int64>(0, frames))));
+    } catch (const std::bad_alloc&) {
+        error = ui::Ls("Pas assez de mémoire pour ", "Not enough memory for ") + file.getFileName();
+        return nullptr;
+    }
     constexpr int chunk = 1 << 16;
     juce::AudioBuffer<float> buffer(static_cast<int>(std::max(1u, reader->numChannels)), chunk);
     for (juce::int64 at = 0; at < frames; at += chunk) {

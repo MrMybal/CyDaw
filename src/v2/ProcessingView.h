@@ -106,6 +106,10 @@ public:
     [[nodiscard]] processing::Values& values() noexcept { return values_; }
     void changed();
     [[nodiscard]] const processing::NoteScriptResult& result() const noexcept { return result_; }
+    // The script running (its result not in yet, or a change waiting for it).
+    [[nodiscard]] bool busy() const noexcept { return job_ != nullptr || owed_; }
+    // Once a frame: a result come in is taken (and heard).
+    void poll();
     bool drawParameters(const std::vector<processing::Parameter>& parameters);
     void drawBeforeAfter(float width);
     // The processed notes made the clip's (one undo step).
@@ -126,6 +130,17 @@ private:
     processing::NoteScriptResult result_;
     std::uint32_t seed_ { 1 };
     int heard_ { -1 };        // -1 silent, 0 before, 1 after
+    // The script runs on a thread of its own: a slow or endless one never
+    // holds the interface, only its result waits. One at a time; a change
+    // made meanwhile runs once it is done (owed_). A job left behind (a clip
+    // cleared) finishes on its own, its result dropped.
+    struct NoteJob {
+        std::atomic<bool> done {};
+        processing::NoteScriptResult result;
+    };
+    std::shared_ptr<NoteJob> job_;
+    bool owed_ {};
+    void start();
 };
 
 class ProcessingView final {

@@ -4,11 +4,27 @@
 #include <cstring>
 #include <thread>
 
+#if JUCE_WINDOWS
+extern "C" __declspec(dllimport) unsigned long __stdcall GetCurrentProcessId();
+#else
+#include <unistd.h>
+#endif
+
 namespace cydaw::app {
 
 namespace {
 std::atomic<int> sessionNumerator { 4 };
 std::atomic<int> sessionDenominator { 4 };
+
+// This process: its workers end when it is gone (a crash leaves none behind).
+juce::String processId()
+{
+#if JUCE_WINDOWS
+    return juce::String(static_cast<juce::int64>(GetCurrentProcessId()));
+#else
+    return juce::String(static_cast<juce::int64>(getpid()));
+#endif
+}
 } // namespace
 
 void IsolatedPluginHost::setSessionMetre(const int numerator, const int denominator) noexcept
@@ -121,6 +137,9 @@ juce::Result IsolatedPluginHost::startWorker(PluginWorkerLaunch launch,
                          "--sample-rate", juce::String(sampleRate, 3),
                          "--block-size", juce::String(maximumBlockSize),
                          "--channels", juce::String(channelCount) });
+    // A worker under Wine sees other process numbers: it is not told.
+    if (!launch.usesWindowsGuestPaths())
+        arguments.addArray({ "--parent-pid", processId() });
     if (!process_.start(arguments, 0)) {
         mapping_.reset();
         sharedFile_.deleteFile();
@@ -158,6 +177,11 @@ juce::Result IsolatedPluginHost::startWorker(PluginWorkerLaunch launch,
     pendingRealtimeParameterCount_ = 0;
     missedBlocks_.store(0, std::memory_order_relaxed);
     pipelineLatencySamples_.store(maximumBlockSize, std::memory_order_release);
+    sampleRate_ = sampleRate;
+    blockSize_ = maximumBlockSize;
+    startedChannels_ = channelCount;
+    lastHeartbeat_ = 0;
+    heartbeatSince_ = juce::Time::getMillisecondCounterHiRes() * 0.001;
     active_.store(shared, std::memory_order_release);
     juce::MemoryBlock initialState;
     (void) getState(initialState);
@@ -194,6 +218,8 @@ void IsolatedPluginHost::stop()
     nextCommandSequence_ = 1;
     pendingRealtimeParameterCount_ = 0;
     pipelineLatencySamples_.store(0, std::memory_order_release);
+    sampleRate_ = 0.0;
+    blockSize_ = 0;
     cachedState_.reset();
 }
 
@@ -204,6 +230,26 @@ void IsolatedPluginHost::pollWorkerHealth()
         return;
     const auto state = static_cast<cydaw::plugins::SharedPluginState>(
         cydaw::plugins::sharedAtomic(shared->state).load(std::memory_order_acquire));
+    // A plug-in stuck in its processing: the process alive, blocks waiting,
+    // no answer for seconds (and no command running, which may take long).
+    // It is ended, and the track goes on dry as after a crash.
+    auto hung = false;
+    {
+        const auto now = juce::Time::getMillisecondCounterHiRes() * 0.001;
+        const auto beat = cydaw::plugins::sharedAtomic(shared->heartbeat).load(std::memory_order_acquire);
+        const auto waiting = cydaw::plugins::sharedAtomic(shared->requestSequence).load(std::memory_order_acquire)
+                             != cydaw::plugins::sharedAtomic(shared->responseSequence).load(std::memory_order_acquire);
+        const auto commanding = cydaw::plugins::sharedAtomic(shared->commandSequence).load(std::memory_order_acquire)
+                                != cydaw::plugins::sharedAtomic(shared->commandResponseSequence).load(std::memory_order_acquire);
+        if (beat != lastHeartbeat_ || !waiting || commanding) {
+            lastHeartbeat_ = beat;
+            heartbeatSince_ = now;
+        } else if (now - heartbeatSince_ > 8.0) {
+            hung = true;
+        }
+    }
+    if (hung && process_.isRunning())
+        process_.kill();
     if (process_.isRunning() && state != cydaw::plugins::SharedPluginState::error) {
         // Parameters set and at rest for a moment: the state kept (what a
         // restarted worker gets back, what an autosave writes) follows.
@@ -220,7 +266,8 @@ void IsolatedPluginHost::pollWorkerHealth()
     const auto retainedState = cachedState_;
     auto failure = state == cydaw::plugins::SharedPluginState::error
                        ? juce::String::fromUTF8(shared->statusMessage)
-                       : juce::String("Plugin worker crashed");
+                   : hung ? juce::String("Plugin stopped answering")
+                          : juce::String("Plugin worker crashed");
     if (failure.isEmpty())
         failure = "Plugin worker unavailable";
     stop();
@@ -292,11 +339,19 @@ juce::Result IsolatedPluginHost::getCachedState(
     return juce::Result::ok();
 }
 
+bool IsolatedPluginHost::controlBusy(cydaw::plugins::SharedPluginAudio& shared) noexcept
+{
+    return cydaw::plugins::sharedAtomic(shared.commandSequence).load(std::memory_order_acquire)
+           != cydaw::plugins::sharedAtomic(shared.commandResponseSequence).load(std::memory_order_acquire);
+}
+
 juce::Result IsolatedPluginHost::setState(const juce::MemoryBlock& state)
 {
     auto* shared = active_.load(std::memory_order_acquire);
     if (shared == nullptr)
         return juce::Result::fail("Plugin worker is not running");
+    if (controlBusy(*shared))
+        return juce::Result::fail("Plugin control channel is busy");
     if (state.getSize() > cydaw::plugins::maximumSharedPluginStateBytes)
         return juce::Result::fail("Plugin state exceeds the 4 MB shared-memory limit");
     if (!state.isEmpty())
@@ -360,6 +415,8 @@ juce::Result IsolatedPluginHost::setProgram(const int index)
         return juce::Result::fail("Plugin worker is not running");
     if (index < 0)
         return juce::Result::fail("Unknown plugin program");
+    if (controlBusy(*shared))
+        return juce::Result::fail("Plugin control channel is busy");
     shared->commandParameterIndex = static_cast<std::uint32_t>(index);
     const auto result = sendCommand(cydaw::plugins::SharedPluginCommand::setProgram);
     if (result.wasOk()) {
@@ -375,6 +432,8 @@ juce::Result IsolatedPluginHost::setParameter(const std::uint32_t index,
     auto* shared = active_.load(std::memory_order_acquire);
     if (shared == nullptr)
         return juce::Result::fail("Plugin worker is not running");
+    if (controlBusy(*shared))
+        return juce::Result::fail("Plugin control channel is busy");
     shared->commandParameterIndex = index;
     shared->commandParameterValue = juce::jlimit(0.0f, 1.0f, normalisedValue);
     const auto result = sendCommand(cydaw::plugins::SharedPluginCommand::setParameter);
@@ -423,8 +482,7 @@ bool IsolatedPluginHost::processBlock(juce::AudioBuffer<float>& buffer,
         return false;
     }
 
-    const auto channelCount = std::min({ buffer.getNumChannels(),
-                                         static_cast<int>(shared->inputChannels),
+    const auto channelCount = std::min({ buffer.getNumChannels(), startedChannels_,
                                          static_cast<int>(cydaw::plugins::maximumSharedAudioChannels) });
     const auto callback = ++callbackCounter_;
     auto request = cydaw::plugins::sharedAtomic(shared->requestSequence);

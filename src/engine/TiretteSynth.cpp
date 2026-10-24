@@ -467,10 +467,11 @@ public:
 
         for (int done = 0; done < count; done += step) {
             const auto length = std::min(step, count - done);
+            const auto part = static_cast<double>(length) / static_cast<double>(step);
             const auto seconds = static_cast<double>(length) / rate_;
             const auto inverse = 1.0 / static_cast<double>(length);
             // The slow things, once a step: the gate, the glide, the partials' pitches and levels.
-            const auto ampLevel = amp_.step(attackStep, 0.0, 1.0, releaseStep);
+            const auto ampLevel = amp_.step(attackStep, 0.0, 1.0, releaseStep, part);
             if (!active())
                 return false;
             elapsed_ += seconds;

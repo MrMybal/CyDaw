@@ -168,6 +168,10 @@ private:
     };
     std::vector<Step> undo_;
     std::vector<Step> redo_;
+    // Studio::trackRefsSerial when the steps above were kept: a track gone or
+    // another project, and they are dropped.
+    std::uint64_t refsSerial_ {};
+    void dropStaleSteps();
 
     // ---- A sound file's format ----------------------------------------------------------------
     struct Format {

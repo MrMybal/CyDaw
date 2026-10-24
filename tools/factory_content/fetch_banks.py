@@ -20,6 +20,7 @@ import argparse
 import concurrent.futures
 import json
 import os
+import subprocess
 import sys
 import threading
 import time
@@ -105,6 +106,16 @@ def default_destination() -> Path:
     return Path(os.environ.get("LOCALAPPDATA", Path.home())) / "CyDAW" / "Banks"
 
 
+def commit_at(repository: str, branch: str) -> str:
+    """The commit the branch is at now, by git (the GitHub API allows 60 calls an hour)."""
+    completed = subprocess.run(["git", "ls-remote", f"https://github.com/{repository}", f"refs/heads/{branch}"],
+                               capture_output=True, text=True, timeout=60)
+    line = completed.stdout.strip().split()
+    if completed.returncode != 0 or not line:
+        raise RuntimeError(f"{repository}: git ls-remote failed: {completed.stderr.strip()}")
+    return line[0]
+
+
 def api(url: str) -> dict:
     request = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json", "User-Agent": "CyDAW-banks"})
     with urllib.request.urlopen(request, timeout=60) as response:
@@ -126,6 +137,12 @@ def fetch(repository: str, branch: str, path: str, target: Path, size: int) -> i
     """The file, unless it is there already; the bytes written."""
     if target.exists() and target.stat().st_size == size:
         return 0
+    # Git LFS: the tree gives the pointer's size (a hundred bytes or so), the
+    # disk holds the file itself; there already when it is no pointer.
+    if target.exists() and size < 1024 and target.stat().st_size > size:
+        with target.open("rb") as handle:
+            if not handle.read(len(LFS)).startswith(LFS):
+                return 0
     quoted = urllib.parse.quote(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     partial = target.with_name(target.name + ".partial")
@@ -161,6 +178,7 @@ def main() -> int:
     summary_path = dest / "banks.json"
     summary = json.loads(summary_path.read_text(encoding="utf-8")) if summary_path.exists() else {"banks": {}}
     lock = threading.Lock()
+    failed = 0
     for bank_id, repository, licence, confirmed in BANKS:
         if only and bank_id not in only:
             continue
@@ -171,7 +189,11 @@ def main() -> int:
         if tree_path.exists() and time.time() - tree_path.stat().st_mtime < 86_400:
             tree = json.loads(tree_path.read_text(encoding="utf-8"))
         else:
-            tree = api(f"https://api.github.com/repos/{repository}/git/trees/{branch}?recursive=1")
+            # The tree of one commit, kept with it: the registry pins that
+            # commit, the one these paths and sizes are from.
+            commit = commit_at(repository, branch)
+            tree = api(f"https://api.github.com/repos/{repository}/git/trees/{commit}?recursive=1")
+            tree["commit"] = commit
             tree_path.write_text(json.dumps(tree), encoding="utf-8")
         files = [item for item in tree.get("tree", []) if item["type"] == "blob" and kept(item["path"], item["size"])]
         total = sum(item["size"] for item in files)
@@ -183,7 +205,8 @@ def main() -> int:
         started = time.time()
 
         def one(item: dict) -> None:
-            written = fetch(repository, branch, item["path"], folder / item["path"], item["size"])
+            # From the commit the tree is of (the branch may have moved since).
+            written = fetch(repository, tree.get("commit") or branch, item["path"], folder / item["path"], item["size"])
             with lock:
                 done[0] += 1
                 done[1] += written
@@ -200,6 +223,7 @@ def main() -> int:
         licence_files = [item["path"] for item in files if item["path"].rsplit("/", 1)[-1].lower().startswith(("license", "licence"))]
         record = {
             "id": bank_id, "repository": f"https://github.com/{repository}", "branch": branch, "tree": tree.get("sha"),
+            "commit": tree.get("commit"),
             "title": repository.split("/")[-1], "licence": licence, "licenceConfirmed": confirmed,
             "licenceFiles": licence_files, "fetched": time.strftime("%Y-%m-%d"),
             "files": [{"path": item["path"], "size": item["size"]} for item in files],
@@ -211,7 +235,9 @@ def main() -> int:
         summary["banks"][bank_id]["megabytes"] = round(total / 1e6, 1)
         summary_path.write_text(json.dumps(summary, indent=1, ensure_ascii=False), encoding="utf-8")
         print(json.dumps({"bank": bank_id, "finished": True, "failures": len(failures)}), flush=True)
-    return 0
+        failed += len(failures)
+    # A file that could not be fetched: a script calling this one knows it.
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

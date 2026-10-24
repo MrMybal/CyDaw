@@ -93,6 +93,7 @@ const juce::Identifier loopRangeExplicit("loopRangeExplicit");
 const juce::Identifier loopStart("loopStart");
 const juce::Identifier loopStartBeats("loopStartBeats");
 const juce::Identifier masterGainDb("masterGainDb");
+const juce::Identifier masterMuted("masterMuted");
 const juce::Identifier maximum("maximum");
 const juce::Identifier midiEditorVisible("midiEditorVisible");
 const juce::Identifier midiNotes("midiNotes");
@@ -1184,6 +1185,10 @@ void restoreAudioClip(Engine& engine, const std::size_t trackIndex, const juce::
                                        static_cast<std::size_t>(std::max<juce::int64>(0, static_cast<juce::int64>(clip.getProperty("version")))));
     }
 
+    // A clip whose sounds were all removed stays empty, not its source again.
+    if (const auto* savedEvents = clip.getProperty(keys::events).getArray();
+        savedEvents != nullptr && savedEvents->isEmpty() && static_cast<bool>(clip.getProperty(keys::eventTimeline)))
+        (void) engine.replaceAudioClipEvents(trackIndex, clipId, {});
     if (const auto* savedEvents = clip.getProperty(keys::events).getArray();
         savedEvents != nullptr && !savedEvents->isEmpty()) {
         std::vector<Engine::AudioEvent> events;
@@ -1967,6 +1972,7 @@ juce::var buildDocument(Studio& studio, const juce::File& projectFile, const boo
     document->setProperty("timeSignatureNumerator", engine.timeSignatureNumerator());
     document->setProperty("timeSignatureDenominator", engine.timeSignatureDenominator());
     document->setProperty(keys::masterGainDb, engine.masterGainDb());
+    document->setProperty(keys::masterMuted, engine.isMasterMuted());
     if (masterGraph.getDynamicObject() != nullptr)
         document->setProperty("masterGraph", Studio::withoutSharedModules(masterGraph));
     // The controllers' assignments that belong to this project.
@@ -2282,6 +2288,7 @@ bool DocumentLoad::next()
             warn(s.warnings, "The arrangement could not be rebuilt: " + rebuilt.getErrorMessage());
         engine.setTempo(s.tempo);
         engine.setMasterGain(root.hasProperty(keys::masterGainDb) ? toFloat(root.getProperty(keys::masterGainDb)) : 0.0f);
+        engine.setMasterMuted(static_cast<bool>(root.getProperty(keys::masterMuted)));
         // The master's devices; a project from before them gets the limiter.
         studio.restoreMasterGraph(root.getProperty("masterGraph"));
         engine.setArrangementPlaybackEnabled(!root.hasProperty(keys::arrangementPlayback)

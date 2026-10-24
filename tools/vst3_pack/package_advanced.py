@@ -2,6 +2,7 @@
 import hashlib
 import json
 import shutil
+import subprocess
 import zipfile
 from pathlib import Path
 from catalogue import ROOT, WORK
@@ -101,10 +102,13 @@ Dans un terminal développeur :
 
 Les six bundles sont dans build/AdvancedTest01_artefacts/Release/VST3 à AdvancedTest06_artefacts/Release/VST3. Les ressources JSON sont copiées automatiquement. Aucun sample ou banque n’est requis pour les six définitions incluses. Les scripts de catalogue général sont fournis comme sources de l’outillage, mais il n’est pas nécessaire de les relancer pour recompiler cette sélection.
 '''
+    # What git keeps only: the files left out of it on purpose (FFmpeg's
+    # binaries, local tools, comparisons) never go into a shared archive.
+    tracked=set(subprocess.run(['git','ls-files','-z'],cwd=ROOT,capture_output=True,check=True).stdout.decode('utf-8').split('\0'))
     with zipfile.ZipFile(source_zip,'w',zipfile.ZIP_DEFLATED,compresslevel=6) as z:
         for directory in ['src','include','resources','third_party','tools','scripts','os']:
             for f in sorted((ROOT/directory).rglob('*')):
-                if f.is_file() and '__pycache__' not in f.parts and not f.name.endswith('.pyc'):
+                if f.is_file() and f.relative_to(ROOT).as_posix() in tracked:
                     z.write(f,'CyDAW/'+f.relative_to(ROOT).as_posix())
         z.write(ROOT/'CMakeLists.txt','CyDAW/CMakeLists.txt');z.write(ROOT/'LICENSE','CyDAW/LICENSE')
         z.writestr('Export/CMakeLists.txt',cmake);z.writestr('RECOMPILER.md',rebuild)

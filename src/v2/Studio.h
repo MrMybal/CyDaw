@@ -1129,6 +1129,9 @@ public:
     std::optional<TrackRef> addMidiTrack(const juce::String& name = {}, const juce::String& instrumentKey = {});
     bool removeTrack(const TrackRef& track);
     bool moveTrack(const TrackRef& track, int delta);
+    // Counts what makes a TrackRef kept aside stale (a track removed, the
+    // session cleared): the undo histories holding refs drop theirs.
+    [[nodiscard]] std::uint64_t trackRefsSerial() const noexcept { return trackRefsSerial_; }
 
     // ---- Graphs -----------------------------------------------------------------
     [[nodiscard]] GraphSlot* graphFor(const TrackRef& track) override;
@@ -1246,6 +1249,7 @@ private:
     // The tracks' order on screen, by routing key (kept up to date by
     // tracks(): one gone is dropped, one new comes at the end).
     mutable std::vector<std::uint64_t> trackOrder_;
+    std::uint64_t trackRefsSerial_ {};
     // The groups: each track's group (routing keys), the groups, the folded.
     std::map<std::uint64_t, std::uint64_t> groupOf_;
     std::set<std::uint64_t> groups_;
@@ -1455,6 +1459,12 @@ private:
     bool autosaveEnabled_ { true };
     double lastAutosaveSeconds_ {};
     std::atomic<bool> autosaveWriting_ { false };
+    // One recovery file for every CyDAW 2 open: the first to start owns it,
+    // the others neither offer, write nor delete it (one closing cleanly
+    // would wipe the copy of another that crashes).
+    [[nodiscard]] bool ownsRecovery() const;
+    mutable std::unique_ptr<juce::InterProcessLock> recoveryLock_;
+    mutable bool ownsRecovery_ {};
     // Recording.
     std::optional<TrackRef> recordingTrack_;
     juce::File recordingFile_;

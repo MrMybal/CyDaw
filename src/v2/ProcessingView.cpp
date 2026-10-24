@@ -13,6 +13,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <system_error>
+#include <utility>
 
 namespace cydaw::v2 {
 
@@ -417,6 +419,8 @@ void MidiTrial::clear()
     clipId_ = 0;
     before_.clear();
     result_ = {};
+    job_.reset();
+    owed_ = false;
 }
 
 void MidiTrial::setProcessing(const proc::Processing& processing)
@@ -444,13 +448,49 @@ void MidiTrial::changed()
 {
     if (clipId_ == 0)
         return;
-    result_ = proc::renderNotes(processing_, values_, before_, studio_.engine().tempo(), clipLength_, seed_);
+    if (job_ != nullptr) {
+        owed_ = true;
+        return;
+    }
+    start();
+}
+
+void MidiTrial::start()
+{
+    auto job = std::make_shared<NoteJob>();
+    job_ = job;
+    try {
+        std::thread([job, processing = processing_, values = values_, notes = before_, tempo = studio_.engine().tempo(),
+                     length = clipLength_, seed = seed_]() mutable {
+            try {
+                job->result = proc::renderNotes(processing, values, std::move(notes), tempo, length, seed);
+            } catch (...) {
+                job->result = {};
+                job->result.error = ui::Ls("Le script n'a pas pu tourner (mémoire)", "The script could not run (memory)");
+            }
+            job->done.store(true);
+        }).detach();
+    } catch (const std::system_error&) {
+        job->result.error = ui::Ls("Le script n'a pas pu tourner", "The script could not run");
+        job->done.store(true);
+    }
+}
+
+void MidiTrial::poll()
+{
+    if (job_ == nullptr || !job_->done.load())
+        return;
+    result_ = std::move(job_->result);
+    job_.reset();
     if (heard_ == 1 && result_.ok)
         (void) studio_.setMidiClipNotes(track_, clipId_, result_.notes, false);
+    if (std::exchange(owed_, false) && clipId_ != 0)
+        start();
 }
 
 bool MidiTrial::drawParameters(const std::vector<proc::Parameter>& parameters)
 {
+    poll();
     const auto moved = drawSettings(parameters, values_);
     if (ImGui::Button(L("Autre tirage", "Another draw"))) {
         ++seed_;
@@ -488,6 +528,8 @@ void MidiTrial::stopListening()
 
 juce::Result MidiTrial::apply()
 {
+    if (busy())
+        return juce::Result::fail(ui::Ls("Le script tourne encore", "The script is still running"));
     if (!result_.ok)
         return juce::Result::fail(result_.error.isNotEmpty() ? result_.error : ui::Ls("Le script ne tourne pas", "The script does not run"));
     stopListening();
@@ -499,12 +541,15 @@ juce::Result MidiTrial::apply()
 
 void MidiTrial::drawBeforeAfter(const float width)
 {
+    poll();
     const auto& p = theme::palette();
     if (clipId_ == 0) {
         ImGui::TextDisabled("%s", L("Aucun clip MIDI.", "No MIDI clip."));
         return;
     }
-    if (!result_.ok) {
+    if (busy())
+        ImGui::TextColored(theme::vec(p.textDim), "%s", L("Le script tourne…", "The script is running…"));
+    else if (!result_.ok) {
         ImGui::TextColored(theme::vec(p.record), "%s", result_.error.isNotEmpty() ? result_.error.toRawUTF8() : L("Le script ne tourne pas.", "The script does not run."));
     } else {
         ImGui::TextColored(theme::vec(p.textDim), "%s",
@@ -1080,7 +1125,10 @@ void ProcessingView::drawTrial()
     ImGui::EndDisabled();
     midiTrial_.drawParameters(parameters);
     midiTrial_.drawBeforeAfter(ImGui::GetContentRegionAvail().x);
-    if (midiTrial_.hasClip() && midiTrial_.result().ok) {
+    // Its result comes in without an event to draw it: frames until then.
+    if (midiTrial_.busy())
+        host_.wake(2);
+    if (midiTrial_.hasClip() && midiTrial_.result().ok && !midiTrial_.busy()) {
         if (ImGui::Button(L("Appliquer au clip", "Apply to the clip"))) {
             const auto applied = midiTrial_.apply();
             state_.status = applied.wasOk() ? ui::Ls("Traitement appliqué (Ctrl+Z l'annule)", "Processing applied (Ctrl+Z undoes it)")
@@ -1374,7 +1422,9 @@ void ProcessingView::drawApply()
         ImGui::TextColored(theme::vec(p.record), "%s", applyError_.toRawUTF8());
     ImGui::EndChild();
     ImGui::Separator();
-    const auto ready = midi ? applyMidi_.result().ok : (applyTrial_.result() != nullptr && applyTrial_.result()->ok && !applyTrial_.busy());
+    applyMidi_.poll();
+    const auto ready = midi ? applyMidi_.result().ok && !applyMidi_.busy()
+                            : (applyTrial_.result() != nullptr && applyTrial_.result()->ok && !applyTrial_.busy());
     ImGui::BeginDisabled(!ready);
     if (ui::primaryButton(L("Appliquer", "Apply"), ImVec2(dp(120.0f), 0.0f))) {
         juce::Result applied = juce::Result::ok();

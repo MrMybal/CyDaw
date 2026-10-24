@@ -620,8 +620,9 @@ public:
 
         for (int done = 0; done < count; done += step) {
             const auto length = std::min(step, count - done);
-            const auto ampLevel = amp_.step(ampAttackStep, ampDecayStep, v(ampSustain), ampReleaseStep);
-            const auto env2Level = env2_.step(env2AttackStep, env2DecayStep, v(env2Sustain), env2ReleaseStep);
+            const auto part = static_cast<double>(length) / static_cast<double>(step);
+            const auto ampLevel = amp_.step(ampAttackStep, ampDecayStep, v(ampSustain), ampReleaseStep, part);
+            const auto env2Level = env2_.step(env2AttackStep, env2DecayStep, v(env2Sustain), env2ReleaseStep, part);
             if (!active())
                 return false;
             const auto seconds = static_cast<double>(length) / rate_;

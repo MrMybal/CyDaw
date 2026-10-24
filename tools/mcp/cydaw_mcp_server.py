@@ -2260,9 +2260,23 @@ def daw_alive():
         return False
 
 
+def port_open():
+    """Whether something listens on the control port (a CyDAW busy for a
+    while answers no ping, yet is there)."""
+    try:
+        with socket.create_connection(("127.0.0.1", PORT), timeout=1.0):
+            return True
+    except OSError:
+        return False
+
+
 def launch_daw(wait_seconds=20.0):
     if daw_alive():
         return {"launched": False, "running": True, "port": PORT}
+    # Busy (a large project opening, another client on the port): a second
+    # CyDAW would take the audio device and stay open for nothing.
+    if port_open():
+        raise DawUnavailable("CyDAW est occupe sur le port %d, reessayer" % PORT)
     if not os.path.isfile(EXE):
         raise DawUnavailable("CyDAW ne repond pas sur le port %d et %s "
                              "n'existe pas (CYDAW_EXE)" % (PORT, EXE))

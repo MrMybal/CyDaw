@@ -23,6 +23,9 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from fetch_banks import default_destination  # noqa: E402
+
 BANKS = {
     "vcsl": {"repo": "sgossner/VCSL", "branch": "master", "licence": "CC0-1.0",
              "title": "Versilian Community Sample Library (VCSL)", "author": "Versilian Studios LLC"},
@@ -156,8 +159,9 @@ def fetch(url: str, target: Path, size: int) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    default = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "CyDAW" / "sources"
-    parser.add_argument("--dest", type=Path, default=default)
+    # Where CyDAW keeps its banks (the folder chosen in Options › Emplacements):
+    # the build tools read the manifest from there.
+    parser.add_argument("--dest", type=Path, default=default_destination())
     parser.add_argument("--list", action="store_true", help="only print the selection")
     args = parser.parse_args()
     args.dest.mkdir(parents=True, exist_ok=True)

@@ -164,19 +164,39 @@ juce::Result CinemaVideo::extractAudio(const juce::File& source,const juce::File
     juce::FileOutputStream out(wav);if(out.failedToOpen())return out.getStatus();
     out.write("RIFF",4);out.writeInt(0);out.write("WAVEfmt ",8);out.writeInt(16);out.writeShort(1);out.writeShort(2);
     out.writeInt(48000);out.writeInt(192000);out.writeShort(4);out.writeShort(16);out.write("data",4);out.writeInt(0);
-    SwrContext* converter=nullptr;struct Cleanup{SwrContext*& context;~Cleanup(){swr_free(&context);}} cleanup{converter};
-    int sourceRate=0;std::uint64_t bytes=0;std::vector<std::uint8_t> pcm;
+    SwrContext* converter=nullptr;AVChannelLayout sourceLayout{};
+    struct Cleanup{SwrContext*& context;AVChannelLayout& layout;~Cleanup(){swr_free(&context);av_channel_layout_uninit(&layout);}} cleanup{converter,sourceLayout};
+    int sourceRate=0,sourceFormat=-1;std::uint64_t bytes=0;std::vector<std::uint8_t> pcm;
     auto write=[&](int count)->juce::Result{
         if(count<0)return juce::Result::fail(mediaError("FFmpeg, conversion audio",count));
         const auto size=static_cast<std::size_t>(count)*4;
         if(bytes+size>0xffffff00u)return juce::Result::fail("Bande son trop longue pour un WAV PCM classique");
         if(!out.write(pcm.data(),size))return out.getStatus();bytes+=size;return juce::Result::ok();
     };
+    // What the resampler still holds, written out (at the end, and before the
+    // stream changes its layout, format or rate).
+    auto drain=[&]()->juce::Result{
+        if(converter)for(;;){
+            pcm.resize(4096*4);std::uint8_t* output[]={pcm.data()};const auto count=swr_convert(converter,output,4096,nullptr,0);
+            if(!count)break;const auto written=write(count);if(written.failed())return written;
+        }
+        return juce::Result::ok();
+    };
     while(input.next()){
         auto* frame=input.frame;
+        // A stream may change mid-way (a broadcast going from 5.1 to stereo):
+        // the resampler is made again for the new frames, never fed planes it
+        // does not expect.
+        if(converter&&(frame->sample_rate!=sourceRate||frame->format!=sourceFormat||av_channel_layout_compare(&frame->ch_layout,&sourceLayout)!=0)){
+            const auto drained=drain();if(drained.failed())return drained;
+            swr_free(&converter);
+        }
         if(!converter){
             AVChannelLayout stereo=AV_CHANNEL_LAYOUT_STEREO;
-            sourceRate=frame->sample_rate;
+            if(frame->sample_rate<=0||frame->ch_layout.nb_channels<=0)continue;
+            sourceRate=frame->sample_rate;sourceFormat=frame->format;
+            av_channel_layout_uninit(&sourceLayout);
+            if(av_channel_layout_copy(&sourceLayout,&frame->ch_layout)<0)return juce::Result::fail("FFmpeg, préparation audio");
             auto result=swr_alloc_set_opts2(&converter,&stereo,AV_SAMPLE_FMT_S16,48000,&frame->ch_layout,static_cast<AVSampleFormat>(frame->format),sourceRate,0,nullptr);
             if(result>=0)result=swr_init(converter);
             if(result<0)return juce::Result::fail(mediaError("FFmpeg, préparation audio",result));
@@ -188,10 +208,7 @@ juce::Result CinemaVideo::extractAudio(const juce::File& source,const juce::File
     }
     if(cancel&&cancel())return juce::Result::fail("Import audio annulé");
     if(input.error!=AVERROR_EOF)return juce::Result::fail(mediaError("FFmpeg, décodage audio",input.error));
-    if(converter)for(;;){
-        pcm.resize(4096*4);std::uint8_t* output[]={pcm.data()};const auto count=swr_convert(converter,output,4096,nullptr,0);
-        if(!count)break;const auto written=write(count);if(written.failed())return written;
-    }
+    if(const auto drained=drain();drained.failed())return drained;
     if(!bytes)return juce::Result::fail("Bande son vide");
     out.setPosition(4);out.writeInt(static_cast<int>(bytes+36));out.setPosition(40);out.writeInt(static_cast<int>(bytes));out.flush();
     return out.getStatus();

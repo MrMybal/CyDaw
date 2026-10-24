@@ -1211,7 +1211,7 @@ if(CYDAW_BUILD_DESKTOP)
                     add_test(NAME cydaw2_batterie_check
                              COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/v2_batterie_check.py"
                                      --port 47846 --exe "$<TARGET_FILE:CyDAW2>")
-                    set_tests_properties(cydaw2_batterie_check PROPERTIES TIMEOUT 300)
+                    set_tests_properties(cydaw2_batterie_check PROPERTIES TIMEOUT 300 SKIP_RETURN_CODE 77)
                     # An SFZ played as it moves: its controllers, keyswitches and
                     # release on the card, the samples decoded as they are reached.
                     add_test(NAME cydaw2_sfz_live_check

@@ -215,7 +215,7 @@ SoundBanks::PreloadedList SoundBanks::readList(const juce::File& listFile)
                 if (fields->size() > 3)
                     file.recipe = (*fields)[3];
                 // Inside the bank only.
-                if (file.path.isEmpty() || file.path.contains("..") || juce::File::isAbsolutePath(file.path))
+                if (!locations::staysInside(file.path))
                     continue;
                 read.index[file.path] = read.files.size();
                 read.files.push_back(std::move(file));

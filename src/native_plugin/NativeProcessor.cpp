@@ -29,6 +29,47 @@ std::shared_ptr<const engine::VoiceAssets> sharedVoiceAssets(const std::filesyst
     read[file] = shared;
     return shared;
 }
+// As PlanSynthesiser::voicingOf inside CyDAW: Prisme and the synths of the
+// family carry their own mono/legato, voice count and glide; the others the
+// plan's voice allocator.
+struct OwnVoicing
+{
+    bool own{};
+    int mode{};
+    int voices{64};
+    float glide{};
+    bool glideAlways{};
+};
+OwnVoicing voicingOf(const engine::PolySynthGraphPlan &plan) noexcept
+{
+    OwnVoicing result;
+    if (plan.waveform == engine::PolyOscillatorWaveform::family && plan.synthModel != engine::synth::Model::none)
+    {
+        namespace s = engine::synth;
+        const auto value = [&plan](const int index) { return plan.synthValues[static_cast<std::size_t>(index)]; };
+        result.own = true;
+        result.mode = std::clamp(static_cast<int>(std::lround(value(s::voicingMode))), 0, 2);
+        result.voices = std::clamp(static_cast<int>(std::lround(value(s::voicingCount))), 1, 32);
+        result.glide = std::max(0.0f, value(s::voicingGlide));
+        result.glideAlways = value(s::voicingGlideAlways) >= 0.5f;
+    }
+    else if (plan.waveform == engine::PolyOscillatorWaveform::prism)
+    {
+        namespace p = engine::prism;
+        const auto value = [&plan](const int index) { return plan.prismValues[static_cast<std::size_t>(index)]; };
+        result.own = true;
+        result.mode = std::clamp(static_cast<int>(std::lround(value(p::voiceBase + p::voiceMode))), 0, 2);
+        result.voices = std::clamp(static_cast<int>(std::lround(value(p::voiceBase + p::voiceCount))), 1, 32);
+        result.glide = std::max(0.0f, value(p::voiceBase + p::voiceGlide));
+        result.glideAlways = value(p::voiceBase + p::voiceGlideAlways) >= 0.5f;
+    }
+    else
+    {
+        result.mode = std::clamp(plan.voiceMode, 0, 2);
+        result.glide = std::max(0.0f, plan.glideSeconds);
+    }
+    return result;
+}
 } // namespace
 struct NativeProcessor::Target
 {
@@ -234,11 +275,12 @@ void NativeProcessor::reset()
         v->clear();
     std::fill(notes_.begin(), notes_.end(), -1);
     midiEffects_.reset();
-    std::fill(std::begin(bends_), std::end(bends_), 0);
+    std::fill(std::begin(bends_), std::end(bends_), 0.0f);
     std::memset(sustain_, 0, sizeof(sustain_));
     std::memset(deferred_, 0, sizeof(deferred_));
     down_.fill(false);
     downCount_ = 0;
+    lastNote_ = -1;
     controlNotes_.held = 0;
 }
 void NativeProcessor::midi(const engine::MidiEffectEvent &e)
@@ -260,7 +302,10 @@ void NativeProcessor::midi(const engine::MidiEffectEvent &e)
             --downCount_;
         }
         if (sustain_[channel])
-            deferred_[note][channel] = true;
+        {
+            if (note >= 0 && note < 128)
+                deferred_[note][channel] = true;
+        }
         else
             for (std::size_t i = 0; i < voices_.size(); ++i)
                 if (notes_[i] == note && channels_[i] == channel)
@@ -286,13 +331,16 @@ void NativeProcessor::midi(const engine::MidiEffectEvent &e)
         if (e.data1 == 64)
         {
             sustain_[channel] = e.data2 >= 64;
+            // Every voice of a key released under the pedal stops (a key
+            // struck twice holds two); the keys are cleared after.
             if (!sustain_[channel])
+            {
                 for (std::size_t i = 0; i < voices_.size(); ++i)
-                    if (channels_[i] == channel && notes_[i] >= 0 && deferred_[notes_[i]][channel])
-                    {
+                    if (channels_[i] == channel && notes_[i] >= 0 && notes_[i] < 128 && deferred_[notes_[i]][channel])
                         voices_[i]->stopNote(true);
-                        deferred_[notes_[i]][channel] = false;
-                    }
+                for (auto &key : deferred_)
+                    key[channel] = false;
+            }
         }
         else if (e.data1 == 1)
             prismContext_.modWheel = e.data2 / 127.0f;
@@ -325,11 +373,17 @@ void NativeProcessor::noteOn(const int channel, const int note, const float velo
     }
     // The keys held as it starts (a sampler's first and legato zones).
     prismContext_.sampler.heldKeys = downCount_;
+    const auto overlapping = downCount_ > 0;
     if (note >= 0 && note < 128 && !down_[note])
     {
         down_[note] = true;
         ++downCount_;
     }
+    // A note the plan refuses (outside its range) takes no voice: one stolen
+    // for it would only be cut.
+    if (!instrument_.enabled || note < instrument_.minimumMidiNote || note > instrument_.maximumMidiNote ||
+        instrument_.waveform == engine::PolyOscillatorWaveform::rack)
+        return;
     // A closed hat cuts the open one: the voices its group chokes go first.
     auto group = 0;
     if (sampler != nullptr)
@@ -350,12 +404,33 @@ void NativeProcessor::noteOn(const int channel, const int note, const float velo
             if (voice->isActive() && voice->chokedBy(instrument_) == group)
                 voice->fadeOut(0.006);
     {
+        const auto voicing = voicingOf(instrument_);
         std::size_t chosen = 0;
         bool found = false;
-        if (instrument_.voiceMode != 0)
+        if (voicing.mode != 0)
         {
             chosen = 0;
             found = true;
+            // Leftover tails go, so one voice plays.
+            for (std::size_t i = 1; i < voices_.size(); ++i)
+                if (voices_[i]->isActive())
+                    voices_[i]->fadeOut(0.006);
+        }
+        else if (voicing.own)
+        {
+            // Prisme's voice limit: the oldest goes when it is reached.
+            auto active = 0;
+            for (const auto &voice : voices_)
+                active += voice->isActive() ? 1 : 0;
+            if (active >= voicing.voices)
+            {
+                for (std::size_t i = 0; i < voices_.size(); ++i)
+                    if (voices_[i]->isActive() && (!found || ages_[i] < ages_[chosen]))
+                    {
+                        chosen = i;
+                        found = true;
+                    }
+            }
         }
         for (std::size_t i = 0; !found && i < voices_.size(); ++i)
             if (!voices_[i]->isActive())
@@ -370,9 +445,25 @@ void NativeProcessor::noteOn(const int channel, const int note, const float velo
         if (voices_.empty())
             return;
         const auto previous = notes_[chosen];
-        const auto legato = instrument_.voiceMode == 2 && voices_[chosen]->isActive();
-        voices_[chosen]->startNote(instrument_, note, velocity, rate_,
-                                   instrument_.glideSeconds > 0 ? previous : -1, legato);
+        const auto sounding = voices_[chosen]->isActive();
+        if (voicing.own)
+        {
+            // Mono and legato as inside CyDAW: a legato note played over the
+            // last slides the sounding voice without a new attack.
+            const auto from = voicing.mode != 0 && sounding ? previous : lastNote_;
+            const auto slide = voicing.glide > 0.0f && (voicing.glideAlways || (voicing.mode != 0 && overlapping));
+            if (voicing.mode == 2 && sounding && overlapping)
+                (void)voices_[chosen]->retarget(instrument_, note, velocity, rate_);
+            else
+                (void)voices_[chosen]->startNote(instrument_, note, velocity, rate_, slide && from >= 0 ? from : -1);
+        }
+        else
+        {
+            const auto legato = voicing.mode == 2 && sounding;
+            (void)voices_[chosen]->startNote(instrument_, note, velocity, rate_,
+                                             instrument_.glideSeconds > 0 ? previous : -1, legato);
+        }
+        lastNote_ = note;
         voices_[chosen]->setExpression(bends_[channel], 0);
         notes_[chosen] = note;
         channels_[chosen] = channel;
@@ -420,8 +511,9 @@ bool NativeProcessor::process(NativeBlock &data)
     }
     auto incoming = std::min(data.midi.size(), midiIn_.size());
     std::copy_n(data.midi.begin(), incoming, midiIn_.begin());
-    std::sort(midiIn_.begin(), midiIn_.begin() + incoming,
-              [](auto a, auto b) { return a.offset < b.offset; });
+    // Stable: a note-off and a note-on of one key at one sample stay in order.
+    std::stable_sort(midiIn_.begin(), midiIn_.begin() + incoming,
+                     [](const auto &a, const auto &b) { return a.offset < b.offset; });
     auto clock = data.clock;
     clock.sampleRate = rate_;
     prismContext_.clockSeconds = data.seconds;
@@ -453,8 +545,17 @@ bool NativeProcessor::process(NativeBlock &data)
         renderVoices(output, nc, position, frames - position);
     std::array<PlanarBuffer, NativeDspRuntime::maximumExtraInputs> extra;
     std::array<const PlanarBuffer *, NativeDspRuntime::maximumExtraInputs> ptrs{};
+    // A sidechain the host leaves inactive may come with null channels.
+    const auto usable = [](const auto &bus) {
+        if (bus.channels == nullptr || bus.count <= 0)
+            return false;
+        for (int c = 0; c < bus.count; ++c)
+            if (bus.channels[c] == nullptr)
+                return false;
+        return true;
+    };
     for (size_t i = 1; i < data.inputs.size() && i <= extra.size(); ++i)
-        if (data.inputs[i].channels)
+        if (usable(data.inputs[i]))
         {
             extra[i - 1] = {data.inputs[i].channels, data.inputs[i].count, frames};
             ptrs[i - 1] = &extra[i - 1];

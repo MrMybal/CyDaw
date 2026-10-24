@@ -193,9 +193,16 @@ juce::File AiModels::catalogueFile() const
 
 void AiModels::loadCatalogue()
 {
+    // The same file as last time: the list stays as it is (a search thread
+    // may be reading it; made again, its models would be freed under it).
+    const auto text = catalogueFile().loadFileAsString();
+    if (loaded_ && text == catalogueText_)
+        return;
+    loaded_ = true;
+    catalogueText_ = text;
     models_.clear();
     packages_.clear();
-    const auto json = juce::JSON::parse(catalogueFile().loadFileAsString());
+    const auto json = juce::JSON::parse(text);
     if (const auto* list = json.getProperty("engine", {}).getProperty("packages", {}).getArray())
         for (const auto& item : *list)
             packages_.push_back({ item.getProperty("name", {}).toString(), item.getProperty("licence", {}).toString(),
@@ -236,9 +243,10 @@ void AiModels::loadCatalogue()
             }
             // A file outside the model's folder is not one of its files.
             const auto safe = std::all_of(model.files.begin(), model.files.end(), [](const AiModel::File& file) {
-                return file.path.isNotEmpty() && !file.path.contains("..") && !juce::File::isAbsolutePath(file.path);
+                return locations::staysInside(file.path);
             });
-            if (model.id.isNotEmpty() && model.version.isNotEmpty() && !model.files.empty() && safe
+            // Its id and version name its folder (removed whole on "Remove").
+            if (locations::isPlainName(model.id) && locations::isPlainName(model.version) && !model.files.empty() && safe
                 && model.baseUrl.startsWithIgnoreCase("http"))
                 models_.push_back(std::move(model));
         }

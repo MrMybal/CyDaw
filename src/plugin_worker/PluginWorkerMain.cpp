@@ -4,6 +4,20 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
 
+#if JUCE_WINDOWS
+extern "C" __declspec(dllimport) void* __stdcall OpenProcess(unsigned long, int, unsigned long);
+extern "C" __declspec(dllimport) unsigned long __stdcall WaitForSingleObject(void*, unsigned long);
+extern "C" __declspec(dllimport) int __stdcall CloseHandle(void*);
+extern "C" __declspec(dllimport) unsigned int __stdcall timeBeginPeriod(unsigned int);
+extern "C" __declspec(dllimport) unsigned int __stdcall timeEndPeriod(unsigned int);
+#if defined(_MSC_VER)
+#pragma comment(lib, "winmm.lib")
+#endif
+#else
+#include <cerrno>
+#include <signal.h>
+#endif
+
 #include <algorithm>
 #include <cmath>
 #include <atomic>
@@ -14,6 +28,50 @@
 #include <utility>
 
 namespace {
+
+// The CyDAW that started this worker. Gone (a crash, a kill), and the worker
+// ends too rather than keep its plug-in loaded for ever.
+class ParentWatch final {
+public:
+    explicit ParentWatch(const juce::int64 pid) : pid_(pid)
+    {
+#if JUCE_WINDOWS
+        if (pid_ > 0)
+            handle_ = OpenProcess(0x00100000ul /* SYNCHRONIZE */, 0, static_cast<unsigned long>(pid_));
+#endif
+    }
+    ~ParentWatch()
+    {
+#if JUCE_WINDOWS
+        if (handle_ != nullptr)
+            (void) CloseHandle(handle_);
+#endif
+    }
+    ParentWatch(const ParentWatch&) = delete;
+    ParentWatch& operator=(const ParentWatch&) = delete;
+    // Looked at twice a second at most.
+    [[nodiscard]] bool gone() noexcept
+    {
+        const auto now = juce::Time::getMillisecondCounter();
+        if (pid_ <= 0 || now - checked_ < 500)
+            return false;
+        checked_ = now;
+#if JUCE_WINDOWS
+        return handle_ != nullptr && WaitForSingleObject(handle_, 0) == 0 /* WAIT_OBJECT_0 */;
+#else
+        return kill(static_cast<pid_t>(pid_), 0) != 0 && errno == ESRCH;
+#endif
+    }
+
+private:
+    juce::int64 pid_ {};
+    juce::uint32 checked_ {};
+#if JUCE_WINDOWS
+    void* handle_ {};
+#endif
+};
+// What runRealtimeWorker returns when CyDAW went away.
+constexpr int parentGone = 18;
 
 juce::var pluginDescriptionToJson(const juce::PluginDescription& description)
 {
@@ -633,10 +691,26 @@ private:
 int runRealtimeWorker(const juce::File& pluginFile,
                       const juce::File& sharedFile,
                       const double sampleRate,
-                      const int maximumBlockSize,
+                      const int requestedBlockSize,
                       const int requestedChannels,
-                      const bool passthrough)
+                      const bool passthrough,
+                      const juce::int64 parentPid)
 {
+    // Prepared for the largest block the host can send, whatever its device
+    // uses now: a buffer made larger later is still played.
+    const auto maximumBlockSize = static_cast<int>(cydaw::plugins::maximumSharedAudioFrames);
+    juce::ignoreUnused(requestedBlockSize);
+    ParentWatch parent(parentPid);
+    // A block answered late is a block played dry: the waits between blocks
+    // last a millisecond (Windows' default tick is 15.6), and the worker runs
+    // ahead of the programs that are not playing.
+#if JUCE_WINDOWS
+    struct FineTimer {
+        FineTimer() { (void) timeBeginPeriod(1); }
+        ~FineTimer() { (void) timeEndPeriod(1); }
+    } fineTimer;
+#endif
+    juce::Process::setPriority(juce::Process::HighPriority);
     if (!sharedFile.existsAsFile())
         return 10;
     juce::MemoryMappedFile mapping(sharedFile, juce::MemoryMappedFile::readWrite, false);
@@ -708,6 +782,12 @@ int runRealtimeWorker(const juce::File& pluginFile,
         auto shutdown = cydaw::plugins::sharedAtomic(shared->shutdownRequested);
 
         while (shutdown.load(std::memory_order_acquire) == 0) {
+            if (parent.gone()) {
+                editorWindow.reset();
+                if (instance != nullptr)
+                    instance->releaseResources();
+                return parentGone;
+            }
             auto didWork = false;
             const auto requested = request.load(std::memory_order_acquire);
             if (requested != response.load(std::memory_order_relaxed)) {
@@ -920,8 +1000,13 @@ int main(const int argc, char* argv[])
         const auto sampleRate = argumentValue(arguments, "--sample-rate", "48000").getDoubleValue();
         const auto maximumBlockSize = argumentValue(arguments, "--block-size", "512").getIntValue();
         const auto channels = argumentValue(arguments, "--channels", "2").getIntValue();
-        return runRealtimeWorker(pluginFile, sharedFile, sampleRate, maximumBlockSize,
-                                 channels, passthrough);
+        const auto parentPid = argumentValue(arguments, "--parent-pid", "0").getLargeIntValue();
+        const auto result = runRealtimeWorker(pluginFile, sharedFile, sampleRate, maximumBlockSize,
+                                              channels, passthrough, parentPid);
+        // Nobody left to remove its shared file.
+        if (result == parentGone)
+            (void) sharedFile.deleteFile();
+        return result;
     }
 
     auto probeIndex = arguments.indexOf("--probe-plugin");

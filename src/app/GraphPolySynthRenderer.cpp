@@ -285,6 +285,26 @@ void GraphPolySynthRenderer::render(juce::AudioBuffer<float>& output,
                                        numSamples);
 }
 
+void GraphPolySynthRenderer::renderChanged(juce::AudioBuffer<float>& output, const juce::MidiBuffer& midi,
+                                           const int startSample, const int numSamples, const PlanChange change,
+                                           const void* context) noexcept
+{
+    // Declared first, so released last: the copies below go while it holds.
+    const auto current = impl_->plan.borrowPlan();
+    if (current == nullptr)
+        return;
+    auto plan = *current;
+    if (change != nullptr)
+        change(plan, context);
+    const auto sanitised = sanitise(plan);
+    impl_->plan.realtimeOverride = &sanitised;
+    impl_->synthesiser.advance(static_cast<double>(numSamples) / std::max(1.0, impl_->synthesiser.getSampleRate()),
+                               NativeDspRuntime::sessionTempo(), &sanitised);
+    impl_->synthesiser.renderNextBlock(output, impl_->throughEffects(midi, startSample, numSamples, &sanitised), startSample,
+                                       numSamples);
+    impl_->plan.realtimeOverride = nullptr;
+}
+
 void GraphPolySynthRenderer::renderWithPlan(
     juce::AudioBuffer<float>& output, const juce::MidiBuffer& midi,
     const int startSample, const int numSamples,

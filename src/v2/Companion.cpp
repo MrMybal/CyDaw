@@ -5,6 +5,7 @@
 #include <juce_data_structures/juce_data_structures.h>
 
 #include <optional>
+#include <thread>
 
 namespace cydaw::v2 {
 
@@ -321,8 +322,22 @@ juce::var Companion::runNow(const juce::StringArray& arguments, juce::String& er
         error = "Python could not be started: " + command[0];
         return {};
     }
-    const auto output = process.readAllProcessOutput();
-    process.waitForProcessToFinish(timeoutMs);
+    // Read on a thread of its own: reading lasts until the output ends, which
+    // a hung Python never does; past the time allowed it is ended.
+    juce::String output;
+    juce::WaitableEvent read;
+    std::thread reader([&process, &output, &read] {
+        output = process.readAllProcessOutput();
+        read.signal();
+    });
+    const auto inTime = read.wait(timeoutMs);
+    if (!inTime)
+        (void) process.kill();
+    reader.join();
+    if (!inTime) {
+        error = command[0] + " did not answer in time";
+        return {};
+    }
     juce::StringArray lines;
     lines.addLines(output);
     juce::var last;

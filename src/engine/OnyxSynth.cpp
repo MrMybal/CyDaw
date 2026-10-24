@@ -497,13 +497,14 @@ public:
 
         for (int done = 0; done < count; done += step) {
             const auto length = std::min(step, count - done);
+            const auto part = static_cast<double>(length) / static_cast<double>(step);
             // The slow things, once a step: envelopes, the LFO, the glide, the bends, the matrix, the pitches and the filter.
-            const auto ampLevel = amp_.step(ampAttackStep, ampDecayStep, v(ampSustain), ampReleaseStep);
-            const auto filterLevel = filterEnvelope_.step(filterAttackStep, filterDecayStep, v(fenvSustain), filterReleaseStep);
+            const auto ampLevel = amp_.step(ampAttackStep, ampDecayStep, v(ampSustain), ampReleaseStep, part);
+            const auto filterLevel = filterEnvelope_.step(filterAttackStep, filterDecayStep, v(fenvSustain), filterReleaseStep, part);
             std::array<double, oscSize> envelopes {};
             for (std::size_t osc = 0; osc < oscSize; ++osc) {
                 const auto& line = lines[osc];
-                envelopes[osc] = distortion_[osc].step(line.attack, line.decay, line.sustain, line.release);
+                envelopes[osc] = distortion_[osc].step(line.attack, line.decay, line.sustain, line.release, part);
             }
             if (!active())
                 return false;

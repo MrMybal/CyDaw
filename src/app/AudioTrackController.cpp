@@ -720,7 +720,7 @@ juce::Result GainPanAudioSource::reloadPlugin(std::size_t index, double rate, in
     pluginsAvailable_.store(true,std::memory_order_release);removed->stop();return juce::Result::ok();
 }
 
-void GainPanAudioSource::removePlugin(const std::size_t pluginIndex)
+void GainPanAudioSource::removePlugin(const std::size_t pluginIndex, const std::function<void()>& whileHeld)
 {
     const auto currentCount = pluginCount_.load(std::memory_order_acquire);
     if (pluginIndex >= currentCount)
@@ -734,6 +734,8 @@ void GainPanAudioSource::removePlugin(const std::size_t pluginIndex)
         pluginHosts_[index] = std::move(pluginHosts_[index + 1]);
     pluginHosts_[currentCount - 1].reset();
     pluginCount_.store(currentCount - 1, std::memory_order_release);
+    if (whileHeld)
+        whileHeld();
     pluginsAvailable_.store(true, std::memory_order_release);
     if (removed != nullptr)
         removed->stop();
@@ -754,7 +756,8 @@ void GainPanAudioSource::clearPlugins()
             host->stop();
 }
 
-bool GainPanAudioSource::movePlugin(const std::size_t pluginIndex, const int direction)
+bool GainPanAudioSource::movePlugin(const std::size_t pluginIndex, const int direction,
+                                    const std::function<void()>& whileHeld)
 {
     const auto currentCount = pluginCount_.load(std::memory_order_acquire);
     if (pluginIndex >= currentCount || direction == 0)
@@ -767,6 +770,8 @@ bool GainPanAudioSource::movePlugin(const std::size_t pluginIndex, const int dir
     while (pluginCallbacksInFlight_.load() != 0)
         std::this_thread::yield();
     std::swap(pluginHosts_[pluginIndex], pluginHosts_[static_cast<std::size_t>(destination)]);
+    if (whileHeld)
+        whileHeld();
     pluginsAvailable_.store(true, std::memory_order_release);
     return true;
 }
@@ -777,6 +782,26 @@ void GainPanAudioSource::pollPluginHealth()
     for (std::size_t index = 0; index < count; ++index)
         if (pluginHosts_[index] != nullptr)
             pluginHosts_[index]->pollWorkerHealth();
+}
+
+bool GainPanAudioSource::followDevice(const double sampleRate, const int blockSize, const int channels)
+{
+    auto restarted = false;
+    const auto count = pluginCount_.load(std::memory_order_acquire);
+    for (std::size_t index = 0; index < count; ++index) {
+        const auto* host = pluginHosts_[index].get();
+        if (host == nullptr || !host->isRunning() || host->pluginFile() == juce::File {}
+            || (host->preparedSampleRate() == sampleRate && host->preparedBlockSize() == blockSize))
+            continue;
+        // Tried once for this format: a worker that cannot start at it is
+        // not started again at every poll.
+        auto& tried = followTried_[index];
+        if (tried.first == sampleRate && tried.second == blockSize)
+            continue;
+        tried = { sampleRate, blockSize };
+        restarted = reloadPlugin(index, sampleRate, blockSize, channels).wasOk() || restarted;
+    }
+    return restarted;
 }
 
 juce::Result GainPanAudioSource::getPluginState(const std::size_t pluginIndex,
@@ -4372,6 +4397,8 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
                 pad->prepare(sampleRate, samplesPerBlockExpected);
         if (liveInput.load(std::memory_order_acquire))
             collector.reset(sampleRate);
+        blockMidi_.ensureSize(16'384);
+        incomingMidi_.ensureSize(4'096);
     }
 
     void releaseResources() override
@@ -4398,7 +4425,10 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
             positionSeconds.store(at, std::memory_order_relaxed);
             playing.store(active, std::memory_order_relaxed);
         }
-        juce::MidiBuffer midi;
+        // Kept from block to block (their room made in prepareToPlay): none
+        // allocated on the audio thread for the notes it carries.
+        auto& midi = blockMidi_;
+        midi.clear();
         // Where this block starts, for the automation of the effects.
         const auto automationSeconds = positionSeconds.load(std::memory_order_relaxed);
         // The notes heard live, apart from the clips', for the lights.
@@ -4406,7 +4436,8 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
         if (liveInput.load(std::memory_order_acquire)) {
             collector.removeNextBlockOfMessages(midi, output.numSamples);
             if (auto* extra = hardware.load(std::memory_order_acquire)) {
-                juce::MidiBuffer incoming;
+                auto& incoming = incomingMidi_;
+                incoming.clear();
                 extra->removeNextBlockOfMessages(incoming, output.numSamples);
                 midi.addEvents(incoming, 0, output.numSamples, 0);
             }
@@ -5244,6 +5275,8 @@ struct AudioTrackController::MidiSynthEngine final : public juce::AudioSource, p
     PlanSynthesiser synthesiser;
     AudioTrackController& owner;
     juce::MidiMessageCollector& collector;
+    juce::MidiBuffer blockMidi_;
+    juce::MidiBuffer incomingMidi_;
     juce::MidiKeyboardState& keyboard;
     cydaw::realtime::RtPublisher<std::vector<ScheduledNote>> sequence;
     std::atomic<double> sequenceLengthSeconds {};
@@ -12639,14 +12672,17 @@ void AudioTrackController::clearTrackPlugin(const std::size_t index,
                                             const std::size_t pluginIndex)
 {
     if (auto* track = findTrack(index)) {
-        track->gainPanSource.removePlugin(pluginIndex);
-        std::erase_if(track->pluginAutomation, [pluginIndex](const auto& lane) {
-            return lane.pluginIndex == pluginIndex;
+        // The lanes renumbered with the plug-ins, before a block plays them:
+        // the removed one's would land on the next plug-in.
+        track->gainPanSource.removePlugin(pluginIndex, [this, track, pluginIndex] {
+            std::erase_if(track->pluginAutomation, [pluginIndex](const auto& lane) {
+                return lane.pluginIndex == pluginIndex;
+            });
+            for (auto& lane : track->pluginAutomation)
+                if (lane.pluginIndex > pluginIndex)
+                    --lane.pluginIndex;
+            publishTrackPluginAutomation(*track);
         });
-        for (auto& lane : track->pluginAutomation)
-            if (lane.pluginIndex > pluginIndex)
-                --lane.pluginIndex;
-        publishTrackPluginAutomation(*track);
         refreshLatencyCompensation();
     }
 }
@@ -12666,10 +12702,9 @@ bool AudioTrackController::moveTrackPlugin(const std::size_t index,
                                            const int direction)
 {
     if (auto* track = findTrack(index)) {
-        const auto moved = track->gainPanSource.movePlugin(pluginIndex, direction);
-        if (moved) {
-            const auto destination = static_cast<std::size_t>(
-                static_cast<std::ptrdiff_t>(pluginIndex) + (direction < 0 ? -1 : 1));
+        const auto destination = static_cast<std::size_t>(
+            std::max<std::ptrdiff_t>(0, static_cast<std::ptrdiff_t>(pluginIndex) + (direction < 0 ? -1 : 1)));
+        const auto moved = track->gainPanSource.movePlugin(pluginIndex, direction, [this, track, pluginIndex, destination] {
             for (auto& lane : track->pluginAutomation) {
                 if (lane.pluginIndex == pluginIndex)
                     lane.pluginIndex = destination;
@@ -12677,8 +12712,9 @@ bool AudioTrackController::moveTrackPlugin(const std::size_t index,
                     lane.pluginIndex = pluginIndex;
             }
             publishTrackPluginAutomation(*track);
+        });
+        if (moved)
             refreshLatencyCompensation();
-        }
         return moved;
     }
     return false;
@@ -12686,6 +12722,15 @@ bool AudioTrackController::moveTrackPlugin(const std::size_t index,
 
 void AudioTrackController::pollPluginWorkers()
 {
+    // The device's rate or block size changed (another device, other
+    // settings): the plug-ins started for the old ones start again.
+    if (auto* device = deviceManager_.getCurrentAudioDevice()) {
+        const auto rate = device->getCurrentSampleRate();
+        const auto block = juce::jlimit(1, 2'048, device->getCurrentBufferSizeSamples());
+        if (rate > 0.0)
+            for (auto& track : tracks_)
+                (void) track->gainPanSource.followDevice(rate, block, track->channelCount);
+    }
     for (auto& track : tracks_)
         track->gainPanSource.pollPluginHealth();
     refreshLatencyCompensation();

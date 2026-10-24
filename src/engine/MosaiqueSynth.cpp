@@ -453,6 +453,7 @@ public:
     void prepare(const double sampleRate) override
     {
         rate_ = std::max(1.0, sampleRate);
+        dcPole_ = std::pow(0.995, 48'000.0 / rate_);
         for (auto& filter : filters_)
             for (auto& side : filter)
                 side.prepare(rate_);
@@ -461,6 +462,7 @@ public:
     void start(const Values& values, const int note, const float velocity, const double glideFrom, const double sampleRate) noexcept override
     {
         rate_ = std::max(1.0, sampleRate);
+        dcPole_ = std::pow(0.995, 48'000.0 / rate_);
         target_ = static_cast<double>(note);
         pitch_ = glideFrom >= 0.0 && values[voicingGlide] > 0.0f ? glideFrom : target_;
         aimGlide(values);
@@ -534,6 +536,7 @@ public:
         if (!active())
             return false;
         rate_ = std::max(1.0, sampleRate);
+        dcPole_ = std::pow(0.995, 48'000.0 / rate_);
         const auto v = [&values](const int index) { return static_cast<double>(values[static_cast<std::size_t>(index)]); };
         const auto choice = [&values](const int index, const int options) {
             return std::clamp(static_cast<int>(std::lround(values[static_cast<std::size_t>(index)])), 0, options - 1);
@@ -593,9 +596,10 @@ public:
 
         for (int done = 0; done < count; done += step) {
             const auto length = std::min(step, count - done);
-            const auto ampLevel = amp_.step(ampSteps.attack, ampSteps.decay, ampSteps.sustain, ampSteps.release);
-            const auto env2Level = env2_.step(env2Steps.attack, env2Steps.decay, env2Steps.sustain, env2Steps.release);
-            const auto env3Level = env3_.step(env3Steps.attack, env3Steps.decay, env3Steps.sustain, env3Steps.release);
+            const auto part = static_cast<double>(length) / static_cast<double>(step);
+            const auto ampLevel = amp_.step(ampSteps.attack, ampSteps.decay, ampSteps.sustain, ampSteps.release, part);
+            const auto env2Level = env2_.step(env2Steps.attack, env2Steps.decay, env2Steps.sustain, env2Steps.release, part);
+            const auto env3Level = env3_.step(env3Steps.attack, env3Steps.decay, env3Steps.sustain, env3Steps.release, part);
             if (!active())
                 return false;
             const auto seconds = static_cast<double>(length) / rate_;
@@ -888,7 +892,7 @@ public:
                     }
                     if (drive > 1.0e-4)
                         x = saturate(driveKind, drive, x, side);
-                    const auto blocked = x - dcIn_[side] + 0.995 * dcOut_[side];
+                    const auto blocked = x - dcIn_[side] + dcPole_ * dcOut_[side];
                     dcIn_[side] = x;
                     dcOut_[side] = blocked;
                     channel[side] = blocked * gain * panGains[side];
@@ -993,6 +997,9 @@ private:
     std::array<std::array<MultiFilter, 2>, 2> filters_ {}; // [filter][side]
     std::array<Shape, 2> shapes_ {};
     std::array<Engines, unisonMost> subs_ {};
+    // The offset blocker's pole: its corner where 0.995 puts it at 48 kHz
+    // (about 38 Hz), whatever the rate.
+    double dcPole_ { 0.995 };
     std::array<double, 2> dcIn_ {};
     std::array<double, 2> dcOut_ {};
     std::array<double, 2> held_ {};

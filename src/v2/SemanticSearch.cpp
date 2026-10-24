@@ -183,8 +183,10 @@ public:
 
     ~Worker() override { close(); }
 
-    bool open(const juce::StringArray& command, juce::String& error, const std::atomic<bool>* stop)
+    bool open(juce::StringArray command, juce::String& error, const std::atomic<bool>* stop)
     {
+        // Every request carries it: the worker answers no other connection.
+        command.addArray({ "--token", token_ });
         if (!process_.start(command, juce::ChildProcess::wantStdOut | juce::ChildProcess::wantStdErr)) {
             error = ui::Ls("Python ne démarre pas : ", "Python does not start: ") + command[0];
             return false;
@@ -216,13 +218,18 @@ public:
         return true;
     }
 
-    juce::var request(const juce::var& json, juce::String& error, const int timeoutMs = 600'000)
+    // stop: asked to give up (indexing stopped). The model is then ended: its
+    // answer, come later, would be read as the next request's.
+    juce::var request(const juce::var& json, juce::String& error, const int timeoutMs = 600'000,
+                      const std::atomic<bool>* stop = nullptr)
     {
         const std::scoped_lock lock(requestMutex_);
         if (!socket_.isConnected()) {
             error = ui::Ls("le modèle n'est plus là", "the model is gone");
             return {};
         }
+        if (auto* object = json.getDynamicObject())
+            object->setProperty("token", token_);
         const auto line = juce::JSON::toString(json, true).replace("\n", " ") + "\n";
         const auto* bytes = line.toRawUTF8();
         const auto size = static_cast<int>(line.getNumBytesAsUTF8());
@@ -246,6 +253,11 @@ public:
                 return {};
             }
             if (ready == 0) {
+                if (stop != nullptr && stop->load()) {
+                    socket_.close();
+                    (void) process_.kill();
+                    return {};
+                }
                 if (juce::Time::getMillisecondCounterHiRes() > deadline || !process_.isRunning()) {
                     error = ui::Ls("le modèle ne répond pas", "the model does not answer");
                     socket_.close();
@@ -282,8 +294,8 @@ public:
     void close()
     {
         if (socket_.isConnected()) {
-            const auto* bye = "{\"op\": \"shutdown\"}\n";
-            (void) socket_.write(bye, static_cast<int>(std::strlen(bye)));
+            const auto bye = "{\"op\": \"shutdown\", \"token\": \"" + token_ + "\"}\n";
+            (void) socket_.write(bye.toRawUTF8(), static_cast<int>(bye.getNumBytesAsUTF8()));
             socket_.close();
         }
         if (process_.isRunning())
@@ -331,6 +343,7 @@ private:
 
     juce::ChildProcess process_;
     juce::StreamingSocket socket_;
+    const juce::String token_ { juce::Uuid().toString() };
     std::mutex requestMutex_;
     mutable std::mutex outputMutex_;
     juce::String lastError_;
@@ -632,7 +645,7 @@ public:
                 request->setProperty("file", audioFile.getFullPathName());
                 request->setProperty("items", windows);
                 request->setProperty("out", vectorFile.getFullPathName());
-                const auto answer = worker->request(juce::var(request), error);
+                const auto answer = worker->request(juce::var(request), error, 600'000, &stop_);
                 if (!answer.isObject()) {
                     finish(error);
                     return;
@@ -706,7 +719,7 @@ private:
         request->setProperty("op", "embed_text");
         request->setProperty("texts", texts);
         juce::String error;
-        const auto answer = worker.request(juce::var(request), error);
+        const auto answer = worker.request(juce::var(request), error, 600'000, &stop_);
         const auto* list = answer.getProperty("vectors", {}).getArray();
         if (list == nullptr || list->size() != texts.size())
             return;

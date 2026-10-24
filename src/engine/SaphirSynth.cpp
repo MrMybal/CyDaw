@@ -687,21 +687,22 @@ public:
 
         for (int done = 0; done < count; done += step) {
             const auto length = std::min(step, count - done);
+            const auto part = static_cast<double>(length) / static_cast<double>(step);
             // The slow things once a step: the envelopes (a looping one starts
             // again as its decay ends), the LFO, the glide, the frequencies, the filter.
             std::array<double, operatorCount> levels {};
             for (std::size_t op = 0; op < operatorCount; ++op) {
                 auto& envelope = operators_[op];
                 const auto& setting = settings[op];
-                levels[op] = envelope.step(setting.attackStep, setting.decayStep, setting.sustainLevel, setting.releaseStep);
+                levels[op] = envelope.step(setting.attackStep, setting.decayStep, setting.sustainLevel, setting.releaseStep, part);
                 if (setting.loop && (envelope.stage == Envelope::Stage::decay || envelope.stage == Envelope::Stage::sustain)
                     && std::abs(envelope.level - setting.sustainLevel) < 0.02 * std::max(0.05, 1.0 - setting.sustainLevel))
                     envelope.stage = Envelope::Stage::attack;
                 if (envelope.level < 1.0e-12 && envelope.stage != Envelope::Stage::attack)
                     envelope.level = 0.0;
             }
-            const auto filterLevel = filterEnvelope_.step(fenvAttackStep, fenvDecayStep, fenvSustainLevel, fenvReleaseStep);
-            const auto pitchLevel = pitchEnvelope_.step(penvAttackStep, penvDecayStep, 0.0, penvDecayStep);
+            const auto filterLevel = filterEnvelope_.step(fenvAttackStep, fenvDecayStep, fenvSustainLevel, fenvReleaseStep, part);
+            const auto pitchLevel = pitchEnvelope_.step(penvAttackStep, penvDecayStep, 0.0, penvDecayStep, part);
             for (auto* envelope : { &filterEnvelope_, &pitchEnvelope_ })
                 if (envelope->level < 1.0e-12 && envelope->stage != Envelope::Stage::attack)
                     envelope->level = 0.0;

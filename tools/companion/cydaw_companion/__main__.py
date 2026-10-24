@@ -84,7 +84,7 @@ def command_clap_check(arguments: argparse.Namespace) -> int:
 
 def command_clap_worker(arguments: argparse.Namespace) -> int:
     from .clap_worker import serve  # noqa: PLC0415
-    return serve(Path(arguments.model), arguments.device, arguments.idle)
+    return serve(Path(arguments.model), arguments.device, arguments.idle, arguments.token)
 
 
 def command_analyse(arguments: argparse.Namespace) -> int:
@@ -236,6 +236,7 @@ def main(argv: list[str] | None = None) -> int:
     clap_worker_parser.add_argument("--model", required=True)
     clap_worker_parser.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
     clap_worker_parser.add_argument("--idle", type=float, default=900.0)
+    clap_worker_parser.add_argument("--token", default="")
     evaluate_parser = commands.add_parser("evaluate")
     evaluate_parser.add_argument("model")
     evaluate_parser.add_argument("files", nargs="+")

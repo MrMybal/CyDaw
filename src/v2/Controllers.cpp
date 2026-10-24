@@ -212,18 +212,23 @@ struct Controllers::Impl::OscPort final : juce::OSCReceiver::Listener<juce::OSCR
     OscPort(Impl& owner, std::string device) : owner_(owner), device_(std::move(device)) {}
     ~OscPort() override
     {
-        receiver.removeListener(this);
+        // The receiver's thread stopped first: it may be calling the listeners.
         receiver.disconnect();
+        receiver.removeListener(this);
         sender.disconnect();
     }
     void oscMessageReceived(const juce::OSCMessage& message) override { take(message); }
-    void oscBundleReceived(const juce::OSCBundle& bundle) override
+    void oscBundleReceived(const juce::OSCBundle& bundle) override { takeBundle(bundle, 0); }
+    // Bundles in bundles, to a depth (a packet can nest thousands).
+    void takeBundle(const juce::OSCBundle& bundle, const int depth)
     {
+        if (depth > 16)
+            return;
         for (const auto& element : bundle) {
             if (element.isMessage())
                 take(element.getMessage());
             else if (element.isBundle())
-                oscBundleReceived(element.getBundle());
+                takeBundle(element.getBundle(), depth + 1);
         }
     }
     // Each number its own address; none: a press and its let go.
@@ -232,6 +237,9 @@ struct Controllers::Impl::OscPort final : juce::OSCReceiver::Listener<juce::OSCR
         const auto address = message.getAddressPattern().toString().toStdString();
         auto index = 0;
         for (const auto& argument : message) {
+            // A controller sends a few numbers per address, not thousands.
+            if (index >= 64)
+                break;
             std::optional<double> value;
             if (argument.isFloat32())
                 value = argument.getFloat32();
@@ -712,8 +720,9 @@ void Controllers::Impl::post(Incoming incoming)
 {
     {
         const std::scoped_lock hold(queueLock);
+        // Flooded: the oldest half goes at once (not one by one, each time).
         if (queue.size() > 4'096)
-            queue.erase(queue.begin());
+            queue.erase(queue.begin(), queue.begin() + 2'048);
         queue.push_back(std::move(incoming));
     }
     triggerAsyncUpdate();

@@ -41,6 +41,20 @@ inline constexpr std::array allLocations { Location::banks,       Location::down
 
 namespace locations {
 
+// A path read from a list (a bank's files, a model's): relative and staying
+// in the folder it names a file of. On Windows "/x", "\\host\x" and "C:x"
+// are not taken as relative, though JUCE would.
+[[nodiscard]] inline bool staysInside(const juce::String& path)
+{
+    return path.isNotEmpty() && !path.contains("..") && !juce::File::isAbsolutePath(path) && !path.startsWithChar('/')
+           && !path.startsWithChar('\\') && !path.containsChar(':');
+}
+// One folder's name (a model's id, its version): no path in it.
+[[nodiscard]] inline bool isPlainName(const juce::String& name)
+{
+    return staysInside(name) && !name.containsAnyOf("/\\") && name != ".";
+}
+
 [[nodiscard]] juce::File folder(Location location);
 [[nodiscard]] juce::File defaultFolder(Location location);
 [[nodiscard]] bool isDefault(Location location);
@@ -81,6 +95,9 @@ public:
         bool finished {};
         bool cancelled {};
         juce::String error;
+        // Files left in the old folder: the new one already held a different
+        // file of that name, and neither was overwritten.
+        int kept {};
     };
     [[nodiscard]] Progress progress() const;
     [[nodiscard]] Location location() const noexcept { return location_; }

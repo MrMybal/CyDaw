@@ -320,6 +320,20 @@ struct UiState {
     {
         return std::find(pluginWindows.begin(), pluginWindows.end(), window) != pluginWindows.end();
     }
+    // A track removed: the later ones moved down, so what names tracks by
+    // their place no longer names the same ones.
+    void forgetTrackRefs()
+    {
+        selectedTrack.reset();
+        pickedTracks.clear();
+        selectedClips.clear();
+        selectedSlots.clear();
+        editedClip.reset();
+        libraryTarget.reset();
+        expandedPanes.clear();
+        deviceInsertBefore.reset();
+        pluginWindows.clear();
+    }
 };
 
 // Peaks of audio files, read in the background and drawn per pixel.
