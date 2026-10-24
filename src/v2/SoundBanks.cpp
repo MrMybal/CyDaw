@@ -1,5 +1,6 @@
 #include "SoundBanks.h"
 
+#include "AiModels.h"
 #include "Locations.h"
 #include "SamplerMapFile.h"
 #include "Widgets.h"
@@ -214,6 +215,11 @@ SoundBanks::PreloadedList SoundBanks::readList(const juce::File& listFile)
                 file.lfs = fields->size() > 2 && static_cast<int>((*fields)[2]) != 0;
                 if (fields->size() > 3)
                     file.recipe = (*fields)[3];
+                // [path, size, lfs, recipe or null, sha256]
+                if (fields->size() > 4)
+                    if (const auto hash = (*fields)[4].toString().toLowerCase();
+                        hash.length() == 64 && hash.containsOnly("0123456789abcdef"))
+                        file.sha256 = hash;
                 // Inside the bank only.
                 if (!locations::staysInside(file.path))
                     continue;
@@ -642,6 +648,8 @@ bool SoundBanks::fetch(const Wanted& wanted, const int generation, juce::String&
             continue;
         }
         juce::int64 written {};
+        // Hashed as it comes, when the list gives the file's hash.
+        Sha256 hash;
         {
             (void) partial.deleteFile();
             juce::FileOutputStream out(partial);
@@ -663,6 +671,8 @@ bool SoundBanks::fetch(const Wanted& wanted, const int generation, juce::String&
                     break;
                 }
                 written += read;
+                if (wanted.file.sha256.isNotEmpty())
+                    hash.add(buffer.get(), static_cast<std::size_t>(read));
                 addBytes(read);
             }
         }
@@ -677,6 +687,12 @@ bool SoundBanks::fetch(const Wanted& wanted, const int generation, juce::String&
             addBytes(-written);
             error = wanted.bank + "/" + wanted.file.path + ": " + juce::String(written) + " bytes of "
                     + juce::String(wanted.file.size);
+            continue;
+        }
+        if (wanted.file.sha256.isNotEmpty() && hash.hex() != wanted.file.sha256) {
+            addBytes(-written);
+            error = wanted.bank + "/" + wanted.file.path + ": its content is not the one listed (SHA-256)";
+            (void) partial.deleteFile();
             continue;
         }
         if (!makeFolder(target.getParentDirectory()) || !partial.moveFileTo(target)) {

@@ -289,7 +289,28 @@ Sections cabPlaceSections(const CabModel& model, const double position, const do
 
 namespace {
 
-double cabCurveDb(const std::array<float, cabParameterCount>& values, int which, double hz, double sampleRate) noexcept;
+// A cabinet and its microphones as the curve hears them: their sections
+// designed once, read at as many frequencies as asked (the makeup's sweep
+// reads 24; designing them again for each was most of its cost, paid on the
+// audio thread at every step of a knob's glide).
+class CabCurve {
+public:
+    CabCurve(const std::array<float, cabParameterCount>& values, double sampleRate) noexcept;
+    // which: 0 the microphone A, 1 B, 2 both as blended.
+    [[nodiscard]] double db(int which, double hz) const noexcept;
+
+private:
+    double rate_;
+    Sections core_;
+    std::array<Sections, 2> place_;
+    std::array<Sections, 2> mic_;
+    std::array<double, 2> flight_ {};
+    Sections cuts_;
+    bool aligned_ {};
+    bool inverted_ {};
+    bool both_ {};
+    double blend_ {};
+};
 
 // The average of a curve in dB over log-spaced points of a band.
 template <typename Curve>
@@ -306,50 +327,62 @@ double averageDb(const double low, const double high, Curve curve) noexcept
 
 double cabMakeupDb(const std::array<float, cabParameterCount>& values, const double sampleRate) noexcept
 {
-    return std::clamp(-averageDb(100.0, 4'000.0, [&](const double hz) { return cabCurveDb(values, 2, hz, sampleRate); }), -24.0,
-                      24.0);
+    const CabCurve curve(values, sampleRate);
+    return std::clamp(-averageDb(100.0, 4'000.0, [&curve](const double hz) { return curve.db(2, hz); }), -24.0, 24.0);
 }
 
 double cabResponseDb(const std::array<float, cabParameterCount>& values, const int which, const double hz,
                      const double sampleRate) noexcept
 {
-    return cabCurveDb(values, which, hz, sampleRate) + cabMakeupDb(values, sampleRate);
+    const CabCurve curve(values, sampleRate);
+    const auto makeup = std::clamp(-averageDb(100.0, 4'000.0, [&curve](const double at) { return curve.db(2, at); }), -24.0, 24.0);
+    return curve.db(which, hz) + makeup;
 }
 
 namespace {
 
-double cabCurveDb(const std::array<float, cabParameterCount>& values, const int which, const double hz,
-                  const double sampleRate) noexcept
+CabCurve::CabCurve(const std::array<float, cabParameterCount>& values, const double sampleRate) noexcept
+    : rate_(sampleRate)
 {
     const auto& cab = cabModel(choice(values[cabModelValue], cabModelCount));
-    const auto core = response(cabCoreSections(cab, values[cabResonance], sampleRate), hz, sampleRate);
-    const auto omega = 2.0 * kPi * hz;
-    const auto aligned = values[cabAlign] >= 0.5f;
-    const auto mic = [&](const int microphone, const int position, const int distance, const int angle) {
+    core_ = cabCoreSections(cab, values[cabResonance], sampleRate);
+    aligned_ = values[cabAlign] >= 0.5f;
+    const std::array<std::array<int, 4>, 2> mics { { { cabMicA, cabPositionA, cabDistanceA, cabAngleA },
+                                                     { cabMicB, cabPositionB, cabDistanceB, cabAngleB } } };
+    for (std::size_t index = 0; index < 2; ++index) {
+        const auto [microphone, position, distance, angle] = mics[index];
         const auto& model = micModel(choice(values[static_cast<std::size_t>(microphone)], cabMicCount));
-        auto value = response(cabPlaceSections(cab, values[static_cast<std::size_t>(position)], values[static_cast<std::size_t>(angle)],
-                                               sampleRate),
-                              hz, sampleRate)
-                     * response(micSections(model, model.pattern, values[static_cast<std::size_t>(distance)],
-                                            values[static_cast<std::size_t>(angle)], sampleRate),
-                                hz, sampleRate);
-        if (!aligned)
-            value *= std::polar(1.0, -omega * flightSeconds(values[static_cast<std::size_t>(distance)]));
+        place_[index] = cabPlaceSections(cab, values[static_cast<std::size_t>(position)], values[static_cast<std::size_t>(angle)],
+                                         sampleRate);
+        mic_[index] = micSections(model, model.pattern, values[static_cast<std::size_t>(distance)],
+                                  values[static_cast<std::size_t>(angle)], sampleRate);
+        flight_[index] = flightSeconds(values[static_cast<std::size_t>(distance)]);
+    }
+    inverted_ = values[cabPolarityB] >= 0.5f;
+    blend_ = static_cast<double>(std::clamp(values[cabBlend], 0.0f, 1.0f));
+    both_ = values[cabMicBOn] >= 0.5f;
+    if (values[cabLowCut] > 20.5f)
+        cut(cuts_, false, values[cabLowCut], false, sampleRate);
+    if (values[cabHighCut] < 19'900.0f)
+        cut(cuts_, true, values[cabHighCut], false, sampleRate);
+}
+
+double CabCurve::db(const int which, const double hz) const noexcept
+{
+    const auto omega = 2.0 * kPi * hz;
+    const auto mic = [&](const std::size_t index) {
+        auto value = response(place_[index], hz, rate_) * response(mic_[index], hz, rate_);
+        if (!aligned_)
+            value *= std::polar(1.0, -omega * flight_[index]);
         return value;
     };
-    const auto a = mic(cabMicA, cabPositionA, cabDistanceA, cabAngleA);
-    auto b = mic(cabMicB, cabPositionB, cabDistanceB, cabAngleB);
-    if (values[cabPolarityB] >= 0.5f)
+    const auto a = mic(0);
+    auto b = mic(1);
+    if (inverted_)
         b = -b;
-    const auto blend = static_cast<double>(std::clamp(values[cabBlend], 0.0f, 1.0f));
-    const auto both = values[cabMicBOn] >= 0.5f ? a * (1.0 - blend) + b * blend : a;
-    auto total = core * (which == 0 ? a : which == 1 ? b : both);
-    Sections cuts;
-    if (values[cabLowCut] > 20.5f)
-        cut(cuts, false, values[cabLowCut], false, sampleRate);
-    if (values[cabHighCut] < 19'900.0f)
-        cut(cuts, true, values[cabHighCut], false, sampleRate);
-    total *= response(cuts, hz, sampleRate);
+    const auto both = both_ ? a * (1.0 - blend_) + b * blend_ : a;
+    auto total = response(core_, hz, rate_) * (which == 0 ? a : which == 1 ? b : both);
+    total *= response(cuts_, hz, rate_);
     return 20.0 * std::log10(std::max(std::abs(total), 1.0e-9));
 }
 
@@ -365,21 +398,17 @@ Pattern micPatternOf(const std::array<float, micParameterCount>& values) noexcep
     return static_cast<Pattern>(chosen);
 }
 
-namespace {
-
-// The microphone's sections, its pattern's pick-up aside.
-double micCurveDb(const std::array<float, micParameterCount>& values, const double hz, const double sampleRate) noexcept
-{
-    const auto& model = micModel(choice(values[micModelValue], micModelCount));
-    const auto sections = micSections(model, micPatternOf(values), values[micDistance], values[micAngle], sampleRate);
-    return 20.0 * std::log10(std::max(std::abs(response(sections, hz, sampleRate)), 1.0e-9));
-}
-
-} // namespace
-
 double micMakeupDb(const std::array<float, micParameterCount>& values, const double sampleRate) noexcept
 {
-    return std::clamp(-averageDb(300.0, 3'000.0, [&](const double hz) { return micCurveDb(values, hz, sampleRate); }), -24.0, 24.0);
+    // The microphone's sections (its pattern's pick-up aside), designed once
+    // for the whole sweep.
+    const auto& model = micModel(choice(values[micModelValue], micModelCount));
+    const auto sections = micSections(model, micPatternOf(values), values[micDistance], values[micAngle], sampleRate);
+    return std::clamp(-averageDb(300.0, 3'000.0,
+                                 [&](const double hz) {
+                                     return 20.0 * std::log10(std::max(std::abs(response(sections, hz, sampleRate)), 1.0e-9));
+                                 }),
+                      -24.0, 24.0);
 }
 
 double micResponseDb(const std::array<float, micParameterCount>& values, const double hz, const double sampleRate) noexcept

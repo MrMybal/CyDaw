@@ -68,6 +68,9 @@ public:
         bool lfs {};
         // A generated bank's: how the file is made.
         juce::var recipe;
+        // Its SHA-256 (lower-case hex) when the list gives it: a download of
+        // the right size but other bytes (corrupted, tampered) is refused.
+        juce::String sha256;
     };
     struct Wanted {
         juce::String bank;

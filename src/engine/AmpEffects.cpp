@@ -634,7 +634,7 @@ public:
         std::array<float, cabParameterCount> values {};
         for (int index = 0; index < cabParameterCount; ++index)
             values[static_cast<std::size_t>(index)] = value(static_cast<std::size_t>(index));
-        if (values != designed_)
+        if (designKey(values) != designed_)
             design(values);
         const auto& micA = micModel(choice(values[cabMicA], cabMicCount));
         const auto& micB = micModel(choice(values[cabMicB], cabMicCount));
@@ -739,7 +739,17 @@ private:
             channel.cutsRight.set(cuts);
         }
         makeup_ = dbToGain(cabMakeupDb(values, rate_));
-        designed_ = values;
+        designed_ = designKey(values);
+    }
+
+    // The values the sections and the makeup are designed from; the others
+    // (output, mix, room, stereo) are read every block and design nothing.
+    [[nodiscard]] static std::array<float, amp::cabParameterCount> designKey(std::array<float, amp::cabParameterCount> values) noexcept
+    {
+        using namespace amp;
+        for (const auto index : { cabOutput, cabMix, cabRoom, cabRoomSize, cabRoomTone, cabStereo })
+            values[static_cast<std::size_t>(index)] = 0.0f;
+        return values;
     }
 
     struct ChannelState {

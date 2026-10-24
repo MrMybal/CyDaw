@@ -309,7 +309,12 @@ double DeckPlayer::bestGrain(const double natural, const double target) const no
     if (std::abs(natural - target) < 1.0)
         return natural;
     const auto length = std::max(32, static_cast<int>(hop_ * step_));
-    constexpr int decimation = 4;
+    // Spaced by what one output sample spans of the track: the search costs
+    // the same whatever the track's rate (a 192 kHz file is read four times
+    // as densely, its candidates four times as many, each four times longer).
+    const auto spread = std::max(1.0, step_);
+    const auto decimation = std::max(4, static_cast<int>(std::lround(4.0 * spread)));
+    const auto stride = std::max<std::int64_t>(2, std::llround(2.0 * spread));
     const auto reference = static_cast<std::int64_t>(std::llround(natural));
     const auto centre = static_cast<std::int64_t>(std::llround(target));
     const auto score = [&](const std::int64_t candidate) {
@@ -325,14 +330,18 @@ double DeckPlayer::bestGrain(const double natural, const double target) const no
     };
     auto best = centre;
     auto bestScore = score(centre);
-    for (auto candidate = centre - search_; candidate <= centre + search_; candidate += 2) {
+    for (auto candidate = centre - search_; candidate <= centre + search_; candidate += stride) {
         const auto value = score(candidate);
         if (value > bestScore + 1.0e-6f) {
             bestScore = value;
             best = candidate;
         }
     }
-    for (const auto candidate : { best - 1, best + 1 }) {
+    // Then sample by sample between the coarse steps around the best.
+    const auto coarse = best;
+    for (auto candidate = coarse - (stride - 1); candidate <= coarse + (stride - 1); ++candidate) {
+        if (candidate == coarse)
+            continue;
         const auto value = score(candidate);
         if (value > bestScore + 1.0e-6f) {
             bestScore = value;

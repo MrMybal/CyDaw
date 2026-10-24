@@ -582,7 +582,9 @@ private:
     {
         if (current.on) {
             readers_[1] = current;
-            readers_[1].fadingSince = current.age;
+            // Already fading (closing on an edge): it goes on from where it was.
+            if (current.fadingSince < 0.0)
+                readers_[1].fadingSince = current.age;
         }
         current = {};
     }
@@ -629,7 +631,18 @@ private:
         // Behind what was written, within what the buffer still holds.
         const auto newest = static_cast<double>(written_ - 2);
         const auto oldest = std::min(newest, static_cast<double>(written_ - size_ + 8));
-        const auto position = std::clamp(static_cast<double>(region_.capture) + offset, oldest, newest);
+        const auto wanted = static_cast<double>(region_.capture) + offset;
+        // A fast repeat closing on what is being written (or a backwards one
+        // on what the buffer lets go) fades out before it gets there: held on
+        // one sample at the edge, it would click.
+        if (reader.fadingSince < 0.0) {
+            const auto writing = !(region_.on && written_ - region_.capture >= holdAfter_);
+            const auto room = reader.reversed ? wanted - oldest : newest - wanted;
+            const auto closing = reader.reversed ? reader.speed + (writing ? 1.0 : 0.0) : reader.speed - (writing ? 1.0 : 0.0);
+            if (closing > 0.0 && room < closing * fade_ + 2.0)
+                reader.fadingSince = reader.age;
+        }
+        const auto position = std::clamp(wanted, oldest, newest);
         const auto whole = std::floor(position);
         const auto t = position - whole;
         const auto index = static_cast<std::int64_t>(whole);

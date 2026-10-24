@@ -40,8 +40,18 @@ import venv
 from pathlib import Path
 
 CUDA_INDEXES = ("cu130", "cu128", "cu126", "cu124")
+# The versions it was tried with, and how far from them it may go: no new
+# major release (other licences than components.json lists, other behaviour)
+# comes in unseen. PyTorch's builds differ by platform and CUDA index, so its
+# own range is a bound, not one version (torchaudio follows the PyTorch
+# installed, at its exact version).
+PIP_PACKAGE = "pip>=23,<27"
+NUMPY_PACKAGE = "numpy>=1.26,<3"
+TORCH_PACKAGE = "torch>=2.4,<3"
 # What the semantic search was tried with (CLAP through transformers).
 CLAP_PACKAGES = ("transformers==4.57.6",)
+# CREPE, the version tried (its model is inside).
+CREPE_PACKAGES = ("torchcrepe==0.0.24",)
 # Written in an environment CyDAW made: the companion, run from it, keeps its
 # caches and temporary files in it.
 MARKER = "cydaw-environment.json"
@@ -178,11 +188,11 @@ def _setup(folder: Path, torch: str, clap: bool, crepe: bool) -> int:
         emit(error=f"no Python in the new environment ({python})")
         return 1
     (folder / MARKER).write_text(json.dumps({"format": "cydaw-companion-environment", "version": 1}), encoding="utf-8")
-    if run([str(python), *PIP, "install", "--upgrade", "pip", "numpy"], 0.2, "numpy") != 0:
+    if run([str(python), *PIP, "install", "--upgrade", PIP_PACKAGE, NUMPY_PACKAGE], 0.2, "numpy") != 0:
         emit(error="pip could not install numpy")
         return 1
     if torch == "cpu":
-        if run([str(python), *PIP, "install", "torch", "--index-url", "https://download.pytorch.org/whl/cpu"],
+        if run([str(python), *PIP, "install", TORCH_PACKAGE, "--index-url", "https://download.pytorch.org/whl/cpu"],
                0.5, "PyTorch (CPU)") != 0:
             emit(error="pip could not install PyTorch (CPU)")
             return 1
@@ -193,7 +203,7 @@ def _setup(folder: Path, torch: str, clap: bool, crepe: bool) -> int:
         version = installed_torch(python)
         replacing = version is not None and "+cu" not in version
         for index in CUDA_INDEXES:
-            command = [str(python), *PIP, "install", "--upgrade", "torch", "--index-url",
+            command = [str(python), *PIP, "install", "--upgrade", TORCH_PACKAGE, "--index-url",
                        f"https://download.pytorch.org/whl/{index}"]
             if replacing:
                 command.insert(command.index("--upgrade") + 1, "--force-reinstall")
@@ -219,7 +229,7 @@ def _setup(folder: Path, torch: str, clap: bool, crepe: bool) -> int:
                 f"https://download.pytorch.org/whl/{index}"], 0.88, f"torchaudio ({index})") != 0:
             emit(error="pip could not install torchaudio for this PyTorch")
             return 1
-        if run([str(python), *PIP, "install", "torchcrepe", f"torch=={version}"], 0.92, "torchcrepe (CREPE)") != 0:
+        if run([str(python), *PIP, "install", *CREPE_PACKAGES, f"torch=={version}"], 0.92, "torchcrepe (CREPE)") != 0:
             emit(error="pip could not install torchcrepe")
             return 1
     emit(progress=0.95, message="check")

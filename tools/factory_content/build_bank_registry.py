@@ -19,6 +19,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from fetch_banks import BANKS, MAIN, default_destination  # noqa: E402
+from hash_bank_lists import sha256_of  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 LICENCE_URLS = {
@@ -125,9 +126,9 @@ def main() -> int:
                 continue
             size = path.stat().st_size
             # Git LFS: the tree gives the pointer's size, the disk the file's.
-            entry = [item["path"], size]
-            if size != item["size"]:
-                entry.append(1)
+            # [path, size, lfs, recipe (none here), sha256]: CyDAW checks what
+            # it downloads against the hash.
+            entry = [item["path"], size, 1 if size != item["size"] else 0, None, sha256_of(path)]
             files.append(entry)
         branch = record.get("branch") or MAIN.get(bank_id, "master")
         title, author, french, english = INFO.get(bank_id, (bank_id, "", "", ""))
@@ -152,7 +153,7 @@ def main() -> int:
             "bytes": sum(entry[1] for entry in files),
         })
         print(json.dumps({"bank": bank_id, "files": len(files), "megabytes": round(registry[-1]["bytes"] / 1e6, 1),
-                          "lfs": sum(1 for entry in files if len(entry) > 2)}), flush=True)
+                          "lfs": sum(1 for entry in files if entry[2])}), flush=True)
     # The banks CyDAW makes itself (build_electro_banks.py) are kept as they are.
     previous = args.out / "banks.json"
     if previous.exists():
