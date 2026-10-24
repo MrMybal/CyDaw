@@ -22,8 +22,11 @@ juce::String cppString(juce::String value)
 
 juce::String cmakeString(juce::String value)
 {
-    value = value.replace("\\", "/").replace("\"", "\\\"");
-    value = value.replace(";", "\\;").replaceCharacters("\r\n", "  ");
+    // In a quoted argument "\$" is a dollar sign (a bare one could expand a
+    // variable), and a semicolon has no escape that stays one character: it
+    // would make the name a list wherever it is used, so it becomes a comma.
+    value = value.replace("\\", "/").replace("\"", "\\\"").replace("$", "\\$");
+    value = value.replace(";", ",").replaceCharacters("\r\n", "  ");
     return "\"" + value + "\"";
 }
 
@@ -391,6 +394,9 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
                                          "thresholdDb",
                                          "ratio",
                                          "tone",
+                                         "bandFrequencyHz",
+                                         "bandGainDb",
+                                         "bandQ",
                                          "wavetablePosition",
                                          "wavetableDetuneCents",
                                          "stringDamping",

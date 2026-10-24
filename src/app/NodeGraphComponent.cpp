@@ -268,8 +268,22 @@ void writeCardAssets(juce::DynamicObject& value,
                      const juce::var& soundModelJson,
                      const juce::var& samplerJson,
                      const juce::var& prismTablesJson,
-                     const juce::var& impulseJson)
+                     const juce::var& impulseJson,
+                     const bool bypassed,
+                     const juce::var& instrumentJson,
+                     const juce::StringArray& branchNames)
 {
+    // Written as a top-level card writes them.
+    if (bypassed)
+        value.setProperty(jsonKeys::bypassed, true);
+    if (instrumentJson.isObject())
+        value.setProperty("instrument", instrumentJson);
+    if (std::any_of(branchNames.begin(), branchNames.end(), [](const auto& name) { return name.isNotEmpty(); })) {
+        juce::Array<juce::var> names;
+        for (const auto& name : branchNames)
+            names.add(name);
+        value.setProperty("branchNames", names);
+    }
     if (samplerJson.isObject())
         value.setProperty(jsonKeys::sampler, samplerJson);
     if (prismTablesJson.isObject())
@@ -331,6 +345,12 @@ void readCardAssets(const juce::DynamicObject& object, Card& card)
             card.impulse = std::move(read);
             card.impulseJson = response;
         }
+    card.bypassed = static_cast<bool>(object.getProperty(jsonKeys::bypassed));
+    if (const auto instrument = object.getProperty("instrument"); instrument.isObject())
+        card.instrumentJson = instrument;
+    if (const auto* names = object.getProperty("branchNames").getArray())
+        for (const auto& name : *names)
+            card.branchNames.add(name.toString().substring(0, 64));
 }
 
 } // namespace
@@ -5092,7 +5112,7 @@ juce::var NodeGraphComponent::serialise() const
                                     child.interfaceLayoutOverridden);
             childValue->setProperty(jsonKeys::collapsed, child.collapsed);
             writeCardAssets(*childValue, child.wavetableShape, child.soundModelJson, child.samplerJson, child.prismTablesJson,
-                            child.impulseJson);
+                            child.impulseJson, child.bypassed, child.instrumentJson, child.branchNames);
             children.add(juce::var(childValue.get()));
         }
         moduleValue->setProperty(jsonKeys::nodes, children);
@@ -5656,7 +5676,9 @@ cydaw::engine::NativeDspGraph NodeGraphComponent::buildNativeDspGraph(
                     &addPassthrough, &expandModule](
                        const SavedModule& module,
                        juce::StringArray& expansionStack) -> Expansion {
-        if (expansionStack.contains(module.key))
+        // A cycle, or devices inside devices past what any real graph holds
+        // (a crafted file multiplying them): passed through.
+        if (expansionStack.contains(module.key) || graph.nodes.size() >= 65'536)
             return addPassthrough();
         expansionStack.add(module.key);
 
@@ -5673,6 +5695,11 @@ cydaw::engine::NativeDspGraph NodeGraphComponent::buildNativeDspGraph(
             if (!hasAudioInput && !hasAudioOutput)
                 continue;
             audioChildren.insert(child.id);
+            // Switched off inside the device: its sound goes through as is.
+            if (child.bypassed && hasAudioInput && hasAudioOutput) {
+                expandedChildren.emplace(child.id, addPassthrough());
+                continue;
+            }
             if (const auto* nested = findModule(child.typeKey)) {
                 auto nestedExpansion = expandModule(*nested, expansionStack);
                 const auto prefix = nodeParameterBinding(child.id, {});
@@ -6021,7 +6048,7 @@ juce::Result NodeGraphComponent::compilePolySynthGraph(
     expandModule = [this, &flatNodes, &flatConnections, &generatedId, &connect,
                     &expandModule](const SavedModule& module,
                                    juce::StringArray& stack) -> Expansion {
-        if (stack.contains(module.key))
+        if (stack.contains(module.key) || flatNodes.size() >= 65'536)
             return {};
         stack.add(module.key);
         std::unordered_map<NodeId, Expansion> children;
@@ -7013,12 +7040,19 @@ void NodeGraphComponent::restore(const juce::var& state)
     selectedCommentId_ = 0;
     selectedConnection_ = -1;
     NodeId highestId {};
+    // A corrupt or crafted state: no node without an id, none twice (their
+    // cables would all be refused), none past what a float-exact id holds,
+    // and no more of them than the native graph takes.
+    constexpr NodeId largestNodeId = NodeId { 1 } << 48;
+    std::set<NodeId> restoredIds;
     if (const auto* values = root->getProperty(jsonKeys::nodes).getArray()) {
         for (const auto& value : *values) {
             const auto* object = value.getDynamicObject();
             if (object == nullptr)
                 continue;
             const auto id = static_cast<NodeId>(static_cast<juce::int64>(object->getProperty(jsonKeys::id)));
+            if (id == 0 || id > largestNodeId || nodes_.size() >= 4'096 || !restoredIds.insert(id).second)
+                continue;
             auto typeKey = object->getProperty(jsonKeys::type).toString();
             if (typeKey == "graph-audio-input"
                 || typeKey == "graph-audio-output") {
@@ -7152,11 +7186,14 @@ void NodeGraphComponent::restore(const juce::var& state)
         }
     }
     nextNodeId_ = std::max(highestId + 1,
-                           static_cast<NodeId>(static_cast<juce::int64>(root->getProperty(jsonKeys::nextNodeId))));
+                           std::min(largestNodeId,
+                                    static_cast<NodeId>(static_cast<juce::int64>(root->getProperty(jsonKeys::nextNodeId)))));
     if (nodes_.empty()) {
         initialiseDefaultGraph();
     } else if (const auto* links = root->getProperty(jsonKeys::connections).getArray()) {
         for (const auto& value : *links) {
+            if (connections_.size() >= 16'384)
+                break;
             if (const auto* link = value.getDynamicObject()) {
                 const auto source = static_cast<NodeId>(static_cast<juce::int64>(link->getProperty(jsonKeys::source)));
                 const auto destination = static_cast<NodeId>(static_cast<juce::int64>(link->getProperty(jsonKeys::destination)));
@@ -7174,7 +7211,8 @@ void NodeGraphComponent::restore(const juce::var& state)
                 if (connected && link->hasProperty("mode")) {
                     auto& restoredMode = connections_.back();
                     restoredMode.mode = static_cast<std::uint8_t>(juce::jlimit(0, 1, static_cast<int>(link->getProperty("mode"))));
-                    restoredMode.amount = static_cast<float>(static_cast<double>(link->getProperty("amount")));
+                    if (const auto amount = static_cast<double>(link->getProperty("amount")); std::isfinite(amount))
+                        restoredMode.amount = static_cast<float>(amount);
                 }
                 if (connected && schemaVersion >= 24) {
                     auto& restoredConnection = connections_.back();
@@ -7520,16 +7558,48 @@ bool NodeGraphComponent::modulateParameter(const NodeId sourceNodeId,
         if (bindingMatchesType(rangeNode->typeKey, parameter.key))
             parameter.value = nativeParameterValue(rangeNode->parameters,
                                                    parameter.key);
+    // Refused (the knob already cabled, a loop): the range goes again, with
+    // what it was wired to, rather than stay in the graph unconnected.
+    const auto dropRange = [this, rangeId] {
+        std::erase_if(connections_, [rangeId](const Connection& connection) {
+            return connection.source == rangeId || connection.destination == rangeId;
+        });
+        std::erase_if(nodes_, [rangeId](const Node& node) { return node.id == rangeId; });
+        selectedNodes_.erase(rangeId);
+        selectedConnection_ = -1;
+    };
     if (!connectNodes(sourceNodeId, rangeId, sourcePort, 0)) {
+        dropRange();
         modulateFailure_ = "source -> range refused";
         return false;
     }
     if (!connectNodes(rangeId, targetNodeId, 0, portId)) {
+        dropRange();
         modulateFailure_ = "range -> target refused";
         return false;
     }
     synchroniseGraphInterface();
     rebuildEmbeddedSliders();
+    return true;
+}
+
+bool NodeGraphComponent::modulateWithNewSource(const juce::String& sourceTypeKey, const juce::String& targetTypeKey,
+                                               const juce::String& parameterSuffix)
+{
+    const auto target = nodeIdForType(targetTypeKey);
+    const auto* type = findType(sourceTypeKey);
+    if (editingLocked_ || target == 0 || type == nullptr)
+        return false;
+    const auto before = nodes_.size();
+    addNodeFromType(*type);
+    if (nodes_.size() <= before)
+        return false;
+    const auto source = nodes_.back().id;
+    if (!modulateParameter(source, 0, target, nodeParameterBinding(target, parameterSuffix))) {
+        (void) removeNodeById(source);
+        return false;
+    }
+    notifyLayoutChanged("modulate");
     return true;
 }
 
@@ -8204,6 +8274,16 @@ juce::Result NodeGraphComponent::replaceInstrument(const juce::String& presetKey
             newTypeByRole[static_cast<std::size_t>(role)] = added.typeKey;
         }
     }
+    // The new voice first in the graph's order, as a preset's is: the
+    // compilers and the boundary take the first node of each kind, which
+    // would otherwise be a Gain, Low-pass or Envelope card of the chain
+    // (appended last, the voice would come after them).
+    {
+        std::set<NodeId> voice(ids.begin(), ids.end());
+        voice.erase(midiInput);
+        voice.erase(master);
+        std::stable_partition(nodes_.begin(), nodes_.end(), [&voice](const Node& node) { return voice.contains(node.id); });
+    }
     // A cable made again as it was (its mode and amount).
     const auto reconnect = [this](const Connection& old, const NodeId source, const NodeId destination,
                                   const cydaw::graph::PortId sourcePort, const cydaw::graph::PortId destinationPort) {
@@ -8377,15 +8457,20 @@ juce::Result NodeGraphComponent::insertFactoryDevice(
                      (source->position.y + destination->position.y) * 0.5f)
     };
 
+    const auto before = nodes_.size();
     addNodeFromType(*type, position);
+    if (nodes_.size() <= before)
+        return juce::Result::fail("The Graph is locked");
     const auto insertedId = nodes_.back().id;
+    // That cable only (a parallel one between the same cards stays), its
+    // ends kept on the ports they were on.
     std::erase_if(connections_, [&splice](const auto& connection) {
-        return connection.source == splice.source
-               && connection.destination == splice.destination
-               && connection.kind == splice.kind;
+        return connection.source == splice.source && connection.destination == splice.destination
+               && connection.kind == splice.kind && connection.sourcePort == splice.sourcePort
+               && connection.destinationPort == splice.destinationPort;
     });
-    if (!connectNodes(splice.source, insertedId)
-        || !connectNodes(insertedId, splice.destination)) {
+    if (!connectNodes(splice.source, insertedId, splice.sourcePort, {})
+        || !connectNodes(insertedId, splice.destination, {}, splice.destinationPort)) {
         std::erase_if(connections_, [insertedId](const auto& connection) {
             return connection.source == insertedId
                    || connection.destination == insertedId;
@@ -9081,8 +9166,11 @@ juce::Result NodeGraphComponent::loadNodeParameterPresetForNode(
     if (!compatible)
         return juce::Result::fail(tr("nodes.error.incompatibleNodePreset"));
 
+    // Over the defaults, not over the card as it is: a preset keeps only the
+    // settings of a Prisme, a Kick, a model or a sampler that differ from
+    // the defaults, and the card's own edits would otherwise stay under it.
     node->parameters = restoreNativeParameters(preset->parameters,
-                                                node->parameters);
+                                                cydaw::engine::NativeDspNodeParameters {});
     restorePortDefaults(preset->portDefaults, node->ports);
     if (findModule(node->typeKey) == nullptr)
         applyParameterPortDefaults(node->typeKey, node->parameters,
@@ -13803,6 +13891,9 @@ void NodeGraphComponent::loadSelectedFactoryPreset()
 
 juce::Result NodeGraphComponent::applyFactoryPreset(const FactoryPreset& preset)
 {
+    // Locked, nothing is replaced (the cards could not be added again).
+    if (editingLocked_)
+        return juce::Result::fail("The Graph is locked");
     std::vector<const NodeType*> types;
     types.reserve(preset.nodes.size());
     for (const auto& presetNode : preset.nodes) {
@@ -13821,6 +13912,11 @@ juce::Result NodeGraphComponent::applyFactoryPreset(const FactoryPreset& preset)
     currentGraphPresetFile_ = juce::File {};
     connections_.clear();
     selectedNodes_.clear();
+    // The old graph's programs and notes go with it: their values name its
+    // cards by ids the new cards take again from 1.
+    programs_.clear();
+    comments_.clear();
+    selectedCommentId_ = 0;
     graphRole_ = cydaw::graph::GraphRole::generic;
     nextNodeId_ = 1;
     std::vector<NodeId> ids;
@@ -14622,6 +14718,7 @@ void NodeGraphComponent::duplicateSelectedNodes()
             point = graphPosition(point + juce::Point<float> { 0.05f, 0.08f });
         connections_.push_back(std::move(connection));
     }
+    remapModulatorOwners(remappedIds);
     synchroniseGraphInterface();
     rebuildEmbeddedSliders();
     setStatus(tr("nodes.status.duplicated"));
@@ -14697,6 +14794,7 @@ void NodeGraphComponent::pasteCopiedNodes(
         selectedNodes_.insert(copy.id);
         nodes_.push_back(std::move(copy));
     }
+    remapModulatorOwners(remappedIds);
     for (auto connection : copiedConnections_) {
         const auto source = remappedIds.find(connection.source);
         const auto destination = remappedIds.find(connection.destination);
@@ -14893,6 +14991,9 @@ void NodeGraphComponent::createModuleFromSelection()
             child.prismTablesJson = node->prismTablesJson;
             child.impulse = node->impulse;
             child.impulseJson = node->impulseJson;
+            child.bypassed = node->bypassed;
+            child.instrumentJson = node->instrumentJson;
+            child.branchNames = node->branchNames;
             module.nodes.push_back(std::move(child));
         }
     for (const auto& connection : connections_)
@@ -17444,7 +17545,30 @@ NodeGraphComponent::graphDefinitions() const
     };
 
     const auto definitionsMark = juce::Time::getHighResolutionTicks();
-    for (const auto& module : savedModules_) {
+    // Each class after the ones it holds: its definition reads theirs (their
+    // ports, their published knobs), which must be built first, whatever
+    // order the library lists them in (a class made inside another comes
+    // after it there).
+    std::vector<const SavedModule*> ordered;
+    {
+        ordered.reserve(savedModules_.size());
+        std::set<juce::String> placed;
+        std::set<juce::String> visiting;
+        std::function<void(const SavedModule&)> place = [&](const SavedModule& module) {
+            if (placed.contains(module.key) || !visiting.insert(module.key).second)
+                return;
+            for (const auto& child : module.nodes)
+                if (const auto* inner = findModule(child.typeKey))
+                    place(*inner);
+            visiting.erase(module.key);
+            placed.insert(module.key);
+            ordered.push_back(&module);
+        };
+        for (const auto& module : savedModules_)
+            place(module);
+    }
+    for (const auto* orderedModule : ordered) {
+        const auto& module = *orderedModule;
         if (module.factoryModule && module.definitionCache.has_value()) {
             ++definitionsCacheHits_;
             definitions.push_back(*module.definitionCache);
@@ -17955,6 +18079,31 @@ std::uint64_t NodeGraphComponent::editorModulatorOwner(const std::uint64_t modul
                                node->parameters.eqBands[modulators::ownerHighSlot]);
 }
 
+void NodeGraphComponent::remapModulatorOwners(const std::unordered_map<NodeId, NodeId>& remapped)
+{
+    namespace modulators = cydaw::engine::modulator;
+    for (const auto& [previous, copied] : remapped) {
+        juce::ignoreUnused(previous);
+        const auto owner = editorModulatorOwner(copied);
+        if (owner == 0)
+            continue;
+        const auto moved = remapped.find(owner);
+        if (moved == remapped.end())
+            continue;
+        auto* node = findNode(copied);
+        if (node == nullptr)
+            continue;
+        node->parameters.eqBands[modulators::ownerLowSlot] = modulators::ownerLowOf(moved->second);
+        node->parameters.eqBands[modulators::ownerHighSlot] = modulators::ownerHighOf(moved->second);
+        for (auto& parameter : node->interfaceState.parameters)
+            if (parameter.key.endsWith(".ownerLow"))
+                parameter.value = parameter.defaultValue = modulators::ownerLowOf(moved->second);
+            else if (parameter.key.endsWith(".ownerHigh"))
+                parameter.value = parameter.defaultValue = modulators::ownerHighOf(moved->second);
+        node->serialised = juce::var();
+    }
+}
+
 std::uint64_t NodeGraphComponent::editorAddModulator(const std::uint64_t owner, const juce::String& typeKey)
 {
     const auto* effect = cydaw::engine::effectForType(typeKey.toStdString());
@@ -17967,7 +18116,13 @@ std::uint64_t NodeGraphComponent::editorAddModulator(const std::uint64_t owner, 
         if (editorModulatorOwner(node.id) == owner)
             ++count;
     const auto position = card->position + juce::Point<float>(0.0f, 0.14f + 0.07f * static_cast<float>(count));
-    const auto id = editorAddNode(typeKey, position);
+    // Added without a history step of its own: with its card set below, one
+    // step (undone, no modulator without a card is left).
+    std::uint64_t id {};
+    {
+        const juce::ScopedValueSetter<bool> quiet(restoringHistory_, true);
+        id = editorAddNode(typeKey, position);
+    }
     auto* made = findNode(id);
     if (made == nullptr)
         return 0;
@@ -18744,7 +18899,7 @@ juce::var NodeGraphComponent::moduleGraphState(const SavedModule& module) const
                            child.interfaceLayoutOverridden);
         value->setProperty(jsonKeys::collapsed, child.collapsed);
         writeCardAssets(*value, child.wavetableShape, child.soundModelJson, child.samplerJson, child.prismTablesJson,
-                        child.impulseJson);
+                        child.impulseJson, child.bypassed, child.instrumentJson, child.branchNames);
         nodeValues.add(juce::var(value.get()));
         highestId = std::max(highestId, child.id);
     }
@@ -18797,6 +18952,12 @@ juce::var NodeGraphComponent::moduleGraphState(const SavedModule& module) const
     root->setProperty(jsonKeys::viewZoom, 1.0);
     root->setProperty(jsonKeys::viewOffsetX, 0.0);
     root->setProperty(jsonKeys::viewOffsetY, 0.0);
+    // Not the parent graph's: its notes and where its view was would show
+    // inside the device (and be saved with it to the library).
+    root->setProperty(jsonKeys::comments, juce::Array<juce::var> {});
+    for (const auto& key : { jsonKeys::viewCentreX, jsonKeys::viewCentreY, jsonKeys::viewAnchorNode, jsonKeys::viewAnchorDX,
+                             jsonKeys::viewAnchorDY })
+        root->removeProperty(key);
     return state;
 }
 
@@ -18815,12 +18976,35 @@ void NodeGraphComponent::applyModuleGraphState(const juce::String& moduleKey,
     // definitions first so a newly composed module can immediately be used by
     // nodes in the graph currently being edited.
     if (const auto* moduleValues = root->getProperty(jsonKeys::modules).getArray()) {
+        // Only the classes this device uses (within it, and within those, as
+        // deep as they go), and those it brought: the state carries every
+        // class of the library as it was when this device was opened, and
+        // another device's class, edited meanwhile elsewhere (another
+        // workshop tab), would be put back as it was.
+        std::map<juce::String, const juce::DynamicObject*> incoming;
+        for (const auto& moduleValue : *moduleValues)
+            if (const auto* object = moduleValue.getDynamicObject())
+                if (const auto key = object->getProperty(jsonKeys::key).toString(); key.isNotEmpty())
+                    incoming[key] = object;
+        std::set<juce::String> used;
+        std::vector<const juce::var*> pendingNodes { &root->getProperty(jsonKeys::nodes) };
+        while (!pendingNodes.empty()) {
+            const auto* nodesValue = pendingNodes.back();
+            pendingNodes.pop_back();
+            if (const auto* list = nodesValue->getArray())
+                for (const auto& child : *list)
+                    if (const auto type = child.getProperty(jsonKeys::type, {}).toString();
+                        incoming.contains(type) && used.insert(type).second)
+                        pendingNodes.push_back(&incoming[type]->getProperty(jsonKeys::nodes));
+        }
         for (const auto& moduleValue : *moduleValues) {
             const auto* object = moduleValue.getDynamicObject();
             const auto key = object != nullptr
                                  ? object->getProperty(jsonKeys::key).toString()
                                  : juce::String {};
             if (object == nullptr || key.isEmpty() || key == moduleKey)
+                continue;
+            if (findModule(key) != nullptr && !used.contains(key))
                 continue;
             SavedModule parsed;
             parsed.key = key;
@@ -20946,6 +21130,7 @@ void NodeGraphComponent::commitEditHistory(const bool parameterChange)
         && now - lastParameterHistoryTimeMs_ < 650;
     if (!coalesceParameterChange) {
         undoHistory_.push_back(editHistoryBaseline());
+        ++historySteps_;
         if (undoHistory_.size() > maxEditHistoryStates)
             undoHistory_.erase(undoHistory_.begin());
     }
@@ -25507,12 +25692,15 @@ cydaw::engine::GraphResult NodeGraphComponent::validateConnection(
         }
         return std::uint32_t {};
     };
+    // The cables already there, all at once: compiled once, not once each.
+    std::vector<cydaw::engine::Connection> existing;
+    existing.reserve(connections_.size());
     for (const auto& connection : connections_) {
         const auto* existingSource = findNode(connection.source);
         const auto* existingDestination = findNode(connection.destination);
         if (existingSource == nullptr || existingDestination == nullptr)
             continue;
-        const auto existing = graph.connect({
+        existing.push_back({
             { connection.source,
               portIndex(*existingSource, connection.sourcePort, false,
                         connection.kind), connection.kind },
@@ -25520,9 +25708,9 @@ cydaw::engine::GraphResult NodeGraphComponent::validateConnection(
               portIndex(*existingDestination, connection.destinationPort,
                         true, connection.kind), connection.kind }
         });
-        if (!existing)
-            return existing;
     }
+    if (const auto added = graph.connectAll(existing); !added)
+        return added;
     return graph.connect({
         { source, portIndex(*sourceNode, sourcePort, false, sourceKind),
           sourceKind },
@@ -26018,22 +26206,34 @@ bool NodeGraphComponent::editorRemoveFromChain(const std::uint64_t id)
     if (editorIsContainer(id))
         return editorRemoveContainer(id);
     // The signal around it: audio and MIDI, not the control cables that
-    // only steered it.
+    // only steered it, nor what fed its sidechain (another track's: joined
+    // to the chain, it would play there instead of the track's own sound).
+    std::set<cydaw::graph::PortId> sidechains;
+    for (const auto& port : node->ports)
+        if (port.input && port.key == "sidechain-in")
+            sidechains.insert(port.id);
     std::vector<Connection> into;
     std::vector<Connection> out;
     for (const auto& connection : connections_) {
         if (connection.kind != PortKind::audio && connection.kind != PortKind::midi)
             continue;
-        if (connection.destination == id && connection.source != id)
+        if (connection.destination == id && connection.source != id && !sidechains.contains(connection.destinationPort))
             into.push_back(connection);
         if (connection.source == id && connection.destination != id)
             out.push_back(connection);
     }
-    std::erase_if(connections_, [id](const Connection& connection) {
-        return connection.source == id || connection.destination == id;
+    // Its modulators go with it (as with a container or a branch): left,
+    // they would be invisible, owned by no card.
+    std::set<NodeId> going { id };
+    for (const auto& candidate : nodes_)
+        if (const auto owner = editorModulatorOwner(candidate.id); owner == id)
+            going.insert(candidate.id);
+    std::erase_if(connections_, [&going](const Connection& connection) {
+        return going.contains(connection.source) || going.contains(connection.destination);
     });
-    std::erase_if(nodes_, [id](const Node& item) { return item.id == id; });
-    selectedNodes_.erase(id);
+    std::erase_if(nodes_, [&going](const Node& item) { return going.contains(item.id); });
+    for (const auto gone : going)
+        selectedNodes_.erase(gone);
     selectedConnection_ = -1;
     selectedPortId_ = 0;
     for (const auto& source : into)
@@ -26052,6 +26252,10 @@ bool NodeGraphComponent::editorRemoveFromChain(const std::uint64_t id)
 
 bool NodeGraphComponent::editorMoveInChain(const std::uint64_t id, const std::uint64_t before)
 {
+    // A container moves with all it holds (its head's way out is its dry
+    // path, inside it): as the device panel's other drops move it.
+    if (editorIsContainer(id))
+        return editorMoveCard(id, 0, -1, before);
     auto* node = findNode(id);
     if (editingLocked_ || node == nullptr || isBoundaryNode(*node) || id == before
         || instrumentVoiceBoundary().voiceNodes.contains(id))

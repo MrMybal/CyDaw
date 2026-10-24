@@ -179,6 +179,9 @@ public:
         std::shared_ptr<const std::vector<PluginParameterAutomationLane>> automation);
     void setDrive(float driveDb) noexcept;
     void setFilterCutoff(float cutoffHz) noexcept;
+    // Every card of a kind changed in the playing graph (control threads).
+    void updateGraphNodes(cydaw::engine::NativeDspNodeKind kind,
+                          const std::function<void(cydaw::engine::NativeDspNodeParameters&)>& change) noexcept;
     [[nodiscard]] juce::Result setNativeDspGraph(
         const cydaw::engine::NativeDspGraph& graph);
     [[nodiscard]] juce::Result updateNativeDspParameters(

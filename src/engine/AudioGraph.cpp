@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <functional>
 #include <queue>
+#include <tuple>
 #include <unordered_set>
 
 namespace cydaw::engine {
@@ -86,6 +87,38 @@ GraphResult AudioGraph::connect(Connection connection)
         return { result.error, result.message };
     }
 
+    ++generation_;
+    return {};
+}
+
+GraphResult AudioGraph::connectAll(const std::vector<Connection>& connections)
+{
+    const auto before = connections_.size();
+    const auto undo = [this, before](const GraphResult& result) {
+        connections_.resize(before);
+        return result;
+    };
+    for (const auto& connection : connections) {
+        if (const auto result = validatePort(connection.source, true); !result)
+            return undo(result);
+        if (const auto result = validatePort(connection.destination, false); !result)
+            return undo(result);
+        if (connection.source.kind != connection.destination.kind)
+            return undo(failure(GraphError::incompatiblePortKinds, "Port kinds must match"));
+        connections_.push_back(connection);
+    }
+    // Duplicates, found once all are in (sorted copies, not each against all).
+    auto sorted = std::vector<Connection>(connections_.begin(), connections_.end());
+    const auto key = [](const Connection& value) {
+        return std::tuple(value.source.nodeId, value.source.portIndex, static_cast<int>(value.source.kind),
+                          value.destination.nodeId, value.destination.portIndex, static_cast<int>(value.destination.kind));
+    };
+    std::sort(sorted.begin(), sorted.end(), [&key](const Connection& a, const Connection& b) { return key(a) < key(b); });
+    if (std::adjacent_find(sorted.begin(), sorted.end(), [&key](const Connection& a, const Connection& b) { return key(a) == key(b); })
+        != sorted.end())
+        return undo(failure(GraphError::duplicateConnection, "This connection already exists"));
+    if (const auto result = compile(); !result)
+        return undo({ result.error, result.message });
     ++generation_;
     return {};
 }

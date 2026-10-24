@@ -708,11 +708,30 @@ std::map<std::uint64_t, cydaw::engine::ImpulseResponseRef> impulsesFromGraphStat
 void attachImpulses(cydaw::engine::NativeDspGraph& graph, const juce::var& editorState)
 {
     const auto responses = impulsesFromGraphState(editorState);
-    if (responses.empty())
-        return;
     for (auto& node : graph.nodes)
         if (const auto found = responses.find(node.id); found != responses.end())
             node.impulse = found->second;
+    // A wavetable card's table is no number either: it comes back the same
+    // way (its harmonics in the graph), or the card plays the built-in one.
+    using Shape = cydaw::engine::WavetableShape;
+    std::map<std::uint64_t, cydaw::engine::WavetableBankRef> tables;
+    if (const auto* nodes = editorState.getProperty("nodes", {}).getArray())
+        for (const auto& value : *nodes)
+            if (const auto* harmonics = value.getProperty("wavetable", {}).getArray();
+                harmonics != nullptr && harmonics->size() == static_cast<int>(Shape::frameCount * Shape::harmonicCount)) {
+                Shape shape;
+                auto index = 0;
+                for (auto& frame : shape.harmonics)
+                    for (auto& amplitude : frame) {
+                        const auto read = static_cast<double>((*harmonics)[index++]);
+                        amplitude = std::isfinite(read) ? static_cast<float>(read) : 0.0f;
+                    }
+                tables[static_cast<std::uint64_t>(static_cast<juce::int64>(value.getProperty("id", 0)))]
+                    = cydaw::engine::buildWavetableBank(shape);
+            }
+    for (auto& node : graph.nodes)
+        if (const auto found = tables.find(node.id); found != tables.end() && node.wavetable == nullptr)
+            node.wavetable = found->second;
 }
 
 juce::String describeSoundModel(const cydaw::engine::SoundModel& model)

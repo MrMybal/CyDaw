@@ -393,6 +393,14 @@ private:
                               const bool preserveNodeId)
     {
         Expansion expansion;
+        // Devices inside devices multiply: past this many nodes (no real
+        // graph comes near) a crafted file would ask for billions.
+        if (native.nodes.size() >= 65'536) {
+            if (std::ranges::none_of(validation.issues, [](const auto& issue) { return issue.code == graph::ValidationCode::invalidRange
+                                                                                         && issue.message == "The graph expands to too many nodes"; }))
+                addIssue(validation, graph::ValidationCode::invalidRange, "The graph expands to too many nodes", node.id);
+            return expansion;
+        }
         const auto primitiveValidation = primitives.validateNode(node);
         validation.issues.insert(validation.issues.end(),
                                  primitiveValidation.issues.begin(),
@@ -492,6 +500,23 @@ private:
             return expansion;
         }
         expansion = expand(*nested, false);
+        // A wire straight across the nested Graph (its audio input to its
+        // output: an empty device, a thru with a meter tapping it): a
+        // passthrough node stands for it, for the parent's cables to reach.
+        // Without it the instance had no way through and all after it fell
+        // silent.
+        for (const auto& [in, out] : expansion.boundaryPassthroughs) {
+            const auto port = std::ranges::find(nested->ports, in, &graph::GraphPort::id);
+            if (port == nested->ports.end() || port->type != graph::PortType::audio)
+                continue;
+            NativeDspNode through;
+            through.id = nextNativeNodeId++;
+            through.kind = NativeDspNodeKind::passthrough;
+            native.nodes.push_back(through);
+            expansion.inputs[in].push_back({ through.id, 1 });
+            expansion.outputs[out].push_back({ through.id, 2 });
+        }
+        expansion.boundaryPassthroughs.clear();
         // A reusable Graph is a class, but every instance owns the fallback
         // value of its exposed Value/Trigger inputs. Apply these defaults to
         // the flattened native destinations before parent cables are added;
@@ -525,6 +550,17 @@ private:
             auto& inputs = expansion.controlInputs[port.id];
             inputs.clear();
             for (const auto& target : targets->second) {
+                // Only what the runtime can drive: a knob it cannot reach (a
+                // compressor's attack, an LFO's rate) is left as set, rather
+                // than the whole graph refused for one cable.
+                using Kind = NativeDspNodeKind;
+                const auto made = std::ranges::find(native.nodes, target.nativeNodeId, &NativeDspNode::id);
+                if (made == native.nodes.end()
+                    || (made->kind >= Kind::controlConstant && made->kind <= Kind::controlNot)
+                    || (made->kind >= Kind::controlModulo && made->kind <= Kind::controlRound) || isModulatorKind(made->kind)
+                    || (nativeDspParameterField(made->kind, target.parameterKey) == nullptr
+                        && nativeDspParameterSlot(made->kind, target.parameterKey) < 0))
+                    continue;
                 const auto range = parameterRange(target.processorKey, target.parameterKey);
                 inputs.push_back({ target.nativeNodeId, port.id, target.parameterKey, range.first, range.second });
             }

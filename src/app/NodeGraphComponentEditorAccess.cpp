@@ -472,7 +472,13 @@ std::uint64_t NodeGraphComponent::editorConnectThroughConverter(const std::uint6
         return 0;
     // Between the two cards, a little below the cable.
     const juce::Point<float> middle((a->position.x + b->position.x) * 0.5f, (a->position.y + b->position.y) * 0.5f + 0.08f);
-    const auto converter = addNodeForRemote(key, clampedPosition(middle));
+    // One undo step for the converter and its two cables (none when they
+    // cannot be made): the card is added without a step of its own.
+    std::uint64_t converter {};
+    {
+        const juce::ScopedValueSetter<bool> quiet(restoringHistory_, true);
+        converter = addNodeForRemote(key, clampedPosition(middle));
+    }
     if (converter == 0)
         return 0;
     const auto id = static_cast<NodeId>(converter);
@@ -486,7 +492,10 @@ std::uint64_t NodeGraphComponent::editorConnectThroughConverter(const std::uint6
         notifyLayoutChanged("v2-connect-converter");
         return converter;
     }
-    (void) editorRemoveNodes({ converter });
+    {
+        const juce::ScopedValueSetter<bool> quiet(restoringHistory_, true);
+        (void) editorRemoveNodes({ converter });
+    }
     return 0;
 }
 
@@ -768,6 +777,9 @@ std::uint64_t NodeGraphComponent::editorCreateModuleFromSelection(const std::vec
         child.prismTablesJson = node->prismTablesJson;
         child.impulse = node->impulse;
         child.impulseJson = node->impulseJson;
+        child.bypassed = node->bypassed;
+        child.instrumentJson = node->instrumentJson;
+        child.branchNames = node->branchNames;
         module.nodes.push_back(std::move(child));
         least = { std::min(least.x, node->position.x), std::min(least.y, node->position.y) };
         most = { std::max(most.x, node->position.x), std::max(most.y, node->position.y) };
@@ -1291,7 +1303,9 @@ std::optional<NodeGraphComponent::EditorContainer> NodeGraphComponent::editorCon
         std::set<NodeId> seen;
         while (at != 0 && at != stop && seen.insert(at).second) {
             const auto* card = readNode(at);
-            if (card == nullptr)
+            // A branch wired past its end stops at the graph's own output
+            // (never one of its cards: removing the branch would take it).
+            if (card == nullptr || isBoundaryNode(*card))
                 break;
             cards.push_back(at);
             // A container inside: on from its (last) end.
@@ -1642,6 +1656,10 @@ bool NodeGraphComponent::editorRemoveBranch(const std::uint64_t head, const int 
         }
     }
     const auto branchEnd = container->blend != 0 ? container->blend : container->end;
+    // The head's settings as they are, read before the cards go: erasing
+    // them moves the head in the list, and `node` would point elsewhere.
+    const auto headParameters = node->parameters;
+    node = nullptr;
     // Their modulators with them.
     for (const auto& candidate : nodes_)
         if (const auto owner = editorModulatorOwner(candidate.id); owner != 0 && going.contains(owner))
@@ -1671,7 +1689,7 @@ bool NodeGraphComponent::editorRemoveBranch(const std::uint64_t head, const int 
             if (to == nullptr)
                 continue;
             const auto* from = index + 1 < count ? settingOf(word, index + 1) : nullptr;
-            const auto value = from != nullptr ? cydaw::engine::effectValue(node->parameters, *from) : to->defaultValue;
+            const auto value = from != nullptr ? cydaw::engine::effectValue(headParameters, *from) : to->defaultValue;
             (void) setGraphInterfaceParameter(prefix + juce::String(std::string(to->suffix)), value);
         }
     // Its name goes, the next ones' move down.
@@ -1680,7 +1698,7 @@ bool NodeGraphComponent::editorRemoveBranch(const std::uint64_t head, const int 
     if (const auto* chains = cydaw::engine::effectParameter(*effect, "chains"))
         (void) setGraphInterfaceParameter(prefix + juce::String(std::string(chains->suffix)), count - 1);
     if (const auto* selected = cydaw::engine::effectParameter(*effect, "selected"))
-        if (const auto current = static_cast<int>(std::lround(cydaw::engine::effectValue(node->parameters, *selected))); current >= branch)
+        if (const auto current = static_cast<int>(std::lround(cydaw::engine::effectValue(headParameters, *selected))); current >= branch)
             (void) setGraphInterfaceParameter(prefix + juce::String(std::string(selected->suffix)),
                                               juce::jmax(0, current == branch ? juce::jmin(current, count - 2) : current - 1));
     for (auto& item : nodes_)

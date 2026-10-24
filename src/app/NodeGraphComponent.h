@@ -413,6 +413,11 @@ public:
     // Delete key does; for the control port.
     bool removeNodeById(std::uint64_t id);
     bool removeNodeByType(const juce::String& typeKey);
+    // A new card of `sourceTypeKey` made to modulate a knob of the first card
+    // of `targetTypeKey` (the control port's `modulate`): that new card, not
+    // one already there, and it goes again when the cable is refused.
+    bool modulateWithNewSource(const juce::String& sourceTypeKey, const juce::String& targetTypeKey,
+                               const juce::String& parameterSuffix);
     // The same, its neighbours joined around the gap (editorRemoveFromChain).
     bool removeNodeFromChain(std::uint64_t id);
     bool removeNodeFromChainByType(const juce::String& typeKey);
@@ -651,6 +656,9 @@ public:
                                                 std::uint64_t destination,
                                                 std::uint64_t destinationPort) const;
     [[nodiscard]] bool editorCanUndo() const noexcept;
+    // Undo steps recorded so far (ever growing): what an edit made of
+    // several calls took, to take it back exactly.
+    [[nodiscard]] std::uint64_t editorHistorySteps() const noexcept { return historySteps_; }
     [[nodiscard]] bool editorCanRedo() const noexcept;
     [[nodiscard]] bool editorLocked() const noexcept { return editingLocked_; }
     std::uint64_t editorAddNode(const juce::String& typeKey, juce::Point<float> position);
@@ -806,6 +814,9 @@ public:
     std::uint64_t editorAddModulator(std::uint64_t owner, const juce::String& typeKey);
     // The card a modulator belongs to; 0 for none (or not a modulator).
     [[nodiscard]] std::uint64_t editorModulatorOwner(std::uint64_t modulator) const;
+    // A wavetable card's table, by its id (not the first card of its type).
+    [[nodiscard]] cydaw::engine::WavetableShape editorNodeWavetable(std::uint64_t id) const { return nodeWavetable(id); }
+    bool editorSetNodeWavetable(std::uint64_t id, const cydaw::engine::WavetableShape& shape) { return setNodeWavetable(id, shape); }
     // The socket of `node` that feeds its knob `binding`; 0 for none.
     [[nodiscard]] std::uint64_t editorParameterSocket(std::uint64_t node, const juce::String& binding) const;
     // A modulator onto the knob `binding`, moving it by `amount` (-1..1 of
@@ -1167,6 +1178,12 @@ private:
         juce::var prismTablesJson;
         cydaw::engine::ImpulseResponseRef impulse;
         juce::var impulseJson;
+        // As a top-level card's: switched off, a Replacer's instrument (its
+        // graph), a container's branch names. Made into a device, or a
+        // device's inside written back, a card keeps them.
+        bool bypassed {};
+        juce::var instrumentJson;
+        juce::StringArray branchNames;
     };
 
     struct SavedModule {
@@ -1408,6 +1425,9 @@ private:
         juce::Point<float> normalisedPosition);
     void removeSelectedNodes();
     void duplicateSelectedNodes();
+    // Copies made of cards and their modulators: each copied modulator
+    // belongs to its card's copy, not to the original.
+    void remapModulatorOwners(const std::unordered_map<NodeId, NodeId>& remapped);
     void copySelectedNodes();
     void pasteCopiedNodes(
         std::optional<juce::Point<float>> targetPosition = std::nullopt);
@@ -2108,6 +2128,7 @@ private:
     // Trees, not text. Stringifying the graph on every edit is what made
     // placing a node cost fifty-five milliseconds.
     std::vector<juce::var> undoHistory_;
+    std::uint64_t historySteps_ {};
     std::vector<juce::var> redoHistory_;
     juce::var currentHistoryState_;
     // The snapshot behind currentHistoryState_, taken when the baseline is

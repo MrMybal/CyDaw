@@ -616,26 +616,36 @@ ValidationResult GraphLibrary::validate(const GraphDefinition& definition) const
         }
     }
 
-    enum class Visit : std::uint8_t { unseen, visiting, visited };
-    std::unordered_map<NodeId, Visit> visits;
-    std::function<bool(NodeId)> visit = [&](const NodeId node) {
-        if (visits[node] == Visit::visiting)
-            return false;
-        if (visits[node] == Visit::visited)
-            return true;
-        visits[node] = Visit::visiting;
-        for (const auto destination : edges[node])
-            if (!visit(destination))
-                return false;
-        visits[node] = Visit::visited;
-        return true;
-    };
+    // A cycle, without recursion (a long chain of nodes overflowed the
+    // stack): the nodes taken one by one once nothing feeds them; those left
+    // over are on a cycle or after one.
+    std::unordered_map<NodeId, std::size_t> feeding;
     for (const auto& node : definition.nodes)
-        if (!visit(node.id)) {
-            addIssue(result, ValidationCode::processingCycle,
-                     "Processing cycle needs an explicit delay node", node.id);
-            break;
-        }
+        feeding.emplace(node.id, 0);
+    for (const auto& [source, destinations] : edges)
+        for (const auto destination : destinations)
+            ++feeding[destination];
+    std::vector<NodeId> ready;
+    for (const auto& [node, count] : feeding)
+        if (count == 0)
+            ready.push_back(node);
+    std::size_t taken {};
+    while (!ready.empty()) {
+        const auto node = ready.back();
+        ready.pop_back();
+        ++taken;
+        if (const auto found = edges.find(node); found != edges.end())
+            for (const auto destination : found->second)
+                if (--feeding[destination] == 0)
+                    ready.push_back(destination);
+    }
+    if (taken < feeding.size())
+        for (const auto& node : definition.nodes)
+            if (feeding[node.id] > 0) {
+                addIssue(result, ValidationCode::processingCycle,
+                         "Processing cycle needs an explicit delay node", node.id);
+                break;
+            }
 
     std::unordered_set<std::string> interfaceIds;
     for (const auto& interface : definition.interfaces) {
@@ -776,9 +786,22 @@ std::optional<CompiledLibrary> GraphLibrary::compile(
     enum class Visit : std::uint8_t { unseen, visiting, visited };
     std::unordered_map<std::string, Visit> visits;
     std::vector<GraphReference> loadOrder;
+    // Graphs inside graphs, to a depth (a long chain of them would run the
+    // recursion off the stack).
+    auto depth = 0;
     std::function<bool(const GraphDefinition&)> visitDefinition
         = [&](const GraphDefinition& definition) {
         const auto key = keyFor(definition.reference);
+        if (depth >= 64) {
+            addIssue(combined, ValidationCode::dependencyCycle,
+                     "Nested graphs go deeper than 64 levels at " + key);
+            return false;
+        }
+        struct Level {
+            int& depth;
+            explicit Level(int& value) : depth(++value) {}
+            ~Level() { --depth; }
+        } level { depth };
         if (visits[key] == Visit::visiting) {
             addIssue(combined, ValidationCode::dependencyCycle,
                      "Nested graph dependency cycle at " + key);

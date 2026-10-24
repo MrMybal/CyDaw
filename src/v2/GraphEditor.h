@@ -197,6 +197,9 @@ private:
     std::vector<std::pair<ImVec2, ImVec2>> cardRects_;
     // A device made of a graph to open, once this frame is drawn.
     std::optional<std::uint64_t> pendingEnter_;
+    // Levels to go back out of in the workshop, once this frame is drawn:
+    // leaving frees the graph the frame is still drawing.
+    std::size_t pendingLeave_ {};
     ImGuiID deviceMenuId_ {};
     ImGuiID ioMenuId_ {};
     ImGuiID cableMenuId_ {};

@@ -530,7 +530,8 @@ void DevicesView::draw()
             if (const auto* payload = ImGui::AcceptDragDropPayload("CYDAW_DEVICE_CARD", ImGuiDragDropFlags_AcceptBeforeDelivery
                                                                                             | ImGuiDragDropFlags_AcceptNoDrawDefaultRect)) {
                 list->AddLine(ImVec2(origin.x - dp(3.0f), origin.y), ImVec2(origin.x - dp(3.0f), origin.y + size.y), p.accent, dp(3.0f));
-                if (payload->IsDelivery() && graph.editorMoveInChain(*static_cast<const std::uint64_t*>(payload->Data), 0)) {
+                // As the other drops: a container goes with all it holds.
+                if (payload->IsDelivery() && graph.editorMoveCard(*static_cast<const std::uint64_t*>(payload->Data), 0, -1, 0)) {
                     graph_layout::arrange(graph);
                     state_.focused = Panel::devices;
                 }

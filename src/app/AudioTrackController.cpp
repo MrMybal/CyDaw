@@ -592,24 +592,37 @@ void GainPanAudioSource::setDrive(const float driveDb) noexcept
 {
     const auto value = juce::jlimit(0.0f, 36.0f, driveDb);
     driveDb_.store(value, std::memory_order_relaxed);
-    // The track's drive fader reaches every drive card of the chain through
-    // the runtime's lock-free path, as host automation does.
-    for (auto node : nativeGraphDescription_.nodes)
-        if (node.kind == cydaw::engine::NativeDspNodeKind::drive) {
-            node.parameters.driveDb = value;
-            (void) nativeGraph_.updateNodeParametersRealtime(node);
-        }
+    // The track's drive fader reaches every drive card of the chain. Through
+    // the runtime's control-thread path: this runs on the message thread or
+    // a project's loading thread, and the realtime one is the audio thread's
+    // alone (a second reader there could free the graph it plays).
+    updateGraphNodes(cydaw::engine::NativeDspNodeKind::drive,
+                     [value](cydaw::engine::NativeDspNodeParameters& parameters) { parameters.driveDb = value; });
 }
 
 void GainPanAudioSource::setFilterCutoff(const float cutoffHz) noexcept
 {
     const auto value = juce::jlimit(20.0f, 20'000.0f, cutoffHz);
     filterCutoffHz_.store(value, std::memory_order_relaxed);
-    for (auto node : nativeGraphDescription_.nodes)
-        if (node.kind == cydaw::engine::NativeDspNodeKind::lowpass) {
-            node.parameters.cutoffHz = value;
-            (void) nativeGraph_.updateNodeParametersRealtime(node);
-        }
+    updateGraphNodes(cydaw::engine::NativeDspNodeKind::lowpass,
+                     [value](cydaw::engine::NativeDspNodeParameters& parameters) { parameters.cutoffHz = value; });
+}
+
+void GainPanAudioSource::updateGraphNodes(const cydaw::engine::NativeDspNodeKind kind,
+                                          const std::function<void(cydaw::engine::NativeDspNodeParameters&)>& change) noexcept
+{
+    try {
+        auto graph = nativeGraph_.graph();
+        auto changed = false;
+        for (auto& node : graph.nodes)
+            if (node.kind == kind) {
+                change(node.parameters);
+                changed = true;
+            }
+        if (changed)
+            (void) nativeGraph_.updateParameters(graph);
+    } catch (...) {
+    }
 }
 
 juce::Result GainPanAudioSource::setNativeDspGraph(

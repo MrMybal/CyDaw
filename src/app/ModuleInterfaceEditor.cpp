@@ -1893,16 +1893,19 @@ juce::Result validateModuleInterfaceDocument(const juce::var& document, const Mo
         }
     }
     const auto bindingExists=[&](const juce::String& key){return std::ranges::any_of(parameters.parameters,[&](const auto& p){return p.key==key;});};
+    // Unique across both layouts, as the interface keeps them (restoring
+    // skips an id seen in the other layout: a device control would be lost
+    // without a word).
+    std::set<juce::int64> ids;
     for(const auto* layout:{"controls","deviceControls"}) {
         const auto value=document.getProperty(layout,{});
         const auto* controls=value.getArray();
         if(!controls) {if(juce::String(layout)=="controls")return fail("controls must be an array");else continue;}
         if(controls->size()>4096)return fail("An interface supports up to 4096 controls");
-        std::set<juce::int64> ids;
         for(const auto& c:*controls) {
             if(!c.isObject())return fail("A control must be a JSON object");
             const auto id=static_cast<juce::int64>(c.getProperty("id",0));
-            if(id<=0||!ids.insert(id).second)return fail("Control IDs must be positive and unique within each layout");
+            if(id<=0||!ids.insert(id).second)return fail("Control IDs must be positive and unique across both layouts");
             const auto kind=c.getProperty("kind",{}).toString();
             bool known=false;
             for(int i=0;i<=static_cast<int>(ModuleControlKind::custom);++i)if(kind==controlKindKey(static_cast<ModuleControlKind>(i)))known=true;

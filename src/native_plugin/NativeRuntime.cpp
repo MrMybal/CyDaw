@@ -372,7 +372,9 @@ bool NativeDspRuntime::updateNodeParametersRealtime(const cydaw::engine::NativeD
             current->liveNodes[live->second].scratch.parameters = node.parameters;
             current->liveNodes[live->second].touched = true;
         }
-        return cydaw::engine::updateNativeDspProcessorParameters(*found->second, node);
+        // Never the Replacer's instrument here: setting it takes a lock and
+        // may free a plan (the audio thread calls this); its own path sets it.
+        return cydaw::engine::updateNativeDspProcessorParameters(*found->second, node, false);
     }
     const auto control = current->controlIndices.find(node.id);
     if (isControlOnly(node.kind) && control != current->controlIndices.end())

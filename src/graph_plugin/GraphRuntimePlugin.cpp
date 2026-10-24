@@ -27,6 +27,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <type_traits>
 #include <vector>
 
 namespace cydaw::graph_plugin {
@@ -918,8 +919,25 @@ public:
             // weigh about 100 KB), their storage reused from block to block.
             auto& nodes = hostNodes_;
             const auto nodeCount = mapping->nodes.size();
-            for (auto index = std::size_t {}; index < nodeCount; ++index)
-                nodes[index] = mapping->nodes[index];
+            // Their numbers copied; their tables, response and instrument
+            // pointed at without being owned (an aliasing pointer with no
+            // owner): what they point at is the map's, kept while it is read,
+            // and nothing a copy held can be freed here, on the audio thread.
+            const auto unowned = [](const auto& pointer) {
+                using Pointer = std::decay_t<decltype(pointer)>;
+                return Pointer(Pointer {}, pointer.get());
+            };
+            for (auto index = std::size_t {}; index < nodeCount; ++index) {
+                const auto& from = mapping->nodes[index];
+                auto& node = nodes[index];
+                node.id = from.id;
+                node.kind = from.kind;
+                node.parameters = from.parameters;
+                node.inputBus = from.inputBus;
+                node.wavetable = unowned(from.wavetable);
+                node.impulse = unowned(from.impulse);
+                node.instrument = unowned(from.instrument);
+            }
             for (auto slot = std::size_t {}; slot < hostParameterSlotCount;
                  ++slot) {
                 const auto& target = mapping->slots[slot];

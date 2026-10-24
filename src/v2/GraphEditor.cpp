@@ -230,6 +230,9 @@ void GraphEditor::draw()
     cableMenu(*slot);
     if (ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows))
         handleKeys(*slot);
+    // Back out of devices, once the frame no longer draws their graphs.
+    for (auto leave = std::exchange(pendingLeave_, 0); leave > 0; --leave)
+        studio_.leaveWorkshopDevice();
     // A device made of a graph opens after the frame that asked for it: in
     // place inside the workshop, in the workshop from a track.
     if (const auto node = std::exchange(pendingEnter_, std::nullopt)) {
@@ -553,7 +556,7 @@ void GraphEditor::drawToolbar(GraphSlot& slot, const std::optional<TrackRef>& tr
         const auto trail = studio_.workshop().trail;
         ImGui::BeginDisabled(trail.size() < 2);
         if (ui::iconButton(icon::back, L("Revenir au niveau du dessus (Échap)", "Back one level (Esc)")))
-            studio_.leaveWorkshopDevice();
+            pendingLeave_ = 1;
         ImGui::EndDisabled();
         for (std::size_t level = 0; level < trail.size(); ++level) {
             ImGui::SameLine(0.0f, dp(4.0f));
@@ -569,8 +572,7 @@ void GraphEditor::drawToolbar(GraphSlot& slot, const std::optional<TrackRef>& tr
                 ImGui::TextUnformatted(name.toRawUTF8());
                 ImGui::PopFont();
             } else if (ImGui::SmallButton(name.toRawUTF8())) {
-                for (auto drop = trail.size() - level - 1; drop > 0; --drop)
-                    studio_.leaveWorkshopDevice();
+                pendingLeave_ = trail.size() - level - 1;
             }
             ImGui::PopID();
         }
@@ -848,8 +850,13 @@ void GraphEditor::drawCanvas(GraphSlot& slot, const std::optional<TrackRef>& tra
             order.push_back(&layout);
     std::optional<std::pair<std::uint64_t, std::uint64_t>> hoveredPort; // node, port
     for (const auto* layout : order) {
-        if (layout->max.x < canvasMin_.x - 40.0f || layout->min.x > canvasMax_.x + 40.0f
-            || layout->max.y < canvasMin_.y - 40.0f || layout->min.y > canvasMax_.y + 40.0f) {
+        // A card being dragged is drawn wherever it goes: off the canvas,
+        // its button gone, the drag would never end (no undo step, cables
+        // left unhovered).
+        const auto dragged = movingNodes_ && selection_.contains(layout->node->id);
+        if (!dragged
+            && (layout->max.x < canvasMin_.x - 40.0f || layout->min.x > canvasMax_.x + 40.0f
+                || layout->max.y < canvasMin_.y - 40.0f || layout->min.y > canvasMax_.y + 40.0f)) {
             continue;
         }
         drawNode(graph, *layout, list);
@@ -1690,16 +1697,16 @@ void GraphEditor::splice(app::NodeGraphComponent& graph, const std::vector<NodeL
         if (!freeAudioEnds(*layout.node, connections, input, output))
             return;
         const auto target = *spliceTarget_;
+        // The steps the history records: a connect through a converter makes
+        // two (and two when it fails), so they are counted, not assumed.
+        const auto before = graph.editorHistorySteps();
         graph.editorDisconnect(target.source, target.sourcePort, target.destination, target.destinationPort);
-        auto steps = 1;
         auto error = graph.editorConnect(target.source, target.sourcePort, layout.node->id, input);
-        if (error.isEmpty()) {
-            ++steps;
+        if (error.isEmpty())
             error = graph.editorConnect(layout.node->id, output, target.destination, target.destinationPort);
-        }
         if (error.isNotEmpty()) {
             // Put the cable back as it was: exactly the steps taken.
-            for (auto step = 0; step < steps; ++step)
+            for (auto step = graph.editorHistorySteps(); step > before; --step)
                 (void) graph.editorUndo();
             lastError_ = error;
             lastErrorTime_ = ImGui::GetTime();

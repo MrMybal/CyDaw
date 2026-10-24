@@ -46,7 +46,7 @@ juce::var presetState(const app::NodeGraphComponent& graph, const std::uint64_t 
                 state->setProperty("soundModel", model);
         if (node.typeKey == "wavetable") {
             juce::Array<juce::var> harmonics;
-            for (const auto& frame : graph.nodeWavetable(node.typeKey).harmonics)
+            for (const auto& frame : graph.editorNodeWavetable(nodeId).harmonics)
                 for (const auto amplitude : frame)
                     harmonics.add(amplitude);
             state->setProperty("wavetable", harmonics);
@@ -95,7 +95,7 @@ bool applyPreset(app::NodeGraphComponent& graph, const std::uint64_t nodeId, con
         for (auto& frame : shape.harmonics)
             for (auto& amplitude : frame)
                 amplitude = static_cast<float>(static_cast<double>((*harmonics)[index++]));
-        (void) graph.setNodeWavetable(node->typeKey, shape);
+        (void) graph.editorSetNodeWavetable(nodeId, shape);
     }
     // A cabinet preset brings its response, or none (the models then); an
     // Empreinte preset its place's, or none (its built-in spaces then).

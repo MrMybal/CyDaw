@@ -541,8 +541,17 @@ void ContainerEndProcessor::processAudioBuses(const std::span<const AudioInputBu
 
     const auto fadeStep = static_cast<float>(
         1.0 / std::max(1.0, static_cast<double>(head_->setting("fade", 20.0f)) * 0.001 * sampleRate_));
+    // A split works on the left and right: a surround track's other channels
+    // go through as they came, not remade of the left and right parts.
+    const auto splits = kind == NativeDspNodeKind::midSideSplit || kind == NativeDspNodeKind::stereoSplit
+                        || kind == NativeDspNodeKind::multiband2 || kind == NativeDspNodeKind::multiband3;
     for (std::uint32_t channel = 0; channel < channels; ++channel) {
         auto* out = output.channel(channel);
+        if (splits && channel >= 2) {
+            if (dry != nullptr && channel < dry->channelCount)
+                std::copy_n(dry->channel(channel), frames, out);
+            continue;
+        }
         const auto side = channel == 0 ? -1.0f : channel == 1 ? 1.0f : 0.0f;
         switch (kind) {
         case NativeDspNodeKind::midSideSplit: {

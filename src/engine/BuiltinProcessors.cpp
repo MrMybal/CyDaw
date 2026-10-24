@@ -1142,9 +1142,33 @@ void CompressorProcessor::process(const AudioBlockView input,
                                   const AudioBlockView output,
                                   const ProcessContext&) noexcept
 {
+    compress(input, input, output);
+}
+
+void CompressorProcessor::processAudioBuses(const std::span<const AudioInputBusView> inputs, const AudioBlockView output,
+                                            const ProcessContext&) noexcept
+{
+    const AudioInputBusView* main = nullptr;
+    const AudioInputBusView* sidechain = nullptr;
+    for (const auto& bus : inputs)
+        if (bus.portId == sidechainPort)
+            sidechain = &bus;
+        else if (main == nullptr)
+            main = &bus;
+    if (main == nullptr) {
+        clearAudio(output);
+        return;
+    }
+    compress(main->audio, sidechain != nullptr ? sidechain->audio : main->audio, output);
+}
+
+void CompressorProcessor::compress(const AudioBlockView input, const AudioBlockView detector,
+                                   const AudioBlockView output) noexcept
+{
     clearAudio(output);
     const auto channels = std::min(input.channelCount, output.channelCount);
-    const auto frames = std::min(input.frameCount, output.frameCount);
+    const auto frames = std::min({ input.frameCount, output.frameCount, detector.frameCount });
+    const auto heard = detector.channelCount;
     const auto attack = static_cast<float>(std::exp(-1.0 / (0.008 * sampleRate_)));
     const auto release = static_cast<float>(std::exp(-1.0 / (0.090 * sampleRate_)));
     const auto thresholdDb = thresholdDb_.load(std::memory_order_relaxed);
@@ -1152,8 +1176,8 @@ void CompressorProcessor::process(const AudioBlockView input,
     auto deepestReductionDb = 0.0f;
     for (std::uint32_t frame = 0; frame < frames; ++frame) {
         auto peak = 0.0f;
-        for (std::uint32_t channel = 0; channel < channels; ++channel)
-            peak = std::max(peak, std::abs(input.channel(channel)[frame]));
+        for (std::uint32_t channel = 0; channel < heard; ++channel)
+            peak = std::max(peak, std::abs(detector.channel(channel)[frame]));
         const auto coefficient = peak > envelope_ ? attack : release;
         envelope_ = coefficient * envelope_ + (1.0f - coefficient) * peak;
         const auto levelDb = 20.0f * std::log10(std::max(envelope_, 1.0e-9f));

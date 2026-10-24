@@ -26,7 +26,13 @@ inline constexpr float ownerHalfRange = 16'777'215.0f;
 
 [[nodiscard]] constexpr std::uint64_t ownerOf(const float low, const float high) noexcept
 {
-    return (static_cast<std::uint64_t>(high) << 24) | static_cast<std::uint64_t>(low);
+    // Each half a whole number of 24 bits: anything else (negative, too
+    // large, not a number: a corrupt state) is no owner, not a cast that
+    // the language leaves undefined.
+    const auto half = [](const float value) -> std::uint64_t {
+        return value >= 0.0f && value <= ownerHalfRange ? static_cast<std::uint64_t>(value) : 0;
+    };
+    return (half(high) << 24) | half(low);
 }
 [[nodiscard]] constexpr float ownerLowOf(const std::uint64_t owner) noexcept
 {

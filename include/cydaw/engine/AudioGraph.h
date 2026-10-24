@@ -84,6 +84,10 @@ public:
     [[nodiscard]] GraphResult addNode(NodeDescriptor node);
     [[nodiscard]] GraphResult removeNode(NodeId nodeId);
     [[nodiscard]] GraphResult connect(Connection connection);
+    // Many at once, the graph compiled once at the end (not once each: a
+    // graph's cables checked one by one cost the square of their number).
+    // None are kept when one is refused.
+    [[nodiscard]] GraphResult connectAll(const std::vector<Connection>& connections);
     [[nodiscard]] GraphResult disconnect(const Connection& connection);
 
     [[nodiscard]] CompileResult compile() const;

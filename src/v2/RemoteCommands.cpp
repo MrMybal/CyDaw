@@ -4964,10 +4964,9 @@ juce::var Commands::onModulate()
     auto source = text("source").trim();
     if (source.isEmpty())
         source = "lfo-core";
-    if (const auto inserted = graph.insertNode(source); inserted.failed())
-        return fail(source + ": " + inserted.getErrorMessage());
-    if (!graph.modulateParameterForTest(source, targetType, parameter)) {
-        (void) graph.removeNodeByType(source);
+    // A new source card (not one of that type already there, which a first-
+    // of-type lookup would take, nor delete when the cable is refused).
+    if (!graph.modulateWithNewSource(source, targetType, parameter)) {
         commitGraph(*target, true);
         return fail("the cable did not reach " + targetType + "." + parameter
                     + "; get_track_graph gives the cards and their knobs");

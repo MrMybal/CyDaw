@@ -375,8 +375,11 @@ private:
     std::vector<float> dampingState_;
 };
 
-class CompressorProcessor final : public AudioProcessor {
+class CompressorProcessor final : public AudioProcessor, public MultiBusAudioProcessor {
 public:
+    // Its sockets (core.compressor): the sound in, and the sidechain the
+    // level is read from (another track's kick), which is not heard.
+    static constexpr std::uint64_t sidechainPort = 2;
     CompressorProcessor(float thresholdDb = -16.0f, float ratio = 4.0f) noexcept;
     void setThresholdDb(float thresholdDb) noexcept;
     void setRatio(float ratio) noexcept;
@@ -388,8 +391,13 @@ public:
     void reset() noexcept override;
     void process(AudioBlockView input, AudioBlockView output,
                  const ProcessContext& context) noexcept override;
+    void processAudioBuses(std::span<const AudioInputBusView> inputs, AudioBlockView output,
+                           const ProcessContext& context) noexcept override;
 
 private:
+    // `signal` brought down by the level of `detector` (itself, without a
+    // sidechain).
+    void compress(AudioBlockView signal, AudioBlockView detector, AudioBlockView output) noexcept;
     std::atomic<float> thresholdDb_ { -16.0f };
     std::atomic<float> ratio_ { 4.0f };
     std::atomic<float> gainReductionDb_ {};

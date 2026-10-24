@@ -30,6 +30,18 @@ juce::var serialiseParameters(
     CYDAW_WRITE_PARAMETER(thresholdDb);
     CYDAW_WRITE_PARAMETER(ratio);
     CYDAW_WRITE_PARAMETER(tone);
+    // An EQ band's, a wavetable's, a string's and a voice's: left out once,
+    // they came back at their defaults in an exported plug-in.
+    CYDAW_WRITE_PARAMETER(bandFrequencyHz);
+    CYDAW_WRITE_PARAMETER(bandGainDb);
+    CYDAW_WRITE_PARAMETER(bandQ);
+    CYDAW_WRITE_PARAMETER(wavetablePosition);
+    CYDAW_WRITE_PARAMETER(wavetableDetuneCents);
+    CYDAW_WRITE_PARAMETER(stringDamping);
+    CYDAW_WRITE_PARAMETER(stringDecaySeconds);
+    CYDAW_WRITE_PARAMETER(voiceMode);
+    CYDAW_WRITE_PARAMETER(glideMilliseconds);
+    CYDAW_WRITE_PARAMETER(synthModel);
     CYDAW_WRITE_PARAMETER(oscillatorWaveform);
     CYDAW_WRITE_PARAMETER(oscillatorLevel);
     CYDAW_WRITE_PARAMETER(attackMilliseconds);
@@ -75,10 +87,11 @@ cydaw::engine::NativeDspNodeParameters restoreParameters(
     const auto* value = state.getDynamicObject();
     if (value == nullptr)
         return parameters;
+// A value that is no number (a corrupt state) keeps the default.
 #define CYDAW_READ_PARAMETER(name)                                      \
     if (value->hasProperty(#name))                                      \
-        parameters.name = static_cast<float>(                           \
-            static_cast<double>(value->getProperty(#name)))
+        if (const auto read = static_cast<double>(value->getProperty(#name)); std::isfinite(read)) \
+            parameters.name = static_cast<float>(read)
     CYDAW_READ_PARAMETER(driveDb);
     CYDAW_READ_PARAMETER(gainDb);
     CYDAW_READ_PARAMETER(cutoffHz);
@@ -96,6 +109,16 @@ cydaw::engine::NativeDspNodeParameters restoreParameters(
     CYDAW_READ_PARAMETER(thresholdDb);
     CYDAW_READ_PARAMETER(ratio);
     CYDAW_READ_PARAMETER(tone);
+    CYDAW_READ_PARAMETER(bandFrequencyHz);
+    CYDAW_READ_PARAMETER(bandGainDb);
+    CYDAW_READ_PARAMETER(bandQ);
+    CYDAW_READ_PARAMETER(wavetablePosition);
+    CYDAW_READ_PARAMETER(wavetableDetuneCents);
+    CYDAW_READ_PARAMETER(stringDamping);
+    CYDAW_READ_PARAMETER(stringDecaySeconds);
+    CYDAW_READ_PARAMETER(voiceMode);
+    CYDAW_READ_PARAMETER(glideMilliseconds);
+    CYDAW_READ_PARAMETER(synthModel);
     CYDAW_READ_PARAMETER(oscillatorWaveform);
     CYDAW_READ_PARAMETER(oscillatorLevel);
     CYDAW_READ_PARAMETER(attackMilliseconds);
@@ -322,9 +345,13 @@ std::optional<cydaw::engine::NativeDspGraph> restoreNativeDspGraphState(
             if (value->hasProperty("mode")) {
                 auto& restored = graph.modulations.back();
                 restored.mode = static_cast<std::uint8_t>(juce::jlimit(0, 1, static_cast<int>(value->getProperty("mode"))));
-                restored.amount = static_cast<float>(static_cast<double>(value->getProperty("amount")));
-                restored.minimum = static_cast<float>(static_cast<double>(value->getProperty("minimum")));
-                restored.maximum = static_cast<float>(static_cast<double>(value->getProperty("maximum")));
+                const auto finite = [value](const char* key, const float otherwise) {
+                    const auto read = static_cast<double>(value->getProperty(key));
+                    return std::isfinite(read) ? static_cast<float>(read) : otherwise;
+                };
+                restored.amount = finite("amount", 0.0f);
+                restored.minimum = finite("minimum", 0.0f);
+                restored.maximum = finite("maximum", 1.0f);
             }
         }
     if(const auto* bypasses=root->getProperty("bypasses").getArray())for(const auto& b:*bypasses){

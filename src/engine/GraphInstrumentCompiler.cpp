@@ -36,6 +36,8 @@ struct Expansion {
     std::unordered_map<PortId, std::vector<Endpoint>> inputs;
     std::unordered_map<PortId, std::vector<Endpoint>> outputs;
     std::unordered_map<std::string, std::vector<ParameterTarget>> parameters;
+    // Wires straight across a definition, its input port to its output port.
+    std::vector<std::pair<PortId, PortId>> passthroughs;
 };
 
 struct FlatNode {
@@ -90,6 +92,11 @@ public:
 
         Expansion expansion;
         for (const auto& connection : definition.connections) {
+            if (connection.source.nodeId == graph::boundaryNodeId
+                && connection.destination.nodeId == graph::boundaryNodeId) {
+                expansion.passthroughs.emplace_back(connection.source.portId, connection.destination.portId);
+                continue;
+            }
             if (connection.source.nodeId == graph::boundaryNodeId) {
                 append(expansion.inputs[connection.source.portId],
                        endpoint(expandedNodes, connection.destination, true));
@@ -148,6 +155,14 @@ private:
                               const bool preserveNodeId)
     {
         Expansion expansion;
+        // Devices inside devices multiply: past this many nodes (no real
+        // graph comes near) a crafted file would ask for billions.
+        if (nodes.size() >= 65'536) {
+            if (std::ranges::none_of(validation.issues, [](const auto& issue) { return issue.code == graph::ValidationCode::invalidRange
+                                                                                         && issue.message == "The graph expands to too many nodes"; }))
+                addIssue(validation, graph::ValidationCode::invalidRange, "The graph expands to too many nodes", node.id);
+            return expansion;
+        }
         auto primitiveValidation = registry.validateNode(node);
         validation.issues.insert(validation.issues.end(),
                                  primitiveValidation.issues.begin(),
@@ -185,6 +200,23 @@ private:
             return {};
         }
         auto expansion = expand(*nested, false);
+        // MIDI wired straight across the nested Graph (a thru device before
+        // the voice): a transpose of nothing stands for the wire, which the
+        // note path follows like any MIDI effect. Without it the notes
+        // stopped there.
+        for (const auto& [in, out] : expansion.passthroughs) {
+            const auto port = std::ranges::find(nested->ports, in, &graph::GraphPort::id);
+            if (port == nested->ports.end() || port->type != graph::PortType::midi)
+                continue;
+            FlatNode through;
+            through.id = nextId++;
+            through.processorKey = "core.midi-transpose";
+            through.parameters.emplace("semitones", 0.0);
+            nodes.push_back(std::move(through));
+            expansion.inputs[in].push_back({ nodes.back().id, 1 });
+            expansion.outputs[out].push_back({ nodes.back().id, 2 });
+        }
+        expansion.passthroughs.clear();
         for (const auto& [key, value] : node.parameterOverrides) {
             const auto descriptor = std::ranges::find(
                 nested->parameters, key, &graph::PublishedParameter::key);

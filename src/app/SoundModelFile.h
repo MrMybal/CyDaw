@@ -79,7 +79,9 @@ struct VoiceAssets {
 // The cards of a saved graph (top level) that hold a response, by id: what
 // an exported plug-in puts back into its effects.
 [[nodiscard]] std::map<std::uint64_t, cydaw::engine::ImpulseResponseRef> impulsesFromGraphState(const juce::var& state);
-// Those responses put onto a restored chain's nodes of the same ids.
+// A state's native graph made whole again from the graph it carries: the
+// cabinets' responses and the wavetables' tables, onto their cards' nodes
+// (of the same ids).
 void attachImpulses(cydaw::engine::NativeDspGraph& graph, const juce::var& editorState);
 
 } // namespace cydaw::app
