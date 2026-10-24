@@ -5153,7 +5153,11 @@ juce::var NodeGraphComponent::serialise() const
 
 cydaw::engine::NativeDspGraph NodeGraphComponent::nativeDspGraph() const
 {
-    auto graph = exportedNativeGraph();
+    return withCardBypasses(exportedNativeGraph());
+}
+
+cydaw::engine::NativeDspGraph NodeGraphComponent::withCardBypasses(cydaw::engine::NativeDspGraph graph) const
+{
     if (std::none_of(nodes_.begin(), nodes_.end(), [](const Node& node) { return node.bypassed; }))
         return graph;
     // A card switched off: its last node gives out what its first one
@@ -5304,7 +5308,7 @@ std::optional<std::pair<std::uint64_t, juce::String>> NodeGraphComponent::editor
 
 cydaw::engine::NativeDspGraph NodeGraphComponent::nativeDspGraphWithoutCache() const
 {
-    return runtimeGraphExport().nativeGraph;
+    return withCardBypasses(runtimeGraphExport().nativeGraph);
 }
 
 std::uint64_t NodeGraphComponent::structuralSignature() const
@@ -5345,6 +5349,10 @@ std::uint64_t NodeGraphComponent::structuralSignature() const
         mix(static_cast<std::uint64_t>(module.key.hashCode64()));
         mix(module.nodes.size());
         mix(module.connections.size());
+        // A card switched off inside compiles to a way through: a device
+        // whose only card it is has no node of its own left to patch.
+        for (const auto& child : module.nodes)
+            mix(child.bypassed ? 1u : 0u);
     }
     mix(graphInterfaceState_.parameters.size());
     for (const auto& parameter : graphInterfaceState_.parameters)
@@ -9453,8 +9461,10 @@ juce::var NodeGraphComponent::createVst3RuntimeState() const
         root->setProperty("factoryFolder", factory.getFullPathName());
     if (const auto banks = banksFolder(); banks.isDirectory())
         root->setProperty("banksFolder", banks.getFullPathName());
+    // The cards switched off stay off in the plug-in (they were left out:
+    // a device bypassed in CyDAW played in its export).
     root->setProperty(jsonKeys::native,
-                      serialiseNativeDspGraphState(runtimeExport.nativeGraph));
+                      serialiseNativeDspGraphState(withCardBypasses(runtimeExport.nativeGraph)));
     root->setProperty(jsonKeys::polySynth,
                       serialisePolySynthGraphPlan(
                           runtimeExport.instrumentPlan));
@@ -14612,6 +14622,14 @@ bool NodeGraphComponent::spliceNodeIntoConnection(
         repaint(canvasBounds());
         return false;
     }
+    // A cable that modulated a knob still does, by as much, from the card
+    // put on its way.
+    for (auto& connection : connections_)
+        if (connection.source == insertedId && connection.destination == original.destination
+            && connection.destinationPort == original.destinationPort) {
+            connection.mode = original.mode;
+            connection.amount = original.amount;
+        }
 
     selectedNodes_.clear();
     selectedNodes_.insert(insertedId);
@@ -17653,6 +17671,7 @@ NodeGraphComponent::graphDefinitions() const
                                                          : child.title)
                                    .toStdString();
             node.description = child.description.toStdString();
+            node.bypassed = child.bypassed;
             if (const auto* nested = findModule(child.typeKey)) {
                 node.kind = graph::GraphNodeKind::graphInstance;
                 node.graph = moduleReference(*nested);

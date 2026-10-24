@@ -8,7 +8,12 @@ A synth plays a held chord through a three-band equaliser cut by 24 dB:
 * the instrument switched off: the track falls silent; on again, it plays;
 * saved and opened again, the equaliser is still off;
 * a reverb added after it, then moved before it: the signal goes through the
-  reverb first.
+  reverb first;
+* the equaliser made into a device, switched off inside it (in the workshop):
+  the chord comes back up there too;
+* the same on an audio track (its chain compiled from the device's
+  definition): a tone comes back up, as the track plays it and as the
+  exported plug-in does.
 
 Exit code 0 when all hold.
 """
@@ -16,9 +21,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import shutil
 import socket
+import struct
 import subprocess
 import tempfile
 import time
@@ -151,6 +158,56 @@ def scenario(scratch: Path) -> None:
     check(order.index("halo") < order.index("eq-three"), f"moved before it, the signal goes through the reverb first ({order})")
     refused = request({"cmd": "move_device", "track": "Synth", "nodeId": card("Synth", "ambre-synth"), "before": 0})
     check(not refused.get("ok"), "the instrument stays first: it cannot be moved")
+
+    # Switched off inside a device: the device's own graph compiles it as a
+    # way through, as the track's graph does a card of its own.
+    need({"cmd": "set_node", "track": "Synth", "nodeId": equaliser, "bypassed": False}, "equaliser on")
+    device = int(need({"cmd": "create_device", "track": "Synth", "nodeIds": [equaliser], "name": "Cut"}, "device")["nodeId"])
+    need({"cmd": "transport", "action": "play", "position": 0}, "play")
+    inside = peak("Synth", 0.8)
+    need({"cmd": "workshop", "action": "open_track", "track": "Synth", "nodeId": device}, "open the device")
+    inner = card("workshop", "eq-three")
+    need({"cmd": "set_node", "track": "workshop", "nodeId": inner, "bypassed": True}, "inner equaliser off")
+    passed = peak("Synth", 0.8)
+    need({"cmd": "set_node", "track": "workshop", "nodeId": inner, "bypassed": False}, "inner equaliser on")
+    back = peak("Synth", 0.8, settle=1.5)
+    need({"cmd": "transport", "action": "stop"}, "stop")
+    check(inside > -80.0 and passed > inside + 10.0 and back < passed - 10.0,
+          f"switched off inside a device, the chord comes back up; on again, it is cut ({inside:.1f}, {passed:.1f}, {back:.1f} dB)")
+
+    # An audio track's chain is compiled from the definitions (an
+    # instrument's goes another way): the card switched off inside the
+    # device there too, live and exported.
+    tone = scratch / "tone.wav"
+    samples = [0.3 * math.sin(2.0 * math.pi * 220.0 * index / 48_000.0) for index in range(48_000)]
+    data = b"".join(struct.pack("<h", int(round(value * 32767))) for value in samples)
+    tone.write_bytes(struct.pack("<4sI4s4sIHHIIHH4sI", b"RIFF", 36 + len(data), b"WAVE", b"fmt ", 16, 1, 1, 48_000,
+                                 96_000, 2, 16, b"data", len(data)) + data)
+    audio = need({"cmd": "add_audio_track", "file": str(tone)}, "audio track")["name"]
+    need({"cmd": "insert_device", "track": audio, "key": "eq-three"}, "audio equaliser")
+    cutter = card(audio, "eq-three")
+    for band in ("low", "mid", "high"):
+        need({"cmd": "set_node_parameter", "track": audio, "nodeId": cutter, "parameter": f"eq3.{band}", "value": -24}, band)
+    holder = int(need({"cmd": "create_device", "track": audio, "nodeIds": [cutter], "name": "Cut"}, "audio device")["nodeId"])
+
+    def tone_level(live: bool) -> float:
+        return need({"cmd": "effect_chain_check", "track": audio, "hz": 220.0, "amplitude": 0.3, "seconds": 0.6,
+                     "live": live}, "chain")["outputDb"]
+
+    cut_live, cut_export = tone_level(True), tone_level(False)
+    need({"cmd": "workshop", "action": "open_track", "track": audio, "nodeId": holder}, "open the audio device")
+    need({"cmd": "set_node", "track": "workshop", "nodeId": card("workshop", "eq-three"), "bypassed": True}, "audio inner off")
+    off_live, off_export = tone_level(True), tone_level(False)
+    check(off_live > cut_live + 10.0 and off_export > cut_export + 10.0,
+          f"on an audio track too, played and exported ({cut_live:.1f} -> {off_live:.1f}, {cut_export:.1f} -> {off_export:.1f} dB)")
+    # On again inside, the whole device switched off on the track instead.
+    need({"cmd": "set_node", "track": "workshop", "nodeId": card("workshop", "eq-three"), "bypassed": False}, "audio inner on")
+    again_live = tone_level(True)
+    need({"cmd": "set_node", "track": audio, "nodeId": holder, "bypassed": True}, "audio device off")
+    whole_live, whole_export = tone_level(True), tone_level(False)
+    check(again_live < off_live - 10.0 and whole_live > again_live + 10.0 and whole_export > again_live + 10.0,
+          f"on again inside it cuts; the device itself switched off, played and exported ({again_live:.1f}, "
+          f"{whole_live:.1f}, {whole_export:.1f} dB)")
 
 
 def main() -> int:

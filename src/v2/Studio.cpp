@@ -861,14 +861,12 @@ std::vector<TrackInput> Studio::trackInputs(const TrackRef& track) const
     // graph is another (the graph knows).
     const auto& graph = slot->graph();
     const auto buses = graph.audioInputBuses();
-    const auto nodes = graph.editorNodes();
     for (const auto& [node, bus] : buses) {
         if (bus > maximumTrackInputs)
             break;
         TrackInput input { node, {} };
-        for (const auto& candidate : nodes)
-            if (candidate.id == node)
-                input.name = candidate.alias.trim();
+        // Each input's own name, not the whole graph described (every frame).
+        input.name = graph.editorNodeAlias(node).trim();
         if (input.name.isEmpty())
             input.name = ui::Ls("Entrée ", "Input ") + juce::String(static_cast<int>(bus) + 1);
         inputs.push_back(std::move(input));
@@ -4641,11 +4639,11 @@ std::optional<Studio::PresetHolder> Studio::devicePresetHolder(const TrackRef& t
     const auto* slot = graphFor(track);
     if (slot == nullptr)
         return std::nullopt;
-    for (const auto& node : slot->graph().editorNodes())
-        if (node.id == nodeId)
-            return PresetHolder { "device", node.typeKey,
-                                  juce::String(static_cast<juce::int64>(routingKey(track))) + "/device/"
-                                      + juce::String(static_cast<juce::int64>(nodeId)) };
+    // Asked for by every card the device panel draws: its type alone.
+    if (const auto typeKey = slot->graph().editorNodeTypeKey(nodeId); typeKey.isNotEmpty())
+        return PresetHolder { "device", typeKey,
+                              juce::String(static_cast<juce::int64>(routingKey(track))) + "/device/"
+                                  + juce::String(static_cast<juce::int64>(nodeId)) };
     return std::nullopt;
 }
 

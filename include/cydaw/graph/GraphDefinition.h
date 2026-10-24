@@ -129,6 +129,9 @@ struct GraphNode {
     std::vector<NodeParameter> parameters;
     std::unordered_map<std::string, double> parameterOverrides;
     bool breaksFeedbackCycle {};
+    // Switched off: a node with an audio input and an audio output passes
+    // its sound through as is; any other plays as usual.
+    bool bypassed {};
 
     [[nodiscard]] bool operator==(const GraphNode&) const = default;
 };

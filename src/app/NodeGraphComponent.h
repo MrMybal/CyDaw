@@ -338,6 +338,10 @@ public:
     [[nodiscard]] juce::var serialise() const;
     // The graph the engine plays: its cards switched off listed in it.
     [[nodiscard]] cydaw::engine::NativeDspGraph nativeDspGraph() const;
+    // A compiled graph of this one (runtimeGraphExport's) with the cards
+    // switched off listed in it, as nativeDspGraph has them: what an
+    // exported plug-in must play too.
+    [[nodiscard]] cydaw::engine::NativeDspGraph withCardBypasses(cydaw::engine::NativeDspGraph graph) const;
     // The same graph with the cache set aside, and how many times the export
     // has been rebuilt from scratch. The suite compares the two graphs and
     // counts the rebuilds: a notch must produce the first and none of the
@@ -632,6 +636,11 @@ public:
         std::vector<int> outputKinds;
     };
     [[nodiscard]] std::vector<EditorNode> editorNodes() const;
+    // One card's type and its own name (empty when there is no such card),
+    // without describing the whole graph as editorNodes does: asked for each
+    // card, every frame, that made a large graph's frame cost its square.
+    [[nodiscard]] juce::String editorNodeTypeKey(std::uint64_t id) const;
+    [[nodiscard]] juce::String editorNodeAlias(std::uint64_t id) const;
     bool editorSetPortExposure(std::uint64_t node, std::uint64_t port, bool exposed);
     bool editorSetPortDetails(std::uint64_t node, std::uint64_t port, const juce::String& name, const juce::String& category);
     bool editorRemoveBoundary(std::uint64_t node);

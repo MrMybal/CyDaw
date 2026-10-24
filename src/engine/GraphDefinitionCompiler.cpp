@@ -265,6 +265,10 @@ public:
     {
         std::unordered_map<NodeId, Expansion> nodeExpansions;
         for (const auto& node : definition.nodes) {
+            if (auto through = expandBypassed(node)) {
+                nodeExpansions.emplace(node.id, std::move(*through));
+                continue;
+            }
             auto expansion = node.kind == graph::GraphNodeKind::primitive
                 ? expandPrimitive(node, preservePrimitiveIds)
                 : expandInstance(node);
@@ -387,6 +391,32 @@ private:
         const auto port = ports.find(graphEndpoint.portId);
         return port == ports.end() ? std::vector<ControlEndpoint> {}
                                    : port->second;
+    }
+
+    // A card switched off inside a device: its first audio input goes
+    // straight to its first audio output, its knobs and sockets reach
+    // nothing. Without an audio way through (an instrument) it plays.
+    std::optional<Expansion> expandBypassed(const GraphNode& node)
+    {
+        if (!node.bypassed)
+            return std::nullopt;
+        const auto audio = [&node](const graph::PortDirection direction) {
+            return std::ranges::find_if(node.ports, [direction](const auto& port) {
+                return port.type == graph::PortType::audio && port.direction == direction;
+            });
+        };
+        const auto in = audio(graph::PortDirection::input);
+        const auto out = audio(graph::PortDirection::output);
+        if (in == node.ports.end() || out == node.ports.end())
+            return std::nullopt;
+        NativeDspNode through;
+        through.id = nextNativeNodeId++;
+        through.kind = NativeDspNodeKind::passthrough;
+        native.nodes.push_back(through);
+        Expansion expansion;
+        expansion.inputs[in->id].push_back({ through.id, 1 });
+        expansion.outputs[out->id].push_back({ through.id, 2 });
+        return expansion;
     }
 
     Expansion expandPrimitive(const GraphNode& node,

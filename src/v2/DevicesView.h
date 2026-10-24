@@ -131,6 +131,11 @@ private:
     std::optional<std::pair<std::uint64_t, int>> catalogueBranch_;
     // The track's key (its routing key and pad), for UiState's per-card maps.
     std::uint64_t trackKey_ {};
+    // How far each card of the strip moved the cursor when last drawn (a
+    // container with its branch): a card out of sight is passed over by
+    // that much instead of drawn. Drawing all of them, every frame, made a
+    // chain of hundreds of cards unplayable.
+    std::map<std::uint64_t, float> cardAdvance_;
 
 
     // A plugin's parameters as its worker last reported them, refreshed a

@@ -157,6 +157,18 @@ std::vector<NodeGraphComponent::EditorNode> NodeGraphComponent::editorNodes() co
     return out;
 }
 
+juce::String NodeGraphComponent::editorNodeTypeKey(const std::uint64_t id) const
+{
+    const auto* node = findNode(id);
+    return node != nullptr ? node->typeKey : juce::String();
+}
+
+juce::String NodeGraphComponent::editorNodeAlias(const std::uint64_t id) const
+{
+    const auto* node = findNode(id);
+    return node != nullptr ? node->alias : juce::String();
+}
+
 bool NodeGraphComponent::editorSetPortExposure(const std::uint64_t id, const std::uint64_t portId, const bool exposed)
 {
     auto* node = findNode(id);

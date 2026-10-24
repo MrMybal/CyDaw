@@ -189,6 +189,7 @@ std::uint64_t fingerprintDefinition(const GraphDefinition& definition,
             hashValue(hash, value);
         }
         hashValue(hash, node.breaksFeedbackCycle);
+        hashValue(hash, node.bypassed);
     }
     hashValue(hash, definition.connections.size());
     for (const auto& connection : definition.connections) {

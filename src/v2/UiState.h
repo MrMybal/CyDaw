@@ -350,6 +350,8 @@ private:
     juce::AudioFormatManager& formats_;
     juce::AudioThumbnailCache cache_ { 256 };
     std::map<juce::String, std::unique_ptr<juce::AudioThumbnail>> thumbnails_;
+    // Whether each file is there, and when the disk was last asked (ms).
+    std::map<juce::String, std::pair<double, bool>> present_;
 };
 
 } // namespace cydaw::v2

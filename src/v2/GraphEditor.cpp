@@ -17,6 +17,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace cydaw::v2 {
 
@@ -45,6 +47,72 @@ juce::String fold(const juce::String& text)
     for (const auto& pair : pairs)
         out = out.replace(juce::String::fromUTF8(pair[0]), pair[1]);
     return out;
+}
+
+// Each card's layout by its id, and a cable's two ends found through it:
+// going through every card for every cable, every frame, froze the editor
+// on graphs of thousands of cables.
+template <typename Layouts>
+auto indexCards(const Layouts& layouts)
+{
+    std::unordered_map<std::uint64_t, const typename Layouts::value_type*> index;
+    index.reserve(layouts.size());
+    for (const auto& layout : layouts)
+        index.emplace(layout.node->id, &layout);
+    return index;
+}
+
+template <typename Index, typename Connection>
+bool wireEnds(const Index& cards, const Connection& connection, ImVec2& a, ImVec2& b)
+{
+    const auto from = cards.find(connection.source);
+    const auto to = cards.find(connection.destination);
+    if (from == cards.end() || to == cards.end())
+        return false;
+    auto found = 0;
+    for (const auto& [port, centre] : from->second->outputs)
+        if (port->id == connection.sourcePort) {
+            a = centre;
+            ++found;
+            break;
+        }
+    for (const auto& [port, centre] : to->second->inputs)
+        if (port->id == connection.destinationPort) {
+            b = centre;
+            ++found;
+            break;
+        }
+    return found == 2;
+}
+
+// The sockets a cable reaches, each asked for at once (the same scan of
+// every cable, for every socket, every frame).
+struct Socket {
+    std::uint64_t node {};
+    std::uint64_t port {};
+    bool input {};
+    bool operator==(const Socket&) const = default;
+};
+
+struct SocketHash {
+    std::size_t operator()(const Socket& socket) const noexcept
+    {
+        return std::hash<std::uint64_t> {}(socket.node * 0x9E3779B97F4A7C15ull + socket.port * 2u + (socket.input ? 1u : 0u));
+    }
+};
+
+using CabledSockets = std::unordered_set<Socket, SocketHash>;
+
+template <typename Connections>
+CabledSockets cabledSockets(const Connections& connections)
+{
+    CabledSockets cabled;
+    cabled.reserve(connections.size() * 2);
+    for (const auto& connection : connections) {
+        cabled.insert({ connection.destination, connection.destinationPort, true });
+        cabled.insert({ connection.source, connection.sourcePort, false });
+    }
+    return cabled;
 }
 
 ImU32 toImColour(const juce::Colour colour)
@@ -334,25 +402,11 @@ std::optional<GraphEditor::EditorConnection> GraphEditor::wireAt(const std::vect
                                                                  const ImVec2 mouse) const
 {
     const auto s = scale();
+    const auto cards = indexCards(layouts);
     for (const auto& connection : connections) {
         ImVec2 a {};
         ImVec2 b {};
-        auto found = 0;
-        for (const auto& layout : layouts) {
-            if (layout.node->id == connection.source)
-                for (const auto& [port, centre] : layout.outputs)
-                    if (port->id == connection.sourcePort) {
-                        a = centre;
-                        ++found;
-                    }
-            if (layout.node->id == connection.destination)
-                for (const auto& [port, centre] : layout.inputs)
-                    if (port->id == connection.destinationPort) {
-                        b = centre;
-                        ++found;
-                    }
-        }
-        if (found < 2)
+        if (!wireEnds(cards, connection, a, b))
             continue;
         const auto dx = std::max(50.0f * s, std::abs(b.x - a.x) * 0.5f);
         const auto closest = ImBezierCubicClosestPointCasteljau(a, ImVec2(a.x + dx, a.y), ImVec2(b.x - dx, b.y), b, mouse,
@@ -659,6 +713,7 @@ void GraphEditor::layoutNodes(const std::vector<EditorNode>& nodes, const std::v
     // Value inputs nothing feeds stay out of the way, except on the card in
     // hand and while a control cable looks for somewhere to land.
     const auto drawingControl = (wire_ && wire_->kind == 2 && wire_->fromOutput) || (searchWire_ && searchWire_->kind == 2);
+    const auto cabled = cabledSockets(connections);
     for (const auto& node : nodes) {
         NodeLayout layout;
         layout.node = &node;
@@ -670,10 +725,7 @@ void GraphEditor::layoutNodes(const std::vector<EditorNode>& nodes, const std::v
         for (const auto& port : node.ports) {
             auto visible = port.exposure == 1 || (port.exposure < 0 && (!(port.input && port.kind == 2) || showAll));
             if (!visible)
-                for (const auto& connection : connections)
-                    if ((connection.destination == node.id && connection.destinationPort == port.id)
-                        || (connection.source == node.id && connection.sourcePort == port.id))
-                        visible = true;
+                visible = cabled.contains({ node.id, port.id, true }) || cabled.contains({ node.id, port.id, false });
             if (visible)
                 shown.push_back(&port);
         }
@@ -832,6 +884,8 @@ void GraphEditor::drawCanvas(GraphSlot& slot, const std::optional<TrackRef>& tra
         signals_.updateSimulation(slot);
     std::vector<NodeLayout> layouts;
     layoutNodes(nodes, connections, layouts);
+    const auto cards = indexCards(layouts);
+    const auto cabled = cabledSockets(connections);
     cardRects_.clear();
     for (const auto& layout : layouts)
         cardRects_.push_back({ layout.min, layout.max });
@@ -876,6 +930,13 @@ void GraphEditor::drawCanvas(GraphSlot& slot, const std::optional<TrackRef>& tra
 
     // Sockets: hover target for a cable being drawn, start of a new one.
     for (const auto& layout : layouts) {
+        // Off the canvas nothing reaches its sockets (but the card in hand's,
+        // and the one a cable is drawn from, stay theirs).
+        const auto keep = (movingNodes_ && selection_.contains(layout.node->id)) || (wire_ && wire_->node == layout.node->id);
+        if (!keep
+            && (layout.max.x < canvasMin_.x - 40.0f || layout.min.x > canvasMax_.x + 40.0f
+                || layout.max.y < canvasMin_.y - 40.0f || layout.min.y > canvasMax_.y + 40.0f))
+            continue;
         ImGui::PushID(static_cast<int>(layout.node->id));
         const auto drawSockets = [&](const auto& sockets, const bool inputs) {
             for (const auto& [port, centre] : sockets) {
@@ -892,11 +953,7 @@ void GraphEditor::drawCanvas(GraphSlot& slot, const std::optional<TrackRef>& tra
                     ImGui::EndPopup();
                 }
                 const auto colour = kindColour(port->kind);
-                auto connected = false;
-                for (const auto& connection : connections)
-                    if ((inputs && connection.destination == layout.node->id && connection.destinationPort == port->id)
-                        || (!inputs && connection.source == layout.node->id && connection.sourcePort == port->id))
-                        connected = true;
+                const auto connected = cabled.contains({ layout.node->id, port->id, inputs });
                 const auto compatible = wire_.has_value() && wire_->fromOutput == inputs && wire_->kind == port->kind
                                         && wire_->node != layout.node->id;
                 if (hovered && wire_ && compatible)
@@ -980,10 +1037,7 @@ void GraphEditor::drawCanvas(GraphSlot& slot, const std::optional<TrackRef>& tra
                 }
                 if (!first)
                     first = std::make_pair(layout.node->id, port->id);
-                const auto used = std::any_of(connections.begin(), connections.end(), [&](const auto& connection) {
-                    return wire_->fromOutput ? connection.destination == layout.node->id && connection.destinationPort == port->id
-                                             : connection.source == layout.node->id && connection.sourcePort == port->id;
-                });
+                const auto used = cabled.contains({ layout.node->id, port->id, wire_->fromOutput });
                 if (!free && !used)
                     free = std::make_pair(layout.node->id, port->id);
             }
@@ -1035,22 +1089,7 @@ void GraphEditor::drawCanvas(GraphSlot& slot, const std::optional<TrackRef>& tra
         for (const auto& connection : connections) {
             ImVec2 a {};
             ImVec2 b {};
-            auto found = 0;
-            for (const auto& layout : layouts) {
-                if (layout.node->id == connection.source)
-                    for (const auto& [port, centre] : layout.outputs)
-                        if (port->id == connection.sourcePort) {
-                            a = centre;
-                            ++found;
-                        }
-                if (layout.node->id == connection.destination)
-                    for (const auto& [port, centre] : layout.inputs)
-                        if (port->id == connection.destinationPort) {
-                            b = centre;
-                            ++found;
-                        }
-            }
-            if (found < 2)
+            if (!wireEnds(cards, connection, a, b))
                 continue;
             const auto dx = std::max(40.0f * s, std::abs(b.x - a.x) * 0.5f);
             const auto closest = ImBezierCubicClosestPointCasteljau(a, ImVec2(a.x + dx, a.y), ImVec2(b.x - dx, b.y), b, mouse,
@@ -1130,29 +1169,22 @@ void GraphEditor::drawWires(ImDrawList* list, const std::vector<EditorConnection
     auto flowIndex = 0;
     // Under an open menu the cables neither light up nor say what they do.
     const auto menuOpen = ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId);
+    const auto cards = indexCards(layouts);
     for (const auto& connection : connections) {
         ImVec2 a {};
         ImVec2 b {};
-        auto found = 0;
-        for (const auto& layout : layouts) {
-            if (layout.node->id == connection.source)
-                for (const auto& [port, centre] : layout.outputs)
-                    if (port->id == connection.sourcePort) {
-                        a = centre;
-                        ++found;
-                    }
-            if (layout.node->id == connection.destination)
-                for (const auto& [port, centre] : layout.inputs)
-                    if (port->id == connection.destinationPort) {
-                        b = centre;
-                        ++found;
-                    }
-        }
-        if (found < 2)
+        if (!wireEnds(cards, connection, a, b))
             continue;
         const auto dx = std::max(50.0f * s, std::abs(b.x - a.x) * 0.5f);
         const ImVec2 c1(a.x + dx, a.y);
         const ImVec2 c2(b.x - dx, b.y);
+        // Wholly off the canvas (a curve stays inside its four points).
+        if (std::max({ a.x, b.x, c1.x, c2.x }) < canvasMin_.x || std::min({ a.x, b.x, c1.x, c2.x }) > canvasMax_.x
+            || std::max(a.y, b.y) < canvasMin_.y || std::min(a.y, b.y) > canvasMax_.y) {
+            if (playing && connection.kind == 0)
+                ++flowIndex;
+            continue;
+        }
         const auto selected = selectedWire_ && selectedWire_->source == connection.source
                               && selectedWire_->destination == connection.destination
                               && selectedWire_->sourcePort == connection.sourcePort
@@ -1651,27 +1683,13 @@ void GraphEditor::findSpliceTarget(const std::vector<EditorConnection>& connecti
     const ImVec2 centre((card->min.x + card->max.x) * 0.5f, card->min.y + card->headerHeight * 0.5f);
     const auto s = scale();
     auto best = std::max(dp(26.0f), 40.0f * s);
+    const auto cards = indexCards(layouts);
     for (const auto& connection : connections) {
         if (connection.kind != 0 || connection.source == id || connection.destination == id)
             continue;
         ImVec2 a {};
         ImVec2 b {};
-        auto found = 0;
-        for (const auto& layout : layouts) {
-            if (layout.node->id == connection.source)
-                for (const auto& [port, position] : layout.outputs)
-                    if (port->id == connection.sourcePort) {
-                        a = position;
-                        ++found;
-                    }
-            if (layout.node->id == connection.destination)
-                for (const auto& [port, position] : layout.inputs)
-                    if (port->id == connection.destinationPort) {
-                        b = position;
-                        ++found;
-                    }
-        }
-        if (found < 2)
+        if (!wireEnds(cards, connection, a, b))
             continue;
         const auto dx = std::max(50.0f * s, std::abs(b.x - a.x) * 0.5f);
         const auto closest = ImBezierCubicClosestPointCasteljau(a, ImVec2(a.x + dx, a.y), ImVec2(b.x - dx, b.y), b, centre,

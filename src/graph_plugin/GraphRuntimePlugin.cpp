@@ -1617,8 +1617,9 @@ void GraphRuntimeEditor::publish(const bool topologyChanged)
     const auto runtimeExport = graph.runtimeGraphExport();
     if (runtimeExport.compilationResult.failed())
         return;
+    // Its cards switched off stay off, as in CyDAW.
     (void) processor_.applyEditorGraph(
-        graph.serialise(), runtimeExport.nativeGraph,
+        graph.serialise(), graph.withCardBypasses(runtimeExport.nativeGraph),
         runtimeExport.publishedParameters, runtimeExport.instrumentPlan,
         topologyChanged);
 }
@@ -1764,8 +1765,9 @@ void GraphRuntimeEditor::publish(const bool topologyChanged)
             runtimeExport.nativeGraph.nodes.size());
         return;
     }
+    // Its cards switched off stay off, as in CyDAW.
     const auto result = processor_.applyEditorGraph(
-        graph_.serialise(), runtimeExport.nativeGraph,
+        graph_.serialise(), graph_.withCardBypasses(runtimeExport.nativeGraph),
         runtimeExport.publishedParameters, runtimeExport.instrumentPlan,
         topologyChanged);
     graph_.setDspCompilationStatus(result,

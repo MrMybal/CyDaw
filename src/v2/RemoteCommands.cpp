@@ -34,6 +34,7 @@
 #include <cmath>
 #include <memory>
 #include <optional>
+#include <unordered_map>
 #include <vector>
 
 namespace cydaw::v2 {
@@ -663,6 +664,13 @@ private:
     [[nodiscard]] juce::var graphSummary(const GraphTarget& target) const
     {
         const auto state = target.graph().serialise();
+        // The cards described once, found by id: described again for each
+        // card, a graph of a thousand took seconds to answer.
+        const auto cards = target.graph().editorNodes();
+        std::unordered_map<std::uint64_t, const app::NodeGraphComponent::EditorNode*> cardById;
+        cardById.reserve(cards.size());
+        for (const auto& card : cards)
+            cardById.emplace(card.id, &card);
         juce::Array<juce::var> nodes;
         if (const auto* list = state.getProperty("nodes", juce::var()).getArray())
             for (const auto& node : *list) {
@@ -686,15 +694,12 @@ private:
                         static_cast<std::uint64_t>(static_cast<juce::int64>(node.getProperty("id", 0)))))
                     set(entry, "graphDevice", true);
                 // A designed interface: device_window opens it.
-                {
-                    const auto id = static_cast<std::uint64_t>(static_cast<juce::int64>(node.getProperty("id", 0)));
-                    for (const auto& card : target.graph().editorNodes())
-                        if (card.id == id) {
-                            // The name its card shows, in the interface's language.
-                            set(entry, "name", card.title);
-                            if (card.hasInterface)
-                                set(entry, "window", true);
-                        }
+                if (const auto card = cardById.find(static_cast<std::uint64_t>(static_cast<juce::int64>(node.getProperty("id", 0))));
+                    card != cardById.end()) {
+                    // The name its card shows, in the interface's language.
+                    set(entry, "name", card->second->title);
+                    if (card->second->hasInterface)
+                        set(entry, "window", true);
                 }
                 nodes.add(entry);
             }

@@ -218,6 +218,8 @@ void DevicesView::draw()
     // The cards' modulators, and their modulations for the knobs: each in its
     // card's column, out of the chain.
     const auto trackKey = studio_.routingKey(track) + (track.pad >= 0 ? static_cast<std::uint64_t>(track.pad + 1) << 48 : 0);
+    if (trackKey != trackKey_)
+        cardAdvance_.clear();
     trackKey_ = trackKey;
     modulators_->begin(track, trackKey, graph, nodes);
     const ui::ModulationHostScope modulationScope(modulators_->host());
@@ -486,10 +488,25 @@ void DevicesView::draw()
     Strip strip { track, slot, graph, nodes, modulated, setParameter, {}, {} };
     // A Replacer's instrument has no chain of its own: no "+" between.
     const auto ownChain = track.pad < Studio::replacerPadBase;
+    // Out of sight, a card already drawn once is passed over (but all are
+    // drawn while a menu is open or something is held: a card's menu, a
+    // knob turned, a card dragged stay theirs).
+    const auto visibleMin = ImGui::GetWindowPos().x;
+    const auto visibleMax = visibleMin + ImGui::GetWindowSize().x;
+    const auto mayPass = !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId) && !ImGui::IsAnyItemActive();
     for (std::size_t chainIndex = 0; chainIndex < chain.size(); ++chainIndex) {
         if (ownChain)
             insertGap(strip, chain[chainIndex]->id, height);
+        const auto id = chain[chainIndex]->id;
+        const auto at = ImGui::GetCursorScreenPos().x;
+        if (const auto known = cardAdvance_.find(id);
+            mayPass && known != cardAdvance_.end() && (at + known->second < visibleMin || at > visibleMax)) {
+            ImGui::Dummy(ImVec2(known->second, height));
+            ImGui::SameLine(0.0f, 0.0f);
+            continue;
+        }
         drawCard(strip, *chain[chainIndex], height, CardPlace { 0, -1, nextMovable(chainIndex), 0 });
+        cardAdvance_[id] = std::max(1.0f, ImGui::GetCursorScreenPos().x - at);
     }
     if (strip.removeNode) {
         // Its modulators go with it (a container's, with all it holds).

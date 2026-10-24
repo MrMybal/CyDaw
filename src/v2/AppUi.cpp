@@ -1256,6 +1256,11 @@ unsigned long long AppUi::logo(const float pixels)
                                                                cydaw::branding::cydawlogo512_pngSize);
     if (!source.isValid())
         return 0;
+    // The cache first: as the call's argument, the rescaled logo was made
+    // again at every frame (a read back from the GPU, waiting for it to
+    // finish drawing: most of a frame on a large graph).
+    if (const auto cached = host_.texture(key, {}); cached != 0)
+        return cached;
     return host_.texture(key, size == source.getWidth() ? source
                                                         : source.rescaled(size, size, juce::Graphics::highResamplingQuality));
 }

@@ -8,9 +8,16 @@ WaveformCache::~WaveformCache() = default;
 
 juce::AudioThumbnail* WaveformCache::get(const juce::File& file)
 {
-    if (!file.existsAsFile())
-        return nullptr;
     const auto key = file.getFullPathName();
+    // The disk asked whether the file is there once a second at most: asked
+    // for every clip drawn, at every frame, it was a good part of a frame
+    // (more with a virus scanner looking at each request).
+    const auto now = juce::Time::getMillisecondCounterHiRes();
+    auto& present = present_[key];
+    if (present.first == 0.0 || now - present.first > 1'000.0)
+        present = { now, file.existsAsFile() };
+    if (!present.second)
+        return nullptr;
     const auto found = thumbnails_.find(key);
     if (found != thumbnails_.end())
         return found->second.get();
@@ -33,6 +40,7 @@ bool WaveformCache::anyLoading() const
 void WaveformCache::clear()
 {
     thumbnails_.clear();
+    present_.clear();
 }
 
 } // namespace cydaw::v2
