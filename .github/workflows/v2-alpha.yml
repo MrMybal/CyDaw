@@ -1,0 +1,100 @@
+name: CyDAW V2 Alpha
+run-name: CyDAW V2 Alpha — ${{ inputs.tag }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Alpha release tag (v2-<CMake version>-alpha.<number>)
+        required: true
+        default: v2-0.77.0-alpha.1
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cydaw-v2-alpha
+  cancel-in-progress: false
+
+jobs:
+  windows-v2:
+    name: Build and verify CyDAW V2 / Windows x64
+    runs-on: windows-2022
+    timeout-minutes: 90
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+      CYDAW_NO_RECOVERY: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Package contract tests
+        run: python tests/v2_package_check.py
+      - name: Check Alpha tag
+        run: python tools/publish_v2_alpha.py --check-tag "$env:RELEASE_TAG"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            output/ffmpeg-dependency
+            third_party/ffmpeg
+          key: windows-ffmpeg-${{ hashFiles('third_party/ffmpeg-sdk.json', 'tools/setup_ffmpeg.py') }}
+      - name: Prepare shared LGPL FFmpeg SDK
+        run: python tools/setup_ffmpeg.py
+      - name: Prepare NASM 2.16.03
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'nasm.zip'
+          Invoke-WebRequest 'https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/win64/nasm-2.16.03-win64.zip' -OutFile $archive
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne '3ee4782247bcb874378d02f7eab4e294a84d3d15f3f6ee2de2f47a46aa7226e6') { throw 'NASM checksum mismatch' }
+          Expand-Archive -LiteralPath $archive -DestinationPath $env:RUNNER_TEMP
+          (Join-Path $env:RUNNER_TEMP 'nasm-2.16.03') | Out-File -FilePath $env:GITHUB_PATH -Append
+      - name: Configure CyDAW V2 Release
+        run: cmake --preset desktop-windows-wasapi -DCYDAW_BUILD_V2=ON -DCYDAW_ENABLE_LTO=ON
+      - name: Build V2 and native tests
+        run: cmake --build --preset desktop-windows-wasapi --parallel 2
+      - name: Native tests
+        run: ctest --preset desktop-windows-wasapi --parallel 2
+      - name: Package Alpha
+        run: >-
+          python tools/package_v2_test.py --alpha
+          --build-dir build/windows-wasapi/CyDAW2_artefacts/Release
+          --juce-source build/windows-wasapi/_deps/juce-src
+          --output artifacts/v2-alpha
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CyDAW-V2-Alpha-Windows-x64
+          path: |
+            artifacts/v2-alpha/*.zip
+            artifacts/v2-alpha/*.sha256
+            artifacts/v2-alpha/SHA256SUMS.txt
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: CyDAW-V2-Alpha-build-diagnostics
+          path: |
+            build/windows-wasapi/Testing/Temporary/LastTest.log
+            build/windows-wasapi/Testing/Temporary/LastTestsFailed.log
+            build/windows-wasapi/CMakeFiles/CMakeConfigureLog.yaml
+          if-no-files-found: ignore
+
+  publish-alpha:
+    name: Publish CyDAW V2 Alpha
+    needs: windows-v2
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: CyDAW-V2-Alpha-Windows-x64
+          path: artifacts/v2-alpha
+      - name: Publish verified Alpha assets
+        run: python3 tools/publish_v2_alpha.py --tag "$RELEASE_TAG" --assets artifacts/v2-alpha

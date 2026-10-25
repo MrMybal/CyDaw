@@ -88,3 +88,24 @@ publication de l'artefact.
 L'application est CyDAW 2, construite sous Windows (`CYDAW_BUILD_V2`) ; l'ancienne
 interface multiplateforme a été retirée le 19 octobre 2026. Sous Linux et macOS, ces
 presets construisent les bibliothèques, le worker, la sonde audio et leurs tests.
+
+
+## CyDAW V2 Alpha releases on GitHub
+
+The manually dispatched `CyDAW V2 Alpha` workflow (`.github/workflows/v2-alpha.yml`)
+compiles the Dear ImGui V2 application on a Windows 2022 GitHub-hosted runner. It
+provisions the pinned shared LGPL FFmpeg SDK and verified NASM, builds Release with
+LTO, runs native tests, and packages the application with its worker, codecs,
+fonts, controllers, translations, factory maps and notices. It does not package
+the retired desktop interface or claim a Linux/macOS V2 build.
+
+Dispatch on main with an Alpha tag such as `v2-0.77.0-alpha.1` matching the CMake
+version. The publish job uses the workflow's short-lived `GITHUB_TOKEN` with
+`contents: write`. It checks local and uploaded SHA-256 digests, then publishes a
+pre-release explicitly named Alpha. Stable releases are never replaced. An
+existing tag pointing to another commit is refused; increment the Alpha number.
+
+Local-only example projects, unfinished sound models and sample recordings are
+not part of a clean Git checkout. The package contains available tracked factory
+maps; sample banks are downloaded from CyDAW's sound-bank settings. WASAPI is
+enabled; ASIO and VST2 are not enabled by this release workflow.
