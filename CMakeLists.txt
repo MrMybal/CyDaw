@@ -194,6 +194,9 @@ add_library(cydaw_core STATIC
     src/ui/WorkspaceLayout.cpp
 )
 add_library(CyDAW::Core ALIAS cydaw_core)
+# The core is also linked into shared plug-ins; in particular its thread-local
+# transport state needs PIC relocations on Linux.
+set_target_properties(cydaw_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 target_include_directories(cydaw_core PUBLIC include)
 target_compile_features(cydaw_core PUBLIC cxx_std_20)
@@ -378,6 +381,7 @@ if(CYDAW_BUILD_DESKTOP)
                 "${cydaw_root}/src/app/NativeDspRuntime.cpp"
                 "${cydaw_root}/src/app/NativeDspRuntime.h"
                 "${cydaw_root}/src/app/NodeGraphComponent.cpp"
+                "${cydaw_root}/src/app/NodeGraphComponentEditorAccess.cpp"
                 "${cydaw_root}/src/app/SoundModelFile.cpp"
                 "${cydaw_root}/src/app/SamplerMapFile.cpp"
                 "${cydaw_root}/src/app/NodeGraphComponentFactoryData.cpp"
@@ -394,7 +398,6 @@ if(CYDAW_BUILD_DESKTOP)
                 # the same views as in CyDAW 2.
                 target_sources(${target_name} PRIVATE
                     "${cydaw_root}/src/plugin_ui/PluginInterface.cpp"
-                    "${cydaw_root}/src/app/NodeGraphComponentEditorAccess.cpp"
                     "${cydaw_root}/src/plugin_ui/PluginInterface.h"
                     "${cydaw_root}/src/v2/ImGuiHost.cpp"
                     "${cydaw_root}/src/v2/Theme.cpp"
