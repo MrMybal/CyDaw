@@ -57,6 +57,13 @@ class PackageTests(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             pack.package(self.root / 'build', self.root / 'out', True, self.root / 'juce')
 
+    def test_retry_finds_existing_draft(self):
+        existing = {'id': 42, 'tag_name': 'v2-0.77.0-alpha.1', 'draft': True,
+                    'assets': [{'name': 'already-uploaded.zip'}]}
+        request = lambda method, url: [existing]
+        self.assertIs(publish.find_release(request, 'https://api.example', existing['tag_name']), existing)
+        self.assertIsNone(publish.find_release(request, 'https://api.example', 'v2-0.77.0-alpha.2'))
+
     def test_only_versioned_alpha_tags(self):
         self.assertEqual(publish.check_tag('v2-0.77.0-alpha.1'), '0.77.0')
         for tag in ('v0.77.0', 'v2-0.77.0', 'v2-0.78.0-alpha.1', 'v2-0.77.0-alpha.0', '../alpha'):

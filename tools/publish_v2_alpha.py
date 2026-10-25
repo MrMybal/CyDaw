@@ -43,6 +43,20 @@ def verified_assets(folder):
     return assets
 
 
+def find_release(request, api, tag):
+    # GitHub's tag endpoint omits draft releases. Look through the release list
+    # so a publication retried after a partial upload resumes the same draft.
+    page = 1
+    while True:
+        releases = request('GET', api + '/releases?per_page=100&page=' + str(page))
+        for release in releases:
+            if release['tag_name'] == tag:
+                return release
+        if len(releases) < 100:
+            return None
+        page += 1
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--check-tag')
@@ -73,8 +87,17 @@ def main():
         if stream is not None:
             data = stream
             headers.update({'Content-Type': 'application/octet-stream', 'Content-Length': str(size)})
-        with urllib.request.urlopen(urllib.request.Request(url, data=data, headers=headers, method=method), timeout=600) as response:
-            return json.load(response)
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url, data=data, headers=headers, method=method), timeout=600) as response:
+                return json.load(response)
+        except urllib.error.HTTPError as exc:
+            if exc.code == 404:
+                raise
+            try:
+                detail = json.loads(exc.read()).get('message', exc.reason)
+            except (ValueError, UnicodeError):
+                detail = exc.reason
+            raise RuntimeError('GitHub HTTP ' + str(exc.code) + ': ' + str(detail)) from None
 
     def optional(url):
         try:
@@ -102,7 +125,7 @@ def main():
             '- Building exported plugins requires the C++ tools and CyDAW sources.\n\n'
             '**Experimental Alpha / préversion expérimentale.** Windows x64 only. SHA-256 checksums are supplied.\n\n'
             'Source: [' + sha[:7] + '](https://github.com/' + repository + '/commit/' + sha + ').\n')
-    release = optional(api + '/releases/tags/' + args.tag)
+    release = find_release(request, api, args.tag)
     if release is None:
         release = request('POST', api + '/releases', {'tag_name': args.tag, 'target_commitish': sha,
                           'name': title, 'body': body, 'draft': True, 'prerelease': True, 'make_latest': 'false'})
