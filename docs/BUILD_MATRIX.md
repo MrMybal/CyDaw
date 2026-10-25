@@ -74,7 +74,12 @@ yabridge restent utilisables et conservent l'isolation par instance. Consultez
 
 ## Validation native automatisée
 
-Le workflow `.github/workflows/native-desktop.yml` construit d'abord sous Windows
+Les push et pull requests valident uniquement Windows pour le moment. Dans
+`.github/workflows/native-desktop.yml`, Linux et macOS sont désactivés par défaut ;
+ils peuvent être réactivés lors d'un lancement manuel en cochant `include_unix`.
+Le workflow de publication Alpha V2 reste un build Windows x64.
+
+Lorsque `include_unix` est activé, le workflow construit d'abord sous Windows
 un `CyDAWPluginWorker.exe`, vérifie son handshake IPC versionné puis le transmet
 au job Ubuntu. Linux installe les dépendances exactes de JUCE, active ALSA/JACK,
 exécute les tests C++ et le contrat du script Wine/UMU sous Xvfb, injecte le

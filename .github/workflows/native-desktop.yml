@@ -4,13 +4,19 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      include_unix:
+        description: Also validate Linux and macOS (Windows only by default)
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
 
 jobs:
   windows-worker:
-    name: Windows x64 plugin worker for Linux bridge
+    name: Windows x64 plugin worker
     runs-on: windows-2022
     timeout-minutes: 35
     steps:
@@ -37,6 +43,7 @@ jobs:
           if-no-files-found: error
 
   linux:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.include_unix }}
     name: Linux x64 / ALSA + JACK
     needs: windows-worker
     runs-on: ubuntu-24.04
@@ -80,6 +87,7 @@ jobs:
           if-no-files-found: error
 
   macos:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.include_unix }}
     name: macOS arm64 / CoreAudio
     runs-on: macos-14
     timeout-minutes: 45
