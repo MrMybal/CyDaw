@@ -114,3 +114,12 @@ Local-only example projects, unfinished sound models and sample recordings are
 not part of a clean Git checkout. The package contains available tracked factory
 maps; sample banks are downloaded from CyDAW's sound-bank settings. WASAPI is
 enabled; ASIO and VST2 are not enabled by this release workflow.
+
+
+## Interface modulaire CyUI
+
+CyDAW V2 et les fenêtres des plugins utilisent désormais une révision épinglée de
+CyUI, avec les cibles de modules explicites et la cible Dear ImGui existante.
+Les workers et le moteur DSP restent indépendants de cette bibliothèque UI.
+Voir [CYUI_MIGRATION.md](CYUI_MIGRATION.md) pour les modules, dépendances,
+exports natifs, vérifications et fonctionnalités avancées conservées côté CyDAW.

@@ -726,6 +726,8 @@ void AppUi::followSoundMatching()
 
 void AppUi::notify(const juce::String& message, const bool error)
 {
+    if (ImGui::GetCurrentContext())
+        cyui::notify(message.toRawUTF8(), error ? cyui::Tone::error : cyui::Tone::success);
     state_.status = message;
     state_.statusIsError = error;
     state_.statusTime = ImGui::GetCurrentContext() != nullptr ? ImGui::GetTime() : 0.0;
@@ -1132,6 +1134,10 @@ void AppUi::redo()
 
 void AppUi::frame()
 {
+    struct InspectorFrameEnd {
+        InspectorView* view;
+        ~InspectorFrameEnd() { if (view) view->finishFrame(); }
+    } inspectorFrameEnd {inspector_.get()};
     // A project opening: its window only, until it is open.
     if (studio_.openingProject()) {
         continueOpening();

@@ -1,11 +1,14 @@
 """Exercise Cinema's real timeline controls, filmstrip, docking and ImGui diagnostics.
-Starts an isolated silent instance; requires Pillow and imageio_ffmpeg.
+Starts an isolated silent instance; requires Pillow and either --ffmpeg or imageio_ffmpeg.
 """
 import argparse,json,math,os,socket,struct,subprocess,time,uuid,wave
 from pathlib import Path
 from PIL import Image
-import imageio_ffmpeg
-p=argparse.ArgumentParser();p.add_argument('--exe',required=True,type=Path);p.add_argument('--output',required=True,type=Path);p.add_argument('--port',type=int,default=48077);a=p.parse_args()
+p=argparse.ArgumentParser();p.add_argument('--exe',required=True,type=Path);p.add_argument('--output',required=True,type=Path);p.add_argument('--port',type=int,default=48077);p.add_argument('--ffmpeg',type=Path);p.add_argument('--encoder',default='libx264');a=p.parse_args()
+if a.ffmpeg:ffmpeg=str(a.ffmpeg.resolve())
+else:
+    import imageio_ffmpeg
+    ffmpeg=imageio_ffmpeg.get_ffmpeg_exe()
 folder=a.output.resolve()/uuid.uuid4().hex;folder.mkdir(parents=True)
 locations=folder/'locations.json';locations.write_text(json.dumps(dict(format='CyDAW Locations',version=1,folders={k:str(folder/k) for k in ('cache','devices','pluginExports','presets','mixes','foundry','banks')})),encoding='utf8')
 env=dict(os.environ,CYDAW_NO_RECOVERY='1',CYDAW_SINGLE_VIEWPORT='1',CYDAW_LOCATIONS_FILE=str(locations),CYDAW_DJ_COLLECTION_FILE=str(folder/'dj.json'),CYDAW_DJ_PROCESSING_FILE=str(folder/'dj-processing.json'))
@@ -39,7 +42,7 @@ try:
         except OSError:time.sleep(.2)
     q(cmd='app_mode',mode='cinema');c(action='new',name='Cinema timeline and video');c(action='view',resetLayout=True,start=0,seconds=2,length=2)
     video=folder/'frames.mp4'
-    subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(),'-y','-loglevel','error','-f','lavfi','-i','testsrc2=size=320x180:rate=25:duration=2','-c:v','libx264','-pix_fmt','yuv420p',str(video)],check=True)
+    subprocess.run([ffmpeg,'-y','-loglevel','error','-f','lavfi','-i','testsrc2=size=320x180:rate=25:duration=2','-c:v',a.encoder,'-pix_fmt','yuv420p',str(video)],check=True)
     c(action='video',file=str(video));wait(lambda:tab().get('decoder',{}).get('width')==320)
     wait(lambda:tab()['thumbnailCount']>=10)
     c(action='view',start=.96,seconds=.16)

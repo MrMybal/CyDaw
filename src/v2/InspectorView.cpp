@@ -54,6 +54,24 @@ void row(const char* label)
 
 InspectorView::InspectorView(Studio& studio, UiState& state) : studio_(studio), state_(state) {}
 
+void InspectorView::finishFrame()
+{
+    if (masterFrame_ == ImGui::GetFrameCount() || !masterOwner_) return;
+    // A hidden/collapsed/replaced inspector cannot leave an uncommitted
+    // engine preview behind. Do not restore over a newer external model.
+    const auto current = studio_.trackMix(*masterOwner_);
+    if (masterSerial_ == studio_.trackRefsSerial() && masterObserved_ &&
+        masterObservedValues_ == std::pair{current.gainDb, current.muted}) {
+        for (const auto& [id, draft] : masterInspector_.drafts) {
+            if (!draft.active) continue;
+            if (id == 1) studio_.engine().setMasterGain(float(std::get<double>(draft.before)));
+            if (id == 2) studio_.engine().setMasterMuted(std::get<bool>(draft.before));
+        }
+    }
+    masterInspector_.drafts.clear(); masterOwner_.reset(); masterObserved_ = false;
+    ++masterRevision_;
+}
+
 void InspectorView::draw()
 {
     auto& engine = studio_.engine();
@@ -68,20 +86,31 @@ void InspectorView::draw()
         const auto track = *state_.selectedTrack;
         ui::sectionTitle("MASTER");
         auto mix = studio_.trackMix(track);
-        auto changed = false;
-        row(L("Volume", "Volume"));
-        changed |= ImGui::SliderFloat("##masterGain", &mix.gainDb, -60.0f, 12.0f, "%.1f dB");
-        if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
-            mix.gainDb = 0.0f;
-            changed = true;
+        masterFrame_ = ImGui::GetFrameCount(); masterOwner_ = track;
+        const auto values = std::pair{mix.gainDb, mix.muted};
+        const auto externallyReplaced = !masterObserved_ || masterSerial_ != studio_.trackRefsSerial()
+                                        || masterObservedValues_ != values;
+        if (externallyReplaced) ++masterRevision_;
+        masterSerial_ = studio_.trackRefsSerial();
+        cyui::Property gain;
+        gain.id = 1; gain.label = "Volume"; gain.value = double(mix.gainDb);
+        gain.bounded = true; gain.minimum = -60; gain.maximum = 12;
+        cyui::Property mute;
+        mute.id = 2; mute.label = "Mute"; mute.value = mix.muted;
+        const std::vector<cyui::Property> properties {gain, mute};
+        for (const auto& change : cyui::inspector("##master", masterInspector_, properties, masterRevision_)) {
+            if (externallyReplaced && change.edit.phase == cyui::EditPhase::cancel) continue;
+            // Preview/cancel go straight to the engine. Only a commit marks
+            // the project, retaining realtime audition without history spam.
+            if (change.id == 1) mix.gainDb = float(std::get<double>(change.edit.value));
+            if (change.id == 2) mix.muted = std::get<bool>(change.edit.value);
+            if (change.edit.committed()) studio_.setTrackMix(track, mix);
+            else {
+                engine.setMasterGain(mix.gainDb);
+                engine.setMasterMuted(mix.muted);
+            }
         }
-        ImGui::Dummy(ImVec2(dp(74.0f), 0.0f));
-        ImGui::SameLine();
-        ImGui::PushFont(theme::boldFont(), ui::currentFontBase() * 0.85f);
-        changed |= ui::toggle(L("MUET", "MUTE"), &mix.muted, p.mute);
-        ImGui::PopFont();
-        if (changed)
-            studio_.setTrackMix(track, mix);
+        masterObservedValues_ = {mix.gainDb, mix.muted}; masterObserved_ = true;
         ImGui::TextDisabled("%s", L("Les pistes mixées passent par ses périphériques, puis son volume.",
                                     "The tracks mixed go through its devices, then its volume."));
         ImGui::Spacing();

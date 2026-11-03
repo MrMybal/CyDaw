@@ -5,6 +5,7 @@
 #include "DeviceVisuals.h"
 
 #include "GraphLayout.h"
+#include <cyui/modules/Canvas.h>
 #include "NodeTree.h"
 
 #include "Icons.h"
@@ -207,16 +208,16 @@ float GraphEditor::scale() const
     return (view_ != nullptr ? view_->zoom : 1.0f) * ImGui::GetStyle().FontScaleDpi;
 }
 
-ImVec2 GraphEditor::worldToScreen(const ImVec2 world) const
+ImVec2 GraphEditor::worldToScreen(ImVec2 world) const
 {
-    const auto s = scale();
-    return ImVec2(canvasMin_.x + (world.x - view_->scroll.x) * s, canvasMin_.y + (world.y - view_->scroll.y) * s);
+    const cyui::CanvasView view {{view_->scroll.x, view_->scroll.y}, scale()};
+    return view.screen({world.x, world.y}, canvasMin_);
 }
-
-ImVec2 GraphEditor::screenToWorld(const ImVec2 screen) const
+ImVec2 GraphEditor::screenToWorld(ImVec2 screen) const
 {
-    const auto s = scale();
-    return ImVec2(view_->scroll.x + (screen.x - canvasMin_.x) / s, view_->scroll.y + (screen.y - canvasMin_.y) / s);
+    const cyui::CanvasView view {{view_->scroll.x, view_->scroll.y}, scale()};
+    const auto world = view.world(screen, canvasMin_);
+    return ImVec2(float(world.x), float(world.y));
 }
 
 ImVec2 GraphEditor::fractionToWorld(const juce::Point<float> fraction)
@@ -809,24 +810,8 @@ void GraphEditor::drawCanvas(GraphSlot& slot, const std::optional<TrackRef>& tra
     // Background: grid, then the canvas's own input under everything.
     const auto s = scale();
     {
-        // A field of dots, the stronger ones every fourth step.
-        auto step = kGridStep * s;
-        while (step < dp(9.0f))
-            step *= 2.0f;
-        const auto worldStep = step / s;
-        const auto startX = canvasMin_.x - std::fmod(view_->scroll.x * s, step) - (view_->scroll.x < 0.0f ? -step : 0.0f);
-        const auto startY = canvasMin_.y - std::fmod(view_->scroll.y * s, step) - (view_->scroll.y < 0.0f ? -step : 0.0f);
-        const auto dot = theme::alpha(p.text, 0.07f);
-        const auto strongDot = theme::alpha(p.text, 0.16f);
-        for (auto x = startX; x < canvasMax_.x; x += step) {
-            const auto column = static_cast<long long>(std::llround(screenToWorld(ImVec2(x, 0.0f)).x / worldStep));
-            for (auto y = startY; y < canvasMax_.y; y += step) {
-                const auto row = static_cast<long long>(std::llround(screenToWorld(ImVec2(0.0f, y)).y / worldStep));
-                const auto strong = column % 4 == 0 && row % 4 == 0;
-                list->AddRectFilled(ImVec2(x - 0.75f, y - 0.75f), ImVec2(x + 0.75f + (strong ? 0.6f : 0.0f), y + 0.75f + (strong ? 0.6f : 0.0f)),
-                                    strong ? strongDot : dot);
-            }
-        }
+        const cyui::CanvasView view {{view_->scroll.x, view_->scroll.y}, s};
+        cyui::drawCanvasGrid({canvasMin_, canvasMax_}, view, kGridStep);
     }
     ImGui::SetCursorScreenPos(canvasMin_);
     ImGui::SetNextItemAllowOverlap();

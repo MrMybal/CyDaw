@@ -1,4 +1,5 @@
 #pragma once
+#include "SourceEditor.h"
 
 #include "DeviceHost.h"
 #include "UiState.h"
@@ -74,6 +75,7 @@ private:
     [[nodiscard]] ImVec2 windowSize() const;
     void report(const juce::String& message);
 
+    SourceEditor sourceEditor_, cppEditor_;
     DeviceHost& studio_;
     UiState& state_;
     app::ModuleInterfaceState interface_;

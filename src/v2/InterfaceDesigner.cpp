@@ -443,9 +443,8 @@ void InterfaceEditor::drawCode(GraphSlot &slot)
         ImGui::SetClipboardText(code_.data());
     if (codeError_.isNotEmpty())
         ImGui::TextWrapped("%s", codeError_.toRawUTF8());
-    ImGui::InputTextMultiline("##sceneSource", code_.data(), code_.size(),
-                              ImVec2(-1, std::max(dp(100), ImGui::GetContentRegionAvail().y)),
-                              ImGuiInputTextFlags_AllowTabInput);
+    sourceEditor_.draw("##sceneSource", code_,
+                       ImVec2(-1, std::max(dp(100), ImGui::GetContentRegionAvail().y)), cyui::CodeLanguage::json);
 }
 
 void InterfaceEditor::styleProperties(GraphSlot &slot, Control &control)
@@ -572,15 +571,13 @@ void InterfaceEditor::styleProperties(GraphSlot &slot, Control &control)
         ImGui::Separator();
         ui::sectionTitle(L("Composant C++ Dear ImGui", "Dear ImGui C++ component"));
         const auto source = designValue(control, "customSource").toString();
-        if (ImGui::GetActiveID() != ImGui::GetID("##cppSource"))
+        if (!cppEditor_.focused())
             std::snprintf(cpp_.data(), cpp_.size(), "%s", source.toRawUTF8());
-        ImGui::InputTextMultiline("##cppSource", cpp_.data(), cpp_.size(), ImVec2(-1, dp(260)),
-                                  ImGuiInputTextFlags_AllowTabInput);
-        if (ImGui::IsItemDeactivatedAfterEdit())
-        {
+        if (cppEditor_.draw("##cppSource", cpp_, ImVec2(-1, dp(260)), cyui::CodeLanguage::cpp)) {
             setDesign(control, "customSource", juce::String::fromUTF8(cpp_.data()));
-            push(slot, true);
+            push(slot, false);
         }
+        if (cppEditor_.committed()) push(slot, true);
         if (ImGui::Button(L("Compiler le composant", "Compile component")))
         {
             setDesign(control, "customSource", juce::String::fromUTF8(cpp_.data()));

@@ -69,14 +69,15 @@ smtg_add_vst3plugin(CyDAWGeneratedGraphPlugin_VST3 PACKAGE_NAME "${CYDAW_PRODUCT
     "${CMAKE_CURRENT_SOURCE_DIR}/generated/Definition.cpp" ${CYDAW_CUSTOM_SOURCES}
     "${native}/NativePlugin.cpp" "${native}/NativeEditor.cpp" "${native}/NativeProcessor.cpp" "${native}/NativeResources.cpp" "${native}/NativeFonts.cpp" ${native_visual_sources}
     "${CYDAW_VST3_SDK_DIR}/public.sdk/source/vst/vstsinglecomponenteffect.cpp"
-    "${imgui}/imgui.cpp" "${imgui}/imgui_draw.cpp" "${imgui}/imgui_tables.cpp" "${imgui}/imgui_widgets.cpp"
    )
 target_compile_features(CyDAWGeneratedGraphPlugin_VST3 PRIVATE cxx_std_20)
 target_include_directories(CyDAWGeneratedGraphPlugin_VST3 PRIVATE "${native_visual_dir}" "${native}" "${imgui}" "${CYDAW_SOURCE_ROOT}/src/v2")
-target_compile_definitions(CyDAWGeneratedGraphPlugin_VST3 PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN IMGUI_DISABLE_OBSOLETE_FUNCTIONS
+target_compile_definitions(CyDAWGeneratedGraphPlugin_VST3 PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN
     "CYDAW_PRODUCT=\"${CYDAW_PRODUCT_NAME}\"" "CYDAW_VENDOR=\"${CYDAW_COMPANY_NAME}\"" "CYDAW_VERSION=\"${PROJECT_VERSION}\"" "CYDAW_CATEGORY=\"${CYDAW_CATEGORY}\"" "CYDAW_VENDOR_ID=${CYDAW_VENDOR_ID}" "CYDAW_PRODUCT_ID=${CYDAW_PRODUCT_ID}")
 cydaw_native_platform(CyDAWGeneratedGraphPlugin_VST3)
 target_link_libraries(CyDAWGeneratedGraphPlugin_VST3 PRIVATE sdk CyDAW::Core)
+target_link_libraries(CyDAWGeneratedGraphPlugin_VST3 PRIVATE CyUI::Core CyUI::Audio CyUI::AudioViews)
+cydaw_copy_cyui_notices(CyDAWGeneratedGraphPlugin_VST3)
 
 if(CYDAW_NATIVE_VALIDATOR)
     add_executable(CyDAWNativeViewTest "${CYDAW_SOURCE_ROOT}/tests/NativeViewTest.cpp"

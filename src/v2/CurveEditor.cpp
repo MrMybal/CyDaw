@@ -1,4 +1,5 @@
 #include "CurveEditor.h"
+#include <cyui/modules/Plots.h>
 
 #include "Theme.h"
 #include "Widgets.h"
@@ -172,9 +173,7 @@ double Editor::partOf(const Lane& lane, const double value)
     const auto minimum = lane.minimum;
     const auto maximum = std::max(lane.minimum + 1.0e-9, lane.maximum);
     const auto v = std::clamp(value, minimum, maximum);
-    if (onLogScale(lane))
-        return std::log(v / minimum) / std::log(maximum / minimum);
-    return (v - minimum) / (maximum - minimum);
+    return cyui::Axis{{minimum, maximum}, onLogScale(lane)}.fraction(v);
 }
 
 double Editor::valueOf(const Lane& lane, const double part)
@@ -184,9 +183,7 @@ double Editor::valueOf(const Lane& lane, const double part)
         return std::clamp(lane.fromPart(n), std::min(lane.minimum, lane.maximum), std::max(lane.minimum, lane.maximum));
     const auto minimum = lane.minimum;
     const auto maximum = std::max(lane.minimum + 1.0e-9, lane.maximum);
-    if (onLogScale(lane))
-        return minimum * std::pow(maximum / minimum, n);
-    return minimum + n * (maximum - minimum);
+    return cyui::Axis{{minimum, maximum}, onLogScale(lane)}.value(n);
 }
 
 double Editor::valueAt(const std::vector<Point>& points, const Lane& lane, const double time)

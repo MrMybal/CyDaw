@@ -331,9 +331,12 @@ if(CYDAW_BUILD_DESKTOP)
                 third_party/imgui/backends/imgui_impl_dx11.cpp
             )
             target_include_directories(cydaw_imgui PUBLIC third_party/imgui)
-            target_compile_definitions(cydaw_imgui PUBLIC IMGUI_DISABLE_OBSOLETE_FUNCTIONS)
             target_compile_features(cydaw_imgui PUBLIC cxx_std_17)
             target_link_libraries(cydaw_imgui PUBLIC d3d11 dxgi dwmapi d3dcompiler)
+        endif()
+
+        if(WIN32)
+            include("${CMAKE_CURRENT_SOURCE_DIR}/src/v2/CyUI.cmake")
         endif()
 
         function(cydaw_add_graph_runtime_plugin target_name)
@@ -401,6 +404,7 @@ if(CYDAW_BUILD_DESKTOP)
                     "${cydaw_root}/src/plugin_ui/PluginInterface.h"
                     "${cydaw_root}/src/v2/ImGuiHost.cpp"
                     "${cydaw_root}/src/v2/Theme.cpp"
+                    "${cydaw_root}/src/v2/ThemeRuntime.cpp"
                     "${cydaw_root}/src/v2/Widgets.cpp"
                     "${cydaw_root}/src/v2/UiState.cpp"
                     "${cydaw_root}/src/v2/GraphSlot.cpp"
@@ -425,7 +429,8 @@ if(CYDAW_BUILD_DESKTOP)
                 target_include_directories(${target_name} PRIVATE
                     "${cydaw_root}/src/v2"
                     "${cydaw_root}/src/plugin_ui")
-                target_link_libraries(${target_name} PRIVATE cydaw_imgui juce::juce_dsp)
+                target_link_libraries(${target_name} PRIVATE cydaw_imgui juce::juce_dsp
+                    CyUI::Core CyUI::Audio CyUI::AudioViews CyUI::CodeEditor)
             endif()
             target_compile_features(${target_name} PRIVATE cxx_std_20)
             target_compile_definitions(${target_name} PRIVATE
@@ -762,6 +767,7 @@ if(CYDAW_BUILD_DESKTOP)
                 src/v2/Studio.h
                 src/v2/ProjectIo.cpp
                 src/v2/Theme.cpp
+                src/v2/ThemeRuntime.cpp
                 src/v2/Theme.h
                 src/v2/Widgets.cpp
                 src/v2/Widgets.h
@@ -918,11 +924,28 @@ if(CYDAW_BUILD_DESKTOP)
             )
             cydaw_configure_plugin_formats(CyDAW2)
             cydaw_configure_audio_backends(CyDAW2)
+            if(CYDAW_BUILD_TESTS)
+                add_executable(cydaw_cyui_tests tests/CyUiTests.cpp
+                    src/v2/Theme.cpp src/v2/ThemeRuntime.cpp src/v2/Widgets.cpp)
+                target_include_directories(cydaw_cyui_tests PRIVATE src/v2)
+                target_compile_features(cydaw_cyui_tests PRIVATE cxx_std_20)
+                target_compile_definitions(cydaw_cyui_tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
+                target_link_libraries(cydaw_cyui_tests PRIVATE CyUI::Core CyUI::Audio CyUI::AudioViews
+                    CyUI::Nodes CyUI::CodeEditor CyUI::Images CyUI::Inspector juce::juce_core)
+                if(MSVC)
+                    target_compile_options(cydaw_cyui_tests PRIVATE /utf-8 /EHsc)
+                endif()
+                add_test(NAME cydaw_cyui_tests COMMAND cydaw_cyui_tests)
+                cydaw_configure_test(cydaw_cyui_tests 60)
+            endif()
+            cydaw_copy_cyui_notices(CyDAW2)
             cydaw_use_precompiled_header(CyDAW2)
             target_link_libraries(CyDAW2 PRIVATE
                 CyDAW::Core
                 CyDAWTranslations
                 CyDAW2Branding
+                CyUI::Core CyUI::Audio CyUI::AudioViews CyUI::Nodes
+                CyUI::CodeEditor CyUI::Images CyUI::Inspector
                 cydaw_imgui
                 juce::juce_audio_devices
                 juce::juce_audio_formats

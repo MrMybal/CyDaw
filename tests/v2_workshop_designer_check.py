@@ -61,7 +61,7 @@ workshop('programs',op='add',name='Soft')
 workshop('save')
 export=workshop('vst3_export',folder=str((args.output/'NativeComp').resolve()),productName='CyNativeComp',pluginCode='NCMP')
 project=Path(export['project']);cmake=(project/'CMakeLists.txt').read_text(encoding='utf8');cpp=(project/'generated/Definition.cpp').read_text(encoding='utf8')
-assert 'NativePlugin.cmake' in cmake and 'JUCE' not in cmake
+assert 'NativeFormats.cmake' in cmake and 'set(CYDAW_EXPORT_FORMAT VST3' in cmake and 'JUCE' not in cmake
 assert 'cydawCustom_101' in cpp and 'Soft' in cpp and 'p.values.push_back' in cpp
 assert 'NodeGraphComponent' not in cpp
 (args.output/'checks.json').write_text(json.dumps(dict(layouts=True,strictCodeValidation=True,portMetadata=True,manualBoundaries=True,cppComponent=True,nativeProject=True,programs=2),indent=2),encoding='utf8')

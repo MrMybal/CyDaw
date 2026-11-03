@@ -1,4 +1,5 @@
 #pragma once
+#include "SourceEditor.h"
 #include "Studio.h"
 #include "UiState.h"
 namespace cydaw::v2
@@ -15,6 +16,7 @@ class JsfxView final
 
   private:
     class Compiler;
+    SourceEditor sourceEditor_;
     Studio &studio_;
     UiState &state_;
     std::unique_ptr<Compiler> compiler_;

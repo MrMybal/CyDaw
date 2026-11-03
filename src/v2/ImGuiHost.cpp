@@ -1,6 +1,8 @@
 #include "ImGuiHost.h"
 
 #include "Theme.h"
+#include "Widgets.h"
+#include <cyui/Core.h>
 
 #include <imgui.h>
 
@@ -606,8 +608,10 @@ void ImGuiHost::frame()
     if (beforeNewFrame)
         beforeNewFrame();
     ImGui::NewFrame();
+    cyui::setLocale(ui::language().toRawUTF8());
     if (onFrame)
         onFrame();
+    cyui::renderNotifications();
     ImGui::Render();
 
     const auto background = theme::vec(theme::palette().bg0);

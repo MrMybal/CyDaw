@@ -1,6 +1,6 @@
 #pragma once
 
-#include <imgui.h>
+#include <cyui/Theme.h>
 
 #include <juce_core/juce_core.h>
 
@@ -13,27 +13,8 @@
 
 namespace cydaw::v2::theme {
 
-struct Palette {
-    // Grounds, from the deepest (timeline background) to the raised frames.
-    ImU32 bg0;
-    ImU32 bg1;
-    ImU32 bg2;
-    ImU32 bg3;
-    ImU32 bg4;
-    ImU32 bg5;
-    // Lines.
-    ImU32 line;
-    ImU32 lineStrong;
-    ImU32 grid;
-    ImU32 gridStrong;
-    // Text.
-    ImU32 text;
-    ImU32 textDim;
-    ImU32 textFaint;
-    // The one accent, for what is active or selected.
-    ImU32 accent;
-    ImU32 accentHover;
-    ImU32 accentDim;
+// CyDAW-specific signal roles extend the shared semantic palette.
+struct Palette : cyui::Palette {
     // Meaning colours: signal kinds and transport states.
     ImU32 audio;
     ImU32 midi;
@@ -47,7 +28,6 @@ struct Palette {
     ImU32 meterLow;
     ImU32 meterMid;
     ImU32 meterHigh;
-    ImU32 selection;
 };
 
 [[nodiscard]] const Palette& palette();
@@ -62,9 +42,8 @@ struct Theme {
     bool builtIn {};
     juce::File file;
 };
-// CyDAW's own: mid grey (the default, as Bitwig's), light grey (as Ableton
-// Live's), the first dark one. Their names in English; the interface says
-// them in its language (ThemesView).
+// Shared built-in themes with legacy CyDAW keys. Mid grey remains the default;
+// ThemesView translates their display names in the application's language.
 [[nodiscard]] const std::vector<Theme>& builtInThemes();
 inline constexpr const char* defaultThemeKey = "mid-grey";
 // The palette's colours by name, in the order an editor shows them, with

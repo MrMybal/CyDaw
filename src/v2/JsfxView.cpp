@@ -373,23 +373,8 @@ void JsfxView::draw()
         }
         const auto available = ImGui::GetContentRegionAvail();
         const auto height = std::max(ui::dp(140), available.y - ui::dp(150));
-        ImGui::PushFont(theme::monoFont(), ui::dp(theme::baseFontSize()));
-        if (ImGui::InputTextMultiline(
-                "##jsfxSource", code_.data(), code_.size(), ImVec2(-1, height),
-                ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CallbackResize,
-                [](ImGuiInputTextCallbackData *data)
-                {
-                    auto *code = static_cast<std::vector<char> *>(data->UserData);
-                    if (data->EventFlag == ImGuiInputTextFlags_CallbackResize)
-                    {
-                        code->resize(size_t(data->BufSize) + 4096);
-                        data->Buf = code->data();
-                    }
-                    return 0;
-                },
-                &code_))
+        if (sourceEditor_.draw("##jsfxSource", code_, ImVec2(-1, height), eelLanguage()))
             changed_ = true;
-        ImGui::PopFont();
         ImGui::TextColored(theme::vec(error_ ? theme::palette().record : theme::palette().textDim), "%s",
                            ui::L("Diagnostics", "Diagnostics"));
         ImGui::BeginChild("jsfxDiagnostics", ImVec2(0, ui::dp(80)), ImGuiChildFlags_Borders);

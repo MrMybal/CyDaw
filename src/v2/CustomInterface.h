@@ -97,7 +97,7 @@ class CustomInterface final
                 cmake += "  \"" + imgui.getChildFile(file).getFullPathName().replaceCharacter('\\', '/') + "\"\n";
             cmake += ")\ntarget_compile_features(CyInterfaceComponent PRIVATE "
                      "cxx_std_20)\ntarget_compile_definitions(CyInterfaceComponent PRIVATE "
-                     "IMGUI_DISABLE_OBSOLETE_FUNCTIONS)\ntarget_include_directories(CyInterfaceComponent PRIVATE \"" +
+                     "NOMINMAX)\ntarget_include_directories(CyInterfaceComponent PRIVATE \"" +
                      imgui.getFullPathName().replaceCharacter('\\', '/') + "\" \"" +
                      root.getChildFile("src/v2").getFullPathName().replaceCharacter('\\', '/') + "\")\n";
             cmake += "target_compile_options(CyInterfaceComponent PRIVATE /utf-8)\n";

@@ -6,6 +6,7 @@
 #include "CinemaVideo.h"
 
 #include <imgui.h>
+#include <cyui/modules/Images.h>
 
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -95,6 +96,8 @@ private:
         engine::foundry::Note noteOriginal;
         std::int64_t noteGrab{};
         bool noteResize{};
+        cyui::ImageState videoView;
+        std::string videoViewFile;
         std::unique_ptr<CinemaVideo> video;
         std::uint64_t videoRevision{};
         unsigned long long videoTexture{};

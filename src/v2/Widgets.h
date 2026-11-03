@@ -1,6 +1,6 @@
 #pragma once
 
-#include <imgui.h>
+#include <cyui/Core.h>
 #include <juce_core/juce_core.h>
 
 #include <cstdint>
@@ -309,7 +309,7 @@ void setDetached(const char* id, bool detached);
 
 [[nodiscard]] inline float dp(const float value)
 {
-    return value * ImGui::GetStyle().FontScaleDpi;
+    return cyui::dp(value);
 }
 
 } // namespace cydaw::v2::ui

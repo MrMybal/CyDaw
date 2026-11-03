@@ -721,24 +721,12 @@ void ProcessingView::remove()
         }
 }
 
-void ProcessingView::drawCode(std::vector<char>& buffer, const char* id, const float height)
+void ProcessingView::drawCode(std::vector<char>& buffer, const char* id, float height)
 {
-    ImGui::PushFont(theme::monoFont(), dp(theme::baseFontSize()));
-    if (ImGui::InputTextMultiline(
-            id, buffer.data(), buffer.size(), ImVec2(-1.0f, height), ImGuiInputTextFlags_AllowTabInput | ImGuiInputTextFlags_CallbackResize,
-            [](ImGuiInputTextCallbackData* data) {
-                auto* code = static_cast<std::vector<char>*>(data->UserData);
-                if (data->EventFlag == ImGuiInputTextFlags_CallbackResize) {
-                    code->resize(static_cast<std::size_t>(data->BufSize) + 4'096);
-                    data->Buf = code->data();
-                }
-                return 0;
-            },
-            &buffer)) {
+    if (sourceEditor_.draw(id, buffer, ImVec2(-1, height), cyui::CodeLanguage::plain)) {
         codeChanged_ = true;
-        codeDueAt_ = now() + 0.5;
+        codeDueAt_ = now() + .5;
     }
-    ImGui::PopFont();
 }
 
 namespace {

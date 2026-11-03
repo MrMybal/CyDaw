@@ -1,4 +1,5 @@
 #pragma once
+#include "SourceEditor.h"
 
 #include "Processing.h"
 #include "UiState.h"
@@ -176,6 +177,7 @@ private:
     void remove();
     void stopEverything();
 
+    SourceEditor sourceEditor_;
     Studio& studio_;
     UiState& state_;
     ImGuiHost& host_;

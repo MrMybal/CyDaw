@@ -1,6 +1,7 @@
 #include "DeviceVisuals.h"
 
 #include "StudioEffectsView.h"
+#include <cyui/modules/AudioViews.h>
 
 #include <cydaw/engine/ProEffectsDesign.h>
 
@@ -539,26 +540,34 @@ bool spectrometerPlot(const Plot& plot, std::vector<Param>& parameters, const Pa
     return false;
 }
 
-bool spectrumPlot(const Plot& plot, ImU32 colour, const Live& live)
+bool spectrumPlot(const Plot& bounds, ImU32 colour, const Live& live)
 {
-    const auto& p = theme::palette();
-    auto* list = ImGui::GetWindowDrawList();
-    frequencyGrid(list, plot);
-    if (live.before != nullptr)
-        drawSpectrum(list, plot, *live.before, theme::alpha(p.textDim, 0.55f), theme::alpha(p.textDim, 0.16f));
-    if (live.after != nullptr)
-        drawSpectrum(list, plot, *live.after, colour, theme::alpha(colour, 0.22f));
-    const auto quiet = (live.before == nullptr || !live.before->visible()) && (live.after == nullptr || !live.after->visible());
-    if (quiet)
-        ui::centredText(list, plot.min, plot.max, p.textFaint, L("lecture arrêtée", "not playing"));
-    else if (live.before != nullptr) {
-        // Which line is which.
-        const auto y = plot.min.y + dp(4.0f);
-        auto x = plot.max.x - smallTextSize(L("après", "after")).x - dp(6.0f);
-        smallText(list, ImVec2(x, y), colour, L("après", "after"));
-        x -= smallTextSize(L("avant", "before")).x + dp(8.0f);
-        smallText(list, ImVec2(x, y), p.textDim, L("avant", "before"));
+    (void)colour;
+    std::array<std::vector<cyui::Point>, 2> points;
+    std::vector<cyui::PlotSeries> series;
+    const Spectrum* signals[] = {live.before, live.after};
+    for (int channel = 0; channel < 2; ++channel) {
+        if (!signals[channel]) continue;
+        auto& prepared = points[std::size_t(channel)];
+        prepared.reserve(Spectrum::binCount);
+        for (int bin = 0; bin < Spectrum::binCount; ++bin)
+            prepared.push_back({Spectrum::frequencyOfBin(float(bin)), Spectrum::floorDb +
+                signals[channel]->levels()[std::size_t(bin)] * (Spectrum::ceilingDb - Spectrum::floorDb)});
+        series.push_back({std::uint64_t(channel + 1), channel ? L("après", "after") : L("avant", "before"),
+                          prepared, cyui::PlotStyle::line, channel});
     }
+    cyui::PlotState view {{{20, 20000}, true}, {{Spectrum::floorDb, Spectrum::ceilingDb}, false}};
+    cyui::PlotOptions options;
+    options.navigation = false;
+    options.axes = bounds.width() > dp(210);
+    options.legend = live.before && live.after && bounds.width() > dp(180);
+    options.formatX = [](double hz) { return hz >= 1000 ? juce::String(hz / 1000, 1).toStdString() + "k" : juce::String(int(hz)).toStdString(); };
+    const auto cursor = ImGui::GetCursorScreenPos();
+    ImGui::SetCursorScreenPos(bounds.min);
+    cyui::spectrum("##signalSpectrum", view, series, ImVec2(bounds.width(), bounds.height()), options);
+    ImGui::SetCursorScreenPos(cursor);
+    if ((!live.before || !live.before->visible()) && (!live.after || !live.after->visible()))
+        cyui::centredText(ImGui::GetWindowDrawList(), bounds.min, bounds.max, cyui::palette().textFaint, L("lecture arrêtée", "not playing"));
     return false;
 }
 
@@ -833,21 +842,27 @@ void scope(ImDrawList* list, const Plot& plot, const engine::AudioAnalysisFrame*
 
 // The oscilloscope: the sound's last samples across, its zero line, its
 // full scale.
-bool scopePlot(const Plot& plot, const ImU32 colour, const Live& live)
+bool scopePlot(const Plot& bounds, ImU32 colour, const Live& live)
 {
-    const auto& p = theme::palette();
-    auto* list = ImGui::GetWindowDrawList();
-    const auto centre = (plot.min.y + plot.max.y) * 0.5f;
-    const auto half = plot.height() * 0.46f;
-    for (const auto level : { -1.0f, -0.5f, 0.5f, 1.0f })
-        list->AddLine(ImVec2(plot.min.x, centre - level * half), ImVec2(plot.max.x, centre - level * half), p.grid);
-    list->AddLine(ImVec2(plot.min.x, centre), ImVec2(plot.max.x, centre), theme::alpha(p.line, 0.9f));
-    const auto* frame = live.afterFrame != nullptr ? live.afterFrame : live.beforeFrame;
-    if (!live.running || frame == nullptr || frame->waveformCount < 16) {
-        ui::centredText(list, plot.min, plot.max, p.textFaint, L("lecture arrêtée", "not playing"));
-        return false;
+    (void)colour;
+    const auto* frame = live.afterFrame ? live.afterFrame : live.beforeFrame;
+    std::vector<cyui::Point> samples;
+    if (live.running && frame && frame->waveformCount >= 16) {
+        const auto count = std::min<std::uint32_t>(1024, frame->waveformCount);
+        samples.reserve(count);
+        for (std::uint32_t i = 0; i < count; ++i)
+            samples.push_back({double(i) / std::max(1u, count - 1), frame->waveform[frame->waveformCount - count + i]});
     }
-    scope(list, plot, frame, colour, 1.0f, 1'024);
+    cyui::PlotState view {{{0, 1}, false}, {{-1, 1}, false}};
+    const cyui::PlotSeries series {1, "", samples};
+    cyui::PlotOptions options;
+    options.navigation = options.axes = options.legend = false;
+    const auto cursor = ImGui::GetCursorScreenPos();
+    ImGui::SetCursorScreenPos(bounds.min);
+    cyui::oscilloscope("##signalScope", view, {&series, 1}, ImVec2(bounds.width(), bounds.height()), options);
+    ImGui::SetCursorScreenPos(cursor);
+    if (samples.empty())
+        cyui::centredText(ImGui::GetWindowDrawList(), bounds.min, bounds.max, cyui::palette().textFaint, L("lecture arrêtée", "not playing"));
     return false;
 }
 

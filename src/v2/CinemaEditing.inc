@@ -149,7 +149,7 @@ void FoundryView::drawCinemaVideo(Tab& t,ImVec2 size){
     if(t.video){const auto info=t.video->snapshot();if(info.codec.isNotEmpty())ImGui::TextDisabled("%s · %s",info.backend.toRawUTF8(),info.codec.toRawUTF8());}
     const auto area=ImGui::GetContentRegionAvail();const auto box=ImVec2(std::max(1.f,area.x),std::max(dp(40),std::min(std::max(dp(40),area.y-dp(115)),area.x*9/16)));
     const auto origin=ImGui::GetCursorScreenPos();auto* draw=ImGui::GetWindowDrawList();
-    draw->AddRectFilled(origin,ImVec2(origin.x+box.x,origin.y+box.y),IM_COL32(0,0,0,255));
+    draw->AddRectFilled(origin,ImVec2(origin.x+box.x,origin.y+box.y),cyui::palette().bg0);
     bool drawn=false;
     if(t.video){const auto frame=t.video->snapshot();
         if(frame.revision!=t.videoRevision&&frame.image.isValid()){
@@ -157,10 +157,13 @@ void FoundryView::drawCinemaVideo(Tab& t,ImVec2 size){
         }
         const auto local=transportState().seconds-picture.start;
         if(t.videoTexture&&frame.image.isValid()&&local>=0&&(picture.duration<=0||local<picture.duration)){
-            const auto scale=std::min(box.x/frame.image.getWidth(),box.y/frame.image.getHeight());
-            const ImVec2 extent(frame.image.getWidth()*scale,frame.image.getHeight()*scale);
-            const ImVec2 top(origin.x+(box.x-extent.x)*.5f,origin.y+(box.y-extent.y)*.5f);
-            draw->AddImage(static_cast<ImTextureID>(t.videoTexture),top,ImVec2(top.x+extent.x,top.y+extent.y));drawn=true;
+            if(t.videoViewFile!=picture.file){t.videoViewFile=picture.file;t.videoView.fitPending=true;}
+            cyui::ImageData image;
+            image.texture=static_cast<ImTextureID>(t.videoTexture);
+            image.width=frame.image.getWidth();image.height=frame.image.getHeight();
+            ImGui::SetCursorScreenPos(origin);
+            cyui::imageViewport("##videoPreview",t.videoView,image,box);
+            drawn=true;
         }
         if(frame.error.isNotEmpty())ImGui::TextWrapped("%s",frame.error.toRawUTF8());
     }

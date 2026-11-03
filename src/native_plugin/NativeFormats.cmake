@@ -27,17 +27,18 @@ else()
 endif()
 add_library(${target} MODULE "${CMAKE_CURRENT_SOURCE_DIR}/generated/Definition.cpp" ${CYDAW_CUSTOM_SOURCES}
     "${native}/NativeProcessor.cpp" "${native}/NativeResources.cpp" "${native}/NativeFonts.cpp" ${adapter} ${native_visual_sources}
-    "${imgui}/imgui.cpp" "${imgui}/imgui_draw.cpp" "${imgui}/imgui_tables.cpp" "${imgui}/imgui_widgets.cpp"
    )
 target_compile_features(${target} PRIVATE cxx_std_20)
 target_include_directories(${target} PRIVATE "${native_visual_dir}" "${native}" "${imgui}" "${CYDAW_SOURCE_ROOT}/src/v2"
     "${CYDAW_SOURCE_ROOT}/third_party/clap/include" "${CYDAW_SOURCE_ROOT}/third_party/lv2/include")
 set(uri "urn:cydaw:${CYDAW_VENDOR_ID}:${CYDAW_PRODUCT_ID}")
-target_compile_definitions(${target} PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN IMGUI_DISABLE_OBSOLETE_FUNCTIONS
+target_compile_definitions(${target} PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN
     "CYDAW_PRODUCT=\"${CYDAW_PRODUCT_NAME}\"" "CYDAW_VENDOR=\"${CYDAW_COMPANY_NAME}\"" "CYDAW_VERSION=\"${PROJECT_VERSION}\""
     "CYDAW_PLUGIN_URI=\"${uri}\"")
 cydaw_native_platform(${target})
 target_link_libraries(${target} PRIVATE CyDAW::Core)
+target_link_libraries(${target} PRIVATE CyUI::Core CyUI::Audio CyUI::AudioViews)
+cydaw_copy_cyui_notices(${target})
 if(CYDAW_EXPORT_FORMAT STREQUAL "CLAP")
     set_target_properties(${target} PROPERTIES PREFIX "" SUFFIX ".clap" OUTPUT_NAME "${CYDAW_PRODUCT_NAME}"
         LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/CLAP/$<CONFIG>" RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/CLAP/$<CONFIG>")
