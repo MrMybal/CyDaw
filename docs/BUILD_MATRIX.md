@@ -104,7 +104,7 @@ LTO, runs native tests, and packages the application with its worker, codecs,
 fonts, controllers, translations, factory maps and notices. It does not package
 the retired desktop interface or claim a Linux/macOS V2 build.
 
-Dispatch on main with an Alpha tag such as `v2-0.77.0-alpha.1` matching the CMake
+Dispatch on main with an Alpha tag such as `v2-0.78.0-alpha.1` matching the CMake
 version. The publish job uses the workflow's short-lived `GITHUB_TOKEN` with
 `contents: write`. It checks local and uploaded SHA-256 digests, then publishes a
 pre-release explicitly named Alpha. Stable releases are never replaced. An

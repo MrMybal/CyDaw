@@ -26,10 +26,15 @@ class PackageTests(unittest.TestCase):
                      'content/factory/catalogue.json', 'build/CyDAW 2.exe', 'build/CyDAWPluginWorker.exe',
                      'build/fonts/Roboto-Medium.ttf', 'build/fonts/Cousine-Regular.ttf',
                      'build/i18n/en.json', 'build/Licenses/FFmpeg/LICENSE-LGPL-3.0.txt',
-                     'build/Licenses/FFmpeg/sources/ffmpeg.tar.gz', 'build/ControlPlugins/Gamepads.cyctl'):
+                     'build/Licenses/FFmpeg/sources/ffmpeg.tar.gz', 'build/ControlPlugins/Gamepads.cyctl',
+                     'build/Licenses/CyUI/LICENSE', 'build/Licenses/CyUI/THIRD_PARTY_NOTICES.md',
+                     'build/Licenses/CyUI/third_party/texteditor/LICENSE',
+                     'build/Licenses/CyUI/third_party/lexilla/License.txt',
+                     'build/Licenses/CyUI/third_party/scintilla/License.txt',
+                     'build/Licenses/CyUI/third_party/SciTE-Properties-License.txt'):
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text('project(CyDAW VERSION 0.77.0)' if name == 'CMakeLists.txt' else 'fixture', 'utf-8')
+            path.write_text('project(CyDAW VERSION 0.78.0)' if name == 'CMakeLists.txt' else 'fixture', 'utf-8')
         for component in ('avcodec', 'avformat', 'avutil', 'swscale', 'swresample'):
             (self.root / 'build' / (component + '-1.dll')).write_bytes(b'fixture')
         self.patch = patch.object(pack, 'ROOT', self.root)
@@ -47,6 +52,8 @@ class PackageTests(unittest.TestCase):
             self.assertTrue(any(n.endswith('/avcodec-1.dll') for n in names))
             self.assertTrue(any(n.endswith('/Licenses/FFmpeg/sources/ffmpeg.tar.gz') for n in names))
             self.assertTrue(any(n.endswith('/ControlPlugins/Gamepads.cyctl') for n in names))
+            self.assertTrue(any(n.endswith('/Licenses/CyUI/LICENSE') for n in names))
+            self.assertTrue(any(n.endswith('/Licenses/CyUI/third_party/texteditor/LICENSE') for n in names))
         self.assertEqual(len(publish.verified_assets(self.root / 'out')), 3)
         archive.write_bytes(b'corrupt')
         with self.assertRaises(ValueError):
@@ -57,16 +64,21 @@ class PackageTests(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             pack.package(self.root / 'build', self.root / 'out', True, self.root / 'juce')
 
+    def test_missing_cyui_licence_fails_before_packaging(self):
+        (self.root / 'build/Licenses/CyUI/LICENSE').unlink()
+        with self.assertRaises(FileNotFoundError):
+            pack.package(self.root / 'build', self.root / 'out', True, self.root / 'juce')
+
     def test_retry_finds_existing_draft(self):
-        existing = {'id': 42, 'tag_name': 'v2-0.77.0-alpha.1', 'draft': True,
+        existing = {'id': 42, 'tag_name': 'v2-0.78.0-alpha.1', 'draft': True,
                     'assets': [{'name': 'already-uploaded.zip'}]}
         request = lambda method, url: [existing]
         self.assertIs(publish.find_release(request, 'https://api.example', existing['tag_name']), existing)
-        self.assertIsNone(publish.find_release(request, 'https://api.example', 'v2-0.77.0-alpha.2'))
+        self.assertIsNone(publish.find_release(request, 'https://api.example', 'v2-0.78.0-alpha.2'))
 
     def test_only_versioned_alpha_tags(self):
-        self.assertEqual(publish.check_tag('v2-0.77.0-alpha.1'), '0.77.0')
-        for tag in ('v0.77.0', 'v2-0.77.0', 'v2-0.78.0-alpha.1', 'v2-0.77.0-alpha.0', '../alpha'):
+        self.assertEqual(publish.check_tag('v2-0.78.0-alpha.1'), '0.78.0')
+        for tag in ('v0.78.0', 'v2-0.78.0', 'v2-0.79.0-alpha.1', 'v2-0.78.0-alpha.0', '../alpha'):
             with self.assertRaises(ValueError):
                 publish.check_tag(tag)
 

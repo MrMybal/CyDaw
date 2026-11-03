@@ -1,7 +1,10 @@
 # CyDAW 2 — modular CyUI integration
 
 CyUI is pinned to `8367401fe45fc22bfed5e227cb3de343177f676b` (1.2.0),
-from https://github.com/MrMybal/CyUI. Integration uses FetchContent, like JUCE;
+from https://github.com/MrMybal/CyUI, under its [MIT licence](https://github.com/MrMybal/CyUI/blob/8367401fe45fc22bfed5e227cb3de343177f676b/LICENSE).
+The complete licence and upstream notices are shipped in `Licenses/CyUI`, so
+reading them does not require access to the source repository.
+Integration uses FetchContent, like JUCE;
 there is no copied CyUI implementation in the application. `src/v2/CyUI.cmake`
 selects modules before adding the library and supplies the host's `cydaw_imgui`
 target. No second ImGui library, demo, gallery, browser/CEF or Unreal adapter is

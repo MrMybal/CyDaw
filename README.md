@@ -156,7 +156,10 @@ CyDAW is distributed under the GNU Affero General Public License, version 3 (AGP
 [LICENSE](LICENSE). Maintained by Cyberalien.
 
 It is built on [JUCE 8](https://juce.com) (AGPLv3) and [Dear ImGui](https://github.com/ocornut/imgui)
-(MIT). The sound banks keep their own licences.
+(MIT). The modular interface also uses [CyUI](https://github.com/MrMybal/CyUI),
+under the [MIT licence](https://github.com/MrMybal/CyUI/blob/8367401fe45fc22bfed5e227cb3de343177f676b/LICENSE).
+The release includes its licence and dependency notices in `Licenses/CyUI`.
+The sound banks keep their own licences.
 
 The external **VST3, CLAP, LV2 and JSFX** formats, the native exports and the JSFX editor are described
 in [PLUGIN_FORMATS.md](docs/PLUGIN_FORMATS.md).

@@ -123,6 +123,8 @@ def main():
             '- Native instruments/effects, isolated VST3/CLAP/LV2/JSFX hosting and video codecs.\n'
             '- Factory sample banks are downloaded separately in Options > Sound banks. Local example projects and unfinished sound models may be absent.\n'
             '- Building exported plugins requires the C++ tools and CyDAW sources.\n\n'
+            '- Modular CyUI interface: shared audio controls, themes, native source editors, Cinema preview and master property drafts.\n'
+            '- CyUI: [source](https://github.com/MrMybal/CyUI) and [MIT licence](https://github.com/MrMybal/CyUI/blob/8367401fe45fc22bfed5e227cb3de343177f676b/LICENSE); full notices are included in Licenses/CyUI.\n\n'
             '**Experimental Alpha / préversion expérimentale.** Windows x64 only. SHA-256 checksums are supplied.\n\n'
             'Source: [' + sha[:7] + '](https://github.com/' + repository + '/commit/' + sha + ').\n')
     release = find_release(request, api, args.tag)

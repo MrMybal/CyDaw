@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(CyDAW VERSION 0.77.0 LANGUAGES C CXX)
+project(CyDAW VERSION 0.78.0 LANGUAGES C CXX)
 
 # zstd's decoder (third_party/zstd, BSD): Zrythm's projects are compressed with it.
 add_library(cydaw_zstd STATIC
