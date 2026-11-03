@@ -123,3 +123,9 @@ CyUI, avec les cibles de modules explicites et la cible Dear ImGui existante.
 Les workers et le moteur DSP restent indépendants de cette bibliothèque UI.
 Voir [CYUI_MIGRATION.md](CYUI_MIGRATION.md) pour les modules, dépendances,
 exports natifs, vérifications et fonctionnalités avancées conservées côté CyDAW.
+
+The pinned Windows FFmpeg SDK is mirrored in the versioned
+[build dependency release](https://github.com/MrMybal/CyDaw/releases/tag/build-deps-ffmpeg-46d899d7),
+with matching source, licence texts, build configuration and SHA-256 checksums.
+`third_party/ffmpeg-sdk.json` retains the original upstream URL and unchanged
+checksums; CI does not depend on retention of rolling upstream autobuilds.

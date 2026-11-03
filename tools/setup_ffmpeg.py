@@ -33,7 +33,7 @@ version=subprocess.check_output([str(base/'bin/ffmpeg.exe'),'-version'],text=Tru
 check('--enable-gpl' not in version and '--enable-nonfree' not in version,'not an LGPL build')
 (dest/'BUILD-CONFIGURATION.txt').write_text(version,encoding='utf8')
 sources=dest/'sources';sources.mkdir(exist_ok=True);source=sources/('ffmpeg-'+manifest['revision']+'.tar.gz')
-fetch('https://codeload.github.com/FFmpeg/FFmpeg/tar.gz/'+manifest['revision'],source,manifest['sourceSha256'])
+fetch(manifest.get('sourceUrl', 'https://codeload.github.com/FFmpeg/FFmpeg/tar.gz/'+manifest['revision']),source,manifest['sourceSha256'])
 check(hashlib.sha256(source.read_bytes()).hexdigest()==manifest['sourceSha256'],'FFmpeg source SHA-256 mismatch')
 # Retain the GPL text incorporated by LGPLv3 as well as all upstream copyright notices in the source archive.
 with tarfile.open(source) as t:
