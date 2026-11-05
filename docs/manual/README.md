@@ -1,5 +1,7 @@
 # Authoring the CyDAW CyDoc manual
 
+[Documentation](https://MrMybal.github.io/CyDaw/#/en/welcome) — the complete English CyDoc reader; [version française](https://MrMybal.github.io/CyDaw/#/fr/welcome).
+
 Application-owned authoring inputs remain in docs/manual/en, fr and assets.
 manifest.json records ordered stable chapter IDs and translated titles/groups.
 Headings use explicit matching IDs: `## Human title {#stable-id}`.
@@ -69,3 +71,25 @@ carries the complete help tree and MIT/dependency notices. Generation needs Node
 
 See [integration and verification](../USER_MANUAL.md) and
 [migration details](../CYDOC_MIGRATION.md).
+
+## Public documentation on GitHub Pages
+
+[Documentation](https://MrMybal.github.io/CyDaw/#/en/welcome) opens the same visual
+reader as Help > User manual. Locale hashes select English or French explicitly.
+The documentation-pages.yml workflow regenerates and validates the export on
+relevant main-branch pushes, then deploys only build/documentation-pages through
+GitHub Pages Actions. It can also be dispatched manually. Pages must use the
+GitHub Actions build source in the repository settings.
+
+To reproduce the deployment payload locally:
+
+~~~sh
+python tools/docs/build.py --out build/documentation-pages
+python tools/docs/validate.py --root build/documentation-pages
+~~~
+
+The deploy job has Pages write and OIDC permissions; the generation job only reads
+the repository. No application binaries, projects, sound libraries, caches or
+local configuration are published. The source index remains restricted to the
+six distributable files in docs/cydoc.inventory.json. The embedded file:// reader
+uses the unchanged export pipeline and needs no Internet connection.

@@ -135,8 +135,11 @@ with `ctest -C Release` in the build folder.
 
 Open **Help > User manual** or **Ctrl+F1** for the complete offline illustrated **CyDoc** manual in your default browser:
 40 chapters in **English (default) and French**, with search, diagrams and screenshots.
-Read the [English start](docs/manual/en/welcome.md), [French start](docs/manual/fr/welcome.md)
-or [manual overview and maintenance](docs/USER_MANUAL.md).
+[Documentation](https://MrMybal.github.io/CyDaw/#/en/welcome) ·
+[Documentation en français](https://MrMybal.github.io/CyDaw/#/fr/welcome)
+
+The online reader is the same CyDoc export shipped with the application, including
+navigation, search, images and diagrams. See [manual maintenance](docs/USER_MANUAL.md) for authoring and build instructions.
 
 The following technical and developer references are mostly written in French.
 

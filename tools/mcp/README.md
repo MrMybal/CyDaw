@@ -1,5 +1,7 @@
 # Serveur MCP CyDAW
 
+[Documentation](https://MrMybal.github.io/CyDaw/#/fr/mcp) — le lecteur CyDoc en français, ouvert sur le serveur MCP.
+
 Un agent (Claude Code, Claude Desktop, tout client MCP) pilote CyDAW par
 ce serveur : ouvrir un projet ou un modèle, poser des pistes et des notes,
 placer des périphériques, tourner leurs paramètres, lancer le transport,

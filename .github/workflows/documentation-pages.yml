@@ -1,0 +1,71 @@
+name: Documentation / GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/documentation-pages.yml'
+      - 'README.md'
+      - 'docs/**'
+      - 'os/README.md'
+      - 'tools/mcp/README.md'
+      - 'tools/mcp/cydaw_mcp_server.py'
+      - 'tools/docs/**'
+      - 'third_party/cydoc*'
+      - 'include/cydaw/control/ControlPluginABI.h'
+      - 'include/cydaw/engine/AudioProcessor.h'
+      - 'include/cydaw/engine/AudioBuffer.h'
+      - 'include/cydaw/engine/Transport.h'
+      - 'src/v2/CustomInterfaceABI.h'
+      - 'CMakeLists.txt'
+      - 'LICENSE*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: documentation-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Generate the complete CyDoc reader
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/cache@v4
+        with:
+          path: output/cydoc-cache
+          key: cydoc-pages-${{ runner.os }}-${{ hashFiles('third_party/cydoc.json', 'third_party/cydoc-*.tgz', 'tools/docs/build.py') }}
+      - name: Generate the same HTML export as the application
+        run: python tools/docs/build.py --out build/documentation-pages
+      - name: Validate content, translations, resources and export integrity
+        run: python tools/docs/validate.py --root build/documentation-pages
+      # Upload only the generated reader, never the checkout, application output,
+      # user projects, sample packs or build caches.
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/documentation-pages
+
+  deploy:
+    name: Publish documentation
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+      - name: Deploy the exported reader
+        id: deployment
+        uses: actions/deploy-pages@v4
