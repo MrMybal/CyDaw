@@ -19,6 +19,7 @@ on:
       - 'src/v2/CustomInterfaceABI.h'
       - 'CMakeLists.txt'
       - 'LICENSE*'
+      - 'content/factory/LICENCE.txt'
   workflow_dispatch:
 
 permissions:
