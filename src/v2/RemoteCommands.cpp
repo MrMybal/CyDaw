@@ -1901,6 +1901,10 @@ juce::var Commands::run()
         return onVoiceLive();
     if (command == "slot_stop")
         return onSlotStop();
+    if (command == "manual") {
+        const auto answer = ui_.manual(request_);
+        return answer.isObject() ? ok(answer) : fail(answer.isString() ? answer.toString() : juce::String("no manual interface"));
+    }
     if (command == "processing")
         return onProcessing();
     if (command == "jsfx" || command == "dj" || command == "foundry" || command == "cinema" || command == "transport_sync"

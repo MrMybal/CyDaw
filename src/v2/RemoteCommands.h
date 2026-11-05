@@ -79,6 +79,7 @@ public:
     // Foundry's sound files. Their answer, or a string saying what failed;
     // null when there is no interface.
     virtual juce::var jsfx(const juce::var&) { return {}; }
+    virtual juce::var manual(const juce::var&) { return {}; }
     virtual juce::var cinema(const juce::var&) { return {}; }
     // processing: the Traitements mode's window ({show, select, testFile,
     // reload}: what it shows); openProcessing: the apply window on a clip.

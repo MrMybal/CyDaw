@@ -133,7 +133,12 @@ with `ctest -C Release` in the build folder.
 
 ## Documentation
 
-The detailed documentation is written in French.
+Open **Help > User manual** or **Ctrl+F1** for the complete offline illustrated manual:
+40 chapters in **English (default) and French**, with search, diagrams and screenshots.
+Read the [English start](docs/manual/en/welcome.md), [French start](docs/manual/fr/welcome.md)
+or [manual overview and maintenance](docs/USER_MANUAL.md).
+
+The following technical and developer references are mostly written in French.
 
 - [Interface and control port reference](docs/V2_INTERFACE.md)
 - [Sampler and factory instruments](docs/SAMPLER.md) · [Synths](docs/SYNTHES.md) ·

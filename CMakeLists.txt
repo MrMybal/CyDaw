@@ -715,6 +715,10 @@ if(CYDAW_BUILD_DESKTOP)
             target_link_libraries(CyDAW2 PRIVATE ysfx::ysfx)
             target_include_directories(CyDAW2 PRIVATE third_party/ysfx/thirdparty/WDL/source)
             target_sources(CyDAW2 PRIVATE
+                src/v2/ManualContent.cpp
+                src/v2/ManualContent.h
+                src/v2/ManualView.cpp
+                src/v2/ManualView.h
                 src/v2/Main.cpp
                 src/v2/HiddenDesktop.cpp
                 src/v2/Processing.cpp
@@ -925,6 +929,26 @@ if(CYDAW_BUILD_DESKTOP)
             cydaw_configure_plugin_formats(CyDAW2)
             cydaw_configure_audio_backends(CyDAW2)
             if(CYDAW_BUILD_TESTS)
+                add_executable(cydaw_manual_tests tests/ManualContentTests.cpp src/v2/ManualContent.cpp)
+                target_include_directories(cydaw_manual_tests PRIVATE src/v2)
+                target_compile_features(cydaw_manual_tests PRIVATE cxx_std_20)
+                target_compile_definitions(cydaw_manual_tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
+                target_link_libraries(cydaw_manual_tests PRIVATE juce::juce_core)
+                if(MSVC)
+                    target_compile_options(cydaw_manual_tests PRIVATE /utf-8 /EHsc)
+                endif()
+                add_test(NAME cydaw_manual_model COMMAND cydaw_manual_tests "${CMAKE_CURRENT_SOURCE_DIR}/docs/manual")
+                cydaw_configure_test(cydaw_manual_model 60)
+                find_package(Python3 COMPONENTS Interpreter QUIET)
+                if(Python3_Interpreter_FOUND)
+                    add_test(NAME cydaw_manual_content COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/manual/validate.py")
+                    add_test(NAME cydaw_manual_reference COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/manual/build_reference.py" --check)
+                    if(WIN32)
+                        add_test(NAME cydaw_manual_reader COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/v2_manual_check.py"
+                            --exe "$<TARGET_FILE:CyDAW2>" --output "${CMAKE_BINARY_DIR}/manual-check" --port 48064)
+                        set_tests_properties(cydaw_manual_reader PROPERTIES TIMEOUT 300)
+                    endif()
+                endif()
                 add_executable(cydaw_cyui_tests tests/CyUiTests.cpp
                     src/v2/Theme.cpp src/v2/ThemeRuntime.cpp src/v2/Widgets.cpp)
                 target_include_directories(cydaw_cyui_tests PRIVATE src/v2)
@@ -938,6 +962,10 @@ if(CYDAW_BUILD_DESKTOP)
                 add_test(NAME cydaw_cyui_tests COMMAND cydaw_cyui_tests)
                 cydaw_configure_test(cydaw_cyui_tests 60)
             endif()
+            add_custom_target(cydaw_manual_resources
+                COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/docs/manual"
+                        "$<TARGET_FILE_DIR:CyDAW2>/docs/manual" VERBATIM)
+            add_dependencies(CyDAW2 cydaw_manual_resources)
             cydaw_copy_cyui_notices(CyDAW2)
             cydaw_use_precompiled_header(CyDAW2)
             target_link_libraries(CyDAW2 PRIVATE
@@ -945,7 +973,7 @@ if(CYDAW_BUILD_DESKTOP)
                 CyDAWTranslations
                 CyDAW2Branding
                 CyUI::Core CyUI::Audio CyUI::AudioViews CyUI::Nodes
-                CyUI::CodeEditor CyUI::Images CyUI::Inspector
+                CyUI::CodeEditor CyUI::Images CyUI::Inspector CyUI::DocumentViews
                 cydaw_imgui
                 juce::juce_audio_devices
                 juce::juce_audio_formats
@@ -1301,6 +1329,7 @@ if(CYDAW_BUILD_DESKTOP)
         endif()
 
         if(TARGET CyDAW2)
+            install(DIRECTORY docs/manual DESTINATION docs COMPONENT CyDAWRuntime)
             install(TARGETS CyDAW2
                     RUNTIME DESTINATION . COMPONENT CyDAWRuntime
                     RESOURCE DESTINATION . COMPONENT CyDAWRuntime)

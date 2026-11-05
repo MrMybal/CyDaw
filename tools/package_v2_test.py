@@ -5,6 +5,7 @@ The default build directory remains build/agent-graph/CyDAW2_artefacts/Release.
 """
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -49,6 +50,12 @@ def package(build, output, alpha=False, juce_source=None):
     juce_licence = Path(juce_source) / 'LICENSE.md' if juce_source else ROOT / 'third_party/JUCE/LICENSE.md'
     if not juce_licence.is_file():
         raise FileNotFoundError('JUCE notice missing; supply --juce-source')
+    # An incomplete offline manual must never silently ship in a release.
+    spec = importlib.util.spec_from_file_location('cydaw_manual_validate',
+        Path(__file__).resolve().parent / 'manual/validate.py')
+    validator = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(validator)
+    validator.validate(ROOT / 'docs/manual')
     archive = output / (name + '.zip')
     with tempfile.TemporaryDirectory(prefix='.cydaw-package-', dir=output) as temporary:
         temporary = Path(temporary)

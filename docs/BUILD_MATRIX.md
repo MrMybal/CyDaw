@@ -129,3 +129,11 @@ The pinned Windows FFmpeg SDK is mirrored in the versioned
 with matching source, licence texts, build configuration and SHA-256 checksums.
 `third_party/ffmpeg-sdk.json` retains the original upstream URL and unchanged
 checksums; CI does not depend on retention of rolling upstream autobuilds.
+
+## Bilingual offline manual
+
+CyDAW2 links CyUI::DocumentViews for its built-in English/French user manual.
+The manual resources are copied beside the executable at each application build
+and included by install and Windows ZIP packaging. They are not native plugin
+runtime resources. The Windows release packager validates both languages and
+all local links/figures before producing an archive. See [USER_MANUAL.md](USER_MANUAL.md).

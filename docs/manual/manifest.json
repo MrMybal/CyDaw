@@ -1,0 +1,451 @@
+{
+  "format": "CyDAW Manual",
+  "schema": 1,
+  "defaultLanguage": "en",
+  "languages": [
+    "en",
+    "fr"
+  ],
+  "topics": [
+    {
+      "id": "welcome",
+      "title": {
+        "en": "Welcome and first project",
+        "fr": "Bienvenue et premier projet"
+      },
+      "group": {
+        "en": "Start here",
+        "fr": "Bien démarrer"
+      }
+    },
+    {
+      "id": "setup",
+      "title": {
+        "en": "Audio, MIDI and first launch",
+        "fr": "Audio, MIDI et premier lancement"
+      },
+      "group": {
+        "en": "Start here",
+        "fr": "Bien démarrer"
+      }
+    },
+    {
+      "id": "workspace",
+      "title": {
+        "en": "Panels and timeline navigation",
+        "fr": "Panneaux et navigation temporelle"
+      },
+      "group": {
+        "en": "Start here",
+        "fr": "Bien démarrer"
+      }
+    },
+    {
+      "id": "studio",
+      "title": {
+        "en": "Studio: arrange and record",
+        "fr": "Studio : arranger et enregistrer"
+      },
+      "group": {
+        "en": "Compose and edit",
+        "fr": "Composer et éditer"
+      }
+    },
+    {
+      "id": "launcher",
+      "title": {
+        "en": "Launcher: clips and scenes",
+        "fr": "Lanceur : clips et scènes"
+      },
+      "group": {
+        "en": "Compose and edit",
+        "fr": "Composer et éditer"
+      }
+    },
+    {
+      "id": "midi",
+      "title": {
+        "en": "Notes and MIDI expression",
+        "fr": "Notes et expressions MIDI"
+      },
+      "group": {
+        "en": "Compose and edit",
+        "fr": "Composer et éditer"
+      }
+    },
+    {
+      "id": "audio",
+      "title": {
+        "en": "Audio, takes and time stretching",
+        "fr": "Audio, prises et étirement"
+      },
+      "group": {
+        "en": "Compose and edit",
+        "fr": "Composer et éditer"
+      }
+    },
+    {
+      "id": "automation",
+      "title": {
+        "en": "Automation and curves",
+        "fr": "Automation et courbes"
+      },
+      "group": {
+        "en": "Compose and edit",
+        "fr": "Composer et éditer"
+      }
+    },
+    {
+      "id": "mixing",
+      "title": {
+        "en": "Mixer, buses and sidechains",
+        "fr": "Mixeur, bus et sidechains"
+      },
+      "group": {
+        "en": "Compose and edit",
+        "fr": "Composer et éditer"
+      }
+    },
+    {
+      "id": "devices",
+      "title": {
+        "en": "Devices, presets and native panels",
+        "fr": "Périphériques, presets et panneaux natifs"
+      },
+      "group": {
+        "en": "Instruments and effects",
+        "fr": "Instruments et effets"
+      }
+    },
+    {
+      "id": "synths",
+      "title": {
+        "en": "Synthesizer family and sound design",
+        "fr": "Famille de synthés et création sonore"
+      },
+      "group": {
+        "en": "Instruments and effects",
+        "fr": "Instruments et effets"
+      }
+    },
+    {
+      "id": "prisme",
+      "title": {
+        "en": "Prisme: wavetable synthesis",
+        "fr": "Prisme : synthèse à tables d’ondes"
+      },
+      "group": {
+        "en": "Instruments and effects",
+        "fr": "Instruments et effets"
+      }
+    },
+    {
+      "id": "sampler",
+      "title": {
+        "en": "Sampler, SFZ and factory instruments",
+        "fr": "Sampler, SFZ et instruments d’usine"
+      },
+      "group": {
+        "en": "Instruments and effects",
+        "fr": "Instruments et effets"
+      }
+    },
+    {
+      "id": "drums",
+      "title": {
+        "en": "Kick, Silex, Batterie and pads",
+        "fr": "Kick, Silex, Batterie et pads"
+      },
+      "group": {
+        "en": "Instruments and effects",
+        "fr": "Instruments et effets"
+      }
+    },
+    {
+      "id": "studio-effects",
+      "title": {
+        "en": "EQ, dynamics, reverb and filtering",
+        "fr": "EQ, dynamique, réverbe et filtrage"
+      },
+      "group": {
+        "en": "Instruments and effects",
+        "fr": "Instruments et effets"
+      }
+    },
+    {
+      "id": "mixing-effects",
+      "title": {
+        "en": "Mixing, colour and mastering effects",
+        "fr": "Effets de mixage, couleur et mastering"
+      },
+      "group": {
+        "en": "Instruments and effects",
+        "fr": "Instruments et effets"
+      }
+    },
+    {
+      "id": "creative-effects",
+      "title": {
+        "en": "Creative, MIDI and utility effects",
+        "fr": "Effets créatifs, MIDI et utilitaires"
+      },
+      "group": {
+        "en": "Instruments and effects",
+        "fr": "Instruments et effets"
+      }
+    },
+    {
+      "id": "guitar-voice",
+      "title": {
+        "en": "Amp, cabinet and microphone",
+        "fr": "Ampli, baffle et microphone"
+      },
+      "group": {
+        "en": "Instruments and effects",
+        "fr": "Instruments et effets"
+      }
+    },
+    {
+      "id": "modulators",
+      "title": {
+        "en": "Modulators and macros",
+        "fr": "Modulateurs et macros"
+      },
+      "group": {
+        "en": "Instruments and effects",
+        "fr": "Instruments et effets"
+      }
+    },
+    {
+      "id": "containers",
+      "title": {
+        "en": "Effect and instrument containers",
+        "fr": "Conteneurs d’effets et d’instruments"
+      },
+      "group": {
+        "en": "Instruments and effects",
+        "fr": "Instruments et effets"
+      }
+    },
+    {
+      "id": "dj",
+      "title": {
+        "en": "DJ mix: decks and transitions",
+        "fr": "Mix DJ : platines et transitions"
+      },
+      "group": {
+        "en": "Dedicated modes",
+        "fr": "Modes dédiés"
+      }
+    },
+    {
+      "id": "foundry",
+      "title": {
+        "en": "Foundry: multitrack sound editing",
+        "fr": "Fonderie : montage sonore multipiste"
+      },
+      "group": {
+        "en": "Dedicated modes",
+        "fr": "Modes dédiés"
+      }
+    },
+    {
+      "id": "cinema",
+      "title": {
+        "en": "Cinema: sound to picture",
+        "fr": "Cinéma : travailler le son à l’image"
+      },
+      "group": {
+        "en": "Dedicated modes",
+        "fr": "Modes dédiés"
+      }
+    },
+    {
+      "id": "processing",
+      "title": {
+        "en": "Processings: audio and note scripts",
+        "fr": "Traitements : audio et scripts de notes"
+      },
+      "group": {
+        "en": "Dedicated modes",
+        "fr": "Modes dédiés"
+      }
+    },
+    {
+      "id": "graphs",
+      "title": {
+        "en": "Graphs, typed ports and exposed values",
+        "fr": "Graphes, ports typés et valeurs exposées"
+      },
+      "group": {
+        "en": "Build and connect",
+        "fr": "Créer et connecter"
+      }
+    },
+    {
+      "id": "workshop",
+      "title": {
+        "en": "Plugin workshop: from graph to device",
+        "fr": "Atelier Plugin : du graphe au périphérique"
+      },
+      "group": {
+        "en": "Build and connect",
+        "fr": "Créer et connecter"
+      }
+    },
+    {
+      "id": "interface-design",
+      "title": {
+        "en": "Design full windows and module cards",
+        "fr": "Concevoir fenêtres et cartes module"
+      },
+      "group": {
+        "en": "Build and connect",
+        "fr": "Créer et connecter"
+      }
+    },
+    {
+      "id": "plugin-formats",
+      "title": {
+        "en": "Host plugins, edit JSFX and export",
+        "fr": "Héberger, éditer JSFX et exporter"
+      },
+      "group": {
+        "en": "Build and connect",
+        "fr": "Créer et connecter"
+      }
+    },
+    {
+      "id": "controllers",
+      "title": {
+        "en": "MIDI, OSC and hardware controllers",
+        "fr": "Contrôleurs MIDI, OSC et matériels"
+      },
+      "group": {
+        "en": "Build and connect",
+        "fr": "Créer et connecter"
+      }
+    },
+    {
+      "id": "sync",
+      "title": {
+        "en": "Transport synchronisation",
+        "fr": "Synchronisation du transport"
+      },
+      "group": {
+        "en": "Build and connect",
+        "fr": "Créer et connecter"
+      }
+    },
+    {
+      "id": "library",
+      "title": {
+        "en": "Sound library and factory banks",
+        "fr": "Bibliothèque sonore et banques d’usine"
+      },
+      "group": {
+        "en": "Build and connect",
+        "fr": "Créer et connecter"
+      }
+    },
+    {
+      "id": "resynthesis",
+      "title": {
+        "en": "Recreate a sound as an instrument",
+        "fr": "Recréer un son en instrument"
+      },
+      "group": {
+        "en": "Build and connect",
+        "fr": "Créer et connecter"
+      }
+    },
+    {
+      "id": "import-export",
+      "title": {
+        "en": "Save, import and render deliverables",
+        "fr": "Enregistrer, importer et rendre"
+      },
+      "group": {
+        "en": "Build and connect",
+        "fr": "Créer et connecter"
+      }
+    },
+    {
+      "id": "troubleshooting",
+      "title": {
+        "en": "Troubleshooting and current limits",
+        "fr": "Dépannage et limites actuelles"
+      },
+      "group": {
+        "en": "Reference",
+        "fr": "Référence"
+      }
+    },
+    {
+      "id": "shortcuts",
+      "title": {
+        "en": "Keyboard and mouse reference",
+        "fr": "Référence clavier et souris"
+      },
+      "group": {
+        "en": "Reference",
+        "fr": "Référence"
+      }
+    },
+    {
+      "id": "glossary",
+      "title": {
+        "en": "Glossary and units",
+        "fr": "Glossaire et unités"
+      },
+      "group": {
+        "en": "Reference",
+        "fr": "Référence"
+      }
+    },
+    {
+      "id": "licenses",
+      "title": {
+        "en": "Versions, licences and documentation",
+        "fr": "Versions, licences et documentation"
+      },
+      "group": {
+        "en": "Reference",
+        "fr": "Référence"
+      }
+    },
+    {
+      "id": "reference-instruments",
+      "title": {
+        "en": "Instrument and generator reference",
+        "fr": "Référence instruments et générateurs"
+      },
+      "group": {
+        "en": "Reference",
+        "fr": "Référence"
+      }
+    },
+    {
+      "id": "reference-effects",
+      "title": {
+        "en": "Effect parameter reference",
+        "fr": "Référence des paramètres d’effets"
+      },
+      "group": {
+        "en": "Reference",
+        "fr": "Référence"
+      }
+    },
+    {
+      "id": "reference-nodes",
+      "title": {
+        "en": "MIDI, control and container reference",
+        "fr": "Référence MIDI, contrôles et conteneurs"
+      },
+      "group": {
+        "en": "Reference",
+        "fr": "Référence"
+      }
+    }
+  ]
+}

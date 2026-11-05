@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="620" viewBox="0 0 1200 620">
+<rect width="1200" height="620" rx="22" fill="#17212d"/>
+<text x="40" y="58" fill="#f3f7fc" font-family="sans-serif" font-size="26" font-weight="bold">CyDAW · Routing</text>
+<text x="40" y="92" fill="#b7c9dc" font-family="sans-serif" font-size="18">Signal flow and workflow</text>
+<path d="M 360 195 L 818 195" fill="none" stroke="#72b9f3" stroke-width="4"/>
+<polygon points="818,195 806,188 806,202" fill="#72b9f3"/>
+<path d="M 755 195 L 818 195" fill="none" stroke="#72b9f3" stroke-width="4"/>
+<polygon points="818,195 806,188 806,202" fill="#72b9f3"/>
+<path d="M 200 260 C 200 330, 200 315, 200 378" fill="none" stroke="#72b9f3" stroke-width="4"/>
+<polygon points="200,378 193,366 207,366" fill="#72b9f3"/>
+<path d="M 990 260 C 990 330, 595 315, 595 378" fill="none" stroke="#72b9f3" stroke-width="4"/>
+<polygon points="595,378 588,366 602,366" fill="#72b9f3"/>
+<path d="M 360 455 L 423 455" fill="none" stroke="#72b9f3" stroke-width="4"/>
+<polygon points="423,455 411,448 411,462" fill="#72b9f3"/>
+<path d="M 755 455 L 818 455" fill="none" stroke="#72b9f3" stroke-width="4"/>
+<polygon points="818,455 806,448 806,462" fill="#72b9f3"/>
+<rect x="40" y="130" width="320" height="130" rx="14" fill="#25364a" stroke="#526c88" stroke-width="2"/>
+<text x="58" y="158" fill="#ffc277" font-family="sans-serif" font-size="18">01</text>
+<text x="58" y="192" fill="#ffffff" font-family="sans-serif" font-size="19" font-weight="bold">Track A</text>
+<text x="58" y="220" fill="#c6d7e7" font-family="sans-serif" font-size="16">main audio output</text>
+<rect x="435" y="130" width="320" height="130" rx="14" fill="#25364a" stroke="#526c88" stroke-width="2"/>
+<text x="453" y="158" fill="#ffc277" font-family="sans-serif" font-size="18">02</text>
+<text x="453" y="192" fill="#ffffff" font-family="sans-serif" font-size="19" font-weight="bold">Track B</text>
+<text x="453" y="220" fill="#c6d7e7" font-family="sans-serif" font-size="16">main audio output</text>
+<rect x="830" y="130" width="320" height="130" rx="14" fill="#25364a" stroke="#526c88" stroke-width="2"/>
+<text x="848" y="158" fill="#ffc277" font-family="sans-serif" font-size="18">03</text>
+<text x="848" y="192" fill="#ffffff" font-family="sans-serif" font-size="19" font-weight="bold">Group bus</text>
+<text x="848" y="220" fill="#c6d7e7" font-family="sans-serif" font-size="16">shared processing</text>
+<rect x="40" y="390" width="320" height="130" rx="14" fill="#25364a" stroke="#526c88" stroke-width="2"/>
+<text x="58" y="418" fill="#ffc277" font-family="sans-serif" font-size="18">04</text>
+<text x="58" y="452" fill="#ffffff" font-family="sans-serif" font-size="19" font-weight="bold">Reverb return</text>
+<text x="58" y="480" fill="#c6d7e7" font-family="sans-serif" font-size="16">send / parallel processing</text>
+<rect x="435" y="390" width="320" height="130" rx="14" fill="#25364a" stroke="#526c88" stroke-width="2"/>
+<text x="453" y="418" fill="#ffc277" font-family="sans-serif" font-size="18">05</text>
+<text x="453" y="452" fill="#ffffff" font-family="sans-serif" font-size="19" font-weight="bold">Master</text>
+<text x="453" y="480" fill="#c6d7e7" font-family="sans-serif" font-size="16">sum and final effects</text>
+<rect x="830" y="390" width="320" height="130" rx="14" fill="#25364a" stroke="#526c88" stroke-width="2"/>
+<text x="848" y="418" fill="#ffc277" font-family="sans-serif" font-size="18">06</text>
+<text x="848" y="452" fill="#ffffff" font-family="sans-serif" font-size="19" font-weight="bold">Hardware output</text>
+<text x="848" y="480" fill="#c6d7e7" font-family="sans-serif" font-size="16">selected audio device</text>
+<text x="40" y="585" fill="#72b9f3" font-family="sans-serif" font-size="17">Audio</text>
+<text x="180" y="585" fill="#67d7ad" font-family="sans-serif" font-size="17">MIDI</text>
+<text x="310" y="585" fill="#ffc277" font-family="sans-serif" font-size="17">Control / workflow</text>
+</svg>

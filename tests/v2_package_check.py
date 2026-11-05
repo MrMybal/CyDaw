@@ -2,6 +2,7 @@
 import importlib.util
 from pathlib import Path
 import tempfile
+import shutil
 import unittest
 from unittest.mock import patch
 import zipfile
@@ -37,6 +38,7 @@ class PackageTests(unittest.TestCase):
             path.write_text('project(CyDAW VERSION 0.78.0)' if name == 'CMakeLists.txt' else 'fixture', 'utf-8')
         for component in ('avcodec', 'avformat', 'avutil', 'swscale', 'swresample'):
             (self.root / 'build' / (component + '-1.dll')).write_bytes(b'fixture')
+        shutil.copytree(ROOT / 'docs/manual', self.root / 'docs/manual')
         self.patch = patch.object(pack, 'ROOT', self.root)
         self.patch.start()
 
@@ -54,10 +56,22 @@ class PackageTests(unittest.TestCase):
             self.assertTrue(any(n.endswith('/ControlPlugins/Gamepads.cyctl') for n in names))
             self.assertTrue(any(n.endswith('/Licenses/CyUI/LICENSE') for n in names))
             self.assertTrue(any(n.endswith('/Licenses/CyUI/third_party/texteditor/LICENSE') for n in names))
+            for entry in ('manifest.json', 'en/welcome.md', 'fr/welcome.md', 'assets/studio-en.png', 'assets/studio-fr.png'):
+                self.assertTrue(any(n.endswith('/docs/manual/' + entry) for n in names), entry)
         self.assertEqual(len(publish.verified_assets(self.root / 'out')), 3)
         archive.write_bytes(b'corrupt')
         with self.assertRaises(ValueError):
             publish.verified_assets(self.root / 'out')
+
+    def test_missing_manual_translation_fails(self):
+        (self.root / 'docs/manual/fr/welcome.md').unlink()
+        with self.assertRaises(FileNotFoundError):
+            pack.package(self.root / 'build', self.root / 'out', True, self.root / 'juce')
+
+    def test_missing_manual_figure_fails(self):
+        (self.root / 'docs/manual/assets/studio-en.png').unlink()
+        with self.assertRaises(ValueError):
+            pack.package(self.root / 'build', self.root / 'out', True, self.root / 'juce')
 
     def test_missing_codec_fails_before_packaging(self):
         (self.root / 'build/avcodec-1.dll').unlink()

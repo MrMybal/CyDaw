@@ -53,6 +53,7 @@ class ThemesView;
 class TransportSync;
 class Controllers;
 class JsfxView;
+class ManualView;
 
 class AppUi final : public RemoteUi {
 public:
@@ -111,6 +112,7 @@ public:
     void showAudioSettings() { showAudioSettings_ = true; }
     bool showDialog(const juce::String& name) override
     {
+        if (name == "manual") { openManual(); return true; }
         if (name == "transport-sync")
             showTransportSync_ = true;
         else if (name == "audio")
@@ -192,6 +194,8 @@ public:
     juce::var midiInputs(const juce::String& command, const juce::var& request) override;
     juce::var themes(const juce::var& request) override;
     juce::var jsfx(const juce::var&) override;
+    juce::var manual(const juce::var&) override;
+    void openManual(const juce::String& topic = {});
     juce::var transportSync(const juce::var& request) override;
     juce::var controllers(const juce::var& request) override;
     juce::var dj(const juce::var& request) override;
@@ -390,6 +394,7 @@ private:
     std::unique_ptr<Controllers> controllers_;
     bool showControllers_{};
     std::unique_ptr<JsfxView> jsfx_;
+    std::unique_ptr<ManualView> manual_;
     bool showTransportSync_{};
     // The devices' windows, as plugins' (their designed interfaces).
     std::unique_ptr<PluginWindows> pluginWindows_;

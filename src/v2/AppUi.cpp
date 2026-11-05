@@ -1,4 +1,5 @@
 #include "JsfxView.h"
+#include "ManualView.h"
 #include "AppUi.h"
 
 #include "ArrangementView.h"
@@ -61,6 +62,8 @@ namespace cydaw::v2 {
 using ui::dp;
 using ui::L;
 juce::var AppUi::jsfx(const juce::var& request){return jsfx_->command(request);}
+juce::var AppUi::manual(const juce::var& request){return manual_->command(request);}
+void AppUi::openManual(const juce::String& topic){manual_->open(topic);}
 
 namespace {
 
@@ -116,6 +119,7 @@ juce::File layoutVersionFile(const juce::File& layout)
 AppUi::AppUi(Studio& studio, ImGuiHost& host)
     : studio_(studio), host_(host), waveforms_(studio.engine().formatManager())
 {
+    manual_ = std::make_unique<ManualView>(studio_, host_);
     arrangement_ = std::make_unique<ArrangementView>(studio_, state_, waveforms_, host_);
     computerKeyboard_ = std::make_unique<ComputerKeyboard>(studio_);
     themes_ = std::make_unique<ThemesView>(studio_, state_);
@@ -1198,7 +1202,7 @@ void AppUi::frame()
     // The computer's keys play the picked instrument track, before the
     // shortcuts can take them; not where letters are shortcuts of their own
     // (the graph, the workshop).
-    computerKeyboard_->update(state_.selectedTrack && state_.selectedTrack->midi && state_.mode == AppMode::studio
+    computerKeyboard_->update(!manual_->focused() && state_.selectedTrack && state_.selectedTrack->midi && state_.mode == AppMode::studio
                               && state_.focused != Panel::graph);
     // A MIDI keyboard plugged in for the first time plays at once, as in
     // Bitwig; one switched off in the MIDI inputs stays off.
@@ -1238,6 +1242,7 @@ void AppUi::frame()
     JsfxView::drawQuitPrompts();
     contextMenus_->draw();
     drawDialogs();
+    manual_->draw();
 
     if (showDemo_)
         ImGui::ShowDemoWindow(&showDemo_);
@@ -2604,6 +2609,9 @@ void AppUi::applyScriptedInput()
                              ? static_cast<ImGuiKey>(ImGuiKey_A + (name[0] - 'a'))
                          : name.length() == 1 && name[0] >= '0' && name[0] <= '9'
                              ? static_cast<ImGuiKey>(ImGuiKey_0 + (name[0] - '0'))
+                         : name.startsWithChar('f') && name.substring(1).containsOnly("0123456789")
+                               && name.substring(1).getIntValue() >= 1 && name.substring(1).getIntValue() <= 12
+                             ? static_cast<ImGuiKey>(ImGuiKey_F1 + name.substring(1).getIntValue() - 1)
                          : name == ";"         ? ImGuiKey_Semicolon
                                                : ImGuiKey_None;
         if (key != ImGuiKey_None) {
@@ -2816,6 +2824,9 @@ void AppUi::handleShortcuts()
     auto& io = ImGui::GetIO();
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Q, false) && onQuit)
         onQuit();
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_F1, false)) { openManual(); return; }
+    // A reader owns its keyboard; its search/navigation never edits the project.
+    if (manual_->focused()) return;
     // In the Foundry, the files are its sound files.
     const auto foundry = state_.mode == AppMode::foundry||state_.mode==AppMode::cinema;
     auto* sessionView=state_.mode==AppMode::cinema?cinema_.get():foundry_.get();
@@ -3273,6 +3284,10 @@ void AppUi::drawMenuBar()
         ImGui::EndMenu();
     }
     if (ImGui::BeginMenu(ui::labelId(L("Aide", "Help"), "menuHelp").c_str())) {
+        if (ImGui::MenuItem(L("Manuel utilisateur", "User manual"), "Ctrl+F1")) openManual();
+        if (ImGui::MenuItem(L("Aide pour ce mode", "Help for this mode")))
+            openManual(state_.mode == AppMode::cinema ? "cinema" : state_.mode == AppMode::foundry ? "foundry" : state_.mode == AppMode::dj ? "dj" : state_.mode == AppMode::workshop ? "workshop" : state_.mode == AppMode::processing ? "processing" : "studio");
+        ImGui::Separator();
         if (ImGui::MenuItem(L("Raccourcis clavier", "Keyboard shortcuts"), "?"))
             showShortcuts_ = true;
         if (ImGui::MenuItem(L("À propos de CyDAW 2", "About CyDAW 2")))

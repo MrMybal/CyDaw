@@ -12,4 +12,9 @@ regexes = [
   '''^0xcbf29ce484222325ULL$''',
   '''^ImGuiKey_[A-Za-z0-9]+$''',
   '''^_mm512_[a-z0-9_]+$''',
+  # Numeric native-engine parameter keys in docs/manual/reference.json.
+  # Exact schema names, not authentication keys.
+  '''^amp[12]\.velocity$''',
+  '''^m(10|1[2-6])\.destination$''',
+  '''^osc[1-4]\.env\.depth$''',
 ]
