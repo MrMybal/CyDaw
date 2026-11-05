@@ -52,10 +52,10 @@ def package(build, output, alpha=False, juce_source=None):
         raise FileNotFoundError('JUCE notice missing; supply --juce-source')
     # An incomplete offline manual must never silently ship in a release.
     spec = importlib.util.spec_from_file_location('cydaw_manual_validate',
-        Path(__file__).resolve().parent / 'manual/validate.py')
+        Path(__file__).resolve().parent / 'docs/validate.py')
     validator = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(validator)
-    validator.validate(ROOT / 'docs/manual')
+    validator.validate(build / 'help')
     archive = output / (name + '.zip')
     with tempfile.TemporaryDirectory(prefix='.cydaw-package-', dir=output) as temporary:
         temporary = Path(temporary)
@@ -67,6 +67,7 @@ def package(build, output, alpha=False, juce_source=None):
             source = build / folder
             if source.is_dir():
                 shutil.copytree(source, stage / folder, ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
+        shutil.copytree(build / 'help', stage / 'help')
         (stage / 'templates').mkdir()
         templates = ROOT / 'templates'
         if templates.is_dir():

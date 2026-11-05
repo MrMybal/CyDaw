@@ -5,9 +5,13 @@ CyDAW combines a music studio, DJ mixer, multitrack sound editor, sound-to-pictu
 ![From audio setup to a saved and rendered project.](../assets/startup-en.svg)
 
 ## Read, search and navigate {#reading}
-Open Help > User manual or press Ctrl+F1. The left column contains chapters and the current chapter's sections. Search checks titles and text throughout the selected language; several words narrow the results. Accents are optional in French. Hover a result for an excerpt, then select it. Ctrl+F focuses search; Clear restores the contents.
+Open Help > User manual or press Ctrl+F1. CyDAW opens the installed CyDoc reader as a local file in your default browser. Keep the complete help folder beside the executable; reading needs no server, CDN or Internet connection.
 
-Back and Forward restore visited sections and reading positions. Home returns here. Text changes reading size; Figures shows illustrations. Click a figure to enlarge it, then use wheel zoom, middle-button drag (or Space+drag) to pan and double-click to fit. In a narrow window, open Illustration above the text; its selector gives access to every figure. Escape clears search first, then closes the reader.
+Use the chapter navigation, page outline and local search (Ctrl+K). Search covers prose, code and symbols; use the content/language filters and optional typo tolerance. French accents are optional. The language selector retains the page and common section IDs. User guides are bilingual; preserved technical originals clearly identify pending translations and historical scope.
+
+Browser Back/Forward and CyDoc's reading tools keep navigation and reading positions. My space stores bookmarks, recent pages and private notes locally; Resume reading returns to a saved position. Export personal data to back it up. Browser storage policy can limit persistence. A generic Help open resumes the reader's last route when local storage is available; contextual help opens the requested page/section.
+
+Images use minimal controls: focus or hover to show them, enlarge inside the same documentation window, zoom with the wheel or buttons, drag to pan and double-click to reset. Escape reduces an enlarged image. Touch controls remain visible and support pan/pinch. Use browser text zoom and the theme menu for comfortable reading. The browser owns these keys; the DAW's project and transport are separate.
 
 ## Make your first sound {#first-project}
 1. In Options > Audio settings choose a real output device and the channels connected to your speakers. Start with a moderate buffer and lower the master before listening.

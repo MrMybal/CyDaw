@@ -1,6 +1,6 @@
 # Référence clavier et souris
 
-Les commandes suivent l'éditeur au focus et le mode actif. Texte/code gardent la frappe. Le manuel capte sa recherche/navigation sans éditer le projet. Des assignations matérielles peuvent ajouter des fonctions : les vérifier si une touche diffère.
+Les commandes suivent l'éditeur au focus et le mode actif. Texte/code gardent la frappe. CyDoc s'ouvre dans le navigateur et gère ses propres touches. Des assignations matérielles peuvent ajouter des fonctions : les vérifier si une touche diffère.
 
 ![La bande à deux axes garde le temps attrapé sous le pointeur.](../assets/timeline-fr.svg)
 
@@ -8,6 +8,7 @@ Les commandes suivent l'éditeur au focus et le mode actif. Texte/code gardent l
 | Touche | Action |
 | --- | --- |
 | Ctrl+F1 | Ouvrir le manuel. |
+| Ctrl+Maj+F1 | Aide du mode/éditeur actif. |
 | Ctrl+N / Ctrl+O / Ctrl+S | Nouveau/ouvrir/enregistrer selon la session active. |
 | Ctrl+Maj+S | Enregistrer sous. |
 | Ctrl+Z / Ctrl+Y / Ctrl+Maj+Z | Annuler / rétablir dans l'éditeur concerné. |
@@ -18,9 +19,9 @@ Les commandes suivent l'éditeur au focus et le mode actif. Texte/code gardent l
 | F10 / F11 | Mix DJ / Fonderie. |
 | Ctrl+K | Clavier musical de l'ordinateur. |
 | Ctrl+M | Apprentissage des contrôleurs. |
-| ? | Résumé des raccourcis existant. |
+| ? | Ouvrir la référence CyDoc des raccourcis. |
 
-Cinéma réutilise les touches de fonction pour ses outils inférieurs ; suivre ses libellés. Dans le manuel Ctrl+F cherche ; Échap efface puis ferme ; les figures ont leur fenêtre.
+Cinéma réutilise les touches de fonction pour ses outils inférieurs ; suivre ses libellés. Dans CyDoc, Ctrl+K ouvre la recherche ; Échap la ferme ou réduit une image agrandie ; Précédent/Suivant du navigateur retrouve les pages visitées.
 
 ## Transport et édition {#editing}
 | Geste | Contexte et résultat |

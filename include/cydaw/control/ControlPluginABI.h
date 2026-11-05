@@ -1,3 +1,33 @@
+/**
+ * @doc api-controller-abi
+ * @locale en
+ * @title Controller extension ABI
+ * @section API
+ * @order 240
+ * @symbol CyControlPlugin
+ * ## Contract {#contract}
+ * This C ABI creates controller devices; it is separate from audio plugin hosting. A shared library with extension .cyctl exports cydaw_control_plugin(), returning a CyControlPlugin whose abi_version matches CYDAW_CONTROL_ABI_VERSION.
+ *
+ * ## Lifetime and messages {#lifetime}
+ * start(host) announces devices; zero means failure. poll() and send() run on the controller service thread; poll and send may be null. stop() must finish all calls into the host before unloading. Addresses identify controls inside each device. Values are normalised to 0..1; centred axes rest at 0.5. CyControlHost.message may be called from any thread.
+ *
+ * See [controllers](doc:controllers) and the indexed source for the exact callback signatures.
+ */
+/**
+ * @doc api-controller-abi
+ * @locale fr
+ * @title ABI des extensions contrôleurs
+ * @section API
+ * @order 240
+ * @symbol CyControlPlugin
+ * ## Contrat {#contract}
+ * Cette ABI C crée des périphériques de contrôle ; elle est distincte des plugins audio. Une bibliothèque partagée .cyctl exporte cydaw_control_plugin(), qui renvoie un CyControlPlugin dont abi_version correspond à CYDAW_CONTROL_ABI_VERSION.
+ *
+ * ## Durée de vie et messages {#lifetime}
+ * start(host) annonce les périphériques ; zéro signale un échec. poll() et send() tournent sur le thread du service contrôleurs et peuvent être nuls. stop() doit terminer tous les appels vers l'hôte avant le déchargement. Les adresses identifient les contrôles de chaque périphérique. Les valeurs vont de 0 à 1 ; un axe centré repose à 0,5. CyControlHost.message peut être appelé depuis n'importe quel thread.
+ *
+ * Voir les [contrôleurs](doc:controllers) et le source indexé pour les signatures exactes.
+ */
 #ifndef CYDAW_CONTROL_PLUGIN_ABI_H
 #define CYDAW_CONTROL_PLUGIN_ABI_H
 

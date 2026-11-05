@@ -53,7 +53,7 @@ class ThemesView;
 class TransportSync;
 class Controllers;
 class JsfxView;
-class ManualView;
+class HelpDocumentation;
 
 class AppUi final : public RemoteUi {
 public:
@@ -195,7 +195,7 @@ public:
     juce::var themes(const juce::var& request) override;
     juce::var jsfx(const juce::var&) override;
     juce::var manual(const juce::var&) override;
-    void openManual(const juce::String& topic = {});
+    void openManual(const juce::String& topic = {}, const juce::String& section = {});
     juce::var transportSync(const juce::var& request) override;
     juce::var controllers(const juce::var& request) override;
     juce::var dj(const juce::var& request) override;
@@ -353,7 +353,6 @@ private:
     // The components whose licences were ticked as accepted (this opening only).
     juce::StringArray companionAccepted_;
     char companionPython_[512] {};
-    void drawShortcuts();
     void drawLayoutNamePrompt();
     [[nodiscard]] juce::File layoutsFolder() const;
     [[nodiscard]] juce::File namedLayoutFile(const juce::String& name) const;
@@ -383,6 +382,7 @@ private:
     std::unique_ptr<ContextMenus> contextMenus_;
     // The Plugin workshop mode: the whole window is the workshop.
     void resolveMode();
+    void openContextHelp();
     void drawWorkshopMode();
     void drawModeSwitch();
     std::unique_ptr<WorkshopView> workshop_;
@@ -394,7 +394,7 @@ private:
     std::unique_ptr<Controllers> controllers_;
     bool showControllers_{};
     std::unique_ptr<JsfxView> jsfx_;
-    std::unique_ptr<ManualView> manual_;
+    std::unique_ptr<HelpDocumentation> help_;
     bool showTransportSync_{};
     // The devices' windows, as plugins' (their designed interfaces).
     std::unique_ptr<PluginWindows> pluginWindows_;
@@ -434,7 +434,6 @@ private:
     // The audio settings open on the card's inputs and outputs.
     bool showSoundCard_ {};
     bool selectSoundCardTab_ {};
-    bool showShortcuts_ {};
     bool recoveryChecked_ {};
     juce::String recoveryWhen_;
     juce::StringArray dialogLines_;

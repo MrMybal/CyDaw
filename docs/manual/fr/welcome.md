@@ -4,10 +4,14 @@ CyDAW réunit studio musical, table DJ, éditeur de sons multipiste, espace son 
 
 ![Du choix de la carte son au projet enregistré et au mix exporté.](../assets/startup-fr.svg)
 
-## Lire, chercher et naviguer {#reading}
-Ouvrir Aide > Manuel utilisateur ou Ctrl+F1. La colonne gauche contient les chapitres et les sections du chapitre courant. La recherche porte sur titres et texte de toute la langue choisie ; plusieurs mots précisent les résultats. Les accents sont facultatifs en français. Survoler un résultat affiche un extrait ; le sélectionner l'ouvre. Ctrl+F active la recherche ; Effacer rétablit le sommaire.
+## Lire, rechercher et naviguer {#reading}
+Ouvrir Aide > Manuel utilisateur ou Ctrl+F1. CyDAW ouvre le lecteur CyDoc installé comme fichier local dans le navigateur par défaut. Conserver le dossier help complet à côté de l'exécutable ; aucun serveur, CDN ou accès Internet n'est nécessaire.
 
-Retour et Suivant retrouvent sections et positions de lecture. Accueil revient ici. Texte règle la taille ; Figures affiche les illustrations. Cliquer une figure l'agrandit : molette pour zoomer, glisser avec le bouton du milieu (ou Espace+glisser) pour déplacer, double-clic pour cadrer. Dans une fenêtre étroite, ouvrir Illustration au-dessus du texte ; le sélecteur donne accès à toutes les figures. Échap efface d'abord la recherche, puis ferme le lecteur.
+Utiliser les chapitres, le plan de page et la recherche locale (Ctrl+K). Elle couvre texte, code et symboles ; des filtres de contenu/langage et une tolérance aux fautes sont proposés. Les accents français sont facultatifs. Le sélecteur de langue conserve la page et les identifiants communs de section. Les guides utilisateur sont bilingues ; les références techniques originales signalent les traductions à faire et leur portée historique.
+
+Précédent/Suivant du navigateur et les outils CyDoc conservent navigation et positions. Mon espace garde favoris, pages récentes et notes privées localement ; Reprendre ma lecture retrouve une position enregistrée. Exporter ces données pour les sauvegarder. La politique de stockage du navigateur peut limiter leur persistance. L'aide générale retrouve la dernière page quand le stockage local est disponible ; l'aide contextuelle vise sa page/section.
+
+Les images ont des commandes épurées visibles au survol ou au focus : agrandir dans la même fenêtre de documentation, zoomer avec molette/boutons, glisser pour déplacer et double-cliquer pour recentrer. Échap réduit une image agrandie. Les commandes tactiles restent visibles et permettent déplacement/pincement. Employer le zoom du navigateur et le menu de thème pour le confort de lecture. Ces touches appartiennent au navigateur ; projet et transport du DAW restent séparés.
 
 ## Produire un premier son {#first-project}
 1. Dans Options > Réglages audio choisir la carte et les canaux reliés aux enceintes. Commencer avec un tampon modéré et baisser le master avant l'écoute.

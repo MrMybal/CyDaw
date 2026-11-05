@@ -1,55 +1,79 @@
-# CyDAW offline user manual
+# CyDAW local documentation — CyDoc
 
-Open **Help > User manual** (French: **Aide > Manuel utilisateur**) or **Ctrl+F1**.
-The manual starts in English on a fresh installation. Its language selector switches
-between English and French independently of the application language and retains the
-current chapter and section.
+Open **Help > User manual** (Ctrl+F1) to open the installed **help/index.html** in the
+default browser with a correctly encoded file URL. Help for this mode targets the
+current workspace; Keyboard shortcuts and the existing ? binding target the shortcut
+reference. No HTTP server, CDN or runtime Node.js is used. CyDAW's audio application
+does not gain a WebView dependency.
 
-The 40 chapters in each language cover setup, Studio/Launcher, MIDI/audio editing,
-automation, mixing/routing, instruments and effects, controllers/modulators, containers,
-DJ, Foundry, Cinema, processings, graphs, interface design, native plugin export,
-JSFX/CLAP/LV2/VST3 hosting, sync, media/library management and troubleshooting.
-Three generated reference chapters enumerate 168 native types and 2,883 numeric
-schema parameters from the Alpha 0.78 registry. These tables document raw schema
-values, not inferred UI units or enum labels.
+The manual preserves the 40 English/French user chapters, 168 native types and
+2,883 numeric schema parameters, the real screenshots/diagrams, original technical
+documents, licences, code examples and MCP guide. Historical design/test-build
+documents carry scope warnings. Technical originals without complete translations
+are retained with explicit notices; they are not presented as completed translations.
 
-There are 22 real application captures (11 scenes in both languages) and 24 editable
-SVG diagrams. Capture fixtures use original generated audio and synthetic video;
-commercial example projects and sample packs are not documentation resources.
+Only CyDoc's **image** reader is enabled: screenshots and static SVG diagrams need
+zoom/pan/in-window enlargement. There is no justified video/GIF/mesh/gallery/interactive
+graph content in this manual, so those readers and Three.js are not distributed.
+An SVG drawing of a graph is still a static illustration.
 
-## Reader
+## Authoring and generation
 
-- Search covers the entire selected language, with all entered words required and
-  French accent folding. Results link directly to stable section IDs.
-- Back/Forward restore reading position. Home, Ctrl+F, Escape, adjustable text size
-  and a resizable window support navigation.
-- Wide layouts show a figure rail. Narrow layouts show a collapsible illustration
-  above the text. Click to enlarge; wheel zoom, middle-button pan and double-click fit.
-- Help for this mode opens the relevant chapter.
-- Reading/searching does not edit the project or own the transport. HTTPS source
-  links open only after a deliberate click; prose, pictures and diagrams work offline.
+Requirements: Python 3.11+, Node.js 22+ and npm. CyDoc was retrieved with authenticated
+Git and is supplied as a revision-pinned, SHA-256-verified package archive. Ordinary
+application builds need no access to its private repository and store no tokens. Reading the completed export requires none of these tools.
 
-The reader uses the pinned CyUI **DocumentViews** module for Markdown and **Images**
-for figure navigation. Stable identities, bilingual search/history, figure loading and
-texture lifetime belong to CyDAW. The pinned renderer does not expose inline image
-or anchor hooks, so sections and figure rails are composed by the application.
-It is not a general HTML/browser renderer.
+~~~sh
+python tools/docs/build.py --out build/help
+python tools/docs/validate.py --root build/help
+# After the pinned build tools are cached:
+python tools/docs/build.py --offline --out build/help
+~~~
 
-## Build, package and checks
+CMake's cydaw_documentation target generates/validates the export and
+cydaw_help_resources copies it beside CyDAW2. The installation and Windows ZIP
+packager distribute the whole managed tree, including local scripts, data, images,
+notices, route catalog, integrity index and translation/migration reports.
+First generation installs the pinned npm build dependencies; cached generation and all reading are offline.
+The cache is application-owned under output/cydoc-cache. No compiled CyDoc library
+or generated documentation is hand-edited in the source repository.
 
-CMake copies `docs/manual` beside the executable on every CyDAW2 build and installs
-it under `docs/manual`. The Windows packager validates the complete two-language
-manual before writing its ZIP. A missing chapter, image or broken local link fails
-packaging. Copy the entire manual directory when moving the application.
+Read [authoring instructions](manual/README.md) and the detailed
+[migration record](CYDOC_MIGRATION.md).
 
-Run `ctest -C Release -R "^cydaw_manual_" --output-on-failure` in the build directory.
-The Windows reader test launches its own hidden, silent instance with temporary
-locations. It renders every section, tests real keyboard/mouse interactions, language,
-search/history, figures, themes and narrow layout, and writes QA screenshots.
-The content/model checks are independent of the audio engine.
+## Language and source contracts
 
-See [maintenance instructions](manual/README.md) for regeneration commands and
-[English contents](manual/en/welcome.md) / [French contents](manual/fr/welcome.md).
-Older developer and technical documents elsewhere in docs remain mostly French;
-they are separate from this bilingual user manual. Current unsupported features
-and known Alpha limitations are explicitly identified in the relevant chapters.
+English is the content default. Page/section/media identities are shared with French.
+The native filename/manual aliases remain accepted; CyDoc validates its canonical
+routes. A missing content locale falls back to English. The versioned translation
+ledger records the English revision acknowledged by each manual translation.
+An English change without a reviewed French update fails the application validator.
+CyDoc also writes translation-report.json and its reader page; copied technical
+originals and source-extracted API pages retain an honest untracked status.
+
+Only the six files in docs/cydoc.inventory.json's source allowlist enter the lexical
+source index. Controller/custom-ImGui/audio-processor APIs are extracted from real
+bilingual C/C++ annotations. The Python MCP server is indexed as distributed tool
+source. Third-party sources, whole build trees, private settings and user projects
+are excluded. CyDoc does not infer C++ overloads/macros or replace Doxygen.
+
+## Verification
+
+~~~sh
+ctest --test-dir build/cyui-migration -C Release -R "cydaw_help|cydaw_manual_reference" --output-on-failure
+python tests/v2_package_check.py
+node tests/cydoc_browser_check.mjs --help
+~~~
+
+The route model tests validate local URLs, escaping, aliases, anchors and media.
+The native input test uses a hidden silent instance and records requested URLs
+without opening browser tabs. The separate browser test uses the installed Windows
+Chromium executable and a fresh profile, blocks network traffic and reads file://.
+
+Windows is the available native test platform. Linux/macOS distributions share the
+same generated assets and native platform URL API, but their browser/storage/UI
+integration must still be checked on those systems. Mobile/touch browser simulation
+is not validation on a physical tablet. Browser storage/privacy settings determine
+personal-data persistence; browser defaults determine whether a native help open
+reuses a tab. Runtime video codecs and WebGL are not requirements for this image-only
+export.

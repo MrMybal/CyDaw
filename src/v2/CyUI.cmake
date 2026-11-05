@@ -8,7 +8,7 @@ set(CYUI_BUILD_AUDIO OFF CACHE BOOL "" FORCE)
 set(CYUI_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(CYUI_BUILD_WEB_CEF OFF CACHE BOOL "" FORCE)
 if(NOT DEFINED CYDAW_UI_MODULES)
-    set(CYDAW_UI_MODULES "Audio;AudioViews;Nodes;CodeEditor;Images;Inspector;DocumentViews")
+    set(CYDAW_UI_MODULES "Audio;AudioViews;Nodes;CodeEditor;Images;Inspector")
 endif()
 set(CYUI_MODULES "${CYDAW_UI_MODULES}")
 FetchContent_Declare(CyUI

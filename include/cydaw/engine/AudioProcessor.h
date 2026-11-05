@@ -1,3 +1,33 @@
+/**
+ * @doc api-audio-processor
+ * @locale en
+ * @title Audio processor contract
+ * @section API
+ * @order 240
+ * @symbol cydaw::engine::AudioProcessor
+ * ## Lifecycle {#lifecycle}
+ * prepare(ProcessSpec) receives sample rate, maximum block size and channel count. reset() clears processor state. process(input, output, context) is a noexcept audio callback over non-owning buffer views; ProcessContext contains the transport snapshot. Follow the engine's real-time contract: prepare resources outside the audio callback and avoid allocation, locks and file/UI work while processing.
+ *
+ * ## Latency and multi-bus processing {#latency}
+ * latencySamples() reports current delay, bounded by maximumLatencySamples() from prepare onward. Dynamic readings shared with UI/control threads need safe concurrent access. valuesGliding() requests short processing slices with glideValues(). MultiBusAudioProcessor receives individually authored input buses prepared by AudioRenderPlanBuilder.
+ *
+ * See [mixing](doc:mixing), the declarations and their lexical dependencies. This index does not infer overloads or macro expansion.
+ */
+/**
+ * @doc api-audio-processor
+ * @locale fr
+ * @title Contrat du processeur audio
+ * @section API
+ * @order 240
+ * @symbol cydaw::engine::AudioProcessor
+ * ## Cycle de vie {#lifecycle}
+ * prepare(ProcessSpec) reçoit la fréquence, la taille maximale de bloc et le nombre de canaux. reset() réinitialise l'état. process(input, output, context) est un callback audio noexcept utilisant des vues de tampon sans transfert de propriété ; ProcessContext contient l'état du transport. Respecter le contrat temps réel : préparer les ressources hors callback, éviter allocations, verrous, fichiers et UI pendant le traitement.
+ *
+ * ## Latence et traitement multibus {#latency}
+ * latencySamples() rapporte le retard actuel, borné par maximumLatencySamples() après prepare. Les mesures partagées avec les threads UI/contrôle nécessitent un accès concurrent sûr. valuesGliding() demande des tranches courtes avec glideValues(). MultiBusAudioProcessor reçoit les entrées distinctes préparées par AudioRenderPlanBuilder.
+ *
+ * Voir le [mixage](doc:mixing), les déclarations et leurs dépendances lexicales. Cet index ne déduit ni surcharges ni expansion des macros.
+ */
 #pragma once
 
 #include <cydaw/engine/AudioBuffer.h>

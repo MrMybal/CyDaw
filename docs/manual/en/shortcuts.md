@@ -1,6 +1,6 @@
 # Keyboard and mouse reference
 
-Commands act on the focused editor and active mode. Text/source fields keep typing. The manual captures its own search/navigation keys rather than editing the project. Hardware controller assignments can add other mappings; check them if a key behaves differently.
+Commands act on the focused editor and active mode. Text/source fields keep typing. The CyDoc reader opens in the browser and uses its own search/navigation keys. Hardware controller assignments can add other mappings; check them if a key behaves differently.
 
 ![The two-axis navigator keeps its grabbed time under the pointer.](../assets/timeline-en.svg)
 
@@ -8,6 +8,7 @@ Commands act on the focused editor and active mode. Text/source fields keep typi
 | Key | Action |
 | --- | --- |
 | Ctrl+F1 | Open the user manual. |
+| Ctrl+Shift+F1 | Help for the active mode/editor. |
 | Ctrl+N / Ctrl+O / Ctrl+S | New/open/save in the active session context. |
 | Ctrl+Shift+S | Save as. |
 | Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z | Undo / redo in the relevant editor. |
@@ -18,9 +19,9 @@ Commands act on the focused editor and active mode. Text/source fields keep typi
 | F10 / F11 | DJ mix / Foundry. |
 | Ctrl+K | Toggle computer-keyboard notes. |
 | Ctrl+M | Controller Learn overlay. |
-| ? | Existing shortcut summary. |
+| ? | Open the CyDoc shortcut reference. |
 
-Cinema reuses function keys for its own lower tools; use its visible labels. Manual Ctrl+F focuses search; Escape clears it then closes the reader; close/enlarge figures within their own window.
+Cinema reuses function keys for its own lower tools; use its visible labels. CyDoc Ctrl+K opens local search. Escape closes search or reduces an enlarged image; browser Back/Forward follows visited pages.
 
 ## Transport and editing {#editing}
 | Gesture | Context and result |

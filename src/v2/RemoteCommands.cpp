@@ -1901,7 +1901,7 @@ juce::var Commands::run()
         return onVoiceLive();
     if (command == "slot_stop")
         return onSlotStop();
-    if (command == "manual") {
+    if (command == "manual" || command == "help") {
         const auto answer = ui_.manual(request_);
         return answer.isObject() ? ok(answer) : fail(answer.isString() ? answer.toString() : juce::String("no manual interface"));
     }

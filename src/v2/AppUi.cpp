@@ -1,5 +1,5 @@
 #include "JsfxView.h"
-#include "ManualView.h"
+#include "HelpDocumentation.h"
 #include "AppUi.h"
 
 #include "ArrangementView.h"
@@ -62,8 +62,14 @@ namespace cydaw::v2 {
 using ui::dp;
 using ui::L;
 juce::var AppUi::jsfx(const juce::var& request){return jsfx_->command(request);}
-juce::var AppUi::manual(const juce::var& request){return manual_->command(request);}
-void AppUi::openManual(const juce::String& topic){manual_->open(topic);}
+juce::var AppUi::manual(const juce::var& request){return help_->command(request, studio_.keepsSettings());}
+void AppUi::openManual(const juce::String& topic, const juce::String& section){
+    auto* request = new juce::DynamicObject();
+    request->setProperty("action", "open"); request->setProperty("topic", topic); request->setProperty("section", section);
+    request->setProperty("language", studio_.settings().getValue("manualLanguage", "en"));
+    const auto result = help_->command(juce::var(request), studio_.keepsSettings());
+    if (result.isString()) notify(result.toString(), true);
+}
 
 namespace {
 
@@ -119,7 +125,7 @@ juce::File layoutVersionFile(const juce::File& layout)
 AppUi::AppUi(Studio& studio, ImGuiHost& host)
     : studio_(studio), host_(host), waveforms_(studio.engine().formatManager())
 {
-    manual_ = std::make_unique<ManualView>(studio_, host_);
+    help_ = std::make_unique<HelpDocumentation>(HelpDocumentation::installedDirectory());
     arrangement_ = std::make_unique<ArrangementView>(studio_, state_, waveforms_, host_);
     computerKeyboard_ = std::make_unique<ComputerKeyboard>(studio_);
     themes_ = std::make_unique<ThemesView>(studio_, state_);
@@ -1202,7 +1208,7 @@ void AppUi::frame()
     // The computer's keys play the picked instrument track, before the
     // shortcuts can take them; not where letters are shortcuts of their own
     // (the graph, the workshop).
-    computerKeyboard_->update(!manual_->focused() && state_.selectedTrack && state_.selectedTrack->midi && state_.mode == AppMode::studio
+    computerKeyboard_->update(state_.selectedTrack && state_.selectedTrack->midi && state_.mode == AppMode::studio
                               && state_.focused != Panel::graph);
     // A MIDI keyboard plugged in for the first time plays at once, as in
     // Bitwig; one switched off in the MIDI inputs stays off.
@@ -1242,7 +1248,6 @@ void AppUi::frame()
     JsfxView::drawQuitPrompts();
     contextMenus_->draw();
     drawDialogs();
-    manual_->draw();
 
     if (showDemo_)
         ImGui::ShowDemoWindow(&showDemo_);
@@ -2013,43 +2018,6 @@ void AppUi::drawAudioDevice()
     }
 }
 
-void AppUi::drawShortcuts()
-{
-    if (showShortcuts_) {
-        ImGui::OpenPopup("##shortcuts");
-        showShortcuts_ = false;
-    }
-    if (!ImGui::BeginPopupModal("##shortcuts", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize))
-        return;
-    ImGui::PushFont(theme::boldFont(), ImGui::GetStyle().FontSizeBase * 1.1f);
-    ImGui::TextUnformatted(L("Raccourcis", "Shortcuts"));
-    ImGui::PopFont();
-    ImGui::Separator();
-    const char* rows[][2] = {
-        { "Espace", "Lecture / pause" }, { "R", "Enregistrer" }, { "L", "Boucle" }, { "Origine", "Retour au début" },
-        { "Ctrl+Z / Ctrl+Y", "Annuler / rétablir (dans le panneau actif)" }, { "Ctrl+S", "Enregistrer le projet" },
-        { "F1 … F7", "Arrangement, lanceur, périphériques, graphe, mixeur, éditeur, atelier de périphériques" },
-        { "F8", "Routage : formats des pistes, entrées et sorties, carte son" },
-        { "Atelier", "Double-clic sur un périphérique fait d'un graphe : l'ouvrir ; Ctrl+G réunit les cartes choisies ; Échap remonte" },
-        { "Arrangement", "Ctrl+molette zoom, Maj+molette défiler, S scinder, Ctrl+D dupliquer, Suppr" },
-        { "Graphe", "Tab ou double-clic : chercher un nœud ; câble lâché dans le vide : nœuds compatibles ; F cadrer, A ranger, Alt+clic coupe un câble" },
-        { "Piano roll", "Double-clic ajoute/supprime, clic droit efface, flèches déplacent, Q quantifie, Alt+molette hauteur" },
-    };
-    if (ImGui::BeginTable("##keys", 2, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit)) {
-        for (const auto& line : rows) {
-            ImGui::TableNextRow();
-            ImGui::TableSetColumnIndex(0);
-            ImGui::TextColored(theme::vec(theme::palette().accent), "%s", line[0]);
-            ImGui::TableSetColumnIndex(1);
-            ImGui::TextUnformatted(line[1]);
-        }
-        ImGui::EndTable();
-    }
-    if (ui::primaryButton("OK", ImVec2(dp(90.0f), 0.0f)) || ImGui::IsKeyPressed(ImGuiKey_Escape))
-        ImGui::CloseCurrentPopup();
-    ImGui::EndPopup();
-}
-
 void AppUi::drawCompanionWindow()
 {
     auto& companion = studio_.companion();
@@ -2300,7 +2268,6 @@ void AppUi::drawDialogs()
     kick_->drawEditor();
     synth_->drawEditor();
     batterie_->drawEditor();
-    drawShortcuts();
     drawUnsavedPrompt();
     drawFoundryPrompt();
     // A session a crash left behind: offered once, at the start.
@@ -2824,9 +2791,7 @@ void AppUi::handleShortcuts()
     auto& io = ImGui::GetIO();
     if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Q, false) && onQuit)
         onQuit();
-    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_F1, false)) { openManual(); return; }
-    // A reader owns its keyboard; its search/navigation never edits the project.
-    if (manual_->focused()) return;
+    if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_F1, false)) { if (io.KeyShift) openContextHelp(); else openManual(); return; }
     // In the Foundry, the files are its sound files.
     const auto foundry = state_.mode == AppMode::foundry||state_.mode==AppMode::cinema;
     auto* sessionView=state_.mode==AppMode::cinema?cinema_.get():foundry_.get();
@@ -2926,7 +2891,24 @@ void AppUi::handleShortcuts()
         state_.libraryTarget.reset();
     }
     if (io.InputQueueCharacters.contains('?'))
-        showShortcuts_ = true;
+        openManual("shortcuts");
+}
+
+void AppUi::openContextHelp()
+{
+    if (state_.mode != AppMode::studio) {
+        openManual(state_.mode == AppMode::cinema ? "cinema" : state_.mode == AppMode::foundry ? "foundry" : state_.mode == AppMode::dj ? "dj" : state_.mode == AppMode::workshop ? "workshop" : "processing");
+        return;
+    }
+    switch (state_.focused) {
+        case Panel::graph: openManual("graphs"); break;
+        case Panel::mixer: case Panel::routing: openManual("mixing"); break;
+        case Panel::devices: openManual("devices"); break;
+        case Panel::launcher: openManual("launcher"); break;
+        case Panel::browser: openManual("library"); break;
+        case Panel::editor: openManual(state_.selectedTrack && state_.selectedTrack->midi ? "midi" : "audio"); break;
+        default: openManual("studio"); break;
+    }
 }
 
 void AppUi::drawMenuBar()
@@ -3285,11 +3267,10 @@ void AppUi::drawMenuBar()
     }
     if (ImGui::BeginMenu(ui::labelId(L("Aide", "Help"), "menuHelp").c_str())) {
         if (ImGui::MenuItem(L("Manuel utilisateur", "User manual"), "Ctrl+F1")) openManual();
-        if (ImGui::MenuItem(L("Aide pour ce mode", "Help for this mode")))
-            openManual(state_.mode == AppMode::cinema ? "cinema" : state_.mode == AppMode::foundry ? "foundry" : state_.mode == AppMode::dj ? "dj" : state_.mode == AppMode::workshop ? "workshop" : state_.mode == AppMode::processing ? "processing" : "studio");
+        if (ImGui::MenuItem(L("Aide pour cet éditeur", "Help for this editor"), "Ctrl+Shift+F1")) openContextHelp();
         ImGui::Separator();
         if (ImGui::MenuItem(L("Raccourcis clavier", "Keyboard shortcuts"), "?"))
-            showShortcuts_ = true;
+            openManual("shortcuts");
         if (ImGui::MenuItem(L("À propos de CyDAW 2", "About CyDAW 2")))
             showAbout_ = true;
         ImGui::EndMenu();

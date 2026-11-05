@@ -18,3 +18,5 @@ The docs/manual folder contains English/French Markdown, editable SVG diagrams, 
 The bilingual contents use matching stable chapter/section IDs, so switching language retains the topic. Reference values come from a running registry snapshot, not hand-copied knobs. Validation checks local links, section parity, figures and coverage before packaging. If you find a wrong gesture or outdated screenshot, report the software version and chapter/section name.
 
 Start again at [Welcome](welcome.md), consult [troubleshooting](troubleshooting.md) or [plugin limitations](plugin-formats.md#limits).
+
+The CyDoc reader is MIT licensed; its licence and generation notices are shipped in help/Licenses. See the [CyDoc repository](https://github.com/MrMybal/CyDoc).

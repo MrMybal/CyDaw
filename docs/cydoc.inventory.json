@@ -1,0 +1,259 @@
+{
+  "schema": 1,
+  "legacy": [
+    {
+      "path": "README.md",
+      "id": "technical-readme",
+      "sourceLanguage": "en",
+      "status": "technical-reference"
+    },
+    {
+      "path": "os/README.md",
+      "id": "technical-os-readme",
+      "sourceLanguage": "fr",
+      "status": "technical-reference"
+    },
+    {
+      "path": "tools/mcp/README.md",
+      "id": "technical-tools-mcp-readme",
+      "sourceLanguage": "fr",
+      "status": "technical-reference"
+    },
+    {
+      "path": "docs/manual/README.md",
+      "id": "technical-docs-manual-readme",
+      "sourceLanguage": "en",
+      "status": "technical-reference"
+    },
+    {
+      "path": "docs/AMPLIS_ET_MICROS.md",
+      "id": "technical-docs-amplis-et-micros",
+      "sourceLanguage": "fr",
+      "status": "technical-reference"
+    },
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "id": "technical-docs-architecture",
+      "sourceLanguage": "fr",
+      "status": "technical-reference"
+    },
+    {
+      "path": "docs/BANQUE_DE_SONS.md",
+      "id": "technical-docs-banque-de-sons",
+      "sourceLanguage": "fr",
+      "status": "technical-reference"
+    },
+    {
+      "path": "docs/BATTERIE.md",
+      "id": "technical-docs-batterie",
+      "sourceLanguage": "fr",
+      "status": "technical-reference"
+    },
+    {
+      "path": "docs/BUILD_MATRIX.md",
+      "id": "technical-docs-build-matrix",
+      "sourceLanguage": "fr",
+      "status": "technical-reference"
+    },
+    {
+      "path": "docs/CINEMA.md",
+      "id": "technical-docs-cinema",
+      "sourceLanguage": "fr",
+      "status": "technical-reference"
+    },
+    {
+      "path": "docs/CONTENEURS.md",
+      "id": "technical-docs-conteneurs",
+      "sourceLanguage": "fr",
+      "status": "technical-reference"
+    },
+    {
+      "path": "docs/CONTROLEURS.md",
+      "id": "technical-docs-controleurs",
+      "sourceLanguage": "fr",
+      "status": "technical-reference"
+    },
+    {
+      "path": "docs/CYUI_MIGRATION.md",
+      "id": "technical-docs-cyui-migration",
+      "sourceLanguage": "en",
+      "status": "technical-reference"
+    },
+    {
+      "path": "docs/EDITION_AUDIO.md",
+      "id": "technical-docs-edition-audio",
+      "sourceLanguage": "fr",
+      "status": "technical-reference"
+    },
+    {
+      "path": "docs/EFFETS_CREATIFS.md",
+      "id": "technical-docs-effets-creatifs",
+      "sourceLanguage": "fr",
+      "status": "technical-reference"
+    },
+    {
+      "path": "docs/EFFETS_MIXAGE.md",
+      "id": "technical-docs-effets-mixage",
+      "sourceLanguage": "fr",
+      "status": "technical-reference"
+    },
+    {
+      "path": "docs/EFFETS_STUDIO.md",
+      "id": "technical-docs-effets-studio",
+      "sourceLanguage": "fr",
+      "status": "technical-reference"
+    },
+    {
+      "path": "docs/FONDERIE.md",
+      "id": "technical-docs-fonderie",
+      "sourceLanguage": "fr",
+      "status": "technical-reference"
+    },
+    {
+      "path": "docs/GRAPH_EDITOR_VST_ARCHITECTURE.md",
+      "id": "technical-docs-graph-editor-vst-architecture",
+      "sourceLanguage": "fr",
+      "status": "historical-design"
+    },
+    {
+      "path": "docs/GRAPH_SYSTEM.md",
+      "id": "technical-docs-graph-system",
+      "sourceLanguage": "fr",
+      "status": "technical-reference"
+    },
+    {
+      "path": "docs/IMPORT_PROJETS.md",
+      "id": "technical-docs-import-projets",
+      "sourceLanguage": "fr",
+      "status": "technical-reference"
+    },
+    {
+      "path": "docs/KICK_ET_ELECTRO.md",
+      "id": "technical-docs-kick-et-electro",
+      "sourceLanguage": "fr",
+      "status": "technical-reference"
+    },
+    {
+      "path": "docs/LINUX_WINDOWS_VST.md",
+      "id": "technical-docs-linux-windows-vst",
+      "sourceLanguage": "fr",
+      "status": "technical-reference"
+    },
+    {
+      "path": "docs/MIX_DJ.md",
+      "id": "technical-docs-mix-dj",
+      "sourceLanguage": "fr",
+      "status": "technical-reference"
+    },
+    {
+      "path": "docs/MODULATEURS.md",
+      "id": "technical-docs-modulateurs",
+      "sourceLanguage": "fr",
+      "status": "technical-reference"
+    },
+    {
+      "path": "docs/PLUGIN_FORMATS.md",
+      "id": "technical-docs-plugin-formats",
+      "sourceLanguage": "fr",
+      "status": "technical-reference"
+    },
+    {
+      "path": "docs/PRISME.md",
+      "id": "technical-docs-prisme",
+      "sourceLanguage": "fr",
+      "status": "technical-reference"
+    },
+    {
+      "path": "docs/PRODUCT_SPEC.md",
+      "id": "technical-docs-product-spec",
+      "sourceLanguage": "fr",
+      "status": "historical-design"
+    },
+    {
+      "path": "docs/SAMPLER.md",
+      "id": "technical-docs-sampler",
+      "sourceLanguage": "fr",
+      "status": "technical-reference"
+    },
+    {
+      "path": "docs/SOUND_MATCHING.md",
+      "id": "technical-docs-sound-matching",
+      "sourceLanguage": "fr",
+      "status": "technical-reference"
+    },
+    {
+      "path": "docs/SOUND_SOURCES.md",
+      "id": "technical-docs-sound-sources",
+      "sourceLanguage": "fr",
+      "status": "technical-reference"
+    },
+    {
+      "path": "docs/SYNTHES.md",
+      "id": "technical-docs-synthes",
+      "sourceLanguage": "fr",
+      "status": "technical-reference"
+    },
+    {
+      "path": "docs/TRAITEMENTS.md",
+      "id": "technical-docs-traitements",
+      "sourceLanguage": "fr",
+      "status": "technical-reference"
+    },
+    {
+      "path": "docs/TRANSPORT_SYNC.md",
+      "id": "technical-docs-transport-sync",
+      "sourceLanguage": "fr",
+      "status": "technical-reference"
+    },
+    {
+      "path": "docs/USER_MANUAL.md",
+      "id": "technical-docs-user-manual",
+      "sourceLanguage": "en",
+      "status": "technical-reference"
+    },
+    {
+      "path": "docs/V2_INTERFACE.md",
+      "id": "technical-docs-v2-interface",
+      "sourceLanguage": "fr",
+      "status": "technical-reference"
+    },
+    {
+      "path": "docs/V2_TEST_BUILD.md",
+      "id": "technical-docs-v2-test-build",
+      "sourceLanguage": "fr",
+      "status": "historical-design"
+    },
+    {
+      "path": "docs/VST2_BUILD.md",
+      "id": "technical-docs-vst2-build",
+      "sourceLanguage": "fr",
+      "status": "technical-reference"
+    },
+    {
+      "path": "LICENSE",
+      "id": "application-license",
+      "sourceLanguage": "en",
+      "status": "licence"
+    },
+    {
+      "path": "content/factory/LICENCE.txt",
+      "id": "factory-licenses",
+      "sourceLanguage": "fr",
+      "status": "licence"
+    },
+    {
+      "path": "docs/CYDOC_MIGRATION.md",
+      "id": "technical-docs-cydoc-migration",
+      "sourceLanguage": "en",
+      "status": "technical-reference"
+    }
+  ],
+  "sources": [
+    "include/cydaw/control/ControlPluginABI.h",
+    "src/v2/CustomInterfaceABI.h",
+    "include/cydaw/engine/AudioProcessor.h",
+    "include/cydaw/engine/AudioBuffer.h",
+    "include/cydaw/engine/Transport.h",
+    "tools/mcp/cydaw_mcp_server.py"
+  ]
+}

@@ -18,3 +18,5 @@ docs/manual contient Markdown anglais/français, SVG éditables, captures réell
 Les deux langues partagent les identifiants de chapitres/sections pour conserver le sujet au changement. Les valeurs viennent du registre en exécution, pas de boutons recopiés. La validation vérifie liens locaux, sections, figures et couverture avant paquet. Pour signaler geste faux ou capture dépassée, indiquer version et chapitre/section.
 
 Revenir à [l'accueil](welcome.md), consulter [dépannage](troubleshooting.md) ou [limites plugin](plugin-formats.md#limits).
+
+Le lecteur CyDoc est sous licence MIT ; son texte et les notices de génération sont livrés dans help/Licenses. Voir le [dépôt CyDoc](https://github.com/MrMybal/CyDoc).

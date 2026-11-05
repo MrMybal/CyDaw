@@ -31,8 +31,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Package contract tests
-        run: python tests/v2_package_check.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - name: Check Alpha tag
         run: python tools/publish_v2_alpha.py --check-tag "$env:RELEASE_TAG"
       - uses: actions/cache@v4
@@ -55,6 +56,10 @@ jobs:
         run: cmake --preset desktop-windows-wasapi -DCYDAW_BUILD_V2=ON -DCYDAW_ENABLE_LTO=ON
       - name: Build V2 and native tests
         run: cmake --build --preset desktop-windows-wasapi --parallel 2
+      - name: Package and CyDoc contract tests
+        env:
+          CYDAW_TEST_HELP_ROOT: build/windows-wasapi/help
+        run: python tests/v2_package_check.py
       - name: Native tests
         run: ctest --preset desktop-windows-wasapi --parallel 2
       - name: Package Alpha

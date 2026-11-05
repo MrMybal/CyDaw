@@ -132,8 +132,10 @@ checksums; CI does not depend on retention of rolling upstream autobuilds.
 
 ## Bilingual offline manual
 
-CyDAW2 links CyUI::DocumentViews for its built-in English/French user manual.
-The manual resources are copied beside the executable at each application build
-and included by install and Windows ZIP packaging. They are not native plugin
-runtime resources. The Windows release packager validates both languages and
-all local links/figures before producing an archive. See [USER_MANUAL.md](USER_MANUAL.md).
+CyDAW2 builds its local CyDoc export with Python 3.11+, Node.js 22+ and npm.
+The CyDoc package is pinned and checksum-verified from the authenticated Git import;
+cached generation can run offline. CMake copies the complete help tree beside
+the executable and includes it in installation. Windows ZIP packaging validates
+the exported resources before archiving. Runtime reading uses the default browser
+and file:// only; there is no Node.js, WebView or HTTP-server requirement.
+See [CYDOC_MIGRATION.md](CYDOC_MIGRATION.md) and [USER_MANUAL.md](USER_MANUAL.md).

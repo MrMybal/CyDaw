@@ -20,8 +20,7 @@ built. The existing Windows ImGui/D3D11 host and its context lifecycle remain.
 | Canvas / Plots | Double-precision graph transforms/grid and anchored timeline-band navigation; linear/log axes for automation |
 | Nodes | Deterministic, cycle-tolerant graph arrangement; positions commit once through the existing graph history |
 | Code / CodeEditor | Native JSFX/EEL2, processing, JSON interface and C++ component source editors; syntax, keyboard editing and editor Undo |
-| Images | Cinema reference-video preview and manual illustrations, fit/pan/zoom; decoding and texture lifetime stay in CyDAW |
-| DocumentViews | Offline bilingual user-manual prose, tables, code and links; chapter identity, search, figures and navigation remain in the application |
+| Images | Cinema reference-video preview, fit/pan/zoom; decoding and texture lifetime stay in CyDAW |
 | Inspector | Master gain/mute property drafts, live preview, commit, Escape/hidden-panel cancellation and external revision invalidation |
 
 Canvas, Plots and Code are enabled by the selected modules' dependency closure.
@@ -127,6 +126,6 @@ Verified on this revision:
 
 ## Offline user manual
 
-DocumentViews is enabled and linked only by CyDAW2. Native exported plugin UIs retain
-their smaller explicit module closure; they do not carry the manual or its assets.
-See [USER_MANUAL.md](USER_MANUAL.md) for the reader and test/packaging contract.
+The user manual now uses CyDoc's local browser reader. CyUI DocumentViews is no
+longer selected or linked. Images remains available for Cinema. Native exported
+plugins retain their smaller explicit module closure. See [CYDOC_MIGRATION.md](CYDOC_MIGRATION.md).

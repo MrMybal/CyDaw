@@ -1,0 +1,128 @@
+{
+  "schema": 1,
+  "defaultLocale": "en",
+  "translations": {
+    "fr": {
+      "welcome": {
+        "sourceRevision": "bd2c22f293d71bdb"
+      },
+      "setup": {
+        "sourceRevision": "dc92f7e27a5879e8"
+      },
+      "workspace": {
+        "sourceRevision": "06b30defb597e9fe"
+      },
+      "studio": {
+        "sourceRevision": "4867c6b3fccecf41"
+      },
+      "launcher": {
+        "sourceRevision": "06fd8bca5cb4b502"
+      },
+      "midi": {
+        "sourceRevision": "ef239b3184a8310f"
+      },
+      "audio": {
+        "sourceRevision": "90f49c101b867721"
+      },
+      "automation": {
+        "sourceRevision": "781d945fcad79165"
+      },
+      "mixing": {
+        "sourceRevision": "57b2cfee129b2713"
+      },
+      "devices": {
+        "sourceRevision": "c42b7d2ffdaf3d82"
+      },
+      "synths": {
+        "sourceRevision": "3578e5ef7a86780f"
+      },
+      "prisme": {
+        "sourceRevision": "dc4a5d92b899e959"
+      },
+      "sampler": {
+        "sourceRevision": "4774207902fc66a7"
+      },
+      "drums": {
+        "sourceRevision": "30d86dbfc0e29295"
+      },
+      "studio-effects": {
+        "sourceRevision": "2c381576bd722d6d"
+      },
+      "mixing-effects": {
+        "sourceRevision": "24d5cdfc2bccf850"
+      },
+      "creative-effects": {
+        "sourceRevision": "0e910737408bf7c6"
+      },
+      "guitar-voice": {
+        "sourceRevision": "cc4fa402f6f37988"
+      },
+      "modulators": {
+        "sourceRevision": "2e4acba073d229f1"
+      },
+      "containers": {
+        "sourceRevision": "598a928b370938dc"
+      },
+      "dj": {
+        "sourceRevision": "74cf1203c36d83d2"
+      },
+      "foundry": {
+        "sourceRevision": "b29f777ed9590970"
+      },
+      "cinema": {
+        "sourceRevision": "06d01da88309d388"
+      },
+      "processing": {
+        "sourceRevision": "f0726a6d5fbc72b5"
+      },
+      "graphs": {
+        "sourceRevision": "c737623c4c2c4102"
+      },
+      "workshop": {
+        "sourceRevision": "610ca66546b7aa27"
+      },
+      "interface-design": {
+        "sourceRevision": "eaa4c2bc61317b8d"
+      },
+      "plugin-formats": {
+        "sourceRevision": "c31df9c48da8c8d8"
+      },
+      "controllers": {
+        "sourceRevision": "2901d3f7774745d1"
+      },
+      "sync": {
+        "sourceRevision": "b1317d6556e421a2"
+      },
+      "library": {
+        "sourceRevision": "69baac60c2bfd5ff"
+      },
+      "resynthesis": {
+        "sourceRevision": "abe9595cdc3e3e58"
+      },
+      "import-export": {
+        "sourceRevision": "00fa3fd44443825a"
+      },
+      "troubleshooting": {
+        "sourceRevision": "e51c1636ee7c65a9"
+      },
+      "shortcuts": {
+        "sourceRevision": "17c741ecd5170180"
+      },
+      "glossary": {
+        "sourceRevision": "ae7720d59bf7c3c9"
+      },
+      "licenses": {
+        "sourceRevision": "02a015c9bc2fe34a"
+      },
+      "reference-instruments": {
+        "sourceRevision": "3f36a458c08c2304"
+      },
+      "reference-effects": {
+        "sourceRevision": "08f1dc2227d11e31"
+      },
+      "reference-nodes": {
+        "sourceRevision": "327dd29f789e89c5"
+      }
+    }
+  }
+}

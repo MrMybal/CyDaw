@@ -1,57 +1,71 @@
-# Maintaining the bilingual manual
+# Authoring the CyDAW CyDoc manual
 
-The manifest defines ordered chapters and translated titles/groups. English is
-the default. Each chapter exists in en and fr with identical stable section IDs:
-`## Human title {#stable-id}`. The introduction is section `overview`.
-Local links use `chapter.md#stable-id`. Keep them relative and valid in both languages.
+Application-owned authoring inputs remain in docs/manual/en, fr and assets.
+manifest.json records ordered stable chapter IDs and translated titles/groups.
+Headings use explicit matching IDs: `## Human title {#stable-id}`.
+The introduction becomes the stable overview section. Existing links such as
+`mixing.md#sidechain` are converted to CyDoc routes during preparation.
 
-Standalone `![Translated caption](../assets/name-en.png)` lines become figure entries.
-Use bilingual PNG screenshots and SVG diagrams. The app retains chapter/section
-when switching language. It does not load arbitrary remote pictures or execute HTML.
+Technical Markdown and licence files are inventoried in docs/cydoc.inventory.json.
+The migration keeps original prose and fenced code, marks historical/design scope,
+and identifies untranslated originals. Add new technical documents to the inventory.
+The six explicitly approved source files are the only source-index inputs.
 
-## Regeneration
+## Build and check
 
-Run from the repository root with Python 3.11+:
+~~~sh
+python tools/docs/build.py --out build/help
+python tools/docs/validate.py --root build/help
+python tools/docs/build.py --offline --out build/help
+~~~
+
+The first command prepares a fresh authoring project, calls the pinned CyDoc
+official check/export CLI, bundles the application adapter through public API
+exports and validates/copies the complete result. check writes an export.
+Do not hand-edit generated HTML, data.js, manifest.json or module bundles.
+
+For source screenshots and numeric registry references:
 
 ~~~sh
 python tools/manual/diagrams.py
+python tools/manual/capture.py --exe "<build>/CyDAW 2.exe" --images docs/manual/assets --catalogue docs/manual/reference.json --ffmpeg "<ffmpeg.exe>"
 python tools/manual/build_reference.py
 python tools/manual/build_reference.py --check
 python tools/manual/validate.py
 ~~~
 
-To refresh screenshots and the native registry from a Windows build:
+Captures use a private hidden silent process and original synthetic test media.
+No commercial tracks, user projects or sample packs belong in documentation assets.
+Schema reference numbers are raw engine values, not inferred UI units or choices.
+
+## Translation tracking
+
+translations.json is a reviewed ledger, not an automatically refreshed build output.
+When English meaning changes, update French with the same page/section/media IDs,
+review it, then acknowledge only those chapters:
 
 ~~~sh
-python tools/manual/capture.py --exe "<build>/CyDAW 2.exe" --images docs/manual/assets --catalogue docs/manual/reference.json --ffmpeg "<ffmpeg.exe>"
+python tools/docs/translations.py --ack welcome --ack shortcuts
 ~~~
 
-This launches a separate hidden silent process, uses temporary locations, generates
-original test audio and synthetic video, then closes it. It does not use the user's
-projects or commercial tracks. A new registry snapshot must be followed by reference
-regeneration and review; raw numeric bounds/defaults do not encode UI units or choices.
-The manifest and generation check are versioned with the content.
+The generator fingerprints English inputs consistently across line endings. A stale
+ledger makes validation fail. Never acknowledge a translation merely to silence a
+check. Technical originals copied into another locale retain explicit pending
+translation notices and untracked status until real translations are authored.
 
-## Verification and ownership
+## Media and dependencies
 
-~~~sh
-ctest --test-dir <build> -C Release -R "^cydaw_manual_" --output-on-failure
-python tests/v2_package_check.py
-~~~
+Screenshots/SVG files become stable image blocks with minimal controls.
+Only image is currently selected. Static diagrams need no graph reader.
+CyDoc's official export supplies local classic module scripts and resource catalogs;
+the application adapter uses those providers, not file fetches or a web server.
+Source-index extraction is lexical, not a compiler API parser.
 
-The model test verifies load/search/identity/path rules; the content validator checks
-both languages, local links, figures, translation parity and complete registry coverage.
-The Windows reader test renders all sections and exercises keyboard, language,
-scroll/history, zoom, five themes and narrow layout in an isolated instance. Review
-its PNGs in `<build>/manual-check` as well as the prose.
+The repository pins CyDoc's Git revision and a verified package archive in third_party/cydoc.json.
+The library was imported through authenticated Git. Ordinary builds install pinned
+public npm tools without accessing the private repository. The installed application
+carries the complete help tree and MIT/dependency notices. Generation needs Node.js
+22/npm and Python 3.11; reading requires only a browser.
 
-CMake's `cydaw_manual_resources` target refreshes installed resources even if the
-executable does not relink. Runtime uses docs/manual beside the executable, falling
-back to the working directory for source-tree development. Missing resources display
-a reload/restoration message. Windows release packaging requires a valid manual.
-
-Screenshots and diagrams are source-controlled documentation assets. Their synthetic
-media fixtures and test logs stay outside this folder. Do not add customer recordings,
-commercial examples, user paths, downloads or build outputs here. Maintain equivalent
-instructions in both languages; preserve explicit limitations instead of documenting
-unimplemented capabilities as available.
+See [integration and verification](../USER_MANUAL.md) and
+[migration details](../CYDOC_MIGRATION.md).
