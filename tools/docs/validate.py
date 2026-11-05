@@ -28,6 +28,9 @@ def validate(root):
  for (locale,key),page in pages.items():
   require(bool(page['html'].strip()),'Empty page: '+key)
   for href in re.findall(r'href="([^"]+)"',page['html']):
+   # README links to the hosted reader must resolve just like embedded routes.
+   if href.lower().startswith('https://mrmybal.github.io/cydaw/#/'):
+    href='#/'+href.split('#/',1)[1]
    if not href.startswith('#/'):continue
    from urllib.parse import unquote
    route=href.split('?')[0][2:].split('/');target=pages.get((unquote(route[0]),unquote(route[1])))
