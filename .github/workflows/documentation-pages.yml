@@ -6,6 +6,9 @@ on:
     paths:
       - '.github/workflows/documentation-pages.yml'
       - 'README.md'
+      - 'website/**'
+      - 'tools/build_website.py'
+      - 'resources/branding/**'
       - 'docs/**'
       - 'os/README.md'
       - 'tools/mcp/README.md'
@@ -49,11 +52,13 @@ jobs:
         run: python .CyDocBuild/tools/build.py --out build/documentation-pages
       - name: Validate content, translations, resources and export integrity
         run: python .CyDocBuild/tools/validate.py --root build/documentation-pages
-      # Upload only the generated reader, never the checkout, application output,
+      - name: Assemble the presentation and unmodified manual
+        run: python tools/build_website.py --documentation build/documentation-pages --out build/github-pages
+      # Upload only the presentation and manual, never the checkout, application output,
       # user projects, sample packs or build caches.
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: build/documentation-pages
+          path: build/github-pages
 
   deploy:
     name: Publish documentation

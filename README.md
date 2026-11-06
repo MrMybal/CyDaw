@@ -1,5 +1,7 @@
 # CyDAW
 
+[Website](https://mrmybal.github.io/CyDaw/) · [Documentation](https://mrmybal.github.io/CyDaw/manual/Documentation.html#/en/welcome) · [Releases](https://github.com/MrMybal/CyDaw/releases)
+
 **CyDAW** is a digital audio workstation (DAW) for Windows: compose, arrange, play, mix and finish a
 track, with its own instruments, its own effects and a built-in sound library.
 
