@@ -58,7 +58,7 @@ jobs:
         run: cmake --build --preset desktop-windows-wasapi --parallel 2
       - name: Package and CyDoc contract tests
         env:
-          CYDAW_TEST_HELP_ROOT: build/windows-wasapi/help
+          CYDAW_TEST_HELP_ROOT: build/windows-wasapi/Documentation
         run: python tests/v2_package_check.py
       - name: Native tests
         run: ctest --preset desktop-windows-wasapi --parallel 2

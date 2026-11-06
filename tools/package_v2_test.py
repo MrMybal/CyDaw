@@ -52,10 +52,10 @@ def package(build, output, alpha=False, juce_source=None):
         raise FileNotFoundError('JUCE notice missing; supply --juce-source')
     # An incomplete offline manual must never silently ship in a release.
     spec = importlib.util.spec_from_file_location('cydaw_manual_validate',
-        Path(__file__).resolve().parent / 'docs/validate.py')
+        Path(__file__).resolve().parents[1] / '.CyDocBuild/tools/validate.py')
     validator = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(validator)
-    validator.validate(build / 'help')
+    validator.validate(build / 'Documentation')
     archive = output / (name + '.zip')
     with tempfile.TemporaryDirectory(prefix='.cydaw-package-', dir=output) as temporary:
         temporary = Path(temporary)
@@ -67,7 +67,7 @@ def package(build, output, alpha=False, juce_source=None):
             source = build / folder
             if source.is_dir():
                 shutil.copytree(source, stage / folder, ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
-        shutil.copytree(build / 'help', stage / 'help')
+        shutil.copytree(build / 'Documentation', stage / 'Documentation')
         (stage / 'templates').mkdir()
         templates = ROOT / 'templates'
         if templates.is_dir():
@@ -79,7 +79,6 @@ def package(build, output, alpha=False, juce_source=None):
         shutil.copy2(ROOT / 'LICENSE', stage / 'LICENSE')
         shutil.copy2(ROOT / 'README.md', stage / 'README.md')
         shutil.copy2(juce_licence, stage / 'JUCE_LICENSE.md')
-        shutil.copytree(ROOT / 'docs', stage / 'docs', ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
         for notice in (ROOT / 'third_party/imgui/LICENSE.txt', ROOT / 'third_party/zstd/LICENSE'):
             if notice.is_file():
                 destination = stage / 'Licenses' / notice.parent.name

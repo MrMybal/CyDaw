@@ -10,8 +10,8 @@ on:
       - 'os/README.md'
       - 'tools/mcp/README.md'
       - 'tools/mcp/cydaw_mcp_server.py'
-      - 'tools/docs/**'
-      - 'third_party/cydoc*'
+      - '.CyDocBuild/tools/**'
+      - '.CyDocBuild/**'
       - 'include/cydaw/control/ControlPluginABI.h'
       - 'include/cydaw/engine/AudioProcessor.h'
       - 'include/cydaw/engine/AudioBuffer.h'
@@ -43,12 +43,12 @@ jobs:
           node-version: '22'
       - uses: actions/cache@v4
         with:
-          path: output/cydoc-cache
-          key: cydoc-pages-${{ runner.os }}-${{ hashFiles('third_party/cydoc.json', 'third_party/cydoc-*.tgz', 'tools/docs/build.py') }}
+          path: .CyDocBuild/cache
+          key: cydoc-pages-${{ runner.os }}-${{ hashFiles('.CyDocBuild/vendor/cydoc.json', '.CyDocBuild/vendor/cydoc-*.tgz', '.CyDocBuild/tools/build.py') }}
       - name: Generate the same HTML export as the application
-        run: python tools/docs/build.py --out build/documentation-pages
+        run: python .CyDocBuild/tools/build.py --out build/documentation-pages
       - name: Validate content, translations, resources and export integrity
-        run: python tools/docs/validate.py --root build/documentation-pages
+        run: python .CyDocBuild/tools/validate.py --root build/documentation-pages
       # Upload only the generated reader, never the checkout, application output,
       # user projects, sample packs or build caches.
       - uses: actions/upload-pages-artifact@v3

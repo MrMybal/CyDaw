@@ -138,4 +138,4 @@ cached generation can run offline. CMake copies the complete help tree beside
 the executable and includes it in installation. Windows ZIP packaging validates
 the exported resources before archiving. Runtime reading uses the default browser
 and file:// only; there is no Node.js, WebView or HTTP-server requirement.
-See [CYDOC_MIGRATION.md](CYDOC_MIGRATION.md) and [USER_MANUAL.md](USER_MANUAL.md).
+See [CyDoc integration](../.CyDocBuild/README.md) and [../.CyDocBuild/README.md](../.CyDocBuild/README.md).

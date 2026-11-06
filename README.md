@@ -117,7 +117,7 @@ the instruments' maps and the list of banks. Their authors and licences are cred
 ## Building
 
 Requirements: Windows 10 or 11 (x64), Visual Studio 2022 (C++), CMake 3.24 or newer,
-[Git LFS](https://git-lfs.com) (a few test files), Python 3.11 for the tools and tests.
+[Git LFS](https://git-lfs.com) (a few test files), Python 3.11 for the tools and tests, and Node.js 22/npm to generate the documentation.
 JUCE 8 is fetched automatically.
 
 ```bash
@@ -135,11 +135,11 @@ with `ctest -C Release` in the build folder.
 
 Open **Help > User manual** or **Ctrl+F1** for the complete offline illustrated **CyDoc** manual in your default browser:
 40 chapters in **English (default) and French**, with search, diagrams and screenshots.
-[Documentation](https://MrMybal.github.io/CyDaw/#/en/welcome) ·
-[Documentation en français](https://MrMybal.github.io/CyDaw/#/fr/welcome)
+[Documentation](https://MrMybal.github.io/CyDaw/Documentation.html#/en/welcome) ·
+[Documentation en français](https://MrMybal.github.io/CyDaw/Documentation.html#/fr/welcome)
 
 The online reader is the same CyDoc export shipped with the application, including
-navigation, search, images and diagrams. See [manual maintenance](docs/USER_MANUAL.md) for authoring and build instructions.
+navigation, search, images and diagrams. See [documentation authoring](.CyDocBuild/README.md) for authoring and build instructions.
 
 The following technical and developer references are mostly written in French.
 

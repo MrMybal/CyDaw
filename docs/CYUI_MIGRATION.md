@@ -128,4 +128,4 @@ Verified on this revision:
 
 The user manual now uses CyDoc's local browser reader. CyUI DocumentViews is no
 longer selected or linked. Images remains available for Cinema. Native exported
-plugins retain their smaller explicit module closure. See [CYDOC_MIGRATION.md](CYDOC_MIGRATION.md).
+plugins retain their smaller explicit module closure. See [CyDoc integration](../.CyDocBuild/README.md).

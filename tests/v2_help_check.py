@@ -41,7 +41,7 @@ def main():
     assert help()['url'].endswith('#/en/shortcuts'),'real Help > Keyboard shortcuts'
     assert help()['engine']=='CyDoc';before=help()['requests'];shortcut()
     current=help();assert current['requests']==before+1 and current['url'].startswith('file:///') and current['launchSuppressed']
-    assert current['url'].endswith('/help/index.html'),'generic help resumes browser state'
+    assert current['url'].endswith('/Documentation/Documentation.html'),'generic help opens the official local reader'
     events(dict(type='text',text='?'));assert help()['url'].endswith('#/en/shortcuts')
     contexts={}
     for mode,topic in [('foundry','foundry'),('cinema','cinema'),('dj','dj'),('workshop','workshop'),('processing','processing')]:

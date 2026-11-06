@@ -1,45 +1,28 @@
-"""Preservation checks independent of the audio engine and browser."""
-import importlib.util,json,re,tempfile,unittest
+"""Check translation freshness, stable routes and the private/public boundary."""
+import importlib.util,json,re,tempfile,unittest,hashlib
 from pathlib import Path
-ROOT=Path(__file__).resolve().parents[1]
-spec=importlib.util.spec_from_file_location('prepare_help',ROOT/'tools/docs/prepare.py');prepare=importlib.util.module_from_spec(spec);spec.loader.exec_module(prepare)
-def blocks(text):
- result=[];opened=None;value=[]
- for line in text.splitlines():
-  mark=re.match(r'^\s*(\x60{3,}|~{3,})(.*)$',line)
-  if opened is None and mark:opened=mark[1];value=[];continue
-  if opened and mark and mark[1][0]==opened[0] and len(mark[1])>=len(opened) and not mark[2].strip():
-   result.append('\n'.join(value));opened=None;continue
-  if opened:value.append(line)
- return result
-class Preservation(unittest.TestCase):
- @classmethod
- def setUpClass(cls):
-  cls.temp=tempfile.TemporaryDirectory(prefix='cydoc-preserve-');cls.project=Path(cls.temp.name)
-  prepare.prepare(cls.project)
- @classmethod
- def tearDownClass(cls):cls.temp.cleanup()
- def test_all_existing_code_examples_retained(self):
-  inventory=json.loads((ROOT/'docs/cydoc.inventory.json').read_text(encoding='utf-8'));topics=json.loads((ROOT/'docs/manual/manifest.json').read_text(encoding='utf-8'))['topics']
-  inputs=[(ROOT/row['path'],row['id']) for row in inventory['legacy']]
-  inputs += [(ROOT/'docs/manual'/lang/(row['id']+'.md'),row['id']) for row in topics for lang in ('en','fr')]
-  checked=0
-  for file,page in inputs:
-   original=blocks(file.read_text(encoding='utf-8-sig'))
-   locales=(file.parent.name,) if file.parent.name in ('en','fr') else ('en','fr')
-   for lang in locales:
-    translated=blocks((self.project/'content'/lang/(page+'.md')).read_text(encoding='utf-8'))
-    for block in original:self.assertIn(block,translated,(file,lang))
-   checked+=len(original)
-  self.assertGreater(checked,0)
-  print('Preserved original fenced code examples:',checked)
- def test_technical_inventory_covers_all_top_level_docs(self):
-  inventory=json.loads((ROOT/'docs/cydoc.inventory.json').read_text(encoding='utf-8'))
-  retained={row['path'] for row in inventory['legacy']}
-  self.assertFalse({p.relative_to(ROOT).as_posix() for p in (ROOT/'docs').glob('*.md')}-retained)
- def test_only_approved_source_files_are_copied(self):
-  inventory=json.loads((ROOT/'docs/cydoc.inventory.json').read_text(encoding='utf-8'))
-  copied={p.relative_to(self.project/'sources').as_posix() for p in (self.project/'sources').rglob('*') if p.is_file()}
-  self.assertEqual(copied,set(inventory['sources']))
-  self.assertEqual(len(copied),6)
+ROOT=Path(__file__).resolve().parents[1];W=ROOT/'.CyDocBuild'
+spec=importlib.util.spec_from_file_location('prepare_help',W/'tools/prepare.py');prepare=importlib.util.module_from_spec(spec);spec.loader.exec_module(prepare)
+class DocumentationInputs(unittest.TestCase):
+ def test_complete_reviewed_translations(self):
+  en={p.stem:p for p in (W/'manual/en').glob('*.md')};fr={p.stem:p for p in (W/'manual/fr').glob('*.md')}
+  self.assertEqual(set(en),set(fr));self.assertEqual(len(en),42)
+  for key,p in en.items():
+   e=p.read_text(encoding='utf-8');f=fr[key].read_text(encoding='utf-8');body=e.split('---',2)[2]
+   revision=hashlib.sha256(body.encode('utf-8')).hexdigest()[:16]
+   self.assertIn('revision: '+revision,e,key);self.assertIn('sourceRevision: '+revision,f,key)
+   self.assertEqual(re.findall(r'\{#([^}]+)\}',e),re.findall(r'\{#([^}]+)\}',f),key)
+   self.assertNotEqual(e.split('---',2)[2],f.split('---',2)[2],key)
+ def test_private_work_stays_out_of_content(self):
+  with tempfile.TemporaryDirectory(prefix='cydoc-input-') as tmp:
+   p=Path(tmp);config=prepare.prepare(p)
+   self.assertFalse((p/'sources').exists());self.assertFalse((p/'internal').exists())
+   self.assertFalse(any(v.suffix in ('.h','.cpp','.py') for v in (p/'assets').rglob('*')))
+   self.assertEqual(config['defaultLocale'],'en');self.assertEqual(config['modules'],['image'])
+   self.assertNotIn('sourceIndex',config);self.assertNotIn('apiIndex',config)
+ def test_legacy_aliases_target_human_topics(self):
+  data=json.loads((W/'cydoc.config.json').read_text(encoding='utf-8'));ids={p.stem for p in (W/'manual/en').glob('*.md')}|{'api-controller-abi','api-interface-abi','api-audio-processor'}
+  for key,value in data['aliases'].items():self.assertIn(value.split('#')[0],ids,key)
+  self.assertEqual(data['aliases']['atelier-vst'],'workshop')
+  self.assertEqual(data['aliases']['technical-tools-mcp-readme'],'mcp')
 if __name__=='__main__':unittest.main()

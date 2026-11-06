@@ -1,0 +1,43 @@
+---
+id: mixing-effects
+title: Effets de mixage, couleur et mastering
+description: Équilibrer dynamique, saturation et couleur de mastering.
+section: Manuel / Instruments et effets
+parent: studio-effects
+order: 15
+sourceRevision: 111ac14b3fd8f3b3
+---
+
+## Vue d’ensemble {#overview}
+
+Ces modules réunissent plusieurs opérations dans des panneaux dédiés. Partir d'un preset proche du besoin puis changer un aspect à la fois. Garder de la marge dans les étages non linéaires/multibandes et comparer bypass à niveau égal.
+
+
+~~~image
+{"id": "figure-routing", "src": "assets/routing-fr.svg", "alt": "Bus et parallèle rendent explicite le rôle du traitement.", "title": "Bus et parallèle rendent explicite le rôle du traitement.", "controls": "minimal"}
+~~~
+
+*Bus et parallèle rendent explicite le rôle du traitement.*
+
+
+## Choisir un module {#modules}
+| Module | Rôle |
+| --- | --- |
+| Pression | Dynamique multibande ascendante/descendante ; régler séparément faible et fort niveau. |
+| Fournaise | Saturation/couleur ; vérifier drive, timbre et compensation de sortie. |
+| Écho Bande | Écho de bande ; temps, feedback, couleur et mouvement interagissent. |
+| Multibande Pro | Dynamique par bandes ; régler coupures avant seuils et équilibre. |
+| Velours | Réduction des résonances ; écouter ce qui est retiré, éviter de trop lisser. |
+| Patine | Usure analogique, mouvement et bruit ; équilibrer caractère et lisibilité. |
+| Sonomètre | Mesures de sonie/niveau ; remettre l'intégrée à zéro pour une passe. |
+| Tranche | Traitement de console ; ordre et gains comptent. |
+| Finition | Finalisation/mastering ; comparer timbre et dynamique à sonie égale. |
+| Halo | Grande réverbération ; régler largeur, couleur, durée et mélange. |
+
+## Travailler par étapes {#workflow}
+Sur un bus batterie corriger d'abord les pistes puis ajouter une dynamique commune douce. Sur une voix réparer avant de colorer. En mastering conserver une version sans traitement de niveau final et juger des passages complets. Les multibandes modifient l'équilibre et la phase aux coupures ; comparer les bandes réunies, pas seulement en solo.
+
+## Échos, espace et mesures {#space}
+Les répétitions dépassent la source ; Freeze et fort feedback peuvent ne pas décroître. Un export trop court coupe une bonne queue. Vérifier mélange insert/retour et compatibilité mono. Une mesure décrit le point qu'elle reçoit : placer le sonomètre où mesurer. Un preset plus fort ne doit pas gagner automatiquement.
+
+Voir les [effets de studio](doc:studio-effects), [l'automation](doc:automation) et la [référence complète](doc:reference-effects).

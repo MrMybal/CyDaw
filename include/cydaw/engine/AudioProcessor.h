@@ -11,7 +11,7 @@
  * ## Latency and multi-bus processing {#latency}
  * latencySamples() reports current delay, bounded by maximumLatencySamples() from prepare onward. Dynamic readings shared with UI/control threads need safe concurrent access. valuesGliding() requests short processing slices with glideValues(). MultiBusAudioProcessor receives individually authored input buses prepared by AudioRenderPlanBuilder.
  *
- * See [mixing](doc:mixing), the declarations and their lexical dependencies. This index does not infer overloads or macro expansion.
+ * See [mixing](doc:mixing), and the public signatures below.
  */
 /**
  * @doc api-audio-processor
@@ -26,7 +26,7 @@
  * ## Latence et traitement multibus {#latency}
  * latencySamples() rapporte le retard actuel, borné par maximumLatencySamples() après prepare. Les mesures partagées avec les threads UI/contrôle nécessitent un accès concurrent sûr. valuesGliding() demande des tranches courtes avec glideValues(). MultiBusAudioProcessor reçoit les entrées distinctes préparées par AudioRenderPlanBuilder.
  *
- * Voir le [mixage](doc:mixing), les déclarations et leurs dépendances lexicales. Cet index ne déduit ni surcharges ni expansion des macros.
+ * Voir le [mixage](doc:mixing), et les signatures publiques ci-dessous.
  */
 #pragma once
 

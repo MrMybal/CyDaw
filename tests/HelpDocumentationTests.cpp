@@ -20,10 +20,10 @@ int main(int argc, char** argv) {
         need(help.link("cinema","unknown").isEmpty(),"unknown section");
         need(help.link("cinema",{},"de").isEmpty(),"unsupported locale");
         const auto folder=juce::File::getSpecialLocation(juce::File::tempDirectory).getNonexistentChildFile(juce::String::fromUTF8("CyDAW help é #%"),"",false);
-        folder.createDirectory();
+        folder.getChildFile("DocData").createDirectory();
         struct Cleanup {juce::File file;~Cleanup(){file.deleteRecursively();}} cleanup{folder};
-        juce::File(juce::String::fromUTF8(argv[1])).getChildFile("routes.json").copyFileTo(folder.getChildFile("routes.json"));
-        folder.getChildFile("index.html").replaceWithText("fixture");
+        juce::File(juce::String::fromUTF8(argv[1])).getChildFile("DocData/routes.json").copyFileTo(folder.getChildFile("DocData/routes.json"));
+        folder.getChildFile("Documentation.html").replaceWithText("fixture");
         HelpDocumentation spaced{folder};auto encoded=spaced.link("welcome");
         need(encoded.contains("%20") && encoded.contains("%23") && encoded.contains("%25") && encoded.contains("%C3%A9"),"platform file URL encoding");
         HelpDocumentation absent{folder.getChildFile("absent")};need(!absent.load() && absent.error().isNotEmpty(),"missing resources are reported");

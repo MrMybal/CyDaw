@@ -1,6 +1,6 @@
 # CyDAW OS — direction
 
-[Documentation](https://MrMybal.github.io/CyDaw/#/fr/technical-os-readme) — le lecteur CyDoc en français, ouvert sur cette référence.
+[Documentation](https://MrMybal.github.io/CyDaw/Documentation.html#/fr/welcome) — le lecteur CyDoc en français, ouvert sur cette référence.
 
 CyDAW OS sera une image Linux dédiée, maintenable et reproductible. La première
 base proposée est une distribution minimale stable avec paquets natifs (pas un

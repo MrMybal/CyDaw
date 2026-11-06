@@ -3,13 +3,13 @@
 namespace cydaw::v2 {
 HelpDocumentation::HelpDocumentation(juce::File directory) : directory_(std::move(directory)) {}
 juce::File HelpDocumentation::installedDirectory() {
-    return juce::File::getSpecialLocation(juce::File::currentExecutableFile).getSiblingFile("help");
+    return juce::File::getSpecialLocation(juce::File::currentExecutableFile).getSiblingFile("Documentation");
 }
 bool HelpDocumentation::load() {
     error_.clear();
-    if (!directory_.getChildFile("index.html").existsAsFile()) { error_ = "CyDoc help/index.html is missing. Restore the complete help folder beside CyDAW."; return false; }
+    if (!directory_.getChildFile("Documentation.html").existsAsFile()) { error_ = "Documentation/Documentation.html is missing. Restore the complete Documentation folder beside CyDAW."; return false; }
     if (catalog_.isObject()) return true;
-    const auto file = directory_.getChildFile("routes.json");
+    const auto file = directory_.getChildFile("DocData/routes.json");
     if (!file.existsAsFile() || file.getSize() > 8 * 1024 * 1024) { error_ = "CyDoc help route catalog is missing or too large"; return false; }
     const auto data = juce::JSON::parse(file);
     if (data.getProperty("format", {}).toString() != "CyDAW CyDoc Routes" || int(data.getProperty("schema", 0)) != 1
@@ -38,8 +38,8 @@ juce::String HelpDocumentation::encode(const juce::String& value) { return juce:
 juce::String HelpDocumentation::link(juce::String id, juce::String anchor, juce::String locale, const juce::StringPairArray& state) {
     if (!load()) return {};
     if (locale != "en" && locale != "fr") { error_ = "Help locale: en or fr"; return {}; }
-    const auto base = juce::URL(directory_.getChildFile("index.html")).toString(true);
-    if (id.isEmpty()) return base; // CyDoc restores the reader's last route/locale.
+    const auto base = juce::URL(directory_.getChildFile("Documentation.html")).toString(true);
+    if (id.isEmpty()) return base; // The reader chooses its home page and saved locale.
     if (id.length() > 256 || anchor.length() > 256 || !canonical(id, anchor)) { error_ = "Unknown help page"; return {}; }
     const auto* target = page(id);
     auto available = target->getProperty("anchors", {}).getProperty(juce::Identifier(locale), {});

@@ -40,11 +40,10 @@ class PackageTests(unittest.TestCase):
             path.write_text('project(CyDAW VERSION 0.78.0)' if name == 'CMakeLists.txt' else 'fixture', 'utf-8')
         for component in ('avcodec', 'avformat', 'avutil', 'swscale', 'swresample'):
             (self.root / 'build' / (component + '-1.dll')).write_bytes(b'fixture')
-        candidates = [Path(os.environ['CYDAW_TEST_HELP_ROOT'])] if os.environ.get('CYDAW_TEST_HELP_ROOT') else [ROOT/'build/help', ROOT/'build/cyui-migration/help', ROOT/'build/cydoc-help']
-        source = next((p for p in candidates if (p/'integrity.json').is_file()), None)
-        if source is None: raise RuntimeError('Generate CyDoc help first: python tools/docs/build.py --out build/help')
-        shutil.copytree(source, self.root/'build/help')
-        shutil.copytree(ROOT / 'docs/manual', self.root / 'docs/manual')
+        candidates = [Path(os.environ['CYDAW_TEST_HELP_ROOT'])] if os.environ.get('CYDAW_TEST_HELP_ROOT') else [ROOT/'Documentation',ROOT/'build/cyui-migration/Documentation']
+        source = next((p for p in candidates if (p/'DocData/integrity.json').is_file()), None)
+        if source is None: raise RuntimeError('Generate CyDoc help first: python .CyDocBuild/tools/build.py')
+        shutil.copytree(source, self.root/'build/Documentation')
         self.patch = patch.object(pack, 'ROOT', self.root)
         self.patch.start()
 
@@ -62,20 +61,21 @@ class PackageTests(unittest.TestCase):
             self.assertTrue(any(n.endswith('/ControlPlugins/Gamepads.cyctl') for n in names))
             self.assertTrue(any(n.endswith('/Licenses/CyUI/LICENSE') for n in names))
             self.assertTrue(any(n.endswith('/Licenses/CyUI/third_party/texteditor/LICENSE') for n in names))
-            for entry in ('index.html', 'data.js', 'cydaw-reader.js', 'media-image.js', 'routes.json', 'assets/studio-en.png', 'assets/studio-fr.png', 'Licenses/CyDoc-MIT.txt'):
-                self.assertTrue(any(n.endswith('/help/' + entry) for n in names), entry)
+            for entry in ('Documentation.html', 'DocAI.md', 'DocData/data.js', 'DocData/viewer.js', 'DocData/media-image.js', 'DocData/routes.json', 'DocData/assets/studio-en.png', 'DocData/assets/studio-fr.png', 'DocData/Licenses/CyDoc-MIT.txt'):
+                self.assertTrue(any(n.endswith('/Documentation/' + entry) for n in names), entry)
+            self.assertFalse(any('/.CyDocBuild/' in n or '/docs/manual/' in n or n.endswith(('.cpp', '.h', '.py')) and '/Documentation/' in n for n in names))
         self.assertEqual(len(publish.verified_assets(self.root / 'out')), 3)
         archive.write_bytes(b'corrupt')
         with self.assertRaises(ValueError):
             publish.verified_assets(self.root / 'out')
 
     def test_missing_reader_data_fails(self):
-        (self.root / 'build/help/data.js').unlink()
+        (self.root / 'build/Documentation/DocData/data.js').unlink()
         with self.assertRaises(ValueError):
             pack.package(self.root / 'build', self.root / 'out', True, self.root / 'juce')
 
     def test_missing_manual_figure_fails(self):
-        (self.root / 'build/help/assets/studio-en.png').unlink()
+        (self.root / 'build/Documentation/DocData/assets/studio-en.png').unlink()
         with self.assertRaises(ValueError):
             pack.package(self.root / 'build', self.root / 'out', True, self.root / 'juce')
 

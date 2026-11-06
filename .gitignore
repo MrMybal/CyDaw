@@ -41,3 +41,13 @@ __pycache__/
 /Examples/2026-10-17/Mix DJ - Fugees/
 # Built from a commercial sound-effects pack (its samples are not ours to redistribute).
 /Examples/2026-10-17/Fonderie - Atelier des machines/
+
+# CyDoc authoring workspace caches and generated reader.
+/Documentation/
+/.CyDocBuild/cache/
+/.CyDocBuild/generated/
+/.CyDocBuild/.stage-*/
+/.CyDocBuild/node_modules/
+/.CyDocBuild/internal/previous-assets/
+/.CyDocBuild/internal/previous-manual-*/
+/.CyDocBuild/internal/previous-tools/
