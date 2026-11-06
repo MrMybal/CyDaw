@@ -1,76 +1,78 @@
 (() => {
-  // Existing documentation links at the site's former root retain their page and section.
-  if (location.hash.startsWith('#/')) {
-    const target = new URL('manual/Documentation.html', location.href);
-    target.search = location.search; target.hash = location.hash;
-    location.replace(target.href); return;
+  'use strict';
+  if (/^#\/(en|fr)\//.test(location.hash)) {
+    const reader = new URL('manual/Documentation.html', location.href);
+    reader.search = location.search; reader.hash = location.hash;
+    location.replace(reader.href); return;
   }
-  const english = Object.fromEntries([...document.querySelectorAll('[data-i18n]')].map(el => [el.dataset.i18n, el.innerHTML]));
-  const french = {
-    skip:'Aller au contenu',navExplore:'Découvrir',navSound:'Le son',navDocs:'Documentation',edition:'WINDOWS · OPEN SOURCE · V2 ALPHA',
-    heroLine1:'Place à',heroLine2:'votre son.',heroCopy:'De la première note au dernier mix. Un studio pour composer, jouer et façonner le son — et créer vos propres outils.',
-    download:'Télécharger l’alpha Windows',discover:'Découvrir CyDAW',alphaNote:'En développement actif. Gardez des sauvegardes de vos projets.',realInterface:'L’INTERFACE DE L’APPLICATION',
-    screenCaption:'Une idée devient un morceau. Instruments, effets et arrangement au même endroit.',strip1:'Instruments et effets natifs',strip3:'Anglais et français',strip4:'AGPL-3.0',
-    workspaceEyebrow:'SIX APPROCHES DU SON',workspaceTitle:'Changez d’espace.<br>Gardez les possibilités.',workspaceIntro:'Écrivez un morceau, jouez un set, montez un enregistrement ou travaillez à l’image. Choisissez les outils qui correspondent à l’instant.',
-    modeStudio:'Studio',modeDJ:'Mix DJ',modeFoundry:'Fonderie',modeCinema:'Cinéma',modeProcessing:'Traitements',modeWorkshop:'Atelier Plugin',
-    soundEyebrow:'LE SON COMMENCE ICI',soundTitle:'Trouvez une voix.<br>Donnez-lui la vôtre.',soundCopy:'Synthèse à tables d’ondes, analogique, FM et granulaire. Superposez les instruments, dessinez les modulations et suivez votre son.',
-    soundLink:'Découvrir les instruments',synthCaption:'/ SYNTHÉTISEUR À TABLES D’ONDES',graphEyebrow:'DU PATCH AU PLUGIN',graphTitle:'Vos idées.<br>Vos instruments.',
-    graphCopy:'Reliez des modules dans un graphe, exposez les réglages utiles et concevez l’interface. Exportez votre création en VST3, CLAP ou LV2.',graphLink:'Découvrir l’Atelier Plugin',
-    patchNotes:'Notes et expressions',patchEffect:'Votre chaîne d’effets',patchOut:'Votre son',graphNote:'Un chemin du signal visuel. Des périphériques réutilisables. Une grande fenêtre et une carte de module compacte à concevoir séparément.',
-    detail1Title:'Mixez avec intention.',detail1:'Égalisation, dynamique, saturation, réverbérations et effets créatifs natifs. Les bus, envois, sidechains et automations relient le tout.',
-    detail2Title:'Retrouvez vos outils.',detail2:'Chargez VST3, CLAP, LV2 et JSFX, éditez vos scripts JSFX et reliez vos contrôleurs MIDI ou OSC à votre espace de travail.',
-    detail3Title:'Apprenez à votre rythme.',detail3:'Un manuel illustré en anglais et en français, avec recherche, schémas et guides détaillés. Sur le web et hors ligne dans l’application.',
-    ctaEyebrow:'À VOUS DE JOUER',ctaTitle:'Votre prochaine idée<br>a trouvé sa place.',readManual:'Lire la documentation',ctaNote:'Windows x64 · Logiciel en alpha · AGPL-3.0<br>Sources et notes de version sur GitHub.',
-    footerCredit:'Créé par Cyberalien. Pour faire du son.',source:'Sources',licence:'Licence'
-  };
-  const modes = {
-    studio:{image:'studio.png',page:'studio',en:['A song starts here.','Arrange audio and MIDI, launch clips and scenes, edit notes and automate your mix.','Studio arrangement with MIDI tracks and native devices'],fr:['Un morceau commence ici.','Arrangez audio et MIDI, lancez clips et scènes, éditez les notes et automatisez votre mix.','Arrangement Studio avec pistes MIDI et périphériques natifs']},
-    dj:{image:'dj.png',page:'dj',en:['Take it to the decks.','Two or four decks, sync, hot cues and loops. Shape a set with the crossfader, effects and cue monitoring.','CyDAW DJ mix with two decks and a central mixer'],fr:['Passez aux platines.','Deux ou quatre platines, synchronisation, hot cues et boucles. Construisez un set avec le crossfader, les effets et la préécoute.','Mix DJ de CyDAW avec deux platines et une table centrale']},
-    foundry:{image:'foundry.png',page:'foundry',en:['Get closer to the recording.','Cut, assemble and process sound files. Set clip fades, work across tracks and render the result.','Foundry multitrack audio editing workspace'],fr:['Entrez dans le son.','Découpez, assemblez et traitez des fichiers audio. Réglez les fondus, travaillez sur plusieurs pistes et exportez le résultat.','Espace Fonderie de montage audio multipiste']},
-    cinema:{image:'cinema.png',page:'cinema',en:['Give the picture a voice.','Place sound against video frames, organise sub-tracks in bus containers and shape the soundtrack with native effects.','Cinema workspace with a video monitor and audio containers'],fr:['Donnez une voix à l’image.','Calez les sons sur les images vidéo, organisez les sous-pistes dans des conteneurs de bus et façonnez la bande son avec les effets natifs.','Espace Cinéma avec moniteur vidéo et conteneurs audio']},
-    processing:{image:'processing.svg',page:'processing',en:['Make a process your own.','Build reusable audio and MIDI processing steps. Listen before and after, then apply the result to your clips.','Diagram of an audio and MIDI processing workflow'],fr:['Créez votre méthode.','Construisez des étapes réutilisables de traitement audio et MIDI. Écoutez avant et après, puis appliquez le résultat aux clips.','Schéma d’un traitement audio et MIDI']},
-    workshop:{image:'graph.png',page:'workshop',en:['Build the tool you want to play.','Connect typed module ports, expose parameters, design your interface and export a reusable device or plugin.','CyDAW module graph with connected instrument and envelope nodes'],fr:['Créez l’outil que vous voulez jouer.','Reliez les ports typés des modules, exposez les paramètres, concevez l’interface et exportez un périphérique ou un plugin.','Graphe de modules CyDAW reliant instrument et enveloppe']}
-  };
+  const translated = [...document.querySelectorAll('[data-fr]')];
+  const original = new Map(translated.map(node => [node, node.innerHTML]));
+  const altImages = [...document.querySelectorAll('[data-alt-fr]')];
+  const originalAlt = new Map(altImages.map(node => [node, node.alt]));
   let language = new URLSearchParams(location.search).get('lang') === 'fr' ? 'fr' : 'en';
   let selected = 'studio';
+  const modes = {
+    studio: {image:'studio.png',page:'studio',en:['A song starts here.','Arrange audio and MIDI, launch clips and scenes, edit notes and automate your mix.',['Arrangement','Clip launcher','Piano roll']],fr:['Un morceau commence ici.','Arrangez audio et MIDI, lancez clips et scènes, éditez les notes et automatisez votre mix.',['Arrangement','Lanceur de clips','Piano roll']]},
+    dj: {image:'dj.png',page:'dj',en:['Take it to the decks.','Two or four decks, hot cues, loops and effects. Shape a set with the crossfader and cue monitoring.',['2 / 4 decks','Hot cues','Loops']],fr:['Passez aux platines.','Deux ou quatre platines, hot cues, boucles et effets. Construisez un set avec le crossfader et la préécoute.',['2 / 4 platines','Hot cues','Boucles']]},
+    foundry: {image:'foundry.png',page:'foundry',en:['Get closer to the recording.','Cut, assemble and process audio. Set clip fades, work across tracks and render the result.',['Audio editing','Fades','Processing']],fr:['Entrez dans le son.','Découpez, assemblez et traitez l’audio. Réglez les fondus, travaillez sur plusieurs pistes et exportez le résultat.',['Montage audio','Fondus','Traitements']]},
+    cinema: {image:'cinema.png',page:'cinema',en:['Give the picture a voice.','Place sounds against video frames. Organise sub-tracks in bus containers and build your soundtrack.',['Video monitor','Bus containers','Frame alignment']],fr:['Donnez une voix à l’image.','Calez vos sons sur les images vidéo. Organisez les sous-pistes dans des conteneurs de bus et construisez votre bande son.',['Moniteur vidéo','Conteneurs de bus','Calage à l’image']]},
+    processing: {image:'processing.svg',page:'processing',en:['Make a process your own.','Build reusable audio and MIDI processing steps. Listen before and after, then apply the result to your clips.',['Audio + MIDI','Reusable chains','Before / after']],fr:['Créez votre méthode.','Construisez des étapes de traitement audio et MIDI réutilisables. Écoutez avant et après, puis appliquez le résultat aux clips.',['Audio + MIDI','Chaînes réutilisables','Avant / après']]},
+    workshop: {image:'workshop.png',page:'workshop',en:['Build what you want to play.','Connect modules, publish controls and design an interface. Turn your graph into a reusable device or native plugin.',['Node graphs','Custom interfaces','Plugin export']],fr:['Créez l’outil que vous voulez jouer.','Reliez les modules, publiez les réglages et dessinez l’interface. Transformez votre graphe en périphérique réutilisable ou en plugin natif.',['Graphes à nœuds','Interfaces personnalisées','Export de plugins']]}
+  };
   const tabs = [...document.querySelectorAll('[data-mode]')];
   function renderMode() {
-    const mode = modes[selected], text = mode[language];
+    const mode = modes[selected], copy = mode[language];
     tabs.forEach(tab => {const active = tab.dataset.mode === selected;tab.setAttribute('aria-selected',String(active));tab.tabIndex = active ? 0 : -1;});
-    document.querySelector('#mode-panel').setAttribute('aria-labelledby','tab-'+selected);
-    const image = document.querySelector('#mode-image');image.src = 'site-assets/'+mode.image;image.alt = text[2];
-    document.querySelector('#mode-title').textContent = text[0];document.querySelector('#mode-copy').textContent = text[1];
-    const link = document.querySelector('#mode-link');link.href = 'manual/Documentation.html#/'+language+'/'+mode.page;link.setAttribute('aria-label',(language==='fr'?'Lire le guide : ':'Read the guide: ')+document.querySelector('#tab-'+selected+' [data-i18n]').textContent);
-    document.querySelector('.hero-counter').textContent = String(tabs.findIndex(t=>t.dataset.mode===selected)+1).padStart(2,'0')+' — 06';
+    document.querySelector('#mode-panel').setAttribute('aria-labelledby','tab-' + selected);
+    document.querySelector('#mode-title').textContent = copy[0];
+    document.querySelector('#mode-copy').textContent = copy[1];
+    document.querySelector('#mode-features').replaceChildren(...copy[2].map(text => {const item=document.createElement('li');item.textContent=text;return item;}));
+    const image=document.querySelector('#mode-image');image.src='site-assets/'+mode.image;
+    const label=document.querySelector('#tab-'+selected).textContent;
+    image.alt=selected==='processing'?(language==='fr'?'Schéma de traitement audio et MIDI':'Audio and MIDI processing diagram'):'CyDAW — '+label;
+    const preview=document.querySelector('.mode-picture');preview.dataset.view=mode.image;preview.dataset.caption=label;
+    preview.setAttribute('aria-label',(language==='fr'?'Agrandir : ':'Enlarge: ')+label);
+    document.querySelector('.mode-index').textContent=String(tabs.indexOf(document.querySelector('#tab-'+selected))+1).padStart(2,'0')+' / 06';
+    document.querySelector('#mode-link').href='manual/Documentation.html#/'+language+'/'+mode.page;
   }
-  function renderLanguage(updateURL) {
-    document.documentElement.lang = language;
-    document.querySelector('.header nav').setAttribute('aria-label',language==='fr'?'Navigation principale':'Main navigation');
+  function renderLanguage(updateURL=false) {
+    document.documentElement.lang=language;
+    translated.forEach(node=>{node.innerHTML=language==='fr'?node.dataset.fr:original.get(node);});
+    altImages.forEach(node=>{node.alt=language==='fr'?node.dataset.altFr:originalAlt.get(node);});
+    document.querySelectorAll('[data-doc]').forEach(link=>{link.href='manual/Documentation.html#/'+language+'/'+link.dataset.doc;});
+    document.querySelectorAll('[data-lang]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.lang===language)));
     document.querySelector('.languages').setAttribute('aria-label',language==='fr'?'Langue':'Language');
-    document.querySelector('.mode-tabs').setAttribute('aria-label',language==='fr'?'Espaces CyDAW':'CyDAW workspaces');
-    document.querySelector('.patch').setAttribute('aria-label',language==='fr'?'Chemin du signal illustré, du MIDI au son':'A conceptual signal path from MIDI to sound');
-    document.querySelector('.patch-node.output small').textContent=language==='fr'?'SORTIE':'OUTPUT';
-    const dictionary = language === 'fr' ? french : english;
-    document.querySelectorAll('[data-i18n]').forEach(el => {el.innerHTML = dictionary[el.dataset.i18n];});
-    document.querySelectorAll('[data-lang]').forEach(el => el.setAttribute('aria-pressed',String(el.dataset.lang===language)));
-    document.querySelectorAll('[data-doc]').forEach(link => {link.href = 'manual/Documentation.html#/'+language+'/'+link.dataset.doc;});
-    const descriptions = language==='fr' ? ['CyDAW — Place à votre son.','CyDAW, station audio open source pour Windows. Composez, jouez, montez le son et créez vos plugins.'] : ['CyDAW — Make room for your sound.','CyDAW is an open-source audio workstation for Windows. Compose, perform, edit sound and build your own plugins.'];
-    document.title = descriptions[0];document.querySelector('meta[name="description"]').content = descriptions[1];
-    document.querySelector('[data-alt="heroAlt"]').alt = language==='fr'?'Studio CyDAW avec pistes MIDI colorées, instruments et effets natifs':'CyDAW Studio showing coloured MIDI tracks, native instruments and effects';
-    document.querySelector('[data-alt="synthAlt"]').alt = language==='fr'?'Synthétiseur Colosse à tables d’ondes, oscillateurs, filtres et enveloppes':'Colosse wavetable synthesizer with oscillators, filters and envelopes';
+    document.querySelector('.mode-tabs').setAttribute('aria-label',language==='fr'?'Espaces de travail':'Workspaces');
+    document.querySelector('.chapter-nav').setAttribute('aria-label',language==='fr'?'Chapitres de la page':'Page chapters');
+    document.querySelectorAll('[data-view]').forEach(button=>button.setAttribute('aria-label',(language==='fr'?'Agrandir : ':'Enlarge: ')+(button.querySelector('img')?.alt||button.dataset.caption)));
+    document.querySelector('#image-viewer').setAttribute('aria-label',language==='fr'?'Aperçu de l’interface':'Interface preview');
+    const title=language==='fr'?'CyDAW 2 — Suivez le son.':'CyDAW 2 — Follow the sound.';
+    const description=language==='fr'?'Découvrez CyDAW 2 : studio musical open source, mix DJ, montage audio et atelier de création de plugins. Essayez l’alpha Windows.':'Meet CyDAW 2: an open-source music studio, DJ mixer, sound editor and plugin workshop. Explore the Windows alpha.';
+    document.title=title;document.querySelector('meta[name="description"]').content=description;
+    document.querySelector('meta[property="og:title"]').content=title;document.querySelector('meta[property="og:description"]').content=description;
     if(updateURL){const url=new URL(location.href);url.searchParams.set('lang',language);history.replaceState(null,'',url);}
     renderMode();
   }
-  document.querySelectorAll('[data-lang]').forEach(el=>el.addEventListener('click',()=>{language=el.dataset.lang;renderLanguage(true);}));
+  document.querySelectorAll('[data-lang]').forEach(button=>button.addEventListener('click',()=>{language=button.dataset.lang;renderLanguage(true);}));
   tabs.forEach(tab=>{
     tab.addEventListener('click',()=>{selected=tab.dataset.mode;renderMode();});
     tab.addEventListener('keydown',event=>{
       const index=tabs.indexOf(tab);let next;
-      if(['ArrowDown','ArrowRight'].includes(event.key))next=(index+1)%tabs.length;
-      if(['ArrowUp','ArrowLeft'].includes(event.key))next=(index-1+tabs.length)%tabs.length;
+      if(['ArrowRight','ArrowDown'].includes(event.key))next=(index+1)%tabs.length;
+      if(['ArrowLeft','ArrowUp'].includes(event.key))next=(index-1+tabs.length)%tabs.length;
       if(event.key==='Home')next=0;if(event.key==='End')next=tabs.length-1;
       if(next===undefined)return;event.preventDefault();selected=tabs[next].dataset.mode;renderMode();tabs[next].focus();
     });
   });
-  renderLanguage(false);
+  const viewer=document.querySelector('#image-viewer');
+  document.querySelectorAll('[data-view]').forEach(button=>button.addEventListener('click',()=>{
+    const image=document.querySelector('#viewer-image');image.src='site-assets/'+button.dataset.view;
+    image.alt=button.querySelector('img')?.alt||button.dataset.caption;
+    document.querySelector('#viewer-caption').textContent=image.alt;
+    viewer.showModal();document.body.classList.add('viewer-open');
+  }));
+  document.querySelector('#viewer-close').addEventListener('click',()=>viewer.close());
+  viewer.addEventListener('click',event=>{if(event.target===viewer)viewer.close();});
+  viewer.addEventListener('close',()=>document.body.classList.remove('viewer-open'));
+  renderLanguage();
 })();

@@ -2,7 +2,7 @@
 import argparse,importlib.util,json,shutil,tempfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
-ASSETS={'studio.png':'docs/images/cydaw-studio.png','colosse.png':'docs/images/cydaw-colosse.png','icon.png':'resources/branding/cydaw-icon-small.png','dj.png':'.CyDocBuild/assets/dj-en.png','foundry.png':'.CyDocBuild/assets/foundry-en.png','cinema.png':'.CyDocBuild/assets/cinema-en.png','processing.svg':'.CyDocBuild/assets/processor-en.svg','graph.png':'.CyDocBuild/assets/graph-en.png'}
+ASSETS={'studio.png':'docs/images/cydaw-studio.png','colosse.png':'docs/images/cydaw-colosse.png','icon.png':'resources/branding/cydaw-icon-small.png','dj.png':'.CyDocBuild/assets/dj-en.png','foundry.png':'.CyDocBuild/assets/foundry-en.png','cinema.png':'.CyDocBuild/assets/cinema-en.png','processing.svg':'.CyDocBuild/assets/processor-en.svg','graph.png':'.CyDocBuild/assets/graph-en.png','arrangement.png':'.CyDocBuild/assets/studio-en.png','workshop.png':'website/assets/workshop-showcase.png','mixer.png':'.CyDocBuild/assets/mixer-en.png','launcher.png':'.CyDocBuild/assets/launcher-en.png','midi.png':'.CyDocBuild/assets/midi-en.png','jsfx.png':'.CyDocBuild/assets/jsfx-en.png','opale.png':'.CyDocBuild/assets/synth-en.png','native-rack.png':'website/assets/native-rack.png','modulation-effects.png':'website/assets/modulation-effects.png'}
 def assemble(documentation,out):
  documentation=Path(documentation).resolve();out=Path(out).resolve()
  if out==ROOT or ROOT.is_relative_to(out) or out==documentation or documentation.is_relative_to(out):raise ValueError('Unsafe website output')
