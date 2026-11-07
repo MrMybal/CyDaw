@@ -29,7 +29,7 @@
     document.querySelector('#mode-features').replaceChildren(...copy[2].map(text => {const item=document.createElement('li');item.textContent=text;return item;}));
     const image=document.querySelector('#mode-image');image.src='site-assets/'+mode.image;
     const label=document.querySelector('#tab-'+selected).textContent;
-    image.alt=selected==='processing'?(language==='fr'?'Schéma de traitement audio et MIDI':'Audio and MIDI processing diagram'):'CyDAW — '+label;
+    image.alt=selected==='processing'?(language==='fr'?'Schéma de traitement audio et MIDI':'Audio and MIDI processing diagram'):'CyDaw — '+label;
     const preview=document.querySelector('.mode-picture');preview.dataset.view=mode.image;preview.dataset.caption=label;
     preview.setAttribute('aria-label',(language==='fr'?'Agrandir : ':'Enlarge: ')+label);
     document.querySelector('.mode-index').textContent=String(tabs.indexOf(document.querySelector('#tab-'+selected))+1).padStart(2,'0')+' / 06';
@@ -46,8 +46,8 @@
     document.querySelector('.chapter-nav').setAttribute('aria-label',language==='fr'?'Chapitres de la page':'Page chapters');
     document.querySelectorAll('[data-view]').forEach(button=>button.setAttribute('aria-label',(language==='fr'?'Agrandir : ':'Enlarge: ')+(button.querySelector('img')?.alt||button.dataset.caption)));
     document.querySelector('#image-viewer').setAttribute('aria-label',language==='fr'?'Aperçu de l’interface':'Interface preview');
-    const title=language==='fr'?'CyDAW 2 — Suivez le son.':'CyDAW 2 — Follow the sound.';
-    const description=language==='fr'?'Découvrez CyDAW 2 : studio musical open source, mix DJ, montage audio et atelier de création de plugins. Essayez l’alpha Windows.':'Meet CyDAW 2: an open-source music studio, DJ mixer, sound editor and plugin workshop. Explore the Windows alpha.';
+    const title=language==='fr'?'CyDaw — Suivez le son.':'CyDaw — Follow the sound.';
+    const description=language==='fr'?'Découvrez CyDaw : studio musical open source, mix DJ, montage audio et atelier de création de plugins. Essayez l’alpha Windows.':'Meet CyDaw: an open-source music studio, DJ mixer, sound editor and plugin workshop. Explore the Windows alpha.';
     document.title=title;document.querySelector('meta[name="description"]').content=description;
     document.querySelector('meta[property="og:title"]').content=title;document.querySelector('meta[property="og:description"]').content=description;
     if(updateURL){const url=new URL(location.href);url.searchParams.set('lang',language);history.replaceState(null,'',url);}

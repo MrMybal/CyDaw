@@ -21,7 +21,7 @@ def assemble(documentation,out):
    html=html.replace('site-assets/'+name,'site-assets/'+name+'?v='+revision)
   (stage/'index.html').write_text(html,encoding='utf-8')
   # Keep the previously published direct-reader entry and all deep links.
-  (stage/'Documentation.html').write_text('<!doctype html><html lang="en"><meta charset="utf-8"><title>CyDAW Documentation</title><script>const reader=new URL("manual/Documentation.html",location.href);reader.search=location.search;reader.hash=location.hash;location.replace(reader.href);</script><a href="manual/Documentation.html">Documentation</a></html>',encoding='utf-8')
+  (stage/'Documentation.html').write_text('<!doctype html><html lang="en"><meta charset="utf-8"><title>CyDaw Documentation</title><script>const reader=new URL("manual/Documentation.html",location.href);reader.search=location.search;reader.hash=location.hash;location.replace(reader.href);</script><a href="manual/Documentation.html">Documentation</a></html>',encoding='utf-8')
   (stage/'.nojekyll').write_text('',encoding='utf-8')
   (stage/'site-build.json').write_text(json.dumps({'format':'CyDAW Presentation Site','schema':1,'documentation':'manual/Documentation.html','languages':['en','fr']}),encoding='utf-8')
   if out.exists():
