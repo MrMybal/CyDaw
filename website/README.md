@@ -45,3 +45,6 @@ revision (including the former workshop name); the presentation uses the current
 workspace names. No third-party music, video frames or user project files are
 included. The compact-device close-up is a CSS view of the Studio capture; its
 image dialog opens the original complete image.
+
+The presentation uses a dark graphite palette with orange accents. Hero captures
+remain unobstructed: no floating promotional labels are overlaid on the image.
