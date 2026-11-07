@@ -8,3 +8,6 @@
 @media(max-width:760px){.native-extra{grid-template-columns:1fr;gap:25px}.native-gallery>figure{padding:10px}.native-gallery figcaption{font-size:10px}.effects-detail{padding:20px}.effects-detail h3{font-size:30px}}
 .chapter-nav{position:sticky;top:0;z-index:8;background:#121417f5;border-bottom:1px solid var(--line);backdrop-filter:blur(15px)}.chapter-nav>.wrap{display:flex;justify-content:space-between;gap:20px;padding-block:18px;overflow:auto;scrollbar-width:thin}.chapter-nav a{font-size:11px;font-weight:600;white-space:nowrap}.chapter-nav a:hover{color:var(--accent)}
 @media(max-width:760px){.chapter-nav>.wrap{gap:23px;padding-block:15px;width:calc(100% - 30px)}.chapter-nav a{font-size:10px}.hero-art{display:none}}
+
+.nav-github{display:inline-flex;align-items:center;gap:7px;padding:12px 16px;border:1px solid var(--line);border-radius:7px;font-size:12px;font-weight:600;white-space:nowrap}.nav-github:hover{border-color:var(--accent)}
+@media(max-width:760px){.nav-github{padding:9px 10px;font-size:10px;gap:5px}.header{height:auto;min-height:74px;flex-wrap:wrap;padding-block:15px;row-gap:12px}.nav-end{margin-left:auto}}
