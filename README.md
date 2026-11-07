@@ -1,175 +1,164 @@
-# CyDAW
+<table width="100%">
+  <tr>
+    <td width="300" align="left" valign="top">
+      <a href="https://mrmybal.github.io/CyDaw/">Website</a><br>
+      <a href="https://mrmybal.github.io/CyDaw/manual/Documentation.html#/en/welcome">Manual</a><br>
+      <a href="https://github.com/MrMybal/CyDaw">GitHub</a><br><br>
+      <sub>README</sub><br>
+      <a href="README.md">English</a> · <a href="README.fr.md">Français</a>
+    </td>
+    <td width="400" align="center" valign="middle">
+      <a href="https://mrmybal.github.io/CyDaw/"><img src="resources/branding/cydaw-logo-512.png" alt="CyDaw" width="128"></a>
+    </td>
+    <td width="300" align="right" valign="top">
+      <p><sub>Application license</sub><br><a href="LICENSE"><strong>AGPL-3.0</strong></a></p>
+      <p><sub>Version</sub><br><a href="VERSION.md"><strong>0.78.0 · Alpha 1</strong></a><br><strong>ALPHA</strong></p>
+      <p><a href="https://github.com/MrMybal/CyDaw/releases/download/v2-0.78.0-alpha.1/CyDAW2-0.78.0-Windows-x64-Alpha.zip"><strong>Download</strong></a><br><sub>Windows x64 · portable ZIP</sub></p>
+    </td>
+  </tr>
+</table>
 
-[Website](https://mrmybal.github.io/CyDaw/) · [Documentation](https://mrmybal.github.io/CyDaw/manual/Documentation.html#/en/welcome) · [Releases](https://github.com/MrMybal/CyDaw/releases)
+<h1 align="center">CyDaw</h1>
 
-**CyDAW** is a digital audio workstation (DAW) for Windows: compose, arrange, play, mix and finish a
-track, with its own instruments, its own effects and a built-in sound library.
+**CyDaw** is an open-source digital audio workstation for musicians, sound designers and audio creators. Compose and arrange music, perform a DJ set, edit recordings, work to picture or build your own instruments and effects.
 
-![CyDAW: the arrangement, the tracks and a track's devices](docs/images/cydaw-studio.png)
+> **ALPHA · 0.78.0 · Alpha 1**
+>
+> Experimental Windows x64 release for testing and feedback. Some features may be incomplete. Read the [version notes, source updates and known limitations](VERSION.md). The current sources and online manual can be newer than the downloadable Alpha 1 package.
 
-## What it offers
+[![CyDaw Studio with MIDI arrangement, native instruments and effects](docs/images/cydaw-studio.png)](docs/images/cydaw-studio.png)
 
-**Compose and arrange**
-- Arrangement and clip launcher (scenes), on the same tracks.
-- Note editor with per-note expressions (pitch, volume), legato for monophonic instruments.
-- Audio editing: time stretching without changing pitch, takes and comping, clip versions.
-- Automation of every setting, modulation (LFOs, macros), tempo and time signature.
-- Import projects from other software: Ableton Live, Bitwig, Studio One, Reaper, FL Studio, Ardour,
-  LMMS, Zrythm, DAWproject (Cubase…), AAF (Logic, Pro Tools…), and a MIDI file with its audio tracks.
+## About CyDaw
 
-**Its instruments**
-- **Prisme** (wavetable), **Ambre** (analogue), **Colosse** (modern wavetable), **Mosaïque** (hybrid),
-  **Nébuleuse** (layers and grains), **Kick** (synthesised kick drum).
-- **Opale** (everyday polyphonic), **Quartz** and **Saphir** (FM), **Tirette** (organ), **Onyx** (phase
-  distortion), **Alliage** (modular), **Argile** and **Dérive** (analogue), **Bronze** (resonant
-  objects), **Jade** (modelled electric piano), **Silex** (synthesised drum machine).
-- **Drum Machine** (one pad per key, each an instrument with its effects), **Instrument Layer** and
-  **Instrument Selector** (layers of instruments, together or one at a time), and **Nuée** (granular, on
-  its own sounds).
-- **Batterie**: six acoustic kits, per-piece mixing, microphone settings, grooves laid down as MIDI
-  clips.
-- **Sampler**: zones, velocity layers, round robin, SFZ import (controllers, articulations, release
-  noises), streaming from disk for long recordings.
-- **More than 90 factory instruments** (pianos, strings, winds, guitars, basses, drums, percussion…) built
-  from free (CC0) sound banks.
-- **Sound models**: a recorded note analysed and resynthesised into a playable instrument.
+### One project, several ways to work
 
-![Colosse, one of CyDAW's synths](docs/images/cydaw-colosse.png)
+| Workspace | What you can do |
+| --- | --- |
+| **Studio** | Arrange audio and MIDI, launch clips/scenes, edit notes and automate a mix. |
+| **DJ mix** | Perform with two or four decks, hot cues, loops, sync, EQ, effects, crossfader and headphone cueing. |
+| **Foundry** | Cut and assemble recordings, adjust gains/fades, reverse, stretch, process and render multitrack audio. |
+| **Cinema** | Place sounds against video frames; organise editable audio/MIDI sub-tracks in bus containers and mix the soundtrack. |
+| **Processing** | Reuse audio/MIDI processing steps, audition before/after and apply them to clips. |
+| **Plugin workshop** | Design module graphs, publish controls/presets, draw interfaces and export reusable devices or native plugins. |
 
-**Its effects**
-- Studio: equaliser, compressor, reverb, limiter and filter.
-- Mixing: Pression (upward and downward multiband compression), Fournaise (saturation), Écho Bande (tape
-  echo), Multibande Pro, Velours (resonance taming), Patine (analogue wear), Halo (reverb), Tranche
-  (console channel strip), Finition (mastering) and Sonomètre (loudness).
-- Amps, cabinets and microphones for guitars, basses and vocals.
-- Creative: vocoder, pitch shifter and harmoniser, pitch correction, de-esser, convolution reverb,
-  spectral freeze and blur, granular delay, rhythmic repeats, looper, frequency shifter, ring
-  modulation, rotary speaker, resonators, comb filter, rhythmic volume.
-- MIDI: arpeggiator, chords, scale, note echo, humanise, note length, step sequencer, note repeat.
-- Utilities: tuner, stereo scope (goniometer, phase correlation), polarity and mono bass.
+[![DJ mix with two decks, waveforms and a central mixer](.CyDocBuild/assets/dj-en.png)](.CyDocBuild/assets/dj-en.png)
 
-**Modulate**
-- On every device, **modulators**: LFO, Steps, Random, ADSR, Keytrack, Expressions, Macro,
-  Button, Math, Envelope Follower. Drag their arrow onto any knob, effects and instruments included; a
-  ring shows how far it moves, adjustable while it plays.
-- **Containers**: Chain, FX Layer, FX Selector, Mid-Side Split, Stereo Split, Multiband
-  FX-2 and FX-3, XY FX and Replacer. Their chains show in the device strip, devices drop into them, they
-  nest, their branches can be renamed, and their presets keep everything they hold.
+### Instruments, effects and modulation
 
-**Mix and route**
-- Mixer with buses, sends, sidechain and latency compensation.
-- Tracks from mono to 7.1, virtual inputs and outputs with their own effects.
-- **VST3, CLAP, LV2 and JSFX** plug-in hosting, each instance isolated in its own process, with a built-in
-  JSFX script editor.
+Start with native synthesis: **Prisme**, **Ambre**, **Colosse**, **Mosaïque**, **Nébuleuse**, **Opale**, **Quartz**, **Saphir**, **Onyx**, **Alliage**, **Argile**, **Dérive**, **Bronze**, **Jade**, **Tirette**, **Silex** and **Kick** cover wavetable, analogue, FM, phase distortion, atmospheric textures, resonant objects, organ, modelled keys and synthesized percussion.
 
-**DJ mixing**
-- The **DJ mix** mode: two or four decks (tempo with key lock, sync, hot cues, loops, scratching, one
-  effect per deck), a mixer (kill EQ, filter, crossfader, headphones, limiter), an analysed collection
-  (tempo, beat grid, key), and recorded mixes.
+The sampler supports zones, velocity layers, round robin, SFZ controllers/articulations and disk streaming. Batterie, Drum Machine, Instrument Layer, Instrument Selector and Nuée provide kits, per-key instruments, layers, switching and granular sound. Factory sample instruments are downloaded separately; sound models may be absent from the release.
 
-**Edit sound files**
-- The **Foundry**: a multitrack sound editor (several tracks, several sounds on each) — cut, paste,
-  fades, normalise, stretch and transpose, process with the studio's effects, measure (peak, RMS, LUFS,
-  spectrum), save as WAV, FLAC, AIFF or Ogg, export the mix.
+[![Colosse wavetable synthesizer with filters and envelopes](docs/images/cydaw-colosse.png)](docs/images/cydaw-colosse.png)
 
-**Build your own processing**
-- The **Processings** mode: audio processings made of steps (an effect chain set up like a track, JSFX
-  code, noise reduction, hum removal, click removal, filters, normalisation) that can let a reverb ring
-  past the end of the sound, and MIDI processings written as scripts (humanise, swing, strum, note
-  echoes…). Each one is tried by listening before / after, then applied to a clip as a single undo
-  step.
+Build track chains with native EQ, compression, limiting, saturation, delays, reverbs, amp/cabinet/microphone processing, creative audio effects and MIDI effects. Pression, Fournaise, Écho Bande, Velours, Patine, Halo, Tranche, Finition and Sonomètre provide focused mixing tools. LFOs, envelopes, steps, random sources, macros and followers modulate device parameters. Containers organise serial, parallel, mid/side, multiband and selectable chains.
 
-**Sound to picture**
-- The **Cinema** mode: an optional reference video, buses laid out in rows as in the arrangement, time
-  containers of audio/MIDI sub-tracks with their clips, a list with framing, native effects, routing
-  and automation. A video's soundtrack becomes an editable audio clip on its own bus automatically.
+### From a graph to your own tool
 
-**Control with hardware**
-- **MIDI / OSC controllers**, organised around devices: your MIDI keyboard, a gamepad, an OSC tablet
-  (local or on the network), the computer keyboard. Create the device, move one of its controls so CyDAW
-  recognises the hardware, then learn its rules by moving its controls one by one: each has its chain of
-  transformations both ways (range, curve, encoder, toggle, dead zone) and what it controls, picked with
-  a click in the interface. **Learn** mode also works the other way: click a CyDAW control, then move a
-  hardware control.
+Connect typed audio, MIDI and control ports, expose parameters and prepare presets. Design the full editor and compact device card separately. Export an editable `.cydawdevice` for another compatible CyDaw installation, or build **VST3, CLAP and LV2** with the required compiler/SDKs. Windows and Linux x64 export targets are documented; cross-compilation alone does not validate a plugin in a Linux host. macOS export is deferred.
 
-**Make your own devices**
-- The **Plugin workshop** builds devices from module graphs, draws them an interface, and exports them as
-  **VST3, CLAP and LV2** plug-ins (Windows and Linux), samplers included: their samples travel inside the
-  plug-in.
+[![CyDaw graph connecting a wavetable instrument, envelope, gain and voice filter](website/assets/workshop-showcase.png)](website/assets/workshop-showcase.png)
 
-**Find your sounds**
-- A library that brings together the sound banks and your own folders: categories, key, tempo,
-  favourites, column filters.
-- Optional search by description (a CLAP model downloaded from within the application, with its
-  licence).
+## Features
 
-**Drive it**
-- An **MCP** server (`tools/mcp`) lets an AI assistant create tracks, write notes, set up instruments
-  and effects, or export a mix.
+- **Audio and MIDI editing:** timeline zoom, clip splitting/resizing, takes/comping, time stretching, piano roll, note expression and automation.
+- **Mixing and routing:** buses, sends, sidechains, latency compensation, mono-to-7.1 track formats and virtual I/O.
+- **External effects:** isolated **VST3, CLAP, LV2 and JSFX** hosting on audio tracks, with an integrated JSFX editor. This path does not yet provide external instruments on MIDI tracks or effects on hardware buses/master.
+- **Transport sync:** MIDI Clock, MTC/MMC, JACK Transport and Ableton Link with compatible peers. Protocols share different timing data; transport sync does not carry audio.
+- **Controllers:** learn MIDI/OSC mappings, gamepad or computer-keyboard controls, ranges, curves and bidirectional feedback.
+- **Project interchange:** readers for Ableton Live, Bitwig, Studio One, REAPER, FL Studio, Ardour, LMMS, Zrythm, DAWproject and AAF; fidelity varies. Read the import report and compare against a reference render.
+- **Sound library:** local folders and downloadable banks, categories, favourites and tempo/key filters; optional description search uses a separately downloaded model.
+- **Automation tools:** the [local MCP server](tools/mcp/README.md) can create tracks, write notes, configure devices and export mixes.
+- **English and French:** application UI and illustrated documentation, with HTML navigation, search, images and diagrams.
 
-The interface is available in English and French.
+## Sound banks and documentation
 
-## The sounds
+Samples are not stored in this repository. Open **Options > Sound banks** to download the free banks to a location you choose. The repository supplies maps/catalogues; [factory credits and licenses](content/factory/LICENCE.txt) identify their sources. Copy external media separately when transferring projects or editable devices.
 
-The samples are not in this repository: the sound banks (free, CC0 or Unlicense) are downloaded from
-within the application, in **Options › Sound banks**, to the location you choose. The repository holds
-the instruments' maps and the list of banks. Their authors and licences are credited in
-[`content/factory/LICENCE.txt`](content/factory/LICENCE.txt).
+Open **Help > User manual** or **Ctrl+F1** for the bundled manual. Source builds generate the offline CyDoc reader as `Documentation/Documentation.html` with its `DocData/` directory. No server or internet connection is needed to read that export. The [online manual](https://mrmybal.github.io/CyDaw/manual/Documentation.html#/en/welcome) follows current sources and may document changes after Alpha 1. [Français](https://mrmybal.github.io/CyDaw/manual/Documentation.html#/fr/welcome).
 
-## Building
+---
 
-Requirements: Windows 10 or 11 (x64), Visual Studio 2022 (C++), CMake 3.24 or newer,
-[Git LFS](https://git-lfs.com) (a few test files), Python 3.11 for the tools and tests, and Node.js 22/npm to generate the documentation.
-JUCE 8 is fetched automatically.
+## Installation
 
-```bash
+The published application package is **Windows 10/11 x64 · Alpha 1**. Source build/export targets do not imply downloadable Linux or macOS application packages.
+
+1. [Download CyDaw 0.78.0 Alpha 1](https://github.com/MrMybal/CyDaw/releases/download/v2-0.78.0-alpha.1/CyDAW2-0.78.0-Windows-x64-Alpha.zip). [Release notes](https://github.com/MrMybal/CyDaw/releases/tag/v2-0.78.0-alpha.1) and [SHA-256 checksums](https://github.com/MrMybal/CyDaw/releases/download/v2-0.78.0-alpha.1/SHA256SUMS.txt) accompany it.
+2. Extract the complete ZIP to a writable folder. Keep the DLLs, plugin worker, fonts, translations and license folders beside the executable.
+3. Start **`CyDAW 2.exe`** (the internal executable name), select **Windows Audio / WASAPI** in audio settings and choose the output channels connected to your speakers.
+4. Download any wanted sound banks in **Options > Sound banks**. The published ZIP does not enable ASIO or VST2.
+
+## Source, build and required libraries
+
+<details>
+<summary><strong>Windows source build</strong></summary>
+
+Requirements: **Visual Studio 2022** with C++ tools/Windows SDK, **CMake 3.24+**, **Git/Git LFS**, **Python 3.11+** and **Node.js 22+/npm** for documentation. CMake fetches pinned JUCE 8.0.15 and CyUI sources; CyUI checkout requires access if its repository is restricted. Prepare the shared FFmpeg SDK separately. NASM enables native EEL2 code generation; without it ysfx uses its portable interpreter.
+
+```powershell
 git lfs install
 git clone https://github.com/MrMybal/CyDaw.git
 cd CyDaw
-cmake --preset desktop-windows-wasapi
+python tools/setup_ffmpeg.py
+cmake --preset desktop-windows-wasapi -DCYDAW_BUILD_V2=ON
 cmake --build build/windows-wasapi --config Release --target CyDAW2
+& '.\build\windows-wasapi\CyDAW2_artefacts\Release\CyDAW 2.exe'
 ```
 
-The application is then in `build/windows-wasapi/CyDAW2_artefacts/Release/CyDAW 2.exe`. Run the tests
-with `ctest -C Release` in the build folder.
+The build also prepares the plugin worker and offline documentation. To build all configured targets and run checks:
 
-## Documentation
+```powershell
+cmake --build --preset desktop-windows-wasapi --parallel 2
+ctest --preset desktop-windows-wasapi --parallel 2
+```
 
-Open **Help > User manual** or **Ctrl+F1** for the complete offline illustrated **CyDoc** manual in your default browser:
-40 chapters in **English (default) and French**, with search, diagrams and screenshots.
-[Documentation](https://MrMybal.github.io/CyDaw/Documentation.html#/en/welcome) ·
-[Documentation en français](https://MrMybal.github.io/CyDaw/Documentation.html#/fr/welcome)
+See [build/test usage](docs/V2_TEST_BUILD.md), [CyUI configuration](src/v2/CyUI.cmake), [FFmpeg setup](third_party/FFMPEG.md) and [documentation generation](.CyDocBuild/README.md). Other audio backends and plugin-export toolchains have separate prerequisites. The WASAPI preset disables ASIO/JACK audio backends; JACK Transport is a separate integration. See [plugin formats and export](docs/PLUGIN_FORMATS.md).
 
-The online reader is the same CyDoc export shipped with the application, including
-navigation, search, images and diagrams. See [documentation authoring](.CyDocBuild/README.md) for authoring and build instructions.
+</details>
 
-The following technical and developer references are mostly written in French.
+---
 
-- [Interface and control port reference](docs/V2_INTERFACE.md)
-- [Sampler and factory instruments](docs/SAMPLER.md) · [Synths](docs/SYNTHES.md) ·
-  [Prisme](docs/PRISME.md) · [Batterie](docs/BATTERIE.md) · [Kick](docs/KICK_ET_ELECTRO.md)
-- [Studio effects](docs/EFFETS_STUDIO.md) · [Mixing effects](docs/EFFETS_MIXAGE.md) ·
-  [Creative and MIDI effects](docs/EFFETS_CREATIFS.md) · [Amps and microphones](docs/AMPLIS_ET_MICROS.md)
-- [Sound library](docs/BANQUE_DE_SONS.md) · [Sound models](docs/SOUND_MATCHING.md)
-- [Audio editing](docs/EDITION_AUDIO.md) · [Architecture](docs/ARCHITECTURE.md)
-- [Cinema: video, audio editing and buses](docs/CINEMA.md)
-- [Audio and MIDI processings: steps, code, before / after](docs/TRAITEMENTS.md)
-- [Transport sync: MIDI, JACK, Link](docs/TRANSPORT_SYNC.md)
-- [MIDI / OSC controllers: devices, rules, learning](docs/CONTROLEURS.md)
-- [Modulators: LFOs, steps, envelopes, macros on every device](docs/MODULATEURS.md)
-- [Containers: layers, selector, mid-side, bands, XY pad, replacer](docs/CONTENEURS.md)
-- [MCP server](tools/mcp/README.md)
+## License
 
-## Licence
+CyDaw is distributed under the [GNU Affero General Public License v3](LICENSE) (AGPL-3.0). The project is maintained by Cyberalien. Third-party libraries, sound banks and scripts retain their own terms.
 
-CyDAW is distributed under the GNU Affero General Public License, version 3 (AGPL-3.0): see
-[LICENSE](LICENSE). Maintained by Cyberalien.
+### Third-party libraries
 
-It is built on [JUCE 8](https://juce.com) (AGPLv3) and [Dear ImGui](https://github.com/ocornut/imgui)
-(MIT). The modular interface also uses [CyUI](https://github.com/MrMybal/CyUI),
-under the [MIT licence](https://github.com/MrMybal/CyUI/blob/8367401fe45fc22bfed5e227cb3de343177f676b/LICENSE).
-The release includes its licence and dependency notices in `Licenses/CyUI`.
-The sound banks keep their own licences.
+| Library · source | License · terms | Use / scope |
+| --- | --- | --- |
+| [JUCE 8.0.15](https://github.com/juce-framework/JUCE/tree/8.0.15) | [AGPLv3 / commercial licensing](https://github.com/juce-framework/JUCE/blob/8.0.15/LICENSE.md) | Audio I/O, codecs and plugin hosting; this project uses the AGPL route. JUCE component notices also apply. |
+| [Dear ImGui](https://github.com/ocornut/imgui) | [MIT](third_party/imgui/LICENSE.txt) | Native UI; bundled stb helpers retain their notices. |
+| [CyUI](https://github.com/MrMybal/CyUI) | [MIT](https://github.com/MrMybal/CyUI/blob/8367401fe45fc22bfed5e227cb3de343177f676b/LICENSE) | Shared UI controls and audio views. Source access depends on repository permissions. |
+| [CyUI editor components](https://github.com/MrMybal/CyUI) | [MIT and permissive component terms](https://github.com/MrMybal/CyUI/blob/8367401fe45fc22bfed5e227cb3de343177f676b/THIRD_PARTY_NOTICES.md) | ImGuiColorTextEdit, Lexilla, Scintilla headers and SciTE language data; notices in Licenses/CyUI. |
+| [CLAP](https://github.com/free-audio/clap) | [MIT](third_party/clap/LICENSE) | Plugin worker host API and native CLAP export. |
+| [LV2](https://lv2plug.in/) | [ISC](third_party/lv2/COPYING) | Native export API/metadata; JUCE’s LV2 host stack has additional component notices. |
+| [ysfx](https://github.com/jpcima/ysfx) | [Apache-2.0](third_party/ysfx/LICENSE) | JSFX compiler/runtime inside the isolated worker. |
+| [WDL](https://www.cockos.com/wdl/) | [zlib-style](third_party/ysfx/thirdparty/WDL/LICENSE.txt) | EEL2 and LICE used by ysfx. |
+| [stb](https://github.com/nothings/stb) / [dr_libs](https://github.com/mackron/dr_libs) | [Public domain or MIT](third_party/ysfx/thirdparty/stb/LICENSE); [public domain or MIT-0](third_party/ysfx/thirdparty/dr_libs/LICENSE) | JSFX image/audio helpers. |
+| [Ableton Link 3.1.2](https://github.com/ableton/link) | [GPL-2.0-or-later](third_party/ableton-link/LICENSE.md) | Transport tempo/phase synchronisation. |
+| [Standalone Asio](https://github.com/chriskohlhoff/asio) | [Boost Software License 1.0](third_party/ableton-link/modules/asio-standalone/LICENSE_1_0.txt) | Link networking; unrelated to the Steinberg ASIO audio driver SDK. |
+| [JACK2](https://github.com/jackaudio/jack2) | [LGPL-2.1-or-later](third_party/jack-transport/COPYING) | Transport headers; external library/server loaded dynamically when used. |
+| [FFmpeg shared libraries](https://ffmpeg.org/) | [LGPL-3.0-or-later and component notices](third_party/FFMPEG.md) | Cinema video, filmstrip and soundtrack decoding; shared Windows SDK, not linked into native plugin exports. |
+| [Zstandard](https://github.com/facebook/zstd) | [BSD-3-Clause](third_party/zstd/LICENSE) | Decoding compressed Zrythm project data. |
+| [Pugl](https://github.com/lv2/pugl) | [ISC](third_party/pugl/COPYING) | Linux X11/OpenGL native plugin editors; export dependency, not a Linux application release. |
+| [CyDoc 0.1.0](https://github.com/MrMybal/CyDoc) | [MIT](https://github.com/MrMybal/CyDoc/blob/6ddf9a582defb2f11fbb3f992afef6f98dcadc93/LICENSE) | Offline HTML reader; Node.js, marked, Prism and esbuild are documentation build tools. |
 
-The external **VST3, CLAP, LV2 and JSFX** formats, the native exports and the JSFX editor are described
-in [PLUGIN_FORMATS.md](docs/PLUGIN_FORMATS.md).
+This table indexes the main components; it does not replace their transitive notices. Keep `LICENSE`, `JUCE_LICENSE.md` and the archive’s `Licenses/` directory, including `Licenses/CyUI`, `Licenses/FFmpeg` and `Licenses/PluginFormats`. Fonts and codecs also retain their notices. Optional dependencies and build tools do not change CyDaw’s license. See the [format dependencies](third_party/PLUGIN_FORMAT_DEPENDENCIES.md), [transport dependencies](third_party/TRANSPORT_DEPENDENCIES.md) and [FFmpeg terms](third_party/FFMPEG.md).
+
+## References and links
+
+- [Product website](https://mrmybal.github.io/CyDaw/) · [English manual](https://mrmybal.github.io/CyDaw/manual/Documentation.html#/en/welcome) · [Manuel en français](https://mrmybal.github.io/CyDaw/manual/Documentation.html#/fr/welcome).
+- [Version notes](VERSION.md) · [Published Alpha 1](https://github.com/MrMybal/CyDaw/releases/tag/v2-0.78.0-alpha.1) · [All releases](https://github.com/MrMybal/CyDaw/releases).
+- [Source repository](https://github.com/MrMybal/CyDaw) · [Issue tracker](https://github.com/MrMybal/CyDaw/issues).
+
+<details>
+<summary><strong>Technical references (mostly French)</strong></summary>
+
+- [Interface and control port](docs/V2_INTERFACE.md) · [Architecture](docs/ARCHITECTURE.md).
+- [Sampler](docs/SAMPLER.md) · [Synths](docs/SYNTHES.md) · [Prisme](docs/PRISME.md) · [Batterie](docs/BATTERIE.md) · [Kick](docs/KICK_ET_ELECTRO.md).
+- [Studio effects](docs/EFFETS_STUDIO.md) · [Mixing effects](docs/EFFETS_MIXAGE.md) · [Creative/MIDI effects](docs/EFFETS_CREATIFS.md) · [Amps and microphones](docs/AMPLIS_ET_MICROS.md).
+- [Library](docs/BANQUE_DE_SONS.md) · [Sound models](docs/SOUND_MATCHING.md) · [Audio editing](docs/EDITION_AUDIO.md).
+- [Cinema](docs/CINEMA.md) · [Processing](docs/TRAITEMENTS.md) · [Transport sync](docs/TRANSPORT_SYNC.md).
+- [Controllers](docs/CONTROLEURS.md) · [Modulators](docs/MODULATEURS.md) · [Containers](docs/CONTENEURS.md) · [MCP](tools/mcp/README.md).
+
+</details>
