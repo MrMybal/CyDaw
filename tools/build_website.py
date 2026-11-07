@@ -1,5 +1,5 @@
 """Assemble the presentation and unmodified CyDoc export for GitHub Pages."""
-import argparse,importlib.util,json,shutil,tempfile
+import argparse,hashlib,importlib.util,json,shutil,tempfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 ASSETS={'studio.png':'docs/images/cydaw-studio.png','colosse.png':'docs/images/cydaw-colosse.png','icon.png':'resources/branding/cydaw-icon-small.png','dj.png':'.CyDocBuild/assets/dj-en.png','foundry.png':'.CyDocBuild/assets/foundry-en.png','cinema.png':'.CyDocBuild/assets/cinema-en.png','processing.svg':'.CyDocBuild/assets/processor-en.svg','graph.png':'.CyDocBuild/assets/graph-en.png','arrangement.png':'.CyDocBuild/assets/studio-en.png','workshop.png':'website/assets/workshop-showcase.png','mixer.png':'.CyDocBuild/assets/mixer-en.png','launcher.png':'.CyDocBuild/assets/launcher-en.png','midi.png':'.CyDocBuild/assets/midi-en.png','jsfx.png':'.CyDocBuild/assets/jsfx-en.png','opale.png':'.CyDocBuild/assets/synth-en.png','native-rack.png':'website/assets/native-rack.png','modulation-effects.png':'website/assets/modulation-effects.png'}
@@ -14,7 +14,12 @@ def assemble(documentation,out):
   validator.validate(stage/'manual')
   for target,source in ASSETS.items():shutil.copy2(ROOT/source,assets/target)
   for name in ('site.css','site.js'):shutil.copy2(ROOT/'website'/name,assets/name)
-  shutil.copy2(ROOT/'website/index.html',stage/'index.html')
+  html=(ROOT/'website/index.html').read_text(encoding='utf-8')
+  # A changed bundle gets a fresh URL even when a browser or Pages edge caches it.
+  for name in ('site.css','site.js'):
+   revision=hashlib.sha256((assets/name).read_bytes()).hexdigest()[:12]
+   html=html.replace('site-assets/'+name,'site-assets/'+name+'?v='+revision)
+  (stage/'index.html').write_text(html,encoding='utf-8')
   # Keep the previously published direct-reader entry and all deep links.
   (stage/'Documentation.html').write_text('<!doctype html><html lang="en"><meta charset="utf-8"><title>CyDAW Documentation</title><script>const reader=new URL("manual/Documentation.html",location.href);reader.search=location.search;reader.hash=location.hash;location.replace(reader.href);</script><a href="manual/Documentation.html">Documentation</a></html>',encoding='utf-8')
   (stage/'.nojekyll').write_text('',encoding='utf-8')
