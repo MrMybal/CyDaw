@@ -250,6 +250,15 @@ if(CYDAW_BUILD_TESTS)
     endif()
     add_test(NAME cydaw_engine_tests COMMAND cydaw_engine_tests)
     cydaw_configure_test(cydaw_engine_tests 120)
+
+    # Independent acceptance for the expanded CyDSP services. No JUCE target,
+    # headers, physical device or installed third-party plugin is required.
+    add_executable(cydaw_cydsp_services_tests tests/CyDSPServicesTests.cpp)
+    target_link_libraries(cydaw_cydsp_services_tests PRIVATE CyDSP::Files CyDSP::Devices CyDSP::Plugins)
+    target_compile_features(cydaw_cydsp_services_tests PRIVATE cxx_std_20)
+    add_test(NAME cydaw_cydsp_services_tests COMMAND cydaw_cydsp_services_tests)
+    cydaw_configure_test(cydaw_cydsp_services_tests 120)
+
 endif()
 
 if(CYDAW_BUILD_DESKTOP)

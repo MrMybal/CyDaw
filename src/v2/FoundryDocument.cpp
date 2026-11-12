@@ -288,11 +288,11 @@ juce::Result FoundryDocument::writeSound(const Sound& sound, const juce::File& f
 {
     std::unique_ptr<juce::AudioFormat> format;
     if (file.hasFileExtension("flac"))
-        format = std::make_unique<juce::FlacAudioFormat>();
+        format = std::make_unique<cydaw::integration::FlacFormat>();
     else if (file.hasFileExtension("aif;aiff"))
-        format = std::make_unique<juce::AiffAudioFormat>();
+        format = std::make_unique<cydaw::integration::AiffFormat>();
     else if (file.hasFileExtension("ogg"))
-        format = std::make_unique<juce::OggVorbisAudioFormat>();
+        format = std::make_unique<cydaw::integration::OggFormat>();
     else
         format = std::make_unique<cydaw::integration::WaveFormat>();
     const auto wav = dynamic_cast<cydaw::integration::WaveFormat*>(format.get()) != nullptr;

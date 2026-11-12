@@ -1,0 +1,76 @@
+{
+  "schema": 1,
+  "platform": "Windows x64 MSVC Release",
+  "cydsp_revision": "ea2361af1452b9770c8355cc346060bd3772b40b",
+  "cydsp_source_sha256": "926175ae93eac8d8e0ce26e49d98a9eb7bf9ba759c99d1f18059abb6e171125f",
+  "production_dependency_modified": false,
+  "checks": [
+    {
+      "name": "core_without_juce",
+      "result": "passed",
+      "tests_passed": 4,
+      "tests_total": 4,
+      "log": "output/cydsp-core-current-tests.log"
+    },
+    {
+      "name": "desktop_regressions",
+      "result": "passed",
+      "tests_passed": 10,
+      "tests_total": 10,
+      "log": "output/cydsp-regressions-current.log"
+    },
+    {
+      "name": "wav_list_adtl_independent_roundtrip",
+      "result": "passed",
+      "exit_code": 0
+    },
+    {
+      "name": "clap_original_export_in_process_and_worker",
+      "result": "passed",
+      "fixture": "build/cydsp-clap/CLAP/Release/CyGraphPresets.clap"
+    },
+    {
+      "name": "lv2_original_export_in_process_and_worker",
+      "result": "passed",
+      "fixture": "output/plugin-formats/export-build/LV2/Release/CyGraphPresets.lv2"
+    },
+    {
+      "name": "jsfx_original_sparse_slider_fixture",
+      "result": "passed",
+      "test": "cydaw_cydsp_services_tests"
+    },
+    {
+      "name": "vst3_unmodified_cydsp",
+      "result": "failed",
+      "stage": "saveState",
+      "status": 12,
+      "exit_code": 1,
+      "fixture": "CyDAW Test Gain.vst3",
+      "log": "output/cydsp-vst3-state-probe.log"
+    },
+    {
+      "name": "vst3_only_controller_state_fix",
+      "result": "failed",
+      "stage": "loadState",
+      "status": 12,
+      "exit_code": 1
+    },
+    {
+      "name": "vst3_combined_fix_isolated_copy",
+      "result": "passed",
+      "fixtures": [
+        "CyDAW Test Gain.vst3",
+        "CyDAW Graph Runtime.vst3"
+      ],
+      "scope": "in-process and separate worker; production libraries untouched",
+      "patch": "CyDSP-vst3-state-compatibility.patch"
+    }
+  ],
+  "not_validated": [
+    "physical audio/MIDI endpoints",
+    "third-party installed plugins",
+    "desktop Linux/macOS",
+    "Windows ARM64 runtime",
+    "full desktop without JUCE"
+  ]
+}

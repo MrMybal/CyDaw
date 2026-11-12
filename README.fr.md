@@ -21,7 +21,7 @@
 <h1 align="center">CyDaw</h1>
 
 > **Branche CyDSP-CORE :** l'intégration audio est en cours ; le desktop utilise
-> encore des services JUCE. Cette branche nécessite le checkout CyDSP enrichi,
+> encore des services JUCE. Cette intégration cible CyDSP `ea2361a`,
 > sélectionné avec `CYDAW_CYDSP_SOURCE_DIR`. Voir les [commandes et le statut](docs/CyDSPIntegration.md)
 > et le [rapport détaillé des blocages](docs/CyDSPIntegrationReport.fr.md).
 

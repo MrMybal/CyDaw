@@ -1,0 +1,30 @@
+--- a/src/plugins/Vst3Plugin.cpp
++++ b/src/plugins/Vst3Plugin.cpp
+@@ -829,8 +829,14 @@
+             component.limit = controller.limit = limit;
+             if (component_->getState(&component) != kResultOk || component.failed)
+                 return Status::io_error;
+-            if (controller_ && controller_->getState(&controller) != kResultOk)
+-                return Status::io_error;
++            if (controller_) {
++                const auto status = controller_->getState(&controller);
++                // IEditController's default implementation has no separate state.
++                if (status != kResultOk && status != kNotImplemented)
++                    return Status::io_error;
++                if (status == kNotImplemented && !controller.bytes.empty())
++                    return Status::io_error;
++            }
+             if (controller.failed || component.bytes.size() > limit - 24 ||
+                 controller.bytes.size() > limit - 24 - component.bytes.size())
+                 return Status::block_too_large;
+--- a/src/plugins/VstSupport.h
++++ b/src/plugins/VstSupport.h
+@@ -138,7 +138,7 @@
+         position += n;
+         if (actual)
+             *actual = int32(n);
+-        return n == std::size_t(requested) ? kResultOk : kResultFalse;
++        return n != 0 || requested == 0 ? kResultOk : kResultFalse;
+     }
+     tresult PLUGIN_API write(void* buffer, int32 requested, int32* actual) override {
+         if (actual)

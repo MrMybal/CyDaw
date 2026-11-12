@@ -4,23 +4,22 @@ This branch starts at `cf4228d5ed18897b786bb10f4844673593c21c5a`.
 It integrates the expanded CyDSP working tree described by its `docs/DawIntegration.md`.
 **It does not yet remove JUCE from the complete desktop application.**
 See the [detailed French issue report](CyDSPIntegrationReport.fr.md) before attempting
-that last step. No CyDSP source was changed or copied into this repository.
+that last step. No CyDSP source was changed in its repository or vendored into production targets.
 
 ## Dependency and reproducibility
 
 `CYDAW_CYDSP_SOURCE_DIR` is a CMake cache path, defaulting to the sibling `../CyDSP`.
-The checkout must contain the expanded core, Files, Devices, Sources and Stretch
-modules. Configuration fails clearly instead of falling back to JUCE's DSP.
+The checkout must contain the expanded core, Files, Devices, Sources, Stretch
+and Plugins modules. Configuration fails clearly instead of falling back to JUCE's DSP.
 CyDSP's own tests/benchmarks are disabled; CyDaw's integration tests are separate.
 Do not enable global AVX/fast-math flags. Upstream ISA and strict FP options remain
 local to CyDSP's kernels.
 
-The inspected CyDSP HEAD is `ad813d133a2f54e143db8a3392f2e1768cfdb5ba`, but the
-required additions were **uncommitted/untracked** at integration time. That commit
-alone cannot reproduce this build. The [source snapshot](reports/CyDSPSnapshot.json)
-records the working-tree source hash and scope. Commit/publish the expanded library
-before pinning it for CI/distribution; this branch neither changes workflows nor
-publishes the private working tree.
+The inspected and compiled CyDSP revision is
+`ea2361af1452b9770c8355cc346060bd3772b40b`, with a clean working tree.
+The [source snapshot](reports/CyDSPSnapshot.json) records the source digest and scope.
+The build still uses an explicit local checkout; it does not fetch or publish the
+private dependency. No CyDSP source is modified by the production configuration.
 
 ## Implemented
 
@@ -36,9 +35,17 @@ publishes the private working tree.
   bridge (Studio, DJ, Foundry, Cinema, sampler, processing and import helpers).
   Reads are normalized float, chunked to the prepared maximum, with seek/EOS and
   stream ownership checks. Source bit depth and original format remain available.
-- Untagged WAV exports/recordings use CyDSP's writer, including integer 8/16/24/32
-  and the existing automatic float32 choice. Channel mapping and finalization are
-  independently checked. Unsupported parameters retain stream ownership.
+- WAV exports/recordings use CyDSP's writer, including integer 8/16/24/32
+  and the existing automatic float32 choice. Public typed metadata supports the
+  application's cue labels/notes/regions, sampler loops and RIFF INFO tags.
+  Exclusive typed loop endpoints are converted to inclusive WAV endpoints.
+- Fonderie's AIFF, FLAC and Vorbis exports use CyDSP encoders. Independent decoding
+  verifies frames, sample rate, channel routing and sample error. Unsupported
+  parameters retain stream ownership.
+- A JUCE-free service acceptance target exercises persistent/ambiguous audio and
+  MIDI selectors, null-backend callback clocks/diagnostics, bounded exact PCM
+  proxies, and a sparse-slider JSFX hosted directly and in a separate process.
+  Original local CLAP/LV2 exports are also checked through this host/worker API.
 - CyDSP and upstream notices are copied beside desktop binaries and into native
   VST3/CLAP/LV2 license directories.
 
@@ -46,16 +53,21 @@ publishes the private working tree.
 
 `src/integration/CyDSPAudioFormats.cpp` is an application-side transition adapter,
 not a JUCE API emulation added to CyDSP. JUCE's reader/source interfaces remain.
-It deliberately uses the old parser **only for metadata** so markers/tags/loops are
-not lost. CyDSP is the only decoder registered for sample reads; decoder failures
-are reported, not retried with another audio backend. WAV exports with metadata
-explicitly retain the old writer until the reproduced LIST/adtl bug is fixed.
-AIFF/FLAC/Ogg writers, desktop device/MIDI services, source scheduling, GUI,
-serialization, networking and hosted plugin wrappers still require subsequent work.
+The legacy parser still supplies non-typed fields and other containers. CyDSP's
+public WAV metadata fills the stable application vocabulary and carries a versioned
+opaque preservation payload. Unsupported legacy WAV metadata (e.g. BWF fields)
+explicitly retains the original writer; an opaque payload that cannot be interpreted
+is rejected rather than discarded. No audio decoder fallback is registered.
 
-The CyDSP Devices/Sources/Stretch targets are available to integration acceptance
-checks; their presence does not mean the desktop has switched every service to them.
-The JUCE-free core/native-export path is distinct from the transitional desktop path.
+Desktop device/MIDI services, source scheduling, GUI, serialization, networking and
+hosted plugin wrappers still require application migration. In particular the
+existing project-state envelopes, plugin program API and IPC wire format differ
+from the new CyDSP services. Two VST3 state incompatibilities were reproduced and
+isolated; see the French report and its tested patch. That patch is **not** applied
+to the dependency or production targets. Service acceptance does not mean the
+desktop has already switched its device manager/worker protocol.
+
+The JUCE-free core/native-export path remains distinct from the transitional desktop.
 
 ## Build and check (Windows x64)
 
@@ -68,8 +80,8 @@ cmake --build --preset cydsp-core
 ctest --preset cydsp-core
 
 cmake --preset cydsp-desktop -DCYDAW_CYDSP_SOURCE_DIR=../CyDSP
-cmake --build --preset cydsp-desktop --target CyDAW2 CyDAWTestGain_VST3 cydaw_cydsp_integration_tests
-ctest --preset cydsp-desktop -R "^cydaw_cydsp_integration_tests$"
+cmake --build --preset cydsp-desktop --target CyDAW2 CyDAWTestGain_VST3 cydaw_plugin_ipc_tests cydaw_cydsp_integration_tests cydaw_cydsp_services_tests
+ctest --preset cydsp-desktop -R "^cydaw_(cydsp_integration_tests|cydsp_services_tests|plugin_ipc_tests)$"
 ctest --preset cydsp-desktop -R "^cydaw2_(dj|foundry|processing|editing|sample_search|mixing|project_import)_check$"
 ```
 
@@ -84,10 +96,24 @@ rules otherwise remain in effect. Standalone core tests do not configure JUCE.
 python tools/audit_cydsp_integration.py --cydsp-source ../CyDSP --output output/cydsp-inventory.json
 ```
 
-The upstream probe is intentionally separate from adapter regressions. Exit `2`
-currently identifies a failed metadata roundtrip; it must not be presented as a
-passing test or hidden with CTest WILL_FAIL. The inventory is a lexical scan,
-including retained legacy code/comments, not a count of reachable bugs.
+The metadata probe now exits `0`: cue labels and typed LIST/adtl survive the
+roundtrip. The optional plugin probe is deliberately separate from passing adapter
+regressions and leaves real failures visible (no CTest WILL_FAIL):
+
+```powershell
+# Supply only a deliberately selected original fixture/export, never a whole
+# installed third-party catalogue. Each probe scans/loads executable plugin code.
+& .\build\cydsp-core\Release\cydaw_cydsp_services_tests.exe --plugin clap "D:/absolute/path/OurPlugin.clap"
+& .\build\cydsp-core\Release\cydaw_cydsp_services_tests.exe --plugin lv2 "D:/absolute/path/OurPlugin.lv2"
+& .\build\cydsp-core\Release\cydaw_cydsp_services_tests.exe --plugin vst3 "D:/absolute/path/OurPlugin.vst3"
+```
+
+The unmodified CyDSP VST3 probe fails on `CyDAW Test Gain.vst3` during save-state
+(status12). Correcting the optional controller-state case exposes a second
+short-read restore failure. The combined report patch passes the same save/load
+and worker checks in a separate validation executable, while production libraries
+remain untouched. CLAP/LV2/JSFX acceptance passes on our original fixtures.
+The inventory is lexical (legacy code/comments included), not a migration percentage.
 
 ## Acceptance for complete JUCE removal
 

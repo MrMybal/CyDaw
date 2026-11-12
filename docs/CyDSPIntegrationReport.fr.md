@@ -1,243 +1,158 @@
-# Rapport de migration JUCE → CyDSP
+# Réévaluation de la migration JUCE → CyDSP
 
-Date : 12 novembre 2026. Branche : `CyDSP-CORE`, créée depuis `cf4228d`.
+Date : 12 novembre 2026. Branche `CyDSP-CORE`, reprise après `eac6fdc`.
+CyDSP examiné : `ea2361af1452b9770c8355cc346060bd3772b40b` (working tree propre).
 
-**Le retrait complet de JUCE est bloqué.** La bibliothèque fournit maintenant de
-nombreuses briques audio utilisables, effectivement intégrées ici. Elle ne fournit
-pas encore toutes les fonctions utilisées par l'application. Son propre inventaire
-`docs/Coverage.md` indique que GUI, standards de plugins et API générales JSON/XML
-sont différés. Ces absences ne sont pas présentées comme des bugs d'algorithme.
+## Résultat
 
-Aucun fichier de CyDSP n'a été modifié. Les adaptations et diagnostics sont dans
-CyDaw afin de permettre une mise à jour indépendante de la bibliothèque.
+**Le retrait de JUCE du desktop complet n'est pas encore réalisé.** Les nouveaux
+modules lèvent la majorité des demandes du premier rapport. Le travail restant
+comprend la migration de l'application (fenêtres, modèle, sources et IPC) et deux
+incompatibilités VST3 reproduites ci-dessous. Il ne faut pas demander à CyDSP de
+réimplémenter une interface graphique générale pour corriger ces migrations.
 
-## État du code et provenance
+Aucun fichier du dépôt CyDSP n'a été modifié. Un patch correctif a été vérifié sur
+une copie de validation locale. Il n'est pas appliqué automatiquement au build de
+production. Le [rapport initial](reports/CyDSPIntegrationReport.initial.fr.md)
+est conservé comme historique ; ses demandes ne décrivent plus toutes l'état actuel.
 
-- CyDaw de départ : `cf4228d5ed18897b786bb10f4844673593c21c5a`.
-- CyDSP HEAD : `ad813d133a2f54e143db8a3392f2e1768cfdb5ba`.
-- Les modules DAW examinés sont dans le **working tree non committé**, pas tous dans
-  ce commit. Le détail et le hash des sources sont dans
-  [CyDSPSnapshot.json](reports/CyDSPSnapshot.json).
-- L'inventaire lexical initial après migration compte 235 fichiers avec des
-  références JUCE et 18 083 occurrences dans `src`/`include`. Il inclut des anciens
-  chemins et des commentaires : ce n'est ni un pourcentage de migration, ni un
-  décompte de bugs. Le script fourni permet de régénérer les emplacements exacts.
-- Les builds et paquets conservent les notices nécessaires. Le retrait d'une
-  dépendance ne change pas automatiquement la licence du code CyDaw conservé.
+## Changements intégrés dans CyDaw
 
-## Changements réellement réalisés
+- Le cœur conserve ses buffers alignés, sa convolution et ses FFT CyDSP.
+- L'adaptateur WAV utilise maintenant `AudioMetadata` pour les cues, noms UTF-8,
+  notes, régions, boucles sampler et tags RIFF INFO. Les champs fin de boucle
+  exclusifs de CyDSP sont convertis vers la convention WAV inclusive de CyDaw.
+- Les exports annotés Fonderie/Cinéma utilisent le writer CyDSP ; ce chemin est
+  vérifié explicitement par son identité, puis relu avec un décodeur indépendant.
+- Les exports AIFF, FLAC et Vorbis de Fonderie utilisent aussi les encodeurs CyDSP.
+  Nombre de frames, fréquence, canaux et erreur des échantillons sont contrôlés.
+- L'ABI des sources/writers reste temporairement JUCE. Le parseur historique est
+  encore utilisé pour les champs supplémentaires et les autres conteneurs. Les
+  clés WAV non converties (par exemple BWF) gardent explicitement l'ancien writer.
+  Un payload opaque invalide est refusé sans perte de propriété du flux.
+- `CyDSP::Plugins` est disponible. Un test d'intégration **sans JUCE** vérifie les
+  nouveaux services avec un backend virtuel et un JSFX original, sans matériel ni
+  plugin tiers installé. Ce test ne signifie pas que le desktop utilise déjà le
+  nouveau gestionnaire audio ou le nouveau protocole de worker.
 
-1. Dépendance CMake explicite à CyDSP, sélectionnable par chemin et sans fallback DSP.
-2. Stockage aligné CyDSP pour les buffers du moteur, avec contrats CyDaw conservés.
-3. FFT CyDSP pour la convolution, le stretching existant et l'analyse chromatique.
-4. Suppression du module `juce_dsp` dans les includes, le PCH et les liens.
-5. Décodage d'échantillons par CyDSP dans les lecteurs par défaut de tous les modes.
-6. Encodage WAV sans métadonnées par CyDSP dans les enregistrements/rendus/exports.
-7. Conservation **explicite** du parseur de métadonnées et du writer WAV annoté
-   existants pour éviter une perte de marqueurs/boucles pendant cette migration.
-8. Presets, tests d'intégration, probe amont et inventaire reproductible.
+## Réponse aux anciens points
 
-## Défaut reproduit dans CyDSP
+| Référence | État actuel | Vérification / travail restant |
+| --- | --- | --- |
+| CYDSP-001 LIST/adtl | Corrigé | Probe indépendant passé : libellé conservé, sous-type adtl présent. |
+| CYDSP-002 capacités | API livrée | Capacités connues/inconnues et description négociée ; backend null testé. Adapter l'écran et valider le matériel. |
+| CYDSP-003 pilotes/partage | API livrée | Backend explicite et accès partagé/exclusif présents. ASIO exige toujours un driver/provideur distinct ; pas de fallback autorisé. |
+| CYDSP-004 identité audio | API livrée, testée | Résolution persistante et ambiguïtés testées sans ouvrir de matériel. Migrer les préférences. |
+| CYDSP-005 horloge | API livrée, testée | Génération, ancre monotone et diagnostics sur null ; timestamps/latence matériels inconnus restent inconnus. |
+| CYDSP-006 métadonnées | API WAV livrée, intégrée | Versionnement, marqueurs/régions/boucles/tags. Champs étendus et autres conteneurs restent à adapter. |
+| CYDSP-007 seeking | Proxy livré, testé | PCM float64, seek exact en fin de fixture, refus d'écraser un cache existant. Planifier son utilisation hors UI pour les longs codecs système. |
+| CYDSP-008 sources/stretch | Contrats livrés | Ratios 1/64..64, politiques/curves/prime/tails. Les modes beats/texture exigent le provider des algorithmes CyDaw ; ne pas changer leur son. |
+| CYDSP-009 MIDI | API livrée | Sélecteurs, fan-in, capacités SysEx et époques documentés. Persistance/doublons testés ici ; reste l'adaptateur app et le matériel. |
+| APP-002 hôte | API livrée, partiellement validée | CLAP/LV2/JSFX directs et isolés passent ; VST3 bloqué sur les états, voir ci-dessous. |
+| BUILD-001 snapshot | Corrigé localement | Dépendance complète committée et arbre propre. Aucun fetch/push distant revendiqué. |
 
-### CYDSP-001 — P1 — Perte des libellés WAV LIST/adtl après réécriture
+Les éléments « API livrée » sont vérifiés dans les headers et les guides, pas tous
+par des scénarios matériels. Le [snapshot](reports/CyDSPSnapshot.json) identifie les
+sources réellement compilées. Les résultats amont multiarchitecture décrits dans
+CyDSP ne remplacent pas une exécution de CyDaw sur ces plateformes.
 
-**Constat expérimental.** Un WAV indépendant contient un cue ID 7 à l'échantillon 93
-et un libellé « Door impact ». CyDSP lit le cue, mais restitue le LIST sous la forme
-`{"type":"LIST","data":"bGFibBAAAAAHAAAARG9vciBpbXBhY3QA"}`. Le type de liste
-`adtl` n'est plus représenté. La réécriture avec `AudioFileWriter` et ces métadonnées
-ne permet plus au lecteur indépendant de retrouver le libellé.
+## CYDSP-010 — P1 — Sauvegarde VST3 : état du contrôleur optionnel
 
-Le probe retourne `wav_cue_label_roundtrip=false` et le code de sortie 2.
-Source à corriger : `third_party/choc/choc/audio/choc_AudioFileFormat_WAV.h`,
-`readMetadata_LIST`, `getMetadataSize_LIST`, `writeMetadata_LIST`, puis l'API
-`AudioFileInfo::metadataJson` de CyDSP. Le calcul de taille, l'écriture du sous-type
-et le padding doivent être cohérents, pour LIST/adtl comme LIST/INFO.
+**Reproduction :** le plugin original `CyDAW Test Gain.vst3` est scanné, activé,
+traité, arrêté et désactivé par `PluginProvider/PluginInstance`. `saveState` retourne
+`Status::io_error` (12), le probe sort avec 1. Le même binaire est validé avec
+l'ancien worker : `processingOk=true`, `stateRoundTripOk=true`, `editorOk=true`.
+Aucun plugin tiers n'est requis pour reproduire.
 
-**Impact :** perte des noms de marqueurs/régions de Fonderie/Cinéma lors d'une
-migration naïve des exports ; impossibilité de retirer le parseur historique.
+**Cause identifiée :** `src/plugins/Vst3Plugin.cpp`, `saveState`, exige `kResultOk`
+pour `controller_->getState`. Le contrôleur JUCE du plugin n'implémente pas un état
+séparé ; sa base SDK renvoie `kNotImplemented`. L'état du composant audio reste
+valide. Il ne faut pas transformer cette absence optionnelle en échec global.
 
-**Correction attendue :** conserver le sous-type et tous les chunks labl/note/ltxt,
-soit dans un schéma public typé/versionné, soit dans une représentation brute qui
-préserve exactement les octets. Vérifier les bornes et l'alignement RIFF.
+**Correction proposée :** accepter explicitement `kNotImplemented` sans octets
+écrits ; conserver le refus des autres erreurs et des dépassements de capacité.
+Ne pas accepter aveuglément toute erreur de contrôleur.
 
-**Acceptation :** écrire avec un producteur indépendant, lire/écrire avec CyDSP,
-relire indépendamment ; vérifier IDs, positions, noms UTF-8, longueurs de régions,
-plusieurs LIST et chunk impair. Tester aussi le sens CyDSP → lecteur externe.
-Ne pas valider uniquement un aller-retour entre deux implémentations partageant
-le même défaut. Le probe reproductible est dans
-[CyDSPIntegrationTests.cpp](../tests/CyDSPIntegrationTests.cpp).
+**Acceptation :** composant seul + contrôleur sans état, contrôleur avec état,
+vraie erreur d'écriture, limites de taille ; instance directe et worker.
 
-## Contrats audio à compléter ou préciser
+## CYDSP-011 — P1 — Restauration VST3 : flux court non consommé
 
-### CYDSP-002 — P1 — Capacités détaillées des périphériques absentes
+Le correctif CYDSP-010 seul fait réussir la sauvegarde, puis `loadState` échoue
+encore avec `Status::io_error` sur le même plugin.
 
-`AudioDeviceInfo` expose ID, nom, sens et défaut, mais pas le nombre/noms des canaux,
-les fréquences possibles, tailles de buffers, masques actifs ni configurations duplex.
-`AudioDevice` expose le sample rate, pas les latences entrée/sortie ou la taille
-réellement négociée. Les écrans et le routage utilisent ces informations dans
-[AppUi.cpp](../src/v2/AppUi.cpp) et
-[AudioTrackController.cpp](../src/app/AudioTrackController.cpp).
+**Cause identifiée :** `src/plugins/VstSupport.h`, `MemoryStream::read`, copie les
+quelques dizaines d'octets restants et renseigne `actual`, mais renvoie
+`kResultFalse` si la requête était plus grande. La boucle `readFromUnknownStream`
+du plugin demande 4096 octets et abandonne avant de conserver ces octets dès que
+le statut n'est pas `kResultTrue`. Aucun `ISizeableStream` n'est exposé pour suivre
+l'autre chemin de lecture du plugin.
 
-Ajouter des structures originales CyDSP pour capacités et configuration négociée,
-avec distinction disponible/inconnue et latence mesurée/déclarée. Ne pas retourner
-une liste de fréquences/canaux inventée. Acceptation : device simulé qui négocie
-une autre configuration, puis tests sur la carte réelle sans écraser ses réglages.
+**Correction proposée :** retourner un succès pour une lecture non vide, avec le
+nombre réel lu ; retourner EOF/échec quand aucun octet ne reste. Garder le succès
+des lectures de taille nulle et toutes les vérifications de bornes. Une implémentation
+correcte de `ISizeableStream` serait une autre voie, mais n'est pas le patch testé.
 
-### CYDSP-003 — P1/P2 — Sélection explicite des backends et mode exclusif
+Le [patch combiné](reports/CyDSP-vst3-state-compatibility.patch) a été compilé sur
+une copie des deux fichiers (plus le header d'inclusion inchangé) dans
+`output/cydsp-vst3-fix-check`. Cet objet VST3 remplace celui de l'archive seulement
+dans l'exécutable de validation ; les bibliothèques originales restent intactes.
+**Après les deux corrections :** sauvegarde/restauration et worker passent pour
+`CyDAW Test Gain.vst3` et le Graph Runtime VST3. Ce résultat n'établit pas une
+compatibilité générale de tous les VST3 : ajouter les cas d'erreur/EOF/taille au
+jeu de tests CyDSP avant livraison du correctif.
 
-`AudioDeviceContext::prepare(bool)` laisse le backend natif en sélection automatique.
-`AudioDeviceConfig` n'exprime pas le choix WASAPI partagé/exclusif ; ASIO n'est pas
-fourni. CyDaw possède actuellement des choix de pilotes et configurations de canaux.
+## APP-005 — P1 — Compatibilité des états et programmes de plugins
 
-Prévoir une politique explicite de backend et d'accès partagé/exclusif, retourner
-`unsupported_backend` plutôt que changer silencieusement de mode. ASIO concerne
-les configurations qui le demandent, pas le build WASAPI de validation.
+Ce point relève de l'adaptation de CyDaw, indépendamment des deux bugs précédents.
 
-### CYDSP-004 — P1 — Identifiants audio non persistants entre contextes
+- VST3 : les projets actuels enregistrent le bloc JUCE (XML binaire avec composant
+  et contrôleur). CyDSP utilise `CyDSP.VST3State1` avec deux tailles. Convertir les
+  enveloppes sans modifier le contenu et conserver un lecteur des anciens projets.
+- JSFX : le format CyDaw commence par l'entier `0x43594a53` et une version, puis
+  ses sliders et sa taille de données ; CyDSP utilise `CyJSFX` version1. Le test
+  confirme que le bloc historique est refusé. Écrire une conversion bornée, tester
+  les sliders clairsemés et `@serialize` ; ne pas considérer ces formats identiques.
+- Programmes : l'application demande `getPrograms/setProgram` au worker et le
+  CLAP actuel expose le paramètre Preset. L'API publique CyDSP n'expose pas de
+  contrat programmes/unités VST3 ni l'équivalent complet. Prévoir le contrat ou
+  une politique d'adaptation documentée sans supprimer l'accès aux presets.
+- Automatisation : CyDSP fournit des IDs stables ; CyDaw mémorise encore des indices
+  dans son protocole. Préserver la correspondance par ID lors des rescans/refreshs.
+- IPC : le protocole CyDaw v6 et le protocole CyDSP v1 ont des structures différentes.
+  Changer ensemble client/worker, les timeouts, crash/restart, Wine et le PDC. Ne pas
+  substituer uniquement le binaire du worker.
 
-`AudioDeviceContext::enumerate` construit des clés locales à partir de l'ordre de
-ses enregistrements ; le header précise que les IDs appartiennent à un contexte.
-Les paramètres de CyDaw sont restaurés après redémarrage. Réutiliser ces clés sans
-résolution peut sélectionner un autre périphérique.
+## Adaptations de l'application encore nécessaires
 
-Ajouter un identifiant sérialisable par backend, ou un descripteur de sélection et
-un résolveur documenté. Exposer les ambiguïtés ; ne pas choisir arbitrairement entre
-deux appareils de même nom. Tester réordonnancement, retrait et redémarrage.
+1. **APP-001 plateforme/UI :** `src/v2/ImGuiHost.h` hérite de `juce::Component` ;
+   `src/v2/main.cpp` gère fenêtres et cycle de vie JUCE. Migrer les événements,
+   fenêtres secondaires, DPI, images/textures, dialogues, presse-papiers et timers.
+   Les surfaces natives d'export existantes peuvent être réutilisées mais ne sont
+   pas encore la coque desktop complète.
+2. **APP-003 données/services :** `String/var/DynamicObject`, JSON/XML, fichiers,
+   sockets/processus, archives et tâches restent liés à JUCE. Leur remplacement
+   exige des allers-retours projets/presets, Unicode, imports et liens d'aide.
+3. **APP-004 audio/source :** adapter le gestionnaire de périphériques, callbacks,
+   `AudioSourcePlayer`, readers/read-ahead, enregistrement et shutdown/drain.
+   Conserver les bus MIDI/contrôle/sidechain et le PDC du graphe typé CyDaw.
+4. **VALIDATION-001 :** matériel duplex/hotplug, MIDI physique et autres OS restent
+   hors des vérifications réalisées ici. Aucune capacité matérielle n'est inventée.
 
-### CYDSP-005 — P2 — Temps et diagnostics du callback audio
+## Vérifications et commandes
 
-Le callback reçoit un numéro de frame, mais pas l'ancre monotone associée, le temps
-ADC/DAC, les xruns ou le coût du callback. Le collecteur MIDI demande une ancre dans
-le même domaine steady_clock. On peut fournir une approximation dans l'application,
-mais elle ne doit pas être présentée comme une mesure du driver.
+Voir les [commandes de build](CyDSPIntegration.md). Les logs locaux restent sous
+`output/cydsp-*` ; ils ne sont pas intégrés aux paquets de l'application.
 
-Proposer un contexte audio avec champs valides optionnels et compteurs explicites.
-Documenter qui possède l'horloge et la génération après reconnexion. Les délais
-matériels ne doivent pas être confondus avec les délais des processeurs DSP.
+- Build sans JUCE : cœur + services compilés, **4/4 CTest passent**.
+- Build desktop Release : application, worker et plugin de test compilés.
+- Suite ciblée desktop : **10/10 passent** : intégration fichiers, services, IPC,
+  recherche, édition, mixage, DJ, Fonderie, traitements et import.
+- Probe LIST/adtl : succès, code0, contre-épreuve avec lecteur indépendant.
+- Hôtes CLAP et LV2 + worker : succès avec nos exports locaux. JSFX : succès avec
+  une fixture originale générée par le test, automation au sample et état.
+- VST3 CyDSP d'origine : **échec réel**, code1. Aucune règle WILL_FAIL ne le masque.
+- VST3 avec copie corrigée : succès direct + worker pour les deux plugins originaux.
 
-### CYDSP-006 — P1 — Métadonnées publiques et conversion de vocabulaire
-
-Même après CYDSP-001, `metadataJson` expose un schéma CHOC privé alors que l'application
-consomme des marqueurs, régions, loops sampler et tags avec des clés établies.
-L'absence de conversion n'est pas un défaut du décodeur audio, mais empêche un
-remplacement transparent. Les usages se trouvent dans `FoundryDocument.cpp`,
-`SamplerMapFile.cpp` et `DjEngine.cpp`.
-
-Stabiliser/versionner le contrat public ou fournir des accesseurs originaux pour
-ces données, en préservant les chunks inconnus. Tester cue/régions et smpl loops,
-tags titre/artiste et absence de métadonnées. Conserver les conventions de fin de
-boucle inclusive/exclusive de chaque conteneur.
-
-### CYDSP-007 — P2 — Lecture aléatoire des codecs système
-
-Limite déjà documentée dans DawIntegration : le fallback Windows natif rejoue le
-décodage depuis le début lors d'un seek non séquentiel. Cela rend le coût O(position)
-pour les fichiers longs. Le MP3 portable reste distinct de ce fallback.
-
-Prévoir cache PCM/proxy d'édition ou seeking indexé avec exactitude annoncée.
-Mesurer un seek en fin de long fichier AAC/WMA et la mémoire utilisée. Ne pas
-interpréter une compilation du codec comme une validation de la fluidité d'édition.
-
-### CYDSP-008 — P2 — Parité des politiques de stretching/source
-
-`ReadAheadOptions` borne le ratio à 0,25..4 et n'exprime pas les modes musicaux
-repitch/tonal/beats/texture/complex de CyDaw ni toutes ses courbes de pitch. Le module
-TimeStretch générique est utile, mais ses résultats ne sont pas ceux de chaque mode.
-
-Cette branche conserve les algorithmes CyDaw et remplace leurs FFT. Avant de changer
-les algorithmes ou sources, définir une politique d'adaptation explicite, les plages
-acceptées, le seek/prime, les tails et les références sonores. Ne pas supprimer les
-modes ou borner silencieusement leurs paramètres.
-
-### CYDSP-009 — P2 — MIDI : identité, capacité et publication des ports
-
-Les briques MIDI1/UMP et le collecteur sont présents. Restent à adapter les sélections
-persistantes, plusieurs entrées simultanées, SysEx au-delà de 4096 octets du backend
-MIDI1, threads producteurs, horloges, reconnection et relâchement des notes tenues.
-DawIntegration documente déjà les limites d'identité MIDI1 et de ports virtuels WinMM.
-
-Ce sont des contrats/politiques à préciser, pas l'affirmation que MIDI2 ne fonctionne
-pas. Tester plusieurs ports et doublons, débordements signalés, note-on avant
-reconnexion/note-off après reconnexion et messages système fragmentés.
-
-## Travail d'application hors du périmètre livré par CyDSP
-
-### APP-001 — P1 — Fenêtres et services plateforme
-
-`ImGuiHost` hérite encore de `juce::Component`, `main.cpp` utilise la coque JUCE.
-ImGui/CyUI dessinent l'interface mais ne remplacent pas tous ses événements, fenêtres,
-DPI, timers, menus, presse-papiers, images, dialogues et cycle de vie.
-Décider si ces services vivent dans CyUI ou une couche plateforme dédiée.
-Ce n'est pas une fonction manquante de filtrage/convolution à ajouter à CyDSP.
-
-### APP-002 — P1 — Hôte de plugins et IPC
-
-`HostedInstance` hérite de `juce::AudioPluginInstance` ; CLAP/LV2/JSFX utilisent ce
-contrat et des fenêtres JUCE. Prévoir une interface d'instance indépendante : ports,
-paramètres/gestures, événements horodatés, état, latence/tails, callbacks UI et IPC.
-Le format CLAP n'isole pas automatiquement les crashes : conserver le worker.
-Les exports natifs déjà sans JUCE sont un chemin séparé, utilisable avec CyDSP.
-
-### APP-003 — P1 — Sérialisation et utilitaires
-
-String, var/DynamicObject, JSON, XML, File, Result, collections, sockets/processus,
-archives et tâches sont encore utilisés largement. CyDSP ne fournit pas d'API
-publique générale JSON/XML. Migrer le modèle de données et les services avec tests
-de compatibilité des anciens projets/presets. Renommer `juce::` en `cydsp::` ne
-retire pas la dépendance. La documentation, le réseau et l'IPC ne doivent pas être
-supprimés pour obtenir artificiellement un build sans JUCE.
-
-### APP-004 — P2 — Graphe et contrat des sources
-
-Le graphe CyDSP n'est pas un remplacement direct du graphe typé CyDaw : multibus,
-MIDI/contrôle, sidechain et compensation de latence doivent rester définis dans le
-moteur de l'application. Les AudioSource/Transport de JUCE et leurs workers sont
-encore présents dans le desktop. Les codecs des readers sont migrés, leurs types
-et leur ordonnanceur ne le sont pas. Les interfaces CyDSP disponibles permettent
-une migration ultérieure de ces adaptateurs avec validation des seeks, loops,
-underruns et arrêt/drain de l'enregistrement.
-
-### BUILD-001 — P1 — Dépendance non publiable à partir de HEAD seul
-
-Les ajouts CyDSP nécessaires ne sont pas tous committés. Les copier dans CyDaw ou
-pointer un fetch sur `ad813d1` ne fournirait pas les sources examinées. Il faut
-committer les changements CyDSP dans son propre dépôt, puis fixer une révision
-accessible et garder les notices. Cette branche utilise explicitement le checkout
-local et ne prétend pas être reproductible depuis les deux HEAD distants seuls.
-
-### VALIDATION-001 — P2 — Couverture physique et autres plateformes
-
-Les tests documentés de CyDSP ne prouvent pas une session duplex avec la carte audio
-réelle, la latence physique, le hotplug et l'interopérabilité MIDI2 réelle. Cette
-migration vérifie Windows x64 et des tests silencieux ; elle ne valide pas macOS,
-Linux desktop, Windows ARM64 ou SVE. Les sources Apple codec sont elles-mêmes en
-attente de compilation/runtime selon le guide. Conserver cette distinction.
-
-## Vérifications et reproduction
-
-Les commandes sont dans [CyDSPIntegration.md](CyDSPIntegration.md).
-Les logs et inventaires détaillés sont sous `output/cydsp-*` et restent locaux.
-
-- Moteur indépendant de JUCE : compilation Release et 3 suites CTest passées.
-- Adaptateur application : test de lecture/seek/EOS, ownership, buffers, MIDI et
-  exports WAV 8/16/24/32 relus indépendamment passé.
-- Application CyDAW2 + worker + Graph Runtime VST3 : compilation Release passée.
-- Scénarios sample search, mixage, DJ, Fonderie, traitements et import : passés.
-- Le premier scénario editing a échoué sur un plugin de test non construit et une
-  assertion limitée au français ; plugin construit, assertion corrigée pour les
-  deux traductions. La relance du scénario editing est passée (23,46 s).
-- Probe WAV CyDSP pur : **échec reproduit attendu pour CYDSP-001, code 2** ; il reste
-  séparé des tests d'adaptation. L'échec n'est pas masqué comme un succès.
-- Export CLAP natif avec le cœur CyDSP : compilation Release et test CTest `cydaw_native_clap` passés (0,81 s).
-
-## Ordre proposé pour la suite
-
-1. Publier un commit complet de CyDSP et corriger le roundtrip LIST/adtl.
-2. Stabiliser métadonnées et capacités/identités/horloges des périphériques.
-3. Migrer les adaptateurs sources, enregistrement et MIDI sans modifier leur sémantique.
-4. Séparer les services plateforme et l'interface d'hébergement de plugins de JUCE.
-5. Retirer les derniers modèles/utilitaires JUCE, puis compiler l'application entière
-   avec une vérification interdisant headers, cibles et symboles JUCE.
-6. Accepter les chemins audio physiques et les autres plateformes sur leurs hôtes.
-
-Il n'y a pas de nouvelle release ni de push automatique de cette branche.
+La configuration de production garde les chemins JUCE encore nécessaires. Cette
+branche ne prétend ni à une application entièrement sans JUCE, ni à une release.
