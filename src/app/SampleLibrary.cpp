@@ -1,8 +1,10 @@
+#include <cydaw/integration/CyDSPAudioFormats.h>
 #include "SampleLibrary.h"
 
 #include "AudioTrackController.h"
 
-#include <juce_dsp/juce_dsp.h>
+#include <cydsp/processors/RealFft.h>
+#include <cydsp/math/Window.h>
 #include <juce_events/juce_events.h>
 
 #include <algorithm>
@@ -204,7 +206,7 @@ juce::AudioFormatManager& threadFormatManager()
     if (manager == nullptr) {
         std::lock_guard<std::mutex> lock(formatManagerMutex());
         manager = std::make_unique<juce::AudioFormatManager>();
-        manager->registerBasicFormats();
+        cydaw::integration::registerCyDSPReaders(*manager);
     }
     return *manager;
 }
@@ -437,10 +439,15 @@ std::vector<float> SampleLibrary::chromaOf(const juce::AudioBuffer<float>& audio
     constexpr auto frameSize = 1 << order;
     if (audio.getNumSamples() < frameSize || sampleRate <= 0.0)
         return chroma;
-    juce::dsp::FFT fft(order);
-    juce::dsp::WindowingFunction<float> window(frameSize,
-                                               juce::dsp::WindowingFunction<float>::hann);
-    std::vector<float> frame(frameSize * 2, 0.0f);
+    cydsp::RealFft<float> fft;
+    std::vector<float> window(frameSize), frame(frameSize);
+    std::vector<std::complex<float>> spectrum(frameSize / 2 + 1);
+    cydsp::WindowParameters windowOptions;
+    windowOptions.type = cydsp::WindowType::hann;
+    windowOptions.normalization = cydsp::WindowNormalization::coherentGain;
+    if (fft.prepare(frameSize) != cydsp::Status::ok
+        || cydsp::makeWindow(windowOptions, window) != cydsp::Status::ok)
+        return chroma;
     const auto hop = frameSize / 2;
     const auto lowestBin = static_cast<int>(std::ceil(55.0 * frameSize / sampleRate));
     const auto highestBin = std::min(frameSize / 2 - 1,
@@ -461,8 +468,12 @@ std::vector<float> SampleLibrary::chromaOf(const juce::AudioBuffer<float>& audio
                 value += audio.getSample(channel, start + index);
             frame[static_cast<std::size_t>(index)] = value / static_cast<float>(audio.getNumChannels());
         }
-        window.multiplyWithWindowingTable(frame.data(), frameSize);
-        fft.performFrequencyOnlyForwardTransform(frame.data());
+        for (std::size_t i = 0; i < frame.size(); ++i)
+            frame[i] *= window[i];
+        if (fft.forward(frame, spectrum) != cydsp::Status::ok)
+            return std::vector<float>(12, 0.0f);
+        for (std::size_t i = 0; i < spectrum.size(); ++i)
+            frame[i] = std::abs(spectrum[i]);
         // The first and last moments carry the tonic more often than not.
         const auto edge = start < edgeSamples
                           || start > audio.getNumSamples() - frameSize - edgeSamples;

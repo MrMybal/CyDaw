@@ -1,3 +1,4 @@
+#include <cydaw/integration/CyDSPAudioFormats.h>
 #include "DjLibrary.h"
 
 #include "../app/DjEngine.h"
@@ -217,7 +218,7 @@ void DjLibrary::run()
 {
     const app::DjEngine::DecodingThreadScope decoding;
     juce::AudioFormatManager formats;
-    formats.registerBasicFormats();
+    cydaw::integration::registerCyDSPReaders(formats);
     while (!threadShouldExit()) {
         wake_.wait(1'000);
         bool scanNow = false;

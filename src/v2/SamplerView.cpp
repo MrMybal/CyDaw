@@ -1,3 +1,4 @@
+#include <cydaw/integration/CyDSPAudioFormats.h>
 #include "SamplerView.h"
 
 #include "Icons.h"
@@ -645,7 +646,7 @@ void SamplerView::drawWaveform(const Target& target, juce::var& json, const int 
         std::unique_ptr<juce::AudioFormatReader> reader;
         if (data->streamed) {
             juce::AudioFormatManager formats;
-            formats.registerBasicFormats();
+            cydaw::integration::registerCyDSPReaders(formats);
             reader.reset(formats.createReaderFor(juce::File(juce::String::fromUTF8(data->path.c_str()))));
         }
         for (int column = 0; column < columns && reader != nullptr; ++column) {

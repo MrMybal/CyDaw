@@ -1,3 +1,4 @@
+#include <cydaw/integration/CyDSPAudioFormats.h>
 #include "PluginFiles.h"
 // The control port's commands for CyDAW 2, one function per verb, on the
 // message thread. A port of CyDAW 1's WorkspaceComponentRemote.cpp: the same
@@ -1634,7 +1635,7 @@ juce::var Commands::run()
         }
         const auto out = fileFor(text("out"));
         out.deleteFile();
-        juce::WavAudioFormat wav;
+        cydaw::integration::WaveFormat wav;
         std::unique_ptr<juce::OutputStream> stream(out.createOutputStream().release());
         if (stream == nullptr)
             return fail("cannot write " + out.getFullPathName());

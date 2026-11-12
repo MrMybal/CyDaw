@@ -1,3 +1,4 @@
+#include <cydaw/integration/CyDSPAudioFormats.h>
 #include "SemanticSearch.h"
 
 #include "Locations.h"
@@ -39,7 +40,7 @@ juce::AudioFormatManager& formats()
     thread_local std::unique_ptr<juce::AudioFormatManager> manager;
     if (manager == nullptr) {
         manager = std::make_unique<juce::AudioFormatManager>();
-        manager->registerBasicFormats();
+        cydaw::integration::registerCyDSPReaders(*manager);
     }
     return *manager;
 }

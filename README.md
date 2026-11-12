@@ -20,6 +20,11 @@
 
 <h1 align="center">CyDaw</h1>
 
+> **CyDSP-CORE branch:** audio integration is in progress; the complete desktop
+> still uses JUCE services. This branch requires the expanded CyDSP checkout via
+> `CYDAW_CYDSP_SOURCE_DIR`. See [build instructions and status](docs/CyDSPIntegration.md)
+> and the [detailed issue report (French)](docs/CyDSPIntegrationReport.fr.md).
+
 **CyDaw** is an open-source digital audio workstation for musicians, sound designers and audio creators. Compose and arrange music, perform a DJ set, edit recordings, work to picture or build your own instruments and effects.
 
 > **ALPHA · 0.78.0 · Alpha 1**

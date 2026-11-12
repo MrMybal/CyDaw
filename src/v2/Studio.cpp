@@ -1,3 +1,4 @@
+#include <cydaw/integration/CyDSPAudioFormats.h>
 #include "Studio.h"
 
 #include <cydaw/engine/Containers.h>
@@ -1823,7 +1824,7 @@ juce::Result Studio::placeSlotAudio(const TrackRef& track, const int scene, cons
     if (scene < 0 || scene >= app::AudioTrackController::maximumLauncherScenes)
         return juce::Result::fail(ui::Ls("Pas de case ici", "No slot there"));
     juce::AudioFormatManager formats;
-    formats.registerBasicFormats();
+    cydaw::integration::registerCyDSPReaders(formats);
     std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
     if (!reader || reader->sampleRate <= 0)
         return juce::Result::fail(ui::Ls("Fichier audio illisible : ", "Unreadable audio file: ") + file.getFileName());
@@ -3722,7 +3723,7 @@ juce::Result Studio::matchSynth(const juce::File& file, const juce::String& synt
     if (soundMatching_.running)
         return juce::Result::fail(ui::Ls("Une analyse est déjà en cours", "An analysis is already running"));
     juce::AudioFormatManager formats;
-    formats.registerBasicFormats();
+    cydaw::integration::registerCyDSPReaders(formats);
     std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
     if (reader == nullptr || reader->sampleRate <= 0.0 || reader->lengthInSamples <= 0)
         return juce::Result::fail(ui::Ls("Fichier audio illisible : ", "Unreadable audio file: ") + file.getFileName());
@@ -7180,7 +7181,7 @@ juce::Result Studio::stopSlotRecording(const bool keep)
         }
         // The file from where the recording started: the clip from the bar.
         juce::AudioFormatManager formats;
-        formats.registerBasicFormats();
+        cydaw::integration::registerCyDSPReaders(formats);
         double recorded {};
         if (const std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(recordingFile_));
             reader != nullptr && reader->sampleRate > 0.0)
@@ -7249,7 +7250,7 @@ juce::Result Studio::stopRecording(const bool keep)
 juce::Result Studio::keepRecordedAudio(const TrackRef& track)
 {
     juce::AudioFormatManager formats;
-    formats.registerBasicFormats();
+    cydaw::integration::registerCyDSPReaders(formats);
     double length {};
     if (const std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(recordingFile_));
         reader != nullptr && reader->sampleRate > 0.0)
@@ -7381,7 +7382,7 @@ juce::Result Studio::readAudioClipSound(const TrackRef& track, const std::uint64
     if (const auto problem = engine_.audioClipEditProblem(track.audioIndex, clipId, app::AudioEditOperation::amplify); problem.isNotEmpty())
         return juce::Result::fail(problem);
     juce::AudioFormatManager formats;
-    formats.registerBasicFormats();
+    cydaw::integration::registerCyDSPReaders(formats);
     std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(clip->sourceFile));
     if (reader == nullptr || reader->lengthInSamples <= 0)
         return juce::Result::fail(ui::Ls("Fichier illisible : ", "Unreadable file: ") + clip->sourceFile.getFileName());
@@ -7417,7 +7418,7 @@ juce::Result Studio::applyAudioProcessing(const TrackRef& track, const std::uint
         juce::AudioBuffer<float> buffer(static_cast<int>(result.channels.size()), frames);
         for (int c = 0; c < buffer.getNumChannels(); ++c)
             std::copy_n(result.channels[static_cast<std::size_t>(c)].data(), frames, buffer.getWritePointer(c));
-        juce::WavAudioFormat wav;
+        cydaw::integration::WaveFormat wav;
         std::unique_ptr<juce::OutputStream> stream(destination.createOutputStream());
         std::unique_ptr<juce::AudioFormatWriter> writer(
             stream != nullptr ? wav.createWriterFor(stream.get(), rate, static_cast<unsigned>(buffer.getNumChannels()), 24, {}, 0) : nullptr);

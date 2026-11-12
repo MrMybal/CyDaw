@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <numbers>
+#include <stdexcept>
 
 namespace cydaw::engine {
 
@@ -10,24 +11,6 @@ namespace {
 
 // In place, radix 2, the table of twiddles and the bit-reversed order made
 // beforehand (nothing allocated).
-void transform(std::complex<float>* data, const std::size_t size, const std::vector<std::complex<float>>& twiddles,
-               const std::vector<std::size_t>& reversed) noexcept
-{
-    for (std::size_t i = 0; i < size; ++i)
-        if (i < reversed[i])
-            std::swap(data[i], data[reversed[i]]);
-    for (std::size_t length = 2; length <= size; length <<= 1) {
-        const auto half = length / 2;
-        const auto stride = size / length;
-        for (std::size_t start = 0; start < size; start += length)
-            for (std::size_t k = 0; k < half; ++k) {
-                const auto t = twiddles[k * stride] * data[start + k + half];
-                data[start + k + half] = data[start + k] - t;
-                data[start + k] += t;
-            }
-    }
-}
-
 double blackman(const double x) noexcept
 {
     // x in [-1, 1].
@@ -95,20 +78,8 @@ void Convolver::prepare(const std::vector<float>& response)
     std::copy_n(response.begin(), std::min(block, response.size()), head_.begin());
     history_.assign(2 * block, 0.0f);
     historyAt_ = 0;
-    twiddles_.resize(size / 2);
-    for (std::size_t k = 0; k < size / 2; ++k)
-        twiddles_[k] = std::polar(1.0f, static_cast<float>(-2.0 * std::numbers::pi * static_cast<double>(k) / size));
-    reversed_.resize(size);
-    auto bits = 0;
-    while ((std::size_t { 1 } << bits) < size)
-        ++bits;
-    for (std::size_t i = 0; i < size; ++i) {
-        std::size_t r = 0;
-        for (auto bit = 0; bit < bits; ++bit)
-            if ((i >> bit) & 1u)
-                r |= std::size_t { 1 } << (bits - 1 - bit);
-        reversed_[i] = r;
-    }
+    if (fft_.prepare(size) != cydsp::Status::ok)
+        throw std::runtime_error("CyDSP FFT preparation failed");
     work_.assign(size, {});
     sum_.assign(block + 1, {});
     frame_.assign(size, 0.0f);
@@ -120,7 +91,7 @@ void Convolver::prepare(const std::vector<float>& response)
         std::fill(work_.begin(), work_.end(), std::complex<float> {});
         for (std::size_t i = 0; i < block && start + i < response.size(); ++i)
             work_[i] = response[start + i];
-        transform(work_.data(), size, twiddles_, reversed_);
+        (void) fft_.process(work_, work_, cydsp::FftDirection::forward);
         partitions_.emplace_back(work_.begin(), work_.begin() + static_cast<std::ptrdiff_t>(block + 1));
     }
     spectra_.assign(partitions_.size(), std::vector<std::complex<float>>(block + 1));
@@ -164,7 +135,7 @@ void Convolver::runBlock() noexcept
     if (!partitions_.empty()) {
         for (std::size_t i = 0; i < size; ++i)
             work_[i] = frame_[i];
-        transform(work_.data(), size, twiddles_, reversed_);
+        (void) fft_.process(work_, work_, cydsp::FftDirection::forward);
         const auto count = partitions_.size();
         newest_ = (newest_ + count - 1) % count;
         std::copy_n(work_.begin(), block + 1, spectra_[newest_].begin());
@@ -180,7 +151,7 @@ void Convolver::runBlock() noexcept
             work_[k] = std::conj(sum_[k]);
         for (std::size_t k = 1; k < block; ++k)
             work_[size - k] = sum_[k];
-        transform(work_.data(), size, twiddles_, reversed_);
+        (void) fft_.process(work_, work_, cydsp::FftDirection::forward);
         const auto scale = 1.0f / static_cast<float>(size);
         for (std::size_t i = 0; i < block; ++i)
             tail_[i] = work_[block + i].real() * scale;

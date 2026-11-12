@@ -1,3 +1,4 @@
+#include <cydaw/integration/CyDSPAudioFormats.h>
 #include "DjEngine.h"
 
 #include <algorithm>
@@ -210,7 +211,7 @@ public:
     {
         const DecodingThreadScope decoding;
         juce::AudioFormatManager formats;
-        formats.registerBasicFormats();
+        cydaw::integration::registerCyDSPReaders(formats);
         while (!threadShouldExit()) {
             wake_.wait(500);
             owner_.freeRetired();
@@ -1050,7 +1051,7 @@ juce::Result DjEngine::startRecording(const juce::File& file)
     if (stream == nullptr)
         return juce::Result::fail(juce::String::fromUTF8("Fichier impossible à écrire : ") + file.getFullPathName());
     std::unique_ptr<juce::OutputStream> output { std::move(stream) };
-    juce::WavAudioFormat wav;
+    cydaw::integration::WaveFormat wav;
     const auto options = juce::AudioFormatWriterOptions().withSampleRate(rate_).withNumChannels(2).withBitsPerSample(24);
     auto writer = wav.createWriterFor(output, options);
     if (writer == nullptr)

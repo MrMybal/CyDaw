@@ -1,3 +1,4 @@
+#include <cydaw/integration/CyDSPAudioFormats.h>
 #include "Processing.h"
 
 #include "Locations.h"
@@ -676,7 +677,7 @@ AudioResult renderAudio(const Prepared& prepared, engine::repair::Channels chann
 juce::Result readAudioFile(const juce::File& file, engine::repair::Channels& channels, double& rate)
 {
     juce::AudioFormatManager formats;
-    formats.registerBasicFormats();
+    cydaw::integration::registerCyDSPReaders(formats);
     std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
     if (reader == nullptr || reader->lengthInSamples <= 0 || !std::isfinite(reader->sampleRate) || reader->sampleRate < 1'000.0
         || reader->sampleRate > 384'000.0)
@@ -713,7 +714,7 @@ juce::Result writeAudioFile(const juce::File& file, const engine::repair::Channe
         std::copy_n(channels[static_cast<std::size_t>(c)].data(), frames, buffer.getWritePointer(c));
     (void) file.getParentDirectory().createDirectory();
     (void) file.deleteFile();
-    juce::WavAudioFormat wav;
+    cydaw::integration::WaveFormat wav;
     std::unique_ptr<juce::OutputStream> stream(file.createOutputStream());
     std::unique_ptr<juce::AudioFormatWriter> writer(
         stream != nullptr ? wav.createWriterFor(stream.get(), rate, static_cast<unsigned>(buffer.getNumChannels()), 24, {}, 0) : nullptr);

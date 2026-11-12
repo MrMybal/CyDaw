@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <cydsp/processors/ComplexFft.h>
 
 // Convolution with an impulse response (a cabinet's, a room's), as loaded
 // from a file: no latency, nothing allocated once prepared.
@@ -58,8 +59,7 @@ private:
     std::vector<std::complex<float>> sum_;
     std::vector<float> tail_;          // the rest's output for this block
     std::size_t at_ {};
-    std::vector<std::complex<float>> twiddles_;
-    std::vector<std::size_t> reversed_;
+    cydsp::ComplexFft<float> fft_;
 };
 
 } // namespace cydaw::engine

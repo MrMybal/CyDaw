@@ -1,3 +1,4 @@
+#include <cydaw/integration/CyDSPAudioFormats.h>
 #include "FoundryDocument.h"
 #include "FoundryJson.h"
 
@@ -45,7 +46,7 @@ std::shared_ptr<const engine::foundry::Sound> FoundryDocument::readSound(const j
                                                                          std::vector<FoundryMarker>* markers)
 {
     juce::AudioFormatManager formats;
-    formats.registerBasicFormats();
+    cydaw::integration::registerCyDSPReaders(formats);
     std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
     if (reader == nullptr) {
         error = file.existsAsFile() ? ui::Ls("Format non lu : ", "Format not read: ") + file.getFileName()
@@ -59,7 +60,7 @@ std::shared_ptr<const engine::foundry::Sound> FoundryDocument::readSound(const j
     }
     // An uncompressed file holds what its header says: one claiming more
     // than its size (a broken or forged header) is not believed.
-    if (const auto format = reader->getFormatName(); format.containsIgnoreCase("WAV") || format.containsIgnoreCase("AIFF")) {
+    if (const auto format = reader->metadataValues.getValue("cydsp.format", reader->getFormatName()); format.containsIgnoreCase("WAV") || format.containsIgnoreCase("AIFF")) {
         const auto bytes = static_cast<double>(frames) * std::max(1u, reader->numChannels) * std::max(1u, reader->bitsPerSample / 8u);
         if (bytes > static_cast<double>(file.getSize()) + 1'048'576.0) {
             error = ui::Ls("Fichier abîmé : ", "Damaged file: ") + file.getFileName();
@@ -87,7 +88,7 @@ std::shared_ptr<const engine::foundry::Sound> FoundryDocument::readSound(const j
             std::copy_n(buffer.getReadPointer(c), n, data[static_cast<std::size_t>(c)].data() + at);
     }
     if (bits != nullptr) {
-        *bits = reader->usesFloatingPointData ? 32 : static_cast<int>(reader->bitsPerSample);
+        *bits = reader->bitsPerSample >= 32 ? 32 : static_cast<int>(reader->bitsPerSample);
         if (*bits != 16 && *bits != 24 && *bits != 32)
             *bits = 24;
     }
@@ -293,8 +294,8 @@ juce::Result FoundryDocument::writeSound(const Sound& sound, const juce::File& f
     else if (file.hasFileExtension("ogg"))
         format = std::make_unique<juce::OggVorbisAudioFormat>();
     else
-        format = std::make_unique<juce::WavAudioFormat>();
-    const auto wav = dynamic_cast<juce::WavAudioFormat*>(format.get()) != nullptr;
+        format = std::make_unique<cydaw::integration::WaveFormat>();
+    const auto wav = dynamic_cast<cydaw::integration::WaveFormat*>(format.get()) != nullptr;
     if (!wav && bits == 32)
         bits = 24;
     if (file.hasFileExtension("ogg"))

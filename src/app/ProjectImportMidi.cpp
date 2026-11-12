@@ -1,3 +1,4 @@
+#include <cydaw/integration/CyDSPAudioFormats.h>
 #include "ProjectImport.h"
 #include "ProjectImportShared.h"
 
@@ -110,7 +111,7 @@ public:
             clip.file = stem;
             clip.originalPath = stem.getFullPathName();
             juce::AudioFormatManager formats;
-            formats.registerBasicFormats();
+            cydaw::integration::registerCyDSPReaders(formats);
             if (std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(stem)); reader != nullptr && reader->sampleRate > 0.0)
                 clip.durationSeconds = static_cast<double>(reader->lengthInSamples) / reader->sampleRate;
             if (clip.durationSeconds <= 0.0)

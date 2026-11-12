@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.24)
 
 project(CyDAW VERSION 0.78.0 LANGUAGES C CXX)
 
+include(cmake/CyDSP.cmake)
+
 # zstd's decoder (third_party/zstd, BSD): Zrythm's projects are compressed with it.
 add_library(cydaw_zstd STATIC
     third_party/zstd/lib/common/debug.c
@@ -105,6 +107,7 @@ message(STATUS
     "plugin formats: VST3=ON, VST2=${CYDAW_VST2_AVAILABLE}")
 
 function(cydaw_configure_audio_backends target_name)
+    cydaw_copy_cydsp_notices(${target_name} "$<TARGET_FILE_DIR:${target_name}>/Licenses/CyDSP")
     target_compile_definitions(${target_name} PRIVATE
         JUCE_ASIO=$<BOOL:${CYDAW_ASIO_AVAILABLE}>
         JUCE_JACK=$<BOOL:${CYDAW_JACK_AVAILABLE}>
@@ -194,6 +197,7 @@ add_library(cydaw_core STATIC
     src/ui/WorkspaceLayout.cpp
 )
 add_library(CyDAW::Core ALIAS cydaw_core)
+target_link_libraries(cydaw_core PUBLIC CyDSP::CyDSP)
 # The core is also linked into shared plug-ins; in particular its thread-local
 # transport state needs PIC relocations on Linux.
 set_target_properties(cydaw_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -269,6 +273,25 @@ if(CYDAW_BUILD_DESKTOP)
     set_property(DIRECTORY PROPERTY JUCE_COMPANY_NAME "CyDAW")
     set_property(DIRECTORY PROPERTY JUCE_COMPANY_COPYRIGHT
                  "Copyright (C) 2026 CyDAW")
+
+    # Transitional source interfaces remain JUCE; every application reader
+    # decodes samples through CyDSP. Explicit legacy metadata parser is retained.
+    if(TARGET juce_audio_formats)
+        target_sources(juce_audio_formats INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/src/integration/CyDSPAudioFormats.cpp")
+        target_include_directories(juce_audio_formats INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/include")
+        target_link_libraries(juce_audio_formats INTERFACE CyDSP::Files)
+    endif()
+
+    if(CYDAW_BUILD_TESTS AND TARGET juce::juce_audio_formats)
+        juce_add_console_app(cydaw_cydsp_integration_tests PRODUCT_NAME "CyDSP integration tests")
+        target_sources(cydaw_cydsp_integration_tests PRIVATE tests/CyDSPIntegrationTests.cpp)
+        target_link_libraries(cydaw_cydsp_integration_tests PRIVATE CyDAW::Core
+            CyDSP::Files CyDSP::Devices CyDSP::Sources CyDSP::Stretch juce::juce_audio_formats
+            juce::juce_recommended_config_flags)
+        target_compile_definitions(cydaw_cydsp_integration_tests PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
+        add_test(NAME cydaw_cydsp_integration_tests COMMAND cydaw_cydsp_integration_tests)
+        cydaw_configure_test(cydaw_cydsp_integration_tests 120)
+    endif()
 
     # JUCE compiles its module .cpp files as part of each consuming target, and
     # those files refuse to build once a precompiled header has already pulled
@@ -429,7 +452,7 @@ if(CYDAW_BUILD_DESKTOP)
                 target_include_directories(${target_name} PRIVATE
                     "${cydaw_root}/src/v2"
                     "${cydaw_root}/src/plugin_ui")
-                target_link_libraries(${target_name} PRIVATE cydaw_imgui juce::juce_dsp
+                target_link_libraries(${target_name} PRIVATE cydaw_imgui
                     CyUI::Core CyUI::Audio CyUI::AudioViews CyUI::CodeEditor)
             endif()
             target_compile_features(${target_name} PRIVATE cxx_std_20)
@@ -977,7 +1000,6 @@ if(CYDAW_BUILD_DESKTOP)
                 juce::juce_audio_formats
                 juce::juce_audio_processors
                 juce::juce_audio_utils
-                juce::juce_dsp
                 juce::juce_gui_extra
                 juce::juce_osc
                 juce::juce_recommended_config_flags

@@ -1,3 +1,4 @@
+#include <cydaw/integration/CyDSPAudioFormats.h>
 #include "MidiEffectsHost.h"
 #include "AudioTrackController.h"
 #include "PlanSynthesiser.h"
@@ -1171,7 +1172,7 @@ juce::Result InputRecorder::start(const juce::File& destination,
 
     std::unique_ptr<juce::OutputStream> output { std::move(fileOutput) };
 
-    juce::WavAudioFormat wav;
+    cydaw::integration::WaveFormat wav;
     const auto options = juce::AudioFormatWriterOptions()
                              .withSampleRate(sampleRate)
                              .withNumChannels(channelCount)
@@ -1464,7 +1465,7 @@ juce::Result InputRecorder::selfTestScheduledRecording(
     recorder.stop();
 
     juce::AudioFormatManager formats;
-    formats.registerBasicFormats();
+    cydaw::integration::registerCyDSPReaders(formats);
     auto reader = std::unique_ptr<juce::AudioFormatReader>(
         formats.createReaderFor(destination));
     if (reader == nullptr || reader->lengthInSamples != 9
@@ -1777,7 +1778,7 @@ juce::Result MasterOutputAudioSource::startCapture(
                                      destination.getFullPathName()));
 
     std::unique_ptr<juce::OutputStream> output { std::move(fileOutput) };
-    juce::WavAudioFormat wav;
+    cydaw::integration::WaveFormat wav;
     auto writer = wav.createWriterFor(
         output, juce::AudioFormatWriterOptions()
                     .withSampleRate(sampleRate)
@@ -6558,7 +6559,7 @@ void LoopAuditionSource::getNextAudioBlock(const juce::AudioSourceChannelInfo& i
 
 AudioTrackController::AudioTrackController()
 {
-    formatManager_.registerBasicFormats();
+    cydaw::integration::registerCyDSPReaders(formatManager_);
     readAheadThread_.startThread(juce::Thread::Priority::normal);
     (void) addMidiTrack("Instrument 1");
     simulation_ = std::make_unique<Simulation>(*this);
@@ -7434,7 +7435,7 @@ juce::Result AudioTrackController::selfTestDoubleDeckLauncher(
     const juce::File& alternateSourceFile)
 {
     juce::AudioFormatManager formats;
-    formats.registerBasicFormats();
+    cydaw::integration::registerCyDSPReaders(formats);
     auto firstReader = std::unique_ptr<juce::AudioFormatReader>(
         formats.createReaderFor(sourceFile));
     auto secondReader = std::unique_ptr<juce::AudioFormatReader>(
@@ -7553,7 +7554,7 @@ juce::Result AudioTrackController::selfTestLauncherTimeline(
     const juce::File& eventSourceFile)
 {
     juce::AudioFormatManager formats;
-    formats.registerBasicFormats();
+    cydaw::integration::registerCyDSPReaders(formats);
     auto eventReader = std::unique_ptr<juce::AudioFormatReader>(
         formats.createReaderFor(eventSourceFile));
     auto expectedReader = std::unique_ptr<juce::AudioFormatReader>(
@@ -7653,7 +7654,7 @@ juce::Result AudioTrackController::selfTestMulticlipArrangement(
     const juce::File& alternateSourceFile)
 {
     juce::AudioFormatManager formats;
-    formats.registerBasicFormats();
+    cydaw::integration::registerCyDSPReaders(formats);
     auto launcherReaderA = std::unique_ptr<juce::AudioFormatReader>(
         formats.createReaderFor(sourceFile));
     auto launcherReaderB = std::unique_ptr<juce::AudioFormatReader>(
@@ -8883,7 +8884,7 @@ juce::Result AudioTrackController::selfTestStretchRendering(
     const auto renderMode = [&](const StretchMode mode,
                                 juce::AudioBuffer<float>& destination) {
         juce::AudioFormatManager formats;
-        formats.registerBasicFormats();
+        cydaw::integration::registerCyDSPReaders(formats);
         auto reader = std::unique_ptr<juce::AudioFormatReader>(
             formats.createReaderFor(sourceFile));
         if (reader == nullptr)
@@ -11348,7 +11349,7 @@ juce::Result AudioTrackController::analyseAudioRangeGain(
     const std::atomic<bool>* const cancellation)
 {
     juce::AudioFormatManager formats;
-    formats.registerBasicFormats();
+    cydaw::integration::registerCyDSPReaders(formats);
     auto reader = std::unique_ptr<juce::AudioFormatReader>(
         formats.createReaderFor(source));
     if (reader == nullptr || reader->sampleRate <= 0.0 || reader->numChannels == 0)
@@ -11401,7 +11402,7 @@ AudioTrackController::detectAudioTempo(
     const std::atomic<bool>* const cancellation)
 {
     juce::AudioFormatManager formats;
-    formats.registerBasicFormats();
+    cydaw::integration::registerCyDSPReaders(formats);
     auto reader = std::unique_ptr<juce::AudioFormatReader>(
         formats.createReaderFor(source));
     if (reader == nullptr || reader->sampleRate <= 0.0
@@ -11551,7 +11552,7 @@ juce::Result AudioTrackController::exportAudioRange(
         || destination == source)
         return juce::Result::fail(tr("error.exportSource"));
     juce::AudioFormatManager formats;
-    formats.registerBasicFormats();
+    cydaw::integration::registerCyDSPReaders(formats);
     auto reader = std::unique_ptr<juce::AudioFormatReader>(
         formats.createReaderFor(source));
     if (reader == nullptr || reader->sampleRate <= 0.0 || reader->numChannels == 0)
@@ -11577,7 +11578,7 @@ juce::Result AudioTrackController::exportAudioRange(
         return juce::Result::fail(tr("error.exportCreate", "file",
                                      destination.getFullPathName()));
     std::unique_ptr<juce::OutputStream> output { std::move(fileOutput) };
-    juce::WavAudioFormat format;
+    cydaw::integration::WaveFormat format;
     auto writer = format.createWriterFor(
         output,
         juce::AudioFormatWriterOptions()
@@ -11647,7 +11648,7 @@ juce::Result AudioTrackController::renderAudioEdit(
         return renderAudioSplice(source, sourceStartSeconds, durationSeconds, request, destination, cancellation);
 
     juce::AudioFormatManager formats;
-    formats.registerBasicFormats();
+    cydaw::integration::registerCyDSPReaders(formats);
     auto reader = std::unique_ptr<juce::AudioFormatReader>(
         formats.createReaderFor(source));
     if (reader == nullptr || reader->sampleRate <= 0.0 || reader->numChannels == 0)
@@ -11734,7 +11735,7 @@ juce::Result AudioTrackController::renderAudioEdit(
         return juce::Result::fail(tr("error.exportCreate", "file",
                                      destination.getFullPathName()));
     std::unique_ptr<juce::OutputStream> output { std::move(fileOutput) };
-    juce::WavAudioFormat format;
+    cydaw::integration::WaveFormat format;
     auto writer = format.createWriterFor(
         output,
         juce::AudioFormatWriterOptions()
@@ -11867,7 +11868,7 @@ juce::Result AudioTrackController::renderAudioSplice(
     if (source == juce::File {} || destination == juce::File {} || source == destination)
         return juce::Result::fail(tr("error.audioEditDestination"));
     juce::AudioFormatManager formats;
-    formats.registerBasicFormats();
+    cydaw::integration::registerCyDSPReaders(formats);
     const std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(source));
     if (reader == nullptr || reader->sampleRate <= 0.0 || reader->numChannels == 0)
         return juce::Result::fail(tr("error.openAudio", "file", source.getFileName()));
@@ -11911,7 +11912,7 @@ juce::Result AudioTrackController::renderAudioSplice(
     if (fileOutput == nullptr || !fileOutput->setPosition(0) || fileOutput->truncate().failed())
         return juce::Result::fail(tr("error.exportCreate", "file", destination.getFullPathName()));
     std::unique_ptr<juce::OutputStream> output { std::move(fileOutput) };
-    juce::WavAudioFormat format;
+    cydaw::integration::WaveFormat format;
     auto writer = format.createWriterFor(
         output, juce::AudioFormatWriterOptions().withSampleRate(rate).withNumChannels(channels).withBitsPerSample(24));
     if (writer == nullptr) {
@@ -12019,7 +12020,7 @@ juce::Result AudioTrackController::renderAudioClipComp(const AudioClip& clip, co
     if (destination == juce::File {})
         return juce::Result::fail(tr("error.audioEditDestination"));
     juce::AudioFormatManager formats;
-    formats.registerBasicFormats();
+    cydaw::integration::registerCyDSPReaders(formats);
     // Every take's file, at one rate; the widest gives the file its channels.
     std::vector<std::unique_ptr<juce::AudioFormatReader>> readers;
     auto rate = 0.0;
@@ -12091,7 +12092,7 @@ juce::Result AudioTrackController::renderAudioClipComp(const AudioClip& clip, co
     if (fileOutput == nullptr || !fileOutput->setPosition(0) || fileOutput->truncate().failed())
         return juce::Result::fail(tr("error.exportCreate", "file", destination.getFullPathName()));
     std::unique_ptr<juce::OutputStream> output { std::move(fileOutput) };
-    juce::WavAudioFormat format;
+    cydaw::integration::WaveFormat format;
     auto writer = format.createWriterFor(
         output, juce::AudioFormatWriterOptions().withSampleRate(rate).withNumChannels(channels).withBitsPerSample(24));
     if (writer == nullptr) {
