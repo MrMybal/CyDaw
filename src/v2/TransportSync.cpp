@@ -1,3 +1,7 @@
+#include <cydaw/integration/CyAudioCoreDeviceManager.h>
+#include <cydaw/midi/Devices.h>
+#include <cydaw/midi/LiveInput.h>
+#include <cydaw/audio/Devices.h>
 #include <cydaw/base/Process.h>
 #include <cydaw/base/EventLoop.h>
 #include <cydaw/base/Properties.h>
@@ -104,10 +108,10 @@ namespace {
 }
 
 class TransportSync::Impl final : private cydaw::base::Timer,
-                                  private juce::MidiInputCallback,
+                                  private cydaw::midi::InputCallback,
                                   private juce::HighResolutionTimer {
 public:
-    Impl(cydaw::base::PropertiesFile& properties, juce::AudioDeviceManager& manager, bool saves, Read read, Apply apply)
+    Impl(cydaw::base::PropertiesFile& properties, cydaw::integration::DeviceManager& manager, bool saves, Read read, Apply apply)
         : settings(properties)
         , midiManager(manager)
         , saving(saves)
@@ -127,7 +131,7 @@ public:
     ~Impl() override { disconnect(); }
     Config config, draft;
     cydaw::base::Text error, info;
-    juce::Array<juce::MidiDeviceInfo> inputs, outputs;
+    cydaw::base::Array<cydaw::midi::DeviceInfo> inputs, outputs;
     bool connected {};
     cydaw::base::Text configure(Config next)
     {
@@ -153,13 +157,13 @@ public:
         if (config.enabled) {
             if (config.protocol < 2) {
                 if (config.send) {
-                    output = juce::MidiOutput::openDevice(config.output);
+                    output = cydaw::midi::Output::openDevice(config.output);
                     if (!output)
                         error = ui::Ls(
                             "Sortie MIDI indisponible. Choisissez un port.", "MIDI output unavailable. Choose a port.");
                 } else {
                     bool found = false;
-                    for (const auto& device : juce::MidiInput::getAvailableDevices())
+                    for (const auto& device : cydaw::midi::Input::getAvailableDevices())
                         if (device.identifier == config.input)
                             found = true;
                     if (!found)
@@ -214,8 +218,8 @@ public:
     }
     void refreshDevices()
     {
-        inputs = juce::MidiInput::getAvailableDevices();
-        outputs = juce::MidiOutput::getAvailableDevices();
+        inputs = cydaw::midi::Input::getAvailableDevices();
+        outputs = cydaw::midi::Output::getAvailableDevices();
     }
     cydaw::base::Value status()
     {
@@ -330,13 +334,13 @@ public:
 
 private:
     cydaw::base::PropertiesFile& settings;
-    juce::AudioDeviceManager& midiManager;
+    cydaw::integration::DeviceManager& midiManager;
     bool saving;
     Read read_;
     Apply apply_;
     cydaw::base::Text registeredInput;
     bool inputWasEnabled {};
-    std::unique_ptr<juce::MidiOutput> output;
+    std::unique_ptr<cydaw::midi::Output> output;
     std::unique_ptr<ableton::Link> link;
     bool remoteRunning {}, clockArmed {}, lastLinkPlaying {}, linkPending {};
     double linkStartTime {}, linkBeatOffset {}, linkLocalStart {};
@@ -384,10 +388,10 @@ private:
         }
         if (output && config.send && config.play && outputState.playing) {
             if (config.protocol == 0)
-                output->sendMessageNow(juce::MidiMessage::midiStop());
+                output->sendMessageNow(cydaw::midi::Message::midiStop());
             else {
                 const juce::uint8 bytes[] = { 0xf0, 0x7f, static_cast<juce::uint8>(config.device), 6, 1, 0xf7 };
-                output->sendMessageNow(juce::MidiMessage(bytes, 6, 0));
+                output->sendMessageNow(cydaw::midi::Message(bytes, 6, 0));
             }
         }
         output.reset();
@@ -407,7 +411,7 @@ private:
         outputReset = false;
         connected = false;
     }
-    void handleIncomingMidiMessage(juce::MidiInput*, const juce::MidiMessage& message) override
+    void handleIncomingMidiMessage(cydaw::midi::Input*, const cydaw::midi::Message& message) override
     {
         const auto* bytes = message.getRawData();
         const auto size = message.getRawDataSize();
@@ -431,7 +435,7 @@ private:
     void sendBytes(const std::vector<juce::uint8>& bytes)
     {
         if (output)
-            output->sendMessageNow(juce::MidiMessage(bytes.data(), static_cast<int>(bytes.size()), 0));
+            output->sendMessageNow(cydaw::midi::Message(bytes.data(), static_cast<int>(bytes.size()), 0));
         ++txCount;
         if (sent.size() >= 256)
             sent.pop_front();
@@ -946,7 +950,7 @@ void TransportSync::Impl::tickLink(const State& local)
 }
 
 TransportSync::TransportSync(
-    cydaw::base::PropertiesFile& p, juce::AudioDeviceManager& manager, bool save, Read read, Apply apply)
+    cydaw::base::PropertiesFile& p, cydaw::integration::DeviceManager& manager, bool save, Read read, Apply apply)
     : impl_(std::make_unique<Impl>(p, manager, save, std::move(read), std::move(apply)))
 {
 }

@@ -1,3 +1,6 @@
+#include <cydaw/midi/Devices.h>
+#include <cydaw/midi/LiveInput.h>
+#include <cydaw/audio/Devices.h>
 #include <cydaw/audio/Sources.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/Text.h>
@@ -511,7 +514,7 @@ void VirtualBusRouter::audioDeviceIOCallbackWithContext(
     const float* const* inputChannelData, const int numInputChannels,
     float* const* outputChannelData, const int numOutputChannels,
     const int numSamples,
-    const juce::AudioIODeviceCallbackContext&)
+    const cydaw::audio::DeviceCallbackContext&)
 {
     for (int channel = 0; channel < numOutputChannels; ++channel)
         if (outputChannelData != nullptr && outputChannelData[channel] != nullptr)
@@ -604,7 +607,7 @@ bool VirtualBusRouter::readTap(const std::uint64_t busId, const std::uint64_t no
     return found != graphs_.end() && found->second != nullptr && found->second->readTap(nodeId, input, frame);
 }
 
-void VirtualBusRouter::audioDeviceAboutToStart(juce::AudioIODevice* device)
+void VirtualBusRouter::audioDeviceAboutToStart(cydaw::audio::Device* device)
 {
     if (device == nullptr)
         return;

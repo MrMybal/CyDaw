@@ -1,3 +1,6 @@
+#include <cydaw/midi/Devices.h>
+#include <cydaw/midi/LiveInput.h>
+#include <cydaw/audio/Devices.h>
 #include <cydaw/audio/SampleBuffer.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/integration/AudioFiles.h>
@@ -1316,15 +1319,15 @@ cydaw::base::Value Commands::run()
         const cydaw::base::ScopedValueSetter<bool> mayWait(engine::samplerMayWait, true);
         for (auto start = 0; start < samples; start += block) {
             const auto count = std::min(block, samples - start);
-            juce::MidiBuffer midi;
+            cydaw::midi::EventBuffer midi;
             for (const auto& [controller, value, at] : moves)
                 if (at >= start && at < start + count)
-                    midi.addEvent(juce::MidiMessage::controllerEvent(1, controller, value), at - start);
+                    midi.addEvent(cydaw::midi::Message::controllerEvent(1, controller, value), at - start);
             for (const auto& hit : hits) {
                 if (hit.at >= start && hit.at < start + count)
-                    midi.addEvent(juce::MidiMessage::noteOn(1, hit.note, hit.velocity), hit.at - start);
+                    midi.addEvent(cydaw::midi::Message::noteOn(1, hit.note, hit.velocity), hit.at - start);
                 if (hit.off >= start && hit.off < start + count)
-                    midi.addEvent(juce::MidiMessage::noteOff(1, hit.note), hit.off - start);
+                    midi.addEvent(cydaw::midi::Message::noteOff(1, hit.note), hit.off - start);
             }
             scratch.clear();
             renderer.render(scratch, midi, 0, count);

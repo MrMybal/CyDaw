@@ -1,3 +1,6 @@
+#include <cydaw/midi/Devices.h>
+#include <cydaw/midi/LiveInput.h>
+#include <cydaw/audio/Devices.h>
 #include <cydaw/audio/SampleBuffer.h>
 #include <cydaw/base/EventLoop.h>
 #include <cydaw/base/Thread.h>
@@ -254,9 +257,9 @@ cydaw::base::PropertiesFile& Studio::settings()
 
 cydaw::base::Text Studio::startAudio(const bool restoreSavedDevice)
 {
-    std::unique_ptr<juce::XmlElement> saved;
+    std::unique_ptr<cydaw::base::XmlElement> saved;
     if (restoreSavedDevice)
-        saved = juce::parseXML(settings().getValue("audioDeviceState"));
+        saved = cydaw::base::parseXML(settings().getValue("audioDeviceState"));
     return engine_.initialiseAudio(saved.get());
 }
 

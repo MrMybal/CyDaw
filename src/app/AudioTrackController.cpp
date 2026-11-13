@@ -1,3 +1,7 @@
+#include <cydaw/integration/CyAudioCoreDeviceManager.h>
+#include <cydaw/midi/Devices.h>
+#include <cydaw/midi/LiveInput.h>
+#include <cydaw/audio/Devices.h>
 #include <cydaw/audio/Sources.h>
 #include <cydaw/midi/StandardMidiFile.h>
 #include <cydaw/base/Thread.h>
@@ -1278,7 +1282,7 @@ void InputRecorder::audioDeviceIOCallbackWithContext(const float* const* inputCh
                                                      float* const* outputChannelData,
                                                      const int numOutputChannels,
                                                      const int numSamples,
-                                                     const juce::AudioIODeviceCallbackContext&)
+                                                     const cydaw::audio::DeviceCallbackContext&)
 {
     // AudioDeviceManager mixes secondary callbacks into the device output, so
     // a recorder callback must explicitly contribute silence.
@@ -1406,7 +1410,7 @@ void InputRecorder::audioDeviceIOCallbackWithContext(const float* const* inputCh
     }
 }
 
-void InputRecorder::audioDeviceAboutToStart(juce::AudioIODevice* device)
+void InputRecorder::audioDeviceAboutToStart(cydaw::audio::Device* device)
 {
     sampleRate_.store(device != nullptr ? device->getCurrentSampleRate() : 0.0, std::memory_order_release);
     inputChannelCount_.store(device != nullptr ? device->getActiveInputChannels().countNumberOfSetBits() : 0,
@@ -1450,7 +1454,7 @@ cydaw::base::Result InputRecorder::selfTestScheduledRecording(
         -0.05f, -0.06f, -0.07f, -0.08f
     };
     const std::array<const float*, 2> inputs { left.data(), right.data() };
-    juce::AudioIODeviceCallbackContext context {};
+    cydaw::audio::DeviceCallbackContext context {};
     recorder.audioDeviceIOCallbackWithContext(
         inputs.data(), 2, nullptr, 0, 8, context);
     if (!recorder.hasStarted() || recorder.recordingComplete()) {
@@ -4264,7 +4268,7 @@ struct AudioTrackController::MidiOutQueue {
     cydaw::realtime::SpscRing<Event, 1'024> ring;
     // The device it goes to (set by the outputs' thread's owner); none:
     // nothing is queued.
-    std::atomic<juce::MidiOutput*> device {};
+    std::atomic<cydaw::midi::Output*> device {};
 };
 
 // The tracks' MIDI outputs: each device opened once, a thread sending what
@@ -4284,11 +4288,11 @@ public:
     {
         const cydaw::base::ScopedLock hold(lock_);
         for (auto& [queue, identifier] : queues) {
-            juce::MidiOutput* device {};
+            cydaw::midi::Output* device {};
             if (identifier.isNotEmpty()) {
                 auto& open = devices_[identifier];
                 if (open == nullptr)
-                    open = juce::MidiOutput::openDevice(identifier);
+                    open = cydaw::midi::Output::openDevice(identifier);
                 device = open.get();
             }
             queue->device.store(device, std::memory_order_release);
@@ -4314,7 +4318,7 @@ private:
                         auto* device = queue->device.load(std::memory_order_acquire);
                         if (device == nullptr || event.size == 0)
                             continue;
-                        device->sendMessageNow(juce::MidiMessage(event.bytes.data(), event.size));
+                        device->sendMessageNow(cydaw::midi::Message(event.bytes.data(), event.size));
                         sent_.fetch_add(1, std::memory_order_relaxed);
                     }
                 }
@@ -4326,7 +4330,7 @@ private:
     std::atomic<std::uint32_t>& sent_;
     cydaw::base::CriticalSection lock_;
     std::vector<std::pair<std::shared_ptr<MidiOutQueue>, cydaw::base::Text>> queues_;
-    std::map<cydaw::base::Text, std::unique_ptr<juce::MidiOutput>> devices_;
+    std::map<cydaw::base::Text, std::unique_ptr<cydaw::midi::Output>> devices_;
 };
 
 struct AudioTrackController::MidiSynthEngine final : public cydaw::audio::AudioSource, public RoutedInputReceiver {
@@ -4369,8 +4373,8 @@ struct AudioTrackController::MidiSynthEngine final : public cydaw::audio::AudioS
     }
 
     MidiSynthEngine(AudioTrackController& controller,
-                    juce::MidiMessageCollector& sharedCollector,
-                    juce::MidiKeyboardState& sharedKeyboard)
+                    cydaw::midi::MessageCollector& sharedCollector,
+                    cydaw::midi::KeyboardState& sharedKeyboard)
         : owner(controller), collector(sharedCollector), keyboard(sharedKeyboard)
     {
         instrumentGraph.store(
@@ -4507,7 +4511,7 @@ struct AudioTrackController::MidiSynthEngine final : public cydaw::audio::AudioS
 
         if (needsAllNotesOff.exchange(false, std::memory_order_acq_rel)) {
             for (int channel = 1; channel <= 16; ++channel)
-                midi.addEvent(juce::MidiMessage::allNotesOff(channel), 0);
+                midi.addEvent(cydaw::midi::Message::allNotesOff(channel), 0);
             for (auto& held : liveHeld)
                 held.reset();
             liveSustain.reset();
@@ -4516,9 +4520,9 @@ struct AudioTrackController::MidiSynthEngine final : public cydaw::audio::AudioS
             for (std::size_t channel = 0; channel < liveHeld.size(); ++channel) {
                 for (std::size_t note = 0; note < 128; ++note)
                     if (liveHeld[channel].test(note))
-                        midi.addEvent(juce::MidiMessage::noteOff(static_cast<int>(channel) + 1, static_cast<int>(note)), 0);
+                        midi.addEvent(cydaw::midi::Message::noteOff(static_cast<int>(channel) + 1, static_cast<int>(note)), 0);
                 if (liveSustain.test(channel))
-                    midi.addEvent(juce::MidiMessage::controllerEvent(static_cast<int>(channel) + 1, 64, 0), 0);
+                    midi.addEvent(cydaw::midi::Message::controllerEvent(static_cast<int>(channel) + 1, 64, 0), 0);
                 liveHeld[channel].reset();
             }
             liveSustain.reset();
@@ -4558,11 +4562,11 @@ struct AudioTrackController::MidiSynthEngine final : public cydaw::audio::AudioS
                 return juce::jlimit(0, 16'383, static_cast<int>(std::lround((curveAt(note.curves->gain, position) + 48.0) / 60.0 * 16'383.0)));
             };
             const auto sendBend = [&midi](const ScheduledNote& note, const int value, const int at) {
-                midi.addEvent(juce::MidiMessage::pitchWheel(note.channel, value), at);
+                midi.addEvent(cydaw::midi::Message::pitchWheel(note.channel, value), at);
             };
             const auto sendGain = [&midi](const ScheduledNote& note, const int value, const int at) {
-                midi.addEvent(juce::MidiMessage::controllerEvent(note.channel, 43, value & 127), at);
-                midi.addEvent(juce::MidiMessage::controllerEvent(note.channel, 11, value >> 7), at);
+                midi.addEvent(cydaw::midi::Message::controllerEvent(note.channel, 43, value & 127), at);
+                midi.addEvent(cydaw::midi::Message::controllerEvent(note.channel, 11, value >> 7), at);
             };
             // Its timbre (CC 74), pressure (the channel's) and pan (CC 10),
             // 0..127: what the curve says, its rest when it has none.
@@ -4586,11 +4590,11 @@ struct AudioTrackController::MidiSynthEngine final : public cydaw::audio::AudioS
             const auto addExpression = [&](const ScheduledNote& note, const double time, const int at, const bool beforeNote) {
                 if (beforeNote) {
                     sendBend(note, bendAt(note, time), at);
-                    midi.addEvent(juce::MidiMessage::controllerEvent(note.channel, 74, timbreAt(note, time)), at);
+                    midi.addEvent(cydaw::midi::Message::controllerEvent(note.channel, 74, timbreAt(note, time)), at);
                 } else {
                     sendGain(note, gainAt(note, time), at);
-                    midi.addEvent(juce::MidiMessage::channelPressureChange(note.channel, pressureAt(note, time)), at);
-                    midi.addEvent(juce::MidiMessage::controllerEvent(note.channel, 10, panAt(note, time)), at);
+                    midi.addEvent(cydaw::midi::Message::channelPressureChange(note.channel, pressureAt(note, time)), at);
+                    midi.addEvent(cydaw::midi::Message::controllerEvent(note.channel, 10, panAt(note, time)), at);
                 }
             };
             // A note with a chance plays this time or not: rolled as it comes.
@@ -4608,7 +4612,7 @@ struct AudioTrackController::MidiSynthEngine final : public cydaw::audio::AudioS
                 const auto end = start + static_cast<double>(count) / rate;
                 if (shouldChase) {
                     for (int channel = 1; channel <= 16; ++channel)
-                        midi.addEvent(juce::MidiMessage::allNotesOff(channel), offset);
+                        midi.addEvent(cydaw::midi::Message::allNotesOff(channel), offset);
                     for (const auto& note : *notes)
                         if (note.startSeconds < start && note.endSeconds > start) {
                             roll(note);
@@ -4616,7 +4620,7 @@ struct AudioTrackController::MidiSynthEngine final : public cydaw::audio::AudioS
                                 continue;
                             if (note.curves != nullptr)
                                 addExpression(note, start, offset, true);
-                            midi.addEvent(juce::MidiMessage::noteOn(note.channel, note.noteNumber, note.velocity), offset);
+                            midi.addEvent(cydaw::midi::Message::noteOn(note.channel, note.noteNumber, note.velocity), offset);
                             if (note.curves != nullptr)
                                 addExpression(note, start, offset, false);
                         }
@@ -4634,7 +4638,7 @@ struct AudioTrackController::MidiSynthEngine final : public cydaw::audio::AudioS
                         // the gain once it is there.
                         if (note.curves != nullptr)
                             addExpression(note, note.startSeconds, eventOffset, true);
-                        midi.addEvent(juce::MidiMessage::noteOn(note.channel, note.noteNumber, note.velocity), eventOffset);
+                        midi.addEvent(cydaw::midi::Message::noteOn(note.channel, note.noteNumber, note.velocity), eventOffset);
                         if (note.curves != nullptr)
                             addExpression(note, note.startSeconds, eventOffset, false);
                     }
@@ -4655,19 +4659,19 @@ struct AudioTrackController::MidiSynthEngine final : public cydaw::audio::AudioS
                                     sendGain(note, value, at);
                             if (!note.curves->timbre.empty())
                                 if (const auto value = timbreAt(note, time); value != timbreAt(note, before))
-                                    midi.addEvent(juce::MidiMessage::controllerEvent(note.channel, 74, value), at);
+                                    midi.addEvent(cydaw::midi::Message::controllerEvent(note.channel, 74, value), at);
                             if (!note.curves->pressure.empty())
                                 if (const auto value = pressureAt(note, time); value != pressureAt(note, before))
-                                    midi.addEvent(juce::MidiMessage::channelPressureChange(note.channel, value), at);
+                                    midi.addEvent(cydaw::midi::Message::channelPressureChange(note.channel, value), at);
                             if (!note.curves->pan.empty())
                                 if (const auto value = panAt(note, time); value != panAt(note, before))
-                                    midi.addEvent(juce::MidiMessage::controllerEvent(note.channel, 10, value), at);
+                                    midi.addEvent(cydaw::midi::Message::controllerEvent(note.channel, 10, value), at);
                         }
                     }
                     if (note.endSeconds >= start && note.endSeconds < end) {
                         const auto eventOffset = offset + juce::jlimit(
                             0, count - 1, static_cast<int>(std::llround((note.endSeconds - start) * rate)));
-                        midi.addEvent(juce::MidiMessage::noteOff(note.channel, note.noteNumber), eventOffset);
+                        midi.addEvent(cydaw::midi::Message::noteOff(note.channel, note.noteNumber), eventOffset);
                     }
                 }
             };
@@ -4683,7 +4687,7 @@ struct AudioTrackController::MidiSynthEngine final : public cydaw::audio::AudioS
                 if (!shouldLoop && position >= sessionEnd) {
                     playing.store(false, std::memory_order_release);
                     for (int channel = 1; channel <= 16; ++channel)
-                        midi.addEvent(juce::MidiMessage::allNotesOff(channel),
+                        midi.addEvent(cydaw::midi::Message::allNotesOff(channel),
                                       destinationOffset);
                     break;
                 }
@@ -4702,7 +4706,7 @@ struct AudioTrackController::MidiSynthEngine final : public cydaw::audio::AudioS
 
                 if (shouldLoop && position >= loopEnd && remaining > 0) {
                     for (int channel = 1; channel <= 16; ++channel)
-                        midi.addEvent(juce::MidiMessage::allNotesOff(channel), destinationOffset);
+                        midi.addEvent(cydaw::midi::Message::allNotesOff(channel), destinationOffset);
                     position = loopStart;
                     chase = true;
                 }
@@ -4923,7 +4927,7 @@ struct AudioTrackController::MidiSynthEngine final : public cydaw::audio::AudioS
 
     // The voices, rendered from `plan`: in pieces of 32 frames while its
     // values glide toward it (a knob turned), whole otherwise.
-    void renderVoices(const cydaw::engine::PolySynthGraphPlan* plan, cydaw::audio::SampleBuffer<float>& buffer, const juce::MidiBuffer& midi,
+    void renderVoices(const cydaw::engine::PolySynthGraphPlan* plan, cydaw::audio::SampleBuffer<float>& buffer, const cydaw::midi::EventBuffer& midi,
                       const int start, const int count) noexcept
     {
         if (plan == nullptr || !glide.begin(*plan)) {
@@ -4943,7 +4947,7 @@ struct AudioTrackController::MidiSynthEngine final : public cydaw::audio::AudioS
 
     // The block's notes and controllers into what the modulators read: the
     // keys held, the last note struck, the wheels, every controller.
-    void followNotes(const juce::MidiBuffer& midi) noexcept
+    void followNotes(const cydaw::midi::EventBuffer& midi) noexcept
     {
         for (const auto metadata : midi) {
             const auto message = metadata.getMessage();
@@ -5059,7 +5063,7 @@ struct AudioTrackController::MidiSynthEngine final : public cydaw::audio::AudioS
         PlanSynthesiser synthesiser;
         NativeDspRuntime effects;
         cydaw::audio::SampleBuffer<float> buffer;
-        juce::MidiBuffer notes;
+        cydaw::midi::EventBuffer notes;
         std::atomic<int> note { -1 };   // the key that plays it; -1: none
         std::atomic<int> playAs { -1 }; // the note it plays; -1: the key's own
         std::atomic<float> gain { 1.0f };
@@ -5108,7 +5112,7 @@ struct AudioTrackController::MidiSynthEngine final : public cydaw::audio::AudioS
 
     // The pads' sound, added into the block (before the track's effects):
     // as the track's instrument card has them hear its notes (`trackPlan`).
-    void renderPads(const cydaw::engine::PolySynthGraphPlan* trackPlan, const juce::MidiBuffer& midi, const cydaw::audio::AudioSourceChannelInfo& output,
+    void renderPads(const cydaw::engine::PolySynthGraphPlan* trackPlan, const cydaw::midi::EventBuffer& midi, const cydaw::audio::AudioSourceChannelInfo& output,
                     const double timelineSeconds) noexcept
     {
         namespace container = cydaw::engine::instrument_container;
@@ -5257,7 +5261,7 @@ struct AudioTrackController::MidiSynthEngine final : public cydaw::audio::AudioS
                 if (type == 0x90 && data[2] > 0 && group > 0)
                     for (std::size_t other = 0; other < count; ++other)
                         if (other != index && playing[other]->choke.load(std::memory_order_relaxed) == group)
-                            playing[other]->notes.addEvent(juce::MidiMessage::allNotesOff((data[0] & 0x0F) + 1), metadata.samplePosition);
+                            playing[other]->notes.addEvent(cydaw::midi::Message::allNotesOff((data[0] & 0x0F) + 1), metadata.samplePosition);
             }
         }
         const auto rate = std::max(1.0, synthesiser.getSampleRate());
@@ -5295,10 +5299,10 @@ struct AudioTrackController::MidiSynthEngine final : public cydaw::audio::AudioS
     std::atomic<double> sampleRateHz { 48'000.0 };
     PlanSynthesiser synthesiser;
     AudioTrackController& owner;
-    juce::MidiMessageCollector& collector;
-    juce::MidiBuffer blockMidi_;
-    juce::MidiBuffer incomingMidi_;
-    juce::MidiKeyboardState& keyboard;
+    cydaw::midi::MessageCollector& collector;
+    cydaw::midi::EventBuffer blockMidi_;
+    cydaw::midi::EventBuffer incomingMidi_;
+    cydaw::midi::KeyboardState& keyboard;
     cydaw::realtime::RtPublisher<std::vector<ScheduledNote>> sequence;
     std::atomic<double> sequenceLengthSeconds {};
     std::atomic<double> transportLengthSeconds { 0.000001 };
@@ -5317,7 +5321,7 @@ struct AudioTrackController::MidiSynthEngine final : public cydaw::audio::AudioS
     std::bitset<16> liveSustain {};
     std::atomic<bool> needsLiveNotesOff {};
     // The MIDI keyboards' collector as well as its own (the simulator's).
-    std::atomic<juce::MidiMessageCollector*> hardware {};
+    std::atomic<cydaw::midi::MessageCollector*> hardware {};
     // The notes its clips played (a counter, for the lights).
     std::atomic<std::uint32_t> clipNotes {};
     // Its notes on their way to its MIDI output.
@@ -5328,8 +5332,8 @@ struct AudioTrackController::MidiPlaybackTrack final {
     MidiPlaybackTrack(AudioTrackController& controller,
                       const std::uint64_t trackId,
                       cydaw::base::Text trackName,
-                      juce::MidiMessageCollector& collector,
-                      juce::MidiKeyboardState& keyboard)
+                      cydaw::midi::MessageCollector& collector,
+                      cydaw::midi::KeyboardState& keyboard)
         : id(trackId), name(std::move(trackName)),
           synth(controller, collector, keyboard),
           gainPanSource(synth, synth.positionSeconds),
@@ -5637,8 +5641,8 @@ struct AudioTrackController::Simulation final : public cydaw::audio::AudioSource
         }
     }
 
-    juce::MidiMessageCollector collector;
-    juce::MidiKeyboardState keyboard;
+    cydaw::midi::MessageCollector collector;
+    cydaw::midi::KeyboardState keyboard;
     MidiSynthEngine synth;
     NativeDspRuntime effect;
     cydaw::realtime::RtPublisher<Sample> samples;
@@ -6004,7 +6008,7 @@ void AudioTrackController::setMidiInputGate(MidiInputGate gate)
     midiGate_.swap(shared);
 }
 
-void AudioTrackController::GatedMidiInput::handleIncomingMidiMessage(juce::MidiInput* source, const juce::MidiMessage& message)
+void AudioTrackController::GatedMidiInput::handleIncomingMidiMessage(cydaw::midi::Input* source, const cydaw::midi::Message& message)
 {
     std::shared_ptr<const MidiInputGate> gate;
     {
@@ -6024,7 +6028,7 @@ void AudioTrackController::GatedMidiInput::handleIncomingMidiMessage(juce::MidiI
     }
     if (route != nullptr && !route->all && std::find(route->devices.begin(), route->devices.end(), identifier) == route->devices.end())
         return;
-    owner_.midiCollector_.handleIncomingMidiMessage(source, message);
+    owner_.midiCollector_.addMessageToQueue(message);
 }
 
 void AudioTrackController::setArmFollowsMidiInput(const bool follows) noexcept
@@ -6290,10 +6294,10 @@ cydaw::base::Result AudioTrackController::selfTestPolySynthGraph()
             synthesiser.addVoice(new GraphSynthVoice(graph, unmodulated));
         synthesiser.addSound(new GraphSynthSound());
         synthesiser.setCurrentPlaybackSampleRate(sampleRate);
-        juce::MidiBuffer midi;
+        cydaw::midi::EventBuffer midi;
         for (const auto note : notes) {
-            midi.addEvent(juce::MidiMessage::noteOn(1, note, 0.75f), 0);
-            midi.addEvent(juce::MidiMessage::noteOff(1, note), sampleCount / 2);
+            midi.addEvent(cydaw::midi::Message::noteOn(1, note, 0.75f), 0);
+            midi.addEvent(cydaw::midi::Message::noteOff(1, note), sampleCount / 2);
         }
         cydaw::audio::SampleBuffer<float> output(2, sampleCount);
         output.clear();
@@ -6376,10 +6380,10 @@ cydaw::base::Result AudioTrackController::selfTestPolySynthGraph()
                 return current != nullptr ? PlanSynthesiser::voicingOf(*current) : PlanSynthesiser::Voicing {};
             };
             synthesiser.setCurrentPlaybackSampleRate(sampleRate);
-            juce::MidiBuffer midi;
+            cydaw::midi::EventBuffer midi;
             auto at = 0;
             for (const auto note : notes) {
-                midi.addEvent(juce::MidiMessage::noteOn(1, note, 0.8f), at);
+                midi.addEvent(cydaw::midi::Message::noteOn(1, note, 0.8f), at);
                 at += 480;
             }
             cydaw::audio::SampleBuffer<float> output(2, sampleCount);
@@ -6619,7 +6623,7 @@ AudioTrackController::~AudioTrackController()
 }
 
 cydaw::base::Text AudioTrackController::initialiseAudio(
-    const juce::XmlElement* const savedState)
+    const cydaw::base::XmlElement* const savedState)
 {
     auto error = deviceManager_.initialise(
         savedState == nullptr ? 2 : 0, 2, savedState, true);
@@ -8240,7 +8244,7 @@ AudioTrackController::DeviceChannels AudioTrackController::deviceChannels() cons
     if (device == nullptr)
         return channels;
     // A bus counts the channels open, in order: those are the names it sees.
-    const auto names = [](const cydaw::base::TextList& all, const juce::BigInteger& active) {
+    const auto names = [](const cydaw::base::TextList& all, const cydaw::audio::ChannelSet& active) {
         cydaw::base::TextList open;
         for (auto index = 0; index < all.size(); ++index)
             if (active[index])
@@ -13711,7 +13715,7 @@ cydaw::base::Result AudioTrackController::startMidiRecording(
 }
 
 bool AudioTrackController::enqueueMidiRecordingMessage(
-    const juce::MidiMessage& message,
+    const cydaw::midi::Message& message,
     const double timelineSeconds) noexcept
 {
     if (!midiRecordingActive_.load(std::memory_order_acquire)
@@ -16664,9 +16668,9 @@ cydaw::base::Text AudioTrackController::audioDeviceDescription()
     return tr("status.offline");
 }
 
-juce::AudioDeviceManager& AudioTrackController::deviceManager() noexcept { return deviceManager_; }
+cydaw::integration::DeviceManager& AudioTrackController::deviceManager() noexcept { return deviceManager_; }
 cydaw::audio::AudioFormatManager& AudioTrackController::formatManager() noexcept { return formatManager_; }
-juce::MidiKeyboardState& AudioTrackController::keyboardState() noexcept { return midiKeyboardState_; }
+cydaw::midi::KeyboardState& AudioTrackController::keyboardState() noexcept { return midiKeyboardState_; }
 
 AudioTrackController::PlaybackTrack* AudioTrackController::findTrack(const std::size_t index) noexcept
 {

@@ -1,3 +1,6 @@
+#include <cydaw/midi/Devices.h>
+#include <cydaw/midi/LiveInput.h>
+#include <cydaw/audio/Devices.h>
 #include <cydaw/base/Process.h>
 #include <cydaw/base/EventLoop.h>
 #include <cydaw/base/Thread.h>
@@ -168,7 +171,7 @@ cydaw::base::Text readableAddress(const std::string& address)
     if (parts.size() >= 3 && parts[0] == "cc")
         return "CC " + parts[2] + middleDot() + "ch. " + parts[1];
     if (parts.size() >= 3 && parts[0] == "note")
-        return ui::Ls("Note ", "Note ") + juce::MidiMessage::getMidiNoteName(parts[2].getIntValue(), true, true, 3) + middleDot() + "ch. "
+        return ui::Ls("Note ", "Note ") + cydaw::midi::Message::getMidiNoteName(parts[2].getIntValue(), true, true, 3) + middleDot() + "ch. "
                + parts[1];
     if (parts.size() >= 2 && parts[0] == "pb")
         return ui::Ls("Pitch bend · ch. ", "Pitch bend · ch. ") + parts[1];
@@ -338,7 +341,7 @@ Controllers::Impl::Impl(Studio& studioIn, UiState& state, ImGuiHost& hostIn, con
     loadPlugins();
     restoreProject(studio.controllerAssignments());
     projectRevision = studio.controllerAssignmentsRevision();
-    studio.engine().setMidiInputGate([this](const cydaw::base::Text& identifier, const juce::MidiMessage& message) {
+    studio.engine().setMidiInputGate([this](const cydaw::base::Text& identifier, const cydaw::midi::Message& message) {
         return gatePasses(identifier, message);
     });
     refreshGate();
@@ -385,7 +388,7 @@ void Controllers::Impl::scanMidi()
     for (auto& device : raw)
         if (device->kind == RawKind::midiIn || device->kind == RawKind::midiOut)
             device->present = false;
-    const auto list = [&](const juce::Array<juce::MidiDeviceInfo>& devices, const RawKind kind) {
+    const auto list = [&](const cydaw::base::Array<cydaw::midi::DeviceInfo>& devices, const RawKind kind) {
         std::map<cydaw::base::Text, int> seen;
         for (const auto& info : devices) {
             auto name = info.name;
@@ -414,8 +417,8 @@ void Controllers::Impl::scanMidi()
                 device->enabled = manager.isMidiInputDeviceEnabled(device->identifier);
         }
     };
-    list(juce::MidiInput::getAvailableDevices(), RawKind::midiIn);
-    list(juce::MidiOutput::getAvailableDevices(), RawKind::midiOut);
+    list(cydaw::midi::Input::getAvailableDevices(), RawKind::midiIn);
+    list(cydaw::midi::Output::getAvailableDevices(), RawKind::midiOut);
     {
         const std::scoped_lock hold(gateLock);
         midiNames.clear();
@@ -428,7 +431,7 @@ void Controllers::Impl::scanMidi()
             device->output.reset();
 }
 
-void Controllers::Impl::handleIncomingMidiMessage(juce::MidiInput* source, const juce::MidiMessage& message)
+void Controllers::Impl::handleIncomingMidiMessage(cydaw::midi::Input* source, const cydaw::midi::Message& message)
 {
     if (source == nullptr)
         return;
@@ -460,7 +463,7 @@ void Controllers::Impl::refreshGate()
     takenAddresses = std::move(taken);
 }
 
-bool Controllers::Impl::gatePasses(const cydaw::base::Text& identifier, const juce::MidiMessage& message)
+bool Controllers::Impl::gatePasses(const cydaw::base::Text& identifier, const cydaw::midi::Message& message)
 {
     const std::scoped_lock hold(gateLock);
     const auto found = midiNames.find(identifier);
@@ -597,14 +600,14 @@ void Controllers::Impl::send(const std::string_view id, const control::RawMessag
         if (!device->present)
             return;
         if (device->output == nullptr && device->error.isEmpty()) {
-            device->output = juce::MidiOutput::openDevice(device->identifier);
+            device->output = cydaw::midi::Output::openDevice(device->identifier);
             if (device->output == nullptr)
                 device->error = ui::Ls("Port occupé par un autre logiciel.", "Port busy in another program.");
         }
         const auto bytes = control::toMidi(message);
         if (device->output == nullptr || bytes.empty())
             return;
-        device->output->sendMessageNow(juce::MidiMessage(bytes.data(), static_cast<int>(bytes.size())));
+        device->output->sendMessageNow(cydaw::midi::Message(bytes.data(), static_cast<int>(bytes.size())));
     } else if (device->kind == RawKind::osc) {
         if (device->osc == nullptr || !device->osc->sending)
             return;

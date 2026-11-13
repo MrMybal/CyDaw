@@ -1,3 +1,6 @@
+#include <cydaw/midi/Devices.h>
+#include <cydaw/midi/LiveInput.h>
+#include <cydaw/audio/Devices.h>
 #include <cydaw/base/Process.h>
 #include <cydaw/base/EventLoop.h>
 #include <cydaw/base/File.h>
@@ -28,7 +31,7 @@ inline constexpr const char* computerKeyboardId = "keyboard:computer";
 // A raw address as a person reads it: "CC 74 · ch. 1", "Key F1".
 [[nodiscard]] cydaw::base::Text readableAddress(const std::string& address);
 
-class Controllers::Impl final : private juce::MidiInputCallback, private cydaw::base::AsyncUpdater, private cydaw::base::Timer {
+class Controllers::Impl final : private cydaw::midi::InputCallback, private cydaw::base::AsyncUpdater, private cydaw::base::Timer {
 public:
     Impl(Studio& studio, UiState& state, ImGuiHost& host, bool keepSettings);
     ~Impl() override;
@@ -61,7 +64,7 @@ public:
         // Now.
         double activity {};
         cydaw::base::Text error;
-        std::unique_ptr<juce::MidiOutput> output;
+        std::unique_ptr<cydaw::midi::Output> output;
         std::unique_ptr<OscPort> osc;
         // OSC: the /cydaw/ targets it touched (told back when they move).
         std::set<std::string> touched;
@@ -124,7 +127,7 @@ public:
     void post(Incoming incoming);
     void handleAsyncUpdate() override;
     void process(const Incoming& incoming);
-    void handleIncomingMidiMessage(juce::MidiInput* source, const juce::MidiMessage& message) override;
+    void handleIncomingMidiMessage(cydaw::midi::Input* source, const cydaw::midi::Message& message) override;
     // MIDI identifiers to raw ids, for the MIDI thread.
     std::mutex midiNamesLock;
     std::map<cydaw::base::Text, std::string> midiNames;
@@ -134,7 +137,7 @@ public:
     std::set<std::string> silentDevices;
     std::set<std::pair<std::string, std::string>> takenAddresses;
     void refreshGate();
-    [[nodiscard]] bool gatePasses(const cydaw::base::Text& identifier, const juce::MidiMessage& message);
+    [[nodiscard]] bool gatePasses(const cydaw::base::Text& identifier, const cydaw::midi::Message& message);
 
     // ---- Virtual controllers and assignments ----------------------------------------------
     control::Router router;

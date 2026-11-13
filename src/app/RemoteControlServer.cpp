@@ -140,7 +140,11 @@ cydaw::base::Text RemoteControlServer::respond(const cydaw::base::Text& line) co
     if (auto* object = pending->response.getDynamicObject();
         object != nullptr && request.hasProperty("id"))
         object->setProperty("id", request["id"]);
-    return cydaw::base::JSON::toString(pending->response, true);
+    const auto encoded = cydaw::base::JSON::toString(pending->response, true);
+    if (encoded.isNotEmpty()) return encoded;
+    cydaw::base::MemoryOutputStream diagnostic;
+    const auto result = cydaw::base::JSON::writeToStream(diagnostic, pending->response, true);
+    return failure("The response could not be encoded: " + result.getErrorMessage());
 }
 
 } // namespace cydaw::app

@@ -1,3 +1,6 @@
+#include <cydaw/midi/Devices.h>
+#include <cydaw/midi/LiveInput.h>
+#include <cydaw/audio/Devices.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #include "MidiDevices.h"
@@ -12,8 +15,8 @@ namespace cydaw::v2::midi_devices {
 namespace {
 
 struct Lists {
-    juce::Array<juce::MidiDeviceInfo> inputs;
-    juce::Array<juce::MidiDeviceInfo> outputs;
+    cydaw::base::Array<cydaw::midi::DeviceInfo> inputs;
+    cydaw::base::Array<cydaw::midi::DeviceInfo> outputs;
     double readAt { -1.0e9 };
 };
 
@@ -22,14 +25,14 @@ Lists& lists()
     static Lists cached;
     const auto now = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
     if (now - cached.readAt > 2.0) {
-        cached.inputs = juce::MidiInput::getAvailableDevices();
-        cached.outputs = juce::MidiOutput::getAvailableDevices();
+        cached.inputs = cydaw::midi::Input::getAvailableDevices();
+        cached.outputs = cydaw::midi::Output::getAvailableDevices();
         cached.readAt = now;
     }
     return cached;
 }
 
-cydaw::base::Text nameIn(const juce::Array<juce::MidiDeviceInfo>& devices, const cydaw::base::Text& identifier)
+cydaw::base::Text nameIn(const cydaw::base::Array<cydaw::midi::DeviceInfo>& devices, const cydaw::base::Text& identifier)
 {
     for (const auto& device : devices)
         if (device.identifier == identifier)
@@ -39,12 +42,12 @@ cydaw::base::Text nameIn(const juce::Array<juce::MidiDeviceInfo>& devices, const
 
 } // namespace
 
-const juce::Array<juce::MidiDeviceInfo>& inputs()
+const cydaw::base::Array<cydaw::midi::DeviceInfo>& inputs()
 {
     return lists().inputs;
 }
 
-const juce::Array<juce::MidiDeviceInfo>& outputs()
+const cydaw::base::Array<cydaw::midi::DeviceInfo>& outputs()
 {
     return lists().outputs;
 }

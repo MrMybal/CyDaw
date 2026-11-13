@@ -1,3 +1,6 @@
+#include <cydaw/midi/Devices.h>
+#include <cydaw/midi/LiveInput.h>
+#include <cydaw/audio/Devices.h>
 #include <cydaw/base/Process.h>
 #include <cydaw/base/FileDialog.h>
 #include <cydaw/base/EventLoop.h>
@@ -1218,7 +1221,7 @@ void AppUi::frame()
     // Bitwig; one switched off in the MIDI inputs stays off.
     if (ImGui::GetTime() - midiDevicesTime_ > 2.0) {
         midiDevicesTime_ = ImGui::GetTime();
-        midiDevices_ = juce::MidiInput::getAvailableDevices();
+        midiDevices_ = cydaw::midi::Input::getAvailableDevices();
         auto& settings = studio_.settings();
         auto known = cydaw::base::TextList::fromLines(settings.getValue("knownMidiInputs"));
         auto changed = false;
@@ -1889,7 +1892,7 @@ cydaw::base::Value AppUi::midiInputs(const cydaw::base::Text& command, const cyd
         result->setProperty("keys", keys);
         return cydaw::base::Value(result);
     }
-    const auto devices = juce::MidiInput::getAvailableDevices();
+    const auto devices = cydaw::midi::Input::getAvailableDevices();
     if (request.hasProperty("device")) {
         const auto wanted = request.getProperty("device", cydaw::base::Value()).toString();
         auto found = false;
@@ -3607,7 +3610,7 @@ void AppUi::drawSystemStatus(const float endX)
             tip << "\n" << ui::Ls("Carte son : ", "Sound card: ")
                 << (audio != nullptr ? audio->getName() + "  (" + cydaw::base::Text(audio->getCurrentSampleRate() / 1'000.0, 1) + " kHz)"
                                      : ui::Ls("aucune", "none"));
-            const auto names = [](const juce::Array<juce::MidiDeviceInfo>& found) {
+            const auto names = [](const cydaw::base::Array<cydaw::midi::DeviceInfo>& found) {
                 cydaw::base::TextList list;
                 for (const auto& device : found)
                     list.add(device.name);

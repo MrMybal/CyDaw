@@ -1,3 +1,7 @@
+#include <cydaw/integration/CyAudioCoreDeviceManager.h>
+#include <cydaw/midi/Devices.h>
+#include <cydaw/midi/LiveInput.h>
+#include <cydaw/audio/Devices.h>
 #include <cydaw/audio/Sources.h>
 #include <cydaw/integration/SourcePlayer.h>
 #include <cydaw/base/Thread.h>
@@ -436,7 +440,7 @@ private:
     bool prepared_ {};
 };
 
-class InputRecorder final : public juce::AudioIODeviceCallback {
+class InputRecorder final : public cydaw::audio::DeviceCallback {
 public:
     InputRecorder();
     ~InputRecorder() override;
@@ -466,8 +470,8 @@ public:
                                           float* const* outputChannelData,
                                           int numOutputChannels,
                                           int numSamples,
-                                          const juce::AudioIODeviceCallbackContext& context) override;
-    void audioDeviceAboutToStart(juce::AudioIODevice* device) override;
+                                          const cydaw::audio::DeviceCallbackContext& context) override;
+    void audioDeviceAboutToStart(cydaw::audio::Device* device) override;
     void audioDeviceStopped() override;
 
 private:
@@ -1041,7 +1045,7 @@ public:
     ~AudioTrackController();
 
     [[nodiscard]] cydaw::base::Text initialiseAudio(
-        const juce::XmlElement* savedState = nullptr);
+        const cydaw::base::XmlElement* savedState = nullptr);
     [[nodiscard]] cydaw::base::Result addAudioTrack(
         const cydaw::base::File& file,
         std::size_t* newTrackIndex = nullptr,
@@ -1674,7 +1678,7 @@ public:
     [[nodiscard]] int droppedMidiRecordingEvents() const noexcept;
     [[nodiscard]] std::size_t midiRecordingNoteCount() const noexcept;
     [[nodiscard]] bool enqueueMidiRecordingMessage(
-        const juce::MidiMessage& message,
+        const cydaw::midi::Message& message,
         double timelineSeconds) noexcept;
     void setMidiTrackMixer(std::uint64_t trackId,
                            float gainDb,
@@ -1830,7 +1834,7 @@ public:
     // Which messages of the MIDI inputs reach the instruments: the
     // controllers keep those they map, and a device set to control only.
     // Called on the MIDI thread; null lets everything through.
-    using MidiInputGate = std::function<bool(const cydaw::base::Text& identifier, const juce::MidiMessage& message)>;
+    using MidiInputGate = std::function<bool(const cydaw::base::Text& identifier, const cydaw::midi::Message& message)>;
     void setMidiInputGate(MidiInputGate gate);
     // The track the keyboard and the MIDI input play now.
     [[nodiscard]] std::uint64_t midiInputTrackId() const noexcept;
@@ -2111,9 +2115,9 @@ public:
     [[nodiscard]] int trackCompensationSamples(std::size_t index) const noexcept;
     [[nodiscard]] int midiTrackCompensationSamples(std::uint64_t trackId) const noexcept;
 
-    [[nodiscard]] juce::AudioDeviceManager& deviceManager() noexcept;
+    [[nodiscard]] cydaw::integration::DeviceManager& deviceManager() noexcept;
     [[nodiscard]] cydaw::audio::AudioFormatManager& formatManager() noexcept;
-    [[nodiscard]] juce::MidiKeyboardState& keyboardState() noexcept;
+    [[nodiscard]] cydaw::midi::KeyboardState& keyboardState() noexcept;
 
     // ---- Routing between tracks -----------------------------------------------
     // A track, as the routing names it: an audio track by its index, a MIDI
@@ -2401,11 +2405,11 @@ private:
     std::unique_ptr<PlaybackTrack> clipPreviewTrack_;
     cydaw::audio::MixerAudioSource auditionMixer_;
     VirtualBusRouter virtualBusRouter_ { auditionMixer_ };
-    juce::MidiMessageCollector midiCollector_;
+    cydaw::midi::MessageCollector midiCollector_;
     // The inputs' messages through the gate, then into the collector.
-    struct GatedMidiInput final : juce::MidiInputCallback {
+    struct GatedMidiInput final : cydaw::midi::InputCallback {
         explicit GatedMidiInput(AudioTrackController& owner) : owner_(owner) {}
-        void handleIncomingMidiMessage(juce::MidiInput* source, const juce::MidiMessage& message) override;
+        void handleIncomingMidiMessage(cydaw::midi::Input* source, const cydaw::midi::Message& message) override;
         AudioTrackController& owner_;
     } gatedMidiInput_ { *this };
     cydaw::base::SpinLock midiGateLock_;
@@ -2417,7 +2421,7 @@ private:
     std::atomic<std::uint32_t> midiOutCount_ {};
     std::atomic<std::uint32_t> keyboardCount_ {};
     std::unique_ptr<MidiOutputHub> midiOutputs_;
-    juce::MidiKeyboardState midiKeyboardState_;
+    cydaw::midi::KeyboardState midiKeyboardState_;
     cydaw::integration::SourcePlayer sourcePlayer_;
     InputRecorder recorder_;
     std::vector<std::unique_ptr<PlaybackTrack>> tracks_;

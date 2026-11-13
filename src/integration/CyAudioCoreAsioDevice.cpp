@@ -1,7 +1,7 @@
 #include <cydaw/base/Text.h>
 #include <algorithm>
 #include <cmath>
-#include <cydaw/integration/CyAudioCoreDeviceManager.h>
+#include <cydaw/integration/LegacyCoreDeviceTypes.h>
 #include <cydaw/platform/AsioDriver.h>
 namespace cydaw::integration {
 namespace {

@@ -1,3 +1,7 @@
+#include <cydaw/integration/CyAudioCoreDeviceManager.h>
+#include <cydaw/midi/Devices.h>
+#include <cydaw/midi/LiveInput.h>
+#include <cydaw/audio/Devices.h>
 #include <cydaw/base/Properties.h>
 #include <cydaw/base/File.h>
 #pragma once
@@ -21,7 +25,7 @@ public:
     };
     using Read = std::function<State(int)>;
     using Apply = std::function<void(int, const Update&)>;
-    TransportSync(cydaw::base::PropertiesFile&, juce::AudioDeviceManager&, bool saveSettings, Read, Apply);
+    TransportSync(cydaw::base::PropertiesFile&, cydaw::integration::DeviceManager&, bool saveSettings, Read, Apply);
     ~TransportSync();
     void draw(bool& visible);
     void drawButton(bool& visible);

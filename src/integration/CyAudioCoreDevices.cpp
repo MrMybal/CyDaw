@@ -2,7 +2,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cyaudio/io/AudioDeviceManager.h>
-#include <cydaw/integration/CyAudioCoreDeviceManager.h>
+#include <cydaw/integration/LegacyCoreDeviceTypes.h>
 namespace cydaw::integration {
 namespace {
 using namespace cyaudio;

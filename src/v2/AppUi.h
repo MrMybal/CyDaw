@@ -1,3 +1,6 @@
+#include <cydaw/midi/Devices.h>
+#include <cydaw/midi/LiveInput.h>
+#include <cydaw/audio/Devices.h>
 #include <cydaw/base/FileDialog.h>
 #include <cydaw/base/File.h>
 #pragma once
@@ -431,7 +434,7 @@ private:
     // The colour themes.
     std::unique_ptr<ThemesView> themes_;
     // The MIDI devices, asked again now and then (asking is slow).
-    juce::Array<juce::MidiDeviceInfo> midiDevices_;
+    cydaw::base::Array<cydaw::midi::DeviceInfo> midiDevices_;
     double midiDevicesTime_ { -100.0 };
     // The audio settings open on the card's inputs and outputs.
     bool showSoundCard_ {};

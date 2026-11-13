@@ -1,3 +1,6 @@
+#include <cydaw/midi/Devices.h>
+#include <cydaw/midi/LiveInput.h>
+#include <cydaw/audio/Devices.h>
 #include <cydaw/audio/Sources.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/Text.h>
@@ -91,7 +94,7 @@ public:
 };
 
 class VirtualBusRouter final : public cydaw::audio::AudioSource,
-                               public juce::AudioIODeviceCallback {
+                               public cydaw::audio::DeviceCallback {
 public:
     static constexpr std::size_t maximumBusCount = 16;
 
@@ -141,8 +144,8 @@ public:
         const float* const* inputChannelData, int numInputChannels,
         float* const* outputChannelData, int numOutputChannels,
         int numSamples,
-        const juce::AudioIODeviceCallbackContext& context) override;
-    void audioDeviceAboutToStart(juce::AudioIODevice* device) override;
+        const cydaw::audio::DeviceCallbackContext& context) override;
+    void audioDeviceAboutToStart(cydaw::audio::Device* device) override;
     void audioDeviceStopped() override;
 
     // An input bus's channels read from the sound card's (`outputs` holds

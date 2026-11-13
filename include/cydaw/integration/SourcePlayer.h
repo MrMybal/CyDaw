@@ -1,11 +1,10 @@
 #pragma once
+#include <cydaw/audio/Devices.h>
 #include <cydaw/audio/Sources.h>
 #include <cydaw/midi/LiveInput.h>
-#include <juce_audio_devices/juce_audio_devices.h>
 namespace cydaw::integration {
-// Transitional device callback boundary only. The rendered source graph and all
-// sample storage are native; the remaining device-manager ABI is retired next.
-class SourcePlayer final : public juce::AudioIODeviceCallback {
+// Native device boundary. The source graph borrows Core channel storage.
+class SourcePlayer final : public audio::DeviceCallback {
   audio::AudioSource *source_{};
   double rate_ = 48000;
   int frames_ = 512;
@@ -29,7 +28,7 @@ public:
     if (source_ && prepared_)
       source_->prepareToPlay(frames_, rate_);
   }
-  void audioDeviceAboutToStart(juce::AudioIODevice *device) override {
+  void audioDeviceAboutToStart(audio::Device *device) override {
     if (prepared_)
       audioDeviceStopped();
     if (!device)
@@ -51,7 +50,7 @@ public:
   }
   void audioDeviceIOCallbackWithContext(
       const float *const *, int inputCount, float *const *output, int channels,
-      int count, const juce::AudioIODeviceCallbackContext &context) override {
+      int count, const audio::DeviceCallbackContext &context) override {
     for (int ch = 0; ch < channels; ++ch)
       if (output[ch])
         std::fill_n(output[ch], count, 0.f);

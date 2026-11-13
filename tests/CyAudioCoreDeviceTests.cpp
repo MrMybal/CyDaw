@@ -1,7 +1,7 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
-#include <cydaw/integration/CyAudioCoreDeviceManager.h>
+#include <cydaw/integration/LegacyCoreDeviceTypes.h>
 #include <iostream>
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <stdexcept>
