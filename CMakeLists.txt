@@ -186,6 +186,7 @@ endif()
 
 add_library(cydaw_core STATIC
     src/integration/StandardMidiFile.cpp
+    src/integration/LiveMidiInput.cpp
     src/app/ProjectRecovery.cpp
     src/app/NativeDspRuntime.cpp
     src/app/ModuleInterfaceState.cpp
@@ -367,6 +368,10 @@ if(CYDAW_BUILD_TESTS)
 endif()
 
 if(CYDAW_BUILD_TESTS)
+    add_executable(cydaw_live_midi_tests tests/LiveMidiInputTests.cpp)
+    target_link_libraries(cydaw_live_midi_tests PRIVATE CyDAW::Core)
+    add_test(NAME cydaw_live_midi_tests COMMAND cydaw_live_midi_tests)
+    cydaw_configure_test(cydaw_live_midi_tests 30)
     add_executable(cydaw_instrument_renderer_tests tests/InstrumentRendererTests.cpp)
     target_link_libraries(cydaw_instrument_renderer_tests PRIVATE cydaw_instrument_renderer)
     add_test(NAME cydaw_instrument_renderer_tests COMMAND cydaw_instrument_renderer_tests)

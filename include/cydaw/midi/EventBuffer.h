@@ -1,4 +1,5 @@
 #pragma once
+#include "Message.h"
 #include <algorithm>
 #include <cyaudio/midi/Midi.h>
 #include <stdexcept>
@@ -15,6 +16,9 @@ public:
   struct Event {
     const std::uint8_t *data{};
     int numBytes{}, samplePosition{};
+    Message getMessage() const {
+      return Message(data, numBytes, double(samplePosition));
+    }
   };
   EventBuffer() {
     if (buffer_.prepare(events_, bytes_) != cyaudio::Status::ok)

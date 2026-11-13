@@ -1,5 +1,6 @@
 #pragma once
 #include <cydaw/audio/Sources.h>
+#include <cydaw/midi/LiveInput.h>
 #include <juce_audio_devices/juce_audio_devices.h>
 namespace cydaw::integration {
 // Transitional device callback boundary only. The rendered source graph and all
@@ -12,6 +13,7 @@ class SourcePlayer final : public juce::AudioIODeviceCallback {
   audio::SampleBuffer<float> fallback_;
   std::atomic<float> gain_{1};
   float lastGain_ = 1;
+  std::uint64_t firstFrame_{};
 
 public:
   void setGain(float value) noexcept {
@@ -35,6 +37,7 @@ public:
     rate_ = device->getCurrentSampleRate();
     frames_ = std::max(1, device->getCurrentBufferSizeSamples());
     fallback_.setSize(64, frames_);
+    firstFrame_ = 0;
     prepared_ = true;
     lastGain_ = gain_.load();
     if (source_)
@@ -48,12 +51,14 @@ public:
   }
   void audioDeviceIOCallbackWithContext(
       const float *const *, int inputCount, float *const *output, int channels,
-      int count, const juce::AudioIODeviceCallbackContext &) override {
+      int count, const juce::AudioIODeviceCallbackContext &context) override {
     for (int ch = 0; ch < channels; ++ch)
       if (output[ch])
         std::fill_n(output[ch], count, 0.f);
     if (!source_ || !prepared_ || count <= 0)
       return;
+    const auto clockNs =
+        context.hostTimeNs ? *context.hostTimeNs : midi::monotonicNanoseconds();
     const int width = std::clamp(std::max(channels, inputCount), 2, 64);
     std::array<float *, 64> pointers{};
     for (int first = 0; first < count;) {
@@ -63,6 +68,10 @@ public:
                            ? output[ch] + first
                            : fallback_.getWritePointer(ch);
       audio::SampleBuffer<float> view(pointers.data(), width, frames);
+      const cyaudio::AudioClockAnchor anchor{
+          clockNs + std::uint64_t(double(first) / rate_ * 1e9),
+          firstFrame_ + std::uint64_t(first), rate_};
+      midi::AudioClockScope clock(anchor);
       try {
         source_->getNextAudioBlock({&view, 0, frames});
         const float wanted = gain_.load();
@@ -73,6 +82,7 @@ public:
       }
       first += frames;
     }
+    firstFrame_ += std::uint64_t(count);
   }
 };
 } // namespace cydaw::integration
