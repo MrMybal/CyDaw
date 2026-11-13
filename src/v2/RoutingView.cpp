@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #include "RoutingView.h"
 
 #include "RoutingUi.h"
@@ -48,7 +49,7 @@ void note(const char* text)
 
 RoutingView::RoutingView(Studio& studio, UiState& state) : studio_(studio), state_(state) {}
 
-void RoutingView::report(const juce::String& error)
+void RoutingView::report(const cydaw::base::Text& error)
 {
     if (error.isEmpty())
         return;
@@ -82,7 +83,7 @@ void RoutingView::draw()
     ImGui::PopFont();
     ImGui::SameLine(0.0f, dp(10.0f));
     const auto busInput = track.isBus() && studio_.hardwareBus(track.bus)->direction == app::VirtualBusDirection::input;
-    const auto kind = track.isBus()                ? juce::String(busInput ? L("entrée virtuelle", "virtual input")
+    const auto kind = track.isBus()                ? cydaw::base::Text(busInput ? L("entrée virtuelle", "virtual input")
                                                                            : L("sortie virtuelle", "virtual output"))
                       : track.master               ? ui::Ls("le mix de toutes les pistes", "the mix of every track")
                       : track.midi                 ? ui::Ls("piste instrument", "instrument track")
@@ -145,7 +146,7 @@ void RoutingView::drawSenders(const TrackRef& track)
             ImGui::AlignTextToFramePadding();
             auto line = studio_.trackName(candidate);
             if (output.input != 0)
-                line << juce::String::fromUTF8("  \xe2\x86\x92 ") << studio_.trackInputName(track, output.input);
+                line << cydaw::base::Text::fromUTF8("  \xe2\x86\x92 ") << studio_.trackInputName(track, output.input);
             ImGui::TextUnformatted(line.toRawUTF8());
             ImGui::SameLine();
             ImGui::TextColored(theme::vec(p.textDim), "%+.1f dB%s", output.gainDb, output.preFader ? "  PRE" : "");
@@ -167,8 +168,8 @@ void RoutingView::drawCardChannels(const app::VirtualAudioBus& bus)
         const auto at = bus.deviceChannel(channel);
         const auto speaker = std::string(cydaw::engine::speakerShortName(cydaw::engine::speakerRole(bus.channels, channel)));
         const auto open = at < names.size();
-        const auto text = juce::String(speaker) + juce::String::fromUTF8(input ? "  \xe2\x86\x90  " : "  \xe2\x86\x92  ")
-                          + juce::String(at + 1) + "  " + (open ? names[at] : ui::Ls("(fermée)", "(closed)"));
+        const auto text = cydaw::base::Text(speaker) + cydaw::base::Text::fromUTF8(input ? "  \xe2\x86\x90  " : "  \xe2\x86\x92  ")
+                          + cydaw::base::Text(at + 1) + "  " + (open ? names[at] : ui::Ls("(fermée)", "(closed)"));
         ImGui::TextColored(theme::vec(open ? p.text : p.warn), "%s", text.toRawUTF8());
     }
     ImGui::PopFont();
@@ -179,14 +180,14 @@ void RoutingView::drawCardChannels(const app::VirtualAudioBus& bus)
 void RoutingView::drawBusEffects(const std::uint64_t busId)
 {
     const auto& p = theme::palette();
-    juce::StringArray names;
+    cydaw::base::TextList names;
     if (const auto* slot = studio_.graphFor(TrackRef::ofBus(busId)))
         for (const auto& node : slot->graph().editorNodes())
             if (!node.boundary)
                 names.add(node.title.isNotEmpty() ? node.title : node.typeKey);
     ImGui::TextColored(theme::vec(p.textDim), "%s", L("Ses effets", "Its effects"));
     ImGui::PushTextWrapPos(0.0f);
-    ImGui::TextUnformatted(names.isEmpty() ? L("aucun", "none") : names.joinIntoString(juce::String::fromUTF8(" \xe2\x86\x92 ")).toRawUTF8());
+    ImGui::TextUnformatted(names.isEmpty() ? L("aucun", "none") : names.joinIntoString(cydaw::base::Text::fromUTF8(" \xe2\x86\x92 ")).toRawUTF8());
     ImGui::PopTextWrapPos();
     if (ImGui::Button(L("Modifier ses effets", "Edit its effects"))) {
         state_.selectTrack(TrackRef::ofBus(busId));
@@ -331,7 +332,7 @@ void RoutingView::drawMidiOutput(const TrackRef& track)
 void RoutingView::drawInput(const TrackRef& track)
 {
     const auto& p = theme::palette();
-    juce::String error;
+    cydaw::base::Text error;
     if (track.isBus()) {
         if (const auto bus = studio_.hardwareBus(track.bus))
             drawBusInput(*bus);
@@ -413,7 +414,7 @@ void RoutingView::drawOutput(const TrackRef& track)
                "The sound card's outputs are set in Options \xe2\x80\xba Audio."));
         return;
     }
-    juce::String error;
+    cydaw::base::Text error;
     if (track.midi)
         drawMidiOutput(track);
     // Where its sound goes, and its sends: a line each.

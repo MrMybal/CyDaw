@@ -1,3 +1,4 @@
+#include <cydaw/base/Properties.h>
 #include <cydaw/base/File.h>
 #include "GraphManagerComponent.h"
 
@@ -13,7 +14,7 @@
 namespace cydaw::app {
 
 namespace {
-juce::String assetKindKey(const GraphManagerComponent::AssetKind kind)
+cydaw::base::Text assetKindKey(const GraphManagerComponent::AssetKind kind)
 {
     if (kind == GraphManagerComponent::AssetKind::userPreset)
         return "graph.manager.userPreset";
@@ -26,7 +27,7 @@ juce::String assetKindKey(const GraphManagerComponent::AssetKind kind)
 
 class GraphManagerWindowItem : public juce::TreeViewItem {
 public:
-    explicit GraphManagerWindowItem(juce::String label)
+    explicit GraphManagerWindowItem(cydaw::base::Text label)
         : label_(std::move(label)) {}
 
     bool mightContainSubItems() override { return true; }
@@ -43,7 +44,7 @@ public:
     }
 
 private:
-    juce::String label_;
+    cydaw::base::Text label_;
 };
 }
 
@@ -60,7 +61,7 @@ public:
     bool mightContainSubItems() override { return false; }
     juce::String getUniqueName() const override
     {
-        return juce::String(static_cast<int>(asset_.kind)) + ":" + asset_.key
+        return cydaw::base::Text(static_cast<int>(asset_.kind)) + ":" + asset_.key
                + ":" + asset_.file.getFullPathName();
     }
 
@@ -130,7 +131,7 @@ public:
                                   : juce::Colour(0xffcbd0d4));
         graphics.setFont(juce::FontOptions(9.5f));
         const auto favorite = owner_.isFavorite(asset_);
-        auto roleBadge = juce::String("GRF");
+        auto roleBadge = cydaw::base::Text("GRF");
         if (asset_.role == tr("graph.role.instrument"))
             roleBadge = "INST";
         else if (asset_.role == tr("graph.role.audioEffect"))
@@ -165,7 +166,7 @@ public:
         if (favorite) {
             graphics.setColour(juce::Colour(0xffffb347));
             graphics.setFont(juce::FontOptions(11.0f));
-            graphics.drawText(juce::String::charToString(0x2605),
+            graphics.drawText(cydaw::base::Text::charToString(0x2605),
                               width - 18, 0, 16, height,
                               juce::Justification::centred);
         }
@@ -269,10 +270,10 @@ public:
                           juce::Justification::centredLeft, false);
         graphics.setColour(juce::Colour(0xff7f8992));
         graphics.setFont(juce::FontOptions(8.5f));
-        const auto summary = juce::String(
+        const auto summary = cydaw::base::Text(
             static_cast<int>(asset_->previewNodes.size())) + " "
             + tr("graph.manager.previewNodes") + "  /  "
-            + juce::String(static_cast<int>(
+            + cydaw::base::Text(static_cast<int>(
                 asset_->previewConnections.size())) + " "
             + tr("graph.manager.previewConnections");
         graphics.drawText(summary, header.toNearestInt(),
@@ -456,14 +457,14 @@ GraphManagerComponent::GraphManagerComponent()
                           juce::Colour(0xffbbc1c6));
     detailText_.setJustificationType(juce::Justification::topLeft);
 
-    juce::PropertiesFile::Options options;
+    cydaw::base::PropertiesFile::Options options;
     options.applicationName = "CyDAW";
     options.filenameSuffix = "graph-manager.settings";
     options.folderName = "CyDAW";
-    preferences_ = std::make_unique<juce::PropertiesFile>(options);
-    favoriteAssetIds_ = juce::StringArray::fromLines(
+    preferences_ = std::make_unique<cydaw::base::PropertiesFile>(options);
+    favoriteAssetIds_ = cydaw::base::TextList::fromLines(
         preferences_->getValue("favoriteGraphAssets"));
-    recentAssetIds_ = juce::StringArray::fromLines(
+    recentAssetIds_ = cydaw::base::TextList::fromLines(
         preferences_->getValue("recentGraphAssets"));
 
     fileThread_.startThread(juce::Thread::Priority::low);
@@ -485,7 +486,7 @@ GraphManagerComponent::~GraphManagerComponent()
 void GraphManagerComponent::setAssets(std::vector<Asset> assets)
 {
     const auto previousIdentity = selectedAsset_.has_value()
-        ? assetIdentity(*selectedAsset_) : juce::String {};
+        ? assetIdentity(*selectedAsset_) : cydaw::base::Text {};
     assets_ = std::move(assets);
     const auto previous = std::find_if(
         assets_.begin(), assets_.end(),
@@ -511,19 +512,19 @@ void GraphManagerComponent::setAssets(std::vector<Asset> assets)
 }
 
 void GraphManagerComponent::setFactoryPresetLoadHandler(
-    std::function<void(const juce::String&)> handler)
+    std::function<void(const cydaw::base::Text&)> handler)
 {
     factoryPresetLoadHandler_ = std::move(handler);
 }
 
 void GraphManagerComponent::setUserPresetLoadHandler(
-    std::function<void(const juce::File&)> handler)
+    std::function<void(const cydaw::base::File&)> handler)
 {
     userPresetLoadHandler_ = std::move(handler);
 }
 
 void GraphManagerComponent::setNodeParameterPresetLoadHandler(
-    std::function<void(const juce::File&)> handler)
+    std::function<void(const cydaw::base::File&)> handler)
 {
     nodeParameterPresetLoadHandler_ = std::move(handler);
 }
@@ -534,8 +535,8 @@ void GraphManagerComponent::setRefreshHandler(std::function<void()> handler)
 }
 
 void GraphManagerComponent::setNodeParameterPresetTarget(
-    const juce::String& nodeTypeKey,
-    const juce::String& processorKey,
+    const cydaw::base::Text& nodeTypeKey,
+    const cydaw::base::Text& processorKey,
     const bool editable)
 {
     if (targetNodeTypeKey_ == nodeTypeKey
@@ -550,13 +551,13 @@ void GraphManagerComponent::setNodeParameterPresetTarget(
 }
 
 void GraphManagerComponent::setSubgraphOpenHandler(
-    std::function<void(const juce::String&)> handler)
+    std::function<void(const cydaw::base::Text&)> handler)
 {
     subgraphOpenHandler_ = std::move(handler);
 }
 
 void GraphManagerComponent::setSubgraphVariantHandler(
-    std::function<void(const juce::String&)> handler)
+    std::function<void(const cydaw::base::Text&)> handler)
 {
     subgraphVariantHandler_ = std::move(handler);
     if (selectedAsset_.has_value())
@@ -615,14 +616,14 @@ void GraphManagerComponent::refreshFiles()
         fileList_->setDirectory(directory, true, true);
 }
 
-bool GraphManagerComponent::selectAssetByKey(const juce::String& key)
+bool GraphManagerComponent::selectAssetByKey(const cydaw::base::Text& key)
 {
     const auto asset = std::find_if(
         assets_.begin(), assets_.end(), [&key](const Asset& value) {
             return value.key == key
                    || value.name.equalsIgnoreCase(key)
                    || value.file.getFileNameWithoutExtension()
-                          .equalsIgnoreCase(key);
+                          .equalsIgnoreCase(key.toRawUTF8());
         });
     if (asset == assets_.end())
         return false;
@@ -650,9 +651,9 @@ bool GraphManagerComponent::selectAssetByKey(const juce::String& key)
     return true;
 }
 
-juce::String GraphManagerComponent::selectedAssetKey() const
+cydaw::base::Text GraphManagerComponent::selectedAssetKey() const
 {
-    return selectedAsset_.has_value() ? selectedAsset_->key : juce::String {};
+    return selectedAsset_.has_value() ? selectedAsset_->key : cydaw::base::Text {};
 }
 
 std::size_t GraphManagerComponent::selectedPreviewNodeCount() const noexcept
@@ -680,10 +681,10 @@ void GraphManagerComponent::rebuildFileView()
     fileList_.reset();
     fileFilter_.reset();
 
-    auto query = search_.getText().trim();
+    cydaw::base::Text query = search_.getText().trim();
     query = query.replaceCharacters("*?", "  ").trim();
     query = query.replaceCharacter(' ', '*');
-    const auto prefix = query.isEmpty() ? juce::String("*")
+    const auto prefix = query.isEmpty() ? cydaw::base::Text("*")
                                         : "*" + query + "*";
     const auto wildcard = prefix + graphPresetFileExtension + ";"
         + prefix + nodeParameterPresetFileExtension;
@@ -782,9 +783,9 @@ void GraphManagerComponent::rebuildCategoryTree()
     categoryRoot_ = std::make_unique<CategoryItem>("root");
     const auto query = search_.getText().trim().toLowerCase();
 
-    using CategoryGroups = std::map<juce::String, std::vector<Asset>>;
-    using KindGroups = std::map<juce::String, CategoryGroups>;
-    std::map<juce::String, KindGroups> groups;
+    using CategoryGroups = std::map<cydaw::base::Text, std::vector<Asset>>;
+    using KindGroups = std::map<cydaw::base::Text, CategoryGroups>;
+    std::map<cydaw::base::Text, KindGroups> groups;
     std::vector<Asset> matchedAssets;
     for (const auto& asset : assets_) {
         const auto searchable = (asset.name + " " + asset.category + " "
@@ -799,7 +800,7 @@ void GraphManagerComponent::rebuildCategoryTree()
         if (query.isNotEmpty() && !searchable.contains(query))
             continue;
         matchedAssets.push_back(asset);
-        juce::StringArray groupNames;
+        cydaw::base::TextList groupNames;
         if (groupingSelector_.getSelectedId() == 2)
             groupNames.add(asset.role.isNotEmpty()
                                ? asset.role
@@ -822,7 +823,7 @@ void GraphManagerComponent::rebuildCategoryTree()
     }
 
     const auto appendSmartCollection = [this, &matchedAssets](
-        const juce::String& label, const juce::StringArray& identities) {
+        const cydaw::base::Text& label, const cydaw::base::TextList& identities) {
         std::vector<Asset> items;
         for (const auto& identity : identities) {
             const auto found = std::find_if(
@@ -836,7 +837,7 @@ void GraphManagerComponent::rebuildCategoryTree()
         if (items.empty())
             return;
         auto* collection = new CategoryItem(
-            label + "  (" + juce::String(static_cast<int>(items.size())) + ")");
+            label + "  (" + cydaw::base::Text(static_cast<int>(items.size())) + ")");
         for (auto& item : items)
             collection->addSubItem(new AssetItem(*this, std::move(item)));
         categoryRoot_->addSubItem(collection);
@@ -855,7 +856,7 @@ void GraphManagerComponent::rebuildCategoryTree()
             }
         }
         auto* scopeItem = new CategoryItem(
-            scope + "  (" + juce::String(static_cast<int>(scopeCount)) + ")");
+            scope + "  (" + cydaw::base::Text(static_cast<int>(scopeCount)) + ")");
         for (auto& [kind, categories] : kinds) {
             auto kindCount = std::size_t {};
             for (const auto& [category, items] : categories) {
@@ -863,16 +864,16 @@ void GraphManagerComponent::rebuildCategoryTree()
                 kindCount += items.size();
             }
             auto* kindItem = new CategoryItem(
-                kind + "  (" + juce::String(static_cast<int>(kindCount)) + ")");
+                kind + "  (" + cydaw::base::Text(static_cast<int>(kindCount)) + ")");
             if (groupingSelector_.getSelectedId() == 1) {
                 struct CategoryBranch {
-                    std::map<juce::String,
+                    std::map<cydaw::base::Text,
                              std::unique_ptr<CategoryBranch>> children;
                     std::vector<Asset> assets;
                 };
                 CategoryBranch root;
                 for (auto& [category, items] : categories) {
-                    auto path = juce::StringArray::fromTokens(
+                    auto path = cydaw::base::TextList::fromTokens(
                         category, "/\\", "");
                     path.trim();
                     path.removeEmptyStrings();
@@ -902,11 +903,11 @@ void GraphManagerComponent::rebuildCategoryTree()
                 };
                 const auto appendBranch =
                     [this, &branchCount](auto&& self, CategoryItem& parent,
-                                        const juce::String& label,
+                                        const cydaw::base::Text& label,
                                         CategoryBranch& branch) -> void {
                     const auto count = branchCount(branchCount, branch);
                     auto* item = new CategoryItem(
-                        label + "  (" + juce::String(count) + ")");
+                        label + "  (" + cydaw::base::Text(count) + ")");
                     std::sort(branch.assets.begin(), branch.assets.end(),
                               [](const auto& left, const auto& right) {
                                   return left.name.compareIgnoreCase(
@@ -926,7 +927,7 @@ void GraphManagerComponent::rebuildCategoryTree()
                 for (auto& [category, items] : categories) {
                     auto* categoryItem = new CategoryItem(
                         category + "  ("
-                        + juce::String(static_cast<int>(items.size())) + ")");
+                        + cydaw::base::Text(static_cast<int>(items.size())) + ")");
                     std::sort(items.begin(), items.end(), [](const auto& left,
                                                              const auto& right) {
                         return left.name.compareIgnoreCase(right.name) < 0;
@@ -1108,7 +1109,7 @@ bool GraphManagerComponent::isActiveAsset(const Asset& asset) const
         && assetIdentity(*selectedAsset_) == assetIdentity(asset);
 }
 
-void GraphManagerComponent::openFileAsset(const juce::File& file)
+void GraphManagerComponent::openFileAsset(const cydaw::base::File& file)
 {
     if (!file.existsAsFile())
         return;
@@ -1127,14 +1128,14 @@ void GraphManagerComponent::openFileAsset(const juce::File& file)
         userPresetLoadHandler_(file);
 }
 
-juce::String GraphManagerComponent::assetIdentity(const Asset& asset) const
+cydaw::base::Text GraphManagerComponent::assetIdentity(const Asset& asset) const
 {
     const auto source = (asset.kind == AssetKind::userPreset
                          || asset.kind == AssetKind::nodeParameterPreset)
                             && asset.file.getFullPathName().isNotEmpty()
-        ? asset.file.getFullPathName()
+        ? cydaw::base::Text(asset.file.getFullPathName())
         : asset.key;
-    return juce::String(static_cast<int>(asset.kind)) + ":" + source;
+    return cydaw::base::Text(static_cast<int>(asset.kind)) + ":" + source;
 }
 
 bool GraphManagerComponent::isFavorite(const Asset& asset) const
@@ -1222,7 +1223,7 @@ void GraphManagerComponent::editAssetMetadata(const Asset& asset)
                     document->metadata.author
                         = dialog->getTextEditorContents("author")
                               .trim().substring(0, 128);
-                    auto tags = juce::StringArray::fromTokens(
+                    auto tags = cydaw::base::TextList::fromTokens(
                         dialog->getTextEditorContents("tags"), ",;", "\"");
                     tags.trim();
                     tags.removeEmptyStrings();
@@ -1329,7 +1330,7 @@ void GraphManagerComponent::editAssetMetadata(const Asset& asset)
                 document->description
                     = dialog->getTextEditorContents("description")
                           .trim().substring(0, 2'048);
-                auto tags = juce::StringArray::fromTokens(
+                auto tags = cydaw::base::TextList::fromTokens(
                     dialog->getTextEditorContents("tags"), ",;", "\"");
                 tags.trim();
                 tags.removeEmptyStrings();
@@ -1377,7 +1378,7 @@ void GraphManagerComponent::duplicateUserGraph(const Asset& asset)
 
     document->name = tr("graph.manager.duplicateGraphName",
                         "name", document->name).substring(0, 128);
-    auto slug = juce::File::createLegalFileName(document->name)
+    auto slug = cydaw::base::File::createLegalFileName(document->name)
                     .toLowerCase().replaceCharacter(' ', '-');
     slug = slug.retainCharacters(
         "abcdefghijklmnopqrstuvwxyz0123456789-_");
@@ -1398,12 +1399,12 @@ void GraphManagerComponent::duplicateUserGraph(const Asset& asset)
         if (auto* exportProfile = graph->getProperty("vst3Export")
                                       .getDynamicObject()) {
             exportProfile->setProperty("productName", document->name);
-            exportProfile->setProperty("pluginCode", juce::String {});
+            exportProfile->setProperty("pluginCode", cydaw::base::Text {});
             exportProfile->setProperty("version", "1.0.0");
         }
     }
 
-    auto baseName = juce::File::createLegalFileName(document->name);
+    auto baseName = cydaw::base::File::createLegalFileName(document->name);
     if (baseName.isEmpty())
         baseName = "Graph Copy";
     const auto destination = asset.file.getParentDirectory()
@@ -1445,13 +1446,13 @@ void GraphManagerComponent::saveCollections()
     if (preferences_ == nullptr)
         return;
     preferences_->setValue("favoriteGraphAssets",
-                           favoriteAssetIds_.joinIntoString("\n"));
+                           cydaw::base::Value(favoriteAssetIds_.joinIntoString("\n")));
     preferences_->setValue("recentGraphAssets",
-                           recentAssetIds_.joinIntoString("\n"));
+                           cydaw::base::Value(recentAssetIds_.joinIntoString("\n")));
     preferences_->saveIfNeeded();
 }
 
-juce::String GraphManagerComponent::roleLabel(
+cydaw::base::Text GraphManagerComponent::roleLabel(
     const cydaw::graph::GraphRole role) const
 {
     using Role = cydaw::graph::GraphRole;

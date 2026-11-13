@@ -192,7 +192,7 @@ bool readHead(const cydaw::base::Value& head, cydaw::engine::SoundModelZone& zon
 
 } // namespace
 
-cydaw::engine::SoundModelRef soundModelFromVar(const cydaw::base::Value& value, juce::String& error)
+cydaw::engine::SoundModelRef soundModelFromVar(const cydaw::base::Value& value, cydaw::base::Text& error)
 {
     if (value.getProperty("format", {}).toString() != "cydaw-sound-model") {
         error = "not a cydaw-sound-model";
@@ -317,7 +317,7 @@ namespace {
 // something holds them (a card, a document being read).
 struct FactoryModel {
     cydaw::base::Value json;
-    juce::Time modified;
+    cydaw::base::Time modified;
     juce::int64 size {};
 };
 std::mutex& factoryModelsLock()
@@ -325,9 +325,9 @@ std::mutex& factoryModelsLock()
     static std::mutex lock;
     return lock;
 }
-std::map<juce::String, FactoryModel>& factoryModels()
+std::map<cydaw::base::Text, FactoryModel>& factoryModels()
 {
-    static std::map<juce::String, FactoryModel> models;
+    static std::map<cydaw::base::Text, FactoryModel> models;
     return models;
 }
 const cydaw::base::Identifier soundModelKey("soundModel");
@@ -398,7 +398,7 @@ cydaw::base::Value referenced(const cydaw::base::Value& value, bool& changed)
     return copy;
 }
 
-void expanded(const cydaw::base::Value& value, juce::StringArray& missing)
+void expanded(const cydaw::base::Value& value, cydaw::base::TextList& missing)
 {
     if (const auto* array = value.getArray()) {
         for (const auto& item : *array)
@@ -412,7 +412,7 @@ void expanded(const cydaw::base::Value& value, juce::StringArray& missing)
     if (const auto stored = object->getProperty(soundModelFileKey).toString();
         stored.startsWith("factory:") && !object->getProperty(soundModelKey).isObject()) {
         cydaw::base::Value json;
-        juce::String error;
+        cydaw::base::Text error;
         if (loadSoundModelFile(resolveSamplePath(stored), json, error) != nullptr) {
             object->setProperty(soundModelKey, json);
             object->removeProperty(soundModelFileKey);
@@ -433,7 +433,7 @@ void expanded(const cydaw::base::Value& value, juce::StringArray& missing)
 
 } // namespace
 
-cydaw::engine::SoundModelRef loadSoundModelFile(const juce::File& file, cydaw::base::Value& json, juce::String& error)
+cydaw::engine::SoundModelRef loadSoundModelFile(const cydaw::base::File& file, cydaw::base::Value& json, cydaw::base::Text& error)
 {
     if (!file.existsAsFile()) {
         error = "no file " + file.getFullPathName();
@@ -482,7 +482,7 @@ cydaw::engine::SoundModelRef loadSoundModelFile(const juce::File& file, cydaw::b
     return model;
 }
 
-juce::String factoryModelReference(const cydaw::base::Value& json)
+cydaw::base::Text factoryModelReference(const cydaw::base::Value& json)
 {
     const auto* object = json.getDynamicObject();
     if (object == nullptr)
@@ -500,7 +500,7 @@ cydaw::base::Value withFactoryModelReferences(const cydaw::base::Value& document
     return referenced(document, changed);
 }
 
-void expandFactoryModelReferences(cydaw::base::Value& document, juce::StringArray& missing)
+void expandFactoryModelReferences(cydaw::base::Value& document, cydaw::base::TextList& missing)
 {
     expanded(document, missing);
 }
@@ -516,7 +516,7 @@ VoiceAssets voiceAssetsFromGraphState(const cydaw::base::Value& state)
 {
     VoiceAssets assets;
     // The devices' classes, by key: a card of that type is one of them.
-    std::map<juce::String, const cydaw::base::Array<cydaw::base::Value>*> classes;
+    std::map<cydaw::base::Text, const cydaw::base::Array<cydaw::base::Value>*> classes;
     if (const auto* modules = state.getProperty("modules", {}).getArray())
         for (const auto& module : *modules)
             if (const auto* nodes = module.getProperty("nodes", {}).getArray())
@@ -525,7 +525,7 @@ VoiceAssets voiceAssetsFromGraphState(const cydaw::base::Value& state)
     auto samplerFound = false;
     auto tableFound = false;
     auto prismFound = false;
-    std::set<juce::String> visiting;
+    std::set<cydaw::base::Text> visiting;
     std::function<void(const cydaw::base::Array<cydaw::base::Value>&)> walk = [&](const cydaw::base::Array<cydaw::base::Value>& nodes) {
         for (const auto& node : nodes) {
             if (modelFound && samplerFound && tableFound && prismFound)
@@ -539,14 +539,14 @@ VoiceAssets voiceAssetsFromGraphState(const cydaw::base::Value& state)
             } else if (type == "sampler" || type == "batterie") {
                 if (!samplerFound) {
                     samplerFound = true;
-                    juce::String error;
+                    cydaw::base::Text error;
                     if (const auto map = upgradedSamplerMap(node.getProperty("sampler", {})); map.isObject())
                         assets.sampler = samplerMapFromVar(map, error);
                 }
             } else if (type == "sound-model") {
                 if (!modelFound) {
                     modelFound = true;
-                    juce::String error;
+                    cydaw::base::Text error;
                     if (const auto model = node.getProperty("soundModel", {}); model.isObject())
                         assets.soundModel = soundModelFromVar(model, error);
                 }
@@ -581,7 +581,7 @@ const char* prismOscillatorKey(const int oscillator)
 }
 } // namespace
 
-cydaw::base::Value prismTableVar(const juce::String& name, const juce::String& source, const int frameLength,
+cydaw::base::Value prismTableVar(const cydaw::base::Text& name, const cydaw::base::Text& source, const int frameLength,
                         const std::vector<std::vector<float>>& frames)
 {
     juce::MemoryOutputStream pcm;
@@ -647,19 +647,19 @@ cydaw::base::Value withPrismTable(const cydaw::base::Value& tables, const int os
     return cydaw::base::Value(copy.release());
 }
 
-juce::String prismTableName(const cydaw::base::Value& tables, const int oscillator)
+cydaw::base::Text prismTableName(const cydaw::base::Value& tables, const int oscillator)
 {
     return tables.getProperty(prismOscillatorKey(oscillator), {}).getProperty("name", {}).toString();
 }
 
-cydaw::base::Value impulseVar(const cydaw::engine::ImpulseResponse& response, const juce::String& source)
+cydaw::base::Value impulseVar(const cydaw::engine::ImpulseResponse& response, const cydaw::base::Text& source)
 {
     juce::MemoryOutputStream pcm;
     for (const auto& channel : response.channels)
         for (const auto sample : channel)
             pcm.writeFloat(sample);
     auto value = std::make_unique<cydaw::base::Object>();
-    value->setProperty("name", juce::String(response.name));
+    value->setProperty("name", cydaw::base::Text(response.name));
     value->setProperty("source", source);
     value->setProperty("sampleRate", response.sampleRate);
     value->setProperty("channels", static_cast<int>(response.channels.size()));
@@ -735,18 +735,18 @@ void attachImpulses(cydaw::engine::NativeDspGraph& graph, const cydaw::base::Val
             node.wavetable = found->second;
 }
 
-juce::String describeSoundModel(const cydaw::engine::SoundModel& model)
+cydaw::base::Text describeSoundModel(const cydaw::engine::SoundModel& model)
 {
     static const char* names[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
-    juce::StringArray notes;
+    cydaw::base::TextList notes;
     auto partials = 0;
     for (const auto& zone : model.zones) {
-        notes.addIfNotAlreadyThere(juce::String(names[zone.rootNote % 12]) + juce::String(zone.rootNote / 12 - 1));
+        notes.addIfNotAlreadyThere(cydaw::base::Text(names[zone.rootNote % 12]) + cydaw::base::Text(zone.rootNote / 12 - 1));
         partials = std::max(partials, zone.harmonicCount);
     }
-    return juce::String(model.name) + juce::String::fromUTF8(" \xc2\xb7 ") + juce::String(static_cast<int>(model.zones.size()))
-           + (model.zones.size() > 1 ? " zones" : " zone") + juce::String::fromUTF8(" \xc2\xb7 ") + notes.joinIntoString(", ")
-           + juce::String::fromUTF8(" \xc2\xb7 ") + juce::String(partials) + " partials";
+    return cydaw::base::Text(model.name) + cydaw::base::Text::fromUTF8(" \xc2\xb7 ") + cydaw::base::Text(static_cast<int>(model.zones.size()))
+           + (model.zones.size() > 1 ? " zones" : " zone") + cydaw::base::Text::fromUTF8(" \xc2\xb7 ") + notes.joinIntoString(", ")
+           + cydaw::base::Text::fromUTF8(" \xc2\xb7 ") + cydaw::base::Text(partials) + " partials";
 }
 
 } // namespace cydaw::app

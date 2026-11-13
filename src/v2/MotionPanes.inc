@@ -12,14 +12,14 @@ constexpr ImU32 kMotionHorn = IM_COL32(255, 200, 100, 255);
 constexpr ImU32 kMotionDrum = IM_COL32(170, 130, 255, 255);
 constexpr ImU32 kMotionFloor = IM_COL32(255, 92, 92, 255);
 
-juce::String motionChoiceName(const motiond::MotionChoice& choice)
+cydaw::base::Text motionChoiceName(const motiond::MotionChoice& choice)
 {
-    return juce::String::fromUTF8(ui::french() ? choice.french : choice.english);
+    return cydaw::base::Text::fromUTF8(ui::french() ? choice.french : choice.english);
 }
 
-juce::String motionChoiceHint(const motiond::MotionChoice& choice)
+cydaw::base::Text motionChoiceHint(const motiond::MotionChoice& choice)
 {
-    return juce::String::fromUTF8(ui::french() ? choice.frenchHint : choice.englishHint);
+    return cydaw::base::Text::fromUTF8(ui::french() ? choice.frenchHint : choice.englishHint);
 }
 
 template <std::size_t N>
@@ -28,57 +28,57 @@ const motiond::MotionChoice& motionChoiceAt(const std::array<motiond::MotionChoi
     return choices[static_cast<std::size_t>(std::clamp(static_cast<int>(std::lround(value)), 0, static_cast<int>(N) - 1))];
 }
 
-juce::String motionPompeShapeName(const int index)
+cydaw::base::Text motionPompeShapeName(const int index)
 {
     return motionChoiceName(motionChoiceAt(motiond::pompeShapes, index));
 }
-juce::String motionPompeShapeHint(const int index)
+cydaw::base::Text motionPompeShapeHint(const int index)
 {
     return motionChoiceHint(motionChoiceAt(motiond::pompeShapes, index));
 }
-juce::String motionAnneauShapeName(const int index)
+cydaw::base::Text motionAnneauShapeName(const int index)
 {
     return motionChoiceName(motionChoiceAt(motiond::anneauShapes, index));
 }
-juce::String motionAnneauShapeHint(const int index)
+cydaw::base::Text motionAnneauShapeHint(const int index)
 {
     return motionChoiceHint(motionChoiceAt(motiond::anneauShapes, index));
 }
 
 // "220 Hz", "1.10 kHz".
-juce::String motionHertz(const double hz)
+cydaw::base::Text motionHertz(const double hz)
 {
     const auto size = std::abs(hz);
     if (size >= 1'000.0)
-        return juce::String(hz / 1'000.0, size >= 10'000.0 ? 1 : 2) + " kHz";
-    return juce::String(hz, size < 10.0 ? 2 : size < 100.0 ? 1 : 0) + " Hz";
+        return cydaw::base::Text(hz / 1'000.0, size >= 10'000.0 ? 1 : 2) + " kHz";
+    return cydaw::base::Text(hz, size < 10.0 ? 2 : size < 100.0 ? 1 : 0) + " Hz";
 }
 
 // "+100 Hz", "-12.5 Hz".
-juce::String motionSignedHertz(const double hz)
+cydaw::base::Text motionSignedHertz(const double hz)
 {
-    return (hz > 0.0 ? "+" : "") + juce::String(hz, std::abs(hz) < 10.0 ? 2 : std::abs(hz) < 100.0 ? 1 : 0) + " Hz";
+    return (hz > 0.0 ? "+" : "") + cydaw::base::Text(hz, std::abs(hz) < 10.0 ? 2 : std::abs(hz) < 100.0 ? 1 : 0) + " Hz";
 }
 
 // A sync value: free, or its note value.
-juce::String motionSyncName(const double value)
+cydaw::base::Text motionSyncName(const double value)
 {
     if (const auto* division = engine::noteDivisionFor(static_cast<float>(value)))
-        return juce::String(std::string(division->name));
+        return cydaw::base::Text(std::string(division->name));
     return ui::Ls("Libre", "Free");
 }
 
 // What a cycle runs at: its note value, or its rate.
-juce::String motionCycleText(const float sync, const float rate)
+cydaw::base::Text motionCycleText(const float sync, const float rate)
 {
     if (engine::noteDivisionFor(sync) != nullptr)
         return motionSyncName(sync);
-    return juce::String(rate, rate < 10.0f ? 2 : 1) + " Hz";
+    return cydaw::base::Text(rate, rate < 10.0f ? 2 : 1) + " Hz";
 }
 
-juce::String motionDegrees(const double turns)
+cydaw::base::Text motionDegrees(const double turns)
 {
-    return juce::String(juce::roundToInt(turns * 360.0)) + juce::String::fromUTF8("\xc2\xb0");
+    return cydaw::base::Text(juce::roundToInt(turns * 360.0)) + cydaw::base::Text::fromUTF8("\xc2\xb0");
 }
 
 // The processor's readings, when they are fresh and complete.
@@ -480,7 +480,7 @@ bool motionAnneauDisplay(std::vector<Param>& parameters, const Pane& pane, const
     text(list, ImVec2(std::min(x + dp(6.0f), axis.max.x - textSize(label.toRawUTF8(), large ? 1.3f : 0.72f).x - dp(4.0f)), axis.min.y + dp(3.0f)),
          colour, label.toRawUTF8(), large ? 1.3f : 0.72f);
     if (large && reach > 0.005) {
-        const auto lfo = ui::Ls("LFO ±", "LFO ±") + juce::String(reach, 2) + " oct  ·  "
+        const auto lfo = ui::Ls("LFO ±", "LFO ±") + cydaw::base::Text(reach, 2) + " oct  ·  "
                          + motionCycleText(values[motiond::anneauSync], values[motiond::anneauLfoRate]);
         text(list, ImVec2(axis.min.x + dp(6.0f), axis.max.y - ImGui::GetFontSize() * 1.6f), p.textDim, lfo.toRawUTF8(), 0.62f);
     }
@@ -699,7 +699,7 @@ std::vector<int> motionCardFields(const PaneKind kind, std::vector<Param>& param
 }
 
 // A value as these effects show it; empty for none of theirs.
-juce::String motionFormat(const juce::String& binding, const double value)
+cydaw::base::Text motionFormat(const cydaw::base::Text& binding, const double value)
 {
     const auto off = [] { return ui::Ls("Coupé", "Off"); };
     if (binding.contains("pompe.")) {
@@ -707,7 +707,7 @@ juce::String motionFormat(const juce::String& binding, const double value)
         if (suffix == "shape")
             return motionChoiceName(motionChoiceAt(motiond::pompeShapes, value));
         if (suffix == "trigger")
-            return value >= 0.5 ? ui::Ls("Touche", "Key") : juce::String("Tempo");
+            return value >= 0.5 ? ui::Ls("Touche", "Key") : cydaw::base::Text("Tempo");
         if (suffix == "sync")
             return motionSyncName(value);
         if (suffix == "depth" || suffix == "mix" || suffix == "hold" || suffix.startsWith("point"))
@@ -715,7 +715,7 @@ juce::String motionFormat(const juce::String& binding, const double value)
         if (suffix == "phase" || suffix == "stereoOffset")
             return motionDegrees(value);
         if (suffix == "curve")
-            return (value > 0.0 ? "+" : "") + juce::String(value, 2);
+            return (value > 0.0 ? "+" : "") + cydaw::base::Text(value, 2);
         if (suffix == "smoothing" && value < 0.05)
             return off();
         return {};
@@ -731,7 +731,7 @@ juce::String motionFormat(const juce::String& binding, const double value)
         if (suffix == "shift" || suffix == "fine")
             return motionSignedHertz(value);
         if (suffix == "spread" || suffix == "lfoDepth")
-            return value < 0.05 ? off() : juce::String::fromUTF8("\xc2\xb1") + motionHertz(value);
+            return value < 0.05 ? off() : cydaw::base::Text::fromUTF8("\xc2\xb1") + motionHertz(value);
         if (suffix == "feedback" || suffix == "mix")
             return percent(value);
         if (suffix == "delay" && value < 0.5)
@@ -749,7 +749,7 @@ juce::String motionFormat(const juce::String& binding, const double value)
         if (suffix == "sync")
             return motionSyncName(value);
         if (suffix == "lfoDepth")
-            return value < 0.005 ? off() : juce::String::fromUTF8("\xc2\xb1") + juce::String(value, 2) + " oct";
+            return value < 0.005 ? off() : cydaw::base::Text::fromUTF8("\xc2\xb1") + cydaw::base::Text(value, 2) + " oct";
         if (suffix == "stereo")
             return motionDegrees(value);
         if (suffix == "mix")
@@ -777,7 +777,7 @@ juce::String motionFormat(const juce::String& binding, const double value)
 }
 
 // A parameter of theirs that takes whole steps (a choice, a switch).
-bool motionStepped(const juce::String& binding)
+bool motionStepped(const cydaw::base::Text& binding)
 {
     for (const auto* suffix : { "pompe.shape", "pompe.sync", "pompe.trigger", "decaleur.mode", "decaleur.sync", "decaleur.lfoShape",
                                 "anneau.shape", "anneau.mode", "anneau.sync", "anneau.lfoShape", "rotor.speed" })

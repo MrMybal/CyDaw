@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "CurveEditor.h"
@@ -23,7 +24,7 @@ public:
 
     void draw();
     // Files dropped on the window, at a point of the screen.
-    bool dropFiles(const juce::StringArray& files, ImVec2 screenPoint);
+    bool dropFiles(const cydaw::base::TextList& files, ImVec2 screenPoint);
 
     // Commands the menus and shortcuts call.
     void deleteSelection();
@@ -55,7 +56,7 @@ private:
     struct LaneScale {
         // The volume, in dB; otherwise a parameter of the track's graph.
         bool volume { true };
-        juce::String label;
+        cydaw::base::Text label;
         visual::Param parameter;
     };
     struct LaneHit {
@@ -65,13 +66,13 @@ private:
         float clipBottom {};   // the automation band starts here when shown
         bool automation {};
         // The lane shown: empty for the volume, else a parameter's binding.
-        juce::String lane;
+        cydaw::base::Text lane;
         LaneScale scale;
     };
     enum class Drag { none, move, trimLeft, trimRight, fadeIn, fadeOut, seek, loop, box, resizeLane, scrollbar, navigate };
     struct AutomationEdit {
         TrackRef track;
-        juce::String lane;
+        cydaw::base::Text lane;
         std::vector<Studio::AutomationPoint> points;
     };
     // Instrument tracks' arrangement clips as they were (launcher clips
@@ -106,17 +107,17 @@ private:
     void drawAutomation(ImDrawList* list, const LaneHit& lane);
     bool handleAutomationInput(const std::vector<LaneHit>& lanes);
     void laneChooserMenu();
-    void rememberAutomation(const TrackRef& track, const juce::String& lane);
-    [[nodiscard]] LaneScale laneScale(const TrackRef& track, juce::String& lane) const;
-    [[nodiscard]] static juce::String formatLaneValue(float value, const LaneScale& scale);
+    void rememberAutomation(const TrackRef& track, const cydaw::base::Text& lane);
+    [[nodiscard]] LaneScale laneScale(const TrackRef& track, cydaw::base::Text& lane) const;
+    [[nodiscard]] static cydaw::base::Text formatLaneValue(float value, const LaneScale& scale);
     // The lanes' curve editors (CurveEditor.h): a lane as one sees it, the
     // timeline, a lane's points and back, and the bar of the picked points
     // over the canvas.
-    [[nodiscard]] static juce::String curveKey(const TrackRef& track, const juce::String& lane);
-    [[nodiscard]] curves::Lane curveLane(const TrackRef& track, const juce::String& lane, const LaneScale& scale) const;
+    [[nodiscard]] static cydaw::base::Text curveKey(const TrackRef& track, const cydaw::base::Text& lane);
+    [[nodiscard]] curves::Lane curveLane(const TrackRef& track, const cydaw::base::Text& lane, const LaneScale& scale) const;
     [[nodiscard]] curves::View curveView() const;
-    [[nodiscard]] std::vector<curves::Point> laneCurve(const TrackRef& track, const juce::String& lane) const;
-    void setLaneCurve(const TrackRef& track, const juce::String& lane, const std::vector<curves::Point>& points);
+    [[nodiscard]] std::vector<curves::Point> laneCurve(const TrackRef& track, const cydaw::base::Text& lane) const;
+    void setLaneCurve(const TrackRef& track, const cydaw::base::Text& lane, const std::vector<curves::Point>& points);
     void drawCurveBar();
     void unfocusCurves();
     // Where the lane's name is drawn, a button that chooses the lane.
@@ -187,16 +188,16 @@ private:
         double fetchedAt { -1.0e9 };
         std::vector<app::IsolatedPluginHost::ParameterSnapshot> values;
     };
-    mutable std::map<juce::String, PluginParameters> pluginParameters_;
+    mutable std::map<cydaw::base::Text, PluginParameters> pluginParameters_;
     const std::vector<app::IsolatedPluginHost::ParameterSnapshot>& pluginParameters(std::size_t trackIndex,
                                                                                    std::size_t plugin, bool refresh) const;
     // Automation editing: each lane's curve editor (by curveKey), the one
     // last clicked (it has the keys), whether the canvas has the pointer,
     // and a lane whose chooser its menu asked for.
-    std::map<juce::String, curves::Editor> curveEditors_;
-    juce::String focusedCurve_;
+    std::map<cydaw::base::Text, curves::Editor> curveEditors_;
+    cydaw::base::Text focusedCurve_;
     std::optional<TrackRef> focusedCurveTrack_;
-    juce::String focusedCurveLane_;
+    cydaw::base::Text focusedCurveLane_;
     bool canvasHovered_ {};
     std::optional<TrackRef> chooseLaneFor_;
     std::vector<AutomationEdit> automationUndo_;

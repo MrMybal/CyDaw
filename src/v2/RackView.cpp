@@ -1,3 +1,5 @@
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #include "RackView.h"
 
 #include "Icons.h"
@@ -29,10 +31,10 @@ constexpr int kRows = 4;
 
 std::unique_ptr<juce::FileChooser> chooser;
 
-juce::String noteName(const int note)
+cydaw::base::Text noteName(const int note)
 {
     static const char* names[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
-    return juce::String(names[((note % 12) + 12) % 12]) + juce::String(note / 12 - 1);
+    return cydaw::base::Text(names[((note % 12) + 12) % 12]) + cydaw::base::Text(note / 12 - 1);
 }
 
 // What each track's card shows: the drum machine's chosen pad and lowest
@@ -58,14 +60,14 @@ std::map<std::uint64_t, std::size_t>& chosenLayers()
 // A selector's card: its settings by their keys (their bindings and values).
 struct SelectorCard {
     app::NodeGraphComponent* graph {};
-    std::map<juce::String, std::pair<juce::String, float>> values;
+    std::map<cydaw::base::Text, std::pair<cydaw::base::Text, float>> values;
 
-    [[nodiscard]] float value(const juce::String& key, const float fallback) const
+    [[nodiscard]] float value(const cydaw::base::Text& key, const float fallback) const
     {
         const auto found = values.find(key);
         return found != values.end() ? found->second.second : fallback;
     }
-    void set(const juce::String& key, const double to) const
+    void set(const cydaw::base::Text& key, const double to) const
     {
         if (const auto found = values.find(key); found != values.end() && graph != nullptr)
             (void) graph->editorSetParameter(found->second.first, to);
@@ -96,7 +98,7 @@ float RackView::paneWidth()
     return dp(450.0f);
 }
 
-void RackView::report(const juce::String& error)
+void RackView::report(const cydaw::base::Text& error)
 {
     if (error.isEmpty())
         return;
@@ -105,17 +107,17 @@ void RackView::report(const juce::String& error)
     state_.statusTime = ImGui::GetTime();
 }
 
-juce::String RackView::instrumentItems(Studio& studio, const juce::String& current)
+cydaw::base::Text RackView::instrumentItems(Studio& studio, const cydaw::base::Text& current)
 {
     // Inside a module: English, whatever the language.
     const ui::ModuleText english;
-    juce::String chosen;
+    cydaw::base::Text chosen;
     const auto choices = studio.instrumentChoices();
     for (const auto& choice : choices)
         if (choice.category.isEmpty() && ImGui::MenuItem(choice.name.toRawUTF8(), nullptr, choice.key == current))
             chosen = choice.key;
     // The factory's sampled instruments, by their category.
-    std::vector<juce::String> categories;
+    std::vector<cydaw::base::Text> categories;
     for (const auto& choice : choices)
         if (choice.category.isNotEmpty() && std::find(categories.begin(), categories.end(), choice.category) == categories.end())
             categories.push_back(choice.category);
@@ -146,7 +148,7 @@ juce::String RackView::instrumentItems(Studio& studio, const juce::String& curre
 }
 
 bool RackView::instrumentMenu(Studio& studio, const TrackRef& track, const int note, const std::optional<std::size_t> pad,
-                              juce::String& error)
+                              cydaw::base::Text& error)
 {
     const auto chosen = instrumentItems(studio);
     if (chosen.isEmpty())
@@ -160,16 +162,16 @@ bool RackView::instrumentMenu(Studio& studio, const TrackRef& track, const int n
 
 void RackView::chooseSample(const TrackRef& track, const int note)
 {
-    chooser = std::make_unique<juce::FileChooser>(L("Un son pour ce pad", "A sound for this pad"), juce::File(),
+    chooser = std::make_unique<juce::FileChooser>(L("Un son pour ce pad", "A sound for this pad"), cydaw::base::File(),
                                                   "*.wav;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
     auto* studio = &studio_;
     auto* state = &state_;
     chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                          [studio, state, track, note](const juce::FileChooser& picked) {
                              const auto file = picked.getResult();
-                             if (file == juce::File())
+                             if (file == cydaw::base::File())
                                  return;
-                             juce::String error;
+                             cydaw::base::Text error;
                              if (!studio->loadRackPadSample(track, note, file, error)) {
                                  state->status = error;
                                  state->statusIsError = true;
@@ -213,7 +215,7 @@ void RackView::drawDrums(const TrackRef& track, const ImVec2 at, const ImVec2 si
     const auto cell = std::min((size.x - controlsWidth - stripWidth - dp(20.0f)) / static_cast<float>(kColumns),
                                (size.y - dp(8.0f)) / static_cast<float>(kRows));
     const ImVec2 gridAt(at.x + dp(4.0f), at.y + dp(4.0f));
-    juce::String error;
+    cydaw::base::Text error;
     auto gridHovered = false;
     for (int row = 0; row < kRows; ++row)
         for (int column = 0; column < kColumns; ++column) {
@@ -243,7 +245,7 @@ void RackView::drawDrums(const TrackRef& track, const ImVec2 at, const ImVec2 si
             // A sound dropped onto it (from the browser or the explorer).
             if (ImGui::BeginDragDropTarget()) {
                 if (const auto* payload = ImGui::AcceptDragDropPayload(kFilePayload); payload != nullptr && payload->DataSize > 1) {
-                    if (!studio_.loadRackPadSample(track, note, juce::File(juce::String::fromUTF8(static_cast<const char*>(payload->Data))), error))
+                    if (!studio_.loadRackPadSample(track, note, cydaw::base::File(cydaw::base::Text::fromUTF8(static_cast<const char*>(payload->Data))), error))
                         report(error);
                     chosen = note;
                 }
@@ -266,7 +268,7 @@ void RackView::drawDrums(const TrackRef& track, const ImVec2 at, const ImVec2 si
                                   state->solo ? "S" : "M");
                 if (state->choke > 0)
                     list->AddText(ImVec2(min.x + dp(4.0f), max.y - ImGui::GetFontSize() - dp(2.0f)), p.textFaint,
-                                  (juce::String("C") + juce::String(state->choke)).toRawUTF8());
+                                  (cydaw::base::Text("C") + cydaw::base::Text(state->choke)).toRawUTF8());
                 ImGui::PopFont();
             } else {
                 ui::centredText(list, min, max, p.textFaint, "+");
@@ -377,7 +379,7 @@ void RackView::drawDrums(const TrackRef& track, const ImVec2 at, const ImVec2 si
         if (ImGui::Button("A sound\xe2\x80\xa6"))
             chooseSample(track, chosen);
         if (ImGui::BeginPopup("##emptyMenu")) {
-            juce::String menuError;
+            cydaw::base::Text menuError;
             (void) instrumentMenu(studio_, track, chosen, std::nullopt, menuError);
             report(menuError);
             ImGui::EndPopup();
@@ -402,7 +404,7 @@ void RackView::drawPadControls(const TrackRef& track, const std::size_t pad, con
     auto* list = ImGui::GetWindowDrawList();
     list->PushClipRect(at, ImVec2(at.x + width, at.y + dp(30.0f)), true);
     list->AddText(at, p.text, state->name.toRawUTF8());
-    const auto key = juce::String("key ") + noteName(state->note);
+    const auto key = cydaw::base::Text("key ") + noteName(state->note);
     list->AddText(ImVec2(at.x, at.y + ImGui::GetFontSize() + dp(2.0f)), p.textFaint, key.toRawUTF8());
     list->PopClipRect();
     y += ImGui::GetFontSize() * 2.0f + dp(6.0f);
@@ -447,10 +449,10 @@ void RackView::drawPadControls(const TrackRef& track, const std::size_t pad, con
     // Its choke group.
     ImGui::SetCursorScreenPos(ImVec2(at.x, y));
     ImGui::SetNextItemWidth(width);
-    const auto chokeLabel = mix.choke == 0 ? juce::String("No choke") : juce::String("Chokes group ") + juce::String(mix.choke);
+    const auto chokeLabel = mix.choke == 0 ? cydaw::base::Text("No choke") : cydaw::base::Text("Chokes group ") + cydaw::base::Text(mix.choke);
     if (ImGui::BeginCombo("##choke", chokeLabel.toRawUTF8())) {
         for (int group = 0; group <= 4; ++group) {
-            const auto label = group == 0 ? juce::String("No choke") : juce::String("Group ") + juce::String(group);
+            const auto label = group == 0 ? cydaw::base::Text("No choke") : cydaw::base::Text("Group ") + cydaw::base::Text(group);
             if (ImGui::Selectable(label.toRawUTF8(), group == mix.choke)) {
                 mix.choke = group;
                 changed = true;
@@ -463,7 +465,7 @@ void RackView::drawPadControls(const TrackRef& track, const std::size_t pad, con
     // The note its instrument receives.
     ImGui::SetCursorScreenPos(ImVec2(at.x, y));
     ImGui::SetNextItemWidth(width);
-    const auto playsLabel = mix.playAs < 0 ? juce::String("Plays its key") : juce::String("Plays ") + noteName(mix.playAs);
+    const auto playsLabel = mix.playAs < 0 ? cydaw::base::Text("Plays its key") : cydaw::base::Text("Plays ") + noteName(mix.playAs);
     auto plays = mix.playAs < 0 ? state->note : mix.playAs;
     if (ImGui::DragInt("##plays", &plays, 0.15f, 0, 127, playsLabel.toRawUTF8())) {
         mix.playAs = plays == state->note ? -1 : plays;
@@ -654,10 +656,10 @@ void RackView::drawLayers(const TrackRef& track, const ImVec2 at, const ImVec2 s
     if (renameFor) {
         renaming_ = std::make_pair(studio_.routingKey(track), *renameFor);
         if (const auto* state = studio_.rackPad(track, *renameFor))
-            juce::String(state->name).copyToUTF8(renameBuffer_, sizeof(renameBuffer_));
+            cydaw::base::Text(state->name).copyToUTF8(renameBuffer_, sizeof(renameBuffer_));
         ImGui::OpenPopup("##renameLayer");
     }
-    juce::String error;
+    cydaw::base::Text error;
     if (ImGui::BeginPopup("##layerMenu")) {
         if (chosen < count) {
             if (const auto* state = studio_.rackPad(track, chosen)) {
@@ -671,7 +673,7 @@ void RackView::drawLayers(const TrackRef& track, const ImVec2 at, const ImVec2 s
                 }
                 if (ImGui::MenuItem("Rename\xe2\x80\xa6")) {
                     renaming_ = std::make_pair(studio_.routingKey(track), chosen);
-                    juce::String(state->name).copyToUTF8(renameBuffer_, sizeof(renameBuffer_));
+                    cydaw::base::Text(state->name).copyToUTF8(renameBuffer_, sizeof(renameBuffer_));
                     renameFor = chosen;
                 }
                 ImGui::Separator();
@@ -691,7 +693,7 @@ void RackView::drawLayers(const TrackRef& track, const ImVec2 at, const ImVec2 s
         if (done && renaming_ && renaming_->first == studio_.routingKey(track)) {
             if (const auto* state = studio_.rackPad(track, renaming_->second)) {
                 auto mix = Studio::mixOf(*state);
-                mix.name = juce::String::fromUTF8(renameBuffer_).trim();
+                mix.name = cydaw::base::Text::fromUTF8(renameBuffer_).trim();
                 (void) studio_.setRackPadMix(track, renaming_->second, mix);
             }
             renaming_.reset();
@@ -736,7 +738,7 @@ void RackView::drawLayerControls(const TrackRef& track, const std::size_t layer,
     auto y = at.y;
     auto* list = ImGui::GetWindowDrawList();
     list->PushClipRect(at, ImVec2(at.x + width, at.y + dp(18.0f)), true);
-    list->AddText(at, p.text, (juce::String("Layer ") + juce::String(static_cast<int>(layer) + 1) + juce::String::fromUTF8(" \xc2\xb7 ")
+    list->AddText(at, p.text, (cydaw::base::Text("Layer ") + cydaw::base::Text(static_cast<int>(layer) + 1) + cydaw::base::Text::fromUTF8(" \xc2\xb7 ")
                                + state->name).toRawUTF8());
     list->PopClipRect();
     y += ImGui::GetFontSize() + dp(5.0f);
@@ -750,7 +752,7 @@ void RackView::drawLayerControls(const TrackRef& track, const std::size_t layer,
         state_.openRackPad = std::make_pair(track.owner(), static_cast<int>(layer));
     ui::tooltip("Its instrument and effects, in the devices (back arrow to come back).");
     if (ImGui::BeginPopup("##instrument")) {
-        juce::String error;
+        cydaw::base::Text error;
         (void) instrumentMenu(studio_, track, 0, layer, error);
         report(error);
         ImGui::EndPopup();

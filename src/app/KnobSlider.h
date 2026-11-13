@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "Localization.h"
@@ -90,10 +91,10 @@ public:
 
     // What the ring says about itself: the depth in the knob's units, and
     // whether the sweep is turned over.
-    [[nodiscard]] juce::String modulationDepthReadout() const
+    [[nodiscard]] cydaw::base::Text modulationDepthReadout() const
     {
         auto text = tr("knob.modulationDepth", "depth",
-                       juce::String(std::abs(modulationDepth()),
+                       cydaw::base::Text(std::abs(modulationDepth()),
                                     getNumDecimalPlacesToDisplay())
                            + getTextValueSuffix());
         if (modulationInverted_)
@@ -330,7 +331,7 @@ private:
     bool draggingDepth_ {};
     double depthAtDragStart_ {};
     juce::Point<float> depthDragStart_;
-    juce::String baseTooltip_;
+    cydaw::base::Text baseTooltip_;
     std::unique_ptr<juce::BubbleMessageComponent> depthBubble_;
 };
 

@@ -1,3 +1,4 @@
+#include <cydaw/base/Properties.h>
 #include <cydaw/base/File.h>
 #pragma once
 #include <functional>
@@ -20,7 +21,7 @@ public:
     };
     using Read = std::function<State(int)>;
     using Apply = std::function<void(int, const Update&)>;
-    TransportSync(juce::PropertiesFile&, juce::AudioDeviceManager&, bool saveSettings, Read, Apply);
+    TransportSync(cydaw::base::PropertiesFile&, juce::AudioDeviceManager&, bool saveSettings, Read, Apply);
     ~TransportSync();
     void draw(bool& visible);
     void drawButton(bool& visible);
@@ -30,7 +31,7 @@ public:
     // does, in a line (empty: off).
     [[nodiscard]] std::uint64_t receivedCount() const;
     [[nodiscard]] std::uint64_t sentCount() const;
-    [[nodiscard]] juce::String statusText() const;
+    [[nodiscard]] cydaw::base::Text statusText() const;
 
 private:
     class Impl;

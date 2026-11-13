@@ -60,7 +60,7 @@ double evaluate(const cydaw::base::Value& state, const double timeSeconds)
 {
     struct ValueNode {
         std::uint64_t id {};
-        juce::String type;
+        cydaw::base::Text type;
         float rate { 1.0f };
         float depth { 1.0f };
         float offset {};
@@ -217,7 +217,7 @@ struct Field {
     }
 };
 
-std::optional<Field> fieldFor(const juce::String& suffix)
+std::optional<Field> fieldFor(const cydaw::base::Text& suffix)
 {
     using P = engine::NativeDspNodeParameters;
     if (suffix == "drive.db")
@@ -259,7 +259,7 @@ std::optional<Field> fieldFor(const juce::String& suffix)
 
 // node.<id>.<suffix>: the node and the field.
 template <typename Graph>
-auto resolve(Graph& graph, const juce::String& binding)
+auto resolve(Graph& graph, const cydaw::base::Text& binding)
     -> std::optional<std::pair<decltype(&graph.nodes.front().parameters), Field>>
 {
     if (!binding.startsWith("node."))
@@ -279,7 +279,7 @@ auto resolve(Graph& graph, const juce::String& binding)
 
 } // namespace
 
-std::optional<NativeTarget> nativeTargetFor(const juce::String& binding)
+std::optional<NativeTarget> nativeTargetFor(const cydaw::base::Text& binding)
 {
     if (!binding.startsWith("node."))
         return std::nullopt;
@@ -298,7 +298,7 @@ std::optional<NativeTarget> nativeTargetFor(const juce::String& binding)
     return target;
 }
 
-bool applyToNativeGraph(engine::NativeDspGraph& graph, const juce::String& binding, const double value)
+bool applyToNativeGraph(engine::NativeDspGraph& graph, const cydaw::base::Text& binding, const double value)
 {
     const auto found = resolve(graph, binding);
     if (!found)
@@ -308,7 +308,7 @@ bool applyToNativeGraph(engine::NativeDspGraph& graph, const juce::String& bindi
     return true;
 }
 
-std::optional<double> readFromNativeGraph(const engine::NativeDspGraph& graph, const juce::String& binding)
+std::optional<double> readFromNativeGraph(const engine::NativeDspGraph& graph, const cydaw::base::Text& binding)
 {
     const auto found = resolve(graph, binding);
     if (!found)

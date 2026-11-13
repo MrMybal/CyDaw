@@ -1,3 +1,4 @@
+#include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/File.h>
 #include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "DeviceOps.h"
@@ -17,9 +18,9 @@
 
 namespace cydaw::v2::device_ops {
 
-juce::String parameterKeyOf(const juce::String& binding, const std::uint64_t nodeId)
+cydaw::base::Text parameterKeyOf(const cydaw::base::Text& binding, const std::uint64_t nodeId)
 {
-    const auto prefix = "node." + juce::String(static_cast<juce::int64>(nodeId)) + ".";
+    const auto prefix = "node." + cydaw::base::Text(static_cast<juce::int64>(nodeId)) + ".";
     return binding.startsWith(prefix) ? binding.substring(prefix.length()) : binding;
 }
 
@@ -42,7 +43,7 @@ cydaw::base::Value presetState(const app::NodeGraphComponent& graph, const std::
         if (const auto controls = graph.editorSamplerControls(nodeId))
             for (std::size_t number = 0; number < controls->controllers.size(); ++number)
                 if (controls->controllers[number] >= 0.0f)
-                    knobs->setProperty("sampler.cc" + juce::String(static_cast<int>(number)), controls->controllers[number]);
+                    knobs->setProperty("sampler.cc" + cydaw::base::Text(static_cast<int>(number)), controls->controllers[number]);
         if (node.typeKey == "sound-model")
             if (const auto model = graph.nodeSoundModelJson(nodeId); model.isObject())
                 state->setProperty("soundModel", model);
@@ -60,7 +61,7 @@ cydaw::base::Value presetState(const app::NodeGraphComponent& graph, const std::
             // are not knobs.
             if (const auto values = graph.editorPrismValues(nodeId))
                 for (int index = 0; index < engine::prism::parameterCount; ++index)
-                    knobs->setProperty("prism." + juce::String(engine::prism::parameter(index).key),
+                    knobs->setProperty("prism." + cydaw::base::Text(engine::prism::parameter(index).key),
                                        (*values)[static_cast<std::size_t>(index)]);
         }
         if (node.typeKey == "cab-sim" || node.typeKey == "empreinte")
@@ -71,8 +72,8 @@ cydaw::base::Value presetState(const app::NodeGraphComponent& graph, const std::
     return {};
 }
 
-bool applyPreset(app::NodeGraphComponent& graph, const std::uint64_t nodeId, const cydaw::base::Value& state, juce::String& error,
-                 const std::function<bool(int kit, juce::String& error)>& setBatterieKit)
+bool applyPreset(app::NodeGraphComponent& graph, const std::uint64_t nodeId, const cydaw::base::Value& state, cydaw::base::Text& error,
+                 const std::function<bool(int kit, cydaw::base::Text& error)>& setBatterieKit)
 {
     const auto nodes = graph.editorNodes();
     const auto node = std::ranges::find_if(nodes, [nodeId](const auto& item) { return item.id == nodeId; });
@@ -129,10 +130,10 @@ bool applyPreset(app::NodeGraphComponent& graph, const std::uint64_t nodeId, con
     // place: those the preset sets, the others where the map starts them.
     if (graph.editorSamplerControls(nodeId))
         if (const auto* knobs = state.getProperty("parameters", {}).getDynamicObject()) {
-            const auto prefix = "node." + juce::String(static_cast<juce::int64>(nodeId)) + ".sampler.cc";
+            const auto prefix = "node." + cydaw::base::Text(static_cast<juce::int64>(nodeId)) + ".sampler.cc";
             for (int number = 0; number < 128; ++number) {
-                const auto key = cydaw::base::Identifier("sampler.cc" + juce::String(number));
-                (void) graph.editorSetParameter(prefix + juce::String(number),
+                const auto key = cydaw::base::Identifier("sampler.cc" + cydaw::base::Text(number));
+                (void) graph.editorSetParameter(prefix + cydaw::base::Text(number),
                                                 knobs->hasProperty(key) ? static_cast<double>(knobs->getProperty(key)) : -1.0);
             }
         }
@@ -141,13 +142,13 @@ bool applyPreset(app::NodeGraphComponent& graph, const std::uint64_t nodeId, con
     // sound stays: its third oscillator, its spectral morphs).
     if (node->typeKey == "prism-synth")
         if (const auto* knobs = state.getProperty("parameters", {}).getDynamicObject()) {
-            const auto prefix = "node." + juce::String(static_cast<juce::int64>(nodeId)) + ".prism.";
+            const auto prefix = "node." + cydaw::base::Text(static_cast<juce::int64>(nodeId)) + ".prism.";
             for (int index = 0; index < engine::prism::parameterCount; ++index) {
                 const auto& setting = engine::prism::parameter(index);
-                const auto key = cydaw::base::Identifier("prism." + juce::String(setting.key));
+                const auto key = cydaw::base::Identifier("prism." + cydaw::base::Text(setting.key));
                 const auto value = knobs->hasProperty(key) ? static_cast<double>(knobs->getProperty(key))
                                                            : static_cast<double>(setting.defaultValue);
-                (void) graph.editorSetParameter(prefix + juce::String(setting.key),
+                (void) graph.editorSetParameter(prefix + cydaw::base::Text(setting.key),
                                                 engine::prism::clampValue(index, static_cast<float>(value)));
             }
         }
@@ -166,7 +167,7 @@ namespace {
 
 // The cycle a wavetable file says it is made of: Serum's "clm " chunk
 // ("<!>2048 …"), 0 without one.
-int declaredCycleLength(const juce::File& file)
+int declaredCycleLength(const cydaw::base::File& file)
 {
     juce::FileInputStream input(file);
     if (!input.openedOk())
@@ -253,16 +254,16 @@ std::vector<float> cycleAt(const std::vector<float>& mono, const double start, c
 
 } // namespace
 
-bool importPrismTable(app::NodeGraphComponent& graph, const std::uint64_t nodeId, const int oscillator, const juce::File& file,
-                      juce::String& error)
+bool importPrismTable(app::NodeGraphComponent& graph, const std::uint64_t nodeId, const int oscillator, const cydaw::base::File& file,
+                      cydaw::base::Text& error)
 {
     if (!graph.editorPrismValues(nodeId)) {
         error = ui::Ls("Pas de carte Prisme ici", "No Prisme card here");
         return false;
     }
-    juce::AudioFormatManager formats;
+    cydaw::audio::AudioFormatManager formats;
     cydaw::integration::registerCyAudioCoreReaders(formats);
-    const std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
+    const std::unique_ptr<cydaw::audio::AudioFormatReader> reader(formats.createReaderFor(file));
     if (reader == nullptr || reader->lengthInSamples < 16 || reader->numChannels == 0) {
         error = ui::Ls("Ce fichier ne se lit pas comme un son : ", "This file does not read as a sound: ") + file.getFileName();
         return false;
@@ -335,15 +336,15 @@ bool clearPrismTable(app::NodeGraphComponent& graph, const std::uint64_t nodeId,
     const auto tables = graph.nodePrismTablesJson(nodeId);
     if (!tables.isObject())
         return false;
-    juce::String error;
+    cydaw::base::Text error;
     return graph.setNodePrismTables(nodeId, app::withPrismTable(tables, oscillator, {}), error);
 }
 
-bool loadImpulse(app::NodeGraphComponent& graph, const std::uint64_t nodeId, const juce::File& file, juce::String& error)
+bool loadImpulse(app::NodeGraphComponent& graph, const std::uint64_t nodeId, const cydaw::base::File& file, cydaw::base::Text& error)
 {
-    juce::AudioFormatManager formats;
+    cydaw::audio::AudioFormatManager formats;
     cydaw::integration::registerCyAudioCoreReaders(formats);
-    const std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
+    const std::unique_ptr<cydaw::audio::AudioFormatReader> reader(formats.createReaderFor(file));
     if (reader == nullptr || reader->lengthInSamples < 4 || reader->numChannels == 0 || reader->sampleRate <= 0.0) {
         error = ui::Ls("Ce fichier ne se lit pas comme un son : ", "This file does not read as a sound: ") + file.getFileName();
         return false;

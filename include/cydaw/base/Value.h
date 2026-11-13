@@ -6,7 +6,7 @@
 namespace cydaw::base {
 template<class T> class Array:public std::vector<T>{
 public:
-    using std::vector<T>::vector;
+    using std::vector<T>::vector;Array()=default;template<class A>requires(!std::is_same_v<std::remove_cvref_t<A>,Array>&&requires(const A& a){a.begin();a.end();})Array(const A& a){for(auto& item:a)this->push_back(T(item));}
     int size()const noexcept{return int(std::vector<T>::size());}bool isEmpty()const noexcept{return this->empty();}
     void add(T value){this->push_back(std::move(value));}template<class... U>void add(T value,U... rest){add(std::move(value));(add(std::move(rest)),...);}
     void addArray(const Array& values){std::vector<T>::insert(this->end(),values.begin(),values.end());}
@@ -21,6 +21,7 @@ public:
     void remove(int i){if(i>=0&&i<size())this->erase(this->begin()+i);}void removeRange(int first,int count){first=std::clamp(first,0,size());this->erase(this->begin()+first,this->begin()+std::min(size(),first+std::max(0,count)));}
     int removeAllInstancesOf(const T& value){return int(std::erase(*this,value));}
     void removeLast(int count=1){this->resize(std::size_t(std::max(0,size()-count)));}
+    void sort(){std::sort(this->begin(),this->end());}
     void clearQuick(){this->clear();}void ensureStorageAllocated(int n){this->reserve(std::size_t(std::max(0,n)));}void minimiseStorageOverheads(){this->shrink_to_fit();}
     void swapWith(Array& other)noexcept{this->swap(other);}void move(int from,int to){if(from<0||from>=size())return;auto item=std::move((*this)[from]);remove(from);insert(to,std::move(item));}
 };

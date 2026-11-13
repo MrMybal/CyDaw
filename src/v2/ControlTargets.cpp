@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #include "ControlTargets.h"
 
 #include "Studio.h"
@@ -11,10 +12,10 @@ namespace {
 
 using Kind = ControlTargets::Kind;
 
-// " · " between two names, as a juce::String (inline text is UTF-8).
-juce::String middleDot()
+// " · " between two names, as a cydaw::base::Text (inline text is UTF-8).
+cydaw::base::Text middleDot()
 {
-    return juce::String::fromUTF8(" \xc2\xb7 ");
+    return cydaw::base::Text::fromUTF8(" \xc2\xb7 ");
 }
 
 // "track/12/volume" into its parts (a binding keeps its dots).
@@ -61,7 +62,7 @@ int deckIndex(const std::string& letter)
 
 struct FoundParameter {
     app::NodeGraphComponent::EditorParameter parameter;
-    juce::String card;
+    cydaw::base::Text card;
 };
 
 std::optional<FoundParameter> findParameter(const GraphSlot& slot, const std::string& binding)
@@ -107,7 +108,7 @@ std::string forMaster(const char* what)
     return std::string("master/") + what;
 }
 
-std::string forParameter(const std::uint64_t trackKey, const juce::String& binding)
+std::string forParameter(const std::uint64_t trackKey, const cydaw::base::Text& binding)
 {
     return "param/" + (trackKey == 0 ? std::string("master") : std::to_string(trackKey)) + "/" + binding.toStdString();
 }
@@ -127,7 +128,7 @@ std::string forDj(const char* what)
     return std::string("dj/") + what;
 }
 
-std::pair<std::string, std::string> forTrackLearn(const Studio& studio, const TrackRef& track, const char* what, const juce::String& label)
+std::pair<std::string, std::string> forTrackLearn(const Studio& studio, const TrackRef& track, const char* what, const cydaw::base::Text& label)
 {
     if (track.bus != 0 || track.pad >= 0)
         return {};
@@ -181,9 +182,9 @@ std::optional<ControlTargets::Info> ControlTargets::describe(const std::string& 
     if ((p[0] == "track" && p.size() == 3) || (p[0] == "master" && p.size() == 2)) {
         const auto& what = p.back();
         const auto master = p[0] == "master";
-        juce::String name = master ? juce::String("Master")
+        cydaw::base::Text name = master ? cydaw::base::Text("Master")
                             : p[1] == "selected" ? ui::Ls("Piste sélectionnée", "Selected track")
-                                                 : juce::String();
+                                                 : cydaw::base::Text();
         if (!master && p[1] != "selected") {
             const auto track = trackOf(p[1]);
             if (!track)
@@ -208,7 +209,7 @@ std::optional<ControlTargets::Info> ControlTargets::describe(const std::string& 
         const auto found = slot != nullptr ? findParameter(*slot, p[2]) : std::nullopt;
         if (!found)
             return std::nullopt;
-        info.label = studio_.trackName(*track) + middleDot() + (found->card.isNotEmpty() ? found->card + middleDot() : juce::String())
+        info.label = studio_.trackName(*track) + middleDot() + (found->card.isNotEmpty() ? found->card + middleDot() : cydaw::base::Text())
                      + found->parameter.label;
         info.project = !track->master;
         return info;
@@ -223,7 +224,7 @@ std::optional<ControlTargets::Info> ControlTargets::describe(const std::string& 
         if (p.size() != 3 || deckIndex(p[1]) < 0)
             return std::nullopt;
         const auto& what = p[2];
-        juce::String label;
+        cydaw::base::Text label;
         if (what == "play") { label = ui::Ls("Lecture", "Play"); info.kind = Kind::toggle; }
         else if (what == "cue") { label = "CUE"; info.kind = Kind::hold; }
         else if (what == "sync") { label = "SYNC"; info.kind = Kind::toggle; }
@@ -238,7 +239,7 @@ std::optional<ControlTargets::Info> ControlTargets::describe(const std::string& 
         else if (what == "killLow") { label = "Kill LOW"; info.kind = Kind::toggle; }
         else if (what == "pfl") { label = ui::Ls("Pré-écoute", "Cue (headphones)"); info.kind = Kind::toggle; }
         else return std::nullopt;
-        info.label = "DJ " + juce::String(deckLetter(deckIndex(p[1]))) + middleDot() + label;
+        info.label = "DJ " + cydaw::base::Text(deckLetter(deckIndex(p[1]))) + middleDot() + label;
         return info;
     }
     return std::nullopt;

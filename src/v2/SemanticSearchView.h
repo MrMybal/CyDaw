@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "Studio.h"
@@ -29,17 +30,17 @@ private:
     void drawModel(const AiModel& model);
     void drawIndex();
     void drawConfirm();
-    void report(const juce::String& text, bool error);
+    void report(const cydaw::base::Text& text, bool error);
 
     Studio& studio_;
     UiState& state_;
     bool shown_ {};
     char python_[512] {};
     // The model the confirmation is about, and the licence ticked for it.
-    juce::String confirming_;
-    juce::String accepted_;
+    cydaw::base::Text confirming_;
+    cydaw::base::Text accepted_;
     // The engine's install, confirmed: "cpu" or "cuda".
-    juce::String engineInstall_;
+    cydaw::base::Text engineInstall_;
     bool openConfirm_ {};
     // The NVIDIA build's licences (CUDA, cuDNN) accepted in the confirmation.
     bool engineLicencesAccepted_ {};

@@ -33,7 +33,7 @@ class ModeProcessing final : public app::ModeProcessor
     void processFoundry(const engine::foundry::Session &, double at, double step, float *, float *, int frames) override;
     void syncFoundry(const engine::foundry::Session &session);
     bool copyMixTo(engine::foundry::Session &session);
-    void ensureInput(std::uint64_t id, const juce::String &name, bool midi = false, bool bus = false);
+    void ensureInput(std::uint64_t id, const cydaw::base::Text &name, bool midi = false, bool bus = false);
     struct Parameter
     {
         std::string binding, label;
@@ -51,7 +51,7 @@ class ModeProcessing final : public app::ModeProcessor
         state_.bringToFront = Panel::none;
     }
     void chooseInstrument(std::uint64_t id);
-    cydaw::base::Result loadSample(std::uint64_t id, const juce::File &file);
+    cydaw::base::Result loadSample(std::uint64_t id, const cydaw::base::File &file);
     void selectInput(std::uint64_t id);
     bool routeInput(std::uint64_t id, std::uint64_t destinationId);
     void showPanel(int panel) { requestedEditorFrames_=0;panel_=std::clamp(panel,0,5);selectPanel_=true;state_.bringToFront=Panel::none; }

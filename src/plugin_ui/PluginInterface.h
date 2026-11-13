@@ -41,7 +41,7 @@ public:
     // `instrument`: it plays notes (its graph starts at a MIDI input).
     // `changed`: its graph edited (`structural`: cards or cables, else
     // settings), to compile and hand to the processor.
-    PluginInterface(const juce::String& productName, bool instrument, PluginSound sound, std::function<void(bool structural)> changed);
+    PluginInterface(const cydaw::base::Text& productName, bool instrument, PluginSound sound, std::function<void(bool structural)> changed);
     ~PluginInterface() override;
 
     [[nodiscard]] app::NodeGraphComponent& graph();
@@ -53,7 +53,7 @@ public:
 
     void resized() override;
     // The next frame written as a PNG (tests, without the screen).
-    void captureNextFrame(const juce::File& target, std::function<void(bool)> done);
+    void captureNextFrame(const cydaw::base::File& target, std::function<void(bool)> done);
 
 private:
     struct Impl;

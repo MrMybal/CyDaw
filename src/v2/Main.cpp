@@ -26,7 +26,7 @@ namespace {
 // Probes: --snapshot=<png> renders the window into a PNG after
 // --snapshot-delay=<ms> (default 1500), then quits when --quit is given.
 struct LaunchOptions {
-    juce::File snapshot;
+    cydaw::base::File snapshot;
     int snapshotDelayMs { 1'500 };
     bool quitAfterSnapshot {};
     bool silent {};
@@ -36,29 +36,29 @@ struct LaunchOptions {
     bool visible {};
     int width { 1'600 };
     int height { 960 };
-    juce::String language;
-    juce::File project;
+    cydaw::base::Text language;
+    cydaw::base::File project;
     bool demo {};
     int view {};
     int track { -1 };
-    juce::File dumpGraphs;
-    juce::File saveAs;
+    cydaw::base::File dumpGraphs;
+    cydaw::base::File saveAs;
     bool audioSettings {};
-    juce::File roundTrip;
-    juce::File modulationTest;
-    juce::File displayTest;
+    cydaw::base::File roundTrip;
+    cydaw::base::File modulationTest;
+    cydaw::base::File displayTest;
     bool effectsTest {};
     int controlPort { 47'820 };
     int detach {};
 };
 
-LaunchOptions parseOptions(const juce::String& commandLine)
+LaunchOptions parseOptions(const cydaw::base::Text& commandLine)
 {
     LaunchOptions options;
-    for (const auto& argument : juce::StringArray::fromTokens(commandLine, true)) {
+    for (const auto& argument : cydaw::base::TextList::fromTokens(commandLine, true)) {
         const auto value = argument.unquoted();
         if (value.startsWith("--snapshot="))
-            options.snapshot = juce::File(value.fromFirstOccurrenceOf("=", false, false).unquoted());
+            options.snapshot = cydaw::base::File(value.fromFirstOccurrenceOf("=", false, false).unquoted());
         else if (value.startsWith("--snapshot-delay="))
             options.snapshotDelayMs = value.fromFirstOccurrenceOf("=", false, false).getIntValue();
         else if (value == "--quit")
@@ -80,13 +80,13 @@ LaunchOptions parseOptions(const juce::String& commandLine)
         else if (value.startsWith("--view="))
             options.view = value.fromFirstOccurrenceOf("=", false, false).getIntValue();
         else if (value.startsWith("--roundtrip-test="))
-            options.roundTrip = juce::File(value.fromFirstOccurrenceOf("=", false, false).unquoted());
+            options.roundTrip = cydaw::base::File(value.fromFirstOccurrenceOf("=", false, false).unquoted());
         else if (value == "--effects-test")
             options.effectsTest = true;
         else if (value.startsWith("--display-test="))
-            options.displayTest = juce::File(value.fromFirstOccurrenceOf("=", false, false).unquoted());
+            options.displayTest = cydaw::base::File(value.fromFirstOccurrenceOf("=", false, false).unquoted());
         else if (value.startsWith("--modulation-test="))
-            options.modulationTest = juce::File(value.fromFirstOccurrenceOf("=", false, false).unquoted());
+            options.modulationTest = cydaw::base::File(value.fromFirstOccurrenceOf("=", false, false).unquoted());
         else if (value.startsWith("--detach="))
             options.detach = value.fromFirstOccurrenceOf("=", false, false).getIntValue();
         else if (value.startsWith("--control-port="))
@@ -94,13 +94,13 @@ LaunchOptions parseOptions(const juce::String& commandLine)
         else if (value == "--audio-settings")
             options.audioSettings = true;
         else if (value.startsWith("--save-as="))
-            options.saveAs = juce::File(value.fromFirstOccurrenceOf("=", false, false).unquoted());
+            options.saveAs = cydaw::base::File(value.fromFirstOccurrenceOf("=", false, false).unquoted());
         else if (value.startsWith("--dump-graphs="))
-            options.dumpGraphs = juce::File(value.fromFirstOccurrenceOf("=", false, false).unquoted());
+            options.dumpGraphs = cydaw::base::File(value.fromFirstOccurrenceOf("=", false, false).unquoted());
         else if (value.startsWith("--track="))
             options.track = value.fromFirstOccurrenceOf("=", false, false).getIntValue();
-        else if (!value.startsWith("--") && juce::File::isAbsolutePath(value) && juce::File(value).existsAsFile())
-            options.project = juce::File(value);
+        else if (!value.startsWith("--") && cydaw::base::File::isAbsolutePath(value) && cydaw::base::File(value).existsAsFile())
+            options.project = cydaw::base::File(value);
     }
     // A silent session is an automated one (tests, probes, builders): out of
     // sight too, unless asked for.
@@ -117,7 +117,7 @@ public:
         host_.onInitialised = [this] { ui_.initialise(); };
         host_.onFrame = [this] { ui_.frame(); };
         host_.beforeNewFrame = [this] { ui_.beforeNewFrame(); };
-        host_.onFilesDropped = [this](const juce::StringArray& files, const float x, const float y) {
+        host_.onFilesDropped = [this](const cydaw::base::TextList& files, const float x, const float y) {
             ui_.filesDropped(files, x, y);
         };
         setSize(1'600, 960);
@@ -151,7 +151,7 @@ public:
         centreWithSize(options.width, options.height);
         content->ui().onQuit = [] { juce::JUCEApplication::getInstance()->systemRequestedQuit(); };
         content->ui().onQuitNow = [] { juce::JUCEApplicationBase::quit(); };
-        content->ui().onTitle = [this](const juce::String& title) { setName(title); };
+        content->ui().onTitle = [this](const cydaw::base::Text& title) { setName(title); };
         if (hidden_) {
             // Off the screens before it is ever shown: nothing comes forward.
             content->host().background = true;
@@ -196,9 +196,9 @@ private:
 } // namespace
 
 // Probes: every track's graph as text — cards, positions, sockets, knobs.
-juce::String describeSession(Studio& studio)
+cydaw::base::Text describeSession(Studio& studio)
 {
-    juce::String out;
+    cydaw::base::Text out;
     auto& engine = studio.engine();
     out << "tempo " << engine.tempo() << " master " << engine.masterGainDb() << " loop " << (studio.loopEnabled() ? 1 : 0)
         << " " << engine.loopStart() << " " << engine.loopEnd() << "\n";
@@ -206,7 +206,7 @@ juce::String describeSession(Studio& studio)
         out << "== " << studio.trackName(track) << (track.midi ? " (midi)" : " (audio)") << "\n";
         const auto mix = studio.trackMix(track);
         out << "  mix " << mix.gainDb << " " << mix.pan << " " << (mix.muted ? 1 : 0) << (mix.solo ? 1 : 0) << " colour "
-            << juce::String::toHexString(static_cast<juce::int64>(studio.trackColour(track))) << "\n";
+            << cydaw::base::Text::toHexString(static_cast<juce::int64>(studio.trackColour(track))) << "\n";
         if (track.midi) {
             if (const auto* clips = engine.midiClipsView(track.midiId))
                 for (const auto& clip : *clips) {
@@ -234,13 +234,13 @@ juce::String describeSession(Studio& studio)
                 out << "  wire " << static_cast<juce::int64>(connection.source) << ":" << static_cast<juce::int64>(connection.sourcePort)
                     << " -> " << static_cast<juce::int64>(connection.destination) << ":"
                     << static_cast<juce::int64>(connection.destinationPort) << " kind " << connection.kind << "\n";
-            out << "  compile: " << (slot->lastCompileError().isEmpty() ? juce::String("ok") : slot->lastCompileError()) << "\n";
+            out << "  compile: " << (slot->lastCompileError().isEmpty() ? cydaw::base::Text("ok") : slot->lastCompileError()) << "\n";
         }
     }
     return out;
 }
 
-void dumpGraphs(Studio& studio, const juce::File& file)
+void dumpGraphs(Studio& studio, const cydaw::base::File& file)
 {
     auto text = describeSession(studio);
     // The compiled graphs too: which engine node stands for which card.
@@ -250,24 +250,24 @@ void dumpGraphs(Studio& studio, const juce::File& file)
             continue;
         text << "\n== " << studio.trackName(track) << (track.midi ? " (midi)" : " (audio)") << "\n  cards:";
         for (const auto& node : slot->graph().editorNodes())
-            text << " " << juce::String(static_cast<juce::int64>(node.id)) << ":" << node.typeKey
+            text << " " << cydaw::base::Text(static_cast<juce::int64>(node.id)) << ":" << node.typeKey
                  << (node.composite ? "*" : "");
         const auto native = slot->graph().nativeDspGraph();
         text << "\n  native:";
         for (const auto& node : native.nodes)
-            text << " " << juce::String(static_cast<juce::int64>(node.id)) << ":" << static_cast<int>(node.kind);
+            text << " " << cydaw::base::Text(static_cast<juce::int64>(node.id)) << ":" << static_cast<int>(node.kind);
         text << "\n  wires:";
         for (const auto& connection : native.connections)
-            text << " " << juce::String(static_cast<juce::int64>(connection.source)) << ">"
-                 << juce::String(static_cast<juce::int64>(connection.destination));
-        text << "\n  out: " << juce::String(static_cast<juce::int64>(native.outputNodeId)) << "\n";
+            text << " " << cydaw::base::Text(static_cast<juce::int64>(connection.source)) << ">"
+                 << cydaw::base::Text(static_cast<juce::int64>(connection.destination));
+        text << "\n  out: " << cydaw::base::Text(static_cast<juce::int64>(native.outputNodeId)) << "\n";
     }
     file.replaceWithText(text);
 }
 
 // Loads a project, saves it, loads the saved file into a fresh session and
 // compares the two. Empty when they match.
-juce::String roundTrip(const juce::File& project)
+cydaw::base::Text roundTrip(const cydaw::base::File& project)
 {
     Studio first;
     if (const auto loaded = first.loadProject(project); loaded.failed())
@@ -277,7 +277,7 @@ juce::String roundTrip(const juce::File& project)
         return "a graph does not compile:\n" + before;
     // In the temporary folder: the audio paths are written so they resolve
     // from there, as a "save as" elsewhere would.
-    const auto copy = juce::File::getSpecialLocation(juce::File::tempDirectory)
+    const auto copy = cydaw::base::File::getSpecialLocation(cydaw::base::File::tempDirectory)
                           .getChildFile(project.getFileNameWithoutExtension() + ".v2-roundtrip.cydaw");
     if (const auto saved = first.saveProject(copy); saved.failed())
         return "save: " + saved.getErrorMessage();
@@ -296,7 +296,7 @@ juce::String roundTrip(const juce::File& project)
 // sine LFO at half amount: the engine's value must swing either side of the
 // playhead's quarter and three-quarter second, and come back to the graph's
 // value once the modulation is off. Empty when it all holds.
-juce::String modulationTest(const juce::File& project)
+cydaw::base::Text modulationTest(const cydaw::base::File& project)
 {
     Studio studio;
     // tick() would write an automatic copy of this throwaway session.
@@ -305,7 +305,7 @@ juce::String modulationTest(const juce::File& project)
         return "load: " + loaded.getErrorMessage();
     auto& engine = studio.engine();
     auto checked = 0;
-    juce::StringArray report;
+    cydaw::base::TextList report;
     for (std::size_t index = 0; index < engine.trackCount(); ++index) {
         const TrackRef track { false, index, 0 };
         const auto graph = engine.nativeDspGraph(index);
@@ -318,8 +318,8 @@ juce::String modulationTest(const juce::File& project)
                 const auto turned = target.minimum + (target.maximum - target.minimum) * 0.37;
                 (void) slot->graph().editorSetParameter(target.binding, turned);
                 const auto heard = modulation::readFromNativeGraph(engine.nativeDspGraph(index), target.binding);
-                report.add(studio.trackName(track) + " " + target.binding + ": knob " + juce::String(turned) + " -> engine "
-                           + juce::String(heard.value_or(-1.0e9)));
+                report.add(studio.trackName(track) + " " + target.binding + ": knob " + cydaw::base::Text(turned) + " -> engine "
+                           + cydaw::base::Text(heard.value_or(-1.0e9)));
                 if (!heard || std::abs(*heard - turned) > 1.0e-3 * std::max(1.0, std::abs(turned)))
                     return "a knob change does not reach the engine\n" + report.joinIntoString("\n");
                 base = heard;
@@ -335,8 +335,8 @@ juce::String modulationTest(const juce::File& project)
             const auto low = at(0.75);
             studio.setModulationAssignment(track, target.binding, false, 0.5);
             const auto restored = at(0.25);
-            report.add(studio.trackName(track) + " " + target.binding + ": base " + juce::String(*base) + ", +1 "
-                       + juce::String(high) + ", -1 " + juce::String(low) + ", off " + juce::String(restored));
+            report.add(studio.trackName(track) + " " + target.binding + ": base " + cydaw::base::Text(*base) + ", +1 "
+                       + cydaw::base::Text(high) + ", -1 " + cydaw::base::Text(low) + ", off " + cydaw::base::Text(restored));
             if (!(high > low))
                 return "no swing\n" + report.joinIntoString("\n");
             if (std::abs(restored - *base) > 1.0e-3 * std::max(1.0, std::abs(*base)))
@@ -355,13 +355,13 @@ juce::String modulationTest(const juce::File& project)
 // in a runtime of its own on white noise, each device tapped where its
 // signal enters and leaves; every tap must fill and carry sound. Empty when
 // it all holds.
-juce::String displayTest(const juce::File& project)
+cydaw::base::Text displayTest(const cydaw::base::File& project)
 {
     Studio studio;
     studio.setAutosaveEnabled(false);
     if (const auto loaded = studio.loadProject(project); loaded.failed())
         return "load: " + loaded.getErrorMessage();
-    juce::StringArray report;
+    cydaw::base::TextList report;
     auto checked = 0;
     juce::Random random(7);
     for (const auto& track : studio.tracks()) {
@@ -395,13 +395,13 @@ juce::String displayTest(const juce::File& project)
         for (const auto& modulation : slot->graph().editorVoiceModulations()) {
             auto value = 0.0f;
             runtime.controlValuesNow(&modulation.controlNodeId, &value, 1);
-            report.add(studio.trackName(track) + " voice modulation from " + juce::String(static_cast<juce::int64>(modulation.controlNodeId))
-                       + " target " + juce::String(static_cast<int>(modulation.target)) + " = " + juce::String(value));
+            report.add(studio.trackName(track) + " voice modulation from " + cydaw::base::Text(static_cast<juce::int64>(modulation.controlNodeId))
+                       + " target " + cydaw::base::Text(static_cast<int>(modulation.target)) + " = " + cydaw::base::Text(value));
             if (!std::isfinite(value))
                 return "a voice modulation's source is not evaluated\n" + report.joinIntoString("\n");
         }
         for (const auto& [card, span] : spans) {
-            juce::String line = studio.trackName(track) + " card " + juce::String(static_cast<juce::int64>(card)) + ":";
+            cydaw::base::Text line = studio.trackName(track) + " card " + cydaw::base::Text(static_cast<juce::int64>(card)) + ":";
             for (const auto& tap : taps) {
                 const auto isEntry = std::find(span.entries.begin(), span.entries.end(), tap.nodeId) != span.entries.end();
                 const auto isExit = std::find(span.exits.begin(), span.exits.end(), tap.nodeId) != span.exits.end();
@@ -409,14 +409,14 @@ juce::String displayTest(const juce::File& project)
                     continue;
                 engine::AudioAnalysisFrame frame;
                 if (!runtime.readTap(tap.nodeId, tap.input, frame))
-                    return line + " tap " + juce::String(static_cast<juce::int64>(tap.nodeId)) + " not kept";
+                    return line + " tap " + cydaw::base::Text(static_cast<juce::int64>(tap.nodeId)) + " not kept";
                 auto energy = 0.0;
                 for (std::uint32_t index = 0; index < frame.waveformCount; ++index)
                     energy += frame.waveform[index] * frame.waveform[index];
                 const auto rms = frame.waveformCount > 0 ? std::sqrt(energy / frame.waveformCount) : 0.0;
-                line << (tap.input ? " in " : " out ") << juce::String(static_cast<juce::int64>(tap.nodeId)) << " n="
-                     << static_cast<int>(frame.waveformCount) << " rms=" << juce::String(rms, 4) << " blocks="
-                     << juce::String(static_cast<juce::int64>(frame.sequence));
+                line << (tap.input ? " in " : " out ") << cydaw::base::Text(static_cast<juce::int64>(tap.nodeId)) << " n="
+                     << static_cast<int>(frame.waveformCount) << " rms=" << cydaw::base::Text(rms, 4) << " blocks="
+                     << cydaw::base::Text(static_cast<juce::int64>(frame.sequence));
                 if (frame.waveformCount != engine::AudioAnalysisFrame::waveformCapacity || frame.sequence != 8)
                     return "a tap did not fill\n" + report.joinIntoString("\n") + "\n" + line;
                 if (tap.input && rms <= 1.0e-4)
@@ -452,13 +452,13 @@ bool buildsWithHalfTheStack()
 // Every effect of the catalogue: inserted on a track it compiles, its knobs
 // reach the engine, and on noise it does what it says. Empty when it all
 // holds.
-juce::String effectsTest()
+cydaw::base::Text effectsTest()
 {
     if (!buildsWithHalfTheStack())
         return "the studio is not built with half the stack";
     Studio studio;
     studio.setAutosaveEnabled(false);
-    juce::StringArray report;
+    cydaw::base::TextList report;
     juce::Random random(11);
     // The channel converters change a chain's width, so they go between
     // cards rather than into a track's stereo chain: their sound is checked
@@ -484,14 +484,14 @@ juce::String effectsTest()
         const auto right = out.channel(1)[10];
         const auto expected = kind == engine::NativeDspNodeKind::monoToStereo ? 0.5f : 0.25f;
         if (std::abs(left - expected) > 1.0e-5f || std::abs(right - expected) > 1.0e-5f)
-            return juce::String(kind == engine::NativeDspNodeKind::monoToStereo ? "mono-to-stereo" : "stereo-to-mono")
-                   + " gives " + juce::String(left) + " / " + juce::String(right);
+            return cydaw::base::Text(kind == engine::NativeDspNodeKind::monoToStereo ? "mono-to-stereo" : "stereo-to-mono")
+                   + " gives " + cydaw::base::Text(left) + " / " + cydaw::base::Text(right);
     }
     for (const auto& effect : engine::effectCatalogue) {
         // A modulator is no device of the chain: the modulator check has it.
         if (effect.convertsChannels() || effect.midi || effect.control)
             continue;
-        const auto typeKey = juce::String(std::string(effect.typeKey));
+        const auto typeKey = cydaw::base::Text(std::string(effect.typeKey));
         const auto track = studio.addAudioTrack();
         if (!track)
             return "no track for " + typeKey;
@@ -509,11 +509,11 @@ juce::String effectsTest()
         if (card == nullptr)
             return typeKey + ": no card";
         if (card->parameters.size() != effect.parameterCount()) {
-            juce::StringArray bindings;
+            cydaw::base::TextList bindings;
             for (const auto& parameter : card->parameters)
                 bindings.add(parameter.binding);
-            return typeKey + ": " + juce::String(static_cast<int>(card->parameters.size())) + " knobs for "
-                   + juce::String(static_cast<int>(effect.parameterCount())) + " parameters: " + bindings.joinIntoString(", ");
+            return typeKey + ": " + cydaw::base::Text(static_cast<int>(card->parameters.size())) + " knobs for "
+                   + cydaw::base::Text(static_cast<int>(effect.parameterCount())) + " parameters: " + bindings.joinIntoString(", ");
         }
         // Each knob, moved to the middle of its range, reaches the engine.
         for (const auto& parameter : card->parameters) {
@@ -552,7 +552,7 @@ juce::String effectsTest()
             for (const auto& parameter : effect.parameters)
                 if (std::abs(engine::effectValue(saved->parameters, parameter) - engine::effectValue(restored->parameters, parameter))
                     > 1.0e-4f)
-                    return typeKey + ": " + juce::String(std::string(parameter.key)) + " is not restored";
+                    return typeKey + ": " + cydaw::base::Text(std::string(parameter.key)) + " is not restored";
         }
         // The sound: the engine's graph in a runtime of its own, on noise.
         auto native = graph.nativeDspGraph();
@@ -612,7 +612,7 @@ juce::String effectsTest()
                 }
         }
         const auto ratio = std::sqrt(outputEnergy / (32.0 / 40.0) / std::max(1.0e-12, inputEnergy));
-        juce::String line = typeKey + ": level " + juce::String(ratio, 3) + ", peak " + juce::String(peak, 3);
+        cydaw::base::Text line = typeKey + ": level " + cydaw::base::Text(ratio, 3) + ", peak " + cydaw::base::Text(peak, 3);
         report.add(line);
         if ((effect.kind == engine::NativeDspNodeKind::limiter || effect.kind == engine::NativeDspNodeKind::limiterPro)
             && peak > std::pow(10.0f, -6.0f / 20.0f) + 1.0e-4f)
@@ -665,7 +665,7 @@ juce::String effectsTest()
                 if (std::abs(buffer.getSample(0, sample)) > 0.1f)
                     first = block * 512 + sample;
         }
-        report.add("ping-pong 1/4 at 120 BPM: first echo at sample " + juce::String(first));
+        report.add("ping-pong 1/4 at 120 BPM: first echo at sample " + cydaw::base::Text(first));
         if (std::abs(first - 24'000) > 2)
             return "a synced echo is off the beat\n" + report.joinIntoString("\n");
     }
@@ -715,8 +715,8 @@ juce::String effectsTest()
         const auto lifted = peakOut(1.0f, 6.0f);
         const auto dry = peakOut(0.0f, 0.0f);
         const auto expected = input + ((input + 18.0) / 4.0 - (input + 18.0));
-        report.add("studio compressor: " + juce::String(compressed, 2) + " dB out for " + juce::String(expected, 2)
-                   + " expected, +6 dB makeup " + juce::String(lifted, 2) + ", dry " + juce::String(dry, 2));
+        report.add("studio compressor: " + cydaw::base::Text(compressed, 2) + " dB out for " + cydaw::base::Text(expected, 2)
+                   + " expected, +6 dB makeup " + cydaw::base::Text(lifted, 2) + ", dry " + cydaw::base::Text(dry, 2));
         if (std::abs(compressed - expected) > 0.75)
             return "the studio compressor misses its curve\n" + report.joinIntoString("\n");
         if (std::abs(lifted - compressed - 6.0) > 0.3)
@@ -777,8 +777,8 @@ juce::String effectsTest()
         const auto both = peakAt(0.5, 24);
         runtime.setAutomation({});
         const auto released = peakAt(0.5, 24);
-        report.add("automation: " + juce::String(early, 2) + " dB at 0.25 s, " + juce::String(late, 2) + " dB at 0.75 s, "
-                   + juce::String(both, 2) + " dB with a +12 dB band at 0.5 s, " + juce::String(released, 2) + " dB without the lane");
+        report.add("automation: " + cydaw::base::Text(early, 2) + " dB at 0.25 s, " + cydaw::base::Text(late, 2) + " dB at 0.75 s, "
+                   + cydaw::base::Text(both, 2) + " dB with a +12 dB band at 0.5 s, " + cydaw::base::Text(released, 2) + " dB without the lane");
         if (std::abs(early + 18.0) > 0.6 || std::abs(late + 6.0) > 0.6)
             return "an automated parameter does not follow its lane\n" + report.joinIntoString("\n");
         if (std::abs(both - 0.0) > 0.6)
@@ -880,11 +880,11 @@ juce::String effectsTest()
                 const auto error = drawn < -40.0 ? std::max(0.0, heard - (-40.0)) : std::abs(heard - drawn);
                 worst = std::max(worst, error);
                 if (error > 0.35)
-                    return juce::String("parametric EQ, ") + item.name + " at " + juce::String(hz) + " Hz: heard "
-                           + juce::String(heard, 2) + " dB, drawn " + juce::String(drawn, 2) + " dB\n" + report.joinIntoString("\n");
+                    return cydaw::base::Text("parametric EQ, ") + item.name + " at " + cydaw::base::Text(hz) + " Hz: heard "
+                           + cydaw::base::Text(heard, 2) + " dB, drawn " + cydaw::base::Text(drawn, 2) + " dB\n" + report.joinIntoString("\n");
             }
         }
-        report.add("parametric EQ: heard within " + juce::String(worst, 3) + " dB of its curve");
+        report.add("parametric EQ: heard within " + cydaw::base::Text(worst, 3) + " dB of its curve");
     }
     std::printf("%s\n", report.joinIntoString("\n").toRawUTF8());
     return {};
@@ -894,11 +894,11 @@ juce::String effectsTest()
 // audio, an instrument track with a clip.
 void buildDemoSession(Studio& studio)
 {
-    const auto audio = juce::File::getSpecialLocation(juce::File::currentExecutableFile)
+    const auto audio = cydaw::base::File::getSpecialLocation(cydaw::base::File::currentExecutableFile)
                            .getSiblingFile("templates")
                            .getChildFile("audio");
-    juce::Array<juce::File> files;
-    audio.findChildFiles(files, juce::File::findFiles, false, "*.wav");
+    cydaw::base::Array<cydaw::base::File> files;
+    audio.findChildFiles(files, cydaw::base::File::findFiles, false, "*.wav");
     files.sort();
     for (auto index = 0; index < juce::jmin(3, files.size()); ++index)
         (void) studio.addAudioTrack(files[index], index * 2.0);
@@ -937,7 +937,7 @@ public:
             quit();
             return;
         }
-        if (options_.displayTest != juce::File {}) {
+        if (options_.displayTest != cydaw::base::File {}) {
             const auto failure = displayTest(options_.displayTest);
             std::printf("%s\n", failure.isEmpty() ? "display ok" : failure.toRawUTF8());
             std::fflush(stdout);
@@ -945,7 +945,7 @@ public:
             quit();
             return;
         }
-        if (options_.modulationTest != juce::File {}) {
+        if (options_.modulationTest != cydaw::base::File {}) {
             const auto failure = modulationTest(options_.modulationTest);
             std::printf("%s\n", failure.isEmpty() ? "modulation ok" : failure.toRawUTF8());
             std::fflush(stdout);
@@ -953,11 +953,11 @@ public:
             quit();
             return;
         }
-        if (options_.roundTrip != juce::File {}) {
+        if (options_.roundTrip != cydaw::base::File {}) {
             const auto failure = roundTrip(options_.roundTrip);
             std::printf("%s\n", failure.isEmpty() ? "roundtrip ok" : failure.toRawUTF8());
             std::fflush(stdout);
-            juce::File::getSpecialLocation(juce::File::tempDirectory)
+            cydaw::base::File::getSpecialLocation(cydaw::base::File::tempDirectory)
                 .getChildFile("cydaw2-roundtrip.txt")
                 .replaceWithText(failure.isEmpty() ? "ok" : failure);
             setApplicationReturnValue(failure.isEmpty() ? 0 : 1);
@@ -966,14 +966,14 @@ public:
         }
 
         // Probes keep the speakers silent and leave the saved device alone.
-        const auto probe = options_.snapshot != juce::File {};
+        const auto probe = options_.snapshot != cydaw::base::File {};
         // Automated sessions (the MCP check) leave no copy to recover.
-        noRecovery_ = probe || juce::SystemStats::getEnvironmentVariable("CYDAW_NO_RECOVERY", {}).isNotEmpty();
+        noRecovery_ = probe || cydaw::base::SystemStats::getEnvironmentVariable("CYDAW_NO_RECOVERY", {}).isNotEmpty();
         // Where things are kept: the person's choices, which automated
         // sessions read (the banks) and change only with a file of their own.
         locations::load();
         locations::setSaving(!noRecovery_
-                             || juce::SystemStats::getEnvironmentVariable("CYDAW_LOCATIONS_FILE", {}).isNotEmpty());
+                             || cydaw::base::SystemStats::getEnvironmentVariable("CYDAW_LOCATIONS_FILE", {}).isNotEmpty());
         studio_ = std::make_unique<Studio>();
         studio_->setAutosaveEnabled(!noRecovery_);
         // The sample library and its banks, read and scanned in the
@@ -982,7 +982,7 @@ public:
         const auto audioError = studio_->startAudio(!probe);
         // The software's virtual inputs and outputs, with their effects;
         // automated sessions start from the defaults and leave the file be.
-        const auto ownVirtualIo = juce::SystemStats::getEnvironmentVariable("CYDAW_VIRTUAL_IO_FILE", {}).isNotEmpty();
+        const auto ownVirtualIo = cydaw::base::SystemStats::getEnvironmentVariable("CYDAW_VIRTUAL_IO_FILE", {}).isNotEmpty();
         if (!noRecovery_ || ownVirtualIo)
             studio_->loadVirtualIo();
         studio_->setVirtualIoSaving(!noRecovery_ || ownVirtualIo);
@@ -1009,21 +1009,21 @@ public:
         tick_ = std::make_unique<TickTimer>(*studio_);
         tick_->startTimerHz(30);
 
-        if (options_.project != juce::File {})
+        if (options_.project != cydaw::base::File {})
             window_->content().ui().openProjectNow(options_.project);
         else if (options_.demo)
             buildDemoSession(*studio_);
         if (options_.view > 0 || options_.track >= 0)
             window_->content().ui().showPanel(options_.view, options_.track);
-        if (options_.dumpGraphs != juce::File {})
+        if (options_.dumpGraphs != cydaw::base::File {})
             dumpGraphs(*studio_, options_.dumpGraphs);
         if (options_.audioSettings)
             window_->content().ui().showAudioSettings();
         if (options_.detach > 0)
             window_->content().ui().detachPanel(options_.detach);
-        if (options_.saveAs != juce::File {}) {
+        if (options_.saveAs != cydaw::base::File {}) {
             const auto saved = studio_->saveProject(options_.saveAs);
-            DBG("save-as " << (saved.wasOk() ? juce::String("ok") : saved.getErrorMessage()));
+            DBG("save-as " << (saved.wasOk() ? cydaw::base::Text("ok") : saved.getErrorMessage()));
         }
         if (options_.silent || probe)
             studio_->engine().setMasterGain(-60.0f);
@@ -1042,7 +1042,7 @@ public:
                     }
                     return handleRemoteCommand(*studio_, window_->content().ui(), request);
                 },
-                juce::SystemStats::getEnvironmentVariable("CYDAW_CONTROL_TOKEN", {}));
+                cydaw::base::SystemStats::getEnvironmentVariable("CYDAW_CONTROL_TOKEN", {}));
 
         if (probe) {
             juce::Timer::callAfterDelay(options_.snapshotDelayMs, [this] {
@@ -1061,7 +1061,7 @@ public:
     {
         remoteControl_.reset();
         tick_.reset();
-        if (studio_ != nullptr && options_.snapshot == juce::File {}) {
+        if (studio_ != nullptr && options_.snapshot == cydaw::base::File {}) {
             studio_->saveAudioSetup();
             studio_->flushVirtualIo();
             if (!noRecovery_)
@@ -1074,7 +1074,7 @@ public:
     // Unsaved changes are asked about first, except for probes.
     void systemRequestedQuit() override
     {
-        if (window_ == nullptr || studio_ == nullptr || options_.snapshot != juce::File {}
+        if (window_ == nullptr || studio_ == nullptr || options_.snapshot != cydaw::base::File {}
             || (!studio_->isDirty() && !studio_->workshopAtRisk())) {
             quit();
             return;

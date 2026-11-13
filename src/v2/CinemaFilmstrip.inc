@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 // Visible video frames only: a second decoder keeps seeks away from the preview.
 // Textures are bounded and released with their document; decoding never runs on the UI/audio thread.
 void FoundryView::releaseCinemaThumbnails(Tab& t)
@@ -12,12 +13,12 @@ void FoundryView::drawCinemaFilmstrip(Tab& t, ImVec2 top, ImVec2 bottom)
     const auto snapshot=t.document->shared();const auto& s=*snapshot;const auto& picture=s.picture;
     auto* draw=ImGui::GetWindowDrawList();const auto& p=theme::palette();
     const double fps=std::clamp(picture.fps,1.0,240.0);
-    const auto source=fromUtf8(picture.file)+"|"+juce::String(fps,6);
+    const auto source=fromUtf8(picture.file)+"|"+cydaw::base::Text(fps,6);
     if(source!=t.thumbnailSource){releaseCinemaThumbnails(t);t.thumbnailSource=source;t.thumbnailDecoder=std::make_unique<CinemaVideo>(160);}
     if(t.thumbnailPending>=0){
         const auto frame=t.thumbnailDecoder->snapshot();
         if(frame.image.isValid()&&std::abs(frame.time-t.thumbnailPending/fps)<.6/std::min(fps,frame.fps)){
-            const auto key=t.videoTextureKey+"-thumb-"+juce::String(t.thumbnailPending);
+            const auto key=t.videoTextureKey+"-thumb-"+cydaw::base::Text(t.thumbnailPending);
             t.thumbnails[t.thumbnailPending]={host_.updateTexture(key,frame.image),key,++t.thumbnailClock,static_cast<float>(frame.image.getWidth())/frame.image.getHeight()};
             t.thumbnailPending=-1;
         }else if(frame.error.isNotEmpty())t.thumbnailPending=-2;
@@ -61,7 +62,7 @@ void FoundryView::drawCinemaFilmstrip(Tab& t, ImVec2 top, ImVec2 bottom)
     // Cancel obsolete requests after a pan/zoom, otherwise finish the current frame.
     if(t.thumbnailPending>=0&&std::find(wanted.begin(),wanted.end(),t.thumbnailPending)==wanted.end())t.thumbnailPending=-1;
     if(t.thumbnailPending==-1)for(const auto frame:wanted)if(!t.thumbnails.contains(frame)){
-        t.thumbnailPending=frame;t.thumbnailDecoder->request(juce::File(fromUtf8(picture.file)),frame/fps);break;
+        t.thumbnailPending=frame;t.thumbnailDecoder->request(cydaw::base::File(fromUtf8(picture.file)),frame/fps);break;
     }
     while(t.thumbnails.size()>128){
         const auto oldest=std::min_element(t.thumbnails.begin(),t.thumbnails.end(),[](const auto& a,const auto& b){return a.second.used<b.second.used;});

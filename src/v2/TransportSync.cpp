@@ -1,3 +1,4 @@
+#include <cydaw/base/Properties.h>
 #include <cydaw/base/File.h>
 #include "TransportSync.h"
 #include "Localization.h"
@@ -17,7 +18,7 @@
 
 namespace cydaw::v2 {
 namespace {
-    double nowSeconds() { return juce::Time::getMillisecondCounterHiRes() * 0.001; }
+    double nowSeconds() { return cydaw::base::Time::getMillisecondCounterHiRes() * 0.001; }
     cydaw::base::Value obj() { return cydaw::base::Value(new cydaw::base::Object()); }
     void put(cydaw::base::Value& v, const char* k, const cydaw::base::Value& x) { v.getDynamicObject()->setProperty(k, x); }
     const char* protocols[] = { "MIDI Clock", "MTC + MMC", "JACK Transport", "Ableton Link" };
@@ -31,7 +32,7 @@ namespace {
         bool enabled {}, send {}, tempo { true }, play { true }, position { true }, stopOnLoss { true };
         int protocol {}, target {}, rate { 1 }, device { 127 };
         double offsetMs {}, quantum { 4.0 };
-        juce::String input, output, jackLibrary, server;
+        cydaw::base::Text input, output, jackLibrary, server;
     };
     cydaw::base::Value json(const Config& c)
     {
@@ -54,7 +55,7 @@ namespace {
         put(v, "server", c.server);
         return v;
     }
-    juce::String parse(const cydaw::base::Value& v, Config& c)
+    cydaw::base::Text parse(const cydaw::base::Value& v, Config& c)
     {
         if (!v.isObject())
             return "configuration must be an object";
@@ -104,7 +105,7 @@ class TransportSync::Impl final : private juce::Timer,
                                   private juce::MidiInputCallback,
                                   private juce::HighResolutionTimer {
 public:
-    Impl(juce::PropertiesFile& properties, juce::AudioDeviceManager& manager, bool saves, Read read, Apply apply)
+    Impl(cydaw::base::PropertiesFile& properties, juce::AudioDeviceManager& manager, bool saves, Read read, Apply apply)
         : settings(properties)
         , midiManager(manager)
         , saving(saves)
@@ -123,10 +124,10 @@ public:
     }
     ~Impl() override { disconnect(); }
     Config config, draft;
-    juce::String error, info;
+    cydaw::base::Text error, info;
     juce::Array<juce::MidiDeviceInfo> inputs, outputs;
     bool connected {};
-    juce::String configure(Config next)
+    cydaw::base::Text configure(Config next)
     {
         disconnect();
         config = next;
@@ -187,7 +188,7 @@ public:
                         - previous.seconds * previous.bpm / 60;
                     connected = true;
                 } catch (const std::exception& ex) {
-                    error = juce::String("Link: ") + ex.what();
+                    error = cydaw::base::Text("Link: ") + ex.what();
                 }
             }
             if (!connected) {
@@ -205,7 +206,7 @@ public:
         if (saving) {
             auto saved = json(config);
             put(saved, "enabled", false);
-            settings.setValue("transportSync", juce::String::fromUTF8(cydaw::base::JSON::toString(saved, false).toRawUTF8()));
+            settings.setValue("transportSync", cydaw::base::Text::fromUTF8(cydaw::base::JSON::toString(saved, false).toRawUTF8()));
         }
         return error;
     }
@@ -265,7 +266,7 @@ public:
         } else if (action == "refresh")
             refreshDevices();
         else if (action == "inject") {
-            if (juce::SystemStats::getEnvironmentVariable("CYDAW_NO_RECOVERY", {}).isEmpty())
+            if (cydaw::base::SystemStats::getEnvironmentVariable("CYDAW_NO_RECOVERY", {}).isEmpty())
                 return "diagnostic injection requires CYDAW_NO_RECOVERY";
             if (config.enabled)
                 return "disable live synchronization before diagnostic injection";
@@ -326,12 +327,12 @@ public:
     [[nodiscard]] int linkPeers() const { return link ? static_cast<int>(link->numPeers()) : 0; }
 
 private:
-    juce::PropertiesFile& settings;
+    cydaw::base::PropertiesFile& settings;
     juce::AudioDeviceManager& midiManager;
     bool saving;
     Read read_;
     Apply apply_;
-    juce::String registeredInput;
+    cydaw::base::Text registeredInput;
     bool inputWasEnabled {};
     std::unique_ptr<juce::MidiOutput> output;
     std::unique_ptr<ableton::Link> link;
@@ -714,12 +715,12 @@ void TransportSync::Impl::hiResTimerCallback()
 }
 void TransportSync::Impl::connectJack()
 {
-    juce::StringArray paths;
+    cydaw::base::TextList paths;
     if (config.jackLibrary.isNotEmpty())
         paths.add(config.jackLibrary);
 #if JUCE_WINDOWS
     else {
-        const auto pf = juce::SystemStats::getEnvironmentVariable("ProgramW6432", "C:/Program Files");
+        const auto pf = cydaw::base::SystemStats::getEnvironmentVariable("ProgramW6432", "C:/Program Files");
         paths.add(pf + "/JACK2/lib/libjack64.dll");
         paths.add(pf + "/JACK2/lib/libjack.dll");
         paths.add("libjack64.dll");
@@ -943,7 +944,7 @@ void TransportSync::Impl::tickLink(const State& local)
 }
 
 TransportSync::TransportSync(
-    juce::PropertiesFile& p, juce::AudioDeviceManager& manager, bool save, Read read, Apply apply)
+    cydaw::base::PropertiesFile& p, juce::AudioDeviceManager& manager, bool save, Read read, Apply apply)
     : impl_(std::make_unique<Impl>(p, manager, save, std::move(read), std::move(apply)))
 {
 }
@@ -951,11 +952,11 @@ TransportSync::~TransportSync() = default;
 bool TransportSync::active() const { return impl_->config.enabled && impl_->connected; }
 std::uint64_t TransportSync::receivedCount() const { return impl_->receivedMessages(); }
 std::uint64_t TransportSync::sentCount() const { return impl_->sentMessages(); }
-juce::String TransportSync::statusText() const
+cydaw::base::Text TransportSync::statusText() const
 {
     if (!active())
         return {};
-    auto text = juce::String(protocols[impl_->config.protocol]);
+    auto text = cydaw::base::Text(protocols[impl_->config.protocol]);
     if (impl_->config.protocol == 3)
         text << " (" << impl_->linkPeers() << ui::Ls(" pair(s))", " peer(s))");
     else
@@ -969,7 +970,7 @@ void TransportSync::drawButton(bool& visible)
     if (active())
         ImGui::PushStyleColor(ImGuiCol_Button, theme::vec(theme::palette().accent));
     const auto label
-        = active() ? juce::String::fromUTF8("SYNC · ") + protocols[impl_->config.protocol] : juce::String("SYNC");
+        = active() ? cydaw::base::Text::fromUTF8("SYNC · ") + protocols[impl_->config.protocol] : cydaw::base::Text("SYNC");
     if (ImGui::Button(label.toRawUTF8()))
         visible = !visible;
     if (active())
@@ -1015,7 +1016,7 @@ void TransportSync::Impl::draw(bool& visible)
     if (draft.protocol < 2) {
         auto& ports = draft.send ? outputs : inputs;
         auto& selected = draft.send ? draft.output : draft.input;
-        juce::String name = ui::Ls("Choisir un port…", "Choose a port…");
+        cydaw::base::Text name = ui::Ls("Choisir un port…", "Choose a port…");
         for (const auto& p : ports)
             if (p.identifier == selected)
                 name = p.name;
@@ -1035,12 +1036,12 @@ void TransportSync::Impl::draw(bool& visible)
                 "Virtual and network MIDI ports installed in Windows appear in this list."));
     }
     if (draft.protocol == 2) {
-        auto edit = [](const char* name, juce::String& value) {
+        auto edit = [](const char* name, cydaw::base::Text& value) {
             char buffer[1024] {};
             value.copyToUTF8(buffer, sizeof(buffer));
             ImGui::SetNextItemWidth(ui::dp(360));
             if (ImGui::InputText(name, buffer, sizeof(buffer)))
-                value = juce::String::fromUTF8(buffer);
+                value = cydaw::base::Text::fromUTF8(buffer);
         };
         edit(L("Bibliothèque JACK (facultatif)", "JACK library (optional)"), draft.jackLibrary);
         edit(L("Serveur JACK (vide : défaut)", "JACK server (empty: default)"), draft.server);

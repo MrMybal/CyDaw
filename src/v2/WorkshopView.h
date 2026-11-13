@@ -1,3 +1,5 @@
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "Studio.h"
@@ -62,9 +64,9 @@ private:
     bool askAboutNextAtRisk();
     void refreshLibrary(bool force);
     void save(bool asNewFile);
-    void report(const juce::String& message, bool error);
+    void report(const cydaw::base::Text& message, bool error);
     // A text field kept in step with the model while it is not being typed in.
-    bool textField(const char* id, std::vector<char>& buffer, const juce::String& current, float width, bool multiline = false,
+    bool textField(const char* id, std::vector<char>& buffer, const cydaw::base::Text& current, float width, bool multiline = false,
                    float height = 0.0f);
 
     Studio& studio_;
@@ -90,7 +92,7 @@ private:
     std::unique_ptr<juce::FileChooser> chooser_;
     std::function<void()> quitWaiting_;
     bool askDiscard_ {};
-    juce::File removing_;
+    cydaw::base::File removing_;
     bool askRemove_ {};
 
     std::vector<Studio::LibraryDevice> library_;
@@ -120,11 +122,11 @@ private:
     std::uint64_t planRevision_ {};
     double planTime_ {};
     bool planReady_ {};
-    juce::StringArray planIssues_;
-    juce::StringArray planDetails_;
+    cydaw::base::TextList planIssues_;
+    cydaw::base::TextList planDetails_;
     int planParameters_ {};
-    juce::String exported_;
-    juce::String deviceTransferMessage_;
+    cydaw::base::Text exported_;
+    cydaw::base::Text deviceTransferMessage_;
     bool deviceTransferWarning_ {};
     bool exportFormats_[3] {true, false, false};
     bool exportWindows_ {true}, exportLinux_ {};

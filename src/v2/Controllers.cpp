@@ -17,18 +17,18 @@ constexpr std::size_t monitorLength = 400;
 constexpr const char* cydawPrefix = "/cydaw/";
 using RawKind = Controllers::Impl::RawKind;
 
-// " · " between two names, as a juce::String (inline text is UTF-8).
-juce::String middleDot()
+// " · " between two names, as a cydaw::base::Text (inline text is UTF-8).
+cydaw::base::Text middleDot()
 {
-    return juce::String::fromUTF8(" \xc2\xb7 ");
+    return cydaw::base::Text::fromUTF8(" \xc2\xb7 ");
 }
 
 double secondsNow()
 {
-    return juce::Time::getMillisecondCounterHiRes() * 0.001;
+    return cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
 }
 
-juce::String text(const cydaw::base::Value& value, const char* key, const juce::String& fallback = {})
+cydaw::base::Text text(const cydaw::base::Value& value, const char* key, const cydaw::base::Text& fallback = {})
 {
     return value.hasProperty(key) ? value.getProperty(key, {}).toString() : fallback;
 }
@@ -90,9 +90,9 @@ cydaw::base::Value chainVar(const std::vector<control::Modifier>& chain)
 cydaw::base::Value assignmentVar(const control::Assignment& assignment)
 {
     auto item = object();
-    set(item, "device", juce::String(assignment.device));
-    set(item, "control", juce::String(assignment.control));
-    set(item, "target", juce::String(assignment.target));
+    set(item, "device", cydaw::base::Text(assignment.device));
+    set(item, "control", cydaw::base::Text(assignment.control));
+    set(item, "target", cydaw::base::Text(assignment.target));
     set(item, "minimum", assignment.minimum);
     set(item, "maximum", assignment.maximum);
     set(item, "takeover", assignment.takeover);
@@ -126,7 +126,7 @@ const char* rawKindName(const RawKind kind)
     return "plugin";
 }
 
-RawKind rawKindNamed(const juce::String& name)
+RawKind rawKindNamed(const cydaw::base::Text& name)
 {
     return name == "midi-in" ? RawKind::midiIn : name == "midi-out" ? RawKind::midiOut : name == "osc" ? RawKind::osc
            : name == "keyboard"                                                                          ? RawKind::keyboard
@@ -152,16 +152,16 @@ std::string mostUsed(const control::VirtualDevice& device, const bool feedback)
 // A new device's name until it is given one ("New device 2").
 bool defaultDeviceName(const std::string& name)
 {
-    const auto text = juce::String::fromUTF8(name.c_str());
-    return text.startsWith(juce::String::fromUTF8("Nouveau p\xc3\xa9riph\xc3\xa9rique")) || text.startsWith("New device");
+    const auto text = cydaw::base::Text::fromUTF8(name.c_str());
+    return text.startsWith(cydaw::base::Text::fromUTF8("Nouveau p\xc3\xa9riph\xc3\xa9rique")) || text.startsWith("New device");
 }
 
 } // namespace
 
 // A raw address as a person reads it: "CC 74 · ch. 1", "Note C3 · ch. 10".
-juce::String readableAddress(const std::string& address)
+cydaw::base::Text readableAddress(const std::string& address)
 {
-    const auto parts = juce::StringArray::fromTokens(juce::String(address), "/", "");
+    const auto parts = cydaw::base::TextList::fromTokens(cydaw::base::Text(address), "/", "");
     if (parts.size() >= 3 && parts[0] == "cc")
         return "CC " + parts[2] + middleDot() + "ch. " + parts[1];
     if (parts.size() >= 3 && parts[0] == "note")
@@ -184,7 +184,7 @@ juce::String readableAddress(const std::string& address)
         const auto side = name.startsWith("left") ? ui::Ls("Stick gauche ", "Left stick ") : ui::Ls("Stick droit ", "Right stick ");
         return side + name.getLastCharacters(1);
     }
-    return juce::String(address);
+    return cydaw::base::Text(address);
 }
 
 namespace {
@@ -199,7 +199,7 @@ std::string slug(const std::string& id)
 }
 
 // "MIDIIN2 (box)" and "MIDIOUT2 (box)": the same box.
-juce::String withoutDirection(const juce::String& name)
+cydaw::base::Text withoutDirection(const cydaw::base::Text& name)
 {
     return name.replace("MIDIIN", "MIDI").replace("MIDIOUT", "MIDI").replace(" In", "").replace(" Out", "")
         .replace(" IN", "").replace(" OUT", "").trim();
@@ -335,7 +335,7 @@ Controllers::Impl::Impl(Studio& studioIn, UiState& state, ImGuiHost& hostIn, con
     loadPlugins();
     restoreProject(studio.controllerAssignments());
     projectRevision = studio.controllerAssignmentsRevision();
-    studio.engine().setMidiInputGate([this](const juce::String& identifier, const juce::MidiMessage& message) {
+    studio.engine().setMidiInputGate([this](const cydaw::base::Text& identifier, const juce::MidiMessage& message) {
         return gatePasses(identifier, message);
     });
     refreshGate();
@@ -383,7 +383,7 @@ void Controllers::Impl::scanMidi()
         if (device->kind == RawKind::midiIn || device->kind == RawKind::midiOut)
             device->present = false;
     const auto list = [&](const juce::Array<juce::MidiDeviceInfo>& devices, const RawKind kind) {
-        std::map<juce::String, int> seen;
+        std::map<cydaw::base::Text, int> seen;
         for (const auto& info : devices) {
             auto name = info.name;
             if (const auto count = ++seen[info.name]; count > 1)
@@ -457,7 +457,7 @@ void Controllers::Impl::refreshGate()
     takenAddresses = std::move(taken);
 }
 
-bool Controllers::Impl::gatePasses(const juce::String& identifier, const juce::MidiMessage& message)
+bool Controllers::Impl::gatePasses(const cydaw::base::Text& identifier, const juce::MidiMessage& message)
 {
     const std::scoped_lock hold(gateLock);
     const auto found = midiNames.find(identifier);
@@ -493,7 +493,7 @@ void Controllers::Impl::applyRaw(RawDevice& device)
             if (port->listening)
                 port->receiver.addListener(port.get());
             else
-                device.error = ui::Ls("Le port ", "Port ") + juce::String(device.listenPort)
+                device.error = ui::Ls("Le port ", "Port ") + cydaw::base::Text(device.listenPort)
                                + ui::Ls(" est déjà pris.", " is already taken.");
         }
         if (device.sendPort > 0)
@@ -509,7 +509,7 @@ void Controllers::Impl::closeRaw(RawDevice& device)
     device.osc.reset();
 }
 
-Controllers::Impl::RawDevice& Controllers::Impl::addOsc(const juce::String& name, const int listenPort, const juce::String& sendHost,
+Controllers::Impl::RawDevice& Controllers::Impl::addOsc(const cydaw::base::Text& name, const int listenPort, const cydaw::base::Text& sendHost,
                                                         const int sendPort)
 {
     std::vector<std::string> taken;
@@ -519,9 +519,9 @@ Controllers::Impl::RawDevice& Controllers::Impl::addOsc(const juce::String& name
     auto& device = *raw.back();
     device.id = control::Router::freshId("osc", taken);
     device.kind = RawKind::osc;
-    device.name = name.isNotEmpty() ? name : juce::String("OSC");
+    device.name = name.isNotEmpty() ? name : cydaw::base::Text("OSC");
     device.listenPort = listenPort;
-    device.sendHost = sendHost.isNotEmpty() ? sendHost : juce::String("127.0.0.1");
+    device.sendHost = sendHost.isNotEmpty() ? sendHost : cydaw::base::Text("127.0.0.1");
     device.sendPort = sendPort;
     applyRaw(device);
     changed(true, false);
@@ -543,16 +543,16 @@ void Controllers::Impl::removeRaw(const std::string_view id)
         }
 }
 
-juce::String Controllers::Impl::nameOf(const std::string_view id) const
+cydaw::base::Text Controllers::Impl::nameOf(const std::string_view id) const
 {
     if (id == computerKeyboardId)
         return ui::Ls("Clavier de l'ordinateur", "Computer keyboard");
     if (const auto* device = rawDevice(id))
         return device->name;
-    return juce::String(std::string(id));
+    return cydaw::base::Text(std::string(id));
 }
 
-juce::String Controllers::Impl::familyOf(const RawDevice& device) const
+cydaw::base::Text Controllers::Impl::familyOf(const RawDevice& device) const
 {
     switch (device.kind) {
     case RawKind::midiIn:
@@ -609,7 +609,7 @@ void Controllers::Impl::send(const std::string_view id, const control::RawMessag
         if (message.address.empty() || message.address[0] != '/' || message.address.find('#') != std::string::npos)
             return;
         try {
-            (void) device->osc->sender.send(juce::OSCAddressPattern(juce::String(message.address)), static_cast<float>(message.value));
+            (void) device->osc->sender.send(juce::OSCAddressPattern(cydaw::base::Text(message.address)), static_cast<float>(message.value));
         } catch (const juce::OSCFormatError&) {
             return;
         }
@@ -627,10 +627,10 @@ void Controllers::Impl::send(const std::string_view id, const control::RawMessag
 
 // ---- Application plug-ins ------------------------------------------------------------------------
 
-juce::Array<juce::File> Controllers::Impl::pluginFolders()
+cydaw::base::Array<cydaw::base::File> Controllers::Impl::pluginFolders()
 {
-    return { juce::File::getSpecialLocation(juce::File::currentExecutableFile).getSiblingFile("ControlPlugins"),
-             juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("CyDAW").getChildFile("Control Plugins") };
+    return { cydaw::base::File::getSpecialLocation(cydaw::base::File::currentExecutableFile).getSiblingFile("ControlPlugins"),
+             cydaw::base::File::getSpecialLocation(cydaw::base::File::userDocumentsDirectory).getChildFile("CyDAW").getChildFile("Control Plugins") };
 }
 
 void Controllers::Impl::loadPlugins()
@@ -640,7 +640,7 @@ void Controllers::Impl::loadPlugins()
         Incoming incoming;
         incoming.kind = Incoming::Kind::added;
         incoming.device = id != nullptr ? id : "";
-        incoming.name = juce::String::fromUTF8(name != nullptr ? name : id);
+        incoming.name = cydaw::base::Text::fromUTF8(name != nullptr ? name : id);
         incoming.plugin = c->index;
         c->impl->post(std::move(incoming));
     };
@@ -664,7 +664,7 @@ void Controllers::Impl::loadPlugins()
             c->impl->post({ Incoming::Kind::message, "log", { std::string("log: ") + line, 0.0 }, {}, c->index });
     };
     for (const auto& folder : pluginFolders())
-        for (const auto& file : folder.findChildFiles(juce::File::findFiles, false, "*.cyctl")) {
+        for (const auto& file : folder.findChildFiles(cydaw::base::File::findFiles, false, "*.cyctl")) {
             auto plugin = std::make_unique<Plugin>();
             plugin->file = file;
             plugin->name = file.getFileNameWithoutExtension();
@@ -679,7 +679,7 @@ void Controllers::Impl::loadPlugins()
                 plugin->error = ui::Ls("Version d'interface inconnue", "Unknown interface version");
                 plugin->api = nullptr;
             } else if (plugin->api->name != nullptr) {
-                plugin->name = juce::String::fromUTF8(plugin->api->name);
+                plugin->name = cydaw::base::Text::fromUTF8(plugin->api->name);
             }
             plugins.push_back(std::move(plugin));
         }
@@ -868,7 +868,7 @@ void Controllers::Impl::feedback(const bool force)
 
 // ---- Virtual controllers and assignments --------------------------------------------------------------
 
-std::string Controllers::Impl::addVirtualDevice(const juce::String& name, const std::string& input, const std::string& output)
+std::string Controllers::Impl::addVirtualDevice(const cydaw::base::Text& name, const std::string& input, const std::string& output)
 {
     std::vector<std::string> taken;
     std::set<std::string> names;
@@ -885,7 +885,7 @@ std::string Controllers::Impl::addVirtualDevice(const juce::String& name, const 
         const auto base = input.empty() ? ui::Ls("Nouveau p\xc3\xa9riph\xc3\xa9rique", "New device") : nameOf(input);
         auto unique = base;
         for (auto number = 2; names.contains(unique.toStdString()); ++number)
-            unique = base + " " + juce::String(number);
+            unique = base + " " + cydaw::base::Text(number);
         device.name = unique.toStdString();
     }
     device.input = input;
@@ -907,7 +907,7 @@ std::string Controllers::Impl::duplicateVirtualDevice(const std::string& id)
     // until then its controls hear nothing.
     auto copy = *original;
     copy.id = control::Router::freshId("virtual", taken);
-    copy.name = (juce::String::fromUTF8(original->name.c_str()) + ui::Ls(" (copie)", " (copy)")).toStdString();
+    copy.name = (cydaw::base::Text::fromUTF8(original->name.c_str()) + ui::Ls(" (copie)", " (copy)")).toStdString();
     for (auto& control : copy.controls) {
         if (control.sourceDevice == copy.input)
             control.sourceDevice.clear();
@@ -957,7 +957,7 @@ void Controllers::Impl::setDeviceOutput(control::VirtualDevice& device, const st
     changed(true, false);
 }
 
-std::string Controllers::Impl::addControl(const std::string& deviceId, const juce::String& name, const control::ControlKind kind,
+std::string Controllers::Impl::addControl(const std::string& deviceId, const cydaw::base::Text& name, const control::ControlKind kind,
                                           const std::string& sourceDevice, const std::string& sourceAddress)
 {
     auto* device = router.findDevice(deviceId);
@@ -984,7 +984,7 @@ std::string Controllers::Impl::addControl(const std::string& deviceId, const juc
     if (!control.feedbackDevice.empty())
         control.feedbackAddress = sourceAddress;
     control.name = (name.isNotEmpty() ? name
-                    : sourceAddress.empty() ? juce::String(control.id)
+                    : sourceAddress.empty() ? cydaw::base::Text(control.id)
                                             : readableAddress(sourceAddress)).toStdString();
     device->controls.push_back(control);
     changed(true, false);
@@ -1072,7 +1072,7 @@ void Controllers::Impl::learnFrom(const std::string& rawId, const control::RawMe
                 control->feedbackDevice = feedbackFor(rawId);
                 control->feedbackAddress = control->feedbackDevice.empty() ? std::string() : message.address;
             }
-            learnStatus = juce::String::fromUTF8(control->name.c_str()) + juce::String::fromUTF8(" \xe2\x86\x90 ") + nameOf(rawId)
+            learnStatus = cydaw::base::Text::fromUTF8(control->name.c_str()) + cydaw::base::Text::fromUTF8(" \xe2\x86\x90 ") + nameOf(rawId)
                           + middleDot() + readableAddress(message.address);
             changed(true, false);
         }
@@ -1091,7 +1091,7 @@ void Controllers::Impl::learnFrom(const std::string& rawId, const control::RawMe
     }
     assign(deviceId, controlId, learnTarget, true);
     if (auto* control = router.findControl(deviceId, controlId))
-        learnStatus = learnTargetLabel + juce::String::fromUTF8(" \xe2\x86\x90 ") + juce::String::fromUTF8(control->name.c_str());
+        learnStatus = learnTargetLabel + cydaw::base::Text::fromUTF8(" \xe2\x86\x90 ") + cydaw::base::Text::fromUTF8(control->name.c_str());
     selectedDevice = deviceId;
     selectedControl = controlId;
     learnTarget.clear();
@@ -1118,10 +1118,10 @@ bool Controllers::Impl::learnDevice(const RawDevice& source, const control::RawM
                 const auto base = nameOf(source.id);
                 auto unique = base;
                 for (auto number = 2; names.contains(unique.toStdString()); ++number)
-                    unique = base + " " + juce::String(number);
+                    unique = base + " " + cydaw::base::Text(number);
                 device->name = unique.toStdString();
             }
-            learnStatus = juce::String::fromUTF8(device->name.c_str()) + juce::String::fromUTF8(" \xe2\x86\x90 ") + nameOf(source.id);
+            learnStatus = cydaw::base::Text::fromUTF8(device->name.c_str()) + cydaw::base::Text::fromUTF8(" \xe2\x86\x90 ") + nameOf(source.id);
         }
         learnHardware.clear();
         return true;
@@ -1140,7 +1140,7 @@ bool Controllers::Impl::learnDevice(const RawDevice& source, const control::RawM
         if (!known) {
             selectedDevice = device->id;
             selectedControl = addControl(device->id, {}, control::kindForAddress(message.address), source.id, message.address);
-            learnStatus = juce::String::fromUTF8(device->name.c_str()) + ui::Ls(" : nouvelle r\xc3\xa8gle ", ": new rule ")
+            learnStatus = cydaw::base::Text::fromUTF8(device->name.c_str()) + ui::Ls(" : nouvelle r\xc3\xa8gle ", ": new rule ")
                           + readableAddress(message.address);
         }
         // And it moves what it already moves.
@@ -1166,7 +1166,7 @@ cydaw::base::Value Controllers::Impl::globalState() const
     cydaw::base::Array<cydaw::base::Value> devices;
     for (const auto& device : raw) {
         auto item = object();
-        set(item, "id", juce::String(device->id));
+        set(item, "id", cydaw::base::Text(device->id));
         set(item, "name", device->name);
         set(item, "kind", rawKindName(device->kind));
         set(item, "enabled", device->enabled);
@@ -1183,20 +1183,20 @@ cydaw::base::Value Controllers::Impl::globalState() const
     cydaw::base::Array<cydaw::base::Value> virtualDevices;
     for (const auto& device : router.devices) {
         auto item = object();
-        set(item, "id", juce::String(device.id));
-        set(item, "name", juce::String(device.name));
-        set(item, "input", juce::String(device.input));
-        set(item, "output", juce::String(device.output));
+        set(item, "id", cydaw::base::Text(device.id));
+        set(item, "name", cydaw::base::Text(device.name));
+        set(item, "input", cydaw::base::Text(device.input));
+        set(item, "output", cydaw::base::Text(device.output));
         cydaw::base::Array<cydaw::base::Value> controls;
         for (const auto& control : device.controls) {
             auto entry = object();
-            set(entry, "id", juce::String(control.id));
-            set(entry, "name", juce::String(control.name));
+            set(entry, "id", cydaw::base::Text(control.id));
+            set(entry, "name", cydaw::base::Text(control.name));
             set(entry, "kind", control::controlKindName(control.kind));
-            set(entry, "sourceDevice", juce::String(control.sourceDevice));
-            set(entry, "sourceAddress", juce::String(control.sourceAddress));
-            set(entry, "feedbackDevice", juce::String(control.feedbackDevice));
-            set(entry, "feedbackAddress", juce::String(control.feedbackAddress));
+            set(entry, "sourceDevice", cydaw::base::Text(control.sourceDevice));
+            set(entry, "sourceAddress", cydaw::base::Text(control.sourceAddress));
+            set(entry, "feedbackDevice", cydaw::base::Text(control.feedbackDevice));
+            set(entry, "feedbackAddress", cydaw::base::Text(control.feedbackAddress));
             set(entry, "chain", chainVar(control.chain));
             controls.add(entry);
         }
@@ -1225,7 +1225,7 @@ void Controllers::Impl::restoreGlobal(const cydaw::base::Value& state)
             raw.push_back(std::make_unique<RawDevice>());
             auto& device = *raw.back();
             device.id = id;
-            device.name = text(item, "name", juce::String(id));
+            device.name = text(item, "name", cydaw::base::Text(id));
             device.kind = rawKindNamed(kind);
             device.enabled = static_cast<bool>(item.getProperty("enabled", true));
             device.notes = static_cast<bool>(item.getProperty("notes", true));
@@ -1252,7 +1252,7 @@ void Controllers::Impl::restoreGlobal(const cydaw::base::Value& state)
                     control.id = text(entry, "id").toStdString();
                     if (control.id.empty())
                         continue;
-                    control.name = text(entry, "name", juce::String(control.id)).toStdString();
+                    control.name = text(entry, "name", cydaw::base::Text(control.id)).toStdString();
                     control.kind = control::controlKindNamed(text(entry, "kind").toStdString()).value_or(control::ControlKind::knob);
                     control.sourceDevice = text(entry, "sourceDevice").toStdString();
                     control.sourceAddress = text(entry, "sourceAddress").toStdString();
@@ -1309,7 +1309,7 @@ void Controllers::Impl::saveNow()
     globalDirty = false;
     if (!keepSettings)
         return;
-    studio.settings().setValue("controllers", juce::String::fromUTF8(cydaw::base::JSON::toString(globalState(), true).toRawUTF8()));
+    studio.settings().setValue("controllers", cydaw::base::Text::fromUTF8(cydaw::base::JSON::toString(globalState(), true).toRawUTF8()));
     studio.settings().saveIfNeeded();
 }
 
@@ -1321,7 +1321,7 @@ cydaw::base::Value Controllers::Impl::describe() const
     cydaw::base::Array<cydaw::base::Value> devices;
     for (const auto& device : raw) {
         auto item = object();
-        set(item, "id", juce::String(device->id));
+        set(item, "id", cydaw::base::Text(device->id));
         set(item, "name", device->name);
         set(item, "kind", rawKindName(device->kind));
         set(item, "family", familyOf(*device));
@@ -1344,21 +1344,21 @@ cydaw::base::Value Controllers::Impl::describe() const
     cydaw::base::Array<cydaw::base::Value> virtualDevices;
     for (const auto& device : router.devices) {
         auto item = object();
-        set(item, "id", juce::String(device.id));
-        set(item, "name", juce::String(device.name));
-        set(item, "input", juce::String(device.input));
-        set(item, "output", juce::String(device.output));
+        set(item, "id", cydaw::base::Text(device.id));
+        set(item, "name", cydaw::base::Text(device.name));
+        set(item, "input", cydaw::base::Text(device.input));
+        set(item, "output", cydaw::base::Text(device.output));
         cydaw::base::Array<cydaw::base::Value> controls;
         for (const auto& control : device.controls) {
             auto entry = object();
-            set(entry, "id", juce::String(control.id));
-            set(entry, "name", juce::String(control.name));
+            set(entry, "id", cydaw::base::Text(control.id));
+            set(entry, "name", cydaw::base::Text(control.name));
             set(entry, "kind", control::controlKindName(control.kind));
-            set(entry, "source", juce::String(control.sourceDevice) + " " + juce::String(control.sourceAddress));
-            set(entry, "sourceDevice", juce::String(control.sourceDevice));
-            set(entry, "sourceAddress", juce::String(control.sourceAddress));
-            set(entry, "feedbackDevice", juce::String(control.feedbackDevice));
-            set(entry, "feedbackAddress", juce::String(control.feedbackAddress));
+            set(entry, "source", cydaw::base::Text(control.sourceDevice) + " " + cydaw::base::Text(control.sourceAddress));
+            set(entry, "sourceDevice", cydaw::base::Text(control.sourceDevice));
+            set(entry, "sourceAddress", cydaw::base::Text(control.sourceAddress));
+            set(entry, "feedbackDevice", cydaw::base::Text(control.feedbackDevice));
+            set(entry, "feedbackAddress", cydaw::base::Text(control.feedbackAddress));
             set(entry, "chain", chainVar(control.chain));
             set(entry, "value", control.value);
             controls.add(entry);
@@ -1371,7 +1371,7 @@ cydaw::base::Value Controllers::Impl::describe() const
     for (const auto& assignment : router.assignments) {
         auto item = assignmentVar(assignment);
         const auto info = targets.describe(assignment.target);
-        set(item, "label", info ? info->label : juce::String(assignment.target));
+        set(item, "label", info ? info->label : cydaw::base::Text(assignment.target));
         set(item, "scope", assignment.project ? "project" : "global");
         assignments.add(item);
     }
@@ -1388,9 +1388,9 @@ cydaw::base::Value Controllers::Impl::describe() const
     }
     set(result, "plugins", loaded);
     set(result, "learning", learnMode);
-    set(result, "learnTarget", juce::String(learnTarget));
-    set(result, "learnHardware", juce::String(learnHardware));
-    set(result, "learnControls", juce::String(learnControls));
+    set(result, "learnTarget", cydaw::base::Text(learnTarget));
+    set(result, "learnHardware", cydaw::base::Text(learnHardware));
+    set(result, "learnControls", cydaw::base::Text(learnControls));
     set(result, "learnStatus", learnStatus);
     return result;
 }
@@ -1398,7 +1398,7 @@ cydaw::base::Value Controllers::Impl::describe() const
 cydaw::base::Value Controllers::Impl::command(const cydaw::base::Value& request)
 {
     const auto action = text(request, "action", "status");
-    const auto fail = [](const juce::String& message) { return cydaw::base::Value(message); };
+    const auto fail = [](const cydaw::base::Text& message) { return cydaw::base::Value(message); };
     const auto device = text(request, "device").toStdString();
     const auto controlId = text(request, "control").toStdString();
     if (action == "show") {
@@ -1425,7 +1425,7 @@ cydaw::base::Value Controllers::Impl::command(const cydaw::base::Value& request)
         auto& made = addOsc(text(request, "name", "OSC"), static_cast<int>(number(request, "port", 0)), text(request, "host", "127.0.0.1"),
                             static_cast<int>(number(request, "sendPort", 0)));
         auto result = object();
-        set(result, "device", juce::String(made.id));
+        set(result, "device", cydaw::base::Text(made.id));
         set(result, "listening", made.osc != nullptr && made.osc->listening);
         set(result, "sending", made.osc != nullptr && made.osc->sending);
         if (made.error.isNotEmpty())
@@ -1435,7 +1435,7 @@ cydaw::base::Value Controllers::Impl::command(const cydaw::base::Value& request)
     if (action == "set_raw") {
         auto* found = rawDevice(device);
         if (found == nullptr)
-            return fail("no raw device \"" + juce::String(device) + "\"");
+            return fail("no raw device \"" + cydaw::base::Text(device) + "\"");
         if (request.hasProperty("enabled"))
             found->enabled = static_cast<bool>(request.getProperty("enabled", true));
         if (request.hasProperty("notes"))
@@ -1459,7 +1459,7 @@ cydaw::base::Value Controllers::Impl::command(const cydaw::base::Value& request)
     }
     if (action == "inject") {
         if (rawDevice(device) == nullptr)
-            return fail("no raw device \"" + juce::String(device) + "\"");
+            return fail("no raw device \"" + cydaw::base::Text(device) + "\"");
         process({ Incoming::Kind::message, device, { text(request, "address").toStdString(), number(request, "value", 0.0) } });
         return describe();
     }
@@ -1467,27 +1467,27 @@ cydaw::base::Value Controllers::Impl::command(const cydaw::base::Value& request)
         const auto input = text(request, "input").toStdString();
         const auto output = text(request, "output").toStdString();
         if (!input.empty() && (rawDevice(input) == nullptr || !isInput(rawDevice(input)->kind)))
-            return fail("no raw input \"" + juce::String(input) + "\"");
+            return fail("no raw input \"" + cydaw::base::Text(input) + "\"");
         if (!output.empty() && (rawDevice(output) == nullptr || !isOutput(rawDevice(output)->kind)))
-            return fail("no raw output \"" + juce::String(output) + "\"");
+            return fail("no raw output \"" + cydaw::base::Text(output) + "\"");
         auto result = object();
-        set(result, "device", juce::String(addVirtualDevice(text(request, "name"), input, output)));
+        set(result, "device", cydaw::base::Text(addVirtualDevice(text(request, "name"), input, output)));
         return result;
     }
     if (action == "set_virtual") {
         auto* found = router.findDevice(device);
         if (found == nullptr)
-            return fail("no virtual device \"" + juce::String(device) + "\"");
+            return fail("no virtual device \"" + cydaw::base::Text(device) + "\"");
         if (request.hasProperty("input")) {
             const auto input = text(request, "input").toStdString();
             if (!input.empty() && (rawDevice(input) == nullptr || !isInput(rawDevice(input)->kind)))
-                return fail("no raw input \"" + juce::String(input) + "\"");
+                return fail("no raw input \"" + cydaw::base::Text(input) + "\"");
             setDeviceInput(*found, input);
         }
         if (request.hasProperty("output")) {
             const auto output = text(request, "output").toStdString();
             if (!output.empty() && (rawDevice(output) == nullptr || !isOutput(rawDevice(output)->kind)))
-                return fail("no raw output \"" + juce::String(output) + "\"");
+                return fail("no raw output \"" + cydaw::base::Text(output) + "\"");
             setDeviceOutput(*found, output);
         }
         if (request.hasProperty("name") && text(request, "name").isNotEmpty())
@@ -1498,16 +1498,16 @@ cydaw::base::Value Controllers::Impl::command(const cydaw::base::Value& request)
     if (action == "duplicate_virtual") {
         const auto made = duplicateVirtualDevice(device);
         if (made.empty())
-            return fail("no virtual device \"" + juce::String(device) + "\"");
+            return fail("no virtual device \"" + cydaw::base::Text(device) + "\"");
         auto result = object();
-        set(result, "device", juce::String(made));
+        set(result, "device", cydaw::base::Text(made));
         return result;
     }
     if (action == "learn_hardware" || action == "learn_controls") {
         const auto on = static_cast<bool>(request.getProperty("on", true));
         const auto* found = router.findDevice(device);
         if (on && found == nullptr)
-            return fail("no virtual device \"" + juce::String(device) + "\"");
+            return fail("no virtual device \"" + cydaw::base::Text(device) + "\"");
         if (on && action == "learn_controls" && found->input.empty())
             return fail("the device has no input yet: learn_hardware or set_virtual first");
         stopLearning();
@@ -1528,11 +1528,11 @@ cydaw::base::Value Controllers::Impl::command(const cydaw::base::Value& request)
             id = addControl(device, text(request, "name"), *kind, text(request, "sourceDevice").toStdString(),
                             text(request, "sourceAddress").toStdString());
             if (id.empty())
-                return fail("no virtual device \"" + juce::String(device) + "\"");
+                return fail("no virtual device \"" + cydaw::base::Text(device) + "\"");
         }
         auto* control = router.findControl(device, id);
         if (control == nullptr)
-            return fail("no control \"" + juce::String(id) + "\" on \"" + juce::String(device) + "\"");
+            return fail("no control \"" + cydaw::base::Text(id) + "\" on \"" + cydaw::base::Text(device) + "\"");
         if (request.hasProperty("name"))
             control->name = text(request, "name").toStdString();
         if (action == "set_control" && request.hasProperty("sourceDevice"))
@@ -1547,8 +1547,8 @@ cydaw::base::Value Controllers::Impl::command(const cydaw::base::Value& request)
             control->chain = chainFrom(request.getProperty("chain", {}));
         changed(true, false);
         auto result = object();
-        set(result, "device", juce::String(device));
-        set(result, "control", juce::String(id));
+        set(result, "device", cydaw::base::Text(device));
+        set(result, "control", cydaw::base::Text(id));
         return result;
     }
     if (action == "remove_control") {
@@ -1558,9 +1558,9 @@ cydaw::base::Value Controllers::Impl::command(const cydaw::base::Value& request)
     if (action == "assign") {
         const auto target = text(request, "target").toStdString();
         if (router.findControl(device, controlId) == nullptr)
-            return fail("no control \"" + juce::String(controlId) + "\" on \"" + juce::String(device) + "\"");
+            return fail("no control \"" + cydaw::base::Text(controlId) + "\" on \"" + cydaw::base::Text(device) + "\"");
         if (!targets.describe(target))
-            return fail("no target \"" + juce::String(target) + "\"; targets lists them");
+            return fail("no target \"" + cydaw::base::Text(target) + "\"; targets lists them");
         assign(device, controlId, target, static_cast<bool>(request.getProperty("replace", false)));
         auto& assignment = router.assignments.back();
         assignment.minimum = std::clamp(number(request, "minimum", 0.0), 0.0, 1.0);
@@ -1582,8 +1582,8 @@ cydaw::base::Value Controllers::Impl::command(const cydaw::base::Value& request)
         ui::setLearnMode(learnMode);
         learnTarget = text(request, "target").toStdString();
         if (!learnTarget.empty() && !targets.describe(learnTarget))
-            return fail("no target \"" + juce::String(learnTarget) + "\"");
-        learnTargetLabel = learnTarget.empty() ? juce::String() : targets.describe(learnTarget)->label;
+            return fail("no target \"" + cydaw::base::Text(learnTarget) + "\"");
+        learnTargetLabel = learnTarget.empty() ? cydaw::base::Text() : targets.describe(learnTarget)->label;
         if (!learnMode)
             learnTarget.clear();
         return describe();
@@ -1592,13 +1592,13 @@ cydaw::base::Value Controllers::Impl::command(const cydaw::base::Value& request)
         const auto filter = text(request, "filter");
         cydaw::base::Array<cydaw::base::Value> list;
         for (const auto& key : targets.list()) {
-            if (filter.isNotEmpty() && !juce::String(key).containsIgnoreCase(filter))
+            if (filter.isNotEmpty() && !cydaw::base::Text(key).containsIgnoreCase(filter))
                 continue;
             const auto info = targets.describe(key);
             if (!info)
                 continue;
             auto item = object();
-            set(item, "target", juce::String(key));
+            set(item, "target", cydaw::base::Text(key));
             set(item, "label", info->label);
             set(item, "scope", info->project ? "project" : "global");
             if (const auto value = targets.value(key))
@@ -1612,13 +1612,13 @@ cydaw::base::Value Controllers::Impl::command(const cydaw::base::Value& request)
     if (action == "value" || action == "apply") {
         const auto target = text(request, "target").toStdString();
         if (!targets.describe(target))
-            return fail("no target \"" + juce::String(target) + "\"");
+            return fail("no target \"" + cydaw::base::Text(target) + "\"");
         if (action == "apply") {
             const auto value = number(request, "value", 0.0);
             (void) targets.apply(target, value, value >= 0.5, false, false);
         }
         auto result = object();
-        set(result, "target", juce::String(target));
+        set(result, "target", cydaw::base::Text(target));
         if (const auto value = targets.value(target))
             set(result, "value", *value);
         return result;
@@ -1635,8 +1635,8 @@ cydaw::base::Value Controllers::Impl::command(const cydaw::base::Value& request)
             const auto& seen = monitor[index];
             auto item = object();
             set(item, "out", seen.out);
-            set(item, "device", juce::String(seen.device));
-            set(item, "address", juce::String(seen.message.address));
+            set(item, "device", cydaw::base::Text(seen.device));
+            set(item, "address", cydaw::base::Text(seen.message.address));
             set(item, "value", seen.message.value);
             list.add(item);
         }

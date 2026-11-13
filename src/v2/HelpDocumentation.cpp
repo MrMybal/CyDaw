@@ -1,10 +1,11 @@
+#include <cydaw/base/TextMap.h>
 #include <cydaw/base/File.h>
 #include "HelpDocumentation.h"
 #include <set>
 namespace cydaw::v2 {
-HelpDocumentation::HelpDocumentation(juce::File directory) : directory_(std::move(directory)) {}
-juce::File HelpDocumentation::installedDirectory() {
-    return juce::File::getSpecialLocation(juce::File::currentExecutableFile).getSiblingFile("Documentation");
+HelpDocumentation::HelpDocumentation(cydaw::base::File directory) : directory_(std::move(directory)) {}
+cydaw::base::File HelpDocumentation::installedDirectory() {
+    return cydaw::base::File::getSpecialLocation(cydaw::base::File::currentExecutableFile).getSiblingFile("Documentation");
 }
 bool HelpDocumentation::load() {
     error_.clear();
@@ -19,13 +20,13 @@ bool HelpDocumentation::load() {
     if (!page("welcome")) { catalog_ = cydaw::base::Value(); error_ = "CyDoc welcome page is missing"; return false; }
     return true;
 }
-const cydaw::base::Value* HelpDocumentation::page(const juce::String& id) const {
+const cydaw::base::Value* HelpDocumentation::page(const cydaw::base::Text& id) const {
     if (const auto* pages = catalog_.getProperty("pages", {}).getArray())
         for (const auto& value : *pages) if (value.getProperty("id", {}).toString() == id) return &value;
     return nullptr;
 }
-bool HelpDocumentation::canonical(juce::String& id, juce::String& anchor) const {
-    std::set<juce::String> visited;
+bool HelpDocumentation::canonical(cydaw::base::Text& id, cydaw::base::Text& anchor) const {
+    std::set<cydaw::base::Text> visited;
     const auto aliases = catalog_.getProperty("aliases", {});
     while (aliases.hasProperty(cydaw::base::Identifier(id))) {
         if (!visited.insert(id).second || visited.size() > 16) return false;
@@ -35,8 +36,8 @@ bool HelpDocumentation::canonical(juce::String& id, juce::String& anchor) const 
     }
     return page(id) != nullptr;
 }
-juce::String HelpDocumentation::encode(const juce::String& value) { return juce::URL::addEscapeChars(value, true); }
-juce::String HelpDocumentation::link(juce::String id, juce::String anchor, juce::String locale, const juce::StringPairArray& state) {
+cydaw::base::Text HelpDocumentation::encode(const cydaw::base::Text& value) { return juce::URL::addEscapeChars(value, true); }
+cydaw::base::Text HelpDocumentation::link(cydaw::base::Text id, cydaw::base::Text anchor, cydaw::base::Text locale, const cydaw::base::TextMap& state) {
     if (!load()) return {};
     if (locale != "en" && locale != "fr") { error_ = "Help locale: en or fr"; return {}; }
     const auto base = juce::URL(directory_.getChildFile("Documentation.html")).toString(true);
@@ -63,25 +64,25 @@ juce::String HelpDocumentation::link(juce::String id, juce::String anchor, juce:
     }
     return result;
 }
-juce::String HelpDocumentation::follow(const juce::String& target, juce::String locale) {
+cydaw::base::Text HelpDocumentation::follow(const cydaw::base::Text& target, cydaw::base::Text locale) {
     if (target.length() > 16000) { error_ = "Help target too long"; return {}; }
     auto text = target;
     if (text.startsWith("manual:")) text = text.substring(7);
     else if (text.startsWith("doc:") && !text.startsWith("doc://")) text = text.substring(4);
     if (text.startsWith("//")) text = text.substring(2);
     if (text.startsWith("#/")) {
-        const auto pieces = juce::StringArray::fromTokens(text.substring(2).upToFirstOccurrenceOf("?", false, false), "/", "");
+        const auto pieces = cydaw::base::TextList::fromTokens(text.substring(2).upToFirstOccurrenceOf("?", false, false), "/", "");
         if (pieces.size() < 2 || pieces.size() > 3) { error_ = "Invalid help route"; return {}; }
         locale = juce::URL::removeEscapeChars(pieces[0]);
         text = juce::URL::removeEscapeChars(pieces[1]) + (pieces.size() == 3 ? "#" + juce::URL::removeEscapeChars(pieces[2]) : "")
              + (text.containsChar('?') ? "?" + text.fromFirstOccurrenceOf("?", false, false) : "");
     } else if (text.startsWithChar('#')) text = page_ + text;
-    const auto query = text.containsChar('?') ? text.fromFirstOccurrenceOf("?", false, false) : juce::String();
+    const auto query = text.containsChar('?') ? text.fromFirstOccurrenceOf("?", false, false) : cydaw::base::Text();
     text = text.upToFirstOccurrenceOf("?", false, false);
     auto id = text.upToFirstOccurrenceOf("#", false, false);
-    auto anchor = text.containsChar('#') ? text.fromFirstOccurrenceOf("#", false, false) : juce::String();
-    juce::StringPairArray state;
-    for (const auto& item : juce::StringArray::fromTokens(query, "&", "")) if (item.containsChar('='))
+    auto anchor = text.containsChar('#') ? text.fromFirstOccurrenceOf("#", false, false) : cydaw::base::Text();
+    cydaw::base::TextMap state;
+    for (const auto& item : cydaw::base::TextList::fromTokens(query, "&", "")) if (item.containsChar('='))
         state.set(juce::URL::removeEscapeChars(item.upToFirstOccurrenceOf("=", false, false)),juce::URL::removeEscapeChars(item.fromFirstOccurrenceOf("=", false, false)));
     return link(id, anchor, locale, state);
 }
@@ -91,16 +92,16 @@ cydaw::base::Value HelpDocumentation::command(const cydaw::base::Value& request,
     if (requestedLocale != "en" && requestedLocale != "fr") return "Help language: en or fr";
     locale_ = requestedLocale;
     if (action == "open" || action == "navigate" || action == "follow") {
-        const auto requestedPage = request.getProperty("topic", request.getProperty("page", action == "navigate" ? page_ : juce::String())).toString();
+        const auto requestedPage = request.getProperty("topic", request.getProperty("page", action == "navigate" ? page_ : cydaw::base::Text())).toString();
         const auto requestedAnchor = request.getProperty("section", request.getProperty("anchor", {})).toString();
-        juce::StringPairArray state;
+        cydaw::base::TextMap state;
         if (const auto* object = request.getProperty("state", {}).getDynamicObject())
             for (const auto& value : object->getProperties()) state.set(value.name.toString(), value.value.toString());
         lastUrl_ = action == "follow" ? follow(request.getProperty("target", {}).toString(), locale_) : link(requestedPage, requestedAnchor, locale_, state);
         if (lastUrl_.isEmpty()) return error_;
         if (lastUrl_.contains("#/")) {
-            const auto route = juce::StringArray::fromTokens(lastUrl_.fromFirstOccurrenceOf("#/", false, false).upToFirstOccurrenceOf("?", false, false), "/", "");
-            if (route.size() >= 2) { locale_ = juce::URL::removeEscapeChars(route[0]); page_ = juce::URL::removeEscapeChars(route[1]); anchor_ = route.size() > 2 ? juce::URL::removeEscapeChars(route[2]) : juce::String(); }
+            const auto route = cydaw::base::TextList::fromTokens(lastUrl_.fromFirstOccurrenceOf("#/", false, false).upToFirstOccurrenceOf("?", false, false), "/", "");
+            if (route.size() >= 2) { locale_ = juce::URL::removeEscapeChars(route[0]); page_ = juce::URL::removeEscapeChars(route[1]); anchor_ = route.size() > 2 ? cydaw::base::Text(juce::URL::removeEscapeChars(route[2])) : cydaw::base::Text(); }
         }
         ++requests_; launchSuppressed_ = !allowBrowser || !bool(request.getProperty("launch", true));
         launched_ = !launchSuppressed_ && juce::URL(lastUrl_).launchInDefaultBrowser();

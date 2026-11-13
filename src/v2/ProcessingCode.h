@@ -38,12 +38,12 @@ namespace cydaw::v2::processing {
 
 struct Setting {
     int index {};            // 0-based: param1 / slider1 is 0
-    juce::String name;
+    cydaw::base::Text name;
     double minimum {};
     double maximum { 1.0 };
     double step {};
     double defaultValue {};
-    juce::StringArray choices; // a JSFX slider's names, else empty
+    cydaw::base::TextList choices; // a JSFX slider's names, else empty
 };
 
 // ---- Note scripts ----
@@ -59,14 +59,14 @@ struct ScriptNote {
 
 struct NoteScriptResult {
     bool ok {};
-    juce::String error;
+    cydaw::base::Text error;
     std::vector<ScriptNote> notes;
 };
 
 // Its settings (the param lines) and whether it compiles (an error, else empty).
-[[nodiscard]] std::vector<Setting> noteScriptSettings(const juce::String& source);
-[[nodiscard]] juce::String checkNoteScript(const juce::String& source);
-[[nodiscard]] NoteScriptResult runNoteScript(const juce::String& source, std::vector<ScriptNote> notes,
+[[nodiscard]] std::vector<Setting> noteScriptSettings(const cydaw::base::Text& source);
+[[nodiscard]] cydaw::base::Text checkNoteScript(const cydaw::base::Text& source);
+[[nodiscard]] NoteScriptResult runNoteScript(const cydaw::base::Text& source, std::vector<ScriptNote> notes,
                                              const std::map<int, double>& values, double tempo, double clipLength,
                                              std::uint32_t seed);
 
@@ -74,14 +74,14 @@ struct NoteScriptResult {
 
 struct JsfxInfo {
     bool ok {};
-    juce::String error;
-    juce::String name;
+    cydaw::base::Text error;
+    cydaw::base::Text name;
     std::vector<Setting> sliders;
 };
-[[nodiscard]] JsfxInfo inspectJsfx(const juce::String& source);
+[[nodiscard]] JsfxInfo inspectJsfx(const cydaw::base::Text& source);
 // The sound through the script (stereo in and out), `frames` long (past the
 // input: silence fed in, a tail let ring); its delay taken off.
-[[nodiscard]] cydaw::base::Result renderJsfx(const juce::String& source, const std::map<int, double>& values,
+[[nodiscard]] cydaw::base::Result renderJsfx(const cydaw::base::Text& source, const std::map<int, double>& values,
                                       engine::repair::Channels& channels, double rate, std::int64_t frames,
                                       const std::atomic<bool>* cancel = nullptr);
 

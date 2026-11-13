@@ -10,22 +10,22 @@ namespace rhythmd = engine::rhythm;
 constexpr ImU32 kRhythmGrain = IM_COL32(255, 214, 140, 255);
 constexpr ImU32 kRhythmBackwards = IM_COL32(140, 190, 255, 255);
 
-juce::String rhythmOnOff(const double value)
+cydaw::base::Text rhythmOnOff(const double value)
 {
     return value >= 0.5 ? ui::Ls("Actif", "On") : ui::Ls("Coupé", "Off");
 }
 
 // A note value's name ("1/16"); 0 is free where a value may be.
-juce::String rhythmNoteName(const double value)
+cydaw::base::Text rhythmNoteName(const double value)
 {
     if (const auto* division = engine::noteDivisionFor(static_cast<float>(value)))
-        return juce::String(std::string(division->name));
+        return cydaw::base::Text(std::string(division->name));
     return ui::Ls("Libre", "Free");
 }
 
-juce::String rhythmChoiceName(const rhythmd::RhythmChoice& choice)
+cydaw::base::Text rhythmChoiceName(const rhythmd::RhythmChoice& choice)
 {
-    return juce::String::fromUTF8(ui::french() ? choice.french : choice.english);
+    return cydaw::base::Text::fromUTF8(ui::french() ? choice.french : choice.english);
 }
 
 // The processor's readings when it gave them all, else none.
@@ -399,9 +399,9 @@ struct RhythmPending {
     int target {};
     double since {};
 };
-std::map<juce::String, RhythmPending>& rhythmPending()
+std::map<cydaw::base::Text, RhythmPending>& rhythmPending()
 {
-    static std::map<juce::String, RhythmPending> pending;
+    static std::map<cydaw::base::Text, RhythmPending> pending;
     return pending;
 }
 
@@ -487,10 +487,10 @@ bool rhythmBoucleurDisplay(std::vector<Param>& parameters, const Pane& pane, con
     // What it says: what it does, the loop's length and layers, at the top
     // band's right (its left holds the title).
     {
-        const auto dot = juce::String::fromUTF8("  \xc2\xb7  ");
-        juce::String said = rhythmChoiceName(boucleurStateOf(static_cast<float>(actual)));
+        const auto dot = cydaw::base::Text::fromUTF8("  \xc2\xb7  ");
+        cydaw::base::Text said = rhythmChoiceName(boucleurStateOf(static_cast<float>(actual)));
         if (length > 0.0f) {
-            said << dot << juce::String(length, 2) << " s";
+            said << dot << cydaw::base::Text(length, 2) << " s";
             if (layers > 0)
                 said << dot << layers << (ui::french() ? (layers > 1 ? " couches" : " couche") : (layers > 1 ? " layers" : " layer"));
         }
@@ -498,7 +498,7 @@ bool rhythmBoucleurDisplay(std::vector<Param>& parameters, const Pane& pane, con
         if (large)
             said << dot
                  << (bars <= 0 ? ui::Ls("libre", "free")
-                               : juce::String(bars) + (ui::french() ? (bars > 1 ? " mesures" : " mesure") : (bars > 1 ? " bars" : " bar")));
+                               : cydaw::base::Text(bars) + (ui::french() ? (bars > 1 ? " mesures" : " mesure") : (bars > 1 ? " bars" : " bar")));
         text(list, ImVec2(box.max.x - dp(8.0f) - textSize(said.toRawUTF8(), scale).x, box.min.y + dp(large ? 4.0f : 3.0f)),
              actual == 1 ? p.record : p.textDim, said.toRawUTF8(), scale);
     }
@@ -532,10 +532,10 @@ bool rhythmBoucleurDisplay(std::vector<Param>& parameters, const Pane& pane, con
         if (actual == boucleurWaiting && std::fmod(ImGui::GetTime(), 0.8) < 0.4)
             list->AddRect(strip.min, strip.max, theme::alpha(p.record, 0.9f), dp(3.0f), dp(1.5f));
         if (values[boucleurReverse] >= 0.5f || std::abs(boucleurSpeedOf(values[boucleurSpeed]) - 1.0) > 1.0e-6) {
-            juce::String how = values[boucleurReverse] >= 0.5f ? ui::Ls("inversé ", "reversed ") : juce::String();
-            how << (boucleurSpeedOf(values[boucleurSpeed]) < 1.0 ? juce::String::fromUTF8("\xc2\xbd\xc3\x97")
-                                                                 : boucleurSpeedOf(values[boucleurSpeed]) > 1.0 ? juce::String::fromUTF8("2\xc3\x97")
-                                                                                                                : juce::String());
+            cydaw::base::Text how = values[boucleurReverse] >= 0.5f ? ui::Ls("inversé ", "reversed ") : cydaw::base::Text();
+            how << (boucleurSpeedOf(values[boucleurSpeed]) < 1.0 ? cydaw::base::Text::fromUTF8("\xc2\xbd\xc3\x97")
+                                                                 : boucleurSpeedOf(values[boucleurSpeed]) > 1.0 ? cydaw::base::Text::fromUTF8("2\xc3\x97")
+                                                                                                                : cydaw::base::Text());
             text(list, ImVec2(strip.max.x - textSize(how.toRawUTF8(), 0.56f).x - dp(4.0f), strip.min.y + dp(2.0f)), p.textFaint, how.toRawUTF8(),
                  0.56f);
         }
@@ -661,25 +661,25 @@ std::vector<int> rhythmCardFields(const PaneKind kind, std::vector<Param>& param
 }
 
 // A value as these effects show it; empty for none of theirs.
-juce::String rhythmFormat(const juce::String& binding, const double value)
+cydaw::base::Text rhythmFormat(const cydaw::base::Text& binding, const double value)
 {
     using namespace rhythmd;
-    const auto whole16 = [](const double v) { return juce::String(juce::roundToInt(v)) + "/16"; };
+    const auto whole16 = [](const double v) { return cydaw::base::Text(juce::roundToInt(v)) + "/16"; };
     const auto semitones = [](const double v) {
         const auto rounded = std::round(v * 10.0) / 10.0;
-        return (rounded > 0.0 ? "+" : "") + juce::String(rounded, std::abs(rounded - std::round(rounded)) < 1.0e-6 ? 0 : 1) + " st";
+        return (rounded > 0.0 ? "+" : "") + cydaw::base::Text(rounded, std::abs(rounded - std::round(rounded)) < 1.0e-6 ? 0 : 1) + " st";
     };
     // Grains.
     if (binding.endsWith("grains.pitch"))
         return semitones(value);
     if (binding.endsWith("grains.pitchRandom"))
-        return value < 0.05 ? ui::Ls("Aucun", "Off") : juce::String::fromUTF8("\xc2\xb1") + juce::String(value, 1) + " st";
+        return value < 0.05 ? ui::Ls("Aucun", "Off") : cydaw::base::Text::fromUTF8("\xc2\xb1") + cydaw::base::Text(value, 1) + " st";
     if (binding.endsWith("grains.sync"))
         return rhythmNoteName(value);
     if (binding.endsWith("grains.freeze"))
         return rhythmOnOff(value);
     if (binding.endsWith("grains.density"))
-        return juce::String(value, value < 10.0 ? 1 : 0) + ui::Ls(" grains/s", " grains/s");
+        return cydaw::base::Text(value, value < 10.0 ? 1 : 0) + ui::Ls(" grains/s", " grains/s");
     if (binding.endsWith("grains.feedback") || binding.endsWith("grains.mix") || binding.endsWith("grains.stereo")
         || binding.endsWith("grains.reverseChance"))
         return percent(value);
@@ -704,12 +704,12 @@ juce::String rhythmFormat(const juce::String& binding, const double value)
         const auto bars = boucleurBarsOf(static_cast<float>(value));
         if (bars <= 0)
             return ui::Ls("Libre", "Free");
-        return juce::String(bars) + (ui::french() ? (bars > 1 ? " mesures" : " mesure") : (bars > 1 ? " bars" : " bar"));
+        return cydaw::base::Text(bars) + (ui::french() ? (bars > 1 ? " mesures" : " mesure") : (bars > 1 ? " bars" : " bar"));
     }
     if (binding.endsWith("boucleur.speed")) {
         const auto speed = boucleurSpeedOf(static_cast<float>(value));
-        return speed < 1.0 ? juce::String::fromUTF8("\xc2\xbd\xc3\x97") : speed > 1.0 ? juce::String::fromUTF8("2\xc3\x97")
-                                                                                     : juce::String::fromUTF8("1\xc3\x97");
+        return speed < 1.0 ? cydaw::base::Text::fromUTF8("\xc2\xbd\xc3\x97") : speed > 1.0 ? cydaw::base::Text::fromUTF8("2\xc3\x97")
+                                                                                     : cydaw::base::Text::fromUTF8("1\xc3\x97");
     }
     if (binding.endsWith("boucleur.quantize"))
         return value >= 0.5 ? ui::Ls("À la mesure", "On the bar") : ui::Ls("Aussitôt", "At once");
@@ -721,7 +721,7 @@ juce::String rhythmFormat(const juce::String& binding, const double value)
 }
 
 // A parameter of theirs that takes whole steps (a choice, a switch).
-bool rhythmStepped(const juce::String& binding)
+bool rhythmStepped(const cydaw::base::Text& binding)
 {
     for (const auto* suffix : { "grains.sync", "grains.freeze", "saccade.interval", "saccade.offset", "saccade.gate", "saccade.grid",
                                 "saccade.mode", "saccade.repeat", "boucleur.state", "boucleur.bars", "boucleur.quantize", "boucleur.speed",

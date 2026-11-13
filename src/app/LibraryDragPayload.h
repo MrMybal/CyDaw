@@ -23,25 +23,25 @@ struct LauncherClipDragSource {
 };
 
 [[nodiscard]] inline cydaw::base::Value makeSampleDragPayload(
-    const juce::File& file)
+    const cydaw::base::File& file)
 {
-    if (file == juce::File {})
+    if (file == cydaw::base::File {})
         return {};
-    return juce::String(sampleDragPayloadPrefix)
+    return cydaw::base::Text(sampleDragPayloadPrefix)
            + file.getFullPathName();
 }
 
-[[nodiscard]] inline std::optional<juce::File> sampleFileFromDragPayload(
+[[nodiscard]] inline std::optional<cydaw::base::File> sampleFileFromDragPayload(
     const cydaw::base::Value& payload)
 {
     const auto description = payload.toString();
     if (!description.startsWith(sampleDragPayloadPrefix))
         return std::nullopt;
     const auto path = description.substring(
-        static_cast<int>(juce::String(sampleDragPayloadPrefix).length()));
+        static_cast<int>(cydaw::base::Text(sampleDragPayloadPrefix).length()));
     if (path.isEmpty())
         return std::nullopt;
-    return juce::File(path);
+    return cydaw::base::File(path);
 }
 
 [[nodiscard]] inline cydaw::base::Value makeLauncherClipDragPayload(
@@ -49,9 +49,9 @@ struct LauncherClipDragSource {
 {
     if (sceneIndex < 0)
         return {};
-    return juce::String(launcherClipDragPayloadPrefix)
-           + juce::String(static_cast<juce::int64>(trackIndex)) + ":"
-           + juce::String(sceneIndex);
+    return cydaw::base::Text(launcherClipDragPayloadPrefix)
+           + cydaw::base::Text(static_cast<juce::int64>(trackIndex)) + ":"
+           + cydaw::base::Text(sceneIndex);
 }
 
 [[nodiscard]] inline std::optional<LauncherClipDragSource>
@@ -61,7 +61,7 @@ launcherClipFromDragPayload(const cydaw::base::Value& payload)
     if (!description.startsWith(launcherClipDragPayloadPrefix))
         return std::nullopt;
     const auto encoded = description.substring(static_cast<int>(
-        juce::String(launcherClipDragPayloadPrefix).length()));
+        cydaw::base::Text(launcherClipDragPayloadPrefix).length()));
     const auto separator = encoded.indexOfChar(':');
     if (separator <= 0 || separator == encoded.length() - 1
         || encoded.indexOfChar(separator + 1, ':') >= 0)
@@ -86,89 +86,89 @@ launcherClipFromDragPayload(const cydaw::base::Value& payload)
 }
 
 [[nodiscard]] inline cydaw::base::Value makeFactoryDeviceDragPayload(
-    const juce::String& deviceKey)
+    const cydaw::base::Text& deviceKey)
 {
     if (deviceKey.isEmpty())
         return {};
-    return juce::String(factoryDeviceDragPayloadPrefix) + deviceKey;
+    return cydaw::base::Text(factoryDeviceDragPayloadPrefix) + deviceKey;
 }
 
-[[nodiscard]] inline std::optional<juce::String>
+[[nodiscard]] inline std::optional<cydaw::base::Text>
 factoryDeviceFromDragPayload(const cydaw::base::Value& payload)
 {
     const auto description = payload.toString();
     if (!description.startsWith(factoryDeviceDragPayloadPrefix))
         return std::nullopt;
     const auto key = description.substring(static_cast<int>(
-        juce::String(factoryDeviceDragPayloadPrefix).length()));
+        cydaw::base::Text(factoryDeviceDragPayloadPrefix).length()));
     if (key.isEmpty())
         return std::nullopt;
-    return juce::String::fromUTF8(key.toRawUTF8());
+    return cydaw::base::Text::fromUTF8(key.toRawUTF8());
 }
 
 [[nodiscard]] inline cydaw::base::Value makeGraphPresetDragPayload(
-    const juce::String& presetKey)
+    const cydaw::base::Text& presetKey)
 {
     if (presetKey.isEmpty())
         return {};
-    return juce::String(graphPresetDragPayloadPrefix) + presetKey;
+    return cydaw::base::Text(graphPresetDragPayloadPrefix) + presetKey;
 }
 
-[[nodiscard]] inline std::optional<juce::String>
+[[nodiscard]] inline std::optional<cydaw::base::Text>
 graphPresetFromDragPayload(const cydaw::base::Value& payload)
 {
     const auto description = payload.toString();
     if (!description.startsWith(graphPresetDragPayloadPrefix))
         return std::nullopt;
     const auto key = description.substring(static_cast<int>(
-        juce::String(graphPresetDragPayloadPrefix).length()));
+        cydaw::base::Text(graphPresetDragPayloadPrefix).length()));
     if (key.isEmpty())
         return std::nullopt;
-    return juce::String::fromUTF8(key.toRawUTF8());
+    return cydaw::base::Text::fromUTF8(key.toRawUTF8());
 }
 
 [[nodiscard]] inline cydaw::base::Value makeGraphPresetFileDragPayload(
-    const juce::File& file)
+    const cydaw::base::File& file)
 {
-    if (file == juce::File {})
+    if (file == cydaw::base::File {})
         return {};
-    return juce::String(graphPresetFileDragPayloadPrefix)
+    return cydaw::base::Text(graphPresetFileDragPayloadPrefix)
            + file.getFullPathName();
 }
 
-[[nodiscard]] inline std::optional<juce::File>
+[[nodiscard]] inline std::optional<cydaw::base::File>
 graphPresetFileFromDragPayload(const cydaw::base::Value& payload)
 {
     const auto description = payload.toString();
     if (!description.startsWith(graphPresetFileDragPayloadPrefix))
         return std::nullopt;
     const auto path = description.substring(static_cast<int>(
-        juce::String(graphPresetFileDragPayloadPrefix).length()));
+        cydaw::base::Text(graphPresetFileDragPayloadPrefix).length()));
     if (path.isEmpty())
         return std::nullopt;
-    return juce::File(path);
+    return cydaw::base::File(path);
 }
 
 [[nodiscard]] inline cydaw::base::Value makePluginDragPayload(
-    const juce::File& file)
+    const cydaw::base::File& file)
 {
-    if (file == juce::File {})
+    if (file == cydaw::base::File {})
         return {};
-    return juce::String(pluginDragPayloadPrefix)
+    return cydaw::base::Text(pluginDragPayloadPrefix)
            + file.getFullPathName();
 }
 
-[[nodiscard]] inline std::optional<juce::File> pluginFileFromDragPayload(
+[[nodiscard]] inline std::optional<cydaw::base::File> pluginFileFromDragPayload(
     const cydaw::base::Value& payload)
 {
     const auto description = payload.toString();
     if (!description.startsWith(pluginDragPayloadPrefix))
         return std::nullopt;
     const auto path = description.substring(static_cast<int>(
-        juce::String(pluginDragPayloadPrefix).length()));
+        cydaw::base::Text(pluginDragPayloadPrefix).length()));
     if (path.isEmpty())
         return std::nullopt;
-    return juce::File(path);
+    return cydaw::base::File(path);
 }
 
 } // namespace cydaw::app

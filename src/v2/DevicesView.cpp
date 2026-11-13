@@ -46,7 +46,7 @@ constexpr const char* cardPayload = "CYDAW_DEVICE_CARD";
 // Prisme plays the whole voice: the voice section's other cards (the
 // allocator, the envelope, the gain, the voice filter) do nothing it does
 // not, and stay out of sight. Kick and the synth family's models the same.
-bool wholeVoiceType(const juce::String& typeKey)
+bool wholeVoiceType(const cydaw::base::Text& typeKey)
 {
     return typeKey == "prism-synth" || typeKey == "kick-synth" || SynthView::handles(typeKey) || BatterieView::handles(typeKey)
            || RackView::handles(typeKey);
@@ -58,13 +58,13 @@ ImU32 toImColour(const juce::Colour colour)
     return IM_COL32(colour.getRed(), colour.getGreen(), colour.getBlue(), colour.getAlpha());
 }
 
-juce::String fold(const juce::String& text)
+cydaw::base::Text fold(const cydaw::base::Text& text)
 {
     auto out = text.toLowerCase();
     static const char* pairs[][2] = { { "é", "e" }, { "è", "e" }, { "ê", "e" }, { "à", "a" }, { "â", "a" },
                                       { "î", "i" }, { "ô", "o" }, { "ù", "u" }, { "û", "u" }, { "ç", "c" } };
     for (const auto& pair : pairs)
-        out = out.replace(juce::String::fromUTF8(pair[0]), pair[1]);
+        out = out.replace(cydaw::base::Text::fromUTF8(pair[0]), pair[1]);
     return out;
 }
 
@@ -263,13 +263,13 @@ void DevicesView::draw()
         // a keyboard), lit as a message goes by; a meter for each audio
         // input (a card's input, what tracks route into it).
         struct Light {
-            juce::String tip;
+            cydaw::base::Text tip;
             std::uint32_t counter {};
             bool heard {};
             std::string key;
         };
         std::vector<Light> lights;
-        std::vector<std::pair<juce::String, float>> meters;
+        std::vector<std::pair<cydaw::base::Text, float>> meters;
         if (!track.master && !track.isBus() && track.pad < 0) {
             auto& engine = studio_.engine();
             const auto prefix = (track.midi ? "m" : "a") + std::to_string(track.midi ? track.midiId : track.audioIndex) + ":";
@@ -358,7 +358,7 @@ void DevicesView::draw()
                         && ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows)) {
                         char text[32];
                         std::snprintf(text, sizeof(text), "%.1f dB", level > 1.0e-5f ? 20.0f * std::log10(level) : -100.0f);
-                        ui::tooltip((ui::Ls("Entrée audio : ", "Audio input: ") + tip + "  " + juce::String(text)).toRawUTF8());
+                        ui::tooltip((ui::Ls("Entrée audio : ", "Audio input: ") + tip + "  " + cydaw::base::Text(text)).toRawUTF8());
                     }
                     meterX += meterWide + dp(2.0f);
                 }
@@ -391,7 +391,7 @@ void DevicesView::draw()
         auto y = origin.y + dp(8.0f);
         const auto nameBottom = presetsTop - dp(hybridButton ? 38.0f : 14.0f);
         for (auto index = 0; index < name.length() && y < nameBottom; ++index) {
-            const auto glyph = juce::String::charToString(name[index]).toUpperCase();
+            const auto glyph = cydaw::base::Text::charToString(name[index]).toUpperCase();
             const auto glyphSize = ImGui::CalcTextSize(glyph.toRawUTF8());
             list->AddText(ImVec2(origin.x + (size.x - glyphSize.x) * 0.5f + dp(2.0f), y), p.textDim, glyph.toRawUTF8());
             y += glyphSize.y * 0.92f;
@@ -406,7 +406,7 @@ void DevicesView::draw()
             const auto chains = studio_.factoryChains(track);
             const auto holderKey = holder->key;
             const PresetMenu::Programs factory {
-                [this, &chains, &holderKey](juce::StringArray& names, int& current) {
+                [this, &chains, &holderKey](cydaw::base::TextList& names, int& current) {
                     const auto shown = studio_.presetName(holderKey);
                     for (const auto& [key, name] : chains) {
                         if (name == shown)
@@ -415,7 +415,7 @@ void DevicesView::draw()
                     }
                     return !chains.empty();
                 },
-                [this, &chains, track](const int index, juce::String& error) {
+                [this, &chains, track](const int index, cydaw::base::Text& error) {
                     if (index < 0 || index >= static_cast<int>(chains.size()))
                         return false;
                     const auto applied = studio_.applyFactoryChain(track, chains[static_cast<std::size_t>(index)].first);
@@ -424,7 +424,7 @@ void DevicesView::draw()
                 },
                 L("CHAÎNES DE CYDAW (REMPLACENT TOUTE LA CHAÎNE)", "CYDAW'S CHAINS (REPLACE THE WHOLE CHAIN)") };
             presets_.button("chainPresets", *holder, [this, track] { return studio_.chainPresetState(track); },
-                            [this, track](const cydaw::base::Value& preset, juce::String& error) {
+                            [this, track](const cydaw::base::Value& preset, cydaw::base::Text& error) {
                                 return studio_.applyChainPreset(track, preset, error);
                             },
                             ImVec2(dp(20.0f), dp(20.0f)), chains.empty() ? nullptr : &factory,
@@ -447,7 +447,7 @@ void DevicesView::draw()
 
     // Where the modulation puts each parameter it moves, as a knob position:
     // the graph's own cables, then the track's modulation.
-    std::map<juce::String, float> modulated = graph.editorModulatedParameters();
+    std::map<cydaw::base::Text, float> modulated = graph.editorModulatedParameters();
     if (!track.midi && studio_.modulationActive(track)) {
         const auto output = studio_.modulationOutput(track);
         for (const auto& target : studio_.modulationTargets(track)) {
@@ -938,9 +938,9 @@ void DevicesView::drawCard(Strip& strip, const app::NodeGraphComponent::EditorNo
         ImGui::SameLine(0.0f, dp(2.0f));
         // Its modulators: an LFO, steps, an envelope... dragged onto knobs.
         const auto modulatorTip = modulatorCount > 0
-                                      ? juce::String(columnOpen ? "Hide" : "Show") + " its modulators ("
-                                            + juce::String(static_cast<int>(modulatorCount)) + ")"
-                                      : juce::String("Modulators: an LFO, steps, an envelope, a macro... moving its knobs");
+                                      ? cydaw::base::Text(columnOpen ? "Hide" : "Show") + " its modulators ("
+                                            + cydaw::base::Text(static_cast<int>(modulatorCount)) + ")"
+                                      : cydaw::base::Text("Modulators: an LFO, steps, an envelope, a macro... moving its knobs");
         if (ui::iconButton(icon::modulation, modulatorTip.toRawUTF8(), columnOpen || modulatorCount > 0, p.modulation, button))
             modulators_->setOpen(node->id, !columnOpen);
         ImGui::SameLine(0.0f, dp(2.0f));
@@ -1049,7 +1049,7 @@ void DevicesView::drawCard(Strip& strip, const app::NodeGraphComponent::EditorNo
         if (const auto holder = studio_.devicePresetHolder(track, node->id)) {
             const auto nodeId = node->id;
             presets_.button("devicePresets", *holder, [this, track, nodeId] { return studio_.devicePresetState(track, nodeId); },
-                            [this, track, nodeId](const cydaw::base::Value& preset, juce::String& error) {
+                            [this, track, nodeId](const cydaw::base::Value& preset, cydaw::base::Text& error) {
                                 return studio_.applyDevicePreset(track, nodeId, preset, error);
                             },
                             button);
@@ -1070,7 +1070,7 @@ void DevicesView::drawCard(Strip& strip, const app::NodeGraphComponent::EditorNo
         ImGui::PushFont(theme::boldFont(), ui::currentFontBase() * 0.8f);
         auto y = origin.y + dp(30.0f);
         for (auto index = 0; index < node->title.length() && y < origin.y + height - dp(14.0f); ++index) {
-            const auto glyph = juce::String::charToString(node->title[index]);
+            const auto glyph = cydaw::base::Text::charToString(node->title[index]);
             const auto glyphSize = ImGui::CalcTextSize(glyph.toRawUTF8());
             list->AddText(ImVec2(origin.x + (width - glyphSize.x) * 0.5f, y), p.textDim, glyph.toRawUTF8());
             y += glyphSize.y * 0.9f;
@@ -1130,7 +1130,7 @@ void DevicesView::drawCard(Strip& strip, const app::NodeGraphComponent::EditorNo
             list->AddRectFilled(ImVec2(centre - dp(1.5f), y + size * 0.55f), ImVec2(centre + dp(1.5f), y + size * 1.15f), p.bg0);
             list->AddCircleFilled(ImVec2(centre, y + size * 1.38f), dp(1.8f), p.bg0);
             y += size * 1.7f + dp(10.0f);
-            const auto line = [&](const juce::String& text, const ImU32 lineColour, const float scale, ImFont* font) {
+            const auto line = [&](const cydaw::base::Text& text, const ImU32 lineColour, const float scale, ImFont* font) {
                 ImGui::PushFont(font, ui::currentFontBase() * scale);
                 ui::centredText(list, ImVec2(min.x + dp(6.0f), y), ImVec2(max.x - dp(6.0f), y + ImGui::GetFontSize()), lineColour,
                                 text.toRawUTF8());
@@ -1141,7 +1141,7 @@ void DevicesView::drawCard(Strip& strip, const app::NodeGraphComponent::EditorNo
                  theme::boldFont());
             line(node->title, p.textDim, 0.9f, nullptr);
             if (vendor.isNotEmpty() || format.isNotEmpty())
-                line(vendor + (vendor.isNotEmpty() && format.isNotEmpty() ? juce::String::fromUTF8(" · ") : juce::String()) + format,
+                line(vendor + (vendor.isNotEmpty() && format.isNotEmpty() ? cydaw::base::Text::fromUTF8(" · ") : cydaw::base::Text()) + format,
                      p.textFaint, 0.8f, nullptr);
             ImGui::SetCursorScreenPos(min);
             ImGui::InvisibleButton("##missing", ImVec2(missingWidth, bodyHeight));
@@ -1189,9 +1189,9 @@ void DevicesView::drawCard(Strip& strip, const app::NodeGraphComponent::EditorNo
         }
         if (designed) {
             ImGui::SetCursorScreenPos(ImVec2(x, origin.y + bodyTop));
-            const auto playedId = "designed" + juce::String(static_cast<juce::int64>(node->id));
+            const auto playedId = "designed" + cydaw::base::Text(static_cast<juce::int64>(node->id));
             designed_->drawPlayed(playedId.toRawUTF8(), *designed, ImVec2(designedWidth, bodyHeight - dp(4.0f)),
-                                  [&graph, this](const juce::String& key, const double value) {
+                                  [&graph, this](const cydaw::base::Text& key, const double value) {
                                       (void) graph.editorSetParameter(key, value);
                                       state_.focused = Panel::devices;
                                   }, &graph.editorAnalysis());
@@ -1296,24 +1296,24 @@ const app::NodeGraphComponent::EditorParameter* containerSetting(const app::Node
     const auto* setting = effect != nullptr ? engine::effectParameter(*effect, key) : nullptr;
     if (setting == nullptr)
         return nullptr;
-    const auto suffix = "." + juce::String(std::string(setting->suffix));
+    const auto suffix = "." + cydaw::base::Text(std::string(setting->suffix));
     for (const auto& parameter : head.parameters)
         if (parameter.binding.endsWith(suffix))
             return &parameter;
     return nullptr;
 }
 
-juce::String branchName(const engine::NativeDspNodeKind kind, const int branch)
+cydaw::base::Text branchName(const engine::NativeDspNodeKind kind, const int branch)
 {
     if (const auto* word = engine::container::branchWord(kind))
-        return juce::String(word) + " " + juce::String(branch + 1);
+        return cydaw::base::Text(word) + " " + cydaw::base::Text(branch + 1);
     if (const auto* name = engine::container::fixedBranchName(kind, branch))
         return name;
-    return "Chain " + juce::String(branch + 1);
+    return "Chain " + cydaw::base::Text(branch + 1);
 }
 
 // Its name given by hand, else its usual one.
-juce::String branchName(const app::NodeGraphComponent& graph, const std::uint64_t head, const engine::NativeDspNodeKind kind,
+cydaw::base::Text branchName(const app::NodeGraphComponent& graph, const std::uint64_t head, const engine::NativeDspNodeKind kind,
                         const int branch)
 {
     const auto named = graph.editorBranchName(head, branch);
@@ -1337,7 +1337,7 @@ void DevicesView::drawContainerPanel(Strip& strip, const app::NodeGraphComponent
     const auto count = static_cast<int>(container->branches.size());
     auto& shown = state_.containerBranch[{ trackKey_, head.id }];
     shown = std::clamp(shown, 0, std::max(0, count - 1));
-    const auto set = [&graph, this](const juce::String& binding, const double value) {
+    const auto set = [&graph, this](const cydaw::base::Text& binding, const double value) {
         (void) graph.editorSetParameter(binding, value);
         state_.focused = Panel::devices;
     };
@@ -1531,7 +1531,7 @@ void DevicesView::drawContainerPanel(Strip& strip, const app::NodeGraphComponent
         if (container->postBranch >= 0) {
             const auto post = container->postBranch;
             const auto cards = container->branches[static_cast<std::size_t>(post)].size();
-            const auto label = juce::String("Post FX") + (cards > 0 ? "  (" + juce::String(static_cast<int>(cards)) + ")" : juce::String());
+            const auto label = cydaw::base::Text("Post FX") + (cards > 0 ? "  (" + cydaw::base::Text(static_cast<int>(cards)) + ")" : cydaw::base::Text());
             ImGui::SetCursorScreenPos(ImVec2(at.x + dp(6.0f), y));
             if (ImGui::Selectable(label.toRawUTF8(), shown == post, ImGuiSelectableFlags_None, ImVec2(size.x - dp(12.0f), dp(20.0f))))
                 shown = post;
@@ -1656,13 +1656,13 @@ void DevicesView::drawContainerPanel(Strip& strip, const app::NodeGraphComponent
                 // How many cards it holds.
                 const auto cards = container->branches[static_cast<std::size_t>(branch)].size();
                 if (cards > 0) {
-                    const auto badge = juce::String(static_cast<int>(cards));
+                    const auto badge = cydaw::base::Text(static_cast<int>(cards));
                     const auto width = ImGui::CalcTextSize(badge.toRawUTF8()).x;
                     rows->AddText(ImVec2(rowEnd.x - controls - width - dp(4.0f), rowTop.y + (rowHeight - ImGui::GetFontSize()) * 0.5f),
                                   p.textFaint, badge.toRawUTF8());
                 }
                 auto controlX = rowEnd.x - controls;
-                const auto number = juce::String(branch + 1);
+                const auto number = cydaw::base::Text(branch + 1);
                 if (layered) {
                     if (kind != engine::NativeDspNodeKind::fxSelector) {
                         ImGui::SetCursorScreenPos(ImVec2(controlX, rowTop.y + dp(2.0f)));
@@ -1837,7 +1837,7 @@ void DevicesView::drawBranchRename(app::NodeGraphComponent& graph)
     ImGui::SetNextItemWidth(dp(200.0f));
     if (ImGui::InputText("##branchName", branchNameBuffer_, sizeof(branchNameBuffer_), ImGuiInputTextFlags_EnterReturnsTrue)) {
         if (renamedBranch_)
-            (void) graph.editorRenameBranch(renamedBranch_->first, renamedBranch_->second, juce::String::fromUTF8(branchNameBuffer_));
+            (void) graph.editorRenameBranch(renamedBranch_->first, renamedBranch_->second, cydaw::base::Text::fromUTF8(branchNameBuffer_));
         renamedBranch_.reset();
         state_.focused = Panel::devices;
         ImGui::CloseCurrentPopup();
@@ -1846,7 +1846,7 @@ void DevicesView::drawBranchRename(app::NodeGraphComponent& graph)
 }
 
 void DevicesView::drawValueList(const TrackRef& track, app::NodeGraphComponent& graph, const app::NodeGraphComponent::EditorNode& node,
-                                const ImVec2 at, const ImVec2 size, const ImU32 colour, const std::map<juce::String, float>& modulated)
+                                const ImVec2 at, const ImVec2 size, const ImU32 colour, const std::map<cydaw::base::Text, float>& modulated)
 {
     const auto& p = theme::palette();
     auto* list = ImGui::GetWindowDrawList();
@@ -1856,7 +1856,7 @@ void DevicesView::drawValueList(const TrackRef& track, app::NodeGraphComponent& 
     ImGui::SetCursorScreenPos(ImVec2(at.x + dp(4.0f), at.y + dp(4.0f)));
     ImGui::SetNextItemWidth(size.x - dp(8.0f));
     ImGui::InputTextWithHint("##search", L("Chercher une valeur…", "Find a value…"), search.data(), search.size());
-    const auto filter = juce::String::fromUTF8(search.data()).trim();
+    const auto filter = cydaw::base::Text::fromUTF8(search.data()).trim();
     // Every value of the card, those touched first (the last at the top),
     // then the others as the card lists them.
     std::vector<std::pair<std::uint64_t, const app::NodeGraphComponent::EditorParameter*>> order;
@@ -1921,8 +1921,8 @@ void DevicesView::drawValueList(const TrackRef& track, app::NodeGraphComponent& 
             if (auto* host = ui::modulationHost())
                 host->modulationsOf(parameter->binding.toStdString(), moving);
             for (const auto& modulation : moving)
-                text << juce::String::fromUTF8("  \xe2\x86\x9d ") << juce::String(modulation.name)
-                     << juce::String::formatted(" %+.2f", modulation.amount);
+                text << cydaw::base::Text::fromUTF8("  \xe2\x86\x9d ") << cydaw::base::Text(modulation.name)
+                     << cydaw::base::Text::formatted(" %+.2f", modulation.amount);
             ImGui::PushFont(nullptr, ui::currentFontBase() * 0.85f);
             ui::clippedText(rows, ImVec2(textX, rowTop.y + dp(15.0f)), textWidth, moving.empty() ? p.textDim : p.modulation,
                             text.toRawUTF8());
@@ -1946,7 +1946,7 @@ void DevicesView::drawValueList(const TrackRef& track, app::NodeGraphComponent& 
     ImGui::EndChild();
 }
 
-void DevicesView::drawPluginValueList(const TrackRef& track, const std::size_t plugin, const juce::String& pluginName,
+void DevicesView::drawPluginValueList(const TrackRef& track, const std::size_t plugin, const cydaw::base::Text& pluginName,
                                       PluginParameters& parameters, const ImVec2 at, const ImVec2 size)
 {
     const auto& p = theme::palette();
@@ -1968,7 +1968,7 @@ void DevicesView::drawPluginValueList(const TrackRef& track, const std::size_t p
     ImGui::SetNextItemWidth(size.x - dp(8.0f));
     ImGui::PushID(static_cast<int>(plugin));
     ImGui::InputTextWithHint("##pluginSearch", L("Chercher une valeur…", "Find a value…"), search.data(), search.size());
-    const auto filter = juce::String::fromUTF8(search.data()).trim();
+    const auto filter = cydaw::base::Text::fromUTF8(search.data()).trim();
     std::vector<std::pair<std::uint64_t, app::IsolatedPluginHost::ParameterSnapshot*>> order;
     for (auto& parameter : parameters.values)
         if (filter.isEmpty() || parameter.name.containsIgnoreCase(filter))
@@ -2012,7 +2012,7 @@ void DevicesView::drawPluginValueList(const TrackRef& track, const std::size_t p
             const auto lane = Studio::pluginLaneName(plugin, parameter->index);
             const auto menu = [&] {
                 studio_.rememberPluginParameterName(lane, parameter->name);
-                openParameterMenu(track, lane, pluginName + juce::String::fromUTF8(" \xc2\xb7 ") + parameter->name);
+                openParameterMenu(track, lane, pluginName + cydaw::base::Text::fromUTF8(" \xc2\xb7 ") + parameter->name);
             };
             if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
                 menu();
@@ -2022,7 +2022,7 @@ void DevicesView::drawPluginValueList(const TrackRef& track, const std::size_t p
             ui::clippedText(rows, ImVec2(textX, rowTop.y + dp(1.0f)), textWidth, p.text, parameter->name.toRawUTF8());
             auto text = parameter->text.trim();
             if (text.isEmpty())
-                text = juce::String(parameter->value, 3);
+                text = cydaw::base::Text(parameter->value, 3);
             if (parameter->label.isNotEmpty() && !text.endsWithIgnoreCase(parameter->label))
                 text << " " << parameter->label;
             ImGui::PushFont(nullptr, ui::currentFontBase() * 0.85f);
@@ -2095,17 +2095,17 @@ void DevicesView::drawSoundModelPane(const TrackRef& track, app::NodeGraphCompon
                                               : ui::Ls("Piste › Recréer un son…", "Track › Recreate a sound…");
     // Its zones' notes, when it lists them, as their range ("C#3–G#5"); all
     // of it in its tooltip.
-    juce::String shown;
+    cydaw::base::Text shown;
     {
-        const auto separator = juce::String::fromUTF8(" \xc2\xb7 ");
+        const auto separator = cydaw::base::Text::fromUTF8(" \xc2\xb7 ");
         auto rest = description;
         while (rest.isNotEmpty()) {
             auto part = rest.upToFirstOccurrenceOf(separator, false, false);
             rest = rest.fromFirstOccurrenceOf(separator, false, false);
             if (part.contains(", "))
-                part = part.upToFirstOccurrenceOf(",", false, false) + juce::String::fromUTF8("\xe2\x80\x93")
+                part = part.upToFirstOccurrenceOf(",", false, false) + cydaw::base::Text::fromUTF8("\xe2\x80\x93")
                        + part.fromLastOccurrenceOf(", ", false, false);
-            shown << (shown.isEmpty() ? juce::String() : separator) << part;
+            shown << (shown.isEmpty() ? cydaw::base::Text() : separator) << part;
         }
     }
     const ImVec2 textMin(at.x + dp(4.0f), plotEnd.y + dp(2.0f));
@@ -2125,11 +2125,11 @@ void DevicesView::drawSoundModelPane(const TrackRef& track, app::NodeGraphCompon
         chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                               [this, track, nodeId](const juce::FileChooser& chooser) {
                                   const auto file = chooser.getResult();
-                                  if (file == juce::File())
+                                  if (file == cydaw::base::File())
                                       return;
                                   // On this very card, even inside a device.
                                   cydaw::base::Value json;
-                                  juce::String error;
+                                  cydaw::base::Text error;
                                   auto* slot = studio_.graphFor(track);
                                   if (slot == nullptr || app::loadSoundModelFile(file, json, error) == nullptr
                                       || !slot->graph().setNodeSoundModel(nodeId, json, error)) {
@@ -2144,7 +2144,7 @@ void DevicesView::drawSoundModelPane(const TrackRef& track, app::NodeGraphCompon
     if (model != nullptr) {
         ImGui::SetCursorScreenPos(ImVec2(end.x - dp(54.0f), plotEnd.y + dp(2.0f) + ImGui::GetFrameHeight()));
         if (ImGui::SmallButton(L("Lisible", "Readable"))) {
-            juce::String error;
+            cydaw::base::Text error;
             if (const auto made = studio_.buildReadablePatch(graph.nodeSoundModelJson(nodeId), error))
                 state_.selectTrack(*made);
             else {
@@ -2161,7 +2161,7 @@ void DevicesView::drawSoundModelPane(const TrackRef& track, app::NodeGraphCompon
     ImGui::PopFont();
 }
 
-void DevicesView::openParameterMenu(const TrackRef& track, const juce::String& binding, const juce::String& label)
+void DevicesView::openParameterMenu(const TrackRef& track, const cydaw::base::Text& binding, const cydaw::base::Text& label)
 {
     menuTrack_ = track;
     menuBinding_ = binding;
@@ -2202,17 +2202,17 @@ void DevicesView::drawParameterMenu()
 }
 
 DevicesView::PluginParameters& DevicesView::pluginParameters(const std::size_t trackIndex, const std::size_t pluginIndex,
-                                                             const juce::File& file, const bool refresh)
+                                                             const cydaw::base::File& file, const bool refresh)
 {
-    const auto key = juce::String(static_cast<juce::int64>(trackIndex)) + ":" + juce::String(static_cast<juce::int64>(pluginIndex))
+    const auto key = cydaw::base::Text(static_cast<juce::int64>(trackIndex)) + ":" + cydaw::base::Text(static_cast<juce::int64>(pluginIndex))
                      + ":" + file.getFullPathName();
     auto& entry = pluginParameters_[key];
-    const auto now = juce::Time::getMillisecondCounterHiRes() * 0.001;
+    const auto now = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
     if (refresh && now - entry.fetchedAt > 0.4) {
         entry.fetchedAt = now;
         std::vector<app::IsolatedPluginHost::ParameterSnapshot> fresh;
         const auto result = studio_.engine().refreshTrackPluginParameters(trackIndex, pluginIndex, fresh);
-        entry.error = result.failed() ? result.getErrorMessage() : juce::String();
+        entry.error = result.failed() ? result.getErrorMessage() : cydaw::base::Text();
         if (result.wasOk())
             entry.values = std::move(fresh);
     }
@@ -2238,7 +2238,7 @@ std::vector<std::uint32_t> DevicesView::shownParameters(const TrackRef& track, c
     return shown;
 }
 
-void DevicesView::pluginKnob(const TrackRef& track, const std::size_t plugin, const juce::String& pluginName,
+void DevicesView::pluginKnob(const TrackRef& track, const std::size_t plugin, const cydaw::base::Text& pluginName,
                              app::IsolatedPluginHost::ParameterSnapshot& parameter, const float diameter, const int labelLength)
 {
     const auto& p = theme::palette();
@@ -2276,12 +2276,12 @@ void DevicesView::pluginKnob(const TrackRef& track, const std::size_t plugin, co
     if (ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
         const auto lane = Studio::pluginLaneName(plugin, parameter.index);
         studio_.rememberPluginParameterName(lane, parameter.name);
-        openParameterMenu(track, lane, pluginName + juce::String::fromUTF8(" \xc2\xb7 ") + parameter.name);
+        openParameterMenu(track, lane, pluginName + cydaw::base::Text::fromUTF8(" \xc2\xb7 ") + parameter.name);
     }
     ImGui::PopID();
 }
 
-void DevicesView::openPluginWindow(const TrackRef& track, const std::size_t plugin, const juce::File& file, const juce::String& name)
+void DevicesView::openPluginWindow(const TrackRef& track, const std::size_t plugin, const cydaw::base::File& file, const cydaw::base::Text& name)
 {
     pluginWindowTrack_ = track;
     pluginPopupTrack_ = track.audioIndex;
@@ -2407,15 +2407,15 @@ void DevicesView::drawPlugins(const TrackRef& track, const float height)
             const auto pluginIndex = static_cast<int>(index);
             ImGui::PushID(pluginIndex);
             const PresetMenu::Programs programs {
-                [this, track, pluginIndex](juce::StringArray& names, int& current) {
+                [this, track, pluginIndex](cydaw::base::TextList& names, int& current) {
                     return studio_.pluginPrograms(track, pluginIndex, names, current);
                 },
-                [this, track, pluginIndex](const int program, juce::String& error) {
+                [this, track, pluginIndex](const int program, cydaw::base::Text& error) {
                     return studio_.selectPluginProgram(track, pluginIndex, program, error);
                 }
             };
             presets_.button("pluginPresets", *holder, [this, track, pluginIndex] { return studio_.pluginPresetState(track, pluginIndex); },
-                            [this, track, pluginIndex](const cydaw::base::Value& preset, juce::String& error) {
+                            [this, track, pluginIndex](const cydaw::base::Value& preset, cydaw::base::Text& error) {
                                 return studio_.applyPluginPreset(track, pluginIndex, preset, error);
                             },
                             button, &programs);
@@ -2512,7 +2512,7 @@ void DevicesView::drawPluginParameters()
     if (std::exchange(pluginWindowFocus_, false))
         ImGui::SetNextWindowFocus();
     auto open = true;
-    const auto title = pluginPopupName_ + juce::String::fromUTF8(" \xe2\x80\x94 ") + ui::Ls("paramètres", "parameters") + windowId;
+    const auto title = pluginPopupName_ + cydaw::base::Text::fromUTF8(" \xe2\x80\x94 ") + ui::Ls("paramètres", "parameters") + windowId;
     if (ImGui::Begin(title.toRawUTF8(), &open, ImGuiWindowFlags_NoCollapse)) {
         auto& parameters = pluginParameters(pluginPopupTrack_, pluginPopupIndex_, pluginPopupFile_,
                                             !ImGui::IsMouseDown(ImGuiMouseButton_Left));
@@ -2545,7 +2545,7 @@ void DevicesView::drawPluginParameters()
         ImGui::SameLine(ImGui::GetWindowWidth() - dp(36.0f));
         (void) ui::detachButton(windowId, ImVec2(dp(24.0f), dp(22.0f)));
 
-        const auto query = juce::String::fromUTF8(pluginSearch_).trim();
+        const auto query = cydaw::base::Text::fromUTF8(pluginSearch_).trim();
         std::vector<std::size_t> visible;
         for (std::size_t index = 0; index < parameters.values.size(); ++index) {
             const auto& parameter = parameters.values[index];
@@ -2658,14 +2658,14 @@ namespace {
 
 // A branch of the catalogue's tree: its devices, then its own branches.
 struct CatalogueBranch {
-    juce::String name;
+    cydaw::base::Text name;
     std::vector<CatalogueBranch> children;
     std::vector<const app::NodeGraphComponent::DeviceCatalogueEntry*> entries;
     std::vector<const Studio::LibraryDevice*> devices;
     int count {};
 };
 
-int catalogueRank(const juce::String& name)
+int catalogueRank(const cydaw::base::Text& name)
 {
     static const std::initializer_list<std::pair<const char*, const char*>> order {
         { "Mes périphériques", "My devices" }, { "Effets", "Effects" },     { "Instruments", "Instruments" },
@@ -2681,7 +2681,7 @@ int catalogueRank(const juce::String& name)
     return 100;
 }
 
-CatalogueBranch& branchAt(CatalogueBranch& root, const std::vector<juce::String>& path)
+CatalogueBranch& branchAt(CatalogueBranch& root, const std::vector<cydaw::base::Text>& path)
 {
     auto* branch = &root;
     for (const auto& name : path) {
@@ -2712,10 +2712,10 @@ void sortCatalogue(CatalogueBranch& branch, const bool top)
         branch.count += child.count;
 }
 
-std::vector<juce::String> splitCategory(const juce::String& category)
+std::vector<cydaw::base::Text> splitCategory(const cydaw::base::Text& category)
 {
-    std::vector<juce::String> parts;
-    for (const auto& part : juce::StringArray::fromTokens(category, "/", ""))
+    std::vector<cydaw::base::Text> parts;
+    for (const auto& part : cydaw::base::TextList::fromTokens(category, "/", ""))
         if (part.trim().isNotEmpty())
             parts.push_back(part.trim());
     return parts;
@@ -2726,7 +2726,7 @@ std::vector<juce::String> splitCategory(const juce::String& category)
 void DevicesView::drawCatalogueTree(const TrackRef& track,
                                     const std::vector<const app::NodeGraphComponent::DeviceCatalogueEntry*>& shown,
                                     const app::NodeGraphComponent::DeviceCatalogueEntry*& chosen,
-                                    std::optional<juce::File>& chosenFile)
+                                    std::optional<cydaw::base::File>& chosenFile)
 {
     CatalogueBranch root;
     for (const auto& device : library_) {
@@ -2737,7 +2737,7 @@ void DevicesView::drawCatalogueTree(const TrackRef& track,
             .devices.push_back(&device);
     }
     for (const auto* entry : shown) {
-        std::vector<juce::String> path;
+        std::vector<cydaw::base::Text> path;
         if (entry->kind == "preset") {
             path = { ui::Ls("Chaînes complètes", "Whole chains"),
                      entry->soundSource ? ui::Ls("Instruments", "Instruments") : ui::Ls("Effets", "Effects") };
@@ -2766,7 +2766,7 @@ void DevicesView::drawCatalogueTree(const TrackRef& track,
             // My devices and the effects open; the rest a click away.
             if (depth == 0 && (child.name == ui::Ls("Mes périphériques", "My devices") || child.name == ui::Ls("Effets", "Effects")))
                 flags |= ImGuiTreeNodeFlags_DefaultOpen;
-            const auto label = child.name + "  " + juce::String(child.count) + "###branch";
+            const auto label = child.name + "  " + cydaw::base::Text(child.count) + "###branch";
             if (ImGui::TreeNodeEx(label.toRawUTF8(), flags)) {
                 drawBranch(child, depth + 1);
                 ImGui::TreePop();
@@ -2821,7 +2821,7 @@ void DevicesView::drawCatalogue(const TrackRef& track)
     ImGui::SetNextItemWidth(-1.0f);
     const auto entered = ImGui::InputTextWithHint("##search", L("Rechercher un périphérique…", "Search a device…"), search_,
                                                   sizeof(search_), ImGuiInputTextFlags_EnterReturnsTrue);
-    const auto query = fold(juce::String::fromUTF8(search_).trim());
+    const auto query = fold(cydaw::base::Text::fromUTF8(search_).trim());
     // Made when the list opens (or the track changes), not each frame.
     static std::vector<app::NodeGraphComponent::DeviceCatalogueEntry> entries;
     static std::optional<TrackRef> entriesFor;
@@ -2858,7 +2858,7 @@ void DevicesView::drawCatalogue(const TrackRef& track)
         library_ = studio_.libraryDevices();
         libraryTime_ = ImGui::GetTime();
     }
-    std::optional<juce::File> chosenFile;
+    std::optional<cydaw::base::File> chosenFile;
     ImGui::BeginChild("##entries", ImVec2(dp(324.0f), dp(360.0f)));
     if (query.isEmpty()) {
         drawCatalogueTree(track, shown, chosen, chosenFile);
@@ -2888,7 +2888,7 @@ void DevicesView::drawCatalogue(const TrackRef& track)
             ImGui::PopID();
         }
     }
-    juce::String lastKind;
+    cydaw::base::Text lastKind;
     for (auto index = 0; index < count; ++index) {
         const auto& entry = *shown[static_cast<std::size_t>(index)];
         if (query.isEmpty() && entry.kind != lastKind) {
@@ -2928,16 +2928,16 @@ void DevicesView::drawCatalogue(const TrackRef& track)
     if (plugins && ImGui::Button(L("Plugin VST3 / CLAP / LV2 / JSFX…", "VST3 / CLAP / LV2 / JSFX plugin…"), ImVec2(-1.0f, 0.0f))) {
         ImGui::CloseCurrentPopup();
         chooser_ = std::make_unique<juce::FileChooser>(L("Choisir un plugin", "Choose a plugin"),
-                                                       juce::File("C:\\Program Files\\Common Files\\VST3"), "*.vst3;*.clap;*.lv2;*.jsfx;*.cyplugin");
+                                                       cydaw::base::File("C:\\Program Files\\Common Files\\VST3"), "*.vst3;*.clap;*.lv2;*.jsfx;*.cyplugin");
         const auto index = track.audioIndex;
         chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
                                   | juce::FileBrowserComponent::canSelectDirectories,
                               [this, index](const juce::FileChooser& chooser) {
                                   const auto file = chooser.getResult();
-                                  if (file == juce::File {})
+                                  if (file == cydaw::base::File {})
                                       return;
                                   const auto added = studio_.engine().setTrackPlugin(index, file);
-                                  state_.status = added.wasOk() ? juce::String(file.getFileNameWithoutExtension())
+                                  state_.status = added.wasOk() ? cydaw::base::Text(file.getFileNameWithoutExtension())
                                                                 : added.getErrorMessage();
                                   studio_.markDirty();
                               });

@@ -16,8 +16,8 @@
 namespace cydaw::v2::modulation {
 
 struct Assignment {
-    juce::String binding;   // node.<id>.<type>.<parameter>
-    juce::String label;
+    cydaw::base::Text binding;   // node.<id>.<type>.<parameter>
+    cydaw::base::Text label;
     double base {};
     double minimum {};
     double maximum { 1.0 };
@@ -33,7 +33,7 @@ struct Assignment {
 
 // Writes a value into the native parameter a binding names; false when the
 // binding is not one a modulation can move.
-bool applyToNativeGraph(engine::NativeDspGraph& graph, const juce::String& binding, double value);
+bool applyToNativeGraph(engine::NativeDspGraph& graph, const cydaw::base::Text& binding, double value);
 
 // Where a binding of a track's top-level card lands in the engine: the
 // native node and its field, or a slot of its eqBands; with its range.
@@ -44,9 +44,9 @@ struct NativeTarget {
     float minimum {};
     float maximum { 1.0f };
 };
-[[nodiscard]] std::optional<NativeTarget> nativeTargetFor(const juce::String& binding);
+[[nodiscard]] std::optional<NativeTarget> nativeTargetFor(const cydaw::base::Text& binding);
 // The value a binding names in a native graph, when a modulation can move it.
-[[nodiscard]] std::optional<double> readFromNativeGraph(const engine::NativeDspGraph& graph, const juce::String& binding);
+[[nodiscard]] std::optional<double> readFromNativeGraph(const engine::NativeDspGraph& graph, const cydaw::base::Text& binding);
 
 // The first LFO of a value graph, for a compact editor: rate in Hz, depth
 // 0..1, shape 0 sine, 1 triangle, 2 saw, 3 square.

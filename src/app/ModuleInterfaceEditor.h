@@ -1,3 +1,4 @@
+#include <cydaw/document/ModuleInterface.h>
 #include <cydaw/base/File.h>
 #pragma once
 
@@ -17,145 +18,6 @@
 #include <vector>
 
 namespace cydaw::app {
-
-enum class ModuleControlKind : std::uint8_t {
-    knob,
-    fader,
-    waveform,
-    spectrum,
-    levelMeter,
-    text,
-    inputPort,
-    outputPort,
-    toggle,
-    envelope,
-    group,
-    selector,
-    xyPad,
-    valueDisplay,
-    filterResponse,
-    dynamicsResponse,
-    eqCurve,
-    wavetable,
-    nativePanel,
-    custom
-};
-
-enum class ModuleInterfaceLayoutMode : std::uint8_t {
-    graph,
-    device
-};
-
-struct ModulePublishedParameter {
-    juce::String key;
-    juce::String label;
-    juce::String unit;
-    double minimum {};
-    double maximum { 1.0 };
-    double value {};
-    bool showInDevice { true };
-    // Stable across layout changes and parameter reordering. A zero value is
-    // migrated deterministically from `key` when an older Graph is loaded.
-    std::uint32_t hostParameterId {};
-    bool publishToHost { true };
-    bool automatable { true };
-    bool modulatable { true };
-    juce::String description;
-    // Kept last to preserve source compatibility with schema-4 aggregate
-    // initialisers. NaN means that an older graph has no authored reset value.
-    double defaultValue { std::numeric_limits<double>::quiet_NaN() };
-    // What this parameter last serialised to, and a signature of every field
-    // that went into it. Rebuilding three hundred of these per serialise was
-    // most of what a knob notch cost on a large patch. Validated, not
-    // invalidated: no mutation site has to know.
-    mutable cydaw::base::Value serialised;
-    mutable std::uint64_t serialisedSignature {};
-};
-
-struct ModuleInterfaceControl {
-    std::uint64_t id {};
-    ModuleControlKind kind { ModuleControlKind::knob };
-    juce::String label;
-    juce::String parameterBinding;
-    float x {};
-    float y {};
-    float width { 0.22f };
-    float height { 0.32f };
-    std::uint8_t portKind {};
-    // Audio topology is part of a published port contract and also defines
-    // how many lanes an authored level meter presents. Non-audio controls use
-    // one event/value stream.
-    std::uint8_t portChannels { 1 };
-    // Used by two-dimensional controls such as an XY pad. Kept independent
-    // from the primary binding so each axis retains a stable host parameter.
-    juce::String secondaryParameterBinding;
-    // Multi-parameter controls append their extra stable bindings here. An
-    // envelope maps primary/secondary/tertiary/quaternary to A/D/S/R.
-    juce::String tertiaryParameterBinding;
-    juce::String quaternaryParameterBinding;
-    // Controls that address more parameters than the four named bindings can
-    // hold list the rest here, in the order the control defines. An EQ curve
-    // reads them as consecutive frequency / gain / Q triples, one per band.
-    std::vector<juce::String> extraParameterBindings;
-    // Portable appearance, page/group membership and custom ImGui component source.
-    cydaw::base::Value design;
-    // Same arrangement as ModulePublishedParameter, for the same reason.
-    mutable cydaw::base::Value serialised;
-    mutable std::uint64_t serialisedSignature {};
-};
-
-struct ModuleInterfaceState {
-    std::uint32_t schema { 15 };
-    std::uint64_t nextControlId { 1 };
-    // Portable free-layout grid. Geometry remains normalised so reusable
-    // interfaces keep the same composition at every window size and DPI.
-    bool snapToGrid { true };
-    std::uint8_t gridColumns { 24 };
-    std::uint8_t gridRows { 16 };
-    // The window a plugin made of this graph opens, in pixels; 0 for the
-    // default. The controls keep their normalised places in it.
-    std::uint16_t windowWidth {};
-    std::uint16_t windowHeight {};
-    // Laid out by the person (the workshop's Interface tab), rather than the
-    // one made from the published settings: a plug-in made of the graph
-    // opens on it.
-    bool designed {};
-    bool deviceDesigned {};
-    // Per-surface appearance, independent of control-level overrides.
-    cydaw::base::Value windowDesign;
-    cydaw::base::Value deviceDesign;
-    std::uint16_t deviceWidth { 480 };
-    std::uint16_t deviceHeight { 240 };
-    std::vector<ModulePublishedParameter> parameters;
-    // Free-form controls rendered inside graph nodes and reusable sub-graphs.
-    std::vector<ModuleInterfaceControl> controls;
-    // Constrained wide layout rendered in the device-chain panel.
-    std::vector<ModuleInterfaceControl> deviceControls;
-};
-
-// Drops every cached serialisation in a presentation, so a build can be
-// made from scratch and compared with a cached one.
-void dropSerialisedPresentation(ModuleInterfaceState& state);
-[[nodiscard]] std::uint32_t stableModuleParameterId(
-    const juce::String& parameterKey) noexcept;
-[[nodiscard]] double moduleParameterDefaultValue(
-    const ModulePublishedParameter& parameter) noexcept;
-[[nodiscard]] std::vector<double> moduleSelectorValues(
-    const ModulePublishedParameter& parameter);
-[[nodiscard]] std::size_t closestModuleSelectorValue(
-    const std::vector<double>& values, double value) noexcept;
-[[nodiscard]] juce::String moduleSelectorValueLabel(
-    const ModulePublishedParameter& parameter, double value);
-
-[[nodiscard]] std::vector<ModuleInterfaceControl>& moduleInterfaceControls(
-    ModuleInterfaceState& state, ModuleInterfaceLayoutMode mode) noexcept;
-[[nodiscard]] const std::vector<ModuleInterfaceControl>& moduleInterfaceControls(
-    const ModuleInterfaceState& state, ModuleInterfaceLayoutMode mode) noexcept;
-void rebuildAutomaticDeviceControls(ModuleInterfaceState& state);
-[[nodiscard]] cydaw::base::Value serialiseModuleInterface(const ModuleInterfaceState& state);
-[[nodiscard]] ModuleInterfaceState restoreModuleInterface(const cydaw::base::Value& value);
-[[nodiscard]] cydaw::base::Result validateModuleInterfaceDocument(const cydaw::base::Value& document, const ModuleInterfaceState& parameters);
-[[nodiscard]] cydaw::base::Result validateModuleInterface(const ModuleInterfaceState& state);
 
 class ModuleXyPadComponent final : public juce::Component,
                                    public juce::SettableTooltipClient {
@@ -502,8 +364,8 @@ public:
     void setState(ModuleInterfaceState state);
     [[nodiscard]] const ModuleInterfaceState& state() const noexcept;
     void setStateChangedHandler(std::function<void(const ModuleInterfaceState&)> handler);
-    void setParameterChangedHandler(std::function<void(const juce::String&, double)> handler);
-    [[nodiscard]] bool setParameterValue(const juce::String& key,
+    void setParameterChangedHandler(std::function<void(const cydaw::base::Text&, double)> handler);
+    [[nodiscard]] bool setParameterValue(const cydaw::base::Text& key,
                                          double value);
     void setPortCreationHandler(
         std::function<void(bool, std::uint8_t, std::uint8_t)> handler);
@@ -533,53 +395,53 @@ public:
 private:
     struct SliderEntry {
         std::uint64_t controlId {};
-        juce::String binding;
+        cydaw::base::Text binding;
         std::unique_ptr<juce::Slider> slider;
     };
 
     struct ButtonEntry {
         std::uint64_t controlId {};
-        juce::String binding;
+        cydaw::base::Text binding;
         std::unique_ptr<juce::ToggleButton> button;
     };
 
     struct ComboEntry {
         std::uint64_t controlId {};
-        juce::String binding;
+        cydaw::base::Text binding;
         std::vector<double> values;
         std::unique_ptr<juce::ComboBox> combo;
     };
 
     struct XyEntry {
         std::uint64_t controlId {};
-        juce::String xBinding;
-        juce::String yBinding;
+        cydaw::base::Text xBinding;
+        cydaw::base::Text yBinding;
         std::unique_ptr<ModuleXyPadComponent> pad;
     };
 
     struct EnvelopeEntry {
         std::uint64_t controlId {};
-        std::array<juce::String, 4> bindings;
+        std::array<cydaw::base::Text, 4> bindings;
         std::unique_ptr<ModuleEnvelopeComponent> envelope;
     };
 
     struct EqCurveEntry {
         std::uint64_t controlId {};
-        std::vector<juce::String> bindings;
+        std::vector<cydaw::base::Text> bindings;
         std::unique_ptr<ModuleEqCurveComponent> curve;
     };
 
     struct FilterResponseEntry {
         std::uint64_t controlId {};
-        juce::String cutoffBinding;
-        juce::String resonanceBinding;
+        cydaw::base::Text cutoffBinding;
+        cydaw::base::Text resonanceBinding;
         std::unique_ptr<ModuleFilterResponseComponent> response;
     };
 
     struct DynamicsResponseEntry {
         std::uint64_t controlId {};
-        juce::String thresholdBinding;
-        juce::String ratioBinding;
+        cydaw::base::Text thresholdBinding;
+        cydaw::base::Text ratioBinding;
         std::unique_ptr<ModuleDynamicsResponseComponent> response;
     };
 
@@ -605,26 +467,26 @@ private:
     std::unordered_map<std::uint64_t, juce::Rectangle<float>> compactCells_;
     [[nodiscard]] ModuleInterfaceControl* findControl(std::uint64_t id);
     [[nodiscard]] const ModuleInterfaceControl* findControl(std::uint64_t id) const;
-    [[nodiscard]] ModulePublishedParameter* findParameter(const juce::String& key);
-    [[nodiscard]] const ModulePublishedParameter* findParameter(const juce::String& key) const;
-    [[nodiscard]] juce::String controlTooltip(const ModuleInterfaceControl& control) const;
+    [[nodiscard]] ModulePublishedParameter* findParameter(const cydaw::base::Text& key);
+    [[nodiscard]] const ModulePublishedParameter* findParameter(const cydaw::base::Text& key) const;
+    [[nodiscard]] cydaw::base::Text controlTooltip(const ModuleInterfaceControl& control) const;
     [[nodiscard]] std::uint64_t controlAt(juce::Point<float> position) const;
     [[nodiscard]] std::vector<ModuleInterfaceControl>& activeControls() noexcept;
     [[nodiscard]] const std::vector<ModuleInterfaceControl>& activeControls() const noexcept;
     void rebuildSliders();
-    void synchroniseXyPads(const juce::String& binding = {});
-    void synchroniseEnvelopes(const juce::String& binding = {});
-    void synchroniseFilterResponses(const juce::String& binding = {});
-    void synchroniseEqCurves(const juce::String& binding = {});
-    void synchroniseDynamicsResponses(const juce::String& binding = {});
+    void synchroniseXyPads(const cydaw::base::Text& binding = {});
+    void synchroniseEnvelopes(const cydaw::base::Text& binding = {});
+    void synchroniseFilterResponses(const cydaw::base::Text& binding = {});
+    void synchroniseEqCurves(const cydaw::base::Text& binding = {});
+    void synchroniseDynamicsResponses(const cydaw::base::Text& binding = {});
     void addControl(ModuleControlKind kind,
-                    const juce::String& binding = {},
-                    const juce::String& label = {},
+                    const cydaw::base::Text& binding = {},
+                    const cydaw::base::Text& label = {},
                     std::uint8_t portKind = 0,
                     std::uint8_t portChannels = 1,
-                    const juce::String& secondaryBinding = {},
-                    const juce::String& tertiaryBinding = {},
-                    const juce::String& quaternaryBinding = {});
+                    const cydaw::base::Text& secondaryBinding = {},
+                    const cydaw::base::Text& tertiaryBinding = {},
+                    const cydaw::base::Text& quaternaryBinding = {});
     void showAddMenu();
     void showGridMenu();
     void showControlMenu(std::uint64_t controlId);
@@ -661,7 +523,7 @@ private:
     // from the glyphs afterwards. Fitting the text on every paint was most
     // of what a surface of hundreds of controls cost per frame.
     struct CachedLabel {
-        juce::String text;
+        cydaw::base::Text text;
         juce::Rectangle<int> area;
         juce::GlyphArrangement glyphs;
     };
@@ -734,7 +596,7 @@ private:
     bool refreshingInspector_ {};
 
     std::function<void(const ModuleInterfaceState&)> stateChangedHandler_;
-    std::function<void(const juce::String&, double)> parameterChangedHandler_;
+    std::function<void(const cydaw::base::Text&, double)> parameterChangedHandler_;
     std::function<void(bool, std::uint8_t, std::uint8_t)>
         portCreationHandler_;
 

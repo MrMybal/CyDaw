@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #include "MidiDevices.h"
 #include "RoutingUi.h"
 
@@ -18,7 +19,7 @@ namespace cydaw::v2::routing_ui {
 using ui::dp;
 using ui::L;
 
-juce::String destinationName(const Studio& studio, const std::uint64_t key, const std::uint64_t input)
+cydaw::base::Text destinationName(const Studio& studio, const std::uint64_t key, const std::uint64_t input)
 {
     if (key == 0)
         return "Master";
@@ -27,13 +28,13 @@ juce::String destinationName(const Studio& studio, const std::uint64_t key, cons
         return ui::Ls("(disparue)", "(gone)");
     auto name = studio.trackName(*track);
     if (input != 0)
-        name << juce::String::fromUTF8(" \xe2\x80\xba ") << studio.trackInputName(*track, input);
+        name << cydaw::base::Text::fromUTF8(" \xe2\x80\xba ") << studio.trackInputName(*track, input);
     return name;
 }
 
-juce::String deviceChannelsText(const app::VirtualAudioBus& bus)
+cydaw::base::Text deviceChannelsText(const app::VirtualAudioBus& bus)
 {
-    juce::StringArray parts;
+    cydaw::base::TextList parts;
     auto first = bus.deviceChannel(0);
     auto last = first;
     for (auto channel = 1; channel <= bus.channels; ++channel) {
@@ -42,32 +43,32 @@ juce::String deviceChannelsText(const app::VirtualAudioBus& bus)
             last = next;
             continue;
         }
-        parts.add(first == last ? juce::String(first + 1) : juce::String(first + 1) + "-" + juce::String(last + 1));
+        parts.add(first == last ? cydaw::base::Text(first + 1) : cydaw::base::Text(first + 1) + "-" + cydaw::base::Text(last + 1));
         first = last = next;
     }
     return parts.joinIntoString(",");
 }
 
-juce::String hardwareName(const Studio& studio, const std::uint64_t busId)
+cydaw::base::Text hardwareName(const Studio& studio, const std::uint64_t busId)
 {
     const auto bus = studio.engine().virtualBus(busId);
     if (!bus)
         return ui::Ls("Carte \xe2\x80\xba (disparue)", "Card \xe2\x80\xba (gone)");
-    return ui::Ls("Carte", "Card") + juce::String::fromUTF8(" \xe2\x80\xba ") + bus->name + " (" + deviceChannelsText(*bus) + ")";
+    return ui::Ls("Carte", "Card") + cydaw::base::Text::fromUTF8(" \xe2\x80\xba ") + bus->name + " (" + deviceChannelsText(*bus) + ")";
 }
 
-juce::String outputName(const Studio& studio, const TrackOutput& output)
+cydaw::base::Text outputName(const Studio& studio, const TrackOutput& output)
 {
     return output.hardware != 0 ? hardwareName(studio, output.hardware)
                                 : destinationName(studio, output.destination, output.input);
 }
 
-juce::String mainOutputLabel(const Studio& studio, const TrackRef& track)
+cydaw::base::Text mainOutputLabel(const Studio& studio, const TrackRef& track)
 {
     const auto outputs = studio.trackOutputs(track);
-    auto label = juce::String::fromUTF8("\xe2\x86\x92 ") + outputName(studio, outputs.front());
+    auto label = cydaw::base::Text::fromUTF8("\xe2\x86\x92 ") + outputName(studio, outputs.front());
     if (outputs.size() > 1)
-        label << " +" << juce::String(static_cast<int>(outputs.size() - 1));
+        label << " +" << cydaw::base::Text(static_cast<int>(outputs.size() - 1));
     return label;
 }
 
@@ -130,7 +131,7 @@ void groupHeading(const Group group)
 
 // A destination's name under its heading: an output of the card by its
 // name and channels, another input of a track under it ("› Sidechain").
-juce::String itemName(const Studio& studio, const Destination& destination)
+cydaw::base::Text itemName(const Studio& studio, const Destination& destination)
 {
     if (destination.hardware != 0) {
         const auto bus = studio.engine().virtualBus(destination.hardware);
@@ -138,7 +139,7 @@ juce::String itemName(const Studio& studio, const Destination& destination)
     }
     if (destination.input != 0)
         if (const auto to = studio.trackForKey(destination.key))
-            return juce::String::fromUTF8("    \xe2\x80\xba ") + studio.trackInputName(*to, destination.input);
+            return cydaw::base::Text::fromUTF8("    \xe2\x80\xba ") + studio.trackInputName(*to, destination.input);
     return destinationName(studio, destination.key);
 }
 
@@ -182,7 +183,7 @@ bool destinationCombo(const char* id, const Studio& studio, const TrackRef& trac
     return pickDestination(id, studio, track, output, width);
 }
 
-void outputsEditor(Studio& studio, const TrackRef& track, const float labelWidth, juce::String& error)
+void outputsEditor(Studio& studio, const TrackRef& track, const float labelWidth, cydaw::base::Text& error)
 {
     const auto& p = theme::palette();
     auto outputs = studio.trackOutputs(track);
@@ -274,7 +275,7 @@ void outputsEditor(Studio& studio, const TrackRef& track, const float labelWidth
             error = applied.getErrorMessage();
 }
 
-void mainOutputCombo(Studio& studio, const TrackRef& track, const float width, juce::String& error)
+void mainOutputCombo(Studio& studio, const TrackRef& track, const float width, cydaw::base::Text& error)
 {
     auto outputs = studio.trackOutputs(track);
     if (pickDestination("##mainOutput", studio, track, outputs.front(), width))
@@ -282,7 +283,7 @@ void mainOutputCombo(Studio& studio, const TrackRef& track, const float width, j
             error = applied.getErrorMessage();
 }
 
-void inputsEditor(Studio& studio, const TrackRef& track, const float labelWidth, juce::String& error)
+void inputsEditor(Studio& studio, const TrackRef& track, const float labelWidth, cydaw::base::Text& error)
 {
     const auto& p = theme::palette();
     ImGui::AlignTextToFramePadding();
@@ -307,7 +308,7 @@ void inputsEditor(Studio& studio, const TrackRef& track, const float labelWidth,
         ImGui::SetNextItemWidth(std::max(dp(60.0f), ImGui::GetContentRegionAvail().x - ImGui::GetFrameHeight() - dp(4.0f)));
         if (ImGui::InputText("##name", buffer.data(), buffer.size(), ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll)
             || ImGui::IsItemDeactivatedAfterEdit()) {
-            const auto name = juce::String::fromUTF8(buffer.data()).trim();
+            const auto name = cydaw::base::Text::fromUTF8(buffer.data()).trim();
             if (auto* slot = studio.graphFor(track); slot != nullptr && name.isNotEmpty() && name != input.name)
                 (void) slot->graph().editorSetAlias(input.node, name);
         }
@@ -336,9 +337,9 @@ void inputsEditor(Studio& studio, const TrackRef& track, const float labelWidth,
                   "It appears in its graph; wire it where it is needed."));
 }
 
-juce::String sendersText(const Studio& studio, const TrackRef& track)
+cydaw::base::Text sendersText(const Studio& studio, const TrackRef& track)
 {
-    juce::StringArray names;
+    cydaw::base::TextList names;
     const auto key = studio.routingKey(track);
     if (key != 0 || track.master)
         for (const auto& candidate : studio.tracks())
@@ -347,7 +348,7 @@ juce::String sendersText(const Studio& studio, const TrackRef& track)
                     continue;
                 auto name = studio.trackName(candidate);
                 if (output.input != 0)
-                    name << juce::String::fromUTF8(" \xe2\x86\x92 ") << studio.trackInputName(track, output.input);
+                    name << cydaw::base::Text::fromUTF8(" \xe2\x86\x92 ") << studio.trackInputName(track, output.input);
                 names.addIfNotAlreadyThere(name);
             }
     return names.joinIntoString(", ");
@@ -369,7 +370,7 @@ void sendersLine(const Studio& studio, const TrackRef& track, const float labelW
     ImGui::PopTextWrapPos();
 }
 
-void mainOutputItems(Studio& studio, const TrackRef& track, juce::String& error)
+void mainOutputItems(Studio& studio, const TrackRef& track, cydaw::base::Text& error)
 {
     auto outputs = studio.trackOutputs(track);
     std::optional<Group> last;
@@ -395,7 +396,7 @@ void mainOutputItems(Studio& studio, const TrackRef& track, juce::String& error)
     }
 }
 
-void formatCombo(Studio& studio, const TrackRef& track, const float width, juce::String& error)
+void formatCombo(Studio& studio, const TrackRef& track, const float width, cydaw::base::Text& error)
 {
     const auto channels = studio.trackChannels(track);
     ImGui::SetNextItemWidth(width);
@@ -409,9 +410,9 @@ void formatCombo(Studio& studio, const TrackRef& track, const float width, juce:
     }
     if (ImGui::BeginCombo("##format", Studio::formatName(channels).toRawUTF8())) {
         for (auto count = 1; count <= cydaw::engine::maximumTrackChannels; ++count) {
-            juce::StringArray speakers;
+            cydaw::base::TextList speakers;
             for (auto channel = 0; channel < count; ++channel)
-                speakers.add(juce::String(std::string(cydaw::engine::speakerShortName(cydaw::engine::speakerRole(count, channel)))));
+                speakers.add(cydaw::base::Text(std::string(cydaw::engine::speakerShortName(cydaw::engine::speakerRole(count, channel)))));
             const auto label = Studio::formatName(count) + "   " + speakers.joinIntoString(" ");
             ImGui::PushID(count);
             if (ImGui::Selectable(label.toRawUTF8(), count == channels) && count != channels)
@@ -427,7 +428,7 @@ void formatCombo(Studio& studio, const TrackRef& track, const float width, juce:
                   "its devices process every channel, and its sound converts into where it goes (the master is stereo)."));
 }
 
-std::uint32_t midiInputActivity(const Studio& studio, const TrackRef& track, const juce::String& input)
+std::uint32_t midiInputActivity(const Studio& studio, const TrackRef& track, const cydaw::base::Text& input)
 {
     const auto& engine = studio.engine();
     const auto clips = engine.midiTrackClipActivity(track.midiId);
@@ -438,7 +439,7 @@ std::uint32_t midiInputActivity(const Studio& studio, const TrackRef& track, con
     return clips + engine.midiInputActivity(input);
 }
 
-juce::String midiInputName(const juce::String& input)
+cydaw::base::Text midiInputName(const cydaw::base::Text& input)
 {
     if (input == app::AudioTrackController::allMidiInputs)
         return ui::Ls("Toutes les entrées", "Every input");
@@ -454,7 +455,7 @@ void midiInputCombo(Studio& studio, const TrackRef& track, const float width)
     const auto& p = theme::palette();
     auto& engine = studio.engine();
     const auto inputs = engine.midiTrackInputs(track.midiId);
-    const auto current = inputs.empty() ? juce::String() : inputs.front();
+    const auto current = inputs.empty() ? cydaw::base::Text() : inputs.front();
     // A narrow combo (a launcher's cell) says it short.
     const auto brief = width > 0.0f && width < dp(150.0f);
     auto shown = inputs.empty()                                                  ? ui::Ls(brief ? "Aucune" : "Aucune entrée", brief ? "None" : "No input")
@@ -462,21 +463,21 @@ void midiInputCombo(Studio& studio, const TrackRef& track, const float width)
                  : brief && current == app::AudioTrackController::computerKeyboardInput ? ui::Ls("Clavier PC", "PC keys")
                                                                                          : midiInputName(current);
     if (inputs.size() > 1)
-        shown << " +" << juce::String(static_cast<int>(inputs.size()) - 1);
+        shown << " +" << cydaw::base::Text(static_cast<int>(inputs.size()) - 1);
     auto* list = ImGui::GetWindowDrawList();
     const auto at = ImGui::GetCursorScreenPos();
     const auto height = ImGui::GetFrameHeight();
     const auto light = std::round(height * 0.42f);
     // Room for its light before the name.
     const auto spaces = static_cast<int>(std::ceil((light + dp(4.0f)) / std::max(1.0f, ImGui::CalcTextSize(" ").x)));
-    const auto preview = juce::String::repeatedString(" ", spaces) + shown;
+    const auto preview = cydaw::base::Text::repeatedString(" ", spaces) + shown;
     ImGui::SetNextItemWidth(width);
     ImGui::SetNextWindowSizeConstraints(ImVec2(std::max(width, dp(200.0f)), 0.0f), ImVec2(FLT_MAX, dp(420.0f)));
     if (ImGui::BeginCombo("##midiInput", preview.toRawUTF8())) {
-        const auto pick = [&](const juce::String& input, const char* label) {
+        const auto pick = [&](const cydaw::base::Text& input, const char* label) {
             const auto selected = input.isEmpty() ? inputs.empty() : inputs.size() == 1 && current == input;
             if (ImGui::Selectable(label, selected) && !selected) {
-                engine.setMidiTrackInputs(track.midiId, input.isEmpty() ? std::vector<juce::String> {} : std::vector<juce::String> { input });
+                engine.setMidiTrackInputs(track.midiId, input.isEmpty() ? std::vector<cydaw::base::Text> {} : std::vector<cydaw::base::Text> { input });
                 studio.markDirty();
             }
         };
@@ -523,7 +524,7 @@ void recordInputCombo(Studio& studio, const TrackRef& track, const float width)
     const auto label = [](const app::VirtualAudioBus& bus) {
         return bus.name + "  (" + Studio::formatName(bus.channels) + ", " + deviceChannelsText(bus) + ")";
     };
-    juce::String shown = ui::Ls("(aucune)", "(none)");
+    cydaw::base::Text shown = ui::Ls("(aucune)", "(none)");
     // A narrow combo (a launcher's cell): the input's name alone.
     const auto brief = width > 0.0f && width < dp(150.0f);
     for (const auto& bus : engine.virtualBuses())
@@ -559,7 +560,7 @@ void hybridAudioInputCombo(Studio& studio, const TrackRef& owner, const TrackRef
     const auto label = [](const app::VirtualAudioBus& bus) {
         return bus.name + "  (" + Studio::formatName(bus.channels) + ", " + deviceChannelsText(bus) + ")";
     };
-    juce::String shown = ui::Ls("(aucune)", "(none)");
+    cydaw::base::Text shown = ui::Ls("(aucune)", "(none)");
     const auto brief = width > 0.0f && width < dp(150.0f);
     if (records)
         for (const auto& bus : engine.virtualBuses())

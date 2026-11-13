@@ -1,3 +1,4 @@
+#include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/File.h>
 #include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "DjLibrary.h"
@@ -15,7 +16,7 @@ namespace {
 
 constexpr int maximumScannedFiles = 50'000;
 
-bool isAudioFile(const juce::File& file)
+bool isAudioFile(const cydaw::base::File& file)
 {
     return file.hasFileExtension("wav;wave;aif;aiff;flac;ogg;mp3;wma;m4a");
 }
@@ -41,17 +42,17 @@ DjLibrary::~DjLibrary()
     flush();
 }
 
-juce::File DjLibrary::collectionFile()
+cydaw::base::File DjLibrary::collectionFile()
 {
-    if (const auto other = juce::SystemStats::getEnvironmentVariable("CYDAW_DJ_COLLECTION_FILE", {}); other.isNotEmpty())
-        return juce::File(other);
-    return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory).getChildFile("CyDAW").getChildFile("DjCollection.json");
+    if (const auto other = cydaw::base::SystemStats::getEnvironmentVariable("CYDAW_DJ_COLLECTION_FILE", {}); other.isNotEmpty())
+        return cydaw::base::File(other);
+    return cydaw::base::File::getSpecialLocation(cydaw::base::File::userApplicationDataDirectory).getChildFile("CyDAW").getChildFile("DjCollection.json");
 }
 
 void DjLibrary::load()
 {
-    const auto own = juce::SystemStats::getEnvironmentVariable("CYDAW_DJ_COLLECTION_FILE", {}).isNotEmpty();
-    const auto automated = juce::SystemStats::getEnvironmentVariable("CYDAW_NO_RECOVERY", {}).isNotEmpty();
+    const auto own = cydaw::base::SystemStats::getEnvironmentVariable("CYDAW_DJ_COLLECTION_FILE", {}).isNotEmpty();
+    const auto automated = cydaw::base::SystemStats::getEnvironmentVariable("CYDAW_NO_RECOVERY", {}).isNotEmpty();
     saving_ = own || !automated;
     if (!saving_)
         return;
@@ -60,7 +61,7 @@ void DjLibrary::load()
         fromJson(cydaw::base::JSON::parse(file));
     } else if (!automated) {
         // The first time: the person's music.
-        const auto music = juce::File::getSpecialLocation(juce::File::userMusicDirectory);
+        const auto music = cydaw::base::File::getSpecialLocation(cydaw::base::File::userMusicDirectory);
         if (music.isDirectory()) {
             const std::scoped_lock lock(lock_);
             folders_.add(music.getFullPathName());
@@ -80,7 +81,7 @@ void DjLibrary::flush()
 
 void DjLibrary::tick()
 {
-    if (dirty_.load() && juce::Time::getMillisecondCounterHiRes() * 0.001 - dirtySince_ > 2.0)
+    if (dirty_.load() && cydaw::base::Time::getMillisecondCounterHiRes() * 0.001 - dirtySince_ > 2.0)
         flush();
 }
 
@@ -88,16 +89,16 @@ void DjLibrary::changed()
 {
     revision_.fetch_add(1, std::memory_order_acq_rel);
     if (!dirty_.exchange(true))
-        dirtySince_ = juce::Time::getMillisecondCounterHiRes() * 0.001;
+        dirtySince_ = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
 }
 
-juce::StringArray DjLibrary::folders() const
+cydaw::base::TextList DjLibrary::folders() const
 {
     const std::scoped_lock lock(lock_);
     return folders_;
 }
 
-void DjLibrary::addFolder(const juce::File& folder)
+void DjLibrary::addFolder(const cydaw::base::File& folder)
 {
     if (!folder.isDirectory())
         return;
@@ -109,7 +110,7 @@ void DjLibrary::addFolder(const juce::File& folder)
     rescan();
 }
 
-void DjLibrary::removeFolder(const juce::File& folder)
+void DjLibrary::removeFolder(const cydaw::base::File& folder)
 {
     {
         const std::scoped_lock lock(lock_);
@@ -140,7 +141,7 @@ std::vector<DjTrack> DjLibrary::tracks() const
     return tracks_;
 }
 
-std::size_t DjLibrary::indexOf(const juce::File& file) const
+std::size_t DjLibrary::indexOf(const cydaw::base::File& file) const
 {
     for (std::size_t i = 0; i < tracks_.size(); ++i)
         if (tracks_[i].file == file)
@@ -148,7 +149,7 @@ std::size_t DjLibrary::indexOf(const juce::File& file) const
     return tracks_.size();
 }
 
-std::optional<DjTrack> DjLibrary::find(const juce::File& file) const
+std::optional<DjTrack> DjLibrary::find(const cydaw::base::File& file) const
 {
     const std::scoped_lock lock(lock_);
     const auto index = indexOf(file);
@@ -157,7 +158,7 @@ std::optional<DjTrack> DjLibrary::find(const juce::File& file) const
     return tracks_[index];
 }
 
-void DjLibrary::remember(const juce::File& file)
+void DjLibrary::remember(const cydaw::base::File& file)
 {
     if (!file.existsAsFile())
         return;
@@ -188,7 +189,7 @@ void DjLibrary::update(const DjTrack& track)
     changed();
 }
 
-void DjLibrary::analyse(const juce::File& file)
+void DjLibrary::analyse(const cydaw::base::File& file)
 {
     {
         const std::scoped_lock lock(lock_);
@@ -218,7 +219,7 @@ DjLibrary::Progress DjLibrary::progress() const
 void DjLibrary::run()
 {
     const app::DjEngine::DecodingThreadScope decoding;
-    juce::AudioFormatManager formats;
+    cydaw::audio::AudioFormatManager formats;
     cydaw::integration::registerCyAudioCoreReaders(formats);
     while (!threadShouldExit()) {
         wake_.wait(1'000);
@@ -235,7 +236,7 @@ void DjLibrary::run()
             scanning_ = false;
         }
         while (!threadShouldExit()) {
-            juce::File next;
+            cydaw::base::File next;
             {
                 const std::scoped_lock lock(lock_);
                 if (queue_.empty() || scanWanted_)
@@ -254,12 +255,12 @@ void DjLibrary::run()
 void DjLibrary::scan()
 {
     const auto roots = folders();
-    std::vector<juce::File> found;
+    std::vector<cydaw::base::File> found;
     for (const auto& root : roots) {
-        const juce::File folder(root);
+        const cydaw::base::File folder(root);
         if (!folder.isDirectory())
             continue;
-        for (const auto& entry : juce::RangedDirectoryIterator(folder, true, "*", juce::File::findFiles)) {
+        for (const auto& entry : juce::RangedDirectoryIterator(folder, true, "*", cydaw::base::File::findFiles)) {
             if (threadShouldExit() || static_cast<int>(found.size()) >= maximumScannedFiles)
                 break;
             if (isAudioFile(entry.getFile()))
@@ -268,11 +269,11 @@ void DjLibrary::scan()
     }
     // The disk is read without the lock (the interface takes it every
     // frame): what is new and what is gone, then both applied at once.
-    const auto keyOf = [](const juce::File& file) {
-        return juce::File::areFileNamesCaseSensitive() ? file.getFullPathName() : file.getFullPathName().toLowerCase();
+    const auto keyOf = [](const cydaw::base::File& file) {
+        return cydaw::base::File::areFileNamesCaseSensitive() ? file.getFullPathName() : file.getFullPathName().toLowerCase();
     };
-    std::set<juce::String> known;
-    std::vector<juce::File> listed;
+    std::set<cydaw::base::Text> known;
+    std::vector<cydaw::base::File> listed;
     {
         const std::scoped_lock lock(lock_);
         for (const auto& track : tracks_) {
@@ -294,14 +295,14 @@ void DjLibrary::scan()
         fresh.push_back(std::move(track));
     }
     // Gone from the disk: gone from the collection.
-    std::set<juce::String> gone;
+    std::set<cydaw::base::Text> gone;
     for (const auto& file : listed)
         if (!file.existsAsFile())
             gone.insert(keyOf(file));
     auto added = false;
     {
         const std::scoped_lock lock(lock_);
-        std::set<juce::String> present;
+        std::set<cydaw::base::Text> present;
         for (const auto& track : tracks_)
             present.insert(keyOf(track.file));
         for (auto& track : fresh)
@@ -317,11 +318,11 @@ void DjLibrary::scan()
         changed();
 }
 
-void DjLibrary::analyseNow(juce::AudioFormatManager& formats, const juce::File& file)
+void DjLibrary::analyseNow(cydaw::audio::AudioFormatManager& formats, const cydaw::base::File& file)
 {
-    juce::String error;
-    juce::String title;
-    juce::String artist;
+    cydaw::base::Text error;
+    cydaw::base::Text title;
+    cydaw::base::Text artist;
     const auto audio = app::DjEngine::decode(formats, file, error, title, artist, [this] { return threadShouldExit(); });
     std::optional<engine::dj::TrackAnalysis> found;
     if (audio != nullptr)
@@ -412,7 +413,7 @@ void DjLibrary::fromJson(const cydaw::base::Value& document)
     if (const auto* list = document.getProperty("tracks", cydaw::base::Value()).getArray())
         for (const auto& item : *list) {
             DjTrack track;
-            track.file = juce::File(item.getProperty("path", cydaw::base::Value()).toString());
+            track.file = cydaw::base::File(item.getProperty("path", cydaw::base::Value()).toString());
             track.title = item.getProperty("title", cydaw::base::Value()).toString();
             track.artist = item.getProperty("artist", cydaw::base::Value()).toString();
             track.seconds = number(item, "seconds");
@@ -431,7 +432,7 @@ void DjLibrary::fromJson(const cydaw::base::Value& document)
             track.modified = static_cast<juce::int64>(number(item, "modified"));
             track.plays = static_cast<int>(number(item, "plays"));
             track.lastPlayed = static_cast<juce::int64>(number(item, "lastPlayed"));
-            if (track.file != juce::File())
+            if (track.file != cydaw::base::File())
                 tracks_.push_back(std::move(track));
         }
     revision_.fetch_add(1, std::memory_order_acq_rel);

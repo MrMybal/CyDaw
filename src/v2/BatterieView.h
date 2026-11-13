@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "PresetMenu.h"
@@ -22,7 +23,7 @@ class BatterieView final {
 public:
     BatterieView(Studio& studio, UiState& state);
 
-    [[nodiscard]] static bool handles(const juce::String& typeKey) { return typeKey == "batterie"; }
+    [[nodiscard]] static bool handles(const cydaw::base::Text& typeKey) { return typeKey == "batterie"; }
     [[nodiscard]] static float paneWidth();
     void drawPane(const TrackRef& track, app::NodeGraphComponent& graph, std::uint64_t nodeId, ImVec2 origin, ImVec2 size,
                   ImU32 colour);
@@ -79,7 +80,7 @@ private:
     int groove_ {};
     int bars_ { 4 };
     int fill_ { -1 };
-    juce::String grooveReport_;
+    cydaw::base::Text grooveReport_;
 };
 
 } // namespace cydaw::v2

@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include <juce_audio_devices/juce_audio_devices.h>
@@ -14,8 +15,8 @@ namespace cydaw::v2::midi_devices {
 [[nodiscard]] const juce::Array<juce::MidiDeviceInfo>& inputs();
 [[nodiscard]] const juce::Array<juce::MidiDeviceInfo>& outputs();
 // A device's name by its identifier (the identifier itself when it is gone).
-[[nodiscard]] juce::String inputName(const juce::String& identifier);
-[[nodiscard]] juce::String outputName(const juce::String& identifier);
+[[nodiscard]] cydaw::base::Text inputName(const cydaw::base::Text& identifier);
+[[nodiscard]] cydaw::base::Text outputName(const cydaw::base::Text& identifier);
 
 // How lit a light is: 1 when its counter has just moved, fading out over a
 // quarter of a second; `key` names the light (a track's input).

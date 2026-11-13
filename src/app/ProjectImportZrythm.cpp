@@ -25,14 +25,14 @@ enum TrackType { instrument, audio, master, chord, marker, tempo, modulator, aud
 
 class ZrythmReader {
 public:
-    ZrythmReader(const juce::File& file, ImportedProject& out) : file_(file), out_(out), folder_(file.getParentDirectory()) {}
+    ZrythmReader(const cydaw::base::File& file, ImportedProject& out) : file_(file), out_(out), folder_(file.getParentDirectory()) {}
 
     cydaw::base::Result read()
     {
-        juce::MemoryBlock bytes;
+        cydaw::base::MemoryBlock bytes;
         if (!file_.loadFileAsData(bytes))
             return cydaw::base::Result::fail("The file could not be opened: " + file_.getFullPathName());
-        juce::String text;
+        cydaw::base::Text text;
         const auto* data = static_cast<const juce::uint8*>(bytes.getData());
         if (bytes.getSize() >= 4 && data[0] == 0x28 && data[1] == 0xb5 && data[2] == 0x2f && data[3] == 0xfd) {
             // zstd: frame by frame into memory.
@@ -240,15 +240,15 @@ private:
         track.audioClips.push_back(std::move(clip));
     }
 
-    juce::File file_;
+    cydaw::base::File file_;
     ImportedProject& out_;
-    juce::File folder_;
+    cydaw::base::File folder_;
     std::map<int, cydaw::base::Value> pool_;
 };
 
 } // namespace
 
-cydaw::base::Result importZrythmProject(const juce::File& file, ImportedProject& out)
+cydaw::base::Result importZrythmProject(const cydaw::base::File& file, ImportedProject& out)
 {
     out.source = file;
     ZrythmReader reader(file, out);

@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "Studio.h"
@@ -61,7 +62,7 @@ private:
     };
     void drawSettings(const app::NodeGraphComponent::EditorNode& modulator, ImVec2 at, float width, ImU32 colour);
     void drawBrowser();
-    void report(const juce::String& problem);
+    void report(const cydaw::base::Text& problem);
     [[nodiscard]] std::pair<std::uint64_t, std::uint64_t> key(std::uint64_t owner) const { return { trackKey_, owner }; }
 
     Studio& studio_;
@@ -82,7 +83,7 @@ private:
     // The arrow being dragged (a click on it, not a drag, arms it).
     bool arrowDragged_ {};
     // The last problem told, and when (a drag repeats it every frame).
-    juce::String lastProblem_;
+    cydaw::base::Text lastProblem_;
     double lastProblemTime_ {};
 };
 

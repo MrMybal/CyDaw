@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #include <algorithm>
 #include <cmath>
 #include <cyaudio/io/AudioDeviceManager.h>
@@ -5,9 +6,9 @@
 namespace cydaw::integration {
 namespace {
 using namespace cyaudio;
-juce::String nativeError(Status r) {
-  return r == Status::ok ? juce::String{}
-                         : "CyAudioCore audio: status " + juce::String(int(r));
+cydaw::base::Text nativeError(Status r) {
+  return r == Status::ok ? cydaw::base::Text{}
+                         : "CyAudioCore audio: status " + cydaw::base::Text(int(r));
 }
 class CoreDevice final : public juce::AudioIODevice {
   std::shared_ptr<AudioDeviceContext> context;
@@ -22,13 +23,13 @@ class CoreDevice final : public juce::AudioIODevice {
   std::vector<const float *> inputPointers;
   std::vector<float *> outputPointers;
   juce::AudioIODeviceCallback *callback = nullptr;
-  juce::String lastError;
+  cydaw::base::Text lastError;
   bool opened = false;
-  static juce::StringArray names(const AudioDeviceCapabilities &caps,
+  static cydaw::base::TextList names(const AudioDeviceCapabilities &caps,
                                  bool input) {
-    juce::StringArray names;
+    cydaw::base::TextList names;
     for (const auto &n : caps.channelNames)
-      names.add(juce::String::fromUTF8(n.c_str()));
+      names.add(cydaw::base::Text::fromUTF8(n.c_str()));
     unsigned count = 0;
     for (const auto &f : caps.nativeFormats)
       count = std::max(count, f.channels);
@@ -38,13 +39,13 @@ class CoreDevice final : public juce::AudioIODevice {
       count = 2;
     count = std::min(count, 256u);
     while (unsigned(names.size()) < count)
-      names.add(juce::String(input ? "Input " : "Output ") +
-                juce::String(names.size() + 1));
+      names.add(cydaw::base::Text(input ? "Input " : "Output ") +
+                cydaw::base::Text(names.size() + 1));
     return names;
   }
 
 public:
-  CoreDevice(juce::String name, juce::String type,
+  CoreDevice(cydaw::base::Text name, cydaw::base::Text type,
              std::shared_ptr<AudioDeviceContext> c, AudioAccess a,
              std::string input, std::string output)
       : juce::AudioIODevice(name, type), context(std::move(c)), access(a),
@@ -95,10 +96,10 @@ public:
     return input ? inputId : outputId;
   }
   juce::StringArray getInputChannelNames() override {
-    return inputId.empty() ? juce::StringArray{} : names(inputCaps, true);
+    return inputId.empty() ? cydaw::base::TextList{} : names(inputCaps, true);
   }
   juce::StringArray getOutputChannelNames() override {
-    return outputId.empty() ? juce::StringArray{} : names(outputCaps, false);
+    return outputId.empty() ? cydaw::base::TextList{} : names(outputCaps, false);
   }
   juce::Array<double> getAvailableSampleRates() override {
     juce::Array<double> rates;
@@ -246,15 +247,15 @@ class CoreType final : public juce::AudioIODeviceType {
   AudioAccess access;
   Status prepared = Status::not_prepared;
   std::vector<AudioDeviceInfo> devices;
-  juce::String display(const AudioDeviceInfo &d) const {
-    auto name = juce::String::fromUTF8(d.name.c_str());
+  cydaw::base::Text display(const AudioDeviceInfo &d) const {
+    auto name = cydaw::base::Text::fromUTF8(d.name.c_str());
     if (std::count_if(devices.begin(), devices.end(), [&](const auto &other) {
           return other.input == d.input && other.name == d.name;
         }) > 1)
-      name += " [" + juce::String(d.id) + "]";
+      name += " [" + cydaw::base::Text(d.id) + "]";
     return name;
   }
-  const AudioDeviceInfo *find(const juce::String &name, bool input) const {
+  const AudioDeviceInfo *find(const cydaw::base::Text &name, bool input) const {
     for (const auto &d : devices)
       if (d.input == input && display(d) == name)
         return &d;
@@ -262,7 +263,7 @@ class CoreType final : public juce::AudioIODeviceType {
   }
 
 public:
-  CoreType(juce::String name, AudioBackend backend, AudioAccess a)
+  CoreType(cydaw::base::Text name, AudioBackend backend, AudioAccess a)
       : juce::AudioIODeviceType(name), options{backend}, access(a) {}
   void scanForDevices() override {
     if (prepared != Status::ok)
@@ -274,7 +275,7 @@ public:
       devices.clear();
   }
   juce::StringArray getDeviceNames(bool input) const override {
-    juce::StringArray names;
+    cydaw::base::TextList names;
     for (const auto &d : devices)
       if (d.input == input)
         names.add(display(d));
@@ -318,7 +319,7 @@ public:
 };
 } // namespace
 std::unique_ptr<juce::AudioIODeviceType>
-createCyAudioCoreDeviceType(const juce::String &name,
+createCyAudioCoreDeviceType(const cydaw::base::Text &name,
                             cyaudio::AudioBackend backend,
                             cyaudio::AudioAccess access) {
   return std::make_unique<CoreType>(name, backend, access);

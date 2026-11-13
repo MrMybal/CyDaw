@@ -6,15 +6,15 @@ namespace halod = engine::halo;
 constexpr ImU32 kHaloLow = IM_COL32(255, 170, 90, 255);
 constexpr ImU32 kHaloHigh = IM_COL32(150, 200, 255, 255);
 
-juce::String haloModeName(const int index)
+cydaw::base::Text haloModeName(const int index)
 {
     const auto& mode = halod::haloModes[static_cast<std::size_t>(std::clamp(index, 0, halod::haloModeCount - 1))];
-    return juce::String::fromUTF8(ui::french() ? mode.french : mode.english);
+    return cydaw::base::Text::fromUTF8(ui::french() ? mode.french : mode.english);
 }
-juce::String haloModeHint(const int index)
+cydaw::base::Text haloModeHint(const int index)
 {
     const auto& mode = halod::haloModes[static_cast<std::size_t>(std::clamp(index, 0, halod::haloModeCount - 1))];
-    return juce::String::fromUTF8(ui::french() ? mode.frenchHint : mode.englishHint);
+    return cydaw::base::Text::fromUTF8(ui::french() ? mode.frenchHint : mode.englishHint);
 }
 
 // The tail over time, its lows (orange) and its highs (blue), from the
@@ -106,9 +106,9 @@ bool haloLarge(const Pane& pane, std::vector<Param>& parameters, const ImVec2 po
                          ImVec2(position.x + dp(80.0f), y), dp(300.0f), dp(22.0f), colour, set,
                          L("L'époque : les années 70 sombres et granuleuses, les années 80 avec leur grain numérique, ou la clarté d'aujourd'hui.",
                            "The era: the dark, grainy 1970s, the 1980s and their digital grain, or today's clarity."));
-    std::vector<juce::String> syncs { ui::Ls("Pré-délai libre", "Free predelay") };
+    std::vector<cydaw::base::Text> syncs { ui::Ls("Pré-délai libre", "Free predelay") };
     for (const auto& note : engine::noteDivisions)
-        syncs.push_back(juce::String(std::string(note.name)));
+        syncs.push_back(cydaw::base::Text(std::string(note.name)));
     section(list, ImVec2(position.x + dp(400.0f), y + dp(4.0f)), L("SYNCHRO", "SYNC"));
     changed |= comboCell("##sync", at(parameters, pane, halod::haloSync), syncs, ImVec2(position.x + dp(460.0f), y), dp(150.0f), set);
     y += dp(30.0f);

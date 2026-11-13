@@ -43,9 +43,9 @@ class JsfxInstance final : public HostedInstance
     ysfx_config_u config{ysfx_config_new()};
     ysfx_u fx;
     std::vector<std::pair<int, HostedControl *>> controls;
-    juce::String diagnostics;
-    juce::File source;
-    explicit JsfxInstance(const juce::File &file) : source(file)
+    cydaw::base::Text diagnostics;
+    cydaw::base::File source;
+    explicit JsfxInstance(const cydaw::base::File &file) : source(file)
     {
         ysfx_set_user_data(config.get(), reinterpret_cast<intptr_t>(this));
         ysfx_set_log_reporter(config.get(),
@@ -53,26 +53,26 @@ class JsfxInstance final : public HostedInstance
                               {
                                   auto *self = reinterpret_cast<JsfxInstance *>(data);
                                   if (self->diagnostics.length() < 65536)
-                                      self->diagnostics += juce::String(ysfx_log_level_string(level)) + ": " +
-                                                           juce::String::fromUTF8(message) + "\n";
+                                      self->diagnostics += cydaw::base::Text(ysfx_log_level_string(level)) + ": " +
+                                                           cydaw::base::Text::fromUTF8(message) + "\n";
                               });
         ysfx_guess_file_roots(config.get(), file.getFullPathName().toRawUTF8());
         ysfx_register_builtin_audio_formats(config.get());
         fx.reset(ysfx_new(config.get()));
     }
-    bool load(juce::String &error)
+    bool load(cydaw::base::Text &error)
     {
         if (!fx || !ysfx_load_file(fx.get(), source.getFullPathName().toRawUTF8(), 0) ||
             !ysfx_compile(fx.get(), 0))
         {
             error =
-                diagnostics.isNotEmpty() ? diagnostics : "JSFX: cannot compile " + source.getFullPathName();
+                diagnostics.isNotEmpty() ? diagnostics : cydaw::base::Text("JSFX: cannot compile ") + source.getFullPathName();
             return false;
         }
-        description.name = juce::String::fromUTF8(ysfx_get_name(fx.get()));
+        description.name = cydaw::base::Text::fromUTF8(ysfx_get_name(fx.get()));
         if (description.name.isEmpty())
             description.name = source.getFileNameWithoutExtension();
-        description.manufacturerName = juce::String::fromUTF8(ysfx_get_author(fx.get()));
+        description.manufacturerName = cydaw::base::Text::fromUTF8(ysfx_get_author(fx.get()));
         description.pluginFormatName = "JSFX";
         description.fileOrIdentifier = source.getFullPathName();
         description.uniqueId = description.fileOrIdentifier.hashCode();
@@ -87,13 +87,13 @@ class JsfxInstance final : public HostedInstance
                 ysfx_slider_range_t range{};
                 ysfx_slider_get_range(fx.get(), i, &range);
                 auto p = std::make_unique<HostedControl>(
-                    "slider" + juce::String(i + 1), juce::String::fromUTF8(ysfx_slider_get_name(fx.get(), i)),
+                    "slider" + cydaw::base::Text(i + 1), cydaw::base::Text::fromUTF8(ysfx_slider_get_name(fx.get(), i)),
                     range.min, range.max, range.def);
                 if (ysfx_slider_is_enum(fx.get(), i))
                 {
-                    juce::StringArray labels;
+                    cydaw::base::TextList labels;
                     for (uint32_t j = 0; j < ysfx_slider_get_enum_size(fx.get(), i); ++j)
-                        labels.add(juce::String::fromUTF8(ysfx_slider_get_enum_name(fx.get(), i, j)));
+                        labels.add(cydaw::base::Text::fromUTF8(ysfx_slider_get_enum_name(fx.get(), i, j)));
                     p->steps = labels.size();
                     p->display = [labels, lo = range.min](double v)
                     { return labels[juce::jlimit(0, labels.size() - 1, int(std::round(v - lo)))]; };
@@ -280,7 +280,7 @@ void JsfxGraphics::timerCallback()
         {
             auto &item = parsed->insns[i];
             if (item.opcode == ysfx_menu_item)
-                menu.addItem(int(item.id), juce::String::fromUTF8(item.name),
+                menu.addItem(int(item.id), cydaw::base::Text::fromUTF8(item.name),
                              !(item.item_flags & ysfx_menu_item_disabled),
                              bool(item.item_flags & ysfx_menu_item_checked));
             else if (item.opcode == ysfx_menu_separator)
@@ -295,7 +295,7 @@ void JsfxGraphics::timerCallback()
                 auto child = std::move(menu);
                 menu = std::move(stack.back());
                 stack.pop_back();
-                menu.addSubMenu(juce::String::fromUTF8(item.name), child);
+                menu.addSubMenu(cydaw::base::Text::fromUTF8(item.name), child);
             }
         }
         return menu.show();
@@ -307,7 +307,7 @@ void JsfxGraphics::timerCallback()
         repaint();
     }
 }
-std::unique_ptr<juce::AudioPluginInstance> createJsfx(const juce::File &file, juce::String &error)
+std::unique_ptr<juce::AudioPluginInstance> createJsfx(const cydaw::base::File &file, cydaw::base::Text &error)
 {
     auto p = std::make_unique<JsfxInstance>(file);
     if (!p->load(error))

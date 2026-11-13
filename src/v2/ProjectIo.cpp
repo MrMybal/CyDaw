@@ -238,9 +238,9 @@ bool isLegacyMixedFactoryAudioGraph(const cydaw::base::Value& state)
         || root->getProperty(keys::factoryPreset).toString().isNotEmpty())
         return false;
 
-    std::vector<std::pair<std::uint64_t, juce::String>> typedNodes;
+    std::vector<std::pair<std::uint64_t, cydaw::base::Text>> typedNodes;
     typedNodes.reserve(8);
-    juce::StringArray nodeTypes;
+    cydaw::base::TextList nodeTypes;
     for (const auto& value : *nodes) {
         const auto* node = value.getDynamicObject();
         if (node == nullptr)
@@ -261,7 +261,7 @@ bool isLegacyMixedFactoryAudioGraph(const cydaw::base::Value& state)
             return false;
     }
     nodeTypes.sort(true);
-    juce::StringArray expectedTypes { "audio-clips", "drive", "gain-pan", "lowpass",
+    cydaw::base::TextList expectedTypes { "audio-clips", "drive", "gain-pan", "lowpass",
                                       "master", "midi-input", "poly-sine", "spectrum" };
     expectedTypes.sort(true);
     if (nodeTypes != expectedTypes)
@@ -270,9 +270,9 @@ bool isLegacyMixedFactoryAudioGraph(const cydaw::base::Value& state)
     const auto typeForId = [&typedNodes](const std::uint64_t nodeId) {
         const auto found = std::find_if(typedNodes.begin(), typedNodes.end(),
                                         [nodeId](const auto& item) { return item.first == nodeId; });
-        return found != typedNodes.end() ? found->second : juce::String {};
+        return found != typedNodes.end() ? found->second : cydaw::base::Text {};
     };
-    juce::StringArray edges;
+    cydaw::base::TextList edges;
     for (const auto& value : *connections) {
         const auto* connection = value.getDynamicObject();
         if (connection == nullptr)
@@ -284,7 +284,7 @@ bool isLegacyMixedFactoryAudioGraph(const cydaw::base::Value& state)
         edges.add(from + "->" + to);
     }
     edges.sort(true);
-    juce::StringArray expectedEdges { "audio-clips->drive", "drive->lowpass",        "gain-pan->spectrum",
+    cydaw::base::TextList expectedEdges { "audio-clips->drive", "drive->lowpass",        "gain-pan->spectrum",
                                       "lowpass->gain-pan",  "midi-input->poly-sine", "poly-sine->master",
                                       "spectrum->master" };
     expectedEdges.sort(true);
@@ -293,9 +293,9 @@ bool isLegacyMixedFactoryAudioGraph(const cydaw::base::Value& state)
 
 // ---- Class libraries -------------------------------------------------------------------
 
-std::map<juce::String, cydaw::base::Value> modulesByKey(const cydaw::base::Value& library)
+std::map<cydaw::base::Text, cydaw::base::Value> modulesByKey(const cydaw::base::Value& library)
 {
-    std::map<juce::String, cydaw::base::Value> byKey;
+    std::map<cydaw::base::Text, cydaw::base::Value> byKey;
     if (const auto* modules = library.getArray())
         for (const auto& module : *modules)
             if (const auto* object = module.getDynamicObject())
@@ -306,7 +306,7 @@ std::map<juce::String, cydaw::base::Value> modulesByKey(const cydaw::base::Value
 // The classes of a graph whose body differs from the library's, as a state
 // Studio::mergeModules reads. A class only restored from the library is left
 // out, so a graph merged after the one that edited a class cannot undo the edit.
-cydaw::base::Value editedModules(const cydaw::base::Value& graphState, const std::map<juce::String, cydaw::base::Value>& library)
+cydaw::base::Value editedModules(const cydaw::base::Value& graphState, const std::map<cydaw::base::Text, cydaw::base::Value>& library)
 {
     cydaw::base::Array<cydaw::base::Value> edited;
     if (const auto* graph = graphState.getDynamicObject())
@@ -331,11 +331,11 @@ cydaw::base::Value editedModules(const cydaw::base::Value& graphState, const std
 
 // Relative to the project's folder when the project has a file; another drive
 // gives an absolute path, as getRelativePathFrom does.
-juce::String projectAssetPath(const juce::File& asset, const juce::File& projectFile)
+cydaw::base::Text projectAssetPath(const cydaw::base::File& asset, const cydaw::base::File& projectFile)
 {
-    if (asset == juce::File {})
+    if (asset == cydaw::base::File {})
         return {};
-    if (projectFile == juce::File {})
+    if (projectFile == cydaw::base::File {})
         return asset.getFullPathName();
     return asset.getRelativePathFrom(projectFile.getParentDirectory());
 }
@@ -395,11 +395,11 @@ cydaw::base::Value stopsOffToVar(const Studio& studio, const TrackRef& track)
 // same id under the same name, else the same name and direction, else none.
 using BusIds = std::map<std::uint64_t, std::uint64_t>;
 
-std::uint64_t softwareBus(const Studio& studio, const BusIds& ids, const std::uint64_t saved, const juce::String& name,
+std::uint64_t softwareBus(const Studio& studio, const BusIds& ids, const std::uint64_t saved, const cydaw::base::Text& name,
                           const app::VirtualBusDirection direction)
 {
     const auto buses = studio.engine().virtualBuses();
-    const auto named = [&](const juce::String& wanted) -> std::uint64_t {
+    const auto named = [&](const cydaw::base::Text& wanted) -> std::uint64_t {
         for (const auto& bus : buses)
             if (bus.direction == direction && bus.name.equalsIgnoreCase(wanted))
                 return bus.id;
@@ -447,7 +447,7 @@ cydaw::base::Value portableAssignments(Studio& studio, const cydaw::base::Value&
     cydaw::base::Array<cydaw::base::Value> out;
     if (const auto* list = assignments.getArray())
         for (const auto& item : *list) {
-            auto parts = juce::StringArray::fromTokens(item.getProperty("target", {}).toString(), "/", "");
+            auto parts = cydaw::base::TextList::fromTokens(item.getProperty("target", {}).toString(), "/", "");
             if (parts.size() >= 3 && (parts[0] == "track" || parts[0] == "param") && parts[1].containsOnly("0123456789")) {
                 const auto track = studio.trackForKey(static_cast<std::uint64_t>(parts[1].getLargeIntValue()));
                 if (!track)
@@ -457,9 +457,9 @@ cydaw::base::Value portableAssignments(Studio& studio, const cydaw::base::Value&
                                                     [&track](const auto& summary) { return summary.id == track->midiId; });
                     if (found == summaries.end())
                         continue;
-                    parts.set(1, "@midi:" + juce::String(static_cast<int>(found - summaries.begin())));
+                    parts.set(1, "@midi:" + cydaw::base::Text(static_cast<int>(found - summaries.begin())));
                 } else {
-                    parts.set(1, "@audio:" + juce::String(static_cast<int>(track->audioIndex)));
+                    parts.set(1, "@audio:" + cydaw::base::Text(static_cast<int>(track->audioIndex)));
                 }
             }
             auto copy = cydaw::base::Value(item.getDynamicObject() != nullptr ? item.getDynamicObject()->clone().release() : new cydaw::base::Object());
@@ -475,7 +475,7 @@ cydaw::base::Value localAssignments(Studio& studio, const cydaw::base::Value& sa
     cydaw::base::Array<cydaw::base::Value> out;
     if (const auto* list = saved.getArray())
         for (const auto& item : *list) {
-            auto parts = juce::StringArray::fromTokens(item.getProperty("target", {}).toString(), "/", "");
+            auto parts = cydaw::base::TextList::fromTokens(item.getProperty("target", {}).toString(), "/", "");
             if (parts.size() >= 3 && parts[1].startsWithChar('@')) {
                 const auto position = parts[1].fromFirstOccurrenceOf(":", false, false).getIntValue();
                 std::optional<TrackRef> track;
@@ -485,7 +485,7 @@ cydaw::base::Value localAssignments(Studio& studio, const cydaw::base::Value& sa
                     track = TrackRef { false, static_cast<std::size_t>(position), 0 };
                 if (!track)
                     continue;
-                parts.set(1, juce::String(static_cast<juce::int64>(studio.routingKey(*track))));
+                parts.set(1, cydaw::base::Text(static_cast<juce::int64>(studio.routingKey(*track))));
             }
             auto copy = cydaw::base::Value(item.getDynamicObject() != nullptr ? item.getDynamicObject()->clone().release() : new cydaw::base::Object());
             copy.getDynamicObject()->setProperty("target", parts.joinIntoString("/"));
@@ -623,16 +623,16 @@ cydaw::base::Value parameterLanesToVar(const ParameterLanes& lanes)
 }
 
 // A clip's automation lanes: [{binding, points:[{time, value, curve, curveAmount}]}].
-cydaw::base::Value clipLanesToVar(const std::map<juce::String, std::vector<Engine::AutomationPoint>>& lanes)
+cydaw::base::Value clipLanesToVar(const std::map<cydaw::base::Text, std::vector<Engine::AutomationPoint>>& lanes)
 {
     ParameterLanes shaped;
     shaped.lanes = lanes;
     return parameterLanesToVar(shaped);
 }
 
-std::map<juce::String, std::vector<Engine::AutomationPoint>> readClipLanes(const cydaw::base::Object& clip)
+std::map<cydaw::base::Text, std::vector<Engine::AutomationPoint>> readClipLanes(const cydaw::base::Object& clip)
 {
-    std::map<juce::String, std::vector<Engine::AutomationPoint>> lanes;
+    std::map<cydaw::base::Text, std::vector<Engine::AutomationPoint>> lanes;
     const auto* list = clip.getProperty(keys::clipLanes).getArray();
     if (list == nullptr)
         return lanes;
@@ -766,7 +766,7 @@ cydaw::base::Value stretchMarkersToVar(const std::vector<Engine::StretchMarker>&
     return values;
 }
 
-cydaw::base::Value eventsToVar(const std::vector<Engine::AudioEvent>& events, const juce::File& projectFile)
+cydaw::base::Value eventsToVar(const std::vector<Engine::AudioEvent>& events, const cydaw::base::File& projectFile)
 {
     cydaw::base::Array<cydaw::base::Value> values;
     for (const auto& event : events) {
@@ -794,7 +794,7 @@ cydaw::base::Value eventsToVar(const std::vector<Engine::AudioEvent>& events, co
     return values;
 }
 
-cydaw::base::Value audioClipToVar(const Engine::AudioClip& clip, const juce::File& projectFile)
+cydaw::base::Value audioClipToVar(const Engine::AudioClip& clip, const cydaw::base::File& projectFile)
 {
     auto value = makeObject();
     value->setProperty(keys::name, clip.name);
@@ -862,7 +862,7 @@ cydaw::base::Value audioClipToVar(const Engine::AudioClip& clip, const juce::Fil
     return cydaw::base::Value(value.get());
 }
 
-cydaw::base::Value launcherClipToVar(const Engine::LauncherClip& clip, const juce::File& projectFile)
+cydaw::base::Value launcherClipToVar(const Engine::LauncherClip& clip, const cydaw::base::File& projectFile)
 {
     auto value = makeObject();
     value->setProperty(keys::scene, clip.sceneIndex);
@@ -885,7 +885,7 @@ cydaw::base::Value launcherClipToVar(const Engine::LauncherClip& clip, const juc
 }
 
 cydaw::base::Value pluginsToVar(Engine& engine, const std::size_t trackIndex, const Engine::TrackInfo& info,
-                       const bool refreshPluginState, const juce::File& projectFile)
+                       const bool refreshPluginState, const cydaw::base::File& projectFile)
 {
     const auto lanes = engine.pluginAutomationLanes(trackIndex);
     cydaw::base::Array<cydaw::base::Value> plugins;
@@ -941,28 +941,28 @@ cydaw::base::Value interfaceValue(const Studio& studio, const cydaw::base::Ident
 
 // ---- Reading -------------------------------------------------------------------------------
 
-void warn(juce::StringArray& warnings, const juce::String& line)
+void warn(cydaw::base::TextList& warnings, const cydaw::base::Text& line)
 {
     (void) warnings.addIfNotAlreadyThere(line);
 }
 
-juce::String missingAudio(const juce::File& audio)
+cydaw::base::Text missingAudio(const cydaw::base::File& audio)
 {
-    return "Missing audio file: " + (audio == juce::File {} ? juce::String("(no path)") : audio.getFullPathName());
+    return "Missing audio file: " + (audio == cydaw::base::File {} ? cydaw::base::Text("(no path)") : audio.getFullPathName());
 }
 
 // A stored path: absolute, or relative to the project's folder. A file
 // written on Windows separates its folders with backslashes.
-juce::File resolveAsset(const juce::String& path, const juce::File& projectFile, const juce::File& fallback = {})
+cydaw::base::File resolveAsset(const cydaw::base::Text& path, const cydaw::base::File& projectFile, const cydaw::base::File& fallback = {})
 {
     if (path.isEmpty())
         return fallback;
     auto normalised = path;
-    if (juce::File::getSeparatorChar() != '\\')
+    if (cydaw::base::File::getSeparatorChar() != '\\')
         normalised = normalised.replaceCharacter('\\', '/');
-    if (juce::File::isAbsolutePath(normalised))
-        return juce::File(normalised);
-    const auto folder = projectFile == juce::File {} ? juce::File::getCurrentWorkingDirectory()
+    if (cydaw::base::File::isAbsolutePath(normalised))
+        return cydaw::base::File(normalised);
+    const auto folder = projectFile == cydaw::base::File {} ? cydaw::base::File::getCurrentWorkingDirectory()
                                                      : projectFile.getParentDirectory();
     return folder.getChildFile(normalised);
 }
@@ -1004,8 +1004,8 @@ void restoreGainPoints(const cydaw::base::Value& points, Add&& add, SetCurve&& s
 
 // False when an event is unreadable or its file is missing: v1 then leaves
 // the clip's events as they are.
-bool readEvents(const cydaw::base::Array<cydaw::base::Value>& saved, const juce::File& fallbackSource, const juce::File& projectFile,
-                juce::StringArray& warnings, std::vector<Engine::AudioEvent>& events)
+bool readEvents(const cydaw::base::Array<cydaw::base::Value>& saved, const cydaw::base::File& fallbackSource, const cydaw::base::File& projectFile,
+                cydaw::base::TextList& warnings, std::vector<Engine::AudioEvent>& events)
 {
     events.reserve(static_cast<std::size_t>(saved.size()));
     for (const auto& value : saved) {
@@ -1101,7 +1101,7 @@ cydaw::base::Value readLauncherActions(const cydaw::base::Value& saved)
 }
 
 void restoreAudioClip(Engine& engine, const std::size_t trackIndex, const cydaw::base::Object& clip,
-                      const juce::File& trackFile, const juce::File& projectFile, juce::StringArray& warnings)
+                      const cydaw::base::File& trackFile, const cydaw::base::File& projectFile, cydaw::base::TextList& warnings)
 {
     const auto clipSource = resolveAsset(clip.getProperty(keys::source).toString(), projectFile, trackFile);
     if (!clipSource.existsAsFile()) {
@@ -1216,9 +1216,9 @@ void restoreAudioClip(Engine& engine, const std::size_t trackIndex, const cydaw:
         (void) engine.setAudioClipLanes(trackIndex, clipId, std::move(lanes));
 }
 
-void restorePlugin(Engine& engine, const std::size_t trackIndex, const juce::String& path,
-                   const juce::String& stateBase64, const cydaw::base::Value& automationLanes, const juce::File& projectFile,
-                   juce::StringArray& warnings)
+void restorePlugin(Engine& engine, const std::size_t trackIndex, const cydaw::base::Text& path,
+                   const cydaw::base::Text& stateBase64, const cydaw::base::Value& automationLanes, const cydaw::base::File& projectFile,
+                   cydaw::base::TextList& warnings)
 {
     if (path.isEmpty())
         return;
@@ -1264,7 +1264,7 @@ void restorePlugin(Engine& engine, const std::size_t trackIndex, const juce::Str
 }
 
 void restoreLauncherClip(Engine& engine, const std::size_t trackIndex, const cydaw::base::Object& clip,
-                         const juce::File& trackFile, const juce::File& projectFile, juce::StringArray& warnings)
+                         const cydaw::base::File& trackFile, const cydaw::base::File& projectFile, cydaw::base::TextList& warnings)
 {
     const auto sceneIndex = static_cast<int>(clip.getProperty(keys::scene));
     const auto clipName = clip.getProperty(keys::name).toString();
@@ -1312,8 +1312,8 @@ void restoreLauncherClip(Engine& engine, const std::size_t trackIndex, const cyd
 
 // One entry of "tracks", or the root of the original single-track format.
 struct SavedAudioTrack {
-    juce::String audioPath;
-    juce::String name;
+    cydaw::base::Text audioPath;
+    cydaw::base::Text name;
     juce::int64 colour {};
     int channels { 2 };
     float gainDb {};
@@ -1327,8 +1327,8 @@ struct SavedAudioTrack {
     float driveDb {};
     float filterCutoffHz { 20'000.0f };
     cydaw::base::Value plugins;
-    juce::String legacyPluginPath;
-    juce::String legacyPluginState;
+    cydaw::base::Text legacyPluginPath;
+    cydaw::base::Text legacyPluginState;
     cydaw::base::Value automation;
     cydaw::base::Value audioClips;
     cydaw::base::Value launcherClips;
@@ -1371,8 +1371,8 @@ SavedAudioTrack readSavedTrack(const cydaw::base::Object& track)
 
 // v1's addSavedTrack. Returns the engine index of the track made.
 std::optional<std::size_t> restoreAudioTrack(Studio& studio, const SavedAudioTrack& saved,
-                                             const cydaw::base::Value& legacyNodeGraph, const juce::File& projectFile,
-                                             juce::StringArray& warnings)
+                                             const cydaw::base::Value& legacyNodeGraph, const cydaw::base::File& projectFile,
+                                             cydaw::base::TextList& warnings)
 {
     auto& engine = studio.engine();
     const auto audioFile = resolveAsset(saved.audioPath, projectFile);
@@ -1408,7 +1408,7 @@ std::optional<std::size_t> restoreAudioTrack(Studio& studio, const SavedAudioTra
         if (saved.name.trim().isNotEmpty())
             state.name = saved.name.trim();
         else
-            state.name = "Audio " + juce::String(static_cast<int>(trackIndex + 1));
+            state.name = "Audio " + cydaw::base::Text(static_cast<int>(trackIndex + 1));
         if (saved.colour != 0)
             state.colour = static_cast<juce::uint32>(saved.colour);
         state.audioChannels = juce::jlimit(1, 8, saved.channels > 0 ? saved.channels : 2);
@@ -1616,7 +1616,7 @@ void restoreMidiClip(Engine& engine, const std::uint64_t trackId, const cydaw::b
 
 // Returns the armed track's id, 0 when none is.
 // One MIDI track of the file; its id when it is armed, else 0.
-std::uint64_t restoreMidiTrack(Studio& studio, const cydaw::base::Object& saved, juce::StringArray& warnings)
+std::uint64_t restoreMidiTrack(Studio& studio, const cydaw::base::Object& saved, cydaw::base::TextList& warnings)
 {
     auto& engine = studio.engine();
     const auto trackName = saved.getProperty(keys::name).toString();
@@ -1640,7 +1640,7 @@ std::uint64_t restoreMidiTrack(Studio& studio, const cydaw::base::Object& saved,
     // What it hears (kept as it was before it was saved: every keyboard
     // and the computer's), where its notes also go.
     if (const auto* inputs = saved.getProperty("midiInputs").getArray()) {
-        std::vector<juce::String> heard;
+        std::vector<cydaw::base::Text> heard;
         for (const auto& input : *inputs)
             heard.push_back(input.toString());
         engine.setMidiTrackInputs(trackId, std::move(heard));
@@ -1720,7 +1720,7 @@ void restoreInterfaceState(Studio& studio, const cydaw::base::Object& root)
 
 // ---- Saving ----------------------------------------------------------------------------------
 
-cydaw::base::Value buildDocument(Studio& studio, const juce::File& projectFile, const bool refreshPluginState)
+cydaw::base::Value buildDocument(Studio& studio, const cydaw::base::File& projectFile, const bool refreshPluginState)
 {
     auto& engine = studio.engine();
 
@@ -1775,7 +1775,7 @@ cydaw::base::Value buildDocument(Studio& studio, const juce::File& projectFile, 
         track->setProperty(keys::audioFile, projectAssetPath(info.file, projectFile));
         track->setProperty(keys::name, state != nullptr && state->name.isNotEmpty()
                                            ? state->name
-                                           : "Audio " + juce::String(static_cast<int>(index + 1)));
+                                           : "Audio " + cydaw::base::Text(static_cast<int>(index + 1)));
         track->setProperty(keys::colour, static_cast<juce::int64>(
                                              state != nullptr ? state->colour
                                                               : studio.trackColour(TrackRef { false, index, 0 })));
@@ -2054,7 +2054,7 @@ namespace {
 
 // One audio track of the file, with its input.
 void restoreAudioEntry(Studio& studio, const cydaw::base::Object& track, const cydaw::base::Value& legacyNodeGraph,
-                       const BusIds& busIds, const juce::File& projectFile, juce::StringArray& warnings)
+                       const BusIds& busIds, const cydaw::base::File& projectFile, cydaw::base::TextList& warnings)
 {
     auto& engine = studio.engine();
     const auto index = restoreAudioTrack(studio, readSavedTrack(track), legacyNodeGraph, projectFile, warnings);
@@ -2080,7 +2080,7 @@ void restoreAudioEntry(Studio& studio, const cydaw::base::Object& track, const c
                            : state.automationVisible ? 172 : 88;
 }
 
-juce::String nameOf(const cydaw::base::Value& track)
+cydaw::base::Text nameOf(const cydaw::base::Value& track)
 {
     return track.getProperty(keys::name, {}).toString();
 }
@@ -2094,8 +2094,8 @@ struct DocumentLoad::State {
 
     Studio& studio;
     cydaw::base::Value document;
-    juce::File projectFile;
-    juce::StringArray& warnings;
+    cydaw::base::File projectFile;
+    cydaw::base::TextList& warnings;
     const cydaw::base::Object* root {};
     Stage stage { Stage::prelude };
     std::size_t index {};
@@ -2110,7 +2110,7 @@ struct DocumentLoad::State {
     int finished {};
     cydaw::base::Result result { cydaw::base::Result::ok() };
 
-    State(Studio& owner, cydaw::base::Value doc, juce::File file, juce::StringArray& lines)
+    State(Studio& owner, cydaw::base::Value doc, cydaw::base::File file, cydaw::base::TextList& lines)
         : studio(owner), document(std::move(doc)), projectFile(std::move(file)), warnings(lines)
     {
         root = document.getDynamicObject();
@@ -2126,7 +2126,7 @@ struct DocumentLoad::State {
     }
 };
 
-DocumentLoad::DocumentLoad(Studio& studio, cydaw::base::Value document, juce::File projectFile, juce::StringArray& warnings)
+DocumentLoad::DocumentLoad(Studio& studio, cydaw::base::Value document, cydaw::base::File projectFile, cydaw::base::TextList& warnings)
     : state_(std::make_unique<State>(studio, std::move(document), std::move(projectFile), warnings))
 {
 }
@@ -2140,13 +2140,13 @@ float DocumentLoad::progress() const noexcept
                                                                               / static_cast<float>(std::max(1, state_->total)));
 }
 
-juce::String DocumentLoad::doing() const
+cydaw::base::Text DocumentLoad::doing() const
 {
     auto& s = *state_;
     using Stage = State::Stage;
     const auto count = [](const cydaw::base::Array<cydaw::base::Value>* list) { return list != nullptr ? list->size() : 0; };
     const auto ofTotal = [](const std::size_t at, const int all) {
-        return juce::String(static_cast<int>(at) + 1) + "/" + juce::String(std::max(1, all));
+        return cydaw::base::Text(static_cast<int>(at) + 1) + "/" + cydaw::base::Text(std::max(1, all));
     };
     switch (s.stage) {
     case Stage::prelude:
@@ -2155,19 +2155,19 @@ juce::String DocumentLoad::doing() const
         return ui::Ls("Piste audio ", "Audio track ") + ofTotal(s.index, count(s.audioTracks))
                + (s.audioTracks != nullptr && s.index < static_cast<std::size_t>(s.audioTracks->size())
                       ? " : " + nameOf(s.audioTracks->getReference(static_cast<int>(s.index)))
-                      : juce::String());
+                      : cydaw::base::Text());
     case Stage::middle:
         return ui::Ls("Le master", "The master");
     case Stage::midi:
         return ui::Ls("Piste ", "Track ") + ofTotal(s.index, count(s.midiTracks))
                + (s.midiTracks != nullptr && s.index < static_cast<std::size_t>(s.midiTracks->size())
                       ? " : " + nameOf(s.midiTracks->getReference(static_cast<int>(s.index)))
-                      : juce::String());
+                      : cydaw::base::Text());
     case Stage::routing:
         return ui::Ls("Le routage", "The routing");
     case Stage::publish:
         return ui::Ls("Son préparé : piste ", "Sound prepared: track ") + ofTotal(s.index, static_cast<int>(s.toPublish.size()))
-               + (s.index < s.toPublish.size() ? " : " + s.studio.trackName(s.toPublish[s.index]) : juce::String());
+               + (s.index < s.toPublish.size() ? " : " + s.studio.trackName(s.toPublish[s.index]) : cydaw::base::Text());
     case Stage::finish:
     case Stage::done:
         break;
@@ -2221,13 +2221,13 @@ bool DocumentLoad::next()
                     if (scene < 0 || scene >= Engine::maximumLauncherScenes)
                         continue;
                     MasterClip clip;
-                    clip.name = entry.getProperty("name", juce::String()).toString();
+                    clip.name = entry.getProperty("name", cydaw::base::Text()).toString();
                     clip.colour = static_cast<juce::uint32>(static_cast<juce::int64>(entry.getProperty("colour", static_cast<juce::int64>(0xffffb84d))));
                     clip.lengthBeats = std::clamp(static_cast<double>(entry.getProperty("lengthBeats", 16.0)), 0.25, 4'096.0);
                     clip.looping = static_cast<bool>(entry.getProperty("looping", true));
                     if (const auto* lanes = entry.getProperty("lanes", cydaw::base::Value()).getArray())
                         for (const auto& lane : *lanes) {
-                            const auto binding = lane.getProperty("binding", juce::String()).toString();
+                            const auto binding = lane.getProperty("binding", cydaw::base::Text()).toString();
                             std::vector<MasterClip::Point> points;
                             if (const auto* values = lane.getProperty("points", cydaw::base::Value()).getArray())
                                 for (const auto& value : *values)
@@ -2356,8 +2356,8 @@ bool DocumentLoad::next()
     return false;
 }
 
-cydaw::base::Result applyDocument(Studio& studio, const cydaw::base::Value& document, const juce::File& projectFile,
-                           juce::StringArray& warnings)
+cydaw::base::Result applyDocument(Studio& studio, const cydaw::base::Value& document, const cydaw::base::File& projectFile,
+                           cydaw::base::TextList& warnings)
 {
     DocumentLoad load(studio, document, projectFile, warnings);
     while (load.next()) {

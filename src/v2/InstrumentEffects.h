@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "DeviceHost.h"
@@ -21,7 +22,7 @@ struct Choice {
 };
 
 // `ownType`: the instrument card's type, never listed as an effect.
-void draw(DeviceHost& studio, UiState& state, const TrackRef& track, const juce::String& ownType,
-          const juce::String& instrumentName, std::span<const Choice> choices, ImU32 colour);
+void draw(DeviceHost& studio, UiState& state, const TrackRef& track, const cydaw::base::Text& ownType,
+          const cydaw::base::Text& instrumentName, std::span<const Choice> choices, ImU32 colour);
 
 } // namespace cydaw::v2::instrument_effects

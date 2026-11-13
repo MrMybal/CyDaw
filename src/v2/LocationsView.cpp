@@ -1,3 +1,5 @@
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #include "LocationsView.h"
 
 #include "Theme.h"
@@ -71,7 +73,7 @@ const char* descriptionOf(const Location location)
 }
 
 // The free space where a folder is (or would be).
-juce::int64 freeSpace(juce::File folder)
+juce::int64 freeSpace(cydaw::base::File folder)
 {
     while (!folder.isDirectory() && folder.getParentDirectory() != folder)
         folder = folder.getParentDirectory();
@@ -82,7 +84,7 @@ juce::int64 freeSpace(juce::File folder)
 
 LocationsView::LocationsView(Studio& studio, UiState& state) : studio_(studio), state_(state) {}
 
-void LocationsView::report(const juce::String& text, const bool error)
+void LocationsView::report(const cydaw::base::Text& text, const bool error)
 {
     if (text.isEmpty())
         return;
@@ -91,21 +93,21 @@ void LocationsView::report(const juce::String& text, const bool error)
     state_.statusTime = ImGui::GetTime();
 }
 
-void LocationsView::apply(const Location location, const juce::File& folder)
+void LocationsView::apply(const Location location, const cydaw::base::File& folder)
 {
-    juce::String error;
+    cydaw::base::Text error;
     if (!studio_.setLocation(location, folder, takeContent_, error))
         report(error, true);
     else if (!studio_.locationMove().active)
-        report(juce::String::fromUTF8(nameOf(location)) + " : " + locations::folder(location).getFullPathName(), false);
+        report(cydaw::base::Text::fromUTF8(nameOf(location)) + " : " + locations::folder(location).getFullPathName(), false);
 }
 
 void LocationsView::choose(const Location location)
 {
-    chooser_ = std::make_unique<juce::FileChooser>(juce::String::fromUTF8(nameOf(location)), locations::folder(location));
+    chooser_ = std::make_unique<juce::FileChooser>(cydaw::base::Text::fromUTF8(nameOf(location)), locations::folder(location));
     chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
                           [this, location](const juce::FileChooser& chooser) {
-                              if (const auto folder = chooser.getResult(); folder != juce::File {})
+                              if (const auto folder = chooser.getResult(); folder != cydaw::base::File {})
                                   apply(location, folder);
                           });
 }
@@ -117,9 +119,9 @@ void LocationsView::chooseRoot()
     chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
                           [this](const juce::FileChooser& chooser) {
                               const auto folder = chooser.getResult();
-                              if (folder == juce::File {})
+                              if (folder == cydaw::base::File {})
                                   return;
-                              juce::String error;
+                              cydaw::base::Text error;
                               if (!studio_.setAllLocations(folder, withCreations_, takeContent_, error))
                                   report(error, true);
                               else
@@ -188,7 +190,7 @@ void LocationsView::draw()
             ImGui::PushTextWrapPos(0.0f);
             ImGui::TextUnformatted(folder.getFullPathName().toRawUTF8());
             ImGui::PopTextWrapPos();
-            auto note = locations::isDefault(location) ? ui::Ls("par défaut · ", "default · ") : juce::String();
+            auto note = locations::isDefault(location) ? ui::Ls("par défaut · ", "default · ") : cydaw::base::Text();
             note << ui::sizeText(freeSpace(folder)) << L(" libres sur ce disque", " free on this drive");
             ImGui::TextColored(theme::vec(p.textFaint), "%s", note.toRawUTF8());
 

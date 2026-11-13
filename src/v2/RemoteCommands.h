@@ -32,7 +32,7 @@ public:
     // snapshot: renders the window now — after any panel change still
     // pending — and writes it as a PNG before returning. False when nothing
     // was written.
-    virtual bool snapshot(const juce::File& png) = 0;
+    virtual bool snapshot(const cydaw::base::File& png) = 0;
     // The whole session was replaced (new_project, open_project,
     // load_template, import_project): drop selections, edited clips, caches.
     virtual void sessionReplaced() = 0;
@@ -49,18 +49,18 @@ public:
     // track's graph select it, as CyDAW 1 did.
     virtual void selectTrack(const TrackRef& track) = 0;
     // select_sample: the sample browser in front, this file selected.
-    virtual void selectSample(const juce::File& file) = 0;
+    virtual void selectSample(const cydaw::base::File& file) = 0;
     // browse_samples: the sample browser in front, showing a search (by name,
     // or by description when `semantic`) and the tree's filter.
-    virtual void browseSamples(const juce::String& query, bool semantic, const juce::String& family, const juce::String& category,
-                               const juce::String& source)
+    virtual void browseSamples(const cydaw::base::Text& query, bool semantic, const cydaw::base::Text& family, const cydaw::base::Text& category,
+                               const cydaw::base::Text& source)
     {
         juce::ignoreUnused(query, semantic, family, category, source);
     }
     // library_window: the library's big window shown, set, and asked what it
     // shows; library_perf: the sample catalog's speed measured on as many
     // sounds as asked. Null when there is no interface.
-    virtual cydaw::base::Value library(const juce::String& command, const cydaw::base::Value& request)
+    virtual cydaw::base::Value library(const cydaw::base::Text& command, const cydaw::base::Value& request)
     {
         juce::ignoreUnused(command, request);
         return {};
@@ -100,12 +100,12 @@ public:
     }
     // app_mode: the whole window's mode (studio, dj, foundry, workshop), put
     // on when named; the one on ("" when the name is none of them).
-    virtual juce::String appMode(const juce::String& mode)
+    virtual cydaw::base::Text appMode(const cydaw::base::Text& mode)
     {
         juce::ignoreUnused(mode);
         return {};
     }
-    virtual cydaw::base::Value midiInputs(const juce::String& command, const cydaw::base::Value& request)
+    virtual cydaw::base::Value midiInputs(const cydaw::base::Text& command, const cydaw::base::Value& request)
     {
         juce::ignoreUnused(command, request);
         return {};
@@ -117,7 +117,7 @@ public:
     // scripted pointer stays in place of the real one until "release".
     // file_drop: {files:[absolute paths],x,y}, through the desktop drop handler.
     // Empty on success, otherwise why not.
-    virtual juce::String injectInput(const cydaw::base::Value& events)
+    virtual cydaw::base::Text injectInput(const cydaw::base::Value& events)
     {
         (void) events;
         return "this interface takes no scripted input";
@@ -136,7 +136,7 @@ public:
     // The device workshop's panel in front.
     virtual void showWorkshop() {}
     // show_dialog: a settings window opened ("audio", "companion").
-    virtual bool showDialog(const juce::String& name)
+    virtual bool showDialog(const cydaw::base::Text& name)
     {
         (void) name;
         return false;
@@ -220,18 +220,18 @@ public:
     // layout: the named layouts (the panels, their places, the windows
     // detached onto other screens): their names, one saved as the window
     // is now, one loaded (at the next frame), one deleted.
-    [[nodiscard]] virtual juce::StringArray layoutNames() const { return {}; }
-    virtual cydaw::base::Result saveLayoutAs(const juce::String& name)
+    [[nodiscard]] virtual cydaw::base::TextList layoutNames() const { return {}; }
+    virtual cydaw::base::Result saveLayoutAs(const cydaw::base::Text& name)
     {
         (void) name;
         return cydaw::base::Result::fail("this interface has no layouts");
     }
-    virtual cydaw::base::Result loadLayout(const juce::String& name)
+    virtual cydaw::base::Result loadLayout(const cydaw::base::Text& name)
     {
         (void) name;
         return cydaw::base::Result::fail("this interface has no layouts");
     }
-    virtual bool deleteLayout(const juce::String& name)
+    virtual bool deleteLayout(const cydaw::base::Text& name)
     {
         (void) name;
         return false;
@@ -240,13 +240,13 @@ public:
     virtual Vst3Build* vst3Build() { return nullptr; }
     // A project opened as the person opens it: in steps, the interface
     // drawing a bar meanwhile. False when it cannot start.
-    virtual bool openProjectInSteps(const juce::File& file)
+    virtual bool openProjectInSteps(const cydaw::base::File& file)
     {
         (void) file;
         return false;
     }
     // A project of another software imported the same way.
-    virtual bool importProjectInSteps(const juce::File& file)
+    virtual bool importProjectInSteps(const cydaw::base::File& file)
     {
         (void) file;
         return false;

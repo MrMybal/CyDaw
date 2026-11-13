@@ -1,3 +1,11 @@
+#include <atomic>
+#include <condition_variable>
+#include <deque>
+#include <mutex>
+#include <thread>
+#include <cydaw/integration/AudioFiles.h>
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "StudioTypes.h"
@@ -52,7 +60,7 @@ struct WorkshopRequest {
     Kind kind { Kind::trackDevice };
     TrackRef track;
     std::uint64_t nodeId {}; // 0 with a MIDI track: its instrument
-    juce::File file;
+    cydaw::base::File file;
     int inputChannels { 2 };  // a new effect's widths
     int outputChannels { 2 };
 };
@@ -163,8 +171,8 @@ struct UiState {
     [[nodiscard]] bool inWorkshop() const noexcept { return mode == AppMode::workshop; }
     // A sound file asked open in the Foundry; a file asked loaded on a deck
     // of the DJ mix (-1: the first free).
-    std::optional<juce::File> foundryOpen;
-    std::optional<std::pair<int, juce::File>> djLoad;
+    std::optional<cydaw::base::File> foundryOpen;
+    std::optional<std::pair<int, cydaw::base::File>> djLoad;
     // Asks a panel to come to the front (set by one panel, honoured by the
     // frame).
     Panel bringToFront { Panel::none };
@@ -175,7 +183,7 @@ struct UiState {
     // The sound banks' window shown; the locations asked open.
     bool showBanks {};
     bool showJsfx {};
-    juce::File jsfxFileToOpen;
+    cydaw::base::File jsfxFileToOpen;
     // The colour themes' window.
     bool showThemes {};
     // Several instruments' windows open at once (one each), or one at a
@@ -268,7 +276,7 @@ struct UiState {
     bool followPlayhead { true };
 
     // Status line: the last thing the interface has to say.
-    juce::String status;
+    cydaw::base::Text status;
     bool statusIsError {};
     double statusTime {};
 
@@ -337,21 +345,33 @@ struct UiState {
 };
 
 // Peaks of audio files, read in the background and drawn per pixel.
+class WaveformPeaks final {
+public:
+    struct Data {double rate=0;int channels=0;std::vector<std::vector<std::pair<float,float>>> peaks;};
+    std::atomic<std::shared_ptr<const Data>> data;std::atomic<bool> loaded{false};
+    bool isFullyLoaded()const{return loaded.load(std::memory_order_acquire);}
+    double getTotalLength()const{auto d=data.load();return d&&!d->peaks.empty()?double(d->peaks[0].size()*128)/d->rate:0;}
+    int getNumChannels()const{auto d=data.load();return d?d->channels:0;}
+    void getApproximateMinMax(double start,double end,int channel,float& low,float& high)const;
+};
 class WaveformCache final {
 public:
-    explicit WaveformCache(juce::AudioFormatManager& formats);
+    explicit WaveformCache(cydaw::audio::AudioFormatManager& formats);
     ~WaveformCache();
 
-    [[nodiscard]] juce::AudioThumbnail* get(const juce::File& file);
+    [[nodiscard]] WaveformPeaks* get(const cydaw::base::File& file);
     [[nodiscard]] bool anyLoading() const;
     void clear();
 
 private:
-    juce::AudioFormatManager& formats_;
-    juce::AudioThumbnailCache cache_ { 256 };
-    std::map<juce::String, std::unique_ptr<juce::AudioThumbnail>> thumbnails_;
+    cydaw::audio::AudioFormatManager& formats_;
+    struct Job {base::File file;std::shared_ptr<WaveformPeaks> target;};
+    std::mutex jobMutex_;std::condition_variable jobReady_;std::deque<Job> jobs_;bool stopping_=false;
+    std::array<std::thread,2> workers_;
+    void run();
+    std::map<cydaw::base::Text, std::shared_ptr<WaveformPeaks>> thumbnails_;
     // Whether each file is there, and when the disk was last asked (ms).
-    std::map<juce::String, std::pair<double, bool>> present_;
+    std::map<cydaw::base::Text, std::pair<double, bool>> present_;
 };
 
 } // namespace cydaw::v2

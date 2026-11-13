@@ -179,7 +179,7 @@ void FoundryView::drawAutomation(Tab &tab, const int track, const ImVec2 min, co
             }
             if (ImGui::IsItemDeactivated())
                 finishControlGesture(tab);
-            ui::tooltip((juce::String(point.value, 3) + " @ " + juce::String(point.frame / snapshot->rate, 3) + " s").toRawUTF8());
+            ui::tooltip((cydaw::base::Text(point.value, 3) + " @ " + cydaw::base::Text(point.frame / snapshot->rate, 3) + " s").toRawUTF8());
             ImGui::PopID();
         }
     if (!overPoint && ImGui::IsMouseHoveringRect(ImVec2(min.x, top), ImVec2(max.x, bottom)) &&
@@ -252,7 +252,7 @@ void FoundryView::drawMidiEditor(Tab &tab)
         draw->AddRectFilled(ImVec2(origin.x, y), ImVec2(left, y + row), black ? palette.bg0 : palette.bg4);
         draw->AddLine(ImVec2(left, y), ImVec2(right, y), palette.grid);
         if (pc == 0)
-            draw->AddText(ImVec2(origin.x + dp(2), y), palette.text, ("C" + juce::String(key / 12 - 1)).toRawUTF8());
+            draw->AddText(ImVec2(origin.x + dp(2), y), palette.text, ("C" + cydaw::base::Text(key / 12 - 1)).toRawUTF8());
     }
     for (std::int64_t f = clip.offset; f <= clip.offset + clip.length; f += step)
         draw->AddLine(ImVec2(xOf(f), origin.y), ImVec2(xOf(f), origin.y + height), palette.grid);

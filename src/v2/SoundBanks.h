@@ -46,35 +46,35 @@ namespace cydaw::v2 {
 class SoundBanks {
 public:
     struct Bank {
-        juce::String id;
-        juce::String title;
-        juce::String author;
-        juce::String licence;
-        juce::String licenceUrl;
-        juce::String homepage;
-        juce::String repository;
-        juce::String commit;
-        juce::String baseUrl;
-        juce::String description; // what it holds
+        cydaw::base::Text id;
+        cydaw::base::Text title;
+        cydaw::base::Text author;
+        cydaw::base::Text licence;
+        cydaw::base::Text licenceUrl;
+        cydaw::base::Text homepage;
+        cydaw::base::Text repository;
+        cydaw::base::Text commit;
+        cydaw::base::Text baseUrl;
+        cydaw::base::Text description; // what it holds
         // Not downloaded: made here by this generator ("cydaw-drums").
-        juce::String generator;
+        cydaw::base::Text generator;
         double rate { 48'000.0 };
-        juce::File list;
+        cydaw::base::File list;
         int count {};
         juce::int64 bytes {};
     };
     struct BankFile {
-        juce::String path;
+        cydaw::base::Text path;
         juce::int64 size {};
         bool lfs {};
         // A generated bank's: how the file is made.
         cydaw::base::Value recipe;
         // Its SHA-256 (lower-case hex) when the list gives it: a download of
         // the right size but other bytes (corrupted, tampered) is refused.
-        juce::String sha256;
+        cydaw::base::Text sha256;
     };
     struct Wanted {
-        juce::String bank;
+        cydaw::base::Text bank;
         BankFile file;
     };
     // What a map (or a bank) still needs: the files not on disk yet, their
@@ -82,8 +82,8 @@ public:
     struct Missing {
         std::vector<Wanted> files;
         juce::int64 bytes {};
-        juce::StringArray banks;
-        juce::StringArray unknown;
+        cydaw::base::TextList banks;
+        cydaw::base::TextList unknown;
         // A bank still being counted: what is missing of it is not said yet.
         bool pending {};
         [[nodiscard]] bool empty() const noexcept { return files.empty(); }
@@ -94,13 +94,13 @@ public:
 
     // The registry: CYDAW_BANKS_REGISTRY, else the factory folder's.
     void loadRegistry();
-    [[nodiscard]] juce::File registryFile() const;
+    [[nodiscard]] cydaw::base::File registryFile() const;
     [[nodiscard]] const std::vector<Bank>& banks() const noexcept { return banks_; }
-    [[nodiscard]] const Bank* find(const juce::String& id) const;
+    [[nodiscard]] const Bank* find(const cydaw::base::Text& id) const;
     // Every one of these banks is made here, none downloaded.
-    [[nodiscard]] bool generatedOnly(const juce::StringArray& ids) const;
-    [[nodiscard]] const std::vector<BankFile>& filesOf(const juce::String& id);
-    [[nodiscard]] juce::File folderOf(const juce::String& id) const;
+    [[nodiscard]] bool generatedOnly(const cydaw::base::TextList& ids) const;
+    [[nodiscard]] const std::vector<BankFile>& filesOf(const cydaw::base::Text& id);
+    [[nodiscard]] cydaw::base::File folderOf(const cydaw::base::Text& id) const;
 
     // What of a bank is on disk: counted on a thread of its own (nothing
     // until it is), again after each download.
@@ -108,7 +108,7 @@ public:
         int count {};
         juce::int64 bytes {};
     };
-    [[nodiscard]] std::optional<OnDisk> onDisk(const juce::String& id);
+    [[nodiscard]] std::optional<OnDisk> onDisk(const cydaw::base::Text& id);
     // Everything counted again (the folder moved, files put there by hand).
     void forgetDisk();
 
@@ -118,24 +118,24 @@ public:
     // of the disk; a bank not counted yet is counted, and said `pending`);
     // with it, the disk asked now (before a download).
     [[nodiscard]] Missing missingFor(const cydaw::base::Value& mapJson, bool exact = false);
-    [[nodiscard]] Missing missingForFile(const juce::File& mapFile, bool exact = false);
+    [[nodiscard]] Missing missingForFile(const cydaw::base::File& mapFile, bool exact = false);
     // Maps read ahead on a thread of their own (the factory's are 26 MB of
     // zones): until one is, missingForFile says it `pending` rather than
     // reading it on the caller's thread.
-    void preloadMaps(std::vector<juce::File> maps);
+    void preloadMaps(std::vector<cydaw::base::File> maps);
     // Moves on when what is on disk may have changed (a download, a count).
     [[nodiscard]] int diskGeneration() const noexcept { return diskGeneration_; }
-    [[nodiscard]] Missing missingOfBank(const juce::String& id);
+    [[nodiscard]] Missing missingOfBank(const cydaw::base::Text& id);
 
     // Downloads what is missing (and each bank's licence and readme), as one
     // job named `label`; jobs run one after another.
-    void download(const juce::String& label, const Missing& missing);
+    void download(const cydaw::base::Text& label, const Missing& missing);
     // Stops the running job and drops the others; the files done stay.
     void cancel();
     [[nodiscard]] bool busy() const;
     struct Progress {
         bool running {};
-        juce::String label;
+        cydaw::base::Text label;
         int done {};
         int total {};
         int failed {};
@@ -143,31 +143,31 @@ public:
         juce::int64 bytesDone {};
         juce::int64 bytesTotal {};
         double bytesPerSecond {};
-        juce::String error;
+        cydaw::base::Text error;
         // Made here, not downloaded.
         bool generating {};
     };
     [[nodiscard]] Progress progress() const;
     struct Finished {
-        juce::String label;
-        juce::StringArray banks;
+        cydaw::base::Text label;
+        cydaw::base::TextList banks;
         int files {};
         int failed {};
         bool cancelled {};
         bool generated {};
-        juce::String error;
+        cydaw::base::Text error;
     };
     // The jobs ended since the last call.
     [[nodiscard]] std::vector<Finished> takeFinished();
 
     // A bank's downloaded files, to the recycle bin.
-    bool remove(const juce::String& id, juce::String& error);
+    bool remove(const cydaw::base::Text& id, cydaw::base::Text& error);
 
 private:
     struct Job {
-        juce::String label;
+        cydaw::base::Text label;
         std::deque<Wanted> items;
-        juce::StringArray banks;
+        cydaw::base::TextList banks;
         int total {};
         int done {};
         int failed {};
@@ -175,54 +175,54 @@ private:
         juce::int64 bytesDone {};
         double started {};
         bool cancelled {};
-        juce::String error;
+        cydaw::base::Text error;
     };
     class Worker;
 
-    bool fetch(const Wanted& wanted, int generation, juce::String& error);
-    bool generate(const Bank& bank, const Wanted& wanted, int generation, juce::String& error);
-    [[nodiscard]] juce::String urlOf(const Bank& bank, const BankFile& file, bool lfs) const;
+    bool fetch(const Wanted& wanted, int generation, cydaw::base::Text& error);
+    bool generate(const Bank& bank, const Wanted& wanted, int generation, cydaw::base::Text& error);
+    [[nodiscard]] cydaw::base::Text urlOf(const Bank& bank, const BankFile& file, bool lfs) const;
     void work(juce::Thread& thread);
     void finishFrontJob();
     void writeBankRecord(const Bank& bank) const;
-    [[nodiscard]] std::vector<juce::String> bankPathsOf(const cydaw::base::Value& mapJson) const;
+    [[nodiscard]] std::vector<cydaw::base::Text> bankPathsOf(const cydaw::base::Value& mapJson) const;
 
     std::vector<Bank> banks_;
-    std::map<juce::String, std::vector<BankFile>> lists_;
-    std::map<juce::String, std::map<juce::String, std::size_t>> indexes_;
+    std::map<cydaw::base::Text, std::vector<BankFile>> lists_;
+    std::map<cydaw::base::Text, std::map<cydaw::base::Text, std::size_t>> indexes_;
     std::mutex countLock_;
-    std::map<juce::String, OnDisk> counted_;
-    std::map<juce::String, std::set<juce::String>> absent_;
-    std::set<juce::String> counting_;
+    std::map<cydaw::base::Text, OnDisk> counted_;
+    std::map<cydaw::base::Text, std::set<cydaw::base::Text>> absent_;
+    std::set<cydaw::base::Text> counting_;
     std::atomic<int> countGeneration_ {};
     struct MapFiles {
         juce::int64 stamp {};
-        std::vector<juce::String> paths;
+        std::vector<cydaw::base::Text> paths;
         int generation { -1 };
         Missing missing;
     };
-    std::map<juce::String, MapFiles> maps_;
+    std::map<cydaw::base::Text, MapFiles> maps_;
     // What the preloading thread read: each map's "bank:" paths and the stamp
     // they were read at; the maps it still has to read.
     struct Preloaded {
         juce::int64 stamp {};
-        std::vector<juce::String> paths;
+        std::vector<cydaw::base::Text> paths;
     };
     std::mutex preloadLock_;
-    std::map<juce::String, Preloaded> preloaded_;
-    std::set<juce::String> preloadWaiting_;
+    std::map<cydaw::base::Text, Preloaded> preloaded_;
+    std::set<cydaw::base::Text> preloadWaiting_;
     // The banks' file lists read ahead the same way (some are thousands of
     // files), and those it still has to read.
     struct PreloadedList {
         std::vector<BankFile> files;
-        std::map<juce::String, std::size_t> index;
+        std::map<cydaw::base::Text, std::size_t> index;
     };
-    std::map<juce::String, PreloadedList> preloadedLists_;
-    std::set<juce::String> listsWaiting_;
-    [[nodiscard]] static PreloadedList readList(const juce::File& list);
+    std::map<cydaw::base::Text, PreloadedList> preloadedLists_;
+    std::set<cydaw::base::Text> listsWaiting_;
+    [[nodiscard]] static PreloadedList readList(const cydaw::base::File& list);
     std::thread preloader_;
     std::atomic<bool> stopPreload_ {};
-    [[nodiscard]] static std::vector<juce::String> pathsOfMap(const cydaw::base::Value& mapJson);
+    [[nodiscard]] static std::vector<cydaw::base::Text> pathsOfMap(const cydaw::base::Value& mapJson);
     int diskGeneration_ {};
 
     mutable std::mutex mutex_;

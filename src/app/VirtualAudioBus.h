@@ -33,7 +33,7 @@ enum class VirtualBusDirection : int {
 struct VirtualAudioBus {
     static constexpr int maximumChannels = 8;
     std::uint64_t id {};
-    juce::String name;
+    cydaw::base::Text name;
     VirtualBusDirection direction { VirtualBusDirection::input };
     int channels { 2 };
     int physicalChannelA {};

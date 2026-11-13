@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 // Arrangement-style Cinema timeline. Bus rows share one ruler and scale.
 void FoundryView::fitCinemaContainers(Session& session) const {
     for(auto& track:session.tracks)if(!track.bus){const auto [start,end]=cinemaBounds(track,session.rate);track.containerStart=start;track.containerLength=end-start;}
@@ -71,7 +72,7 @@ void FoundryView::drawCinemaClipLane(Tab& t,int index,ImVec2 top,ImVec2 bottom,f
     }
     if(ImGui::BeginDragDropTarget()){
         if(const auto* payload=ImGui::AcceptDragDropPayload(kFilePayload);payload&&payload->DataSize>1){
-            const auto file=juce::File(juce::String::fromUTF8(static_cast<const char*>(payload->Data),payload->DataSize-1));
+            const auto file=cydaw::base::File(cydaw::base::Text::fromUTF8(static_cast<const char*>(payload->Data),payload->DataSize-1));
             if(cinemaVideoFile(file))openCinemaVideo(file);else importFile(t,file,index,frameAt(ImGui::GetIO().MousePos.x));
         }
         if(const auto* payload=ImGui::AcceptDragDropPayload("CYDAW_CINEMA_CLIP",ImGuiDragDropFlags_AcceptBeforeDelivery);payload&&payload->DataSize==sizeof(Transfer)){
@@ -288,7 +289,7 @@ void FoundryView::drawCinemaTracks(Tab& t,ImVec2 size){
             if(ImGui::MenuItem(L("Créer une sous-piste MIDI ici","Create MIDI subtrack here"))){addCinemaTrack(t,busId,true);}ImGui::EndPopup();
         }
         if(!overContainer&&ImGui::BeginDragDropTarget()){
-            if(const auto* payload=ImGui::AcceptDragDropPayload(kFilePayload);payload&&payload->DataSize>1){const auto file=juce::File(juce::String::fromUTF8(static_cast<const char*>(payload->Data),payload->DataSize-1));
+            if(const auto* payload=ImGui::AcceptDragDropPayload(kFilePayload);payload&&payload->DataSize>1){const auto file=cydaw::base::File(cydaw::base::Text::fromUTF8(static_cast<const char*>(payload->Data),payload->DataSize-1));
                 if(cinemaVideoFile(file))openCinemaVideo(file);else{t.cursor=frameAt(io.MousePos.x);const auto id=addCinemaTrack(t,busId,false,file.getFileNameWithoutExtension());importFile(t,file,t.document->session().trackIndex(id),t.cursor);}}
             ImGui::EndDragDropTarget();
         }

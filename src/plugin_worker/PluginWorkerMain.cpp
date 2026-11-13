@@ -55,7 +55,7 @@ public:
     // Looked at twice a second at most.
     [[nodiscard]] bool gone() noexcept
     {
-        const auto now = juce::Time::getMillisecondCounter();
+        const auto now = cydaw::base::Time::getMillisecondCounter();
         if (pid_ <= 0 || now - checked_ < 500)
             return false;
         checked_ = now;
@@ -112,11 +112,11 @@ int runSelfTest()
 
 struct PluginFormatSelection final {
     std::unique_ptr<juce::AudioPluginFormat> format;
-    juce::String name;
-    juce::String error;
+    cydaw::base::Text name;
+    cydaw::base::Text error;
 };
 
-bool isVst2Candidate(const juce::File& pluginFile)
+bool isVst2Candidate(const cydaw::base::File& pluginFile)
 {
 #if JUCE_WINDOWS
     return pluginFile.hasFileExtension("dll");
@@ -130,13 +130,13 @@ bool isVst2Candidate(const juce::File& pluginFile)
 #endif
 }
 
-PluginFormatSelection formatForPlugin(const juce::File& pluginFile)
+PluginFormatSelection formatForPlugin(const cydaw::base::File& pluginFile)
 {
     if (pluginFile.hasFileExtension("cyplugin")) {
         const auto data = cydaw::base::JSON::parse(pluginFile);
         const auto path = data.getProperty("file", {}).toString();
-        if (!juce::File::isAbsolutePath(path)) return {{}, {}, "Invalid plugin descriptor"};
-        const juce::File target(path);
+        if (!cydaw::base::File::isAbsolutePath(path)) return {{}, {}, "Invalid plugin descriptor"};
+        const cydaw::base::File target(path);
         if(target.hasFileExtension("cyplugin"))return {{}, {}, "Nested plugin descriptors are not supported"};
         return formatForPlugin(target);
     }
@@ -161,9 +161,9 @@ PluginFormatSelection formatForPlugin(const juce::File& pluginFile)
     return { {}, {}, "Unsupported plugin file. Expected VST3, CLAP, LV2 or JSFX." };
 }
 
-void findPluginTypes(PluginFormatSelection& selection, const juce::File& requested, juce::OwnedArray<juce::PluginDescription>& result) {
-    auto file=requested;juce::String id;
-    if(file.hasFileExtension("cyplugin")) {const auto data=cydaw::base::JSON::parse(file);id=data.getProperty("id",{}).toString();file=juce::File(data.getProperty("file",{}).toString());}
+void findPluginTypes(PluginFormatSelection& selection, const cydaw::base::File& requested, juce::OwnedArray<juce::PluginDescription>& result) {
+    auto file=requested;cydaw::base::Text id;
+    if(file.hasFileExtension("cyplugin")) {const auto data=cydaw::base::JSON::parse(file);id=data.getProperty("id",{}).toString();file=cydaw::base::File(data.getProperty("file",{}).toString());}
     selection.format->findAllTypesForFile(result,file.getFullPathName());
     if(id.isNotEmpty())for(int i=result.size();--i>=0;)if(result[i]->descriptiveName!=id && result[i]->fileOrIdentifier!=id)result.remove(i);
 }
@@ -177,7 +177,7 @@ cydaw::base::Value graphStateFromPlugin(juce::AudioProcessor& processor)
     if (state.getSize() >= 24 && std::memcmp(state.getData(), "CyDSP.VST3State1", 16) == 0) {
         const auto* p=static_cast<const unsigned char*>(state.getData());
         const auto size=std::uint32_t(p[16])|(std::uint32_t(p[17])<<8)|(std::uint32_t(p[18])<<16)|(std::uint32_t(p[19])<<24);
-        if(size<=state.getSize()-24) return cydaw::base::JSON::parse(juce::String::fromUTF8(reinterpret_cast<const char*>(p+24),int(size)));
+        if(size<=state.getSize()-24) return cydaw::base::JSON::parse(cydaw::base::Text::fromUTF8(reinterpret_cast<const char*>(p+24),int(size)));
         return {};
     }
     if (auto xml = juce::AudioProcessor::getXmlFromBinary(
@@ -188,17 +188,17 @@ cydaw::base::Value graphStateFromPlugin(juce::AudioProcessor& processor)
         juce::MemoryBlock decoded;
         if (!decoded.fromBase64Encoding(component->getAllSubText()))
             return {};
-        return cydaw::base::JSON::parse(juce::String::fromUTF8(
+        return cydaw::base::JSON::parse(cydaw::base::Text::fromUTF8(
             static_cast<const char*>(decoded.getData()),
             static_cast<int>(decoded.getSize())));
     }
-    return cydaw::base::JSON::parse(juce::String::fromUTF8(
+    return cydaw::base::JSON::parse(cydaw::base::Text::fromUTF8(
         static_cast<const char*>(state.getData()),
         static_cast<int>(state.getSize())));
 }
 
-int probePlugin(const juce::File& pluginFile,
-                const juce::File& outputFile,
+int probePlugin(const cydaw::base::File& pluginFile,
+                const cydaw::base::File& outputFile,
                 const bool validateProcessing)
 {
     cydaw::base::Array<cydaw::base::Value> results;
@@ -214,7 +214,7 @@ int probePlugin(const juce::File& pluginFile,
     juce::OwnedArray<juce::PluginDescription> descriptions;
     if (selection.format != nullptr) {
         if (pluginFile.hasFileExtension("jsfx") || pluginFile.getFileExtension().isEmpty()) {
-            juce::String error;auto instance=cydaw::plugins::createExtraPlugin(pluginFile,48000,512,error);
+            cydaw::base::Text error;auto instance=cydaw::plugins::createExtraPlugin(pluginFile,48000,512,error);
             if(instance){auto d=std::make_unique<juce::PluginDescription>();instance->fillInPluginDescription(*d);descriptions.add(std::move(d));}
             else selection.error=error;
         } else findPluginTypes(selection, pluginFile, descriptions);
@@ -375,9 +375,9 @@ int probePlugin(const juce::File& pluginFile,
                         const auto& parameters = instance->getParameters();
                         juce::AudioProcessorParameter* graphGain = nullptr;
                         juce::AudioProcessorParameter* graphPostEffect = nullptr;
-                        juce::String expectedName;
-                        juce::String expectedUnit;
-                        juce::String expectedPostEffectName;
+                        cydaw::base::Text expectedName;
+                        cydaw::base::Text expectedUnit;
+                        cydaw::base::Text expectedPostEffectName;
                         auto expectedAutomatable = true;
                         auto publishedCount = 0;
                         if (editableGraphRuntime) {
@@ -546,8 +546,8 @@ int probePlugin(const juce::File& pluginFile,
                         object->setProperty("parameterNames", parameterNames);
                         object->setProperty(
                             "graphParameterLabel",
-                            graphGain != nullptr ? graphGain->getLabel()
-                                                 : juce::String());
+                            graphGain != nullptr ? cydaw::base::Text(graphGain->getLabel())
+                                                 : cydaw::base::Text());
                         object->setProperty(
                             "graphParameterAutomatable",
                             graphGain != nullptr && graphGain->isAutomatable());
@@ -606,7 +606,7 @@ int probePlugin(const juce::File& pluginFile,
     }
 
     const auto json = cydaw::base::JSON::toString(results, true);
-    if (outputFile != juce::File {}) {
+    if (outputFile != cydaw::base::File {}) {
         if (!outputFile.replaceWithText(json))
             return 3;
     } else {
@@ -635,9 +635,9 @@ int probePlugin(const juce::File& pluginFile,
     return 0;
 }
 
-juce::String argumentValue(const juce::StringArray& arguments,
-                           const juce::String& key,
-                           const juce::String& fallback = {})
+cydaw::base::Text argumentValue(const cydaw::base::TextList& arguments,
+                           const cydaw::base::Text& key,
+                           const cydaw::base::Text& fallback = {})
 {
     const auto index = arguments.indexOf(key);
     return index >= 0 && index + 1 < arguments.size() ? arguments[index + 1] : fallback;
@@ -645,7 +645,7 @@ juce::String argumentValue(const juce::StringArray& arguments,
 
 void setWorkerStatus(cydaw::plugins::SharedPluginAudio& shared,
                      const cydaw::plugins::SharedPluginState state,
-                     const juce::String& message)
+                     const cydaw::base::Text& message)
 {
     const auto utf8 = message.toRawUTF8();
     const auto length = std::min<std::size_t>(std::strlen(utf8), sizeof(shared.statusMessage) - 1);
@@ -656,7 +656,7 @@ void setWorkerStatus(cydaw::plugins::SharedPluginAudio& shared,
 }
 
 template <std::size_t Size>
-void copyFixedText(char (&destination)[Size], const juce::String& text)
+void copyFixedText(char (&destination)[Size], const cydaw::base::Text& text)
 {
     const auto utf8 = text.toRawUTF8();
     const auto length = std::min<std::size_t>(std::strlen(utf8), Size - 1);
@@ -666,7 +666,7 @@ void copyFixedText(char (&destination)[Size], const juce::String& text)
 
 class WorkerPluginEditorWindow final : public juce::DocumentWindow {
 public:
-    WorkerPluginEditorWindow(const juce::String& title,
+    WorkerPluginEditorWindow(const cydaw::base::Text& title,
                              std::unique_ptr<juce::AudioProcessorEditor> editor)
         : DocumentWindow(title, juce::Colour(0xff17191b), allButtons)
     {
@@ -697,8 +697,8 @@ private:
     PositionInfo position;
 };
 
-int runRealtimeWorker(const juce::File& pluginFile,
-                      const juce::File& sharedFile,
+int runRealtimeWorker(const cydaw::base::File& pluginFile,
+                      const cydaw::base::File& sharedFile,
                       const double sampleRate,
                       const int requestedBlockSize,
                       const int requestedChannels,
@@ -732,7 +732,7 @@ int runRealtimeWorker(const juce::File& pluginFile,
     try {
         WorkerPlayHead playHead;
         std::unique_ptr<juce::AudioPluginInstance> instance;
-        juce::String pluginFormatName;
+        cydaw::base::Text pluginFormatName;
         auto processingChannels = juce::jlimit(1,
                                                 static_cast<int>(cydaw::plugins::maximumSharedAudioChannels),
                                                 requestedChannels);
@@ -757,7 +757,7 @@ int runRealtimeWorker(const juce::File& pluginFile,
                 *descriptions[0], sampleRate, maximumBlockSize, error);
             if (instance == nullptr) {
                 setWorkerStatus(*shared, cydaw::plugins::SharedPluginState::error,
-                                error.isNotEmpty() ? error
+                                error.isNotEmpty() ? cydaw::base::Text(error)
                                                    : "Cannot instantiate "
                                                          + pluginFormatName + " plugin");
                 return 14;
@@ -937,7 +937,7 @@ int runRealtimeWorker(const juce::File& pluginFile,
                     if (editorWindow != nullptr)
                         editorWindow->setVisible(false);
                 } else if (command == cydaw::plugins::SharedPluginCommand::getPrograms) {
-                    juce::String names;
+                    cydaw::base::Text names;
                     auto count = 0;
                     if (instance != nullptr) {
                         count = std::clamp(instance->getNumPrograms(), 0, 4096);
@@ -982,7 +982,7 @@ int runRealtimeWorker(const juce::File& pluginFile,
         return 0;
     } catch (const std::exception& exception) {
         setWorkerStatus(*shared, cydaw::plugins::SharedPluginState::error,
-                        juce::String("Plugin exception: ") + exception.what());
+                        cydaw::base::Text("Plugin exception: ") + exception.what());
         return 16;
     } catch (...) {
         setWorkerStatus(*shared, cydaw::plugins::SharedPluginState::error,
@@ -996,9 +996,9 @@ int runRealtimeWorker(const juce::File& pluginFile,
 int main(const int argc, char* argv[])
 {
     juce::ScopedJuceInitialiser_GUI initialiseJuce;
-    juce::StringArray arguments;
+    cydaw::base::TextList arguments;
     for (int index = 1; index < argc; ++index)
-        arguments.add(juce::String::fromUTF8(argv[index]));
+        arguments.add(cydaw::base::Text::fromUTF8(argv[index]));
 
     if (arguments.contains("--self-test") || arguments.contains("--worker-handshake"))
         return runSelfTest();
@@ -1008,8 +1008,8 @@ int main(const int argc, char* argv[])
         realtimeIndex = arguments.indexOf("--realtime-vst3");
     const auto passthrough = arguments.contains("--realtime-passthrough");
     if ((realtimeIndex >= 0 && realtimeIndex + 1 < arguments.size()) || passthrough) {
-        const auto pluginFile = passthrough ? juce::File {} : juce::File(arguments[realtimeIndex + 1]);
-        const auto sharedFile = juce::File(argumentValue(arguments, "--shared-file"));
+        const auto pluginFile = passthrough ? cydaw::base::File {} : cydaw::base::File(arguments[realtimeIndex + 1]);
+        const auto sharedFile = cydaw::base::File(argumentValue(arguments, "--shared-file"));
         const auto sampleRate = argumentValue(arguments, "--sample-rate", "48000").getDoubleValue();
         const auto maximumBlockSize = argumentValue(arguments, "--block-size", "512").getIntValue();
         const auto channels = argumentValue(arguments, "--channels", "2").getIntValue();
@@ -1026,22 +1026,22 @@ int main(const int argc, char* argv[])
     if (probeIndex < 0)
         probeIndex = arguments.indexOf("--probe-vst3");
     if (probeIndex >= 0 && probeIndex + 1 < arguments.size()) {
-        juce::File outputFile;
+        cydaw::base::File outputFile;
         const auto outputIndex = arguments.indexOf("--output");
         if (outputIndex >= 0 && outputIndex + 1 < arguments.size())
-            outputFile = juce::File(arguments[outputIndex + 1]);
-        return probePlugin(juce::File(arguments[probeIndex + 1]), outputFile, false);
+            outputFile = cydaw::base::File(arguments[outputIndex + 1]);
+        return probePlugin(cydaw::base::File(arguments[probeIndex + 1]), outputFile, false);
     }
 
     auto validateIndex = arguments.indexOf("--validate-plugin");
     if (validateIndex < 0)
         validateIndex = arguments.indexOf("--validate-vst3");
     if (validateIndex >= 0 && validateIndex + 1 < arguments.size()) {
-        juce::File outputFile;
+        cydaw::base::File outputFile;
         const auto outputIndex = arguments.indexOf("--output");
         if (outputIndex >= 0 && outputIndex + 1 < arguments.size())
-            outputFile = juce::File(arguments[outputIndex + 1]);
-        return probePlugin(juce::File(arguments[validateIndex + 1]), outputFile, true);
+            outputFile = cydaw::base::File(arguments[outputIndex + 1]);
+        return probePlugin(cydaw::base::File(arguments[validateIndex + 1]), outputFile, true);
     }
 
     std::cerr << "Usage: CyDAWPluginWorker --self-test | --probe-plugin <plugin> | "

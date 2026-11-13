@@ -27,7 +27,7 @@ constexpr auto semanticOwner = 2;
 
 double nowMs()
 {
-    return juce::Time::getMillisecondCounterHiRes();
+    return cydaw::base::Time::getMillisecondCounterHiRes();
 }
 
 const char* facetTitle(const int facet)
@@ -69,7 +69,7 @@ void drawShape(ImDrawList* list, const std::vector<std::uint8_t>& overview, cons
     }
 }
 
-juce::String plainText(const char* fr, const char* en)
+cydaw::base::Text plainText(const char* fr, const char* en)
 {
     return ui::Ls(fr, en);
 }
@@ -79,15 +79,15 @@ juce::String plainText(const char* fr, const char* en)
 // ---- The small facets (instruments, effects) -------------------------------------------------------
 
 struct LibraryWindow::Facets {
-    std::vector<juce::String> titles;
-    std::vector<std::vector<juce::String>> values; // per facet, its values
+    std::vector<cydaw::base::Text> titles;
+    std::vector<std::vector<cydaw::base::Text>> values; // per facet, its values
     std::vector<std::vector<int>> order;           // per facet, the values in label order
     std::vector<std::vector<char>> selected;
     std::vector<std::vector<int>> rowValues;       // per row, its value per facet
     std::vector<std::string> haystacks;
-    std::vector<std::map<juce::String, int>> index;
+    std::vector<std::map<cydaw::base::Text, int>> index;
 
-    explicit Facets(std::vector<juce::String> names) : titles(std::move(names))
+    explicit Facets(std::vector<cydaw::base::Text> names) : titles(std::move(names))
     {
         values.resize(titles.size());
         order.resize(titles.size());
@@ -98,7 +98,7 @@ struct LibraryWindow::Facets {
     // Starts again, keeping what was chosen (by label).
     void begin()
     {
-        std::vector<juce::StringArray> chosen(titles.size());
+        std::vector<cydaw::base::TextList> chosen(titles.size());
         for (std::size_t facet = 0; facet < titles.size(); ++facet)
             for (std::size_t value = 0; value < selected[facet].size() && value < values[facet].size(); ++value)
                 if (selected[facet][value] != 0)
@@ -112,7 +112,7 @@ struct LibraryWindow::Facets {
         haystacks.clear();
     }
 
-    int value(const std::size_t facet, const juce::String& label)
+    int value(const std::size_t facet, const cydaw::base::Text& label)
     {
         if (const auto found = index[facet].find(label); found != index[facet].end())
             return found->second;
@@ -122,11 +122,11 @@ struct LibraryWindow::Facets {
         return id;
     }
 
-    void addRow(const std::vector<juce::String>& labels, const juce::String& words)
+    void addRow(const std::vector<cydaw::base::Text>& labels, const cydaw::base::Text& words)
     {
         std::vector<int> row;
         for (std::size_t facet = 0; facet < titles.size(); ++facet)
-            row.push_back(value(facet, facet < labels.size() ? labels[facet] : juce::String()));
+            row.push_back(value(facet, facet < labels.size() ? labels[facet] : cydaw::base::Text()));
         rowValues.push_back(std::move(row));
         haystacks.push_back(SampleCatalog::fold(words));
     }
@@ -150,10 +150,10 @@ struct LibraryWindow::Facets {
 
     // The rows kept by the words and the columns, and each value's count as
     // the other columns leave it.
-    std::vector<int> filter(const juce::String& text, std::vector<std::vector<int>>& counts) const
+    std::vector<int> filter(const cydaw::base::Text& text, std::vector<std::vector<int>>& counts) const
     {
         std::vector<std::string> words;
-        for (const auto& word : juce::StringArray::fromTokens(text, " ", ""))
+        for (const auto& word : cydaw::base::TextList::fromTokens(text, " ", ""))
             if (word.isNotEmpty())
                 words.push_back(SampleCatalog::fold(word));
         counts.assign(titles.size(), {});
@@ -190,39 +190,39 @@ struct LibraryWindow::Facets {
         return rows;
     }
 
-    std::vector<juce::StringArray> kept;
+    std::vector<cydaw::base::TextList> kept;
 };
 
 struct LibraryWindow::InstrumentRow {
     enum Kind { factory, native, mine };
     Kind kind { factory };
-    juce::String key;
-    juce::String name;
-    juce::String category;
-    juce::String genre;
-    juce::String state;
-    juce::String bank;
-    juce::String range;
-    juce::String licence;
-    juce::String description;
-    juce::File file;
+    cydaw::base::Text key;
+    cydaw::base::Text name;
+    cydaw::base::Text category;
+    cydaw::base::Text genre;
+    cydaw::base::Text state;
+    cydaw::base::Text bank;
+    cydaw::base::Text range;
+    cydaw::base::Text licence;
+    cydaw::base::Text description;
+    cydaw::base::File file;
     bool missing {};
     bool model {};
     juce::int64 missingBytes {};
-    juce::StringArray banks;
+    cydaw::base::TextList banks;
 };
 
 struct LibraryWindow::EffectRow {
     enum Kind { node, module, preset, mine, vst3 };
     Kind kind { node };
-    juce::String key;
-    juce::String name;
-    juce::String category;
-    juce::String genre;
-    juce::String role;
-    juce::String maker;
-    juce::String description;
-    juce::File file;
+    cydaw::base::Text key;
+    cydaw::base::Text name;
+    cydaw::base::Text category;
+    cydaw::base::Text genre;
+    cydaw::base::Text role;
+    cydaw::base::Text maker;
+    cydaw::base::Text description;
+    cydaw::base::File file;
     bool soundSource {};
 };
 
@@ -231,19 +231,19 @@ struct LibraryWindow::EffectRow {
 class LibraryWindow::PluginScan final : private juce::Thread {
 public:
     struct Plugin {
-        juce::String name;
-        juce::String vendor;
-        juce::String kind; // "Fx", "Instrument"…
-        juce::String subcategory;
-        juce::String format;
-        juce::File file;
+        cydaw::base::Text name;
+        cydaw::base::Text vendor;
+        cydaw::base::Text kind; // "Fx", "Instrument"…
+        cydaw::base::Text subcategory;
+        cydaw::base::Text format;
+        cydaw::base::File file;
     };
 
     PluginScan() : juce::Thread("CyDAW plug-in list") {}
     ~PluginScan() override { stopThread(5'000); }
 
     // The standard VST3 folders and these.
-    void start(juce::StringArray folders)
+    void start(cydaw::base::TextList folders)
     {
         if (isThreadRunning())
             return;
@@ -271,14 +271,14 @@ private:
         {
             const std::scoped_lock lock(mutex_);
             for (const auto& folder : extra_)
-                if (juce::File::isAbsolutePath(folder))
-                    folders.add(juce::File(folder));
+                if (cydaw::base::File::isAbsolutePath(folder))
+                    folders.add(cydaw::base::File(folder));
         }
-        juce::StringArray seen;
+        cydaw::base::TextList seen;
         for (const auto& folder : folders) {
             if (!folder.isDirectory())
                 continue;
-            for (const auto& entry : juce::RangedDirectoryIterator(folder, true, "*", juce::File::findFilesAndDirectories)) {
+            for (const auto& entry : juce::RangedDirectoryIterator(folder, true, "*", cydaw::base::File::findFilesAndDirectories)) {
                 if (threadShouldExit())
                     return;
                 const auto file = entry.getFile();
@@ -291,11 +291,11 @@ private:
                 plugin.file = file;
                 plugin.format = plugin_files::format(file);
                 if (!file.hasFileExtension("vst3")) {
-                    auto cache = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory).getChildFile("CyDAW/plugin-catalogue");
+                    auto cache = cydaw::base::File::getSpecialLocation(cydaw::base::File::userApplicationDataDirectory).getChildFile("CyDAW/plugin-catalogue");
                     (void) cache.createDirectory();
                     auto stamp = file.getLastModificationTime().toMilliseconds();
-                    if (file.isDirectory()) for (const auto& child : juce::RangedDirectoryIterator(file, true, "*", juce::File::findFiles)) stamp = std::max(stamp, child.getFile().getLastModificationTime().toMilliseconds());
-                    const auto key = juce::String::toHexString(file.getFullPathName().hashCode64());
+                    if (file.isDirectory()) for (const auto& child : juce::RangedDirectoryIterator(file, true, "*", cydaw::base::File::findFiles)) stamp = std::max(stamp, child.getFile().getLastModificationTime().toMilliseconds());
+                    const auto key = cydaw::base::Text::toHexString(file.getFullPathName().hashCode64());
                     const auto report = cache.getChildFile(key + ".json");
                     auto data = cydaw::base::JSON::parse(report);
                     if (static_cast<juce::int64>(data.getProperty("stamp", 0)) != stamp) {
@@ -305,8 +305,8 @@ private:
                         command.addArray({"--probe-plugin", file.getFullPathName(), "--output", resultFile.getFullPathName()});
                         juce::ChildProcess process;
                         if (launch.isValid() && process.start(command, 0)) {
-                            const auto deadline=juce::Time::getMillisecondCounterHiRes()+15000;
-                            while(process.isRunning() && !threadShouldExit() && juce::Time::getMillisecondCounterHiRes()<deadline) wait(30);
+                            const auto deadline=cydaw::base::Time::getMillisecondCounterHiRes()+15000;
+                            while(process.isRunning() && !threadShouldExit() && cydaw::base::Time::getMillisecondCounterHiRes()<deadline) wait(30);
                             if(process.isRunning())process.kill();
                             data=cydaw::base::JSON::parse(resultFile);
                             // Read once: what stays is the catalogue's own report.
@@ -328,7 +328,7 @@ private:
                                 auto descriptor=cydaw::base::Object::Ptr(new cydaw::base::Object());descriptor->setProperty("file", file.getFullPathName());descriptor->setProperty("id", item.getProperty("pluginId", {}));
                                 const auto descriptors=cache.getSiblingFile("PluginDescriptors");(void)descriptors.createDirectory();
                                 descriptor->setProperty("name",foundPlugin.name);descriptor->setProperty("format",foundPlugin.format);
-                                const auto entryId=juce::String::toHexString(item.getProperty("pluginId",{}).toString().hashCode64());
+                                const auto entryId=cydaw::base::Text::toHexString(item.getProperty("pluginId",{}).toString().hashCode64());
                                 const auto path=descriptors.getChildFile(key+"-"+entryId+".cyplugin");
                                 (void) path.replaceWithText(cydaw::base::JSON::toString(cydaw::base::Value(descriptor.get())));foundPlugin.file=path;
                             }
@@ -346,7 +346,7 @@ private:
                             if (const auto name = item.getProperty("Name", {}).toString(); name.isNotEmpty())
                                 plugin.name = name;
                             if (const auto* subs = item.getProperty("Sub Categories", {}).getArray(); subs != nullptr) {
-                                juce::StringArray parts;
+                                cydaw::base::TextList parts;
                                 for (const auto& part : *subs)
                                     parts.add(part.toString());
                                 plugin.kind = parts.contains("Instrument") ? "Instrument" : "Fx";
@@ -370,7 +370,7 @@ private:
 
     mutable std::mutex mutex_;
     std::vector<Plugin> plugins_;
-    juce::StringArray extra_;
+    cydaw::base::TextList extra_;
     std::atomic<bool> done_ {};
     std::atomic<int> generation_ {};
 };
@@ -379,8 +379,8 @@ private:
 
 LibraryWindow::LibraryWindow(Studio& studio, UiState& state, ImGuiHost& host, SampleCatalog& catalog)
     : studio_(studio), state_(state), host_(host), catalog_(catalog),
-      instrumentFacets_(std::make_unique<Facets>(std::vector<juce::String> { "category", "genre", "state", "bank" })),
-      effectFacets_(std::make_unique<Facets>(std::vector<juce::String> { "category", "genre", "role", "maker" })),
+      instrumentFacets_(std::make_unique<Facets>(std::vector<cydaw::base::Text> { "category", "genre", "state", "bank" })),
+      effectFacets_(std::make_unique<Facets>(std::vector<cydaw::base::Text> { "category", "genre", "role", "maker" })),
       plugins_(std::make_unique<PluginScan>())
 {
     windowId_ = "###library" + state_.deviceWindowNamespace;
@@ -396,7 +396,7 @@ LibraryWindow::~LibraryWindow()
     catalog_.removeOnChange(this);
 }
 
-void LibraryWindow::report(const juce::String& message, const bool error)
+void LibraryWindow::report(const cydaw::base::Text& message, const bool error)
 {
     state_.status = message;
     state_.statusIsError = error;
@@ -449,7 +449,7 @@ void LibraryWindow::draw()
         flags |= ImGuiWindowFlags_NoDocking;
     if (maximised_ && !detached)
         flags |= ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize;
-    const auto title = juce::String::fromUTF8(L("Bibliothèque", "Library")) + windowId_.c_str();
+    const auto title = cydaw::base::Text::fromUTF8(L("Bibliothèque", "Library")) + windowId_.c_str();
     if (ImGui::Begin(title.toRawUTF8(), &open, flags)) {
         drawHeader();
         switch (state_.libraryTab) {
@@ -515,13 +515,13 @@ void LibraryWindow::drawHeader()
 
 // ---- Sounds ---------------------------------------------------------------------------------------------
 
-void LibraryWindow::setSampleQuery(const juce::String& text, const bool semantic,
-                                   const std::vector<std::pair<int, juce::StringArray>>& chosen, const int sortColumn,
+void LibraryWindow::setSampleQuery(const cydaw::base::Text& text, const bool semantic,
+                                   const std::vector<std::pair<int, cydaw::base::TextList>>& chosen, const int sortColumn,
                                    const bool ascending)
 {
     text.copyToUTF8(search_, sizeof(search_));
     lastSearch_ = search_;
-    query_.text = semantic ? juce::String() : text;
+    query_.text = semantic ? cydaw::base::Text() : text;
     semanticMode_ = semantic;
     semanticHits_.clear();
     semanticSimilarTo_.clear();
@@ -553,7 +553,7 @@ void LibraryWindow::requery()
 {
     // New data: what was chosen, kept by key.
     if (const auto fresh = catalog_.data(); fresh != data_) {
-        std::array<juce::StringArray, SampleCatalog::facetCount> keys;
+        std::array<cydaw::base::TextList, SampleCatalog::facetCount> keys;
         if (data_ != nullptr)
             for (auto facet = 0; facet < SampleCatalog::facetCount; ++facet) {
                 const auto& selection = query_.selected[static_cast<std::size_t>(facet)];
@@ -598,7 +598,7 @@ void LibraryWindow::takeSemanticAnswer()
         return;
     SemanticSearch::rerank(*answer, studio_.samples(), 600);
     semanticHits_.clear();
-    semanticError_ = answer->failed ? answer->error : juce::String();
+    semanticError_ = answer->failed ? answer->error : cydaw::base::Text();
     semanticEnglish_ = answer->english;
     for (const auto& hit : answer->hits)
         semanticHits_.emplace_back(hit.path, hit.score);
@@ -608,10 +608,10 @@ void LibraryWindow::takeSemanticAnswer()
     dirty_ = true;
 }
 
-void LibraryWindow::addSampleToTrack(const juce::String& path)
+void LibraryWindow::addSampleToTrack(const cydaw::base::Text& path)
 {
     auto& engine = studio_.engine();
-    const juce::File file(path);
+    const cydaw::base::File file(path);
     auto placed = false;
     if (const auto track = state_.selectedTrack; track && !track->midi && !track->master) {
         std::uint64_t clipId {};
@@ -627,7 +627,7 @@ void LibraryWindow::addSampleToTrack(const juce::String& path)
 bool LibraryWindow::drawFacetColumns(const char* id, std::vector<FacetColumn>& columns, const float height)
 {
     const auto& p = theme::palette();
-    static std::map<juce::String, int> lastClicked;
+    static std::map<cydaw::base::Text, int> lastClicked;
     auto changed = false;
     ImGui::PushID(id);
     auto total = 0.0f;
@@ -743,7 +743,7 @@ void LibraryWindow::drawSamples()
         if (semanticMode_) {
             semanticPending_ = true;
         } else {
-            query_.text = juce::String::fromUTF8(search_);
+            query_.text = cydaw::base::Text::fromUTF8(search_);
             dirty_ = true;
         }
     }
@@ -765,7 +765,7 @@ void LibraryWindow::drawSamples()
                 semanticAsked_.clear();
                 semanticPending_ = semanticMode_ && search_[0] != 0;
                 editedAt_ = 0.0;
-                query_.text = semanticMode_ ? juce::String() : juce::String::fromUTF8(search_);
+                query_.text = semanticMode_ ? cydaw::base::Text() : cydaw::base::Text::fromUTF8(search_);
                 if (!semanticMode_ && query_.sortColumn == SampleCatalog::colScore)
                     query_.sortColumn = SampleCatalog::colName;
                 dirty_ = true;
@@ -795,7 +795,7 @@ void LibraryWindow::drawSamples()
         ImGui::OpenPopup("##libraryFolders");
     if (ImGui::BeginPopup("##libraryFolders")) {
         ImGui::TextDisabled("%s", L("Dossiers analysés", "Scanned folders"));
-        std::optional<juce::File> remove;
+        std::optional<cydaw::base::File> remove;
         for (const auto& folder : library.folders()) {
             ImGui::PushID(folder.getFullPathName().toRawUTF8());
             if (ui::iconButton(icon::close, L("Retirer ce dossier", "Remove this folder"), false, 0, ImVec2(dp(20.0f), dp(20.0f))))
@@ -807,7 +807,7 @@ void LibraryWindow::drawSamples()
         if (remove)
             library.removeFolder(*remove);
         if (ImGui::Selectable(L("Ajouter un dossier…", "Add a folder…"))) {
-            chooser_ = std::make_unique<juce::FileChooser>(L("Dossier de samples", "Sample folder"), juce::File {});
+            chooser_ = std::make_unique<juce::FileChooser>(L("Dossier de samples", "Sample folder"), cydaw::base::File {});
             chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
                                   [this](const juce::FileChooser& chooser) {
                                       if (const auto folder = chooser.getResult(); folder.isDirectory())
@@ -827,7 +827,7 @@ void LibraryWindow::drawSamples()
     // A description asked once the typing pauses, or on Enter.
     if (semanticMode_ && (semanticPending_ || entered) && (entered || ImGui::GetTime() - editedAt_ > 0.6)) {
         semanticPending_ = false;
-        const auto text = juce::String::fromUTF8(search_).trim();
+        const auto text = cydaw::base::Text::fromUTF8(search_).trim();
         semanticSimilarTo_.clear();
         semanticHits_.clear();
         semanticError_.clear();
@@ -840,10 +840,10 @@ void LibraryWindow::drawSamples()
         host_.wake(2);
     }
     if (semanticMode_) {
-        juce::String line;
+        cydaw::base::Text line;
         auto colour = p.textDim;
         if (semanticSimilarTo_.isNotEmpty())
-            line = ui::Ls("Sons proches de « ", "Sounds like \"") + juce::File(semanticSimilarTo_).getFileNameWithoutExtension() + ui::Ls(" »", "\"");
+            line = ui::Ls("Sons proches de « ", "Sounds like \"") + cydaw::base::File(semanticSimilarTo_).getFileNameWithoutExtension() + ui::Ls(" »", "\"");
         else if (semanticEnglish_.isNotEmpty())
             line = ui::Ls("Cherché : « ", "Searched: \"") + semanticEnglish_ + ui::Ls(" »", "\"");
         if (semantic.searching() || semantic.status().loadingModel) {
@@ -876,7 +876,7 @@ void LibraryWindow::drawSamples()
         const auto& families = app::SampleLibrary::categoryFamilies();
         for (auto facet = 0; facet < SampleCatalog::facetCount; ++facet) {
             FacetColumn column;
-            column.title = juce::String::fromUTF8(facetTitle(facet));
+            column.title = cydaw::base::Text::fromUTF8(facetTitle(facet));
             column.selected = &query_.selected[static_cast<std::size_t>(facet)];
             column.weight = weights[static_cast<std::size_t>(facet)];
             const auto& values = data_->values[static_cast<std::size_t>(facet)];
@@ -898,7 +898,7 @@ void LibraryWindow::drawSamples()
                 if (facet == SampleCatalog::category && value.family != family && value.family >= 0
                     && value.family < static_cast<int>(families.size())) {
                     family = value.family;
-                    column.entries.push_back({ -1, juce::String::fromUTF8(ui::french() ? families[static_cast<std::size_t>(family)].french
+                    column.entries.push_back({ -1, cydaw::base::Text::fromUTF8(ui::french() ? families[static_cast<std::size_t>(family)].french
                                                                                        : families[static_cast<std::size_t>(family)].english),
                                                0, family });
                 }
@@ -1045,8 +1045,8 @@ void LibraryWindow::drawSamples()
                         for (const auto& family : app::SampleLibrary::categoryFamilies()) {
                             ImGui::TextDisabled("%s", ui::french() ? family.french : family.english);
                             for (const auto& category : app::SampleLibrary::categoryTaxonomy())
-                                if (juce::String(category.family) == family.key
-                                    && ImGui::MenuItem((juce::String("  ") + juce::String::fromUTF8(ui::french() ? category.french : category.english))
+                                if (cydaw::base::Text(category.family) == family.key
+                                    && ImGui::MenuItem((cydaw::base::Text("  ") + cydaw::base::Text::fromUTF8(ui::french() ? category.french : category.english))
                                                            .toRawUTF8(),
                                                        nullptr, record != nullptr && record->category == category.key))
                                     library.setCategory(item.path, category.key);
@@ -1055,7 +1055,7 @@ void LibraryWindow::drawSamples()
                     }
                     ImGui::Separator();
                     if (ImGui::MenuItem(L("Montrer dans l'explorateur", "Show in the file explorer")))
-                        juce::File(item.path).revealToUser();
+                        cydaw::base::File(item.path).revealToUser();
                     if (ImGui::MenuItem(L("Copier le chemin", "Copy the path")))
                         juce::SystemClipboard::copyTextToClipboard(item.path);
                     ImGui::EndPopup();
@@ -1099,21 +1099,21 @@ void LibraryWindow::drawSamples()
     drawSamplePreview(chosen, previewWidth);
 
     // What is shown, of how many, and how fast.
-    const auto status = juce::String(result_.matched) + ui::Ls(" sons sur ", " sounds of ") + juce::String(static_cast<int>(data_->items.size()))
-                        + "   \xc2\xb7   " + ui::Ls("filtre ", "filter ") + juce::String(result_.ms, 1) + " ms";
+    const auto status = cydaw::base::Text(result_.matched) + ui::Ls(" sons sur ", " sounds of ") + cydaw::base::Text(static_cast<int>(data_->items.size()))
+                        + "   \xc2\xb7   " + ui::Ls("filtre ", "filter ") + cydaw::base::Text(result_.ms, 1) + " ms";
     ImGui::TextColored(theme::vec(p.textFaint), "%s", status.toRawUTF8());
     if (library.isScanning()) {
         ImGui::SameLine();
         const auto progress = library.progress();
         const auto text = progress.toAnalyse > 0
-                              ? ui::Ls("   analyse : ", "   analysing: ") + juce::String(progress.analysed) + " / " + juce::String(progress.toAnalyse)
-                              : ui::Ls("   vérification des fichiers : ", "   checking the files: ") + juce::String(progress.found);
+                              ? ui::Ls("   analyse : ", "   analysing: ") + cydaw::base::Text(progress.analysed) + " / " + cydaw::base::Text(progress.toAnalyse)
+                              : ui::Ls("   vérification des fichiers : ", "   checking the files: ") + cydaw::base::Text(progress.found);
         ImGui::TextColored(theme::vec(p.accent), "%s", text.toRawUTF8());
         host_.wake(4);
     }
 }
 
-void LibraryWindow::tempoSwitch(const juce::String& path)
+void LibraryWindow::tempoSwitch(const cydaw::base::Text& path)
 {
     const auto& p = theme::palette();
     if (ImGui::Checkbox(L("Au tempo", "At tempo"), &state_.auditionAtTempo) && path.isNotEmpty()
@@ -1199,7 +1199,7 @@ void LibraryWindow::drawSamplePreview(const SampleCatalog::Item* item, const flo
     ImGui::SameLine();
     tempoSwitch(item->path);
     // What it is.
-    const auto row = [&p](const char* label, const juce::String& value) {
+    const auto row = [&p](const char* label, const cydaw::base::Text& value) {
         if (value.isEmpty())
             return;
         ImGui::TextColored(theme::vec(p.textFaint), "%s", label);
@@ -1210,7 +1210,7 @@ void LibraryWindow::drawSamplePreview(const SampleCatalog::Item* item, const flo
     row(L("Type", "Type"), item->typeText);
     row("BPM", item->bpmText);
     row(L("Tonalité", "Key"), item->keyText);
-    row(L("Format", "Format"), (item->channels == 1 ? juce::String("mono") : item->channels == 2 ? juce::String("stereo") : juce::String(item->channels))
+    row(L("Format", "Format"), (item->channels == 1 ? cydaw::base::Text("mono") : item->channels == 2 ? cydaw::base::Text("stereo") : cydaw::base::Text(item->channels))
                                    + "  " + item->rateText + " kHz");
     row(L("Source", "Source"), item->sourceText);
     ImGui::Spacing();
@@ -1227,7 +1227,7 @@ void LibraryWindow::drawSamplePreview(const SampleCatalog::Item* item, const flo
         dirty_ = true;
     }
     if (ImGui::Button(L("Montrer dans l'explorateur", "Show in the file explorer"), ImVec2(-1.0f, 0.0f)))
-        juce::File(item->path).revealToUser();
+        cydaw::base::File(item->path).revealToUser();
     ImGui::PushTextWrapPos(0.0f);
     ImGui::TextColored(theme::vec(p.textFaint), "%s", item->path.toRawUTF8());
     ImGui::PopTextWrapPos();
@@ -1264,7 +1264,7 @@ void LibraryWindow::drawInstruments()
                 row.bank = instrument.source.isNotEmpty() ? instrument.source : instrument.bank;
             row.range = instrument.range;
             row.licence = instrument.licence;
-            row.model = instrument.model != juce::File();
+            row.model = instrument.model != cydaw::base::File();
             instruments_.push_back(std::move(row));
         }
         for (const auto& entry : studio_.deviceCatalogue()) {
@@ -1308,14 +1308,14 @@ void LibraryWindow::drawInstruments()
                              sizeof(instrumentSearch_));
     ImGui::SameLine();
     if (ImGui::Button(L("Nouveau sampler…", "New sampler…"))) {
-        chooser_ = std::make_unique<juce::FileChooser>(L("Les échantillons du sampler", "The sampler's samples"), juce::File {},
+        chooser_ = std::make_unique<juce::FileChooser>(L("Les échantillons du sampler", "The sampler's samples"), cydaw::base::File {},
                                                        "*.wav;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
         chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
                                   | juce::FileBrowserComponent::canSelectMultipleItems,
                               [this](const juce::FileChooser& chooser) {
                                   if (chooser.getResults().isEmpty())
                                       return;
-                                  juce::String error;
+                                  cydaw::base::Text error;
                                   if (const auto track = studio_.newSamplerTrack(chooser.getResults(), error))
                                       state_.selectTrack(*track);
                                   else
@@ -1327,13 +1327,13 @@ void LibraryWindow::drawInstruments()
         state_.showBanks = true;
 
     std::vector<std::vector<int>> counts;
-    const auto facetRows = facets.filter(juce::String::fromUTF8(instrumentSearch_), counts);
+    const auto facetRows = facets.filter(cydaw::base::Text::fromUTF8(instrumentSearch_), counts);
     {
         std::vector<FacetColumn> columns;
         const char* titles[][2] = { { "Catégorie", "Category" }, { "Genre", "Kind" }, { "État", "State" }, { "Source", "Source" } };
         for (std::size_t facet = 0; facet < facets.titles.size(); ++facet) {
             FacetColumn column;
-            column.title = juce::String::fromUTF8(L(titles[facet][0], titles[facet][1]));
+            column.title = cydaw::base::Text::fromUTF8(L(titles[facet][0], titles[facet][1]));
             column.selected = &facets.selected[facet];
             column.weight = facet == 0 ? 1.4f : 1.0f;
             for (const auto id : facets.order[facet]) {
@@ -1355,7 +1355,7 @@ void LibraryWindow::drawInstruments()
     if (const auto track = target(); track && track->midi && !track->master && !track->isBus() && studio_.isValid(*track))
         onto = track;
     const auto add = [this](const InstrumentRow& row, const bool model, const std::optional<TrackRef> on) {
-        juce::String error;
+        cydaw::base::Text error;
         std::optional<TrackRef> track;
         if (row.kind == InstrumentRow::factory) {
             if (row.missing && !studio_.banks().busy())
@@ -1397,7 +1397,7 @@ void LibraryWindow::drawInstruments()
         if (const auto* specs = ImGui::TableGetSortSpecs(); specs != nullptr && specs->SpecsCount > 0) {
             const auto column = specs->Specs[0].ColumnIndex;
             const auto ascending = specs->Specs[0].SortDirection != ImGuiSortDirection_Descending;
-            const auto field = [this, column](const int index) -> const juce::String& {
+            const auto field = [this, column](const int index) -> const cydaw::base::Text& {
                 const auto& row = instruments_[static_cast<std::size_t>(index)];
                 return column == 1 ? row.category : column == 2 ? row.bank : column == 4 ? row.state : row.name;
             };
@@ -1495,7 +1495,7 @@ void LibraryWindow::drawEffects()
     const auto& p = theme::palette();
     auto& facets = *effectFacets_;
     const auto track = target();
-    const auto pluginFolders = juce::StringArray::fromLines(studio_.samples().setting("pluginFolders", juce::String()).toString());
+    const auto pluginFolders = cydaw::base::TextList::fromLines(studio_.samples().setting("pluginFolders", cydaw::base::Text()).toString());
     if (!plugins_->done() && !plugins_->scanning())
         plugins_->start(pluginFolders);
     static int pluginGeneration = -1;
@@ -1616,13 +1616,13 @@ void LibraryWindow::drawEffects()
             ImGui::PopID();
         }
         if (ImGui::Selectable(L("Ajouter un dossier…", "Add a folder…"))) {
-            chooser_ = std::make_unique<juce::FileChooser>(L("Un dossier de plug-ins VST3", "A VST3 plug-in folder"), juce::File {});
+            chooser_ = std::make_unique<juce::FileChooser>(L("Un dossier de plug-ins VST3", "A VST3 plug-in folder"), cydaw::base::File {});
             chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
                                   [this](const juce::FileChooser& chooser) {
                                       const auto folder = chooser.getResult();
                                       if (!folder.isDirectory())
                                           return;
-                                      auto list = juce::StringArray::fromLines(studio_.samples().setting("pluginFolders", juce::String()).toString());
+                                      auto list = cydaw::base::TextList::fromLines(studio_.samples().setting("pluginFolders", cydaw::base::Text()).toString());
                                       list.removeEmptyStrings();
                                       list.addIfNotAlreadyThere(folder.getFullPathName());
                                       studio_.samples().setSetting("pluginFolders", list.joinIntoString("\n"));
@@ -1641,13 +1641,13 @@ void LibraryWindow::drawEffects()
         host_.wake(6);
 
     std::vector<std::vector<int>> counts;
-    auto rows = facets.filter(juce::String::fromUTF8(effectSearch_), counts);
+    auto rows = facets.filter(cydaw::base::Text::fromUTF8(effectSearch_), counts);
     {
         std::vector<FacetColumn> columns;
         const char* titles[][2] = { { "Catégorie", "Category" }, { "Genre", "Kind" }, { "Rôle", "Role" }, { "Fabricant", "Maker" } };
         for (std::size_t facet = 0; facet < facets.titles.size(); ++facet) {
             FacetColumn column;
-            column.title = juce::String::fromUTF8(L(titles[facet][0], titles[facet][1]));
+            column.title = cydaw::base::Text::fromUTF8(L(titles[facet][0], titles[facet][1]));
             column.selected = &facets.selected[facet];
             column.weight = facet == 0 ? 1.5f : 1.0f;
             for (const auto id : facets.order[facet]) {
@@ -1704,7 +1704,7 @@ void LibraryWindow::drawEffects()
         if (const auto* specs = ImGui::TableGetSortSpecs(); specs != nullptr && specs->SpecsCount > 0) {
             const auto column = specs->Specs[0].ColumnIndex;
             const auto ascending = specs->Specs[0].SortDirection != ImGuiSortDirection_Descending;
-            const auto field = [this, column](const int index) -> const juce::String& {
+            const auto field = [this, column](const int index) -> const cydaw::base::Text& {
                 const auto& row = effects_[static_cast<std::size_t>(index)];
                 return column == 1 ? row.category : column == 2 ? row.genre : column == 3 ? row.maker : row.name;
             };
@@ -1796,7 +1796,7 @@ LibraryWindow::Probe LibraryWindow::probe()
     probe.frameMs = frameMs_;
     if (data_ != nullptr) {
         for (auto facet = 0; facet < SampleCatalog::facetCount; ++facet) {
-            std::vector<std::pair<juce::String, int>> values;
+            std::vector<std::pair<cydaw::base::Text, int>> values;
             const auto& counts = result_.counts[static_cast<std::size_t>(facet)];
             for (std::size_t id = 0; id < counts.size(); ++id)
                 if (counts[id] > 0)

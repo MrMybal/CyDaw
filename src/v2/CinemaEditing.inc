@@ -1,10 +1,11 @@
+#include <cydaw/base/File.h>
 // Cinema uses the same clip document, editor, MIDI instruments, automation and processing rack.
 namespace {
-juce::String cinemaTime(double seconds,double fps){
-    if(std::abs(fps-29.97)<.02){const auto c=timecode::fromSeconds(seconds,2);return juce::String::formatted("%02d:%02d:%02d:%02d",c.hours,c.minutes,c.seconds,c.frames);}
+cydaw::base::Text cinemaTime(double seconds,double fps){
+    if(std::abs(fps-29.97)<.02){const auto c=timecode::fromSeconds(seconds,2);return cydaw::base::Text::formatted("%02d:%02d:%02d:%02d",c.hours,c.minutes,c.seconds,c.frames);}
     const auto nominal=std::max(1,static_cast<int>(std::round(fps)));
     const auto frame=static_cast<std::int64_t>(std::floor(std::max(0.0,seconds)*fps+1.0e-7));
-    return juce::String::formatted("%02d:%02d:%02d:%02d",static_cast<int>(frame/(nominal*3600)%24),static_cast<int>(frame/(nominal*60)%60),static_cast<int>(frame/nominal%60),static_cast<int>(frame%nominal));
+    return cydaw::base::Text::formatted("%02d:%02d:%02d:%02d",static_cast<int>(frame/(nominal*3600)%24),static_cast<int>(frame/(nominal*60)%60),static_cast<int>(frame/nominal%60),static_cast<int>(frame%nominal));
 }
 std::pair<std::int64_t,std::int64_t> cinemaBounds(const engine::foundry::Track& track,double rate){
     auto start=std::max<std::int64_t>(0,track.containerStart);
@@ -24,7 +25,7 @@ void cinemaPlace(engine::foundry::Track& track,std::int64_t start,std::int64_t l
     }else for(const auto& clip:track.clips){const auto end=std::max(start+length,clip.end());start=std::min(start,clip.start);length=end-start;}
     track.containerStart=start;track.containerLength=length;
 }
-bool cinemaVideoFile(const juce::File& file){return file.hasFileExtension("mp4;mov;m4v;avi;wmv;mkv;webm;mpeg;mpg;mxf;ts;mts;m2ts;m2v;vob;ogv;flv;3gp;3g2;dv;nut;rm;rmvb");}
+bool cinemaVideoFile(const cydaw::base::File& file){return file.hasFileExtension("mp4;mov;m4v;avi;wmv;mkv;webm;mpeg;mpg;mxf;ts;mts;m2ts;m2v;vob;ogv;flv;3gp;3g2;dv;nut;rm;rmvb");}
 }
 void FoundryView::ensureCinema(Tab& t){
     auto next=t.document->session();const bool wasCinema=next.cinema;next.cinema=true;
@@ -35,17 +36,17 @@ void FoundryView::ensureCinema(Tab& t){
     if(made)for(auto& track:next.tracks)if(!track.bus)track.parentId=group;
     if(!wasCinema&&next.frames()<=0)next.span=static_cast<std::int64_t>(60*next.rate);
     t.activeGroup=group;if(!wasCinema||made)t.document->replace(std::move(next));
-    t.videoTextureKey="cinema-video-"+juce::String::toHexString(reinterpret_cast<juce::pointer_sized_int>(t.document.get()));
+    t.videoTextureKey="cinema-video-"+cydaw::base::Text::toHexString(reinterpret_cast<juce::pointer_sized_int>(t.document.get()));
     syncProcessing(t);
     if(made)for(const auto& track:t.document->session().tracks)if(track.parentId) t.processing->routeInput(track.id,track.parentId);
 }
-std::uint64_t FoundryView::addCinemaGroup(Tab& t,const juce::String& name){
+std::uint64_t FoundryView::addCinemaGroup(Tab& t,const cydaw::base::Text& name){
     auto next=t.document->session();Track bus;bus.id=next.newId();bus.bus=true;bus.virtualGroup=true;
     bus.name=name.isNotEmpty()?name.toStdString():"Bus";const auto id=bus.id;
     next.tracks.push_back(std::move(bus));edit(t,std::move(next),ui::Ls("Créer un bus","Create bus"));
     syncProcessing(t);t.activeGroup=id;t.processing->selectInput(id);return id;
 }
-std::uint64_t FoundryView::addCinemaTrack(Tab& t,std::uint64_t group,bool midi,const juce::String& name){
+std::uint64_t FoundryView::addCinemaTrack(Tab& t,std::uint64_t group,bool midi,const cydaw::base::Text& name){
     auto next=t.document->session();
     const auto parent=next.trackIndex(group);if(group&&(parent<0||!next.tracks[parent].virtualGroup))return 0;
     Track track;track.id=next.newId();track.parentId=group;track.midi=midi;
@@ -62,7 +63,7 @@ bool FoundryView::assignCinemaTrack(Tab& t,std::uint64_t id,std::uint64_t group)
     next.tracks[index].parentId=group;edit(t,std::move(next),ui::Ls("Déplacer la sous-piste","Move subtrack"));
     syncProcessing(t);t.processing->routeInput(id,group);t.activeGroup=group;return true;
 }
-bool FoundryView::openCinemaVideo(const juce::File& file){
+bool FoundryView::openCinemaVideo(const cydaw::base::File& file){
     if(!file.existsAsFile()){report(ui::Ls("Vidéo introuvable : ","Video missing: ")+file.getFullPathName(),true);return false;}
     if(!tab())newDocument();
     auto& t=*tab();auto next=t.document->session();next.picture.file=file.getFullPathName().toStdString();
@@ -74,10 +75,10 @@ bool FoundryView::openCinemaVideo(const juce::File& file){
 }
 void FoundryView::chooseCinemaClipAudio(Tab& t,std::uint64_t track,std::int64_t at){
     const auto identity=t.cinemaIdentity;
-    chooser_=std::make_unique<juce::FileChooser>(ui::Ls("Importer un son dans la sous-piste", "Import sound into subtrack"),juce::File(),"*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg;*.mp3;*.wma");
+    chooser_=std::make_unique<juce::FileChooser>(ui::Ls("Importer un son dans la sous-piste", "Import sound into subtrack"),cydaw::base::File(),"*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg;*.mp3;*.wma");
     chooser_->launchAsync(juce::FileBrowserComponent::openMode|juce::FileBrowserComponent::canSelectFiles,
         [this,identity,track,at](const juce::FileChooser& chooser){
-            const auto file=chooser.getResult();if(file==juce::File())return;
+            const auto file=chooser.getResult();if(file==cydaw::base::File())return;
             for(auto& target:tabs_)if(target.cinemaIdentity==identity){
                 const auto index=target.document->session().trackIndex(track);if(index<0)return;
                 if(importFile(target,file,index,at)){
@@ -96,10 +97,10 @@ void FoundryView::createCinemaAudioClip(Tab& t,int track,std::int64_t at){
     pickTrack(t,track,false);t.detailsFocus=true;
 }
 void FoundryView::chooseCinemaVideo(){
-    chooser_=std::make_unique<juce::FileChooser>(ui::Ls("Charger une vidéo de référence","Load reference video"),juce::File(),
+    chooser_=std::make_unique<juce::FileChooser>(ui::Ls("Charger une vidéo de référence","Load reference video"),cydaw::base::File(),
         "*.mp4;*.mov;*.m4v;*.avi;*.wmv;*.mkv;*.webm;*.mpeg;*.mpg;*.mxf;*.ts;*.mts;*.m2ts;*.m2v;*.vob;*.ogv;*.flv;*.3gp;*.3g2;*.dv;*.nut;*.rm;*.rmvb");
     chooser_->launchAsync(juce::FileBrowserComponent::openMode|juce::FileBrowserComponent::canSelectFiles,
-        [this](const juce::FileChooser& f){if(f.getResult()!=juce::File())openCinemaVideo(f.getResult());});
+        [this](const juce::FileChooser& f){if(f.getResult()!=cydaw::base::File())openCinemaVideo(f.getResult());});
 }
 void FoundryView::tickCinemaVideo(){
     if(!cinema_)return;
@@ -109,7 +110,7 @@ void FoundryView::tickCinemaVideo(){
     if(p.file.empty()){if(t->thumbnailDecoder)releaseCinemaThumbnails(*t);if(t->video){t->video.reset();host_.releaseTexture(t->videoTextureKey);t->videoTexture=0;t->videoRevision=0;}return;}
     if(!t->video)t->video=std::make_unique<CinemaVideo>();
     const auto time=transportState().seconds-p.start+p.sourceIn;
-    t->video->request(juce::File(fromUtf8(p.file)),time);
+    t->video->request(cydaw::base::File(fromUtf8(p.file)),time);
     const auto frame=t->video->snapshot();
     if(frame.duration>0&&p.duration<=0&&frame.error.isEmpty()){
         auto next=t->document->session();next.picture.duration=std::max(0.0,frame.duration-next.picture.sourceIn);
@@ -119,9 +120,9 @@ void FoundryView::tickCinemaVideo(){
         if(playingTab_==current_)this->player().setSession(t->document->shared());
     }
 }
-bool FoundryView::dropCinemaFiles(const juce::StringArray& files,float x,float y){
+bool FoundryView::dropCinemaFiles(const cydaw::base::TextList& files,float x,float y){
     bool any=false;
-    for(const auto& path:files){const juce::File file(path);
+    for(const auto& path:files){const cydaw::base::File file(path);
         if(cinemaVideoFile(file)){any=openCinemaVideo(file)||any;continue;}
         if(file.hasFileExtension("cycinema;cyfoundry")){any=open(file)||any;continue;}
         if(!tab())newDocument();auto& t=*tab();int track=-1;auto at=t.cursor;
@@ -145,7 +146,7 @@ void FoundryView::drawCinemaVideo(Tab& t,ImVec2 size){
     }
     const auto fps=picture.fps;
     ImGui::Text("%s",cinemaTime(transportState().seconds,fps).toRawUTF8());
-    if(!picture.file.empty())ImGui::TextWrapped("%s",juce::File(fromUtf8(picture.file)).getFileName().toRawUTF8());
+    if(!picture.file.empty())ImGui::TextWrapped("%s",cydaw::base::File(fromUtf8(picture.file)).getFileName().toRawUTF8());
     if(t.video){const auto info=t.video->snapshot();if(info.codec.isNotEmpty())ImGui::TextDisabled("%s · %s",info.backend.toRawUTF8(),info.codec.toRawUTF8());}
     const auto area=ImGui::GetContentRegionAvail();const auto box=ImVec2(std::max(1.f,area.x),std::max(dp(40),std::min(std::max(dp(40),area.y-dp(115)),area.x*9/16)));
     const auto origin=ImGui::GetCursorScreenPos();auto* draw=ImGui::GetWindowDrawList();
@@ -199,7 +200,7 @@ cydaw::base::Value FoundryView::cinemaCommand(const cydaw::base::Value& request)
     auto id=[&](const char* key,std::uint64_t fallback){return static_cast<std::uint64_t>(static_cast<juce::int64>(request.getProperty(key,static_cast<juce::int64>(fallback))));};
     if(action=="video_audio")importCinemaAudio();
     else if(action=="video"){
-        if(request.hasProperty("file")&&!openCinemaVideo(juce::File(request.getProperty("file",{}).toString())))return state_.status;
+        if(request.hasProperty("file")&&!openCinemaVideo(cydaw::base::File(request.getProperty("file",{}).toString())))return state_.status;
         auto next=t.document->session();auto& p=next.picture;
         if(static_cast<bool>(request.getProperty("remove",false)))p.file.clear();
         p.start=std::max(0.0,number(request,"start",p.start));p.sourceIn=std::max(0.0,number(request,"sourceIn",p.sourceIn));
@@ -210,17 +211,17 @@ cydaw::base::Value FoundryView::cinemaCommand(const cydaw::base::Value& request)
         const auto op=request.getProperty("op","add").toString();const auto group=id("id",t.activeGroup);
         if(op=="add")addCinemaGroup(t,request.getProperty("name","Bus").toString());
         else if(op=="rename"){
-            auto next=t.document->session();const auto index=next.trackIndex(group);if(index<0||!next.tracks[index].virtualGroup)return juce::String("unknown virtual track");
+            auto next=t.document->session();const auto index=next.trackIndex(group);if(index<0||!next.tracks[index].virtualGroup)return cydaw::base::Text("unknown virtual track");
             next.tracks[index].name=request.getProperty("name","Bus").toString().toStdString();edit(t,std::move(next),"Rename virtual track");
         }else if(op=="remove"){
-            auto next=t.document->session();const auto index=next.trackIndex(group);if(index<0||!next.tracks[index].virtualGroup)return juce::String("unknown virtual track");
+            auto next=t.document->session();const auto index=next.trackIndex(group);if(index<0||!next.tracks[index].virtualGroup)return cydaw::base::Text("unknown virtual track");
             for(auto& track:next.tracks)if(track.parentId==group){track.parentId=0;t.processing->routeInput(track.id,0);}
             next=engine::foundry::withoutTrack(next,index);edit(t,std::move(next),ui::Ls("Retirer le bus","Remove bus"));syncProcessing(t);t.activeGroup=0;
-        }else if(op=="select"){const auto index=t.document->session().trackIndex(group);if(index<0||!t.document->session().tracks[index].bus)return juce::String("unknown bus");t.activeGroup=group;t.processing->selectInput(group);t.processing->showPanel(5);state_.setBottomPanelVisible(true);}
-        else return juce::String("group op: add, rename, select");
+        }else if(op=="select"){const auto index=t.document->session().trackIndex(group);if(index<0||!t.document->session().tracks[index].bus)return cydaw::base::Text("unknown bus");t.activeGroup=group;t.processing->selectInput(group);t.processing->showPanel(5);state_.setBottomPanelVisible(true);}
+        else return cydaw::base::Text("group op: add, rename, select");
     }else if(action=="add_subtrack"||action=="add_track"){
         const auto created=addCinemaTrack(t,id("groupId",t.activeGroup),request.getProperty("type","audio").toString()=="midi",request.getProperty("name",{}).toString());
-        if(!created)return juce::String("unknown bus");
+        if(!created)return cydaw::base::Text("unknown bus");
         if(request.hasProperty("at")||request.hasProperty("length")){
             const auto& session=t.document->session();const auto factor=static_cast<bool>(request.getProperty("seconds",false))?session.rate:1.0;
             const auto index=session.trackIndex(created);const auto [start,end]=cinemaBounds(session.tracks[index],session.rate);
@@ -228,20 +229,20 @@ cydaw::base::Value FoundryView::cinemaCommand(const cydaw::base::Value& request)
         }
     }else if(action=="container"){
         const auto trackId=id("id",id("trackId",0));const auto& session=t.document->session();const auto index=session.trackIndex(trackId);
-        if(index<0||session.tracks[index].bus)return juce::String("unknown subtrack container");
+        if(index<0||session.tracks[index].bus)return cydaw::base::Text("unknown subtrack container");
         const auto op=request.getProperty("op","focus").toString();const auto [start,end]=cinemaBounds(session.tracks[index],session.rate);
         if(op=="focus"||op=="select"){
             t.activeGroup=session.tracks[index].parentId;pickTrack(t,index,false);if(op=="focus")focusCinemaTrack(t,trackId);
             state_.setBottomPanelVisible(true);t.processing->showPanel(5);
         }else if(op=="move"||op=="resize"){
             const auto factor=static_cast<bool>(request.getProperty("seconds",false))?session.rate:1.0;
-            if(!changeCinemaContainer(t,trackId,static_cast<std::int64_t>(number(request,"at",start/factor)*factor),static_cast<std::int64_t>(number(request,"length",(end-start)/factor)*factor),op=="move"))return juce::String("invalid container");
+            if(!changeCinemaContainer(t,trackId,static_cast<std::int64_t>(number(request,"at",start/factor)*factor),static_cast<std::int64_t>(number(request,"length",(end-start)/factor)*factor),op=="move"))return cydaw::base::Text("invalid container");
             if(request.hasProperty("groupId"))assignCinemaTrack(t,trackId,id("groupId",0));
         }else if(op=="rename"){auto next=session;next.tracks[index].name=request.getProperty("name","Sous-piste").toString().toStdString();edit(t,std::move(next),ui::Ls("Renommer la sous-piste","Rename subtrack"));}
         else if(op=="delete"){auto next=engine::foundry::withoutTrack(session,index);edit(t,std::move(next),ui::Ls("Supprimer le conteneur","Delete container"));}
-        else return juce::String("container op: focus, select, move, resize, rename, delete");
+        else return cydaw::base::Text("container op: focus, select, move, resize, rename, delete");
     }else if(action=="assign"){
-        if(!assignCinemaTrack(t,id("trackId",0),id("groupId",t.activeGroup)))return juce::String("invalid subtrack or virtual track");
+        if(!assignCinemaTrack(t,id("trackId",0),id("groupId",t.activeGroup)))return cydaw::base::Text("invalid subtrack or virtual track");
     }else if(action=="view"){
         t.viewStart=std::max(0.0,number(request,"start",t.viewStart/t.document->session().rate))*t.document->session().rate;
         t.cinemaVisibleSeconds=std::clamp(number(request,"seconds",t.cinemaVisibleSeconds),.1,7200.0);
@@ -259,10 +260,10 @@ cydaw::base::Value FoundryView::cinemaCommand(const cydaw::base::Value& request)
 
 void FoundryView::importCinemaAudio(const bool automatic){
     auto* t=tab();if(!t||t->document->session().picture.file.empty())return;
-    const juce::File source(fromUtf8(t->document->session().picture.file));
+    const cydaw::base::File source(fromUtf8(t->document->session().picture.file));
     for(const auto& pending:cinemaAudioTasks_)if(!pending->done&&pending->documentIdentity==t->cinemaIdentity&&pending->source==source)return;
     auto task=std::make_shared<CinemaAudioTask>();task->source=source;task->automatic=automatic;
-    task->target=juce::File::getSpecialLocation(juce::File::tempDirectory).getChildFile("CyDAW Cinema").getChildFile(juce::Uuid().toString()+".wav");
+    task->target=cydaw::base::File::getSpecialLocation(cydaw::base::File::tempDirectory).getChildFile("CyDAW Cinema").getChildFile(juce::Uuid().toString()+".wav");
     task->documentIdentity=t->cinemaIdentity;cinemaAudioTask_=task;cinemaAudioTasks_.push_back(task);
     cinemaAudioWorker_.addJob([task]{
         task->target.getParentDirectory().createDirectory();
@@ -277,7 +278,7 @@ void FoundryView::pollCinemaAudio(){
         task->consumed=true;
         if(task->error.isNotEmpty()){report(task->error,true);task->target.deleteFile();continue;}
         if(!task->hasAudio){if(!task->automatic)report(ui::Ls("Cette vidéo ne contient pas de piste audio.","This video has no audio track."),false);task->target.deleteFile();continue;}
-        for(auto& t:tabs_)if(t.cinemaIdentity==task->documentIdentity&&juce::File(fromUtf8(t.document->session().picture.file))==task->source){
+        for(auto& t:tabs_)if(t.cinemaIdentity==task->documentIdentity&&cydaw::base::File(fromUtf8(t.document->session().picture.file))==task->source){
             const auto picture=t.document->session().picture;
             const auto group=addCinemaGroup(t,ui::Ls("Bande son vidéo","Video soundtrack"));
             const auto id=addCinemaTrack(t,group,false,ui::Ls("Guide vidéo","Video guide"));

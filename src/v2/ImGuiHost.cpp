@@ -1,3 +1,5 @@
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #include "ImGuiHost.h"
 
 #include "Theme.h"
@@ -49,8 +51,8 @@ struct ImGuiHost::Native {
     bool backendsReady {};
     float dpi { 1.0f };
     bool rendering {};
-    juce::String adapter;
-    std::map<juce::String, ID3D11ShaderResourceView*> textures;
+    cydaw::base::Text adapter;
+    std::map<cydaw::base::Text, ID3D11ShaderResourceView*> textures;
 
     void releaseTextures()
     {
@@ -102,7 +104,7 @@ struct ImGuiHost::Native {
             return false;
         DXGI_ADAPTER_DESC description {};
         if (SUCCEEDED(dxgiAdapter->GetDesc(&description)))
-            adapter = juce::String(description.Description);
+            adapter = cydaw::base::Text(description.Description);
         dxgiAdapter->GetParent(IID_PPV_ARGS(&factory));
         dxgiAdapter->Release();
         if (factory == nullptr)
@@ -183,13 +185,13 @@ struct NativeAccess {
     }
     static void dropped(ImGuiHost& host, HDROP drop)
     {
-        juce::StringArray files;
+        cydaw::base::TextList files;
         const auto count = DragQueryFileW(drop, 0xffffffff, nullptr, 0);
         for (UINT i = 0; i < count; ++i) {
             const auto length = DragQueryFileW(drop, i, nullptr, 0);
             std::wstring buffer(length + 1, L'\0');
             DragQueryFileW(drop, i, buffer.data(), length + 1);
-            files.add(juce::String(buffer.c_str()));
+            files.add(cydaw::base::Text(buffer.c_str()));
         }
         POINT point {};
         DragQueryPoint(drop, &point);
@@ -321,7 +323,7 @@ void registerWindowClass()
 ImGuiHost::ImGuiHost()
     : native_(std::make_unique<Native>()),
       vblank_(this, [this](const double timestamp) {
-          lastVBlankMs_ = juce::Time::getMillisecondCounterHiRes();
+          lastVBlankMs_ = cydaw::base::Time::getMillisecondCounterHiRes();
           vblank(timestamp);
       })
 {
@@ -333,7 +335,7 @@ ImGuiHost::ImGuiHost()
 
 void ImGuiHost::Fallback::timerCallback()
 {
-    const auto now = juce::Time::getMillisecondCounterHiRes();
+    const auto now = cydaw::base::Time::getMillisecondCounterHiRes();
     if (now - host.lastVBlankMs_ > 200.0)
         host.vblank(now * 0.001);
 }
@@ -392,7 +394,7 @@ void ImGuiHost::createNativeWindow()
     // screen; dragged back over the main window, it docks again. Kept inside
     // the main window when CYDAW_SINGLE_VIEWPORT is set, so a snapshot shows
     // the device windows too (tests).
-    if (ownWindows && juce::SystemStats::getEnvironmentVariable("CYDAW_SINGLE_VIEWPORT", {}).isEmpty())
+    if (ownWindows && cydaw::base::SystemStats::getEnvironmentVariable("CYDAW_SINGLE_VIEWPORT", {}).isEmpty())
         io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
     io.ConfigViewportsNoTaskBarIcon = true;
     io.ConfigViewportsNoDefaultParent = false;
@@ -455,7 +457,7 @@ float ImGuiHost::dpiScale() const noexcept
     return native_->dpi;
 }
 
-juce::String ImGuiHost::rendererDescription() const
+cydaw::base::Text ImGuiHost::rendererDescription() const
 {
     return "Direct3D 11 — " + native_->adapter;
 }
@@ -470,7 +472,7 @@ void ImGuiHost::setAnimating(const bool animating)
     animating_ = animating;
 }
 
-void ImGuiHost::captureNextFrame(const juce::File& target, std::function<void(bool)> done)
+void ImGuiHost::captureNextFrame(const cydaw::base::File& target, std::function<void(bool)> done)
 {
     captureTarget_ = target;
     captureDone_ = std::move(done);
@@ -494,7 +496,7 @@ void ImGuiHost::vblank(const double timestampSeconds)
     frame();
 }
 
-unsigned long long ImGuiHost::texture(const juce::String& key, const juce::Image& image)
+unsigned long long ImGuiHost::texture(const cydaw::base::Text& key, const juce::Image& image)
 {
     auto& n = *native_;
     if (const auto found = n.textures.find(key); found != n.textures.end())
@@ -543,7 +545,7 @@ unsigned long long ImGuiHost::texture(const juce::String& key, const juce::Image
 }
 
 // Reuse one GPU resource for a video stream instead of caching every frame.
-unsigned long long ImGuiHost::updateTexture(const juce::String& key,const juce::Image& image)
+unsigned long long ImGuiHost::updateTexture(const cydaw::base::Text& key,const juce::Image& image)
 {
     if(!native_||!image.isValid())return 0;
     auto& n=*native_;
@@ -564,7 +566,7 @@ unsigned long long ImGuiHost::updateTexture(const juce::String& key,const juce::
     n.context->UpdateSubresource(resource,0,nullptr,pixels.data(),static_cast<UINT>(image.getWidth()*4),0);
     resource->Release();return reinterpret_cast<unsigned long long>(found->second);
 }
-void ImGuiHost::releaseTexture(const juce::String& key)
+void ImGuiHost::releaseTexture(const cydaw::base::Text& key)
 {
     if(!native_)return;
     if(auto it=native_->textures.find(key);it!=native_->textures.end()){it->second->Release();native_->textures.erase(it);}
@@ -620,7 +622,7 @@ void ImGuiHost::frame()
     n.context->ClearRenderTargetView(n.target, clear);
     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
-    if (captureTarget_ != juce::File {}) {
+    if (captureTarget_ != cydaw::base::File {}) {
         auto ok = false;
         ID3D11Texture2D* back {};
         if (SUCCEEDED(n.swapChain->GetBuffer(0, IID_PPV_ARGS(&back))) && back != nullptr) {
@@ -654,7 +656,7 @@ void ImGuiHost::frame()
             }
             back->Release();
         }
-        captureTarget_ = juce::File {};
+        captureTarget_ = cydaw::base::File {};
         if (auto done = std::exchange(captureDone_, {}))
             juce::MessageManager::callAsync([done, ok] { done(ok); });
     }
@@ -699,19 +701,19 @@ void ImGuiHost::visibilityChanged() {}
 void ImGuiHost::focusGained(FocusChangeType) {}
 bool ImGuiHost::isReady() const noexcept { return false; }
 float ImGuiHost::dpiScale() const noexcept { return 1.0f; }
-juce::String ImGuiHost::rendererDescription() const { return "unavailable on this platform"; }
+cydaw::base::Text ImGuiHost::rendererDescription() const { return "unavailable on this platform"; }
 void ImGuiHost::wake(int) {}
 void ImGuiHost::setAnimating(bool) {}
-void ImGuiHost::captureNextFrame(const juce::File&, std::function<void(bool)> done)
+void ImGuiHost::captureNextFrame(const cydaw::base::File&, std::function<void(bool)> done)
 {
     if (done)
         done(false);
 }
 void ImGuiHost::vblank(double) {}
 void ImGuiHost::renderNow() {}
-unsigned long long ImGuiHost::texture(const juce::String&, const juce::Image&) { return 0; }
-unsigned long long ImGuiHost::updateTexture(const juce::String&, const juce::Image&) { return 0; }
-void ImGuiHost::releaseTexture(const juce::String&) {}
+unsigned long long ImGuiHost::texture(const cydaw::base::Text&, const juce::Image&) { return 0; }
+unsigned long long ImGuiHost::updateTexture(const cydaw::base::Text&, const juce::Image&) { return 0; }
+void ImGuiHost::releaseTexture(const cydaw::base::Text&) {}
 void ImGuiHost::frame() {}
 
 #endif

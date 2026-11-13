@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #include "ImportedInstruments.h"
 
 #include <algorithm>
@@ -118,7 +119,7 @@ bool named(const ImportedDevice& device, std::initializer_list<const char*> name
 
 } // namespace
 
-std::optional<Equivalent> equivalentOf(const ImportedDevice& device, const juce::String& format)
+std::optional<Equivalent> equivalentOf(const ImportedDevice& device, const cydaw::base::Text& format)
 {
     if (device.plugin || !device.instrument)
         return std::nullopt;

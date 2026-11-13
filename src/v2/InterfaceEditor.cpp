@@ -77,7 +77,7 @@ constexpr float kDefaultHeight = 420.0f;
 
 InterfaceEditor::InterfaceEditor(DeviceHost& studio, UiState& state) : studio_(studio), state_(state) {}
 
-void InterfaceEditor::report(const juce::String& message)
+void InterfaceEditor::report(const cydaw::base::Text& message)
 {
     error_ = message;
     errorTime_ = ImGui::GetTime();
@@ -135,7 +135,7 @@ InterfaceEditor::Control* InterfaceEditor::find(const std::uint64_t id)
     return nullptr;
 }
 
-const app::ModulePublishedParameter* InterfaceEditor::parameter(const juce::String& key) const
+const app::ModulePublishedParameter* InterfaceEditor::parameter(const cydaw::base::Text& key) const
 {
     for (const auto& item : interface_.parameters)
         if (item.key == key)
@@ -151,7 +151,7 @@ bool logarithmic(const app::ModulePublishedParameter& item)
 }
 } // namespace
 
-double InterfaceEditor::value01(const juce::String& key) const
+double InterfaceEditor::value01(const cydaw::base::Text& key) const
 {
     const auto* item = parameter(key);
     if (item == nullptr || item->maximum <= item->minimum)
@@ -162,7 +162,7 @@ double InterfaceEditor::value01(const juce::String& key) const
     return std::clamp((item->value - item->minimum) / (item->maximum - item->minimum), 0.0, 1.0);
 }
 
-void InterfaceEditor::setValue01(GraphSlot& slot, const juce::String& key, const double position)
+void InterfaceEditor::setValue01(GraphSlot& slot, const cydaw::base::Text& key, const double position)
 {
     for (auto& item : interface_.parameters)
         if (item.key == key) {
@@ -201,7 +201,7 @@ std::uint64_t InterfaceEditor::hit(const ImVec2 screen) const
     return 0;
 }
 
-std::uint64_t InterfaceEditor::add(GraphSlot& slot, const Kind kind, const ImVec2 at, const juce::String& binding)
+std::uint64_t InterfaceEditor::add(GraphSlot& slot, const Kind kind, const ImVec2 at, const cydaw::base::Text& binding)
 {
     const auto* info = infoOf(kind);
     if (info == nullptr)
@@ -218,11 +218,11 @@ std::uint64_t InterfaceEditor::add(GraphSlot& slot, const Kind kind, const ImVec
 
     // Bindings among the published settings: the one asked for, else one no
     // control shows yet, else any; the curves look for their own words.
-    std::set<juce::String> used;
+    std::set<cydaw::base::Text> used;
     for (const auto& other : interface_.controls)
         used.insert(other.parameterBinding);
-    const auto lower = [](const juce::String& text) { return text.toLowerCase(); };
-    const auto pick = [&](const std::initializer_list<const char*> words, const std::set<juce::String>& except) -> juce::String {
+    const auto lower = [](const cydaw::base::Text& text) { return text.toLowerCase(); };
+    const auto pick = [&](const std::initializer_list<const char*> words, const std::set<cydaw::base::Text>& except) -> cydaw::base::Text {
         for (const auto& item : interface_.parameters) {
             if (except.contains(item.key))
                 continue;
@@ -234,7 +234,7 @@ std::uint64_t InterfaceEditor::add(GraphSlot& slot, const Kind kind, const ImVec
         }
         return {};
     };
-    std::set<juce::String> none;
+    std::set<cydaw::base::Text> none;
     if (info->bindings == 1) {
         control.parameterBinding = binding.isNotEmpty() ? binding : pick({}, used);
         if (control.parameterBinding.isEmpty())
@@ -242,14 +242,14 @@ std::uint64_t InterfaceEditor::add(GraphSlot& slot, const Kind kind, const ImVec
     } else if (info->bindings == 2) {
         const auto first = kind == Kind::filterResponse     ? pick({ "cutoff", "frequency" }, none)
                            : kind == Kind::dynamicsResponse ? pick({ "threshold" }, none)
-                                                            : juce::String();
+                                                            : cydaw::base::Text();
         control.parameterBinding = binding.isNotEmpty() ? binding : first.isNotEmpty() ? first : pick({}, used);
         if (control.parameterBinding.isEmpty())
             control.parameterBinding = pick({}, none);
-        std::set<juce::String> taken { control.parameterBinding };
+        std::set<cydaw::base::Text> taken { control.parameterBinding };
         const auto second = kind == Kind::filterResponse     ? pick({ "resonance", ".q" }, taken)
                             : kind == Kind::dynamicsResponse ? pick({ "ratio" }, taken)
-                                                             : juce::String();
+                                                             : cydaw::base::Text();
         control.secondaryParameterBinding = second.isNotEmpty() ? second : pick({}, taken);
     } else if (info->bindings == 4) {
         control.parameterBinding = pick({ "attack" }, none);
@@ -259,9 +259,9 @@ std::uint64_t InterfaceEditor::add(GraphSlot& slot, const Kind kind, const ImVec
     } else if (info->bindings < 0) {
         // Each band: its frequency, gain and Q.
         for (const auto& item : interface_.parameters) {
-            juce::String base;
-            juce::String gain;
-            juce::String q;
+            cydaw::base::Text base;
+            cydaw::base::Text gain;
+            cydaw::base::Text q;
             if (item.key.endsWith("eqBand.frequency")) {
                 base = item.key.dropLastCharacters(9);
                 gain = base + "gain";
@@ -293,7 +293,7 @@ std::uint64_t InterfaceEditor::add(GraphSlot& slot, const Kind kind, const ImVec
         control.design.getDynamicObject()->setProperty("customSource",CustomInterface::example());
     }
 
-    const auto needs = [&]() -> juce::String {
+    const auto needs = [&]() -> cydaw::base::Text {
         if (info->bindings >= 1 && control.parameterBinding.isEmpty())
             return ui::Ls("Il faut un réglage publié : ajoutez des cartes au graphe.",
                           "It needs a published setting: add cards to the graph.");
@@ -301,7 +301,7 @@ std::uint64_t InterfaceEditor::add(GraphSlot& slot, const Kind kind, const ImVec
                                     || control.secondaryParameterBinding == control.parameterBinding))
             return ui::Ls("Il faut deux réglages publiés différents.", "It needs two different published settings.");
         if (info->bindings == 4) {
-            const std::set<juce::String> four { control.parameterBinding, control.secondaryParameterBinding,
+            const std::set<cydaw::base::Text> four { control.parameterBinding, control.secondaryParameterBinding,
                                                 control.tertiaryParameterBinding, control.quaternaryParameterBinding };
             if (four.size() != 4 || four.contains({}))
                 return ui::Ls("Il faut une enveloppe dans le graphe (attaque, déclin, maintien, relâchement).",
@@ -382,20 +382,20 @@ void InterfaceEditor::drawControl(ImDrawList* list, const Control& control, cons
     const auto font = ImGui::GetFontSize();
     const auto label = control.label.isNotEmpty() ? control.label
                        : parameter(control.parameterBinding) != nullptr ? parameter(control.parameterBinding)->label
-                                                                         : juce::String();
+                                                                         : cydaw::base::Text();
     const auto caption = [&](const float y) {
         if (label.isEmpty())
             return;
         const auto size = ImGui::CalcTextSize(label.toRawUTF8());
         ui::clippedText(list, ImVec2(min.x + std::max(2.0f, (w - size.x) * 0.5f), y), w - 4.0f, p.textDim, label.toRawUTF8());
     };
-    const auto valueText = [&](const juce::String& key) {
+    const auto valueText = [&](const cydaw::base::Text& key) {
         const auto* item = parameter(key);
         if (item == nullptr)
-            return juce::String();
+            return cydaw::base::Text();
         const auto magnitude = std::abs(item->value);
         const auto digits = magnitude >= 100.0 ? 0 : magnitude >= 10.0 ? 1 : 2;
-        return juce::String(item->value, digits) + (item->unit.isNotEmpty() ? " " + item->unit : juce::String());
+        return cydaw::base::Text(item->value, digits) + (item->unit.isNotEmpty() ? " " + item->unit : cydaw::base::Text());
     };
     if(static_cast<bool>(control.design.getProperty("showValue",false)) && control.parameterBinding.isNotEmpty())
         list->AddText(ImVec2(min.x+4,min.y+2),p.text,valueText(control.parameterBinding).toRawUTF8());
@@ -441,9 +441,9 @@ void InterfaceEditor::drawControl(ImDrawList* list, const Control& control, cons
     case Kind::selector: {
         list->AddRectFilled(ImVec2(min.x + 2.0f, min.y + 2.0f), ImVec2(max.x - 2.0f, max.y - 2.0f), p.bg3, 4.0f);
         const auto* item = parameter(control.parameterBinding);
-        const auto text = item != nullptr ? app::moduleSelectorValueLabel(*item, item->value) : juce::String();
+        const auto text = item != nullptr ? app::moduleSelectorValueLabel(*item, item->value) : cydaw::base::Text();
         ui::centredText(list, min, max, p.text,
-                        (juce::String::fromUTF8("\xe2\x80\xb9 ") + text + juce::String::fromUTF8(" \xe2\x80\xba")).toRawUTF8());
+                        (cydaw::base::Text::fromUTF8("\xe2\x80\xb9 ") + text + cydaw::base::Text::fromUTF8(" \xe2\x80\xba")).toRawUTF8());
         break;
     }
     case Kind::xyPad: {
@@ -610,9 +610,9 @@ void InterfaceEditor::drawControl(ImDrawList* list, const Control& control, cons
             api.tertiary=tertiary.c_str();api.quaternary=quaternary.c_str();
             if(const auto* p=parameter(control.parameterBinding)) {api.minimum=p->minimum;api.maximum=p->maximum;}
             api.get=[](void* user,const char* binding) { const auto* self=static_cast<Data*>(user)->editor;
-                if(const auto* p=self->parameter(juce::String::fromUTF8(binding)))return p->value;return 0.0; };
+                if(const auto* p=self->parameter(cydaw::base::Text::fromUTF8(binding)))return p->value;return 0.0; };
             api.set=[](void* user,const char* binding,double value) {const auto* self=static_cast<Data*>(user)->editor;
-                const auto key=juce::String::fromUTF8(binding);if(const auto* p=self->parameter(key);p && std::isfinite(value) && self->renderingPlayed_ && self->componentSet_)
+                const auto key=cydaw::base::Text::fromUTF8(binding);if(const auto* p=self->parameter(key);p && std::isfinite(value) && self->renderingPlayed_ && self->componentSet_)
                     self->componentSet_(key,std::clamp(value,p->minimum,p->maximum));};
             const auto cursor=ImGui::GetCursorScreenPos();ImGui::SetCursorScreenPos(min);ImGui::PushID(static_cast<int>(control.id));
             ImGui::BeginChild("##cppComponent",ImVec2(std::max(1.0f,w),std::max(1.0f,h)),0,ImGuiWindowFlags_NoBackground|ImGuiWindowFlags_NoSavedSettings|(!renderingPlayed_?ImGuiWindowFlags_NoInputs:0));
@@ -627,7 +627,7 @@ void InterfaceEditor::drawControl(ImDrawList* list, const Control& control, cons
 }
 
 void InterfaceEditor::drawPlayed(const char* id, const app::ModuleInterfaceState& state, const ImVec2 size,
-                                 const std::function<void(const juce::String&, double)>& setValue, const engine::AudioAnalysisFrame* analysis)
+                                 const std::function<void(const cydaw::base::Text&, double)>& setValue, const engine::AudioAnalysisFrame* analysis)
 {
     const auto previousAnalysis=std::exchange(analysis_,analysis);
     // Inside a module: English, whatever the language.
@@ -663,7 +663,7 @@ void InterfaceEditor::drawPlayed(const char* id, const app::ModuleInterfaceState
         return nullptr;
     };
     // A setting moved to a place of its travel, shown at once.
-    const auto set01 = [&](const juce::String& key, const double position) {
+    const auto set01 = [&](const cydaw::base::Text& key, const double position) {
         for (auto& item : interface_.parameters)
             if (item.key == key) {
                 const auto at = std::clamp(position, 0.0, 1.0);
@@ -744,7 +744,7 @@ void InterfaceEditor::drawCanvas(GraphSlot& slot)
     auto& io = ImGui::GetIO();
 
     renderingPlayed_=play_;
-    componentSet_=[&slot](const juce::String& key,double value){slot.graph().editorSetParameter(key,value);};
+    componentSet_=[&slot](const cydaw::base::Text& key,double value){slot.graph().editorSetParameter(key,value);};
     // The toolbar: edit or play, the automatic layout, the grid.
     if (ui::iconButton(icon::edit, L("Disposer : déplacer et dimensionner les contrôles", "Lay out: move and size the controls"), !play_))
         play_ = false;
@@ -827,7 +827,7 @@ void InterfaceEditor::drawCanvas(GraphSlot& slot)
         }
         if (const auto* payload = ImGui::AcceptDragDropPayload(parameterPayload); payload != nullptr && payload->DataSize > 0)
             (void) add(slot, Kind::knob, toFraction(mouse),
-                       juce::String::fromUTF8(static_cast<const char*>(payload->Data), payload->DataSize - 1));
+                       cydaw::base::Text::fromUTF8(static_cast<const char*>(payload->Data), payload->DataSize - 1));
         ImGui::EndDragDropTarget();
     }
 
@@ -978,10 +978,10 @@ void InterfaceEditor::drawCanvas(GraphSlot& slot)
         if(selected_ && io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_C,false)) {
             auto copy=interface_;std::erase_if(copy.controls,[this](const auto& c){return c.id!=selected_ && !selection_.contains(c.id);});
             copy.deviceControls.clear();const auto json=cydaw::base::JSON::toString(app::serialiseModuleInterface(copy),false);
-            ImGui::SetClipboardText((juce::String("CyDAW-Interface\n")+json).toRawUTF8());
+            ImGui::SetClipboardText((cydaw::base::Text("CyDAW-Interface\n")+json).toRawUTF8());
         }
         if(io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_V,false)) {
-            const auto text=juce::String::fromUTF8(ImGui::GetClipboardText());
+            const auto text=cydaw::base::Text::fromUTF8(ImGui::GetClipboardText());
             if(text.startsWith("CyDAW-Interface\n")) {
                 const auto copied=app::restoreModuleInterface(cydaw::base::JSON::parse(text.substring(16)));
                 std::vector<Control> additions;bool valid=true;
@@ -1126,7 +1126,7 @@ void InterfaceEditor::drawProperties(GraphSlot& slot)
     ImGui::SetNextItemWidth(width);
     ImGui::InputText("##controlLabel", label_.data(), label_.size());
     if (ImGui::IsItemDeactivatedAfterEdit()) {
-        control->label = juce::String::fromUTF8(label_.data());
+        control->label = cydaw::base::Text::fromUTF8(label_.data());
         (void) push(slot, true);
         control = find(selected_);
         if (control == nullptr)
@@ -1134,7 +1134,7 @@ void InterfaceEditor::drawProperties(GraphSlot& slot)
     }
 
     // What it shows.
-    const auto binding = [&](const char* fr, const char* en, juce::String& key) {
+    const auto binding = [&](const char* fr, const char* en, cydaw::base::Text& key) {
         ImGui::TextDisabled("%s", L(fr, en));
         const auto* item = parameter(key);
         ImGui::SetNextItemWidth(width);

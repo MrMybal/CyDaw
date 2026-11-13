@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #include "GraphPluginExportComponent.h"
 
 #include "Localization.h"
@@ -8,9 +9,9 @@
 namespace cydaw::app {
 namespace {
 
-cydaw::graph::SemanticVersion parseVersion(const juce::String& text)
+cydaw::graph::SemanticVersion parseVersion(const cydaw::base::Text& text)
 {
-    juce::StringArray parts;
+    cydaw::base::TextList parts;
     parts.addTokens(text.trim(), ".", {});
     const auto part = [&parts](const int index, const int fallback) {
         return index < parts.size()
@@ -24,7 +25,7 @@ cydaw::graph::SemanticVersion parseVersion(const juce::String& text)
     };
 }
 
-juce::String directionLabel(const cydaw::graph::PortDirection direction)
+cydaw::base::Text directionLabel(const cydaw::graph::PortDirection direction)
 {
     return tr(direction == cydaw::graph::PortDirection::input
                   ? "graph.export.input" : "graph.export.output");
@@ -132,13 +133,13 @@ void GraphPluginExportComponent::configureEditor(juce::TextEditor& editor,
 void GraphPluginExportComponent::setProfile(
     const cydaw::graph::PluginIdentity& value)
 {
-    productEditor_.setText(juce::String(value.productName), false);
-    companyEditor_.setText(juce::String(value.companyName), false);
+    productEditor_.setText(cydaw::base::Text(value.productName), false);
+    companyEditor_.setText(cydaw::base::Text(value.companyName), false);
     manufacturerCodeEditor_.setText(
-        juce::String(value.manufacturerCode).toUpperCase(), false);
+        cydaw::base::Text(value.manufacturerCode).toUpperCase(), false);
     pluginCodeEditor_.setText(
-        juce::String(value.pluginCode).toUpperCase(), false);
-    versionEditor_.setText(juce::String(value.version.toString()), false);
+        cydaw::base::Text(value.pluginCode).toUpperCase(), false);
+    versionEditor_.setText(cydaw::base::Text(value.version.toString()), false);
 }
 
 cydaw::graph::PluginIdentity GraphPluginExportComponent::profile() const
@@ -226,16 +227,16 @@ void GraphPluginExportComponent::notifyProfileChanged()
 
 void GraphPluginExportComponent::refreshSummary()
 {
-    juce::String text;
+    cydaw::base::Text text;
     if (result_.plan.has_value() && result_.issues.empty()) {
         const auto& plan = *result_.plan;
         text << tr("graph.export.ready") << "\n\n";
         text << tr("graph.export.role") << ": "
-             << juce::String(cydaw::graph::toString(plan.role)) << "\n";
+             << cydaw::base::Text(cydaw::graph::toString(plan.role)) << "\n";
         text << tr("graph.export.category") << ": "
-             << juce::String(plan.vst3Category) << "\n";
+             << cydaw::base::Text(plan.vst3Category) << "\n";
         text << tr("graph.export.fingerprint") << ": "
-             << juce::String::toHexString(
+             << cydaw::base::Text::toHexString(
                     static_cast<juce::int64>(plan.sourceFingerprint))
                     .toUpperCase()
              << "\n\n";
@@ -243,9 +244,9 @@ void GraphPluginExportComponent::refreshSummary()
              << static_cast<int>(plan.buses.size()) << ")\n";
         for (const auto& bus : plan.buses) {
             text << "  " << directionLabel(bus.direction) << " · "
-                 << juce::String(bus.displayName) << " · ";
+                 << cydaw::base::Text(bus.displayName) << " · ";
             if (bus.mediaType == cydaw::graph::PluginBusMediaType::audio)
-                text << juce::String(cydaw::graph::toString(bus.audioType))
+                text << cydaw::base::Text(cydaw::graph::toString(bus.audioType))
                      << " / " << static_cast<int>(bus.channels) << " ch";
             else
                 text << "MIDI";
@@ -259,8 +260,8 @@ void GraphPluginExportComponent::refreshSummary()
             text << "  " << tr("graph.export.noParameters") << "\n";
         for (const auto& parameter : plan.parameters)
             text << "  #" << static_cast<int>(parameter.pluginParameterId)
-                 << " · " << juce::String(parameter.displayName)
-                 << " [" << juce::String(parameter.key) << "]"
+                 << " · " << cydaw::base::Text(parameter.displayName)
+                 << " [" << cydaw::base::Text(parameter.key) << "]"
                  << (parameter.automatable ? " · AUTO" : "") << "\n";
         statusLabel_.setText(tr("graph.export.statusReady"),
                              juce::dontSendNotification);
@@ -271,7 +272,7 @@ void GraphPluginExportComponent::refreshSummary()
     } else {
         text << tr("graph.export.notReady") << "\n\n";
         for (const auto& issue : result_.issues)
-            text << "• " << juce::String(issue.message) << "\n";
+            text << "• " << cydaw::base::Text(issue.message) << "\n";
         if (result_.issues.empty())
             text << tr("graph.export.validatePrompt") << "\n";
         statusLabel_.setText(tr("graph.export.statusInvalid"),

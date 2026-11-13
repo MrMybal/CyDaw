@@ -1,3 +1,5 @@
+#include <cydaw/integration/AudioFiles.h>
+#include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #pragma once
 #include <cydaw/integration/CyAudioCoreDeviceManager.h>
@@ -234,7 +236,7 @@ public:
     {
         return nativeGraph_.readTap(nodeId, input, frame);
     }
-    [[nodiscard]] cydaw::base::Result addPlugin(const juce::File& pluginFile,
+    [[nodiscard]] cydaw::base::Result addPlugin(const cydaw::base::File& pluginFile,
                                          double sampleRate,
                                          int maximumBlockSize,
                                          int channelCount,
@@ -436,7 +438,7 @@ public:
     InputRecorder();
     ~InputRecorder() override;
 
-    [[nodiscard]] cydaw::base::Result start(const juce::File& destination,
+    [[nodiscard]] cydaw::base::Result start(const cydaw::base::File& destination,
                                      double startDelaySeconds = 0.0);
     void scheduleStop(double delaySeconds);
     void stop();
@@ -454,7 +456,7 @@ public:
     void setRouter(const VirtualBusRouter* router) noexcept { router_ = router; }
     void setAfterEffects(bool afterEffects) noexcept { afterEffects_.store(afterEffects, std::memory_order_release); }
     [[nodiscard]] static cydaw::base::Result selfTestScheduledRecording(
-        const juce::File& destination);
+        const cydaw::base::File& destination);
 
     void audioDeviceIOCallbackWithContext(const float* const* inputChannelData,
                                           int numInputChannels,
@@ -467,8 +469,8 @@ public:
 
 private:
     juce::TimeSliceThread writerThread_ { "CyDAW recording writer" };
-    std::unique_ptr<juce::AudioFormatWriter::ThreadedWriter> threadedWriter_;
-    std::atomic<juce::AudioFormatWriter::ThreadedWriter*> activeWriter_ {};
+    std::unique_ptr<cydaw::audio::AudioFormatWriter::ThreadedWriter> threadedWriter_;
+    std::atomic<cydaw::audio::AudioFormatWriter::ThreadedWriter*> activeWriter_ {};
     std::atomic<int> callbacksInFlight_ {};
     std::atomic<double> sampleRate_ {};
     std::atomic<int> inputChannelCount_ {};
@@ -564,7 +566,7 @@ public:
 
     // What the mix is late by (its tracks' compensation, the master's own
     // devices) is skipped, so the file starts with the song's first sample.
-    [[nodiscard]] cydaw::base::Result startCapture(const juce::File& destination,
+    [[nodiscard]] cydaw::base::Result startCapture(const cydaw::base::File& destination,
                                              double durationSeconds, int skipSamples = 0);
     void stopCapture();
     [[nodiscard]] bool isCapturing() const noexcept;
@@ -603,8 +605,8 @@ private:
 
     juce::AudioSource& input_;
     juce::TimeSliceThread writerThread_ { "CyDAW master export writer" };
-    std::unique_ptr<juce::AudioFormatWriter::ThreadedWriter> threadedWriter_;
-    std::atomic<juce::AudioFormatWriter::ThreadedWriter*> activeWriter_ {};
+    std::unique_ptr<cydaw::audio::AudioFormatWriter::ThreadedWriter> threadedWriter_;
+    std::atomic<cydaw::audio::AudioFormatWriter::ThreadedWriter*> activeWriter_ {};
     std::atomic<int> callbacksInFlight_ {};
     std::atomic<double> sampleRate_ {};
     std::atomic<double> clock_ {};
@@ -757,7 +759,7 @@ public:
 
     struct MidiClip {
         std::uint64_t id {};
-        juce::String name;
+        cydaw::base::Text name;
         double startBeats {};
         double lengthBeats { 16.0 };
         bool looping {};
@@ -781,7 +783,7 @@ public:
 
     struct MidiTrackInfo {
         std::uint64_t id {};
-        juce::String name;
+        cydaw::base::Text name;
         float gainDb {};
         float pan {};
         bool muted {};
@@ -816,13 +818,13 @@ public:
     struct PluginAutomationLane {
         std::size_t pluginIndex {};
         std::uint32_t parameterIndex {};
-        juce::String parameterName;
+        cydaw::base::Text parameterName;
         std::vector<PluginAutomationPoint> points;
     };
 
     struct AudioTake {
-        juce::String name;
-        juce::File sourceFile;
+        cydaw::base::Text name;
+        cydaw::base::File sourceFile;
         double sourceLengthSeconds {};
         // Where it lies against the clip's own source: its file is read this
         // much later (a take recorded from further in the clip, a pass of a
@@ -840,8 +842,8 @@ public:
     // A clip's source as it was before a destructive edit, and after:
     // the versions the editor's history lists, the first the original.
     struct SourceVersion {
-        juce::String label;
-        juce::File file;
+        cydaw::base::Text label;
+        cydaw::base::File file;
         double sourceOffsetSeconds {};
         double durationSeconds {};
         double sourceDurationSeconds {};
@@ -880,13 +882,13 @@ public:
     // independent audio events.
     struct AudioEvent {
         std::uint64_t id {};
-        juce::String name;
+        cydaw::base::Text name;
         double startSeconds {};
         double sourceOffsetSeconds {};
         double durationSeconds { 1.0 };
         double sourceDurationSeconds { 1.0 };
         std::uint32_t colour { 0xffff9b2f };
-        juce::File sourceFile;
+        cydaw::base::File sourceFile;
         double sourceLengthSeconds {};
         double fadeInSeconds {};
         double fadeOutSeconds {};
@@ -900,7 +902,7 @@ public:
         // with it): soundVolumeLane (dB over its gain), soundPanLane
         // (-1..1), soundPitchLane (semitones over its transposition; not
         // with repitch or raw, whose pitch is their speed's).
-        std::map<juce::String, std::vector<AutomationPoint>> lanes;
+        std::map<cydaw::base::Text, std::vector<AutomationPoint>> lanes;
     };
     static constexpr const char* soundVolumeLane = "volume";
     static constexpr const char* soundPanLane = "pan";
@@ -908,7 +910,7 @@ public:
 
     struct AudioClip {
         std::uint64_t id {};
-        juce::String name;
+        cydaw::base::Text name;
         double startSeconds {};
         double sourceOffsetSeconds {};
         double durationSeconds { 1.0 };
@@ -917,7 +919,7 @@ public:
         // timeline stretch.
         double sourceDurationSeconds { 1.0 };
         std::uint32_t colour { 0xffff9b2f };
-        juce::File sourceFile;
+        cydaw::base::File sourceFile;
         double sourceLengthSeconds {};
         double fadeInSeconds {};
         double fadeOutSeconds {};
@@ -942,7 +944,7 @@ public:
         float eventGainDb {};
         // Internal too: a rendered sound's own lanes (AudioEvent::lanes),
         // from this region's start.
-        std::map<juce::String, std::vector<AutomationPoint>> soundLanes;
+        std::map<cydaw::base::Text, std::vector<AutomationPoint>> soundLanes;
         // Clip-local gain automation, expressed on the container timeline.
         std::vector<AutomationPoint> automation;
         // Transposed without changing its length (not with repitch).
@@ -956,13 +958,13 @@ public:
         // Its automation of the track's values, played with it: by lane
         // ("volume" in dB over the fader, "pan" -1..1, a device's knob by its
         // binding in its own units), points in the clip's content seconds.
-        std::map<juce::String, std::vector<AutomationPoint>> lanes;
+        std::map<cydaw::base::Text, std::vector<AutomationPoint>> lanes;
     };
 
     struct LauncherClip {
         int sceneIndex {};
-        juce::String name;
-        juce::File sourceFile;
+        cydaw::base::Text name;
+        cydaw::base::File sourceFile;
         double sourceOffsetSeconds {};
         // Duration of the local clip container, not of the source file.
         double durationSeconds { 1.0 };
@@ -977,7 +979,7 @@ public:
         // Clip-local gain automation, expressed on the launcher clip timeline.
         std::vector<AutomationPoint> automation;
         // Its automation of the track's values (as AudioClip::lanes).
-        std::map<juce::String, std::vector<AutomationPoint>> lanes;
+        std::map<cydaw::base::Text, std::vector<AutomationPoint>> lanes;
     };
 
     enum class ArrangementRangeOperation {
@@ -1000,14 +1002,14 @@ public:
 
     struct TrackInfo {
         struct PluginInfo {
-            juce::File file;
-            juce::String name;
+            cydaw::base::File file;
+            cydaw::base::Text name;
             bool running {};
             std::uint64_t missedBlocks {};
             int latencySamples {};
         };
 
-        juce::File file;
+        cydaw::base::File file;
         double lengthSeconds {};
         float gainDb {};
         float pan {};
@@ -1037,10 +1039,10 @@ public:
     AudioTrackController();
     ~AudioTrackController();
 
-    [[nodiscard]] juce::String initialiseAudio(
+    [[nodiscard]] cydaw::base::Text initialiseAudio(
         const juce::XmlElement* savedState = nullptr);
     [[nodiscard]] cydaw::base::Result addAudioTrack(
-        const juce::File& file,
+        const cydaw::base::File& file,
         std::size_t* newTrackIndex = nullptr,
         double initialClipStartSeconds = 0.0);
     // A secondary mixing session, driven by the Foundry/DJ audio callback.
@@ -1069,7 +1071,7 @@ public:
     // project's, played over and over, in step with the transport when it
     // plays; another sound, or no tempo, as it is.
     [[nodiscard]] cydaw::base::Result startSamplePreview(
-        const juce::File& file, double startSeconds = 0.0, const SamplePreviewTempo& tempo = {});
+        const cydaw::base::File& file, double startSeconds = 0.0, const SamplePreviewTempo& tempo = {});
     // The loop being auditioned at the project's tempo: its beats, else 0.
     [[nodiscard]] int samplePreviewLoopBeats() const noexcept;
     // The device's rate, as the audition plays at it.
@@ -1116,10 +1118,10 @@ public:
     };
     [[nodiscard]] TrackMixState trackMixState(std::size_t index) const;
     [[nodiscard]] const std::vector<AudioClip>* audioClipsView(std::size_t index) const;
-    [[nodiscard]] juce::File trackFile(std::size_t index) const;
+    [[nodiscard]] cydaw::base::File trackFile(std::size_t index) const;
     struct MidiTrackSummary {
         std::uint64_t id {};
-        juce::String name;
+        cydaw::base::Text name;
         float gainDb {};
         float pan {};
         bool muted {};
@@ -1152,15 +1154,15 @@ public:
         std::uint64_t busId) const;
     [[nodiscard]] std::vector<std::pair<std::uint64_t, float>>
         virtualBusControlValues(std::uint64_t busId) const;
-    [[nodiscard]] juce::StringArray physicalInputChannelNames() const;
-    [[nodiscard]] juce::StringArray physicalOutputChannelNames() const;
+    [[nodiscard]] cydaw::base::TextList physicalInputChannelNames() const;
+    [[nodiscard]] cydaw::base::TextList physicalOutputChannelNames() const;
     // The sound card's channels in use: the first `inputs` and `outputs` of
     // its own (a bus's channels count among them). What the device has, and
     // what is open now.
     struct DeviceChannels {
         // The channels open, in order: a bus's channel k is the k-th here.
-        juce::StringArray inputNames;
-        juce::StringArray outputNames;
+        cydaw::base::TextList inputNames;
+        cydaw::base::TextList outputNames;
         int activeInputs {};
         int activeOutputs {};
         // What the device has.
@@ -1240,20 +1242,20 @@ public:
         double startSeconds,
         double sourceOffsetSeconds,
         double durationSeconds,
-        juce::String name = {},
+        cydaw::base::Text name = {},
         std::uint32_t colour = 0xffff9b2f,
-        juce::File sourceFile = {},
+        cydaw::base::File sourceFile = {},
         double fadeInSeconds = 0.0,
         double fadeOutSeconds = 0.0);
     [[nodiscard]] cydaw::base::Result addAudioClipFromFile(
         std::size_t index,
-        const juce::File& sourceFile,
+        const cydaw::base::File& sourceFile,
         double startSeconds,
         std::uint64_t* newClipId = nullptr);
     [[nodiscard]] cydaw::base::Result addAudioTake(
         std::size_t index,
         std::uint64_t clipId,
-        const juce::File& sourceFile,
+        const cydaw::base::File& sourceFile,
         bool activate = true,
         bool fitClipToTake = false);
     [[nodiscard]] cydaw::base::Result replaceAudioTakes(
@@ -1294,7 +1296,7 @@ public:
         std::size_t index, std::uint64_t clipId, std::uint64_t markerId);
     [[nodiscard]] cydaw::base::Result addAudioClipEventFromFile(
         std::size_t index, std::uint64_t clipId,
-        const juce::File& sourceFile, double localStartSeconds,
+        const cydaw::base::File& sourceFile, double localStartSeconds,
         std::uint64_t* newEventId = nullptr);
     [[nodiscard]] cydaw::base::Result replaceAudioClipEvents(
         std::size_t index, std::uint64_t clipId,
@@ -1328,7 +1330,7 @@ public:
     // A clip's automation lanes (AudioClip::lanes), one undo step.
     [[nodiscard]] bool setAudioClipLanes(
         std::size_t index, std::uint64_t clipId,
-        std::map<juce::String, std::vector<AutomationPoint>> lanes);
+        std::map<cydaw::base::Text, std::vector<AutomationPoint>> lanes);
     // What a track's volume automation and pan follow while its clips drive
     // them: a volume lane in place of its own (none: its own), a pan lane
     // (empty: its pan knob).
@@ -1351,7 +1353,7 @@ public:
         std::uint64_t markerId);
     [[nodiscard]] cydaw::base::Result commitAudioClipEventEdit(
         std::size_t index, std::uint64_t clipId, std::uint64_t eventId,
-        const juce::File& renderedFile);
+        const cydaw::base::File& renderedFile);
     [[nodiscard]] bool moveAudioClip(
         std::size_t index, std::uint64_t clipId, double startSeconds);
     [[nodiscard]] bool moveAudioClips(
@@ -1441,48 +1443,48 @@ public:
     [[nodiscard]] cydaw::base::Result exportTrackRange(std::size_t index,
                                                 double sourceStartSeconds,
                                                 double durationSeconds,
-                                                const juce::File& destination);
+                                                const cydaw::base::File& destination);
     [[nodiscard]] static cydaw::base::Result analyseAudioRangeGain(
-        const juce::File& source,
+        const cydaw::base::File& source,
         double sourceStartSeconds,
         double durationSeconds,
         float targetPeakDb,
         float& gainDb,
         const std::atomic<bool>* cancellation = nullptr);
     [[nodiscard]] static std::optional<TempoDetectionResult> detectAudioTempo(
-        const juce::File& source,
+        const cydaw::base::File& source,
         const std::atomic<bool>* cancellation = nullptr);
     [[nodiscard]] static cydaw::base::Result exportAudioRange(
-        const juce::File& source,
+        const cydaw::base::File& source,
         double sourceStartSeconds,
         double durationSeconds,
-        const juce::File& destination,
+        const cydaw::base::File& destination,
         const std::atomic<bool>* cancellation = nullptr);
     [[nodiscard]] static cydaw::base::Result renderAudioEdit(
-        const juce::File& source,
+        const cydaw::base::File& source,
         double sourceStartSeconds,
         double durationSeconds,
         AudioEditOperation operation,
-        const juce::File& destination,
+        const cydaw::base::File& destination,
         const std::atomic<bool>* cancellation = nullptr);
     [[nodiscard]] static cydaw::base::Result renderAudioEdit(
-        const juce::File& source,
+        const cydaw::base::File& source,
         double sourceStartSeconds,
         double durationSeconds,
         AudioEditRequest request,
-        const juce::File& destination,
+        const cydaw::base::File& destination,
         const std::atomic<bool>* cancellation = nullptr);
     [[nodiscard]] cydaw::base::Result commitTrackAudioEdit(std::size_t index,
-                                                     const juce::File& renderedFile);
+                                                     const cydaw::base::File& renderedFile);
     [[nodiscard]] cydaw::base::Result commitAudioClipEdit(
         std::size_t index,
         std::uint64_t clipId,
-        const juce::File& renderedFile);
+        const cydaw::base::File& renderedFile);
     // Cut, crop, insert silence, paste: the file written again without, or
     // with, the selection (renderAudioEdit hands them here).
     [[nodiscard]] static cydaw::base::Result renderAudioSplice(
-        const juce::File& source, double sourceStartSeconds, double durationSeconds,
-        const AudioEditRequest& request, const juce::File& destination,
+        const cydaw::base::File& source, double sourceStartSeconds, double durationSeconds,
+        const AudioEditRequest& request, const cydaw::base::File& destination,
         const std::atomic<bool>* cancellation = nullptr);
     // Where a moment of a clip (seconds from its start) plays in its source,
     // through its warp markers; the same for an event of a clip, from the
@@ -1493,22 +1495,22 @@ public:
     // take, 10 ms crossfades where they meet, over the whole length of the
     // clip's source (outside the clip, the nearest passage's take), on the
     // source's time (no stretch, no transposition: the clip keeps those).
-    [[nodiscard]] static cydaw::base::Result renderAudioClipComp(const AudioClip& clip, const juce::File& destination,
+    [[nodiscard]] static cydaw::base::Result renderAudioClipComp(const AudioClip& clip, const cydaw::base::File& destination,
                                                           const std::atomic<bool>* cancellation = nullptr);
     // The clip then plays that file alone: one take, no comp; its history
     // gets it, named `label`. One arrangement undo step.
     [[nodiscard]] cydaw::base::Result commitAudioClipCompFlatten(std::size_t index, std::uint64_t clipId,
-                                                          const juce::File& renderedFile, const juce::String& label);
+                                                          const cydaw::base::File& renderedFile, const cydaw::base::Text& label);
     // Why an edit of that kind cannot apply to a clip (made of events, warp
     // markers or several takes playing for a cut), or empty.
-    [[nodiscard]] juce::String audioClipEditProblem(std::size_t index, std::uint64_t clipId,
+    [[nodiscard]] cydaw::base::Text audioClipEditProblem(std::size_t index, std::uint64_t clipId,
                                                     AudioEditOperation operation) const;
     // A clip's source (its active take's file) replaced by a destructive
     // edit's result: it keeps playing what it played around the edit (a cut
     // shortens it, an insert lengthens it); its history (versions) gets the
     // new one, named `label`. One arrangement undo step.
     [[nodiscard]] cydaw::base::Result commitAudioClipSourceEdit(
-        std::size_t index, std::uint64_t clipId, const juce::File& renderedFile, const juce::String& label,
+        std::size_t index, std::uint64_t clipId, const cydaw::base::File& renderedFile, const cydaw::base::Text& label,
         AudioEditOperation operation, double selectionStartSeconds, double selectionSeconds);
     // A clip back to one of its versions (one undo step).
     [[nodiscard]] bool setAudioClipVersion(std::size_t index, std::uint64_t clipId, std::size_t version);
@@ -1528,7 +1530,7 @@ public:
     [[nodiscard]] bool canUndoTrackAudioEdit(std::size_t index) const noexcept;
     [[nodiscard]] bool canRedoTrackAudioEdit(std::size_t index) const noexcept;
     [[nodiscard]] cydaw::base::Result setTrackPlugin(std::size_t index,
-                                              const juce::File& pluginFile,
+                                              const cydaw::base::File& pluginFile,
                                               std::size_t* pluginIndex = nullptr);
     cydaw::base::Result reloadTrackPlugin(std::size_t track, std::size_t plugin);
     void clearTrackPlugin(std::size_t index, std::size_t pluginIndex);
@@ -1559,7 +1561,7 @@ public:
                                                        float normalisedValue);
     // A hosted plug-in's own programs, and choosing one.
     [[nodiscard]] cydaw::base::Result getTrackPluginPrograms(std::size_t index, std::size_t pluginIndex,
-                                                      juce::StringArray& names, int& current);
+                                                      cydaw::base::TextList& names, int& current);
     [[nodiscard]] cydaw::base::Result setTrackPluginProgram(std::size_t index, std::size_t pluginIndex, int program);
 
     [[nodiscard]] std::uint64_t addMidiNote(int noteNumber,
@@ -1574,7 +1576,7 @@ public:
     [[nodiscard]] bool removeMidiNote(std::uint64_t id);
     void clearMidiNotes();
     [[nodiscard]] std::vector<MidiNote> midiNotes() const;
-    [[nodiscard]] std::uint64_t addMidiTrack(juce::String name = {});
+    [[nodiscard]] std::uint64_t addMidiTrack(cydaw::base::Text name = {});
     [[nodiscard]] bool moveMidiTrack(std::size_t fromIndex,
                                      std::size_t toIndex);
     [[nodiscard]] bool removeMidiTrack(std::uint64_t trackId);
@@ -1583,7 +1585,7 @@ public:
     // `launcherScene`: the launcher's slot it goes in, -1 for the
     // arrangement (then at `startBeats`).
     [[nodiscard]] std::uint64_t addMidiClip(std::uint64_t trackId,
-                                            juce::String name,
+                                            cydaw::base::Text name,
                                             double startBeats = 0.0,
                                             double lengthBeats = 16.0,
                                             bool looping = false,
@@ -1600,7 +1602,7 @@ public:
     // Its name and colour; an empty name or a zero colour leaves that one.
     [[nodiscard]] bool setMidiClipPresentation(std::uint64_t trackId,
                                                std::uint64_t clipId,
-                                               juce::String name,
+                                               cydaw::base::Text name,
                                                std::uint32_t colour);
     [[nodiscard]] bool setMidiClipLooping(std::uint64_t trackId,
                                           std::uint64_t clipId,
@@ -1642,13 +1644,13 @@ public:
         std::uint64_t clipId,
         std::vector<MidiNote> notes);
     [[nodiscard]] cydaw::base::Result importMidiFile(
-        const juce::File& file,
+        const cydaw::base::File& file,
         MidiFileImportSummary& summary,
         bool adoptFileTempo = true);
     [[nodiscard]] cydaw::base::Result exportMidiClipToFile(
         std::uint64_t trackId,
         std::uint64_t clipId,
-        const juce::File& file) const;
+        const cydaw::base::File& file) const;
     [[nodiscard]] std::vector<MidiNote> midiNotes(std::uint64_t trackId,
                                                   std::uint64_t clipId) const;
     [[nodiscard]] bool beginMidiEdit(std::uint64_t trackId,
@@ -1710,7 +1712,7 @@ public:
                                          bool armed) noexcept;
     // The name the launcher, the mixer and the project show for the track.
     [[nodiscard]] bool setMidiTrackName(std::uint64_t trackId,
-                                        juce::String name);
+                                        cydaw::base::Text name);
     [[nodiscard]] cydaw::base::Result setMidiTrackInstrumentGraph(
         std::uint64_t trackId,
         const cydaw::engine::PolySynthGraphPlan& graph);
@@ -1796,16 +1798,16 @@ public:
     // identifier; none: nothing.
     static constexpr const char* allMidiInputs = "*";
     static constexpr const char* computerKeyboardInput = "keyboard";
-    void setMidiTrackInputs(std::uint64_t trackId, std::vector<juce::String> inputs);
-    [[nodiscard]] std::vector<juce::String> midiTrackInputs(std::uint64_t trackId) const;
+    void setMidiTrackInputs(std::uint64_t trackId, std::vector<cydaw::base::Text> inputs);
+    [[nodiscard]] std::vector<cydaw::base::Text> midiTrackInputs(std::uint64_t trackId) const;
     // Its notes (after its MIDI effects) also sent to a MIDI output: a
     // device's identifier, empty for none.
-    void setMidiTrackOutput(std::uint64_t trackId, const juce::String& identifier);
-    [[nodiscard]] juce::String midiTrackOutput(std::uint64_t trackId) const;
+    void setMidiTrackOutput(std::uint64_t trackId, const cydaw::base::Text& identifier);
+    [[nodiscard]] cydaw::base::Text midiTrackOutput(std::uint64_t trackId) const;
     // The computer's keys: on the live track when it hears them.
     void computerKeyboardNote(int note, float velocity, bool on);
     // ---- Activity, for the lights: counters that move with each message ----
-    [[nodiscard]] std::uint32_t midiInputActivity(const juce::String& identifier) const noexcept;
+    [[nodiscard]] std::uint32_t midiInputActivity(const cydaw::base::Text& identifier) const noexcept;
     [[nodiscard]] std::uint32_t computerKeyboardActivity() const noexcept;
     [[nodiscard]] std::uint32_t midiInActivity() const noexcept;
     [[nodiscard]] std::uint32_t midiOutActivity() const noexcept;
@@ -1827,7 +1829,7 @@ public:
     // Which messages of the MIDI inputs reach the instruments: the
     // controllers keep those they map, and a device set to control only.
     // Called on the MIDI thread; null lets everything through.
-    using MidiInputGate = std::function<bool(const juce::String& identifier, const juce::MidiMessage& message)>;
+    using MidiInputGate = std::function<bool(const cydaw::base::Text& identifier, const juce::MidiMessage& message)>;
     void setMidiInputGate(MidiInputGate gate);
     // The track the keyboard and the MIDI input play now.
     [[nodiscard]] std::uint64_t midiInputTrackId() const noexcept;
@@ -1886,7 +1888,7 @@ public:
     [[nodiscard]] std::uint64_t addPluginAutomationPoint(std::size_t trackIndex,
                                                           std::size_t pluginIndex,
                                                           std::uint32_t parameterIndex,
-                                                          juce::String parameterName,
+                                                          cydaw::base::Text parameterName,
                                                           double timeSeconds,
                                                           float normalisedValue);
     [[nodiscard]] bool updatePluginAutomationPoint(std::size_t trackIndex,
@@ -1909,7 +1911,7 @@ public:
     void replacePluginAutomationPoints(std::size_t trackIndex,
                                        std::size_t pluginIndex,
                                        std::uint32_t parameterIndex,
-                                       juce::String parameterName,
+                                       cydaw::base::Text parameterName,
                                        std::vector<PluginAutomationPoint> points);
     [[nodiscard]] std::vector<PluginAutomationPoint> pluginAutomationPoints(
         std::size_t trackIndex,
@@ -1919,14 +1921,14 @@ public:
         std::size_t trackIndex) const;
     [[nodiscard]] bool setLauncherClip(std::size_t trackIndex,
                                        int sceneIndex,
-                                       juce::String name,
+                                       cydaw::base::Text name,
                                        double sourceOffsetSeconds,
                                        double durationSeconds,
                                        bool looping = true,
                                        std::uint32_t colour = 0xff4fd3ae,
-                                       const juce::File& sourceFile = {});
+                                       const cydaw::base::File& sourceFile = {});
     [[nodiscard]] bool createEmptyLauncherClip(
-        std::size_t trackIndex, int sceneIndex, juce::String name,
+        std::size_t trackIndex, int sceneIndex, cydaw::base::Text name,
         double durationSeconds = 4.0,
         std::uint32_t colour = 0xff4fd3ae);
     [[nodiscard]] std::optional<LauncherClip> launcherClip(
@@ -1937,7 +1939,7 @@ public:
         double loopStartSeconds, double loopEndSeconds, bool looping);
     [[nodiscard]] cydaw::base::Result addLauncherClipEventFromFile(
         std::size_t trackIndex, int sceneIndex,
-        const juce::File& sourceFile, double localStartSeconds,
+        const cydaw::base::File& sourceFile, double localStartSeconds,
         std::uint64_t* newEventId = nullptr);
     [[nodiscard]] cydaw::base::Result replaceLauncherClipEvents(
         std::size_t trackIndex, int sceneIndex,
@@ -1984,7 +1986,7 @@ public:
     // A launcher clip's automation lanes (LauncherClip::lanes).
     [[nodiscard]] bool setLauncherClipLanes(
         std::size_t trackIndex, int sceneIndex,
-        std::map<juce::String, std::vector<AutomationPoint>> lanes);
+        std::map<cydaw::base::Text, std::vector<AutomationPoint>> lanes);
     [[nodiscard]] bool transferLauncherClip(
         std::size_t sourceTrackIndex, int sourceSceneIndex,
         std::size_t targetTrackIndex, int targetSceneIndex,
@@ -2019,19 +2021,19 @@ public:
     [[nodiscard]] bool launcherUsesDoubleDeckReadAhead(
         std::size_t trackIndex) const noexcept;
     [[nodiscard]] static cydaw::base::Result selfTestDoubleDeckLauncher(
-        const juce::File& sourceFile,
-        const juce::File& alternateSourceFile = {});
+        const cydaw::base::File& sourceFile,
+        const cydaw::base::File& alternateSourceFile = {});
     [[nodiscard]] static cydaw::base::Result selfTestLauncherTimeline(
-        const juce::File& eventSourceFile);
+        const cydaw::base::File& eventSourceFile);
     [[nodiscard]] static cydaw::base::Result selfTestMidiLauncherClip();
     [[nodiscard]] static cydaw::base::Result selfTestMulticlipArrangement(
-        const juce::File& sourceFile,
-        const juce::File& alternateSourceFile = {});
+        const cydaw::base::File& sourceFile,
+        const cydaw::base::File& alternateSourceFile = {});
     [[nodiscard]] static cydaw::base::Result selfTestAudioTakeRendering(
-        const juce::File& firstTake,
-        const juce::File& secondTake);
+        const cydaw::base::File& firstTake,
+        const cydaw::base::File& secondTake);
     [[nodiscard]] static cydaw::base::Result selfTestStretchRendering(
-        const juce::File& sourceFile);
+        const cydaw::base::File& sourceFile);
     [[nodiscard]] static cydaw::base::Result selfTestPolySynthGraph();
     // Per-note expressions: a pitch curve moves its note alone, a gain
     // curve its level, copies keep them.
@@ -2066,7 +2068,7 @@ public:
     [[nodiscard]] bool hasExplicitLoopRange() const noexcept;
 
     [[nodiscard]] cydaw::base::Result startRecording(
-        const juce::File& destination,
+        const cydaw::base::File& destination,
         double startDelaySeconds = 0.0);
     void scheduleRecordingStop(double delaySeconds);
     void stopRecording();
@@ -2076,13 +2078,13 @@ public:
     [[nodiscard]] bool recordingStopPending() const noexcept;
     [[nodiscard]] bool recordingComplete() const noexcept;
     [[nodiscard]] cydaw::base::Result commitRecordedTake(
-        const juce::File& recordedFile,
+        const cydaw::base::File& recordedFile,
         std::optional<std::size_t> targetTrack,
         double startSeconds,
         RecordedTakeResult& result,
         std::optional<std::uint64_t> targetClipId = std::nullopt);
 
-    [[nodiscard]] cydaw::base::Result startMasterExport(const juce::File& destination);
+    [[nodiscard]] cydaw::base::Result startMasterExport(const cydaw::base::File& destination);
     [[nodiscard]] cydaw::base::Result finishMasterExport();
     void cancelMasterExport();
     [[nodiscard]] bool isMasterExporting() const noexcept;
@@ -2098,7 +2100,7 @@ public:
     [[nodiscard]] bool isPlaying() const noexcept;
     [[nodiscard]] double position() const noexcept;
     [[nodiscard]] double length() const noexcept;
-    [[nodiscard]] juce::String audioDeviceDescription();
+    [[nodiscard]] cydaw::base::Text audioDeviceDescription();
     [[nodiscard]] int droppedRecordingBlocks() const noexcept;
     [[nodiscard]] int mixLatencySamples() const noexcept;
     // What a track's own devices make it late by (look-aheads, oversamplers,
@@ -2109,7 +2111,7 @@ public:
     [[nodiscard]] int midiTrackCompensationSamples(std::uint64_t trackId) const noexcept;
 
     [[nodiscard]] juce::AudioDeviceManager& deviceManager() noexcept;
-    [[nodiscard]] juce::AudioFormatManager& formatManager() noexcept;
+    [[nodiscard]] cydaw::audio::AudioFormatManager& formatManager() noexcept;
     [[nodiscard]] juce::MidiKeyboardState& keyboardState() noexcept;
 
     // ---- Routing between tracks -----------------------------------------------
@@ -2182,7 +2184,7 @@ public:
     enum class SimulationSideSource : int { same, silence, kick };
     void setSimulationSideSource(SimulationSideSource source) noexcept;
     // An audio file looped as the source (read whole, up to five minutes).
-    cydaw::base::Result setSimulationSample(const juce::File& file);
+    cydaw::base::Result setSimulationSample(const cydaw::base::File& file);
     // Notes looped over lengthBeats at the session tempo; empty for none.
     void setSimulationPattern(std::vector<SimulationNote> notes, double lengthBeats);
     void simulationNoteOn(int noteNumber, float velocity);
@@ -2231,13 +2233,13 @@ private:
         std::uint64_t trackId {};
         bool all { true };
         bool keyboard { true };
-        std::vector<juce::String> devices;
+        std::vector<cydaw::base::Text> devices;
     };
     struct MidiSourceSlot {
         std::atomic<std::uint64_t> key {};
         std::atomic<std::uint32_t> count {};
     };
-    void countMidiSource(const juce::String& identifier) noexcept;
+    void countMidiSource(const cydaw::base::Text& identifier) noexcept;
     void publishMidiOutputs();
     struct MidiEditState {
         std::uint64_t trackId {};
@@ -2333,7 +2335,7 @@ private:
                                             double delaySeconds);
 
     cydaw::integration::DeviceManager deviceManager_;
-    juce::AudioFormatManager formatManager_;
+    cydaw::audio::AudioFormatManager formatManager_;
     juce::TimeSliceThread readAheadThread_ { "CyDAW audio read-ahead" };
     TrackMixer mixerSource_;
     MasterOutputAudioSource masterOutput_ { mixerSource_ };
@@ -2381,12 +2383,12 @@ private:
     std::atomic<float> masterGainDb_ {};
     std::atomic<bool> masterMuted_ {};
     juce::AudioTransportSource samplePreviewTransport_;
-    std::unique_ptr<juce::AudioFormatReaderSource> samplePreviewReader_;
+    std::unique_ptr<juce::PositionableAudioSource> samplePreviewReader_;
     std::atomic<float> samplePreviewGainDb_ { -3.0f };
     LoopAuditionSource loopAudition_ { samplePreviewGainDb_ };
     // The loop auditioned at the tempo, made again when the tempo moves.
     struct TempoPreview {
-        juce::File file;
+        cydaw::base::File file;
         SamplePreviewTempo tempo;
         int beats {};
         double sourceSeconds {};
@@ -2394,7 +2396,7 @@ private:
         std::shared_ptr<const LoopAuditionSource::Loop> loop;
         juce::uint32 checked {};
     } tempoPreview_;
-    [[nodiscard]] cydaw::base::Result startTempoPreview(const juce::File& file, double startSeconds, const SamplePreviewTempo& tempo);
+    [[nodiscard]] cydaw::base::Result startTempoPreview(const cydaw::base::File& file, double startSeconds, const SamplePreviewTempo& tempo);
     std::unique_ptr<PlaybackTrack> clipPreviewTrack_;
     juce::MixerAudioSource auditionMixer_;
     VirtualBusRouter virtualBusRouter_ { auditionMixer_ };
@@ -2457,7 +2459,7 @@ private:
     std::atomic<bool> arrangementPlaybackEnabled_ { true };
     std::atomic<int> mixLatencySamples_ {};
     cydaw::engine::NativeDspGraph defaultNativeDspGraph_;
-    juce::File masterExportDestination_;
+    cydaw::base::File masterExportDestination_;
     bool masterExportPreviousLooping_ {};
 };
 

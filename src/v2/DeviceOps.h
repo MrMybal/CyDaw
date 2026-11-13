@@ -14,7 +14,7 @@
 namespace cydaw::v2::device_ops {
 
 // A card's knob by its key: the binding without "node.<id>.".
-[[nodiscard]] juce::String parameterKeyOf(const juce::String& binding, std::uint64_t nodeId);
+[[nodiscard]] cydaw::base::Text parameterKeyOf(const cydaw::base::Text& binding, std::uint64_t nodeId);
 
 // A card's settings as a preset holds them (its knobs by key, a sampler's
 // map, a model card's model, a wavetable's table, Prisme's tables, a
@@ -23,17 +23,17 @@ namespace cydaw::v2::device_ops {
 
 // A preset put back on a card: its assets, then its knobs. A Batterie's kit
 // changes through `setBatterieKit` (none: a preset of another kit fails).
-bool applyPreset(app::NodeGraphComponent& graph, std::uint64_t nodeId, const cydaw::base::Value& state, juce::String& error,
-                 const std::function<bool(int kit, juce::String& error)>& setBatterieKit);
+bool applyPreset(app::NodeGraphComponent& graph, std::uint64_t nodeId, const cydaw::base::Value& state, cydaw::base::Text& error,
+                 const std::function<bool(int kit, cydaw::base::Text& error)>& setBatterieKit);
 
 // A sound file made the table of a Prisme card's oscillator (0 A, 1 B);
 // back to the factory table its setting names.
-bool importPrismTable(app::NodeGraphComponent& graph, std::uint64_t nodeId, int oscillator, const juce::File& file,
-                      juce::String& error);
+bool importPrismTable(app::NodeGraphComponent& graph, std::uint64_t nodeId, int oscillator, const cydaw::base::File& file,
+                      cydaw::base::Text& error);
 bool clearPrismTable(app::NodeGraphComponent& graph, std::uint64_t nodeId, int oscillator);
 
 // A cabinet's (two seconds) or a place's (Empreinte, eight seconds)
 // response read from a sound file, its silences trimmed.
-bool loadImpulse(app::NodeGraphComponent& graph, std::uint64_t nodeId, const juce::File& file, juce::String& error);
+bool loadImpulse(app::NodeGraphComponent& graph, std::uint64_t nodeId, const cydaw::base::File& file, cydaw::base::Text& error);
 
 } // namespace cydaw::v2::device_ops

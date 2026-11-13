@@ -26,12 +26,12 @@ using engine::foundry::Sound;
 
 namespace {
 
-double now() { return juce::Time::getMillisecondCounterHiRes() * 0.001; }
+double now() { return cydaw::base::Time::getMillisecondCounterHiRes() * 0.001; }
 
 // A button's label: its icon, then its words.
-juce::String withIcon(const char* glyph, const char* words)
+cydaw::base::Text withIcon(const char* glyph, const char* words)
 {
-    return juce::String::fromUTF8(glyph) + "  " + juce::String::fromUTF8(words);
+    return cydaw::base::Text::fromUTF8(glyph) + "  " + cydaw::base::Text::fromUTF8(words);
 }
 
 // The before / after buttons: hear one, the other, switch, stop.
@@ -56,12 +56,12 @@ Listen drawListenButtons(const bool afterReady, const char* compareTip)
     return pressed;
 }
 
-juce::String secondsText(const double seconds)
+cydaw::base::Text secondsText(const double seconds)
 {
     if (seconds < 60.0)
-        return juce::String(seconds, 2) + " s";
+        return cydaw::base::Text(seconds, 2) + " s";
     const auto minutes = static_cast<int>(seconds / 60.0);
-    return juce::String(minutes) + " min " + juce::String(seconds - minutes * 60.0, 1) + " s";
+    return cydaw::base::Text(minutes) + " min " + cydaw::base::Text(seconds - minutes * 60.0, 1) + " s";
 }
 
 // A sound's waves over a box, `total` frames across its width.
@@ -149,7 +149,7 @@ AudioTrial::~AudioTrial()
     }
 }
 
-void AudioTrial::setSound(engine::repair::Channels channels, const double rate, const juce::String& name)
+void AudioTrial::setSound(engine::repair::Channels channels, const double rate, const cydaw::base::Text& name)
 {
     source_ = std::move(channels);
     rate_ = rate;
@@ -554,8 +554,8 @@ void MidiTrial::drawBeforeAfter(const float width)
         ImGui::TextColored(theme::vec(p.record), "%s", result_.error.isNotEmpty() ? result_.error.toRawUTF8() : L("Le script ne tourne pas.", "The script does not run."));
     } else {
         ImGui::TextColored(theme::vec(p.textDim), "%s",
-                           (ui::Ls("Avant : ", "Before: ") + juce::String(static_cast<int>(before_.size())) + ui::Ls(" notes · après : ", " notes · after: ")
-                            + juce::String(static_cast<int>(result_.notes.size())) + " notes")
+                           (ui::Ls("Avant : ", "Before: ") + cydaw::base::Text(static_cast<int>(before_.size())) + ui::Ls(" notes · après : ", " notes · after: ")
+                            + cydaw::base::Text(static_cast<int>(result_.notes.size())) + " notes")
                                .toRawUTF8());
     }
     // A common range: beats across, pitches up.
@@ -669,9 +669,9 @@ void ProcessingView::edited()
         midiTrial_.processingChanged(edited_);
 }
 
-juce::String ProcessingView::unsaved() const
+cydaw::base::Text ProcessingView::unsaved() const
 {
-    return dirty_ ? edited_.name : juce::String();
+    return dirty_ ? edited_.name : cydaw::base::Text();
 }
 
 void ProcessingView::stopEverything()
@@ -685,8 +685,8 @@ void ProcessingView::saveEdited(const bool asNew)
     auto copy = edited_;
     copy.factory = false;
     auto file = copy.file;
-    if (asNew || edited_.factory || file == juce::File {})
-        file = proc::userFolder().getNonexistentChildFile(juce::File::createLegalFileName(copy.name.trim().isNotEmpty() ? copy.name : "Processing"),
+    if (asNew || edited_.factory || file == cydaw::base::File {})
+        file = proc::userFolder().getNonexistentChildFile(cydaw::base::File::createLegalFileName(copy.name.trim().isNotEmpty() ? copy.name : "Processing"),
                                                           proc::fileExtension, false);
     if (const auto saved = proc::save(copy, file); saved.failed()) {
         state_.status = saved.getErrorMessage();
@@ -709,7 +709,7 @@ void ProcessingView::saveEdited(const bool asNew)
 
 void ProcessingView::remove()
 {
-    if (edited_.factory || edited_.file == juce::File {})
+    if (edited_.factory || edited_.file == cydaw::base::File {})
         return;
     (void) edited_.file.moveToTrash();
     reload();
@@ -731,7 +731,7 @@ void ProcessingView::drawCode(std::vector<char>& buffer, const char* id, float h
 }
 
 namespace {
-void fill(std::vector<char>& buffer, const juce::String& text)
+void fill(std::vector<char>& buffer, const cydaw::base::Text& text)
 {
     const auto* utf8 = text.toRawUTF8();
     const auto length = std::strlen(utf8);
@@ -759,13 +759,13 @@ void ProcessingView::drawStep(proc::Step& step, const int index)
         drawCode(code_, "##stepCode", dp(260.0f));
         if (codeChanged_ && now() >= codeDueAt_) {
             codeChanged_ = false;
-            step.code = juce::String::fromUTF8(code_.data());
+            step.code = cydaw::base::Text::fromUTF8(code_.data());
             const auto info = proc::inspectJsfx(step.code);
             codeError_ = info.error;
             if (info.ok) {
-                std::map<juce::String, double> settings;
+                std::map<cydaw::base::Text, double> settings;
                 for (const auto& slider : info.sliders) {
-                    const auto key = "slider" + juce::String(slider.index + 1);
+                    const auto key = "slider" + cydaw::base::Text(slider.index + 1);
                     const auto it = step.settings.find(key);
                     settings[key] = it != step.settings.end() ? it->second : slider.defaultValue;
                 }
@@ -781,7 +781,7 @@ void ProcessingView::drawStep(proc::Step& step, const int index)
         std::vector<proc::Parameter> sliders;
         proc::Values values;
         for (const auto& slider : proc::inspectJsfx(step.code).sliders) {
-            const auto key = "slider" + juce::String(slider.index + 1);
+            const auto key = "slider" + cydaw::base::Text(slider.index + 1);
             const auto it = step.settings.find(key);
             const auto value = it != step.settings.end() ? it->second : slider.defaultValue;
             sliders.push_back({ key, slider.name, slider.minimum, slider.maximum, slider.step, value, slider.choices });
@@ -815,7 +815,7 @@ void ProcessingView::drawStep(proc::Step& step, const int index)
             // The knobs shown when it is applied start where they are turned now.
             for (const auto& knob : chain_->parameters(1))
                 for (const auto& published : step.published)
-                    if (published.binding == juce::String(knob.binding))
+                    if (published.binding == cydaw::base::Text(knob.binding))
                         step.settings[published.binding] = knob.value;
             edited();
         }
@@ -823,13 +823,13 @@ void ProcessingView::drawStep(proc::Step& step, const int index)
             for (const auto& knob : chain_->parameters(1)) {
                 if (knob.binding.empty())
                     continue;
-                const juce::String binding(knob.binding);
+                const cydaw::base::Text binding(knob.binding);
                 auto shown = std::any_of(step.published.begin(), step.published.end(), [&](const proc::Published& published) {
                     return published.binding == binding;
                 });
-                if (ImGui::Checkbox((juce::String(knob.label) + "##" + binding).toRawUTF8(), &shown)) {
+                if (ImGui::Checkbox((cydaw::base::Text(knob.label) + "##" + binding).toRawUTF8(), &shown)) {
                     if (shown) {
-                        step.published.push_back({ binding, juce::String(knob.label), knob.minimum, knob.maximum });
+                        step.published.push_back({ binding, cydaw::base::Text(knob.label), knob.minimum, knob.maximum });
                         step.settings[binding] = knob.value;
                     } else {
                         step.published.erase(std::remove_if(step.published.begin(), step.published.end(),
@@ -873,7 +873,7 @@ void ProcessingView::drawSteps(const float width)
             edited();
         ui::tooltip(L("Étape active", "Step on"));
         ImGui::SameLine();
-        if (ImGui::Selectable((juce::String(i + 1) + ". " + proc::nameOf(step.type)).toRawUTF8(), step_ == i, 0,
+        if (ImGui::Selectable((cydaw::base::Text(i + 1) + ". " + proc::nameOf(step.type)).toRawUTF8(), step_ == i, 0,
                               ImVec2(width - dp(110.0f), 0.0f)))
             step_ = i;
         ImGui::SameLine(width - dp(84.0f));
@@ -941,7 +941,7 @@ void ProcessingView::drawScript()
     drawCode(code_, "##noteScript", dp(300.0f));
     if (codeChanged_ && now() >= codeDueAt_) {
         codeChanged_ = false;
-        edited_.script = juce::String::fromUTF8(code_.data());
+        edited_.script = cydaw::base::Text::fromUTF8(code_.data());
         codeError_ = proc::checkNoteScript(edited_.script);
         edited();
     }
@@ -970,20 +970,20 @@ void ProcessingView::drawScript()
 
 void ProcessingView::chooseTestSound()
 {
-    chooser_ = std::make_unique<juce::FileChooser>(ui::Ls("Un son pour essayer le traitement", "A sound to try the processing on"), juce::File {},
+    chooser_ = std::make_unique<juce::FileChooser>(ui::Ls("Un son pour essayer le traitement", "A sound to try the processing on"), cydaw::base::File {},
                                                    "*.wav;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
     chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [this](const juce::FileChooser& chooser) {
         const auto file = chooser.getResult();
-        if (file == juce::File {})
+        if (file == cydaw::base::File {})
             return;
-        (void) dropFiles(juce::StringArray { file.getFullPathName() });
+        (void) dropFiles(cydaw::base::TextList { file.getFullPathName() });
     });
 }
 
-bool ProcessingView::dropFiles(const juce::StringArray& files)
+bool ProcessingView::dropFiles(const cydaw::base::TextList& files)
 {
     for (const auto& path : files) {
-        const juce::File file(path);
+        const cydaw::base::File file(path);
         engine::repair::Channels channels;
         double rate {};
         if (const auto read = proc::readAudioFile(file, channels, rate); read.wasOk()) {
@@ -1050,7 +1050,7 @@ void ProcessingView::drawTrial()
                 chooser_->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
                                       [this, channels, rate](const juce::FileChooser& chooser) {
                                           const auto file = chooser.getResult();
-                                          if (file == juce::File {})
+                                          if (file == cydaw::base::File {})
                                               return;
                                           (void) file.getParentDirectory().createDirectory();
                                           const auto written = proc::writeAudioFile(file.withFileExtension("wav"), channels, rate);
@@ -1072,7 +1072,7 @@ void ProcessingView::drawTrial()
     struct Choice {
         TrackRef track;
         std::uint64_t id {};
-        juce::String label;
+        cydaw::base::Text label;
     };
     std::vector<Choice> choices;
     for (const auto& track : studio_.tracks()) {
@@ -1081,9 +1081,9 @@ void ProcessingView::drawTrial()
         if (const auto* clips = studio_.engine().midiClipsView(track.midiId))
             for (const auto& item : *clips)
                 choices.push_back({ track, item.id,
-                                    studio_.trackName(track) + " \xc2\xb7 " + juce::String(item.name)
-                                        + (item.launcherScene >= 0 ? ui::Ls(" (lanceur ", " (launcher ") + juce::String(item.launcherScene + 1) + ")"
-                                                                   : juce::String()) });
+                                    studio_.trackName(track) + " \xc2\xb7 " + cydaw::base::Text(item.name)
+                                        + (item.launcherScene >= 0 ? ui::Ls(" (lanceur ", " (launcher ") + cydaw::base::Text(item.launcherScene + 1) + ")"
+                                                                   : cydaw::base::Text()) });
     }
     if (!midiTrial_.hasClip()) {
         if (clip)
@@ -1091,14 +1091,14 @@ void ProcessingView::drawTrial()
         else if (!choices.empty())
             midiTrial_.setClip(choices.front().track, choices.front().id);
     }
-    juce::String current = ui::Ls("Choisir un clip MIDI…", "Choose a MIDI clip…");
+    cydaw::base::Text current = ui::Ls("Choisir un clip MIDI…", "Choose a MIDI clip…");
     for (const auto& choice : choices)
         if (midiTrial_.hasClip() && midiTrial_.clipId() == choice.id)
             current = choice.label;
     ImGui::SetNextItemWidth(dp(360.0f));
     if (ImGui::BeginCombo("##trialClip", current.toRawUTF8())) {
         for (const auto& choice : choices)
-            if (ImGui::Selectable((choice.label + "##" + juce::String(static_cast<juce::int64>(choice.id))).toRawUTF8(),
+            if (ImGui::Selectable((choice.label + "##" + cydaw::base::Text(static_cast<juce::int64>(choice.id))).toRawUTF8(),
                                   midiTrial_.hasClip() && midiTrial_.clipId() == choice.id)) {
                 midiTrial_.setProcessing(edited_);
                 midiTrial_.setClip(choice.track, choice.id);
@@ -1192,7 +1192,7 @@ void ProcessingView::drawLibrary(const float width)
         auto copy = edited_;
         copy.name << ui::Ls(" (copie)", " (copy)");
         copy.factory = false;
-        copy.file = juce::File {};
+        copy.file = cydaw::base::File {};
         library_.push_back(copy);
         select(static_cast<int>(library_.size()) - 1);
         library_.pop_back();
@@ -1200,7 +1200,7 @@ void ProcessingView::drawLibrary(const float width)
         dirty_ = true;
     }
     ImGui::SameLine();
-    ImGui::BeginDisabled(edited_.factory || edited_.file == juce::File {});
+    ImGui::BeginDisabled(edited_.factory || edited_.file == cydaw::base::File {});
     if (ImGui::Button(L("Supprimer", "Delete")))
         ImGui::OpenPopup("##deleteProcessing");
     ImGui::EndDisabled();
@@ -1228,7 +1228,7 @@ void ProcessingView::drawEditor()
     ImGui::BeginChild("##processingEditor", ImVec2(0.0f, 0.0f), ImGuiChildFlags_Borders);
     ImGui::SetNextItemWidth(dp(320.0f));
     if (ImGui::InputText(L("Nom", "Name"), nameBuffer_, sizeof(nameBuffer_))) {
-        edited_.name = juce::String::fromUTF8(nameBuffer_);
+        edited_.name = cydaw::base::Text::fromUTF8(nameBuffer_);
         dirty_ = true;
     }
     ImGui::SameLine();
@@ -1243,7 +1243,7 @@ void ProcessingView::drawEditor()
     }
     ImGui::SetNextItemWidth(-1.0f);
     if (ImGui::InputText("##description", descriptionBuffer_, sizeof(descriptionBuffer_))) {
-        edited_.description = juce::String::fromUTF8(descriptionBuffer_);
+        edited_.description = cydaw::base::Text::fromUTF8(descriptionBuffer_);
         dirty_ = true;
     }
     ImGui::Spacing();
@@ -1369,7 +1369,7 @@ void ProcessingView::drawApply()
     if (ImGui::BeginCombo("##applyChoice", choice.name.toRawUTF8())) {
         for (int i = 0; i < static_cast<int>(applyChoices_.size()); ++i) {
             const auto& item = applyChoices_[static_cast<std::size_t>(i)];
-            if (ImGui::Selectable((item.name + (item.factory ? juce::String() : ui::Ls("  (les miens)", "  (mine)"))).toRawUTF8(), i == applyChoice_)) {
+            if (ImGui::Selectable((item.name + (item.factory ? cydaw::base::Text() : ui::Ls("  (les miens)", "  (mine)"))).toRawUTF8(), i == applyChoice_)) {
                 applyChoice_ = i;
                 if (midi)
                     applyMidi_.setProcessing(item);
@@ -1463,7 +1463,7 @@ cydaw::base::Value ProcessingView::command(const cydaw::base::Value& request)
                 select(i);
     }
     if (request.hasProperty("testFile"))
-        result->setProperty("loaded", dropFiles(juce::StringArray { request.getProperty("testFile", {}).toString() }));
+        result->setProperty("loaded", dropFiles(cydaw::base::TextList { request.getProperty("testFile", {}).toString() }));
     if (request.hasProperty("reload"))
         reload();
     result->setProperty("mode", state_.mode == AppMode::processing);

@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #include "MasterClipEditor.h"
 
 #include "Icons.h"
@@ -16,7 +17,7 @@ using ui::L;
 namespace {
 
 // A lane's value as read: "-6.0 dB", "1.20 kHz", "0.45".
-std::string valueText(const double value, const juce::String& unit)
+std::string valueText(const double value, const cydaw::base::Text& unit)
 {
     char text[48];
     if (unit == "Hz" && std::abs(value) >= 1'000.0)
@@ -55,19 +56,19 @@ void MasterClipEditor::draw(const int scene)
         // Another clip: its first lane with points, else the level.
         shownScene_ = scene;
         curve_.clearSelection();
-        lane_ = clip.lanes.empty() ? juce::String(Studio::masterGainLane) : clip.lanes.begin()->first;
+        lane_ = clip.lanes.empty() ? cydaw::base::Text(Studio::masterGainLane) : clip.lanes.begin()->first;
     }
     // A knob gone with its device: the level (always there) instead.
     auto chosen = std::find_if(choices.begin(), choices.end(), [this](const auto& choice) { return choice.binding == lane_; });
     if (chosen == choices.end())
         chosen = choices.begin();
     const auto& choice = *chosen;
-    const auto hasPoints = [&clip](const juce::String& binding) {
+    const auto hasPoints = [&clip](const cydaw::base::Text& binding) {
         const auto lane = clip.lanes.find(binding);
         return lane != clip.lanes.end() && !lane->second.empty();
     };
     const auto labelOf = [&](const Studio::MasterLaneChoice& lane) {
-        return hasPoints(lane.binding) ? juce::String::fromUTF8("\xe2\x97\x8f ") + lane.label : lane.label;
+        return hasPoints(lane.binding) ? cydaw::base::Text::fromUTF8("\xe2\x97\x8f ") + lane.label : lane.label;
     };
 
     // ---- Its toolbar: name, length, loop, launch; the lane, the grid.
@@ -83,7 +84,7 @@ void MasterClipEditor::draw(const int scene)
     std::snprintf(name, sizeof(name), "%s", clip.name.toRawUTF8());
     ImGui::SetNextItemWidth(dp(150.0f));
     if (ImGui::InputText("##masterClipName", name, sizeof(name), ImGuiInputTextFlags_EnterReturnsTrue)) {
-        clip.name = juce::String::fromUTF8(name);
+        clip.name = cydaw::base::Text::fromUTF8(name);
         changed = true;
     }
     ImGui::SameLine();
@@ -119,7 +120,7 @@ void MasterClipEditor::draw(const int scene)
             ImGui::SetKeyboardFocusHere();
         ImGui::SetNextItemWidth(-1.0f);
         ImGui::InputTextWithHint("##laneFilter", L("Chercher un réglage", "Find a setting"), filter_, sizeof(filter_));
-        const auto filter = juce::String::fromUTF8(filter_).trim();
+        const auto filter = cydaw::base::Text::fromUTF8(filter_).trim();
         for (const auto& lane : choices) {
             if (filter.isNotEmpty() && !lane.label.containsIgnoreCase(filter))
                 continue;
@@ -167,10 +168,10 @@ void MasterClipEditor::draw(const int scene)
     lane.colour = theme::fromArgb(clip.colour);
     lane.filled = true;
     const auto unit = choice.unit;
-    lane.formatValue = [unit](const double value) { return juce::String(valueText(value, unit)); };
+    lane.formatValue = [unit](const double value) { return cydaw::base::Text(valueText(value, unit)); };
     lane.formatTime = [beatsPerBar](const double beats) {
         const auto bar = std::floor(beats / beatsPerBar + 1.0e-9);
-        return juce::String(static_cast<int>(bar) + 1) + "." + juce::String(beats - bar * beatsPerBar + 1.0, 2);
+        return cydaw::base::Text(static_cast<int>(bar) + 1) + "." + cydaw::base::Text(beats - bar * beatsPerBar + 1.0, 2);
     };
     // The points with their ids (given to those that have none).
     auto points = std::vector<curves::Point> {};

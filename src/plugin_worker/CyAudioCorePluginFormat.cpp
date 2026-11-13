@@ -1,3 +1,5 @@
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #include "CyAudioCorePluginFormat.h"
 #include "HostedInstance.h"
 #include <cstring>
@@ -13,9 +15,9 @@
 namespace cydaw::plugins {
 namespace {
 using namespace cyaudio;
-std::filesystem::path nativePath(const juce::String &text) {
+std::filesystem::path nativePath(const cydaw::base::Text &text) {
 #if JUCE_WINDOWS
-  return std::filesystem::path(text.toWideCharPointer());
+  return std::filesystem::path(text.toWideString());
 #else
   return std::filesystem::u8path(text.toStdString());
 #endif
@@ -51,8 +53,8 @@ public:
   std::uint32_t requests = 0;
   CoreEditor *editor = nullptr;
   static constexpr std::size_t maximumEvents = 4096;
-  bool load(const juce::File &file, const juce::String &id,
-            juce::String &error) {
+  bool load(const cydaw::base::File &file, const cydaw::base::Text &id,
+            cydaw::base::Text &error) {
     auto r = createPluginProvider(PluginFormat::vst3, provider);
     PluginHostCallbacks host;
     host.context = this;
@@ -77,15 +79,15 @@ public:
       r = provider->create(nativePath(file.getFullPathName()), id.toStdString(),
                            host, plugin);
     if (r != Status::ok) {
-      error = "CyAudioCore VST3: status " + juce::String(int(r));
+      error = "CyAudioCore VST3: status " + cydaw::base::Text(int(r));
       return false;
     }
     const auto &d = *plugin.description();
-    description.name = juce::String::fromUTF8(d.plugin.name.c_str());
-    description.descriptiveName = juce::String::fromUTF8(d.plugin.id.c_str());
+    description.name = cydaw::base::Text::fromUTF8(d.plugin.name.c_str());
+    description.descriptiveName = cydaw::base::Text::fromUTF8(d.plugin.id.c_str());
     description.manufacturerName =
-        juce::String::fromUTF8(d.plugin.vendor.c_str());
-    description.version = juce::String::fromUTF8(d.plugin.version.c_str());
+        cydaw::base::Text::fromUTF8(d.plugin.vendor.c_str());
+    description.version = cydaw::base::Text::fromUTF8(d.plugin.version.c_str());
     description.pluginFormatName = "VST3";
     description.fileOrIdentifier = file.getFullPathName();
     description.uniqueId = description.descriptiveName.hashCode();
@@ -103,17 +105,17 @@ public:
     addPorts(int(in), int(out));
     for (const auto &p : d.parameters) {
       auto control = std::make_unique<HostedControl>(
-          juce::String(p.id), juce::String::fromUTF8(p.name.c_str()), p.minimum,
+          cydaw::base::Text(p.id), cydaw::base::Text::fromUTF8(p.name.c_str()), p.minimum,
           p.maximum, p.defaultValue);
-      control->unit = juce::String::fromUTF8(p.units.c_str());
+      control->unit = cydaw::base::Text::fromUTF8(p.units.c_str());
       control->automate = p.automatable && !p.readOnly;
       if (p.stepped && !p.normalized)
         control->steps = int(std::min(1000000., p.maximum - p.minimum + 1));
       control->display = [this, id = p.id](double value) {
         std::string text;
         return plugin.parameterText(id, value, text) == Status::ok
-                   ? juce::String::fromUTF8(text.c_str())
-                   : juce::String(value, 3);
+                   ? cydaw::base::Text::fromUTF8(text.c_str())
+                   : cydaw::base::Text(value, 3);
       };
       double value = p.defaultValue;
       if (plugin.parameterValue(p.id, value) == Status::ok)
@@ -137,8 +139,8 @@ public:
         for (const auto &p : d->parameters)
           if (p.id == c.info.id) {
             c.info = p;
-            c.value->name = juce::String::fromUTF8(p.name.c_str());
-            c.value->unit = juce::String::fromUTF8(p.units.c_str());
+            c.value->name = cydaw::base::Text::fromUTF8(p.name.c_str());
+            c.value->unit = cydaw::base::Text::fromUTF8(p.units.c_str());
             c.value->automate = p.automatable && !p.readOnly;
             break;
           }
@@ -447,8 +449,8 @@ public:
       return;
     for (const auto &d : list) {
       auto plugin = std::make_unique<CoreInstance>();
-      juce::String error;
-      if (plugin->load(juce::File(path), juce::String::fromUTF8(d.id.c_str()),
+      cydaw::base::Text error;
+      if (plugin->load(cydaw::base::File(path), cydaw::base::Text::fromUTF8(d.id.c_str()),
                        error)) {
         auto description = std::make_unique<juce::PluginDescription>();
         plugin->fillInPluginDescription(*description);
@@ -457,26 +459,26 @@ public:
     }
   }
   bool fileMightContainThisPluginType(const juce::String &path) override {
-    return juce::File(path).hasFileExtension("vst3");
+    return cydaw::base::File(path).hasFileExtension("vst3");
   }
   juce::String
   getNameOfPluginFromIdentifier(const juce::String &path) override {
-    return juce::File(path).getFileNameWithoutExtension();
+    return cydaw::base::File(path).getFileNameWithoutExtension();
   }
   bool pluginNeedsRescanning(const juce::PluginDescription &) override {
     return true;
   }
   bool doesPluginStillExist(const juce::PluginDescription &d) override {
-    return juce::File(d.fileOrIdentifier).exists();
+    return cydaw::base::File(d.fileOrIdentifier).exists();
   }
   bool canScanForPlugins() const override { return true; }
   bool isTrivialToScan() const override { return false; }
   juce::StringArray searchPathsForPlugins(const juce::FileSearchPath &paths,
                                           bool recursive, bool) override {
-    juce::StringArray list;
+    cydaw::base::TextList list;
     for (int i = 0; i < paths.getNumPaths(); ++i)
-      for (auto f : paths[i].findChildFiles(juce::File::findDirectories |
-                                                juce::File::findFiles,
+      for (auto f : paths[i].findChildFiles(cydaw::base::File::findDirectories |
+                                                cydaw::base::File::findFiles,
                                             recursive, "*.vst3"))
         list.add(f.getFullPathName());
     return list;
@@ -488,9 +490,9 @@ public:
   }
   void createPluginInstance(const juce::PluginDescription &d, double, int,
                             PluginCreationCallback cb) override {
-    juce::String error;
+    cydaw::base::Text error;
     auto plugin = std::make_unique<CoreInstance>();
-    if (!plugin->load(juce::File(d.fileOrIdentifier), d.descriptiveName, error))
+    if (!plugin->load(cydaw::base::File(d.fileOrIdentifier), d.descriptiveName, error))
       plugin.reset();
     cb(std::move(plugin), error);
   }

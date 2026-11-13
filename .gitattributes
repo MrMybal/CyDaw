@@ -9,3 +9,5 @@ third_party/asio-sdk/** -text -whitespace
 third_party/portaudio-asio/** -text -whitespace
 
 third_party/nlohmann/** -text -whitespace
+
+third_party/pugixml/** -text -whitespace

@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #include "ProjectImport.h"
 #include "ProjectImportShared.h"
@@ -66,12 +67,12 @@ constexpr int patternBase = 20'480;
 struct Channel {
     int index {};
     int type {};
-    juce::String name;
-    juce::String internalName;
-    juce::String samplePath;
-    juce::String pluginName;
-    juce::String pluginVendor;
-    juce::String pluginPath;
+    cydaw::base::Text name;
+    cydaw::base::Text internalName;
+    cydaw::base::Text samplePath;
+    cydaw::base::Text pluginName;
+    cydaw::base::Text pluginVendor;
+    cydaw::base::Text pluginPath;
     float gainDb {};
     float pan {};
 };
@@ -85,7 +86,7 @@ struct Note {
 };
 
 struct Pattern {
-    juce::String name;
+    cydaw::base::Text name;
     juce::uint32 colour {};
     std::vector<Note> notes;
 };
@@ -101,7 +102,7 @@ struct Item {
 
 struct Arrangement {
     int index {};
-    juce::String name;
+    cydaw::base::Text name;
     std::vector<Item> items;
 };
 
@@ -126,12 +127,12 @@ float readF32(const juce::uint8* at)
 
 // FL 11.5 and later write their text in UTF-16 (little-endian), earlier
 // ones in single bytes; told apart by the zero bytes.
-juce::String textOf(const juce::uint8* data, const std::size_t size)
+cydaw::base::Text textOf(const juce::uint8* data, const std::size_t size)
 {
     auto zeros = 0;
     for (std::size_t index = 1; index < size; index += 2)
         zeros += data[index] == 0 ? 1 : 0;
-    juce::String text;
+    cydaw::base::Text text;
     if (size >= 2 && zeros * 2 >= static_cast<int>(size / 2)) {
         std::vector<juce::juce_wchar> characters;
         for (std::size_t index = 0; index + 1 < size; index += 2) {
@@ -141,21 +142,21 @@ juce::String textOf(const juce::uint8* data, const std::size_t size)
             characters.push_back(unit);
         }
         characters.push_back(0);
-        text = juce::String(juce::CharPointer_UTF32(reinterpret_cast<const juce::CharPointer_UTF32::CharType*>(characters.data())));
+        text = cydaw::base::Text(reinterpret_cast<const char32_t*>(characters.data()));
     } else {
-        text = juce::String::fromUTF8(reinterpret_cast<const char*>(data), static_cast<int>(size));
+        text = cydaw::base::Text::fromUTF8(reinterpret_cast<const char*>(data), static_cast<int>(size));
     }
-    // (A juce::String ends at its first zero: the terminator goes with it.)
+    // (A cydaw::base::Text ends at its first zero: the terminator goes with it.)
     return text.trim();
 }
 
 class FlStudioReader {
 public:
-    FlStudioReader(const juce::File& file, ImportedProject& out) : file_(file), out_(out), folder_(file.getParentDirectory()) {}
+    FlStudioReader(const cydaw::base::File& file, ImportedProject& out) : file_(file), out_(out), folder_(file.getParentDirectory()) {}
 
     cydaw::base::Result read()
     {
-        juce::MemoryBlock bytes;
+        cydaw::base::MemoryBlock bytes;
         if (!file_.loadFileAsData(bytes))
             return cydaw::base::Result::fail("The file could not be opened: " + file_.getFullPathName());
         const auto* data = static_cast<const juce::uint8*>(bytes.getData());
@@ -334,7 +335,7 @@ private:
             at += 12;
             if (at + length > size)
                 break;
-            const auto text = juce::String::fromUTF8(reinterpret_cast<const char*>(data + at), static_cast<int>(length)).trim();
+            const auto text = cydaw::base::Text::fromUTF8(reinterpret_cast<const char*>(data + at), static_cast<int>(length)).trim();
             if (record == 54)
                 channel.pluginName = text;
             else if (record == 55)
@@ -382,7 +383,7 @@ private:
     }
 
     // FL's own instruments: what CyDAW reads them as (ImportedInstruments).
-    static ImportedDevice deviceOf(const Channel& channel, const juce::File& sample)
+    static ImportedDevice deviceOf(const Channel& channel, const cydaw::base::File& sample)
     {
         ImportedDevice device;
         device.instrument = true;
@@ -393,7 +394,7 @@ private:
             device.format = channel.pluginPath.endsWithIgnoreCase(".vst3") ? "VST3" : "VST2";
             return device;
         }
-        device.type = channel.internalName.isNotEmpty() ? channel.internalName : juce::String("Sampler");
+        device.type = channel.internalName.isNotEmpty() ? channel.internalName : cydaw::base::Text("Sampler");
         device.name = device.type;
         device.sample = sample;
         return device;
@@ -423,7 +424,7 @@ private:
             auto [found, made] = tracks.try_emplace(index);
             if (made) {
                 const auto& channel = channels_[index];
-                found->second.name = channel.name.isNotEmpty() ? channel.name : juce::String("Channel ") + juce::String(index + 1);
+                found->second.name = channel.name.isNotEmpty() ? channel.name : cydaw::base::Text("Channel ") + cydaw::base::Text(index + 1);
                 found->second.gainDb = channel.gainDb;
                 found->second.pan = channel.pan;
             }
@@ -444,7 +445,7 @@ private:
                     auto& track = trackOf(channelIndex);
                     track.midi = true;
                     ImportedMidiClip clip;
-                    clip.name = pattern.name.isNotEmpty() ? pattern.name : juce::String("Pattern ") + juce::String(item.pattern);
+                    clip.name = pattern.name.isNotEmpty() ? pattern.name : cydaw::base::Text("Pattern ") + cydaw::base::Text(item.pattern);
                     clip.startBeats = beats(item.position);
                     clip.lengthBeats = std::max(0.25, beats(item.length));
                     clip.colour = pattern.colour;
@@ -485,7 +486,7 @@ private:
         for (auto& [index, track] : tracks) {
             const auto& channel = channels_[index];
             if (track.midi) {
-                const auto sample = channel.samplePath.isNotEmpty() ? audioFile(folder_, channel.samplePath, out_) : juce::File();
+                const auto sample = channel.samplePath.isNotEmpty() ? audioFile(folder_, channel.samplePath, out_) : cydaw::base::File();
                 auto device = deviceOf(channel, sample);
                 track.devices.add(device.name);
                 track.hadInstrument = true;
@@ -494,17 +495,17 @@ private:
             out_.tracks.push_back(std::move(track));
         }
         if (channels_.size() > tracks.size())
-            out_.warnings.add(juce::String(static_cast<int>(channels_.size() - tracks.size()))
+            out_.warnings.add(cydaw::base::Text(static_cast<int>(channels_.size() - tracks.size()))
                               + " channel(s) not played on the playlist were left out.");
         out_.warnings.add("The mixer's inserts and their effects were left out (FL routes channels to inserts).");
     }
 
-    juce::File file_;
+    cydaw::base::File file_;
     ImportedProject& out_;
-    juce::File folder_;
+    cydaw::base::File folder_;
     int ppq_ { 96 };
     bool fineTempo_ {};
-    juce::String version_;
+    cydaw::base::Text version_;
     Context context_ { Context::project };
     int channel_ {};
     int pattern_ {};
@@ -516,7 +517,7 @@ private:
 
 } // namespace
 
-cydaw::base::Result importFlStudioProject(const juce::File& file, ImportedProject& out)
+cydaw::base::Result importFlStudioProject(const cydaw::base::File& file, ImportedProject& out)
 {
     out.source = file;
     FlStudioReader reader(file, out);

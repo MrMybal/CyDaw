@@ -1,0 +1,11 @@
+{
+  "source": "https://github.com/zeux/pugixml",
+  "tag": "v1.15",
+  "license": "MIT",
+  "files": {
+    "LICENSE.md": "0d0b3772af2fa45628a548a3b34583707ebcc68bb6f83ec48ca273aab4a510f1",
+    "pugiconfig.hpp": "981cd9ad3313878817d7b548c9929cc09d3bc42be2c0c1dcb0d77290fc98b92d",
+    "pugixml.cpp": "67c3892efba51d4e4eb6ce5609286fd2703aede6ba49a6d2130068cad09e0744",
+    "pugixml.hpp": "2555f950fd080e02ff16f36698ddf8d4a46d3a484b9337b4cbfc6300043be734"
+  }
+}

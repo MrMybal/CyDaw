@@ -1,3 +1,4 @@
+#include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/File.h>
 #include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "SemanticSearch.h"
@@ -36,11 +37,11 @@ constexpr float wordsLift = 0.08f;
 // The model let go after this long unused.
 constexpr double idleSeconds = 600.0;
 
-juce::AudioFormatManager& formats()
+cydaw::audio::AudioFormatManager& formats()
 {
-    thread_local std::unique_ptr<juce::AudioFormatManager> manager;
+    thread_local std::unique_ptr<cydaw::audio::AudioFormatManager> manager;
     if (manager == nullptr) {
-        manager = std::make_unique<juce::AudioFormatManager>();
+        manager = std::make_unique<cydaw::audio::AudioFormatManager>();
         cydaw::integration::registerCyAudioCoreReaders(*manager);
     }
     return *manager;
@@ -130,9 +131,9 @@ std::vector<float> floatsOf(const cydaw::base::Value& value)
 
 // A sound's windows, mono at the model's rate: the whole of a short one, a
 // few spread over a long one.
-bool decodeWindows(const juce::File& file, const double rate, const double windowSeconds, std::vector<std::vector<float>>& out)
+bool decodeWindows(const cydaw::base::File& file, const double rate, const double windowSeconds, std::vector<std::vector<float>>& out)
 {
-    std::unique_ptr<juce::AudioFormatReader> reader(formats().createReaderFor(file));
+    std::unique_ptr<cydaw::audio::AudioFormatReader> reader(formats().createReaderFor(file));
     if (reader == nullptr || reader->sampleRate <= 0.0 || reader->lengthInSamples <= 0)
         return false;
     const auto sourceRate = reader->sampleRate;
@@ -185,7 +186,7 @@ public:
 
     ~Worker() override { close(); }
 
-    bool open(juce::StringArray command, juce::String& error, const std::atomic<bool>* stop)
+    bool open(cydaw::base::TextList command, cydaw::base::Text& error, const std::atomic<bool>* stop)
     {
         // Every request carries it: the worker answers no other connection.
         command.addArray({ "--token", token_ });
@@ -195,7 +196,7 @@ public:
         }
         startThread();
         // The model loads first: long on a processor, the first time.
-        const auto deadline = juce::Time::getMillisecondCounterHiRes() + 300'000.0;
+        const auto deadline = cydaw::base::Time::getMillisecondCounterHiRes() + 300'000.0;
         while (port_.load() == 0) {
             if (ended_.load() || !process_.isRunning()) {
                 juce::Thread::sleep(100);
@@ -204,7 +205,7 @@ public:
                 close();
                 return false;
             }
-            if ((stop != nullptr && stop->load()) || juce::Time::getMillisecondCounterHiRes() > deadline) {
+            if ((stop != nullptr && stop->load()) || cydaw::base::Time::getMillisecondCounterHiRes() > deadline) {
                 if (stop == nullptr || !stop->load())
                     error = ui::Ls("le modèle ne répond pas", "the model does not answer");
                 close();
@@ -222,7 +223,7 @@ public:
 
     // stop: asked to give up (indexing stopped). The model is then ended: its
     // answer, come later, would be read as the next request's.
-    cydaw::base::Value request(const cydaw::base::Value& json, juce::String& error, const int timeoutMs = 600'000,
+    cydaw::base::Value request(const cydaw::base::Value& json, cydaw::base::Text& error, const int timeoutMs = 600'000,
                       const std::atomic<bool>* stop = nullptr)
     {
         const std::scoped_lock lock(requestMutex_);
@@ -244,8 +245,8 @@ public:
             }
             sent += wrote;
         }
-        juce::MemoryBlock received;
-        const auto deadline = juce::Time::getMillisecondCounterHiRes() + timeoutMs;
+        cydaw::base::MemoryBlock received;
+        const auto deadline = cydaw::base::Time::getMillisecondCounterHiRes() + timeoutMs;
         char buffer[1 << 14];
         for (;;) {
             const auto ready = socket_.waitUntilReady(true, 200);
@@ -260,7 +261,7 @@ public:
                     (void) process_.kill();
                     return {};
                 }
-                if (juce::Time::getMillisecondCounterHiRes() > deadline || !process_.isRunning()) {
+                if (cydaw::base::Time::getMillisecondCounterHiRes() > deadline || !process_.isRunning()) {
                     error = ui::Ls("le modèle ne répond pas", "the model does not answer");
                     socket_.close();
                     return {};
@@ -277,7 +278,7 @@ public:
             if (buffer[read - 1] == '\n')
                 break;
         }
-        const auto answer = cydaw::base::JSON::parse(juce::String::fromUTF8(static_cast<const char*>(received.getData()),
+        const auto answer = cydaw::base::JSON::parse(cydaw::base::Text::fromUTF8(static_cast<const char*>(received.getData()),
                                                                      static_cast<int>(received.getSize())));
         if (!static_cast<bool>(answer.getProperty("ok", false))) {
             error = answer.getProperty("error", ui::Ls("réponse illisible du modèle", "unreadable answer from the model")).toString();
@@ -287,7 +288,7 @@ public:
     }
 
     [[nodiscard]] bool alive() { return socket_.isConnected() && process_.isRunning(); }
-    [[nodiscard]] juce::String device() const
+    [[nodiscard]] cydaw::base::Text device() const
     {
         const std::scoped_lock lock(outputMutex_);
         return device_;
@@ -311,7 +312,7 @@ private:
     // Its output read to the end: a pipe left full would stop it.
     void run() override
     {
-        juce::MemoryBlock line;
+        cydaw::base::MemoryBlock line;
         while (!threadShouldExit()) {
             char byte {};
             if (process_.readProcessOutput(&byte, 1) <= 0) {
@@ -325,7 +326,7 @@ private:
                     line.append(&byte, 1);
                 continue;
             }
-            const auto text = juce::String::fromUTF8(static_cast<const char*>(line.getData()), static_cast<int>(line.getSize())).trim();
+            const auto text = cydaw::base::Text::fromUTF8(static_cast<const char*>(line.getData()), static_cast<int>(line.getSize())).trim();
             line.reset();
             if (text.isEmpty())
                 continue;
@@ -345,11 +346,11 @@ private:
 
     juce::ChildProcess process_;
     juce::StreamingSocket socket_;
-    const juce::String token_ { juce::Uuid().toString() };
+    const cydaw::base::Text token_ { juce::Uuid().toString() };
     std::mutex requestMutex_;
     mutable std::mutex outputMutex_;
-    juce::String lastError_;
-    juce::String device_;
+    cydaw::base::Text lastError_;
+    cydaw::base::Text device_;
     std::atomic<int> port_ {};
     std::atomic<bool> ended_ {};
 };
@@ -358,12 +359,12 @@ private:
 
 class SemanticSearch::Store final {
 public:
-    Store(juce::String model, const int dimension) : model_(std::move(model)), dimension_(dimension) {}
+    Store(cydaw::base::Text model, const int dimension) : model_(std::move(model)), dimension_(dimension) {}
 
     [[nodiscard]] int dimension() const noexcept { return dimension_; }
-    [[nodiscard]] const juce::String& model() const noexcept { return model_; }
+    [[nodiscard]] const cydaw::base::Text& model() const noexcept { return model_; }
 
-    bool load(const juce::File& file)
+    bool load(const cydaw::base::File& file)
     {
         juce::FileInputStream in(file);
         if (!in.openedOk())
@@ -398,7 +399,7 @@ public:
         return true;
     }
 
-    bool save(const juce::File& file) const
+    bool save(const cydaw::base::File& file) const
     {
         (void) file.getParentDirectory().createDirectory();
         const auto temporary = file.getSiblingFile(file.getFileName() + ".tmp");
@@ -432,7 +433,7 @@ public:
         return temporary.moveFileTo(file);
     }
 
-    [[nodiscard]] bool fresh(const juce::String& path, const juce::int64 size, const juce::int64 modified) const
+    [[nodiscard]] bool fresh(const cydaw::base::Text& path, const juce::int64 size, const juce::int64 modified) const
     {
         const std::shared_lock lock(mutex_);
         const auto found = rows_.find(path);
@@ -440,7 +441,7 @@ public:
                && modified_[static_cast<std::size_t>(found->second)] == modified;
     }
 
-    void put(const juce::String& path, const juce::int64 size, const juce::int64 modified, const float* vector)
+    void put(const cydaw::base::Text& path, const juce::int64 size, const juce::int64 modified, const float* vector)
     {
         const std::unique_lock lock(mutex_);
         auto row = 0;
@@ -461,10 +462,10 @@ public:
     }
 
     // The rows of files the library no longer has, dropped.
-    void keepOnly(const std::set<juce::String>& paths)
+    void keepOnly(const std::set<cydaw::base::Text>& paths)
     {
         const std::unique_lock lock(mutex_);
-        std::vector<juce::String> keptPaths;
+        std::vector<cydaw::base::Text> keptPaths;
         std::vector<juce::int64> keptSizes, keptModified;
         std::vector<float> keptData;
         for (std::size_t row = 0; row < paths_.size(); ++row)
@@ -487,7 +488,7 @@ public:
         ++generation_;
     }
 
-    [[nodiscard]] std::optional<std::vector<float>> vectorOf(const juce::String& path) const
+    [[nodiscard]] std::optional<std::vector<float>> vectorOf(const cydaw::base::Text& path) const
     {
         const std::shared_lock lock(mutex_);
         const auto found = rows_.find(path);
@@ -498,10 +499,10 @@ public:
     }
 
     // The nearest rows to a unit vector, best first.
-    [[nodiscard]] std::vector<std::pair<juce::String, float>> nearest(const std::vector<float>& query, const int limit,
-                                                                    const juce::String& skip = {}) const
+    [[nodiscard]] std::vector<std::pair<cydaw::base::Text, float>> nearest(const std::vector<float>& query, const int limit,
+                                                                    const cydaw::base::Text& skip = {}) const
     {
-        std::vector<std::pair<juce::String, float>> out;
+        std::vector<std::pair<cydaw::base::Text, float>> out;
         if (static_cast<int>(query.size()) != dimension_)
             return out;
         const std::shared_lock lock(mutex_);
@@ -529,14 +530,14 @@ public:
     [[nodiscard]] int generation() const noexcept { return generation_.load(); }
 
 private:
-    const juce::String model_;
+    const cydaw::base::Text model_;
     const int dimension_;
     mutable std::shared_mutex mutex_;
-    std::vector<juce::String> paths_;
+    std::vector<cydaw::base::Text> paths_;
     std::vector<juce::int64> sizes_;
     std::vector<juce::int64> modified_;
     std::vector<float> data_;
-    std::map<juce::String, int> rows_;
+    std::map<cydaw::base::Text, int> rows_;
     std::atomic<int> generation_ {};
 };
 
@@ -545,14 +546,14 @@ private:
 class SemanticSearch::Indexer final : public juce::Thread {
 public:
     struct Item {
-        juce::String path;
+        cydaw::base::Text path;
         juce::int64 size {};
         juce::int64 modified {};
         double length {};
     };
 
-    Indexer(SemanticSearch& owner, AiModel model, std::shared_ptr<Store> store, juce::File storeFile, juce::File work,
-            std::vector<Item> items, juce::StringArray uncategorised, const bool categories)
+    Indexer(SemanticSearch& owner, AiModel model, std::shared_ptr<Store> store, cydaw::base::File storeFile, cydaw::base::File work,
+            std::vector<Item> items, cydaw::base::TextList uncategorised, const bool categories)
         : juce::Thread("CyDAW semantic index"),
           owner_(owner), search_(&owner), model_(std::move(model)), store_(std::move(store)), storeFile_(std::move(storeFile)),
           work_(std::move(work)), items_(std::move(items)), uncategorised_(std::move(uncategorised)), categories_(categories)
@@ -569,7 +570,7 @@ public:
 
     void run() override
     {
-        juce::String error;
+        cydaw::base::Text error;
         auto worker = owner_.workerFor(model_, error, &stop_);
         if (worker == nullptr) {
             finish(error);
@@ -585,7 +586,7 @@ public:
         owner_.changed();
         const auto work = work_;
         (void) work.createDirectory();
-        juce::ThreadPool decoders(std::max(2, juce::SystemStats::getNumCpus() - 2));
+        juce::ThreadPool decoders(std::max(2, cydaw::base::SystemStats::getNumCpus() - 2));
         auto sinceSave = 0;
         for (std::size_t start = 0; start < items_.size() && !stop_;) {
             // A batch: so many files, so much audio.
@@ -605,7 +606,7 @@ public:
             std::vector<char> ok(batch.size(), 0);
             for (std::size_t slot = 0; slot < batch.size(); ++slot)
                 decoders.addJob([this, &decoded, &ok, &batch, slot] {
-                    ok[slot] = decodeWindows(juce::File(items_[batch[slot]].path), model_.sampleRate, model_.windowSeconds, decoded[slot])
+                    ok[slot] = decodeWindows(cydaw::base::File(items_[batch[slot]].path), model_.sampleRate, model_.windowSeconds, decoded[slot])
                                    ? 1
                                    : 0;
                 });
@@ -654,10 +655,10 @@ public:
                 }
                 const auto dimension = static_cast<int>(answer.getProperty("dimension", 0));
                 if (dimension != model_.dimension) {
-                    finish(ui::Ls("le modèle donne des vecteurs de ", "the model gives vectors of ") + juce::String(dimension));
+                    finish(ui::Ls("le modèle donne des vecteurs de ", "the model gives vectors of ") + cydaw::base::Text(dimension));
                     return;
                 }
-                juce::MemoryBlock vectors;
+                cydaw::base::MemoryBlock vectors;
                 if (!vectorFile.loadFileAsData(vectors)
                     || vectors.getSize() != static_cast<std::size_t>(windows.size()) * static_cast<std::size_t>(dimension) * sizeof(float)) {
                     finish(ui::Ls("vecteurs illisibles", "unreadable vectors"));
@@ -699,7 +700,7 @@ public:
     }
 
 private:
-    juce::File audioFile() const { return work_.getChildFile("batch.f32"); }
+    cydaw::base::File audioFile() const { return work_.getChildFile("batch.f32"); }
 
     // The sounds nothing named: the category CLAP finds nearest, when clear.
     void classify(Worker& worker)
@@ -714,13 +715,13 @@ private:
         const auto& taxonomy = app::SampleLibrary::categoryTaxonomy();
         for (std::size_t index = 0; index < taxonomy.size(); ++index)
             for (const auto* prompt : taxonomy[index].prompts) {
-                texts.add(juce::String(promptTemplate) + prompt);
+                texts.add(cydaw::base::Text(promptTemplate) + prompt);
                 categoryOf.push_back(static_cast<int>(index));
             }
         auto* request = new cydaw::base::Object();
         request->setProperty("op", "embed_text");
         request->setProperty("texts", texts);
-        juce::String error;
+        cydaw::base::Text error;
         const auto answer = worker.request(cydaw::base::Value(request), error, 600'000, &stop_);
         const auto* list = answer.getProperty("vectors", {}).getArray();
         if (list == nullptr || list->size() != texts.size())
@@ -773,13 +774,13 @@ private:
         });
     }
 
-    void finish(const juce::String& error)
+    void finish(const cydaw::base::Text& error)
     {
         {
             const std::scoped_lock lock(owner_.mutex_);
             owner_.status_.running = false;
             owner_.status_.loadingModel = false;
-            owner_.status_.error = stop_ ? juce::String() : error;
+            owner_.status_.error = stop_ ? cydaw::base::Text() : error;
             owner_.status_.message = error.isNotEmpty() && !stop_ ? error
                                      : stop_                       ? ui::Ls("Indexation arrêtée", "Indexing stopped")
                                                                    : ui::Ls("Index à jour", "Index up to date");
@@ -791,10 +792,10 @@ private:
     juce::WeakReference<SemanticSearch> search_;
     AiModel model_;
     std::shared_ptr<Store> store_;
-    juce::File storeFile_;
-    juce::File work_;
+    cydaw::base::File storeFile_;
+    cydaw::base::File work_;
     std::vector<Item> items_;
-    juce::StringArray uncategorised_;
+    cydaw::base::TextList uncategorised_;
     bool categories_ {};
     std::atomic<bool> stop_ {};
     std::atomic<int> done_ {};
@@ -850,7 +851,7 @@ void SemanticSearch::loadSettings()
 {
     autoIndex_ = static_cast<bool>(library_.setting("semanticAutoIndex", true));
     autoCategories_ = static_cast<bool>(library_.setting("semanticAutoCategories", true));
-    chosenModel_ = library_.setting("semanticModel", juce::String()).toString();
+    chosenModel_ = library_.setting("semanticModel", cydaw::base::Text()).toString();
 }
 
 void SemanticSearch::saveSettings()
@@ -860,7 +861,7 @@ void SemanticSearch::saveSettings()
     library_.setSetting("semanticModel", chosenModel_);
 }
 
-juce::String SemanticSearch::activeModel() const
+cydaw::base::Text SemanticSearch::activeModel() const
 {
     if (chosenModel_.isNotEmpty() && models_.installed(chosenModel_))
         return chosenModel_;
@@ -873,7 +874,7 @@ juce::String SemanticSearch::activeModel() const
     return {};
 }
 
-void SemanticSearch::setActiveModel(const juce::String& id)
+void SemanticSearch::setActiveModel(const cydaw::base::Text& id)
 {
     chosenModel_ = id;
     saveSettings();
@@ -895,24 +896,24 @@ void SemanticSearch::modelsChanged()
     }
     if (active.isNotEmpty()) {
         indexOwed_ = true;
-        indexOwedAt_ = juce::Time::getMillisecondCounterHiRes() * 0.001;
+        indexOwedAt_ = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
         if (!engine().checked)
             checkEngine();
     }
     changed();
 }
 
-juce::File SemanticSearch::storeFolder() const
+cydaw::base::File SemanticSearch::storeFolder() const
 {
     return library_.cacheFolder().getChildFile("semantic");
 }
 
-juce::File SemanticSearch::workFolder() const
+cydaw::base::File SemanticSearch::workFolder() const
 {
     return storeFolder().getChildFile("work");
 }
 
-juce::File SemanticSearch::storeFileOf(const AiModel& model) const
+cydaw::base::File SemanticSearch::storeFileOf(const AiModel& model) const
 {
     return storeFolder().getChildFile(model.key().replaceCharacter('@', '_') + ".cyvec");
 }
@@ -921,7 +922,7 @@ void SemanticSearch::openStore()
 {
     const auto active = activeModel();
     std::shared_ptr<Store> store;
-    juce::File file;
+    cydaw::base::File file;
     if (const auto* model = models_.find(active); model != nullptr) {
         store = std::make_shared<Store>(model->key(), model->dimension);
         file = storeFileOf(*model);
@@ -962,7 +963,7 @@ void SemanticSearch::checkEngine()
     }
     changed();
     checks_.addJob([this] {
-        juce::String error;
+        cydaw::base::Text error;
         const auto answer = companion_.runNow({ "clap-check" }, error, 120'000);
         {
             const std::scoped_lock lock(mutex_);
@@ -974,7 +975,7 @@ void SemanticSearch::checkEngine()
             engine_.cuda = static_cast<bool>(answer.getProperty("cuda", false));
             engine_.gpu = answer.getProperty("gpu", {}).toString();
             engine_.ready = engine_.torch.isNotEmpty() && engine_.transformers.isNotEmpty();
-            engine_.error = engine_.ready ? juce::String()
+            engine_.error = engine_.ready ? cydaw::base::Text()
                             : error.isNotEmpty() ? error
                             : engine_.torch.isEmpty() ? ui::Ls("PyTorch manque", "PyTorch is missing")
                                                       : ui::Ls("transformers manque", "transformers is missing");
@@ -983,14 +984,14 @@ void SemanticSearch::checkEngine()
     });
 }
 
-std::shared_ptr<SemanticSearch::Worker> SemanticSearch::workerFor(const AiModel& model, juce::String& error,
+std::shared_ptr<SemanticSearch::Worker> SemanticSearch::workerFor(const AiModel& model, cydaw::base::Text& error,
                                                                    const std::atomic<bool>* stop)
 {
     const std::scoped_lock creating(creating_);
     {
         const std::scoped_lock lock(mutex_);
         if (worker_ != nullptr && workerModel_ == model.key() && worker_->alive()) {
-            workerUsed_ = juce::Time::getMillisecondCounterHiRes() * 0.001;
+            workerUsed_ = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
             return worker_;
         }
         status_.loadingModel = true;
@@ -1013,7 +1014,7 @@ std::shared_ptr<SemanticSearch::Worker> SemanticSearch::workerFor(const AiModel&
     const std::scoped_lock lock(mutex_);
     worker_ = worker;
     workerModel_ = model.key();
-    workerUsed_ = juce::Time::getMillisecondCounterHiRes() * 0.001;
+    workerUsed_ = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
     status_.loadingModel = false;
     status_.workerUp = true;
     status_.device = worker->device();
@@ -1060,8 +1061,8 @@ void SemanticSearch::startIndexing()
         return;
     // What the library has, without a vector or with one of an older file.
     std::vector<Indexer::Item> items;
-    std::set<juce::String> present;
-    juce::StringArray uncategorised;
+    std::set<cydaw::base::Text> present;
+    cydaw::base::TextList uncategorised;
     for (const auto& record : library_.samples()) {
         if (!record.analysed)
             continue;
@@ -1133,13 +1134,13 @@ void SemanticSearch::sampleLibraryChanged(const bool structure)
     libraryChanged_ = true;
     if (structure) {
         indexOwed_ = true;
-        indexOwedAt_ = juce::Time::getMillisecondCounterHiRes() * 0.001;
+        indexOwedAt_ = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
     }
 }
 
 void SemanticSearch::timerCallback()
 {
-    const auto now = juce::Time::getMillisecondCounterHiRes() * 0.001;
+    const auto now = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
     if (indexer_ != nullptr && !indexer_->isThreadRunning())
         indexer_.reset();
     // The library's sounds with a vector, counted again when either changed.
@@ -1183,7 +1184,7 @@ void SemanticSearch::timerCallback()
 
 // ---- Queries ------------------------------------------------------------------------------------
 
-juce::String SemanticSearch::toEnglish(const juce::String& query)
+cydaw::base::Text SemanticSearch::toEnglish(const cydaw::base::Text& query)
 {
     // Phrases first, then words; what is not here stays (often English).
     static const std::vector<std::pair<const char*, const char*>> phrases {
@@ -1193,7 +1194,7 @@ juce::String SemanticSearch::toEnglish(const juce::String& query)
         { "guitare acoustique", "acoustic guitar" }, { "contrebasse", "double bass" }, { "boite a rythmes", "drum machine" },
         { "bruit blanc", "white noise" }, { "coup de", "hit of" }, { "effet sonore", "sound effect" },
     };
-    static const std::map<juce::String, const char*> words {
+    static const std::map<cydaw::base::Text, const char*> words {
         { "batterie", "drums" }, { "caisse", "drum" }, { "tambour", "drum" }, { "charleston", "hi-hat" },
         { "charley", "hi-hat" }, { "cymbale", "cymbal" }, { "cymbales", "cymbals" }, { "basse", "bass" },
         { "basses", "basses" }, { "nappe", "pad" }, { "nappes", "pads" }, { "cordes", "strings" }, { "corde", "string" },
@@ -1239,19 +1240,19 @@ juce::String SemanticSearch::toEnglish(const juce::String& query)
                                         { "î", "i" }, { "ï", "i" }, { "ô", "o" }, { "ù", "u" }, { "û", "u" }, { "ç", "c" },
                                         { "œ", "oe" } };
     for (const auto& pair : accents)
-        text = text.replace(juce::String::fromUTF8(pair[0]), pair[1]);
-    text = text.replace("'", " ").replace(juce::String::fromUTF8("\xe2\x80\x99"), " ");
+        text = text.replace(cydaw::base::Text::fromUTF8(pair[0]), pair[1]);
+    text = text.replace("'", " ").replace(cydaw::base::Text::fromUTF8("\xe2\x80\x99"), " ");
     for (const auto& [french, english] : phrases)
         text = text.replace(french, english);
-    juce::StringArray out;
-    for (const auto& word : juce::StringArray::fromTokens(text, " ", "")) {
+    cydaw::base::TextList out;
+    for (const auto& word : cydaw::base::TextList::fromTokens(text, " ", "")) {
         if (word.isEmpty())
             continue;
         // The French "l'", "d'" gone; the rest translated when known.
         if (word == "l" || word == "d")
             continue;
         const auto found = words.find(word);
-        out.add(found != words.end() ? juce::String(found->second) : word);
+        out.add(found != words.end() ? cydaw::base::Text(found->second) : word);
     }
     return out.joinIntoString(" ");
 }
@@ -1285,7 +1286,7 @@ SemanticSearch::Answer SemanticSearch::run(const Query& query)
             answer.error = ui::Ls("Rien à chercher", "Nothing to search");
             return answer;
         }
-        juce::String error;
+        cydaw::base::Text error;
         auto worker = workerFor(*model, error, &closing_);
         if (worker == nullptr) {
             answer.failed = true;
@@ -1298,7 +1299,7 @@ SemanticSearch::Answer SemanticSearch::run(const Query& query)
         request->setProperty("op", "embed_text");
         cydaw::base::Array<cydaw::base::Value> texts;
         texts.add(answer.english);
-        texts.add(juce::String(promptTemplate) + answer.english);
+        texts.add(cydaw::base::Text(promptTemplate) + answer.english);
         request->setProperty("texts", texts);
         const auto reply = worker->request(cydaw::base::Value(request), error, 60'000);
         const auto* list = reply.getProperty("vectors", {}).getArray();
@@ -1317,7 +1318,7 @@ SemanticSearch::Answer SemanticSearch::run(const Query& query)
         normalise(vector.data(), model->dimension);
         {
             const std::scoped_lock lock(mutex_);
-            workerUsed_ = juce::Time::getMillisecondCounterHiRes() * 0.001;
+            workerUsed_ = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
         }
     }
     const auto range = std::max(0.01f, model->similarityHigh - model->similarityLow);
@@ -1343,9 +1344,9 @@ void SemanticSearch::rerank(Answer& answer, app::SampleLibrary& library, const i
     }
     // The words of the phrase in English (as the model was asked), without the
     // small ones; each counts once, found in a name in English or in French.
-    static const juce::StringArray ignored { "the", "and", "with", "sound", "sounds", "of", "for", "very", "more", "without" };
-    juce::StringArray english;
-    for (auto word : juce::StringArray::fromTokens(answer.english, " ,;.'", ""))
+    static const cydaw::base::TextList ignored { "the", "and", "with", "sound", "sounds", "of", "for", "very", "more", "without" };
+    cydaw::base::TextList english;
+    for (auto word : cydaw::base::TextList::fromTokens(answer.english, " ,;.'", ""))
         if (word = word.trim().toLowerCase(); word.length() >= 3 && !ignored.contains(word))
             english.addIfNotAlreadyThere(word);
     if (english.isEmpty()) {
@@ -1361,7 +1362,7 @@ void SemanticSearch::rerank(Answer& answer, app::SampleLibrary& library, const i
                         + record->file().getParentDirectory().getFileName() + " "
                         + record->file().getParentDirectory().getParentDirectory().getFileName();
         if (const auto* info = app::SampleLibrary::categoryInfo(record->category))
-            haystack << " " << juce::String::fromUTF8(info->french) << " " << info->english;
+            haystack << " " << cydaw::base::Text::fromUTF8(info->french) << " " << info->english;
         haystack = toEnglish(haystack.replaceCharacters("_-/()", "     ")) + " " + haystack.toLowerCase();
         auto found = 0;
         for (const auto& word : english)
@@ -1411,12 +1412,12 @@ int SemanticSearch::ask(Query query)
     return query.id;
 }
 
-int SemanticSearch::searchText(const juce::String& text, const int limit, const int owner)
+int SemanticSearch::searchText(const cydaw::base::Text& text, const int limit, const int owner)
 {
     return ask({ nextQuery_++, text.trim(), {}, std::max(1, limit), owner });
 }
 
-int SemanticSearch::searchSimilar(const juce::String& path, const int limit, const int owner)
+int SemanticSearch::searchSimilar(const cydaw::base::Text& path, const int limit, const int owner)
 {
     return ask({ nextQuery_++, {}, path, std::max(1, limit), owner });
 }
@@ -1432,13 +1433,13 @@ std::optional<SemanticSearch::Answer> SemanticSearch::takeAnswer(const int owner
     return answer;
 }
 
-SemanticSearch::Answer SemanticSearch::searchNow(const juce::String& text, const int limit, const int timeoutMs)
+SemanticSearch::Answer SemanticSearch::searchNow(const cydaw::base::Text& text, const int limit, const int timeoutMs)
 {
     juce::ignoreUnused(timeoutMs);
     return run({ nextQuery_++, text.trim(), {}, std::max(1, limit) });
 }
 
-SemanticSearch::Answer SemanticSearch::similarNow(const juce::String& path, const int limit, const int timeoutMs)
+SemanticSearch::Answer SemanticSearch::similarNow(const cydaw::base::Text& path, const int limit, const int timeoutMs)
 {
     juce::ignoreUnused(timeoutMs);
     return run({ nextQuery_++, {}, path, std::max(1, limit) });

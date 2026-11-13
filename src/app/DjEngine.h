@@ -1,3 +1,6 @@
+#include <cydaw/base/TextMap.h>
+#include <cydaw/integration/AudioFiles.h>
+#include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #pragma once
 #include "ModeProcessor.h"
@@ -31,7 +34,7 @@ namespace cydaw::app {
 
 // The tags a reader found (title, artist), else "Artist - Title" from the
 // file's name.
-void djTrackTags(const juce::File& file, const juce::StringPairArray& tags, juce::String& title, juce::String& artist);
+void djTrackTags(const cydaw::base::File& file, const cydaw::base::TextMap& tags, cydaw::base::Text& title, cydaw::base::Text& artist);
 
 class DjEngine final : public juce::AudioSource {
 public:
@@ -57,13 +60,13 @@ public:
         Known() { hotCues.fill(-1.0); }
     };
     enum class LoadState { empty, loading, ready, failed };
-    void load(int deck, const juce::File& file, const Known& known = {});
+    void load(int deck, const cydaw::base::File& file, const Known& known = {});
     // A track decoded whole (45 minutes at most; its first two channels),
     // its tags read (else "Artist - Title" from its name); null with `error`
     // set. `cancelled` is asked between chunks. Any thread.
-    [[nodiscard]] static std::shared_ptr<engine::dj::TrackAudio> decode(juce::AudioFormatManager& formats, const juce::File& file,
-                                                                        juce::String& error, juce::String& title,
-                                                                        juce::String& artist,
+    [[nodiscard]] static std::shared_ptr<engine::dj::TrackAudio> decode(cydaw::audio::AudioFormatManager& formats, const cydaw::base::File& file,
+                                                                        cydaw::base::Text& error, cydaw::base::Text& title,
+                                                                        cydaw::base::Text& artist,
                                                                         const std::function<bool()>& cancelled = {});
     // Some decoders (Windows Media) need COM on the thread that decodes:
     // one of these at the top of such a thread.
@@ -82,10 +85,10 @@ public:
     // ---- A deck as it is ---------------------------------------------------------------------
     struct DeckState {
         LoadState state { LoadState::empty };
-        juce::File file;
-        juce::String title;
-        juce::String artist;
-        juce::String error;
+        cydaw::base::File file;
+        cydaw::base::Text title;
+        cydaw::base::Text artist;
+        cydaw::base::Text error;
         // Null while it is analysed.
         std::shared_ptr<const engine::dj::TrackAnalysis> analysis;
         double seconds {};
@@ -188,11 +191,11 @@ public:
     [[nodiscard]] bool anyPlaying() const noexcept;
 
     // ---- The mix recorded --------------------------------------------------------------------
-    cydaw::base::Result startRecording(const juce::File& file);
+    cydaw::base::Result startRecording(const cydaw::base::File& file);
     void stopRecording();
     [[nodiscard]] bool recording() const noexcept { return recording_.load(std::memory_order_acquire); }
     [[nodiscard]] double recordedSeconds() const noexcept;
-    [[nodiscard]] juce::File recordingFile() const;
+    [[nodiscard]] cydaw::base::File recordingFile() const;
 
     void setProcessor(std::shared_ptr<ModeProcessor> processor) {
         processor_.store(std::make_shared<const std::shared_ptr<ModeProcessor>>(std::move(processor)));
@@ -219,10 +222,10 @@ private:
     void alignPhase(Deck& deck, int master);
     [[nodiscard]] int chooseMaster() const noexcept;
     [[nodiscard]] double beatSecondsOf(const Deck& deck) const noexcept;
-    void publish(int deck, std::shared_ptr<const engine::dj::TrackAudio> audio, const juce::String& title,
-                 const juce::String& artist, std::uint64_t ticket);
+    void publish(int deck, std::shared_ptr<const engine::dj::TrackAudio> audio, const cydaw::base::Text& title,
+                 const cydaw::base::Text& artist, std::uint64_t ticket);
     void publishAnalysis(int deck, std::shared_ptr<const engine::dj::TrackAnalysis> analysis, std::uint64_t ticket);
-    void fail(int deck, const juce::String& error, std::uint64_t ticket);
+    void fail(int deck, const cydaw::base::Text& error, std::uint64_t ticket);
     void freeRetired();
 
     std::array<std::unique_ptr<Deck>, deckCount> decks_;
@@ -256,11 +259,11 @@ private:
 
     // Recording: written on a thread of its own.
     juce::TimeSliceThread writerThread_ { "CyDAW DJ mix writer" };
-    std::unique_ptr<juce::AudioFormatWriter::ThreadedWriter> writer_;
+    std::unique_ptr<cydaw::audio::AudioFormatWriter::ThreadedWriter> writer_;
     juce::CriticalSection writerLock_;
     std::atomic<bool> recording_ {};
     std::atomic<std::int64_t> recordedFrames_ {};
-    juce::File recordingFile_;
+    cydaw::base::File recordingFile_;
 };
 
 } // namespace cydaw::app

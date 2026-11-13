@@ -35,7 +35,7 @@ namespace cydaw::app {
 class SelectionSummary final : public juce::Component,
                                public juce::SettableTooltipClient {
 public:
-    void setText(const juce::String& text,
+    void setText(const cydaw::base::Text& text,
                  juce::NotificationType = juce::dontSendNotification);
     [[nodiscard]] int preferredHeight() const;
     void paint(juce::Graphics& graphics) override;
@@ -44,10 +44,10 @@ public:
     std::function<void()> onHeightChanged;
 
 private:
-    [[nodiscard]] int wrappedRows(const juce::String& line,
+    [[nodiscard]] int wrappedRows(const cydaw::base::Text& line,
                                   bool heading = false) const;
 
-    juce::StringArray lines_;
+    cydaw::base::TextList lines_;
 };
 
 class NodeGraphComponent final : public juce::Component,
@@ -66,18 +66,18 @@ public:
     // The palette as text, one row per line: "v NAME (count)" for an open
     // heading, "> " for a folded one, "- NAME" for an entry, indented by
     // depth. Written for the suite, which cannot click.
-    [[nodiscard]] juce::String paletteOutline() const;
+    [[nodiscard]] cydaw::base::Text paletteOutline() const;
     // What the last repaint actually drew, against what it was offered.
     // Guessing where the paint cost sits was wrong twice.
-    [[nodiscard]] juce::String paintProfile() const;
-    void setPaletteSearch(const juce::String& query);
+    [[nodiscard]] cydaw::base::Text paintProfile() const;
+    void setPaletteSearch(const cydaw::base::Text& query);
     // Frames the canvas at a chosen zoom, for snapshots that have to show
     // what a given zoom level actually renders.
     void setCanvasZoom(float zoom);
     // Drags one node by a screen offset and reports the region the drag asked
     // to have repainted. Written for the suite, which cannot drag a mouse.
     juce::RectangleList<int> dragNodeForTest(
-        const juce::String& nodeTypeKey, juce::Point<float> screenDelta);
+        const cydaw::base::Text& nodeTypeKey, juce::Point<float> screenDelta);
     // Lays the cards on a deterministic grid, so a measurement scene is a
     // patch someone could have laid out rather than the tight cascade that
     // inserting leaves behind.
@@ -86,40 +86,40 @@ public:
     // does rather than only what it paints.
     // Where an edit's bookkeeping spends its time: serialising the graph,
     // copying that tree for the history, and comparing it with the last one.
-    [[nodiscard]] juce::String historyCostForTest();
+    [[nodiscard]] cydaw::base::Text historyCostForTest();
     // Where the bookkeeping after an edit spends its time.
-    [[nodiscard]] juce::String insertProfile() const { return insertProfile_; }
+    [[nodiscard]] cydaw::base::Text insertProfile() const { return insertProfile_; }
     // Where one notch of the track drive/cutoff faders goes.
-    [[nodiscard]] juce::String effectParametersProfile() const
+    [[nodiscard]] cydaw::base::Text effectParametersProfile() const
     {
         return effectParametersProfile_;
     }
-    [[nodiscard]] juce::String addProfile() const { return addProfile_; }
-    [[nodiscard]] juce::String placementProfile() const
+    [[nodiscard]] cydaw::base::Text addProfile() const { return addProfile_; }
+    [[nodiscard]] cydaw::base::Text placementProfile() const
     {
         return placementProfile_;
     }
-    [[nodiscard]] juce::String layoutChangeProfile() const
+    [[nodiscard]] cydaw::base::Text layoutChangeProfile() const
     {
         return layoutChangeProfile_;
     }
     // Where the instrument compile's time goes: the typed definitions, the
     // library install, the compile itself.
-    [[nodiscard]] juce::String polyCompileProfile() const
+    [[nodiscard]] cydaw::base::Text polyCompileProfile() const
     {
         return polyCompileProfile_;
     }
     // Who asked for the layout changes, most recent last; for the probe.
-    [[nodiscard]] juce::String layoutChangeOrigins() const
+    [[nodiscard]] cydaw::base::Text layoutChangeOrigins() const
     {
         return layoutChangeOrigins_;
     }
     void undoForTest();
     void redoForTest();
-    void togglePaletteFold(const juce::String& foldKey);
+    void togglePaletteFold(const cydaw::base::Text& foldKey);
     // What dragging a palette row onto the canvas hands over, and whether the
     // canvas would accept it. Written for the suite, which cannot drag.
-    [[nodiscard]] juce::String paletteDragPayload(int row);
+    [[nodiscard]] cydaw::base::Text paletteDragPayload(int row);
     // The arrow keys inside the search box, and what they leave highlighted.
     [[nodiscard]] int nodeCount() const;
     // Serialises with every node cache dropped first. The suite compares the
@@ -131,7 +131,7 @@ public:
     void arrangeNodes() { resetNodeLayout(); }
     // Frames one card, close enough to read its knobs. The demo opens on the
     // modulated drive so the ring and its dot are the first thing seen.
-    void frameNode(const juce::String& nodeTypeKey)
+    void frameNode(const cydaw::base::Text& nodeTypeKey)
     {
         const auto id = nodeIdForType(nodeTypeKey);
         if (id == 0)
@@ -160,73 +160,73 @@ public:
     // channel. Read from the nodes; serialising the graph to read the same
     // thing from its file form cost the change of view 80 ms on a large
     // patch.
-    [[nodiscard]] juce::StringArray deviceNames(int limit) const;
+    [[nodiscard]] cydaw::base::TextList deviceNames(int limit) const;
     // For the paths that reach into every node at once and cannot say which
     // ones they changed.
     void invalidateSerialisedNodes();
     // The undo history's size in distinct objects. Entries share the class
     // bodies they describe, so counting them naively would count the sharing
     // instead of showing it.
-    [[nodiscard]] juce::String historyFootprint() const;
+    [[nodiscard]] cydaw::base::Text historyFootprint() const;
     [[nodiscard]] int paletteSelectedRow() const;
     void movePaletteSelection(int delta);
-    [[nodiscard]] juce::String paletteRowKey(int row) const;
-    [[nodiscard]] bool acceptsDragPayload(const juce::String& payload);
+    [[nodiscard]] cydaw::base::Text paletteRowKey(int row) const;
+    [[nodiscard]] bool acceptsDragPayload(const cydaw::base::Text& payload);
     // A control cable dropped on a knob, as the suite performs it: the
     // source card's output onto the named parameter of the target card.
-    bool modulateParameterForTest(const juce::String& sourceTypeKey,
-                                  const juce::String& targetTypeKey,
-                                  const juce::String& parameterSuffix);
+    bool modulateParameterForTest(const cydaw::base::Text& sourceTypeKey,
+                                  const cydaw::base::Text& targetTypeKey,
+                                  const cydaw::base::Text& parameterSuffix);
     // The ring the knob shows, empty when it shows none; and turning it.
     [[nodiscard]] juce::Range<double> modulationRingForTest(
-        const juce::String& targetTypeKey,
-        const juce::String& parameterSuffix) const;
+        const cydaw::base::Text& targetTypeKey,
+        const cydaw::base::Text& parameterSuffix) const;
     // A ring drag in pixels, the hit test as the ring is drawn, and whether
     // the sweep is turned over — for the suite.
-    bool dragModulationRingForTest(const juce::String& targetTypeKey,
-                                   const juce::String& parameterSuffix,
+    bool dragModulationRingForTest(const cydaw::base::Text& targetTypeKey,
+                                   const cydaw::base::Text& parameterSuffix,
                                    float deltaY);
     [[nodiscard]] bool modulationRingHitForTest(
-        const juce::String& targetTypeKey, const juce::String& parameterSuffix);
+        const cydaw::base::Text& targetTypeKey, const cydaw::base::Text& parameterSuffix);
     [[nodiscard]] bool modulationInvertedForTest(
-        const juce::String& targetTypeKey,
-        const juce::String& parameterSuffix) const;
+        const cydaw::base::Text& targetTypeKey,
+        const cydaw::base::Text& parameterSuffix) const;
     // The ring's menu and its readout, for the suite.
-    bool removeModulationForTest(const juce::String& targetTypeKey,
-                                 const juce::String& parameterSuffix);
-    bool invertModulationForTest(const juce::String& targetTypeKey,
-                                 const juce::String& parameterSuffix);
-    [[nodiscard]] juce::String modulationReadoutForTest(
-        const juce::String& targetTypeKey,
-        const juce::String& parameterSuffix) const;
+    bool removeModulationForTest(const cydaw::base::Text& targetTypeKey,
+                                 const cydaw::base::Text& parameterSuffix);
+    bool invertModulationForTest(const cydaw::base::Text& targetTypeKey,
+                                 const cydaw::base::Text& parameterSuffix);
+    [[nodiscard]] cydaw::base::Text modulationReadoutForTest(
+        const cydaw::base::Text& targetTypeKey,
+        const cydaw::base::Text& parameterSuffix) const;
     [[nodiscard]] bool modulationBubbleShownForTest(
-        const juce::String& targetTypeKey,
-        const juce::String& parameterSuffix) const;
-    bool turnModulatedKnobForTest(const juce::String& targetTypeKey,
-                                  const juce::String& parameterSuffix,
+        const cydaw::base::Text& targetTypeKey,
+        const cydaw::base::Text& parameterSuffix) const;
+    bool turnModulatedKnobForTest(const cydaw::base::Text& targetTypeKey,
+                                  const cydaw::base::Text& parameterSuffix,
                                   double value);
     // Why the last drop was refused, for the suite's labels.
-    [[nodiscard]] juce::String modulateFailureForTest() const
+    [[nodiscard]] cydaw::base::Text modulateFailureForTest() const
     {
         return modulateFailure_;
     }
     // Feeds a modulated knob the value its range node would report, and
     // reads back where its dot sits. The suite has no audio thread.
-    bool feedModulationPositionForTest(const juce::String& targetTypeKey,
-                                       const juce::String& parameterSuffix,
+    bool feedModulationPositionForTest(const cydaw::base::Text& targetTypeKey,
+                                       const cydaw::base::Text& parameterSuffix,
                                        double value);
     [[nodiscard]] std::optional<double> modulationPositionForTest(
-        const juce::String& targetTypeKey,
-        const juce::String& parameterSuffix) const;
+        const cydaw::base::Text& targetTypeKey,
+        const cydaw::base::Text& parameterSuffix) const;
     // Where a socket sits on the canvas, and which socket a canvas point
     // resolves to the way a click does. Written for the suite, which cannot
     // click.
     [[nodiscard]] juce::Point<float> portSocketPoint(
-        const juce::String& nodeTypeKey, const juce::String& portKey) const;
-    [[nodiscard]] juce::String portKeyAtPoint(juce::Point<float> point,
+        const cydaw::base::Text& nodeTypeKey, const cydaw::base::Text& portKey) const;
+    [[nodiscard]] cydaw::base::Text portKeyAtPoint(juce::Point<float> point,
                                               bool input) const;
-    [[nodiscard]] juce::StringArray nodePortKeys(
-        const juce::String& nodeTypeKey, bool input) const;
+    [[nodiscard]] cydaw::base::TextList nodePortKeys(
+        const cydaw::base::Text& nodeTypeKey, bool input) const;
     // What an analysis frame asks to have repainted, and where a card sits.
     // Written for the suite: a frame must touch the cards that show the
     // signal and none of the others.
@@ -245,41 +245,41 @@ public:
         return canvasBounds();
     }
     [[nodiscard]] juce::Rectangle<int> nodeBoundsForTest(
-        const juce::String& nodeTypeKey) const;
+        const cydaw::base::Text& nodeTypeKey) const;
     // The first band's frequency as the card's live curve holds it, or 0
     // when the card has no live curve. Written for the suite, which
     // cannot look at the plot.
     [[nodiscard]] double eqCurveFirstBandFrequencyForTest(
-        const juce::String& nodeTypeKey) const;
+        const cydaw::base::Text& nodeTypeKey) const;
     // What a value input's socket says, keyed like the other probes; empty
     // when the card has no such socket. And typing into one the way the
     // details panel does.
     [[nodiscard]] std::optional<double> inputPortDefaultForTest(
-        const juce::String& nodeTypeKey, const juce::String& portKey) const;
-    bool setInputPortDefaultForTest(const juce::String& nodeTypeKey,
-                                    const juce::String& portKey, double value);
+        const cydaw::base::Text& nodeTypeKey, const cydaw::base::Text& portKey) const;
+    bool setInputPortDefaultForTest(const cydaw::base::Text& nodeTypeKey,
+                                    const cydaw::base::Text& portKey, double value);
     // What a card's live curve says at one frequency, in dB — the EQ
     // curve's summed bands, or the filter card's response — for the suite,
     // which renders a sine through the same graph and asks whether the
     // sound is what the picture says. Empty when the card has no such curve.
     [[nodiscard]] std::optional<double> eqCurveMagnitudeDbForTest(
-        const juce::String& nodeTypeKey, double frequency) const;
+        const cydaw::base::Text& nodeTypeKey, double frequency) const;
     [[nodiscard]] std::optional<double> filterResponseMagnitudeDbForTest(
-        const juce::String& nodeTypeKey, double frequency) const;
+        const cydaw::base::Text& nodeTypeKey, double frequency) const;
     // And the compressor card's transfer: the output level its curve
     // draws for an input level, in dB.
     [[nodiscard]] std::optional<double> dynamicsResponseOutputDbForTest(
-        const juce::String& nodeTypeKey, double inputDb) const;
+        const cydaw::base::Text& nodeTypeKey, double inputDb) const;
     // The table a card is shaped with, and shaping it. Keyed by node type
     // like every other probe here, because an id is not something the suite
     // can learn.
-    bool setNodeWavetable(const juce::String& nodeTypeKey,
+    bool setNodeWavetable(const cydaw::base::Text& nodeTypeKey,
                           const cydaw::engine::WavetableShape& shape);
     // A sound-model card's model, from a "cydaw-sound-model" JSON (a .cysound
     // file's): what it plays. False, with why, when it is not one.
-    bool setNodeSoundModel(std::uint64_t nodeId, const cydaw::base::Value& json, juce::String& error);
+    bool setNodeSoundModel(std::uint64_t nodeId, const cydaw::base::Value& json, cydaw::base::Text& error);
     // "brass-c4 · 1 zone · C4 · 82 partials", or empty without a model.
-    [[nodiscard]] juce::String nodeSoundModelDescription(std::uint64_t nodeId) const;
+    [[nodiscard]] cydaw::base::Text nodeSoundModelDescription(std::uint64_t nodeId) const;
     [[nodiscard]] cydaw::engine::SoundModelRef nodeSoundModel(std::uint64_t nodeId) const;
     // The JSON the card's model came from, as saved.
     [[nodiscard]] cydaw::base::Value nodeSoundModelJson(std::uint64_t nodeId) const;
@@ -289,7 +289,7 @@ public:
     // A sampler card's map, from a "cydaw-sampler" JSON (SamplerMapFile.h):
     // its zones, its samples asked of the store. False, with why, when it is
     // not one.
-    bool setNodeSampler(std::uint64_t nodeId, const cydaw::base::Value& json, juce::String& error);
+    bool setNodeSampler(std::uint64_t nodeId, const cydaw::base::Value& json, cydaw::base::Text& error);
     [[nodiscard]] cydaw::base::Value nodeSamplerJson(std::uint64_t nodeId) const;
     // A Replacer card's instrument, as the studio keeps it; null for none.
     [[nodiscard]] cydaw::base::Value nodeInstrumentJson(std::uint64_t nodeId) const;
@@ -301,28 +301,28 @@ public:
     // A Prisme card's own tables (SoundModelFile.h: prismTableVar…): waves
     // imported into its oscillators, played instead of the factory tables.
     // A void `json` takes them all out. One undo step.
-    bool setNodePrismTables(std::uint64_t nodeId, const cydaw::base::Value& json, juce::String& error);
+    bool setNodePrismTables(std::uint64_t nodeId, const cydaw::base::Value& json, cydaw::base::Text& error);
     [[nodiscard]] cydaw::base::Value nodePrismTablesJson(std::uint64_t nodeId) const;
     [[nodiscard]] cydaw::engine::prism::TablesRef nodePrismTables(std::uint64_t nodeId) const;
     // A cabinet card's impulse response (SoundModelFile.h: impulseVar), played
     // instead of its modelled cabinet and microphones; a void `json` takes
     // it out. One undo step.
-    bool setNodeImpulse(std::uint64_t nodeId, const cydaw::base::Value& json, juce::String& error);
+    bool setNodeImpulse(std::uint64_t nodeId, const cydaw::base::Value& json, cydaw::base::Text& error);
     [[nodiscard]] cydaw::base::Value nodeImpulseJson(std::uint64_t nodeId) const;
     [[nodiscard]] cydaw::engine::ImpulseResponseRef nodeImpulse(std::uint64_t nodeId) const;
     [[nodiscard]] cydaw::engine::WavetableShape nodeWavetable(
-        const juce::String& nodeTypeKey) const;
+        const cydaw::base::Text& nodeTypeKey) const;
     // Building a bank is deferred to the message loop, which a test does not
     // run. This does now what the loop would have done.
     void rebuildWavetableBanksForTest() { rebuildPendingWavetableBanks(); }
     // One drawing gesture, exactly as the editor performs it: the suite
     // cannot drag a mouse, and a simplified stand-in would not prove the
     // wiring.
-    bool drawWavetableForTest(const juce::String& nodeTypeKey,
+    bool drawWavetableForTest(const cydaw::base::Text& nodeTypeKey,
                               const cydaw::engine::WavetableShape& shape);
     // The import, addressed by node type like the rest of the probes.
-    cydaw::base::Result importWavetableFileForTest(const juce::String& nodeTypeKey,
-                                            const juce::File& file);
+    cydaw::base::Result importWavetableFileForTest(const cydaw::base::Text& nodeTypeKey,
+                                            const cydaw::base::File& file);
     struct RuntimeGraphExport {
         cydaw::engine::NativeDspGraph nativeGraph;
         std::vector<cydaw::graph::PublishedParameter> publishedParameters;
@@ -350,7 +350,7 @@ public:
     [[nodiscard]] cydaw::engine::NativeDspGraph nativeDspGraphWithoutCache() const;
     [[nodiscard]] int exportRebuilds() const noexcept { return exportRebuilds_; }
     // Why the last export was rebuilt, or "hit". Guessing this was wrong once.
-    [[nodiscard]] juce::String exportCacheProfile() const
+    [[nodiscard]] cydaw::base::Text exportCacheProfile() const
     {
         return exportCacheProfile_;
     }
@@ -361,17 +361,17 @@ public:
     // Whether the graph holds a node of this type. The device strip used to
     // serialise the whole graph, class bodies and all, to ask this twice on
     // every edit.
-    [[nodiscard]] bool containsNodeType(const juce::String& typeKey) const;
+    [[nodiscard]] bool containsNodeType(const cydaw::base::Text& typeKey) const;
     [[nodiscard]] std::vector<cydaw::graph::GraphDefinition>
         graphDefinitions() const;
     [[nodiscard]] cydaw::graph::ValidationResult validateGraphAsset() const;
     void initialiseEmptyMidiTrackGraph();
     void initialiseValueModulationGraph();
     [[nodiscard]] double evaluateValueOutput(double timeSeconds) const;
-    [[nodiscard]] bool setGraphInterfaceParameter(const juce::String& binding,
+    [[nodiscard]] bool setGraphInterfaceParameter(const cydaw::base::Text& binding,
                                                    double value);
     [[nodiscard]] bool setPublishedParameterExposure(
-        const juce::String& binding, bool showInDevice,
+        const cydaw::base::Text& binding, bool showInDevice,
         bool publishToHost);
     void restore(const cydaw::base::Value& state);
     void setLayoutChangedHandler(std::function<void()> handler);
@@ -390,8 +390,8 @@ public:
     [[nodiscard]] std::size_t factoryPresetCount() const noexcept;
     [[nodiscard]] cydaw::base::Result loadFactoryPreset(std::size_t presetIndex);
     struct FactoryPresetSummary {
-        juce::String key;
-        juce::String translationKey;
+        cydaw::base::Text key;
+        cydaw::base::Text translationKey;
         bool soundSource {};
     };
     // Every factory graph, with what a browser needs to file it: a sound
@@ -401,139 +401,139 @@ public:
     // factory presets (whole graphs), the factory modules and the
     // primitive nodes with an input and an output.
     struct DeviceCatalogueEntry {
-        juce::String key;
-        juce::String name;
-        juce::String kind; // "preset", "module" or "node"
-        juce::String category;
-        juce::String description;
+        cydaw::base::Text key;
+        cydaw::base::Text name;
+        cydaw::base::Text kind; // "preset", "module" or "node"
+        cydaw::base::Text category;
+        cydaw::base::Text description;
         bool soundSource {};
-        juce::String input;  // "audio", "midi", "control", "transport" or "none"
-        juce::String output;
-        juce::String categoryKey; // a node's catalogue category key
+        cydaw::base::Text input;  // "audio", "midi", "control", "transport" or "none"
+        cydaw::base::Text output;
+        cydaw::base::Text categoryKey; // a node's catalogue category key
         // Its name in English, whatever the language (inside a module).
-        juce::String englishName;
+        cydaw::base::Text englishName;
     };
     [[nodiscard]] std::vector<DeviceCatalogueEntry> deviceCatalogue() const;
     // Removes one card — by id, or the last one of a type — the way the
     // Delete key does; for the control port.
     bool removeNodeById(std::uint64_t id);
-    bool removeNodeByType(const juce::String& typeKey);
+    bool removeNodeByType(const cydaw::base::Text& typeKey);
     // A new card of `sourceTypeKey` made to modulate a knob of the first card
     // of `targetTypeKey` (the control port's `modulate`): that new card, not
     // one already there, and it goes again when the cable is refused.
-    bool modulateWithNewSource(const juce::String& sourceTypeKey, const juce::String& targetTypeKey,
-                               const juce::String& parameterSuffix);
+    bool modulateWithNewSource(const cydaw::base::Text& sourceTypeKey, const cydaw::base::Text& targetTypeKey,
+                               const cydaw::base::Text& parameterSuffix);
     // The same, its neighbours joined around the gap (editorRemoveFromChain).
     bool removeNodeFromChain(std::uint64_t id);
-    bool removeNodeFromChainByType(const juce::String& typeKey);
-    [[nodiscard]] std::uint64_t lastNodeIdOfType(const juce::String& typeKey) const;
+    bool removeNodeFromChainByType(const cydaw::base::Text& typeKey);
+    [[nodiscard]] std::uint64_t lastNodeIdOfType(const cydaw::base::Text& typeKey) const;
     // The control port's graph edits: a card placed (positions are the
     // canvas's 0..1; a negative one asks for a free spot), cables made and
     // cut, a card renamed or moved, a comment, and what a type or a card
     // offers — ports and parameter schema.
-    [[nodiscard]] std::uint64_t addNodeForRemote(const juce::String& typeKey,
+    [[nodiscard]] std::uint64_t addNodeForRemote(const cydaw::base::Text& typeKey,
                                                  juce::Point<float> position);
     bool connectNodesForRemote(std::uint64_t source, std::uint64_t destination,
                                std::uint64_t sourcePort,
                                std::uint64_t destinationPort);
     int disconnectNodesForRemote(std::uint64_t source, std::uint64_t destination);
-    bool setNodePresentationForRemote(std::uint64_t id, const juce::String& title,
+    bool setNodePresentationForRemote(std::uint64_t id, const cydaw::base::Text& title,
                                       std::optional<juce::Point<float>> position);
-    [[nodiscard]] cydaw::base::Value describeNodeTypeForRemote(const juce::String& typeKey) const;
+    [[nodiscard]] cydaw::base::Value describeNodeTypeForRemote(const cydaw::base::Text& typeKey) const;
     [[nodiscard]] cydaw::base::Value describeNodeForRemote(std::uint64_t id) const;
-    [[nodiscard]] std::uint64_t addCommentForRemote(const juce::String& title,
-                                                    const juce::String& description,
+    [[nodiscard]] std::uint64_t addCommentForRemote(const cydaw::base::Text& title,
+                                                    const cydaw::base::Text& description,
                                                     juce::Point<float> position,
                                                     juce::Point<float> size);
     bool removeCommentForRemote(std::uint64_t id);
     [[nodiscard]] cydaw::base::Result insertFactoryDevice(
-        const juce::String& deviceKey);
+        const cydaw::base::Text& deviceKey);
     // An instrument preset in place of the instrument this graph plays: its
     // voice section (allocator, source, envelope, gain, voice filter) taken
     // out and the preset's put in, wired where the old one was — what fed
     // its notes, the effects after it, the cables other cards plugged into
     // it — so the chain after it, its automation and its modulators stay.
     // With no voice section to replace, the preset is the whole graph.
-    [[nodiscard]] cydaw::base::Result replaceInstrument(const juce::String& presetKey);
-    [[nodiscard]] cydaw::base::Result insertNode(const juce::String& nodeTypeKey);
+    [[nodiscard]] cydaw::base::Result replaceInstrument(const cydaw::base::Text& presetKey);
+    [[nodiscard]] cydaw::base::Result insertNode(const cydaw::base::Text& nodeTypeKey);
     [[nodiscard]] cydaw::base::Result replaceNode(
-        const juce::String& currentNodeTypeKey,
-        const juce::String& replacementNodeTypeKey);
+        const cydaw::base::Text& currentNodeTypeKey,
+        const cydaw::base::Text& replacementNodeTypeKey);
     // Splices a card into the cable that feeds the output, whatever feeds
     // it. The suite cannot know a loaded preset's topology.
     [[nodiscard]] cydaw::base::Result insertNodeBeforeOutput(
-        const juce::String& insertedNodeTypeKey);
+        const cydaw::base::Text& insertedNodeTypeKey);
     // Splices a MIDI card (an arpeggiator, chords…) into the notes' cable
     // that reaches the instrument: after the MIDI cards already there.
     [[nodiscard]] cydaw::base::Result insertNodeBeforeInstrument(
-        const juce::String& insertedNodeTypeKey);
+        const cydaw::base::Text& insertedNodeTypeKey);
     [[nodiscard]] cydaw::base::Result insertNodeOnConnection(
-        const juce::String& sourceNodeTypeKey,
-        const juce::String& destinationNodeTypeKey,
-        const juce::String& insertedNodeTypeKey);
+        const cydaw::base::Text& sourceNodeTypeKey,
+        const cydaw::base::Text& destinationNodeTypeKey,
+        const cydaw::base::Text& insertedNodeTypeKey);
     [[nodiscard]] cydaw::base::Result connectNodePorts(
-        const juce::String& sourceNodeTypeKey,
-        const juce::String& sourcePortKey,
-        const juce::String& destinationNodeTypeKey,
-        const juce::String& destinationPortKey,
+        const cydaw::base::Text& sourceNodeTypeKey,
+        const cydaw::base::Text& sourcePortKey,
+        const cydaw::base::Text& destinationNodeTypeKey,
+        const cydaw::base::Text& destinationPortKey,
         bool replaceDestination = false);
     [[nodiscard]] cydaw::base::Result addConnectionRoutingPoint(
-        const juce::String& sourceNodeTypeKey,
-        const juce::String& destinationNodeTypeKey,
+        const cydaw::base::Text& sourceNodeTypeKey,
+        const cydaw::base::Text& destinationNodeTypeKey,
         juce::Point<float> graphPoint);
     [[nodiscard]] cydaw::base::Result setNodeCollapsed(
-        const juce::String& nodeTypeKey, bool collapsed);
+        const cydaw::base::Text& nodeTypeKey, bool collapsed);
     [[nodiscard]] cydaw::base::Result createCommentFromSelection(
-        const juce::String& title = {});
+        const cydaw::base::Text& title = {});
     [[nodiscard]] cydaw::base::Result saveViewBookmark(int slot);
     [[nodiscard]] cydaw::base::Result recallViewBookmark(int slot);
     [[nodiscard]] cydaw::base::Result clearViewBookmark(int slot);
-    [[nodiscard]] bool selectNodePort(const juce::String& nodeTypeKey,
-                                      const juce::String& portKey);
+    [[nodiscard]] bool selectNodePort(const cydaw::base::Text& nodeTypeKey,
+                                      const cydaw::base::Text& portKey);
     [[nodiscard]] cydaw::base::Result openSubgraphEditor(
-        const juce::String& moduleKey, bool detached = false);
+        const cydaw::base::Text& moduleKey, bool detached = false);
     [[nodiscard]] cydaw::base::Result createEditableGraphModule(
         cydaw::graph::GraphRole role, bool openEditor = true,
         int audioChannels = 2);
     [[nodiscard]] cydaw::base::Result createGraphVariant(
-        const juce::String& sourceModuleKey,
-        const juce::String& name = {},
+        const cydaw::base::Text& sourceModuleKey,
+        const cydaw::base::Text& name = {},
         bool replaceSelectedInstance = true,
         bool openEditor = true);
     [[nodiscard]] cydaw::base::Result saveUserGraphPreset(
-        const juce::File& file, const juce::String& name) const;
-    [[nodiscard]] cydaw::base::Result loadUserGraphPreset(const juce::File& file);
+        const cydaw::base::File& file, const cydaw::base::Text& name) const;
+    [[nodiscard]] cydaw::base::Result loadUserGraphPreset(const cydaw::base::File& file);
     [[nodiscard]] cydaw::base::Result saveNodeParameterPreset(
-        const juce::String& nodeTypeKey, const juce::File& file,
-        const juce::String& name) const;
+        const cydaw::base::Text& nodeTypeKey, const cydaw::base::File& file,
+        const cydaw::base::Text& name) const;
     [[nodiscard]] cydaw::base::Result loadNodeParameterPreset(
-        const juce::String& nodeTypeKey, const juce::File& file);
+        const cydaw::base::Text& nodeTypeKey, const cydaw::base::File& file);
     void setUserGraphPresetSavedHandler(std::function<void()> handler);
     void addPublishedIoPair(cydaw::engine::PortKind kind,
                             int audioChannels = 2);
     void showGraphInterfaceEditor();
     [[nodiscard]] bool saveGraphInterfaceSnapshot(
-        const juce::File& destination) const;
+        const cydaw::base::File& destination) const;
     void showGraphManager();
     void showGraphMembersPanel();
     [[nodiscard]] std::size_t graphMemberCount() const noexcept;
-    void setGraphMemberSearch(const juce::String& query);
+    void setGraphMemberSearch(const cydaw::base::Text& query);
     [[nodiscard]] std::size_t visibleGraphMemberCount() const noexcept;
     [[nodiscard]] bool setGraphMemberMetadata(
-        const juce::String& key, const juce::String& displayName,
-        const juce::String& description = {});
+        const cydaw::base::Text& key, const cydaw::base::Text& displayName,
+        const cydaw::base::Text& description = {});
     [[nodiscard]] bool setGraphMemberType(
-        const juce::String& key, cydaw::engine::PortKind kind,
+        const cydaw::base::Text& key, cydaw::engine::PortKind kind,
         int audioChannels = 2);
-    [[nodiscard]] bool moveGraphMember(const juce::String& key, int delta);
-    [[nodiscard]] bool selectGraphManagerAsset(const juce::String& key);
+    [[nodiscard]] bool moveGraphMember(const cydaw::base::Text& key, int delta);
+    [[nodiscard]] bool selectGraphManagerAsset(const cydaw::base::Text& key);
     void showGraphManagerFileBrowser();
     [[nodiscard]] bool saveGraphManagerSnapshot(
-        const juce::File& destination);
-    void showNodeBrowser(const juce::String& selectedKey = {});
+        const cydaw::base::File& destination);
+    void showNodeBrowser(const cydaw::base::Text& selectedKey = {});
     [[nodiscard]] bool saveNodeBrowserSnapshot(
-        const juce::File& destination) const;
-    void setContextName(juce::String name);
+        const cydaw::base::File& destination) const;
+    void setContextName(cydaw::base::Text name);
     void setGraphAssetScope(cydaw::graph::GraphScope scope);
     [[nodiscard]] cydaw::graph::GraphReference graphReference() const;
     [[nodiscard]] cydaw::graph::GraphRole graphRole() const noexcept;
@@ -543,7 +543,7 @@ public:
     [[nodiscard]] cydaw::base::Value createVst3ExportManifest() const;
     [[nodiscard]] cydaw::base::Value createVst3RuntimeState() const;
     [[nodiscard]] cydaw::base::Result generateVst3Project(
-        const juce::File& destination, const juce::String& format = "VST3") const;
+        const cydaw::base::File& destination, const cydaw::base::Text& format = "VST3") const;
     void setEffectParameters(float driveDb, float filterCutoffHz, bool enabled);
     // The long way round, for the suite to compare the short one against.
     void resynchroniseGraphInterfaceForTest() { synchroniseGraphInterface(); }
@@ -556,8 +556,8 @@ public:
     // and saving follow without the component ever being shown.
     struct EditorPort {
         std::uint64_t id {};
-        juce::String key;
-        juce::String name;
+        cydaw::base::Text key;
+        cydaw::base::Text name;
         int kind {};      // engine::PortKind: 0 audio, 1 MIDI, 2 control, 3 transport
         int type {};      // graph::PortType
         bool input {};
@@ -565,29 +565,29 @@ public:
         bool multiple {};
         double defaultValue {};
         int exposure { -1 };
-        juce::String category;
+        cydaw::base::Text category;
     };
     struct EditorParameter {
-        juce::String binding;
-        juce::String label;
-        juce::String unit;
+        cydaw::base::Text binding;
+        cydaw::base::Text label;
+        cydaw::base::Text unit;
         double minimum {};
         double maximum { 1.0 };
         double value {};
         double defaultValue {};
         bool showInDevice { true };
         bool publishToHost { true };
-        juce::String description;
+        cydaw::base::Text description;
         std::uint64_t inputPortId {};
     };
     struct EditorNode {
         std::uint64_t id {};
-        juce::String typeKey;
-        juce::String title;     // what the card shows: its alias, else the type
-        juce::String typeTitle;
-        juce::String alias;
-        juce::String category;
-        juce::String description;
+        cydaw::base::Text typeKey;
+        cydaw::base::Text title;     // what the card shows: its alias, else the type
+        cydaw::base::Text typeTitle;
+        cydaw::base::Text alias;
+        cydaw::base::Text category;
+        cydaw::base::Text description;
         juce::Colour colour;
         juce::Point<float> position; // canvas fractions, as stored
         bool collapsed {};
@@ -614,21 +614,21 @@ public:
     };
     struct EditorComment {
         std::uint64_t id {};
-        juce::String title;
-        juce::String description;
+        cydaw::base::Text title;
+        cydaw::base::Text description;
         juce::Point<float> position;
         juce::Point<float> size;
         juce::Colour colour;
     };
     struct EditorNodeType {
-        juce::String key;
-        juce::String title;
-        juce::String category;
-        juce::String categoryKey; // the catalogue's, for a tree of its own
-        juce::String description;
+        cydaw::base::Text key;
+        cydaw::base::Text title;
+        cydaw::base::Text category;
+        cydaw::base::Text categoryKey; // the catalogue's, for a tree of its own
+        cydaw::base::Text description;
         juce::Colour colour;
         bool module {};
-        juce::String moduleCategory; // a graph's own category ("Effets / Délai et espace")
+        cydaw::base::Text moduleCategory; // a graph's own category ("Effets / Délai et espace")
         bool hidden {};
         int inputKind { -1 };   // -1: none
         int outputKind { -1 };
@@ -640,15 +640,15 @@ public:
     // One card's type and its own name (empty when there is no such card),
     // without describing the whole graph as editorNodes does: asked for each
     // card, every frame, that made a large graph's frame cost its square.
-    [[nodiscard]] juce::String editorNodeTypeKey(std::uint64_t id) const;
-    [[nodiscard]] juce::String editorNodeAlias(std::uint64_t id) const;
+    [[nodiscard]] cydaw::base::Text editorNodeTypeKey(std::uint64_t id) const;
+    [[nodiscard]] cydaw::base::Text editorNodeAlias(std::uint64_t id) const;
     bool editorSetPortExposure(std::uint64_t node, std::uint64_t port, bool exposed);
-    bool editorSetPortDetails(std::uint64_t node, std::uint64_t port, const juce::String& name, const juce::String& category);
+    bool editorSetPortDetails(std::uint64_t node, std::uint64_t port, const cydaw::base::Text& name, const cydaw::base::Text& category);
     bool editorRemoveBoundary(std::uint64_t node);
     // Promote a value/socket in one undoable edit. An input becomes part of
     // the graph contract; a variable is a local editable constant.
     cydaw::base::Result editorPromoteValue(std::uint64_t node, std::uint64_t port,
-        const juce::String& binding, bool graphInput, std::uint64_t& created);
+        const cydaw::base::Text& binding, bool graphInput, std::uint64_t& created);
     [[nodiscard]] const cydaw::engine::AudioAnalysisFrame& editorAnalysis() const noexcept { return lastAnalysisFrame_; }
     // The audio inputs beside the main one (the instrument, else the first:
     // the track's clips), in the graph's order: node, bus (1, 2…). What
@@ -662,7 +662,7 @@ public:
     [[nodiscard]] std::vector<EditorParameter> editorGraphParameters() const;
     [[nodiscard]] std::optional<float> editorControlValue(std::uint64_t nodeId) const;
     // Empty when the cable may be drawn; otherwise why not.
-    [[nodiscard]] juce::String editorCanConnect(std::uint64_t source, std::uint64_t sourcePort,
+    [[nodiscard]] cydaw::base::Text editorCanConnect(std::uint64_t source, std::uint64_t sourcePort,
                                                 std::uint64_t destination,
                                                 std::uint64_t destinationPort) const;
     [[nodiscard]] bool editorCanUndo() const noexcept;
@@ -671,14 +671,14 @@ public:
     [[nodiscard]] std::uint64_t editorHistorySteps() const noexcept { return historySteps_; }
     [[nodiscard]] bool editorCanRedo() const noexcept;
     [[nodiscard]] bool editorLocked() const noexcept { return editingLocked_; }
-    std::uint64_t editorAddNode(const juce::String& typeKey, juce::Point<float> position);
+    std::uint64_t editorAddNode(const cydaw::base::Text& typeKey, juce::Point<float> position);
     bool editorRemoveNodes(const std::vector<std::uint64_t>& ids);
     // One of audioInputBuses(): an end of the graph, but never its main one.
     bool editorRemoveAudioInput(std::uint64_t id);
     // ---- Devices made of a graph (modules) ------------------------------
     struct EditorModuleInfo {
-        juce::String key;
-        juce::String name;
+        cydaw::base::Text key;
+        cydaw::base::Text name;
         cydaw::graph::GraphRole role { cydaw::graph::GraphRole::audioEffect };
         // A module of the factory library, shared by every graph using it.
         bool factory {};
@@ -689,43 +689,43 @@ public:
     [[nodiscard]] std::optional<EditorModuleInfo> editorModuleOf(std::uint64_t nodeId) const;
     // A module's inside as a graph state of its own, to edit in another
     // graph; its changes come back through editorApplyModuleGraphState.
-    [[nodiscard]] cydaw::base::Value editorModuleGraphState(const juce::String& key) const;
+    [[nodiscard]] cydaw::base::Value editorModuleGraphState(const cydaw::base::Text& key) const;
     // The edited inside written back: the module and every instance of it.
-    void editorApplyModuleGraphState(const juce::String& key, const cydaw::base::Value& state, bool structural);
+    void editorApplyModuleGraphState(const cydaw::base::Text& key, const cydaw::base::Value& state, bool structural);
     // A shared module made this graph's own before it is edited: the
     // instance plays a copy from now on. The copy's key; the module's own
     // when it already was.
-    juce::String editorMakeModuleOwn(std::uint64_t nodeId);
+    cydaw::base::Text editorMakeModuleOwn(std::uint64_t nodeId);
     // Cards of an audio chain made one device: a module of them with an
     // input and an output, put in their place and wired as they were. Its
     // card, or 0 and why not.
-    std::uint64_t editorCreateModuleFromSelection(const std::vector<std::uint64_t>& ids, const juce::String& name,
-                                                  juce::String& error);
+    std::uint64_t editorCreateModuleFromSelection(const std::vector<std::uint64_t>& ids, const cydaw::base::Text& name,
+                                                  cydaw::base::Text& error);
     // A new device, empty, in the chain: an effect (its input wired to its
     // output) or an instrument. Its card.
     std::uint64_t editorCreateEmptyDevice(cydaw::graph::GraphRole role);
     // A device kept as a graph state (a library file) put into the chain as
     // a module of this graph. Its card, 0 when the state holds no graph.
-    std::uint64_t editorInsertModuleFromState(const cydaw::base::Value& state, cydaw::graph::GraphRole role, const juce::String& name);
+    std::uint64_t editorInsertModuleFromState(const cydaw::base::Value& state, cydaw::graph::GraphRole role, const cydaw::base::Text& name);
     // This graph's name, which a module's inside carries back as the
     // module's.
-    [[nodiscard]] juce::String editorGraphName() const { return graphName_; }
+    [[nodiscard]] cydaw::base::Text editorGraphName() const { return graphName_; }
     // A control cable's way of driving its parameter: set it, or modulate
     // it by `amount` of its range around its own value. One undo step.
     bool editorSetConnectionMode(std::uint64_t source, std::uint64_t sourcePort, std::uint64_t destination,
                                  std::uint64_t destinationPort, int mode, float amount);
     // The socket on a device made of a graph that drives one of its knobs
     // from outside: its id, from the knob's (class) key.
-    [[nodiscard]] static cydaw::graph::PortId knobPortId(const juce::String& classKey);
+    [[nodiscard]] static cydaw::graph::PortId knobPortId(const cydaw::base::Text& classKey);
     // What a control cable drives: the knob (its binding on the card, empty
     // when the card shows none) and the range of the parameter behind it.
     struct ControlCableTarget {
-        juce::String binding;
+        cydaw::base::Text binding;
         double minimum {};
         double maximum { 1.0 };
     };
     // Why a connection is refused, in the language shown.
-    [[nodiscard]] juce::String connectionProblemText(const cydaw::engine::GraphResult& result) const;
+    [[nodiscard]] cydaw::base::Text connectionProblemText(const cydaw::engine::GraphResult& result) const;
     // A mono output to a stereo input (or the reverse): a converter card put
     // between them and wired. Its id, 0 when the widths are not those two.
     std::uint64_t editorConnectThroughConverter(std::uint64_t source, std::uint64_t sourcePort, std::uint64_t destination,
@@ -735,28 +735,28 @@ public:
     bool spliceBeforeOutput(std::uint64_t instance);
     // The audio width of a card's socket (0: none or any).
     [[nodiscard]] int editorAudioChannels(std::uint64_t node, std::uint64_t port, bool input) const;
-    void editorSetGraphName(const juce::String& name);
+    void editorSetGraphName(const cydaw::base::Text& name);
     // What a device made of this graph says of itself (saved with it, and
     // carried into a VST3 export).
     struct EditorGraphInfo {
-        juce::String name;
-        juce::String description;
-        juce::String author;
-        juce::String category;
+        cydaw::base::Text name;
+        cydaw::base::Text description;
+        cydaw::base::Text author;
+        cydaw::base::Text category;
     };
     [[nodiscard]] EditorGraphInfo editorGraphInfo() const;
     void editorSetGraphInfo(const EditorGraphInfo& info);
     // The device's programs: its published settings' values (by key) under a
     // name, saved with it and, in a VST3 export, the plugin's programs.
     struct EditorProgram {
-        juce::String name;
-        std::vector<std::pair<juce::String, double>> values;
+        cydaw::base::Text name;
+        std::vector<std::pair<cydaw::base::Text, double>> values;
     };
     [[nodiscard]] const std::vector<EditorProgram>& editorPrograms() const noexcept { return programs_; }
     // One undo step; the names are trimmed, an empty one is dropped.
     void editorSetPrograms(std::vector<EditorProgram> programs);
     // The published settings as they are now, under a name.
-    [[nodiscard]] EditorProgram editorCaptureProgram(const juce::String& name, bool defaults = false) const;
+    [[nodiscard]] EditorProgram editorCaptureProgram(const cydaw::base::Text& name, bool defaults = false) const;
     // Sets the settings a program has (those still published).
     bool editorApplyProgram(const EditorProgram& program);
     // This graph's own interface: the controls a device (and a plugin) made
@@ -775,17 +775,17 @@ public:
     // The voice parameter a binding of such a card names, when the voices
     // can follow it (filter cutoff and resonance, wavetable position, level
     // and detune, string damping).
-    [[nodiscard]] std::optional<cydaw::engine::PolyVoiceTarget> editorVoiceTargetFor(const juce::String& binding) const;
+    [[nodiscard]] std::optional<cydaw::engine::PolyVoiceTarget> editorVoiceTargetFor(const cydaw::base::Text& binding) const;
     // The same, with the instruments' own settings (Prisme's, Kick's, a
     // sampler's, a sound model's): each by its index, for automation lanes.
-    [[nodiscard]] std::optional<cydaw::engine::PolyVoiceParameter> editorVoiceParameterFor(const juce::String& binding) const;
+    [[nodiscard]] std::optional<cydaw::engine::PolyVoiceParameter> editorVoiceParameterFor(const cydaw::base::Text& binding) const;
     // Where a knob inside a module ("node.12.node.4.lowpass.cutoff") lands
     // in the native graph the chain plays: the node the compiler made for it
     // and the binding on that node itself ("lowpass.cutoff"). Empty for a
     // top-level card's knob (its node keeps the card's id) and for a binding
     // the graph does not publish. The generated id can change when the
     // graph's shape does.
-    [[nodiscard]] std::optional<std::pair<std::uint64_t, juce::String>> editorNativeNodeFor(const juce::String& binding) const;
+    [[nodiscard]] std::optional<std::pair<std::uint64_t, cydaw::base::Text>> editorNativeNodeFor(const cydaw::base::Text& binding) const;
     // A device taken out of a chain, as the device panel does: what fed it
     // is wired to what it fed, so the sound still flows. One undo step.
     bool editorRemoveFromChain(std::uint64_t id);
@@ -802,11 +802,11 @@ public:
                          bool commit);
     // Empty on success, otherwise why the cable was refused. A single input
     // already fed is replaced.
-    juce::String editorConnect(std::uint64_t source, std::uint64_t sourcePort,
+    cydaw::base::Text editorConnect(std::uint64_t source, std::uint64_t sourcePort,
                                std::uint64_t destination, std::uint64_t destinationPort);
     bool editorDisconnect(std::uint64_t source, std::uint64_t sourcePort,
                           std::uint64_t destination, std::uint64_t destinationPort);
-    bool editorSetParameter(const juce::String& binding, double value);
+    bool editorSetParameter(const cydaw::base::Text& binding, double value);
     // ---- Modulators (engine/Modulators.h) -------------------------------
     // A control cable onto a knob: what moves it, by how much.
     struct EditorModulation {
@@ -814,25 +814,25 @@ public:
         std::uint64_t sourcePort {};
         std::uint64_t node {};
         std::uint64_t port {};
-        juce::String binding;
+        cydaw::base::Text binding;
         int mode {};          // 0 sets the knob, 1 moves it around its value
         float amount {};
     };
     [[nodiscard]] std::vector<EditorModulation> editorModulations() const;
     // A modulator of `typeKey` (a control entry of the effect catalogue) for
     // the card `owner`, made beside it; its id, 0 when refused.
-    std::uint64_t editorAddModulator(std::uint64_t owner, const juce::String& typeKey);
+    std::uint64_t editorAddModulator(std::uint64_t owner, const cydaw::base::Text& typeKey);
     // The card a modulator belongs to; 0 for none (or not a modulator).
     [[nodiscard]] std::uint64_t editorModulatorOwner(std::uint64_t modulator) const;
     // A wavetable card's table, by its id (not the first card of its type).
     [[nodiscard]] cydaw::engine::WavetableShape editorNodeWavetable(std::uint64_t id) const { return nodeWavetable(id); }
     bool editorSetNodeWavetable(std::uint64_t id, const cydaw::engine::WavetableShape& shape) { return setNodeWavetable(id, shape); }
     // The socket of `node` that feeds its knob `binding`; 0 for none.
-    [[nodiscard]] std::uint64_t editorParameterSocket(std::uint64_t node, const juce::String& binding) const;
+    [[nodiscard]] std::uint64_t editorParameterSocket(std::uint64_t node, const cydaw::base::Text& binding) const;
     // A modulator onto the knob `binding`, moving it by `amount` (-1..1 of
     // its range); already there, its amount set. Empty on success, else why not.
-    juce::String editorModulate(std::uint64_t modulator, const juce::String& binding, float amount);
-    bool editorUnmodulate(std::uint64_t modulator, const juce::String& binding);
+    cydaw::base::Text editorModulate(std::uint64_t modulator, const cydaw::base::Text& binding, float amount);
+    bool editorUnmodulate(std::uint64_t modulator, const cydaw::base::Text& binding);
     // A cable's amount, turned as a knob is (heard at once, one undo step
     // once it rests): no change of the graph's shape.
     bool editorSetModulationAmount(std::uint64_t source, std::uint64_t sourcePort, std::uint64_t destination,
@@ -847,7 +847,7 @@ public:
         // With a post chain (XY FX's Post FX): the first end, the branches'
         // mix the post chain follows; 0 without.
         std::uint64_t blend {};
-        juce::String typeKey;
+        cydaw::base::Text typeKey;
         std::vector<std::vector<std::uint64_t>> branches;
         // Which of `branches` is the post chain; -1 for none.
         int postBranch { -1 };
@@ -861,20 +861,20 @@ public:
     [[nodiscard]] std::pair<std::uint64_t, int> editorPlaceOf(std::uint64_t node) const;
     // A container of `typeKey` before the card `before` (0: the chain's end);
     // its head, 0 when refused.
-    std::uint64_t editorInsertContainer(const juce::String& typeKey, std::uint64_t before);
+    std::uint64_t editorInsertContainer(const cydaw::base::Text& typeKey, std::uint64_t before);
     // A card (a container with all it holds) moved before `before`: in the
     // main chain (`head` 0) or in a branch of a container (`before` 0: at
     // the branch's end). One undo step.
     bool editorMoveCard(std::uint64_t id, std::uint64_t head, int branch, std::uint64_t before);
     // A new card of `typeKey` (a container too) in a branch, before `before`
     // (0: at its end); its id, 0 when refused.
-    std::uint64_t editorInsertInBranch(std::uint64_t head, int branch, const juce::String& typeKey, std::uint64_t before);
+    std::uint64_t editorInsertInBranch(std::uint64_t head, int branch, const cydaw::base::Text& typeKey, std::uint64_t before);
     // A layer, a selector's chain: one more, or one gone with its cards.
     bool editorAddBranch(std::uint64_t head);
     bool editorRemoveBranch(std::uint64_t head, int branch);
     // A branch's name given by hand (empty: none); naming it (one undo step).
-    [[nodiscard]] juce::String editorBranchName(std::uint64_t head, int branch) const;
-    bool editorRenameBranch(std::uint64_t head, int branch, const juce::String& name);
+    [[nodiscard]] cydaw::base::Text editorBranchName(std::uint64_t head, int branch) const;
+    bool editorRenameBranch(std::uint64_t head, int branch, const cydaw::base::Text& name);
     // A whole container, as a preset keeps it: its head, every card it holds
     // (nested containers' too), its ends, their modulators and the cables
     // between them ({format, type, head, end, nodes, connections}); void
@@ -889,7 +889,7 @@ public:
     bool editorRemoveContainer(std::uint64_t head);
     // When a parameter was last set through editorSetParameter (a knob
     // turned anywhere, a controller): a count that only grows; 0 never.
-    [[nodiscard]] std::uint64_t editorParameterTouch(const juce::String& binding) const;
+    [[nodiscard]] std::uint64_t editorParameterTouch(const cydaw::base::Text& binding) const;
     // A Prisme card's settings, as its own panel reads them every frame.
     [[nodiscard]] std::optional<cydaw::engine::prism::PrismValues> editorPrismValues(std::uint64_t nodeId) const;
     // A Kick card's settings, the same way.
@@ -908,19 +908,19 @@ public:
         bool simple {};
     };
     [[nodiscard]] std::optional<SamplerCardControls> editorSamplerControls(std::uint64_t nodeId) const;
-    bool editorSetAlias(std::uint64_t id, const juce::String& alias);
+    bool editorSetAlias(std::uint64_t id, const cydaw::base::Text& alias);
     // A card's own description (what a missing plug-in was: its maker, its
     // format), kept with the graph.
-    bool editorSetDescription(std::uint64_t id, const juce::String& description);
+    bool editorSetDescription(std::uint64_t id, const cydaw::base::Text& description);
     bool editorSetCollapsed(std::uint64_t id, bool collapsed);
     // A card switched off or on (heard at once, an undo step).
     bool editorSetBypassed(std::uint64_t id, bool bypassed);
     std::vector<std::uint64_t> editorDuplicate(const std::vector<std::uint64_t>& ids);
     bool editorUndo();
     bool editorRedo();
-    std::uint64_t editorAddComment(const juce::String& title, juce::Point<float> position,
+    std::uint64_t editorAddComment(const cydaw::base::Text& title, juce::Point<float> position,
                                    juce::Point<float> size);
-    bool editorSetComment(std::uint64_t id, const juce::String& title, juce::Point<float> position,
+    bool editorSetComment(std::uint64_t id, const cydaw::base::Text& title, juce::Point<float> position,
                           juce::Point<float> size, bool commit);
     bool editorRemoveComment(std::uint64_t id);
     // Arranges the cards by signal flow, as the canvas's own button does.
@@ -945,7 +945,7 @@ public:
     [[nodiscard]] std::vector<cydaw::engine::PolyVoiceModulation> editorVoiceModulations() const;
     // The knobs a control cable drives and the value it delivers now, by
     // binding: what the graph's live values say (setControlValues).
-    [[nodiscard]] std::map<juce::String, float> editorModulatedParameters() const;
+    [[nodiscard]] std::map<cydaw::base::Text, float> editorModulatedParameters() const;
 
     void paint(juce::Graphics& graphics) override;
     void resized() override;
@@ -988,7 +988,7 @@ private:
                           const cydaw::engine::WavetableShape& shape);
     // The first card of a type, for the suite, which has no way to learn an
     // id otherwise.
-    [[nodiscard]] NodeId nodeIdForType(const juce::String& typeKey) const;
+    [[nodiscard]] NodeId nodeIdForType(const cydaw::base::Text& typeKey) const;
     // What a card is shaped with, built-in bank included, so the editor
     // always has something to draw and to start from.
     [[nodiscard]] cydaw::engine::WavetableShape nodeWavetable(
@@ -997,7 +997,7 @@ private:
     void chooseWavetableFile(NodeId nodeId);
     // The reading itself, separated from the asking so the suite can hand it
     // a file without a dialog.
-    cydaw::base::Result importWavetableFile(NodeId nodeId, const juce::File& file);
+    cydaw::base::Result importWavetableFile(NodeId nodeId, const cydaw::base::File& file);
     // A wavetable file is a row of single cycles: a handful of kilobytes, not
     // a recording. Refusing the rest before reading keeps a mistaken pick
     // from pulling twenty minutes of audio into memory.
@@ -1007,22 +1007,22 @@ private:
 
     struct NodePort {
         cydaw::graph::PortId id {};
-        juce::String key;
-        juce::String name;
+        cydaw::base::Text key;
+        cydaw::base::Text name;
         cydaw::graph::PortType type { cydaw::graph::PortType::value };
         bool input {};
         std::uint8_t channels { 1 };
         bool acceptsMultipleConnections {};
         double defaultValue {};
         int exposure { -1 };
-        juce::String category;
+        cydaw::base::Text category;
     };
 
     struct NodeType {
-        juce::String key;
-        juce::String translationKey;
-        juce::String title;
-        juce::String categoryKey;
+        cydaw::base::Text key;
+        cydaw::base::Text translationKey;
+        cydaw::base::Text title;
+        cydaw::base::Text categoryKey;
         juce::Colour colour;
         bool hasInput {};
         PortKind inputKind { PortKind::audio };
@@ -1032,7 +1032,7 @@ private:
         bool composite {};
         std::uint8_t inputChannels {};
         std::uint8_t outputChannels {};
-        juce::String descriptionKey;
+        cydaw::base::Text descriptionKey;
         std::vector<NodePort> ports;
         bool stateful {};
         bool supportsPolyphony {};
@@ -1046,8 +1046,8 @@ private:
     // carries no catalogue index.
     struct LibraryRow {
         int catalogIndex { -1 };
-        juce::String foldKey;    // the fold a heading opens
-        juce::String label;      // heading text
+        cydaw::base::Text foldKey;    // the fold a heading opens
+        cydaw::base::Text label;      // heading text
         int depth {};            // indent: 0 heading, 1 sub-heading or
                                  // uncategorised entry, 2 nested entry
         int count {};            // entries under a heading
@@ -1056,8 +1056,8 @@ private:
 
     struct Node {
         NodeId id {};
-        juce::String typeKey;
-        juce::String title;
+        cydaw::base::Text typeKey;
+        cydaw::base::Text title;
         juce::Colour colour;
         juce::Point<float> position;
         bool hasInput {};
@@ -1068,10 +1068,10 @@ private:
         bool composite {};
         std::uint8_t inputChannels {};
         std::uint8_t outputChannels {};
-        juce::String alias;
+        cydaw::base::Text alias;
         cydaw::engine::NativeDspNodeParameters parameters;
         ModuleInterfaceState interfaceState;
-        juce::String description;
+        cydaw::base::Text description;
         std::vector<NodePort> ports;
         // True only when this reusable-Graph instance owns a custom control
         // surface. Untouched instances continue following the class layout.
@@ -1108,7 +1108,7 @@ private:
         cydaw::base::Value instrumentJson;
         // A container's branches named by hand (by their place; an empty one
         // keeps its usual name).
-        juce::StringArray branchNames;
+        cydaw::base::TextList branchNames;
         // What this node last serialised to. A node is a pure function of
         // itself, so the answer only changes when the node does, and finding
         // out costs about forty microseconds — three hundred of those is what
@@ -1134,8 +1134,8 @@ private:
 
     struct GraphComment {
         std::uint64_t id {};
-        juce::String title;
-        juce::String description;
+        cydaw::base::Text title;
+        cydaw::base::Text description;
         juce::Point<float> position;
         juce::Point<float> size { 0.42f, 0.34f };
         juce::Colour colour { 0xff8064c8 };
@@ -1158,14 +1158,14 @@ private:
 
     struct ModuleNode {
         NodeId id {};
-        juce::String typeKey;
-        juce::String title;
+        cydaw::base::Text typeKey;
+        cydaw::base::Text title;
         juce::Point<float> position;
         cydaw::engine::NativeDspNodeParameters parameters;
         std::uint8_t inputChannels {};
         std::uint8_t outputChannels {};
-        juce::String alias;
-        juce::String description;
+        cydaw::base::Text alias;
+        cydaw::base::Text description;
         // Values and presentation owned by this particular reusable-Graph
         // instance. The SavedModule remains the immutable class/default.
         ModuleInterfaceState interfaceState;
@@ -1193,17 +1193,17 @@ private:
         // device's inside written back, a card keeps them.
         bool bypassed {};
         cydaw::base::Value instrumentJson;
-        juce::StringArray branchNames;
+        cydaw::base::TextList branchNames;
     };
 
     struct SavedModule {
-        juce::String key;
-        juce::String name;
+        cydaw::base::Text key;
+        cydaw::base::Text name;
         cydaw::graph::SemanticVersion version { 1, 0, 0 };
         // Empty for an original class. Variants retain this stable class key
         // so the manager can show lineage without coupling DSP compilation to
         // mutable display names.
-        juce::String parentClassKey;
+        cydaw::base::Text parentClassKey;
         std::vector<ModuleNode> nodes;
         std::vector<Connection> connections;
         ModuleInterfaceState interfaceState;
@@ -1217,13 +1217,13 @@ private:
         bool factoryModule {};
         bool inlineModule {};
         bool locked {};
-        juce::String description;
+        cydaw::base::Text description;
         // Library metadata belongs to the reusable Graph class rather than
         // to one of its instances.  Keeping it beside the class makes the
         // Graph Manager useful for both factory and user-authored libraries.
-        juce::String category;
-        juce::String author;
-        juce::StringArray tags;
+        cydaw::base::Text category;
+        cydaw::base::Text author;
+        cydaw::base::TextList tags;
         cydaw::graph::GraphRole role { cydaw::graph::GraphRole::generic };
         // The value this class was parsed from, held so that restoring the
         // same value again can reuse the class instead of building it a second
@@ -1243,7 +1243,7 @@ private:
     };
 
     struct PresetNode {
-        juce::String typeKey;
+        cydaw::base::Text typeKey;
         juce::Point<float> position;
         cydaw::engine::NativeDspNodeParameters parameters;
     };
@@ -1256,15 +1256,15 @@ private:
     };
 
     struct FactoryPreset {
-        juce::String key;
-        juce::String translationKey;
+        cydaw::base::Text key;
+        cydaw::base::Text translationKey;
         std::vector<PresetNode> nodes;
         std::vector<PresetConnection> connections;
     };
 
     struct EmbeddedSlider {
         NodeId nodeId {};
-        juce::String binding;
+        cydaw::base::Text binding;
         std::unique_ptr<juce::Slider> slider;
         // The map-range feeding this knob, found once at layout: the control
         // values arrive thirty times a second and must not search for it.
@@ -1273,60 +1273,60 @@ private:
 
     struct EmbeddedButton {
         NodeId nodeId {};
-        juce::String binding;
+        cydaw::base::Text binding;
         std::unique_ptr<juce::ToggleButton> button;
     };
 
     struct EmbeddedCombo {
         NodeId nodeId {};
-        juce::String binding;
+        cydaw::base::Text binding;
         std::vector<double> values;
         std::unique_ptr<juce::ComboBox> combo;
     };
 
     struct EmbeddedXyPad {
         NodeId nodeId {};
-        juce::String xBinding;
-        juce::String yBinding;
+        cydaw::base::Text xBinding;
+        cydaw::base::Text yBinding;
         std::unique_ptr<ModuleXyPadComponent> pad;
     };
 
     struct EmbeddedWavetable {
         NodeId nodeId {};
-        juce::String positionBinding;
+        cydaw::base::Text positionBinding;
         std::unique_ptr<ModuleWavetableComponent> table;
     };
 
     struct EmbeddedEnvelope {
         NodeId nodeId {};
-        std::array<juce::String, 4> bindings;
+        std::array<cydaw::base::Text, 4> bindings;
         std::unique_ptr<ModuleEnvelopeComponent> envelope;
     };
 
     struct EmbeddedFilterResponse {
         NodeId nodeId {};
-        juce::String cutoffBinding;
-        juce::String resonanceBinding;
+        cydaw::base::Text cutoffBinding;
+        cydaw::base::Text resonanceBinding;
         std::unique_ptr<ModuleFilterResponseComponent> response;
     };
 
     struct EmbeddedEqCurve {
         NodeId nodeId {};
         // Three bindings per band, in the order the control lists them.
-        std::vector<juce::String> bindings;
+        std::vector<cydaw::base::Text> bindings;
         std::unique_ptr<ModuleEqCurveComponent> curve;
     };
 
     struct EmbeddedDynamicsResponse {
         NodeId nodeId {};
-        juce::String thresholdBinding;
-        juce::String ratioBinding;
+        cydaw::base::Text thresholdBinding;
+        cydaw::base::Text ratioBinding;
         std::unique_ptr<ModuleDynamicsResponseComponent> response;
     };
 
     struct NativeParameterTarget {
         NodeId instanceNodeId {};
-        juce::String parameterKey;
+        cydaw::base::Text parameterKey;
         NodeId nativeNodeId {};
     };
 
@@ -1350,7 +1350,7 @@ private:
     // The first card of a type as the instrument compiler meets them,
     // inside devices too: what `pick` takes from it.
     template <typename Result, typename Pick>
-    [[nodiscard]] Result firstVoiceCard(const juce::String& typeKey, Pick pick) const;
+    [[nodiscard]] Result firstVoiceCard(const cydaw::base::Text& typeKey, Pick pick) const;
     static void applyWavetableHarmonics(
         Node& node, const cydaw::base::Array<cydaw::base::Value>& harmonics);
     [[nodiscard]] cydaw::engine::NativeDspGraph buildNativeDspGraph(
@@ -1365,25 +1365,25 @@ private:
     // built once already. Building all of them to find out that they are
     // present is the single most expensive thing a restore used to do after
     // the graph itself.
-    juce::StringArray factoryModuleKeys_;
+    cydaw::base::TextList factoryModuleKeys_;
     bool factoryModulesInstalled_ {};
 
 public:
     // Where the last restore() spent its time, for the performance bench.
-    [[nodiscard]] juce::String restoreProfile() const { return restoreProfile_; }
-    [[nodiscard]] juce::String exportProfile() const { return exportProfile_; }
-    [[nodiscard]] juce::String definitionsProfile() const
+    [[nodiscard]] cydaw::base::Text restoreProfile() const { return restoreProfile_; }
+    [[nodiscard]] cydaw::base::Text exportProfile() const { return exportProfile_; }
+    [[nodiscard]] cydaw::base::Text definitionsProfile() const
     {
-        return "calls=" + juce::String(definitionsCalls_)
-               + " lastModules=" + juce::String(definitionsLastModulesMs_, 2)
-               + " lastRoot=" + juce::String(definitionsLastRootMs_, 2)
-               + " worst=" + juce::String(definitionsWorstMs_, 2)
-               + " cached=" + juce::String(definitionsCacheHits_);
+        return "calls=" + cydaw::base::Text(definitionsCalls_)
+               + " lastModules=" + cydaw::base::Text(definitionsLastModulesMs_, 2)
+               + " lastRoot=" + cydaw::base::Text(definitionsLastRootMs_, 2)
+               + " worst=" + cydaw::base::Text(definitionsWorstMs_, 2)
+               + " cached=" + cydaw::base::Text(definitionsCacheHits_);
     }
 
 private:
-    juce::String restoreProfile_;
-    mutable juce::String exportProfile_;
+    cydaw::base::Text restoreProfile_;
+    mutable cydaw::base::Text exportProfile_;
     mutable int definitionsCalls_ {};
     mutable int definitionsCacheHits_ {};
     mutable double definitionsWorstMs_ {};
@@ -1450,19 +1450,19 @@ private:
     void createModuleFromSelection();
     void showCreateGraphMenu();
     void showPublishedIoMenu(juce::Component* target);
-    void editGraphMemberDetails(const juce::String& key);
+    void editGraphMemberDetails(const cydaw::base::Text& key);
     void refreshGraphMembersPanel();
     // Cheap fingerprint of exactly the data the members panel renders, so a
     // layout pass does not rebuild a list that has not changed.
     [[nodiscard]] juce::int64 graphMembersSignature() const;
     juce::int64 graphMembersSignature_ { -1 };
     [[nodiscard]] bool updateGraphMemberParameterVisibility(
-        const juce::String& key,
+        const cydaw::base::Text& key,
         std::optional<bool> showInDevice,
         std::optional<bool> publishToHost);
     [[nodiscard]] bool insertModuleIntoCurrentSignalFlow(NodeId moduleNodeId);
     [[nodiscard]] cydaw::engine::NativeDspNodeParameters defaultParametersForType(
-        const juce::String& typeKey) const;
+        const cydaw::base::Text& typeKey) const;
     [[nodiscard]] ModuleInterfaceState createNodeInterface(const Node& node) const;
     [[nodiscard]] ModuleInterfaceState createGraphInstanceInterface(
         NodeId instanceId, const SavedModule& module) const;
@@ -1472,37 +1472,37 @@ private:
     void synchroniseGraphInterface();
     void rebuildEmbeddedSliders();
     void synchroniseEmbeddedXyPads(
-        NodeId nodeId = 0, const juce::String& binding = {});
+        NodeId nodeId = 0, const cydaw::base::Text& binding = {});
     void synchroniseEmbeddedWavetables(NodeId nodeId = 0);
     // Six hundred and fifty thousand sines per table. Once per turn of the
     // message loop, never per notch of a drag.
     void rebuildPendingWavetableBanks();
     void synchroniseEmbeddedEqCurves(NodeId nodeId = 0,
-                                     const juce::String& binding = {});
+                                     const cydaw::base::Text& binding = {});
     void synchroniseEmbeddedEnvelopes(
-        NodeId nodeId = 0, const juce::String& binding = {});
+        NodeId nodeId = 0, const cydaw::base::Text& binding = {});
     void synchroniseEmbeddedFilterResponses(
-        NodeId nodeId = 0, const juce::String& binding = {});
+        NodeId nodeId = 0, const cydaw::base::Text& binding = {});
     void synchroniseEmbeddedDynamicsResponses(
-        NodeId nodeId = 0, const juce::String& binding = {});
+        NodeId nodeId = 0, const cydaw::base::Text& binding = {});
     [[nodiscard]] const ModuleInterfaceState& presentationForNode(
         const Node& node) const;
     [[nodiscard]] ModuleInterfaceState* editablePresentationForNode(Node& node);
     void openGraphInterfaceEditor();
     [[nodiscard]] bool updateNodeParameter(Node& node,
-                                           const juce::String& binding,
+                                           const cydaw::base::Text& binding,
                                            double value);
     [[nodiscard]] bool updateModuleParameter(SavedModule& module,
-                                             const juce::String& binding,
+                                             const cydaw::base::Text& binding,
                                              double value);
     [[nodiscard]] bool updateGraphInstanceParameter(
-        Node& node, const juce::String& binding, double value);
+        Node& node, const cydaw::base::Text& binding, double value);
     void openNodeInterfaceEditor(NodeId nodeId);
-    void openModuleInterfaceEditor(const juce::String& moduleKey);
-    void openModuleGraphEditor(const juce::String& moduleKey);
-    void openModuleGraphEditorDetached(const juce::String& moduleKey);
+    void openModuleInterfaceEditor(const cydaw::base::Text& moduleKey);
+    void openModuleGraphEditor(const cydaw::base::Text& moduleKey);
+    void openModuleGraphEditorDetached(const cydaw::base::Text& moduleKey);
     void promptCreateGraphVariant(NodeId nodeId);
-    void promptCreateGraphVariant(const juce::String& sourceModuleKey,
+    void promptCreateGraphVariant(const cydaw::base::Text& sourceModuleKey,
                                   bool replaceSelectedInstance);
     void resetSelectedGraphInstanceOverrides();
     void resetSelectedGraphInstanceInterface();
@@ -1510,7 +1510,7 @@ private:
     void closeModuleGraphEditor();
     void closeInPlaceModuleGraphEditor(bool commitChanges);
     [[nodiscard]] cydaw::base::Value moduleGraphState(const SavedModule& module) const;
-    void applyModuleGraphState(const juce::String& moduleKey,
+    void applyModuleGraphState(const cydaw::base::Text& moduleKey,
                                const cydaw::base::Value& state,
                                bool structureChanged = true);
     void inferModulePorts(SavedModule& module) const;
@@ -1522,10 +1522,10 @@ private:
     void promptSaveNodeParameterPreset(NodeId nodeId);
     void promptLoadNodeParameterPreset(NodeId nodeId);
     [[nodiscard]] cydaw::base::Result saveNodeParameterPresetForNode(
-        NodeId nodeId, const juce::File& file,
-        const juce::String& name) const;
+        NodeId nodeId, const cydaw::base::File& file,
+        const cydaw::base::Text& name) const;
     [[nodiscard]] cydaw::base::Result loadNodeParameterPresetForNode(
-        NodeId nodeId, const juce::File& file);
+        NodeId nodeId, const cydaw::base::File& file);
     [[nodiscard]] cydaw::base::Result validateUserGraphPresetState(
         const cydaw::base::Value& state) const;
     [[nodiscard]] cydaw::base::Result applyFactoryPreset(const FactoryPreset& preset);
@@ -1544,7 +1544,7 @@ private:
     void applyEditorLayoutPreset(int preset);
     void saveCustomEditorLayout();
     [[nodiscard]] bool loadCustomEditorLayout(bool apply);
-    [[nodiscard]] juce::String viewBookmarkLabel(int slot) const;
+    [[nodiscard]] cydaw::base::Text viewBookmarkLabel(int slot) const;
     void openNodeBrowser(
         juce::Point<float> insertionPoint,
         NodeId connectionAnchor = 0,
@@ -1621,7 +1621,7 @@ private:
     void rebuildCategoryFilter();
     void setEditingLocked(bool locked);
     void refreshDspCompilationBadge();
-    void setStatus(const juce::String& message, bool error = false);
+    void setStatus(const cydaw::base::Text& message, bool error = false);
     void setViewZoom(float zoom, juce::Point<float> anchor);
     bool viewLayoutPending_ { false };
     void resetViewTransform();
@@ -1646,24 +1646,24 @@ private:
     void paintMinimap(juce::Graphics& graphics) const;
     void setViewFromMinimap(juce::Point<float> position);
     [[nodiscard]] cydaw::graph::GraphRole inferCurrentGraphRole() const;
-    [[nodiscard]] juce::String graphRoleLabel() const;
-    [[nodiscard]] juce::String nodeTooltip(const Node& node) const;
-    [[nodiscard]] juce::String embeddedParameterTooltip(
+    [[nodiscard]] cydaw::base::Text graphRoleLabel() const;
+    [[nodiscard]] cydaw::base::Text nodeTooltip(const Node& node) const;
+    [[nodiscard]] cydaw::base::Text embeddedParameterTooltip(
         const Node& node,
-        const juce::String& binding,
+        const cydaw::base::Text& binding,
         double currentValue) const;
-    [[nodiscard]] juce::String graphTooltip() const;
-    [[nodiscard]] static juce::String graphAudioBoundaryKey(bool input,
+    [[nodiscard]] cydaw::base::Text graphTooltip() const;
+    [[nodiscard]] static cydaw::base::Text graphAudioBoundaryKey(bool input,
                                                              int channels);
     [[nodiscard]] static bool isGraphAudioBoundaryKey(
-        const juce::String& key, bool* input = nullptr);
+        const cydaw::base::Text& key, bool* input = nullptr);
     [[nodiscard]] static int graphAudioBoundaryChannels(
-        const juce::String& key);
-    [[nodiscard]] static juce::String audioFormatKey(int channels);
+        const cydaw::base::Text& key);
+    [[nodiscard]] static cydaw::base::Text audioFormatKey(int channels);
 
     [[nodiscard]] juce::Rectangle<int> canvasBounds() const;
     [[nodiscard]] bool isBoundaryNode(const Node& node) const;
-    [[nodiscard]] juce::String displayTitle(const Node& node) const;
+    [[nodiscard]] cydaw::base::Text displayTitle(const Node& node) const;
     [[nodiscard]] std::uint8_t audioInputChannels(const Node& node) const;
     [[nodiscard]] std::uint8_t audioOutputChannels(const Node& node) const;
     [[nodiscard]] juce::Point<float> nodeVisualSize(const Node& node) const;
@@ -1703,12 +1703,12 @@ private:
     [[nodiscard]] std::optional<ControlCableTarget> controlCableTarget(const Connection& connection) const;
     // The knob a socket of `node` feeds (its binding), empty for none: an
     // instrument's setting socket, a catalogue effect's.
-    [[nodiscard]] juce::String knobOfSocket(const Node& node, const juce::String& portKey) const;
+    [[nodiscard]] cydaw::base::Text knobOfSocket(const Node& node, const cydaw::base::Text& portKey) const;
     // The node inside a module that carries one of its knobs (its type key),
     // through the devices it sits in; and that parameter's native range, the
     // one a modulating cable moves it across.
-    [[nodiscard]] juce::String knobNodeType(const juce::String& moduleKey, const juce::String& classKey) const;
-    [[nodiscard]] std::pair<double, double> knobRange(const juce::String& moduleKey, const juce::String& classKey) const;
+    [[nodiscard]] cydaw::base::Text knobNodeType(const cydaw::base::Text& moduleKey, const cydaw::base::Text& classKey) const;
+    [[nodiscard]] std::pair<double, double> knobRange(const cydaw::base::Text& moduleKey, const cydaw::base::Text& classKey) const;
     // A cable from an LFO onto a knob modulates it (an LFO swings from -1 to
     // 1); other values set it.
     void applyDefaultCableMode(std::uint64_t source, std::uint64_t destination, std::uint64_t destinationPort);
@@ -1721,11 +1721,11 @@ private:
     // The sockets that read a named native parameter follow it; the rest
     // — a value node's own inputs — are left as they are.
     static void applyParameterPortDefaults(
-        const juce::String& typeKey,
+        const cydaw::base::Text& typeKey,
         const cydaw::engine::NativeDspNodeParameters& parameters,
         std::vector<NodePort>& ports);
     static void applyLegacyPortDefaults(
-        const juce::String& typeKey,
+        const cydaw::base::Text& typeKey,
         const cydaw::engine::NativeDspNodeParameters& parameters,
         std::vector<NodePort>& ports);
     [[nodiscard]] Node* findNode(NodeId id);
@@ -1738,9 +1738,9 @@ private:
     {
         return findNode(id);
     }
-    [[nodiscard]] const NodeType* findType(const juce::String& key) const;
-    [[nodiscard]] SavedModule* findModule(const juce::String& key);
-    [[nodiscard]] const SavedModule* findModule(const juce::String& key) const;
+    [[nodiscard]] const NodeType* findType(const cydaw::base::Text& key) const;
+    [[nodiscard]] SavedModule* findModule(const cydaw::base::Text& key);
+    [[nodiscard]] const SavedModule* findModule(const cydaw::base::Text& key) const;
     [[nodiscard]] bool connectNodes(
         NodeId source, NodeId destination,
         cydaw::graph::PortId sourcePort = 0,
@@ -1755,7 +1755,7 @@ private:
                                                                  cydaw::graph::PortId destinationPort = 0) const;
     [[nodiscard]] static juce::Colour portColour(PortKind kind);
     [[nodiscard]] static PortKind enginePortKind(cydaw::graph::PortType type);
-    [[nodiscard]] static juce::String portKindKey(PortKind kind);
+    [[nodiscard]] static cydaw::base::Text portKindKey(PortKind kind);
     [[nodiscard]] static PortKind portKindFromInt(int value);
 
     // Up and down inside the search box move the highlighted entry without
@@ -1771,7 +1771,7 @@ private:
 
     void rebuildLibraryRows(const std::vector<std::pair<int, int>>& ranked,
                             bool forceExpanded);
-    void toggleLibraryFold(const juce::String& foldKey);
+    void toggleLibraryFold(const cydaw::base::Text& foldKey);
     void moveLibrarySelection(int delta);
     [[nodiscard]] int firstLibraryEntryRow() const;
     [[nodiscard]] const NodeType* libraryRowType(int row) const;
@@ -1793,23 +1793,23 @@ private:
     std::vector<NodeType> catalog_;
     std::vector<int> filteredCatalog_;
     std::vector<LibraryRow> libraryRows_;
-    juce::String layoutChangeProfile_;
-    juce::String insertProfile_;
-    juce::String effectParametersProfile_;
-    juce::String addProfile_;
+    cydaw::base::Text layoutChangeProfile_;
+    cydaw::base::Text insertProfile_;
+    cydaw::base::Text effectParametersProfile_;
+    cydaw::base::Text addProfile_;
     int layoutChangeCalls_ {};
-    juce::String layoutChangeOrigins_;
-    mutable juce::String polyCompileProfile_;
+    cydaw::base::Text layoutChangeOrigins_;
+    mutable cydaw::base::Text polyCompileProfile_;
     // The typed library the instrument is compiled from, kept between
     // compiles: a knob notch reinstalls its root definition and nothing
     // else, and the library keeps what it knows of the other classes.
     mutable cydaw::graph::GraphLibrary instrumentLibrary_;
     int layoutChangeDepth_ {};
     // Written from the const helper that looks for a free spot.
-    mutable juce::String placementProfile_;
+    mutable cydaw::base::Text placementProfile_;
     mutable int paintedCards_ {};
     mutable int paintedCables_ {};
-    juce::StringArray collapsedLibraryFolds_;
+    cydaw::base::TextList collapsedLibraryFolds_;
     std::vector<Node> nodes_;
     std::vector<Connection> connections_;
     std::vector<GraphComment> comments_;
@@ -1825,7 +1825,7 @@ private:
     mutable std::optional<RuntimeGraphExport> exportCache_;
     mutable std::uint64_t exportCacheSignature_ {};
     mutable int exportRebuilds_ {};
-    mutable juce::String exportCacheProfile_;
+    mutable cydaw::base::Text exportCacheProfile_;
     [[nodiscard]] std::uint64_t structuralSignature() const;
     // A control cable dropped on a knob. The engine modulates by value
     // cables at block rate already, but a cable replaces the parameter; what
@@ -1834,7 +1834,7 @@ private:
     // the knob shows the span as a ring and sets its centre.
     struct KnobHit {
         NodeId nodeId {};
-        juce::String binding;
+        cydaw::base::Text binding;
         juce::Slider* slider {};
         [[nodiscard]] explicit operator bool() const noexcept
         {
@@ -1842,20 +1842,20 @@ private:
         }
     };
     [[nodiscard]] KnobHit knobHitForCable(juce::Point<float> position) const;
-    juce::String modulateFailure_;
+    cydaw::base::Text modulateFailure_;
     [[nodiscard]] bool cableCarriesControl() const;
     bool modulateParameter(NodeId sourceNodeId, cydaw::graph::PortId sourcePort,
-                           NodeId targetNodeId, const juce::String& binding);
+                           NodeId targetNodeId, const cydaw::base::Text& binding);
     // The map-range feeding a knob's value port, or zero.
     // The ring's depth, signed, written to the knob's range node about the
     // centre the knob holds.
-    void setModulationDepth(NodeId nodeId, const juce::String& binding,
+    void setModulationDepth(NodeId nodeId, const cydaw::base::Text& binding,
                             double depth);
     // The ring's menu: the range node and its cables go, and the knob keeps
     // the centre it was showing as its value.
-    void removeModulation(NodeId nodeId, const juce::String& binding);
+    void removeModulation(NodeId nodeId, const cydaw::base::Text& binding);
     [[nodiscard]] NodeId modulationRangeNodeFor(const Node& node,
-                                                const juce::String& binding) const;
+                                                const cydaw::base::Text& binding) const;
     // The cards an analysis frame changes the look of. Everything else the
     // frame leaves exactly as it was, so repainting it was pure cost.
     [[nodiscard]] juce::RectangleList<int> analysisRepaintRegion() const;
@@ -1913,33 +1913,33 @@ private:
     NodeId connectionHoverTarget_ {};
     cydaw::graph::PortId connectionHoverPort_ { 1 };
     bool connectionHoverCompatible_ {};
-    juce::String connectionHoverMessage_;
+    cydaw::base::Text connectionHoverMessage_;
     juce::Point<float> pendingConnectionEnd_;
-    juce::String statusMessage_;
-    juce::String contextName_;
-    juce::String graphName_;
-    juce::String graphDescription_;
-    juce::String graphCategory_;
-    juce::String graphAuthor_;
+    cydaw::base::Text statusMessage_;
+    cydaw::base::Text contextName_;
+    cydaw::base::Text graphName_;
+    cydaw::base::Text graphDescription_;
+    cydaw::base::Text graphCategory_;
+    cydaw::base::Text graphAuthor_;
     std::vector<EditorProgram> programs_;
-    juce::String activeFactoryPresetKey_;
-    juce::File currentGraphPresetFile_;
+    cydaw::base::Text activeFactoryPresetKey_;
+    cydaw::base::File currentGraphPresetFile_;
     cydaw::graph::GraphReference graphReference_;
     cydaw::graph::GraphRole graphRole_ { cydaw::graph::GraphRole::audioEffect };
     cydaw::graph::GraphScope graphScope_ { cydaw::graph::GraphScope::project };
     cydaw::graph::PluginIdentity pluginExportIdentity_;
-    juce::StringArray graphTags_;
-    juce::String graphAssetValidationMessage_;
+    cydaw::base::TextList graphTags_;
+    cydaw::base::Text graphAssetValidationMessage_;
     std::set<NodeId> invalidGraphNodes_;
     std::set<std::pair<NodeId, cydaw::graph::PortId>> invalidGraphPorts_;
-    std::unordered_map<NodeId, juce::String> graphNodeValidationMessages_;
+    std::unordered_map<NodeId, cydaw::base::Text> graphNodeValidationMessages_;
     NodeId lastFocusedValidationNode_ {};
     bool graphAssetValid_ { true };
     bool statusIsError_ {};
     bool dspCompilationKnown_ {};
     bool dspCompilationOk_ {};
     std::size_t dspCompilationNodeCount_ {};
-    juce::String dspCompilationError_;
+    cydaw::base::Text dspCompilationError_;
     static constexpr std::size_t spectrumBinCount = 32;
     std::array<float, cydaw::engine::AudioAnalysisFrame::waveformCapacity> analysisWaveform_ {};
     std::array<float, spectrumBinCount> analysisSpectrum_ {};
@@ -2068,7 +2068,7 @@ private:
     std::unique_ptr<juce::FileChooser> vst3ProjectChooser_;
     NodeGraphComponent* moduleGraphEditor_ {};
     juce::Component::SafePointer<juce::Component> nodeBrowserForSnapshot_;
-    juce::String inPlaceModuleKey_;
+    cydaw::base::Text inPlaceModuleKey_;
     std::function<void()> navigateBackHandler_;
     GraphManagerComponent* graphManager_ {};
     GraphPluginExportComponent* vst3ExportPanel_ {};
@@ -2124,14 +2124,14 @@ private:
     bool nodePresetFileDragOver_ {};
     NodeId nodePresetFileTarget_ {};
     juce::Point<int> nodeDragPosition_;
-    juce::String selectedCategoryKey_;
-    juce::StringArray categoryKeys_;
+    cydaw::base::Text selectedCategoryKey_;
+    cydaw::base::TextList categoryKeys_;
     bool refreshingSelectionUi_ {};
-    juce::String selectedPublishedParameterKey_;
+    cydaw::base::Text selectedPublishedParameterKey_;
     bool editingLocked_ {};
     bool parameterNotificationPending_ {};
     bool parameterHistoryPending_ {};
-    std::map<juce::String, std::uint64_t> parameterTouches_;
+    std::map<cydaw::base::Text, std::uint64_t> parameterTouches_;
     std::uint64_t parameterTouchCount_ {};
     bool parameterGestureActive_ {};
     juce::int64 lastParameterUiChangeTimeMs_ {};
@@ -2155,7 +2155,7 @@ private:
     bool instrumentIsMainInput_ {};
     bool lastHistoryWasParameter_ {};
     juce::int64 lastParameterHistoryTimeMs_ {};
-    juce::String copiedNodeParameterType_;
+    cydaw::base::Text copiedNodeParameterType_;
     std::optional<cydaw::engine::NativeDspNodeParameters>
         copiedNodeParameters_;
     std::unordered_map<cydaw::graph::PortId, double>

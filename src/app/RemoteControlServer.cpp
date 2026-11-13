@@ -10,7 +10,7 @@
 namespace cydaw::app {
 
 namespace {
-juce::String failure(const juce::String& message)
+cydaw::base::Text failure(const cydaw::base::Text& message)
 {
     auto* object = new cydaw::base::Object();
     object->setProperty("ok", false);
@@ -20,7 +20,7 @@ juce::String failure(const juce::String& message)
 } // namespace
 
 RemoteControlServer::RemoteControlServer(const int port, Handler handler,
-                                         juce::String token)
+                                         cydaw::base::Text token)
     : juce::Thread("CyDAW remote control"),
       port_(port),
       handler_(std::move(handler)),
@@ -33,8 +33,8 @@ RemoteControlServer::RemoteControlServer(const int port, Handler handler,
         startThread();
     juce::Logger::writeToLog(
         listening_ ? "remote control: listening on 127.0.0.1:"
-                         + juce::String(port_)
-                   : "remote control: port " + juce::String(port_)
+                         + cydaw::base::Text(port_)
+                   : "remote control: port " + cydaw::base::Text(port_)
                          + " is not available");
 }
 
@@ -83,7 +83,7 @@ void RemoteControlServer::serve(juce::StreamingSocket& client)
             const auto newline = buffer.find('\n');
             if (newline == std::string::npos)
                 break;
-            const auto line = juce::String::fromUTF8(
+            const auto line = cydaw::base::Text::fromUTF8(
                 buffer.data(), static_cast<int>(newline));
             buffer.erase(0, newline + 1);
             if (line.trim().isEmpty())
@@ -99,7 +99,7 @@ void RemoteControlServer::serve(juce::StreamingSocket& client)
     }
 }
 
-juce::String RemoteControlServer::respond(const juce::String& line) const
+cydaw::base::Text RemoteControlServer::respond(const cydaw::base::Text& line) const
 {
     const auto request = cydaw::base::JSON::parse(line);
     if (request.getDynamicObject() == nullptr)

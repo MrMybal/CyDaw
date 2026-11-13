@@ -35,27 +35,27 @@
 namespace cydaw::v2 {
 
 struct AiModel {
-    juce::String id;
-    juce::String version;
-    juce::String title;
-    juce::String provider;
-    juce::String kind; // "clap"
+    cydaw::base::Text id;
+    cydaw::base::Text version;
+    cydaw::base::Text title;
+    cydaw::base::Text provider;
+    cydaw::base::Text kind; // "clap"
     bool isDefault {};
     bool validated {};
     cydaw::base::Value description; // {fr, en}
-    juce::String homepage;
-    juce::String licence;
-    juce::String licenceUrl;
-    juce::String licencePage;
+    cydaw::base::Text homepage;
+    cydaw::base::Text licence;
+    cydaw::base::Text licenceUrl;
+    cydaw::base::Text licencePage;
     cydaw::base::Value licenceNote; // {fr, en}
     bool requiresAcceptance {};
-    juce::String host;
-    juce::String revision;
-    juce::String baseUrl;
+    cydaw::base::Text host;
+    cydaw::base::Text revision;
+    cydaw::base::Text baseUrl;
     struct File {
-        juce::String path;
+        cydaw::base::Text path;
         juce::int64 size {};
-        juce::String sha256;
+        cydaw::base::Text sha256;
     };
     std::vector<File> files;
     int dimension {};
@@ -64,11 +64,11 @@ struct AiModel {
     float similarityLow { 0.05f };
     float similarityHigh { 0.5f };
 
-    [[nodiscard]] juce::String key() const { return id + "@" + version; }
+    [[nodiscard]] cydaw::base::Text key() const { return id + "@" + version; }
     [[nodiscard]] juce::int64 bytes() const;
     // In the interface's language.
-    [[nodiscard]] juce::String describe() const;
-    [[nodiscard]] juce::String note() const;
+    [[nodiscard]] cydaw::base::Text describe() const;
+    [[nodiscard]] cydaw::base::Text note() const;
 };
 
 // SHA-256, fed a piece at a time (a download is hashed as it comes).
@@ -76,9 +76,9 @@ class Sha256 final {
 public:
     Sha256();
     void add(const void* data, std::size_t size);
-    [[nodiscard]] juce::String hex();
+    [[nodiscard]] cydaw::base::Text hex();
     // A whole file's; empty when it cannot be read; `stop` ends it early.
-    [[nodiscard]] static juce::String ofFile(const juce::File& file, const std::atomic<bool>* stop = nullptr);
+    [[nodiscard]] static cydaw::base::Text ofFile(const cydaw::base::File& file, const std::atomic<bool>* stop = nullptr);
 
 private:
     void block(const std::uint8_t* data);
@@ -94,60 +94,60 @@ public:
     ~AiModels();
 
     void loadCatalogue();
-    [[nodiscard]] juce::File catalogueFile() const;
+    [[nodiscard]] cydaw::base::File catalogueFile() const;
     [[nodiscard]] const std::vector<AiModel>& models() const noexcept { return models_; }
-    [[nodiscard]] const AiModel* find(const juce::String& id) const;
+    [[nodiscard]] const AiModel* find(const cydaw::base::Text& id) const;
     // The engine's packages and their licences, to show beside the models'.
     struct Package {
-        juce::String name;
-        juce::String licence;
-        juce::String url;
+        cydaw::base::Text name;
+        cydaw::base::Text licence;
+        cydaw::base::Text url;
     };
     [[nodiscard]] const std::vector<Package>& enginePackages() const noexcept { return packages_; }
 
-    [[nodiscard]] juce::File folderOf(const AiModel& model) const;
-    [[nodiscard]] bool installed(const juce::String& id) const;
+    [[nodiscard]] cydaw::base::File folderOf(const AiModel& model) const;
+    [[nodiscard]] bool installed(const cydaw::base::Text& id) const;
     // When it was installed, and whether the person accepted its licence then.
-    [[nodiscard]] cydaw::base::Value receiptOf(const juce::String& id) const;
+    [[nodiscard]] cydaw::base::Value receiptOf(const cydaw::base::Text& id) const;
 
     // Downloads a model on a thread of its own. Refused (false, `error`) when
     // its licence asks to be accepted and was not, when one runs already.
-    bool install(const juce::String& id, bool licenceAccepted, juce::String& error);
+    bool install(const cydaw::base::Text& id, bool licenceAccepted, cydaw::base::Text& error);
     // The same from a folder holding its files (another program's copy):
     // each checked against its size and SHA-256, then copied.
-    bool importFrom(const juce::String& id, const juce::File& folder, bool licenceAccepted, juce::String& error);
+    bool importFrom(const cydaw::base::Text& id, const cydaw::base::File& folder, bool licenceAccepted, cydaw::base::Text& error);
     void cancel();
     // Its files to the recycle bin.
-    bool remove(const juce::String& id, juce::String& error);
+    bool remove(const cydaw::base::Text& id, cydaw::base::Text& error);
 
     struct Progress {
         bool running {};
-        juce::String id;
-        juce::String step; // "download", "verify", "copy"
-        juce::String file;
+        cydaw::base::Text id;
+        cydaw::base::Text step; // "download", "verify", "copy"
+        cydaw::base::Text file;
         juce::int64 done {};
         juce::int64 total {};
         double bytesPerSecond {};
         // The last run's end, once: its model, an error, or cancelled.
-        juce::String error;
+        cydaw::base::Text error;
     };
     [[nodiscard]] Progress progress() const;
     struct Finished {
-        juce::String id;
+        cydaw::base::Text id;
         bool ok {};
         bool cancelled {};
-        juce::String error;
+        cydaw::base::Text error;
     };
     [[nodiscard]] std::optional<Finished> takeFinished();
 
 private:
     class Job;
-    bool start(const juce::String& id, bool licenceAccepted, const juce::File& from, juce::String& error);
+    bool start(const cydaw::base::Text& id, bool licenceAccepted, const cydaw::base::File& from, cydaw::base::Text& error);
 
     std::vector<AiModel> models_;
     std::vector<Package> packages_;
     // What the catalogue file held when the list was made.
-    juce::String catalogueText_;
+    cydaw::base::Text catalogueText_;
     bool loaded_ {};
     std::unique_ptr<Job> job_;
     mutable std::mutex mutex_;

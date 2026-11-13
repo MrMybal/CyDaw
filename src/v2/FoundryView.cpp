@@ -69,7 +69,7 @@ const char* processName(const int process)
     }
 }
 
-juce::String timeText(const std::int64_t frames, const double rate)
+cydaw::base::Text timeText(const std::int64_t frames, const double rate)
 {
     const auto seconds = rate > 0.0 ? static_cast<double>(frames) / rate : 0.0;
     const auto minutes = static_cast<int>(seconds / 60.0);
@@ -84,9 +84,9 @@ double number(const cydaw::base::Value& object, const char* key, const double fa
     return value.isVoid() ? fallback : static_cast<double>(value);
 }
 
-juce::String fromUtf8(const std::string& text)
+cydaw::base::Text fromUtf8(const std::string& text)
 {
-    return juce::String::fromUTF8(text.c_str());
+    return cydaw::base::Text::fromUTF8(text.c_str());
 }
 
 constexpr float headerWidthDp = 184.0f;
@@ -120,7 +120,7 @@ const engine::foundry::Session& FoundryView::shown(const Tab& tab) const
     return preview_ ? *preview_ : tab.document->session();
 }
 
-void FoundryView::report(const juce::String& message, const bool error)
+void FoundryView::report(const cydaw::base::Text& message, const bool error)
 {
     state_.status = message;
     state_.statusIsError = error;
@@ -131,9 +131,9 @@ void FoundryView::showToolsPanel(int panel)
 {
     if(auto* t=tab()){syncProcessing(*t);t->processing->showPanel(panel);state_.setBottomPanelVisible(true);}
 }
-juce::StringArray FoundryView::unsaved() const
+cydaw::base::TextList FoundryView::unsaved() const
 {
-    juce::StringArray names;
+    cydaw::base::TextList names;
     for (const auto& tab : tabs_)
         if (tab.document->dirty() || (tab.processing && tab.processingRevision != tab.processing->revision()))
             names.add(tab.document->name());
@@ -142,15 +142,15 @@ juce::StringArray FoundryView::unsaved() const
 
 // ---- Files -------------------------------------------------------------------------------------
 
-bool FoundryView::open(const juce::File& file)
+bool FoundryView::open(const cydaw::base::File& file)
 {
     if(cinema_&&file.hasFileExtension("mp4;mov;m4v;avi;wmv;mkv;webm;mpeg;mpg;mxf;ts;mts;m2ts;m2v;vob;ogv;flv;3gp;3g2;dv;nut;rm;rmvb"))return openCinemaVideo(file);
     for (std::size_t i = 0; i < tabs_.size(); ++i)
-        if ((tabs_[i].document->file() == file || tabs_[i].document->sessionFile() == file) && file != juce::File()) {
+        if ((tabs_[i].document->file() == file || tabs_[i].document->sessionFile() == file) && file != cydaw::base::File()) {
             current_ = static_cast<int>(i);barSelected_=-1;
             return true;
         }
-    juce::String error;
+    cydaw::base::Text error;
     auto document = FoundryDocument::open(file, error);
     if (document == nullptr) {
         report(error, true);
@@ -166,9 +166,9 @@ bool FoundryView::open(const juce::File& file)
     return true;
 }
 
-bool FoundryView::importFile(Tab& tab, const juce::File& file, const int track, const std::int64_t at)
+bool FoundryView::importFile(Tab& tab, const cydaw::base::File& file, const int track, const std::int64_t at)
 {
-    juce::String error;
+    cydaw::base::Text error;
     const auto sound = FoundryDocument::readSound(file, error);
     if (sound == nullptr) {
         report(error, true);
@@ -193,12 +193,12 @@ bool FoundryView::importFile(Tab& tab, const juce::File& file, const int track, 
     return true;
 }
 
-bool FoundryView::dropFiles(const juce::StringArray& files, const float x, const float y)
+bool FoundryView::dropFiles(const cydaw::base::TextList& files, const float x, const float y)
 {
     if(cinema_)return dropCinemaFiles(files,x,y);
     auto any = false;
     for (int i = 0; i < files.size(); ++i) {
-        const juce::File file(files[i]);
+        const cydaw::base::File file(files[i]);
         if (!file.existsAsFile())
             continue;
         auto* current = tab();
@@ -224,7 +224,7 @@ bool FoundryView::dropFiles(const juce::StringArray& files, const float x, const
 
 void FoundryView::chooseOpen()
 {
-    chooser_ = std::make_unique<juce::FileChooser>(ui::Ls("Un fichier son ou une session", "A sound file or a session"), juce::File {},
+    chooser_ = std::make_unique<juce::FileChooser>(ui::Ls("Un fichier son ou une session", "A sound file or a session"), cydaw::base::File {},
                                                    cinema_?"*.cycinema;*.mp4;*.mov;*.m4v;*.avi;*.wmv;*.mkv;*.webm;*.mpeg;*.mpg;*.mxf;*.ts;*.mts;*.m2ts;*.m2v;*.vob;*.ogv;*.flv;*.3gp;*.3g2;*.dv;*.nut;*.rm;*.rmvb;*.wav;*.flac":"*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg;*.mp3;*.wma;*.cyfoundry");
     chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
                               | juce::FileBrowserComponent::canSelectMultipleItems,
@@ -241,13 +241,13 @@ void FoundryView::chooseImport()
         return;
     }
     chooser_ = std::make_unique<juce::FileChooser>(ui::Ls("Des sons à ajouter, chacun sur une piste", "Sounds to add, each on a track"),
-                                                   juce::File {}, "*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg;*.mp3;*.wma");
+                                                   cydaw::base::File {}, "*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg;*.mp3;*.wma");
     chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
                               | juce::FileBrowserComponent::canSelectMultipleItems,
                           [this](const juce::FileChooser& chooser) {
                               if (auto* current = tab())
                                   for (const auto& file : chooser.getResults())
-                                      if(cinema_){juce::StringArray files;files.add(file.getFullPathName());dropCinemaFiles(files,-1,-1);}
+                                      if(cinema_){cydaw::base::TextList files;files.add(file.getFullPathName());dropCinemaFiles(files,-1,-1);}
                                       else (void) importFile(*current, file, -1, current->cursor);
                           });
 }
@@ -257,7 +257,7 @@ void FoundryView::newDocument()
     Tab tab;
     auto* device = studio_.engine().deviceManager().getCurrentAudioDevice();
     const auto rate = device != nullptr ? device->getCurrentSampleRate() : 48'000.0;
-    tab.document = FoundryDocument::create(rate > 0.0 ? rate : 48'000.0, ui::Ls("Sans titre ", "Untitled ") + juce::String(++newDocuments_));
+    tab.document = FoundryDocument::create(rate > 0.0 ? rate : 48'000.0, ui::Ls("Sans titre ", "Untitled ") + cydaw::base::Text(++newDocuments_));
     if(cinema_)ensureCinema(tab);
     tabs_.push_back(std::move(tab));
     current_ = static_cast<int>(tabs_.size()) - 1;barSelected_=-1;
@@ -273,12 +273,12 @@ void FoundryView::save(const bool as)
     auto& document = *tab->document;
     // A sound file stays a sound file; anything more is a session.
     if (document.plainFile()) {
-        if (!as && document.file() != juce::File()) {
+        if (!as && document.file() != cydaw::base::File()) {
             const auto result = document.save(document.file(), saveBits_);
             report(result.wasOk() ? ui::Ls("Enregistré : ", "Saved: ") + document.name() : result.getErrorMessage(), result.failed());
             return;
         }
-        const auto folder = document.file() != juce::File() ? document.file().getParentDirectory() : locations::folder(Location::foundry);
+        const auto folder = document.file() != cydaw::base::File() ? document.file().getParentDirectory() : locations::folder(Location::foundry);
         (void) folder.createDirectory();
         chooser_ = std::make_unique<juce::FileChooser>(ui::Ls("Enregistrer le son sous", "Save the sound as"),
                                                        folder.getChildFile(document.name()).withFileExtension("wav"), "*.wav;*.flac;*.aiff;*.ogg");
@@ -286,7 +286,7 @@ void FoundryView::save(const bool as)
         chooser_->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
                               [this, index](const juce::FileChooser& chooser) {
                                   auto file = chooser.getResult();
-                                  if (file == juce::File() || index < 0 || index >= static_cast<int>(tabs_.size()))
+                                  if (file == cydaw::base::File() || index < 0 || index >= static_cast<int>(tabs_.size()))
                                       return;
                                   if (!file.hasFileExtension("wav;flac;aif;aiff;ogg"))
                                       file = file.withFileExtension("wav");
@@ -297,7 +297,7 @@ void FoundryView::save(const bool as)
                               });
         return;
     }
-    if (!as && document.sessionFile() != juce::File()) {
+    if (!as && document.sessionFile() != cydaw::base::File()) {
         const auto result = document.saveSession(document.sessionFile());
         report(result.wasOk() ? ui::Ls("Session enregistrée : ", "Session saved: ") + document.name() : result.getErrorMessage(), result.failed());
         return;
@@ -305,13 +305,13 @@ void FoundryView::save(const bool as)
     const auto folder = locations::folder(Location::foundry);
     (void) folder.createDirectory();
     chooser_ = std::make_unique<juce::FileChooser>(ui::Ls("Enregistrer la session", "Save the session"),
-                                                   folder.getChildFile(juce::File::createLegalFileName(document.name())).withFileExtension(cinema_?"cycinema":"cyfoundry"),
+                                                   folder.getChildFile(cydaw::base::File::createLegalFileName(document.name())).withFileExtension(cinema_?"cycinema":"cyfoundry"),
                                                    cinema_?"*.cycinema":"*.cyfoundry");
     const auto index = current_;
     chooser_->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
                           [this, index](const juce::FileChooser& chooser) {
                               auto file = chooser.getResult();
-                              if (file == juce::File() || index < 0 || index >= static_cast<int>(tabs_.size()))
+                              if (file == cydaw::base::File() || index < 0 || index >= static_cast<int>(tabs_.size()))
                                   return;
                               file = file.withFileExtension(cinema_?"cycinema":"cyfoundry");
                               commitProcessing(tabs_[static_cast<std::size_t>(index)], true);
@@ -330,7 +330,7 @@ void FoundryView::chooseExport()
     const auto folder = locations::folder(Location::foundry);
     (void) folder.createDirectory();
     chooser_ = std::make_unique<juce::FileChooser>(ui::Ls("Exporter le mixage", "Export the mix"),
-                                                   folder.getChildFile(juce::File::createLegalFileName(tab->document->name()))
+                                                   folder.getChildFile(cydaw::base::File::createLegalFileName(tab->document->name()))
                                                        .withFileExtension("wav"),
                                                    "*.wav;*.flac;*.aiff;*.ogg");
     const auto index = current_;
@@ -339,7 +339,7 @@ void FoundryView::chooseExport()
     chooser_->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
                           [this, index, start, end](const juce::FileChooser& chooser) {
                               auto file = chooser.getResult();
-                              if (file == juce::File() || index < 0 || index >= static_cast<int>(tabs_.size()))
+                              if (file == cydaw::base::File() || index < 0 || index >= static_cast<int>(tabs_.size()))
                                   return;
                               if (!file.hasFileExtension("wav;flac;aif;aiff;ogg"))
                                   file = file.withFileExtension("wav");
@@ -428,7 +428,7 @@ void FoundryView::pickTrack(Tab& tab, const int track, const bool add)
 
 // ---- Editing -----------------------------------------------------------------------------------
 
-void FoundryView::edit(Tab& tab, Session next, const juce::String& label)
+void FoundryView::edit(Tab& tab, Session next, const cydaw::base::Text& label)
 {
     if(cinema_)fitCinemaContainers(next);
     tab.document->apply(std::move(next), label);
@@ -439,7 +439,7 @@ void FoundryView::edit(Tab& tab, Session next, const juce::String& label)
     tab.selectionChanged = ImGui::GetTime();
 }
 
-void FoundryView::edit(Tab& tab, Session next, const juce::String& label, const std::int64_t at, const std::int64_t removed,
+void FoundryView::edit(Tab& tab, Session next, const cydaw::base::Text& label, const std::int64_t at, const std::int64_t removed,
                        const std::int64_t inserted)
 {
     // The markers move when every track does.
@@ -574,7 +574,7 @@ void FoundryView::duplicateClip(Tab& tab)
 void FoundryView::addTrack(Tab& tab, const bool midi)
 {
     const auto count=tab.document->session().tracks.size();
-    auto next=engine::foundry::withTrack(tab.document->session(),(ui::Ls(midi?"MIDI ":"Audio ",midi?"MIDI ":"Audio ")+juce::String(static_cast<int>(count)+1)).toStdString());
+    auto next=engine::foundry::withTrack(tab.document->session(),(ui::Ls(midi?"MIDI ":"Audio ",midi?"MIDI ":"Audio ")+cydaw::base::Text(static_cast<int>(count)+1)).toStdString());
     next.tracks.back().midi=midi;
     edit(tab,std::move(next),ui::Ls("Nouvelle piste","New track"));
     syncProcessing(tab);pickTrack(tab,static_cast<int>(count),false);
@@ -594,7 +594,7 @@ void FoundryView::addMarker(Tab& tab, const bool region)
     for (const auto& other : markers)
         if (other.region() == marker.region())
             ++count;
-    marker.name = (marker.region() ? ui::Ls("Région ", "Region ") : ui::Ls("Marqueur ", "Marker ")) + juce::String(count + 1);
+    marker.name = (marker.region() ? ui::Ls("Région ", "Region ") : ui::Ls("Marqueur ", "Marker ")) + cydaw::base::Text(count + 1);
     markers.push_back(marker);
     std::sort(markers.begin(), markers.end(), [](const FoundryMarker& a, const FoundryMarker& b) { return a.start < b.start; });
     tab.document->setMarkers(std::move(markers), marker.region() ? ui::Ls("Région", "Region") : ui::Ls("Marqueur", "Marker"));
@@ -608,7 +608,7 @@ void FoundryView::applyProcess(Tab& tab)
     const auto [start, end] = target(tab);
     const auto set = picked(tab);
     const auto mask = tab.mask;
-    const auto name = juce::String::fromUTF8(processName(process_));
+    const auto name = cydaw::base::Text::fromUTF8(processName(process_));
     namespace fs = engine::foundry;
     const auto each = [&](const fs::ClipProcess& process) { return fs::processed(session, start, end, set, process); };
     switch (process_) {
@@ -781,7 +781,7 @@ cydaw::base::Result FoundryView::applyTrackEffects(Tab& tab, const TrackRef& tra
     if (slot == nullptr)
         return cydaw::base::Result::fail(ui::Ls("Cette piste n'a pas d'effets", "That track has no effects"));
     const auto state = slot->graph().createVst3RuntimeState();
-    juce::String error;
+    cydaw::base::Text error;
     auto native = app::restoreNativeDspGraphState(state.getProperty("native", {}), error);
     if (!native)
         return cydaw::base::Result::fail(ui::Ls("Ses effets ne se relisent pas : ", "Its effects do not restore: ") + error);
@@ -850,8 +850,8 @@ void FoundryView::sendToStudio(Tab& tab, const bool eachTrack)
     const auto& session = tab.document->session();
     const auto folder = locations::folder(Location::foundry);
     (void) folder.createDirectory();
-    const auto base = juce::File::createLegalFileName(tab.document->name()).upToLastOccurrenceOf(".", false, false);
-    std::vector<std::pair<juce::File, engine::foundry::Sound>> files;
+    const auto base = cydaw::base::File::createLegalFileName(tab.document->name()).upToLastOccurrenceOf(".", false, false);
+    std::vector<std::pair<cydaw::base::File, engine::foundry::Sound>> files;
     if (eachTrack) {
         // Each track as it is, whatever is muted or soloed.
         auto heard = session;
@@ -860,15 +860,15 @@ void FoundryView::sendToStudio(Tab& tab, const bool eachTrack)
         for (std::size_t t = 0; t < session.tracks.size(); ++t) {
             TrackSet one(session.tracks.size(), false);
             one[t] = true;
-            const auto name = (base.isNotEmpty() ? base : juce::String("Foundry")) + " - " + fromUtf8(session.tracks[t].name);
-            files.emplace_back(folder.getNonexistentChildFile(juce::File::createLegalFileName(name), ".wav", false),
+            const auto name = (base.isNotEmpty() ? base : cydaw::base::Text("Foundry")) + " - " + fromUtf8(session.tracks[t].name);
+            files.emplace_back(folder.getNonexistentChildFile(cydaw::base::File::createLegalFileName(name), ".wav", false),
                                [&]{
                                    if(!tab.document->processing().getDynamicObject())return engine::foundry::render(heard,0,heard.frames(),&one);
                                    auto stem=heard;for(std::size_t k=0;k<stem.tracks.size();++k)if(k!=t)stem.tracks[k].clips.clear();
                                    return ModeProcessing::render(stem,tab.document->processing(),0,heard.frames(),tab.document->renderTail());
                                }());
         }
-    } else if (tab.document->plainFile() && tab.document->file() != juce::File() && !tab.document->dirty()) {
+    } else if (tab.document->plainFile() && tab.document->file() != cydaw::base::File() && !tab.document->dirty()) {
         if (const auto track = studio_.addAudioTrack(tab.document->file())) {
             state_.selectTrack(*track);
             state_.mode = AppMode::studio;
@@ -876,7 +876,7 @@ void FoundryView::sendToStudio(Tab& tab, const bool eachTrack)
         }
         return;
     } else {
-        files.emplace_back(folder.getNonexistentChildFile(base.isNotEmpty() ? base : juce::String("Foundry"), ".wav", false),
+        files.emplace_back(folder.getNonexistentChildFile(base.isNotEmpty() ? base : cydaw::base::Text("Foundry"), ".wav", false),
                            tab.document->processing().getDynamicObject()?ModeProcessing::render(session,tab.document->processing(),0,session.frames(),tab.document->renderTail()):engine::foundry::render(session, 0, session.frames()));
     }
     auto added = 0;
@@ -891,7 +891,7 @@ void FoundryView::sendToStudio(Tab& tab, const bool eachTrack)
         }
     }
     state_.mode = AppMode::studio;
-    report(ui::Ls("Dans le studio : ", "In the studio: ") + juce::String(added) + ui::Ls(" piste(s)", " track(s)"), added == 0);
+    report(ui::Ls("Dans le studio : ", "In the studio: ") + cydaw::base::Text(added) + ui::Ls(" piste(s)", " track(s)"), added == 0);
 }
 
 // ---- Playing -----------------------------------------------------------------------------------
@@ -1070,7 +1070,7 @@ void FoundryView::commitProcessing(Tab& tab, const bool force)
     const auto revision = tab.processing->revision();
     if (tab.processingRevision == revision)
         return;
-    const auto now = juce::Time::getMillisecondCounterHiRes() * 0.001;
+    const auto now = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
     if (tab.observedProcessingRevision != revision) {
         tab.observedProcessingRevision = revision;
         tab.processingChangedAt = now;
@@ -1223,7 +1223,7 @@ void FoundryView::drawTabs()
     for (int i = 0; i < static_cast<int>(tabs_.size()); ++i) {
         const auto& document = *tabs_[static_cast<std::size_t>(i)].document;
         auto open = true;
-        const auto label = document.name() + "###foundryTab" + juce::String(static_cast<juce::int64>(reinterpret_cast<juce::pointer_sized_int>(&document)));
+        const auto label = document.name() + "###foundryTab" + cydaw::base::Text(static_cast<juce::int64>(reinterpret_cast<juce::pointer_sized_int>(&document)));
         const auto flags = forcing && i == current_ ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
         if (ImGui::BeginTabItem(label.toRawUTF8(), &open, flags | (document.dirty() ? ImGuiTabItemFlags_UnsavedDocument : 0))) {
             shownIndex = i;
@@ -1614,7 +1614,7 @@ void FoundryView::drawTrackHeader(Tab& tab, const int index, const ImVec2 origin
     style.colour = colour;
     const auto knobWidth = dp(knobDiameter + 12.0f);
     const auto half = (size.x - dp(14.0f)) * 0.5f;
-    const auto valueBeside = [&](const float left, const juce::String& text) {
+    const auto valueBeside = [&](const float left, const cydaw::base::Text& text) {
         const auto height = ImGui::GetFontSize();
         list->AddText(ImVec2(left + knobWidth + dp(1.0f), knobs + (dp(knobDiameter) - height) * 0.5f), p.textDim, text.toRawUTF8());
     };
@@ -1622,14 +1622,14 @@ void FoundryView::drawTrackHeader(Tab& tab, const int index, const ImVec2 origin
     ImGui::SetCursorScreenPos(ImVec2(x - dp(6.0f), knobs));
     auto changed = ui::knob("##gain", &gain, -48.0f, 12.0f, 0.0f, style);
     ui::tooltip(L("Volume de la piste (double-clic : 0 dB)", "The track's gain (double click: 0 dB)"));
-    valueBeside(x - dp(6.0f), juce::String(gain, 1) + " dB");
+    valueBeside(x - dp(6.0f), cydaw::base::Text(gain, 1) + " dB");
     style.flags = ui::knobNoLabel | ui::knobBipolar;
     ImGui::SetCursorScreenPos(ImVec2(x - dp(6.0f) + half, knobs));
     changed = ui::knob("##pan", &pan, -1.0f, 1.0f, 0.0f, style) || changed;
     ui::tooltip(L("Panoramique (double-clic : au centre)", "Pan (double click: centred)"));
     const auto percent = juce::roundToInt(std::abs(pan) * 100.0f);
-    valueBeside(x - dp(6.0f) + half, percent == 0 ? juce::String("C")
-                                     : juce::String(pan < 0.0f ? L("G ", "L ") : L("D ", "R ")) + juce::String(percent));
+    valueBeside(x - dp(6.0f) + half, percent == 0 ? cydaw::base::Text("C")
+                                     : cydaw::base::Text(pan < 0.0f ? L("G ", "L ") : L("D ", "R ")) + cydaw::base::Text(percent));
     if (changed)
         change([gain, pan](Track& t) {
             t.gainDb = gain;
@@ -2085,7 +2085,7 @@ void FoundryView::drawTracks(Tab& tab, const ImVec2 size)
             case Drag::pencil: label = L("Crayon", "Pencil"); break;
             default: label = L("Modifier", "Edit"); break;
             }
-            edit(tab, *preview_, juce::String::fromUTF8(label));
+            edit(tab, *preview_, cydaw::base::Text::fromUTF8(label));
         } else if (drag_ == Drag::select && clicked) {
             // A click: the cursor here, the track picked, nothing selected.
             tab.selectionStart = tab.selectionEnd = tab.cursor = mouseFrame;
@@ -2136,7 +2136,7 @@ void FoundryView::drawTracks(Tab& tab, const ImVec2 size)
     if (ImGui::BeginDragDropTarget()) {
         if (const auto* payload = ImGui::AcceptDragDropPayload(kFilePayload); payload != nullptr && payload->DataSize > 1) {
             const auto row = rowAt(io.MousePos.y);
-            (void) importFile(tab, juce::File(juce::String::fromUTF8(static_cast<const char*>(payload->Data))),
+            (void) importFile(tab, cydaw::base::File(cydaw::base::Text::fromUTF8(static_cast<const char*>(payload->Data))),
                               row >= 0 && row < realCount ? row : -1, mouseFrame);
         }
         ImGui::EndDragDropTarget();
@@ -2205,16 +2205,16 @@ void FoundryView::drawStatus(Tab& tab)
     const auto& p = theme::palette();
     const auto& session = tab.document->session();
     const auto rate = session.rate;
-    juce::String text;
+    cydaw::base::Text text;
     if (hasSelection(tab)) {
         const auto set = picked(tab);
         const auto tracks = static_cast<int>(std::count(set.begin(), set.end(), true));
         text << ui::Ls("Sélection ", "Selection ") << timeText(tab.selectionStart, rate) << " - " << timeText(tab.selectionEnd, rate) << "  ("
-             << timeText(tab.selectionEnd - tab.selectionStart, rate) << ", " << juce::String(tracks) << ui::Ls(" piste(s))", " track(s))");
+             << timeText(tab.selectionEnd - tab.selectionStart, rate) << ", " << cydaw::base::Text(tracks) << ui::Ls(" piste(s))", " track(s))");
     } else {
         text << ui::Ls("Curseur ", "Cursor ") << timeText(tab.cursor, rate);
     }
-    text << "     " << juce::String(juce::roundToInt(rate)) << " Hz  ·  " << juce::String(static_cast<int>(session.tracks.size()))
+    text << "     " << cydaw::base::Text(juce::roundToInt(rate)) << " Hz  ·  " << cydaw::base::Text(static_cast<int>(session.tracks.size()))
          << ui::Ls(" pistes", " tracks") << "  ·  " << timeText(session.frames(), rate);
     if (playingTab_ == current_)
         text << "     " << ui::Ls("Lecture ", "Playing ") << timeText(static_cast<std::int64_t>(this->player().position()), rate);
@@ -2295,15 +2295,15 @@ void FoundryView::drawProcesses(Tab& tab)
     const auto [start, end] = target(tab);
     const auto set = picked(tab);
     const auto tracks = static_cast<int>(std::count(set.begin(), set.end(), true));
-    juce::String on;
+    cydaw::base::Text on;
     if (process_ == processRate)
         on = ui::Ls("Toute la session", "The whole session");
     else if (process_ == processInsertSilence)
-        on = ui::Ls("Au curseur, ", "At the cursor, ") + timeText(tab.cursor, session.rate) + ", " + juce::String(tracks) + ui::Ls(" piste(s)", " track(s)");
+        on = ui::Ls("Au curseur, ", "At the cursor, ") + timeText(tab.cursor, session.rate) + ", " + cydaw::base::Text(tracks) + ui::Ls(" piste(s)", " track(s)");
     else if (process_ == processChannels || !hasSelection(tab))
-        on = juce::String(tracks) + ui::Ls(" piste(s), en entier", " track(s), whole");
+        on = cydaw::base::Text(tracks) + ui::Ls(" piste(s), en entier", " track(s), whole");
     else
-        on = ui::Ls("La sélection, ", "The selection, ") + timeText(end - start, session.rate) + ", " + juce::String(tracks)
+        on = ui::Ls("La sélection, ", "The selection, ") + timeText(end - start, session.rate) + ", " + cydaw::base::Text(tracks)
              + ui::Ls(" piste(s)", " track(s)");
     ImGui::TextColored(theme::vec(p.textFaint), "%s", on.toRawUTF8());
     ImGui::Spacing();
@@ -2346,9 +2346,9 @@ void FoundryView::drawProcesses(Tab& tab)
         static constexpr int rates[] { 8'000, 11'025, 16'000, 22'050, 32'000, 44'100, 48'000, 88'200, 96'000, 176'400, 192'000 };
         ImGui::TextColored(theme::vec(p.textFaint), "%s %d Hz", L("Maintenant :", "Now:"), juce::roundToInt(session.rate));
         ImGui::SetNextItemWidth(-1.0f);
-        if (ImGui::BeginCombo("##rate", (juce::String(newRate_) + " Hz").toRawUTF8())) {
+        if (ImGui::BeginCombo("##rate", (cydaw::base::Text(newRate_) + " Hz").toRawUTF8())) {
             for (const auto rate : rates)
-                if (ImGui::Selectable((juce::String(rate) + " Hz").toRawUTF8(), rate == newRate_))
+                if (ImGui::Selectable((cydaw::base::Text(rate) + " Hz").toRawUTF8(), rate == newRate_))
                     newRate_ = rate;
             ImGui::EndCombo();
         }
@@ -2439,7 +2439,7 @@ void FoundryView::drawMarkers(Tab& tab)
         marker.name.copyToUTF8(name.data(), name.size());
         ImGui::SetNextItemWidth(-1.0f);
         if (ImGui::InputText("##name", name.data(), name.size(), ImGuiInputTextFlags_EnterReturnsTrue)) {
-            marker.name = juce::String::fromUTF8(name.data());
+            marker.name = cydaw::base::Text::fromUTF8(name.data());
             changed = true;
         }
         ImGui::Separator();
@@ -2487,9 +2487,9 @@ void FoundryView::drawAnalysis(Tab& tab)
                 ImGui::TextUnformatted(value(c).toRawUTF8());
             }
         };
-        row(L("Crête", "Peak"), [&](int c) { return juce::String(db(stats.peak[static_cast<std::size_t>(c)]), 2) + " dB"; });
-        row("RMS", [&](int c) { return juce::String(db(stats.rms[static_cast<std::size_t>(c)]), 2) + " dB"; });
-        row(L("Décalage DC", "DC offset"), [&](int c) { return juce::String(stats.dc[static_cast<std::size_t>(c)] * 100.0, 3) + " %"; });
+        row(L("Crête", "Peak"), [&](int c) { return cydaw::base::Text(db(stats.peak[static_cast<std::size_t>(c)]), 2) + " dB"; });
+        row("RMS", [&](int c) { return cydaw::base::Text(db(stats.rms[static_cast<std::size_t>(c)]), 2) + " dB"; });
+        row(L("Décalage DC", "DC offset"), [&](int c) { return cydaw::base::Text(stats.dc[static_cast<std::size_t>(c)] * 100.0, 3) + " %"; });
         ImGui::EndTable();
     }
     ImGui::Text("%s %.1f LUFS", L("Sonie intégrée :", "Integrated loudness:"), stats.loudness);
@@ -2514,7 +2514,7 @@ void FoundryView::drawAnalysis(Tab& tab)
             const auto x = origin.x + static_cast<float>(std::log(hz / 20.0) / std::log(nyquist / 20.0)) * width;
             list->AddLine(ImVec2(x, origin.y), ImVec2(x, origin.y + height), p.grid);
             list->AddText(ImVec2(x + dp(2.0f), origin.y + height - ImGui::GetFontSize()), p.textFaint,
-                          hz >= 1'000.0 ? (juce::String(static_cast<int>(hz / 1'000.0)) + "k").toRawUTF8() : "100");
+                          hz >= 1'000.0 ? (cydaw::base::Text(static_cast<int>(hz / 1'000.0)) + "k").toRawUTF8() : "100");
         }
         std::vector<ImVec2> points;
         const auto bins = tab.spectrum.size();
@@ -2637,7 +2637,7 @@ cydaw::base::Value FoundryView::tabJson(const Tab& tab) const
             v->setProperty("width",w->Size.x);v->setProperty("height",w->Size.y);v->setProperty("dock",static_cast<juce::int64>(w->DockId));windows.add(cydaw::base::Value(v));
         }item->setProperty("windows",windows);
         item->setProperty("imguiErrorCount",GImGui->ErrorCountCurrentFrame);
-        item->setProperty("imguiErrorLog",juce::String(GImGui->DebugLogBuf.c_str()));
+        item->setProperty("imguiErrorLog",cydaw::base::Text(GImGui->DebugLogBuf.c_str()));
         cydaw::base::Array<cydaw::base::Value> thumbnailFrames;for(const auto& [frame,thumbnail]:tab.thumbnails)thumbnailFrames.add(static_cast<juce::int64>(frame));
         item->setProperty("thumbnailFrames",thumbnailFrames);
         auto* navigator=new cydaw::base::Object();navigator->setProperty("x",cinemaNavigatorMin_.x-ImGui::GetMainViewport()->Pos.x);navigator->setProperty("y",cinemaNavigatorMin_.y-ImGui::GetMainViewport()->Pos.y);
@@ -2725,13 +2725,13 @@ cydaw::base::Value FoundryView::command(const cydaw::base::Value& request)
     if (request.hasProperty("tab")) {
         const auto index = static_cast<int>(request.getProperty("tab", 0));
         if (index < 0 || index >= static_cast<int>(tabs_.size()))
-            return juce::String("no tab ") + juce::String(index);
+            return cydaw::base::Text("no tab ") + cydaw::base::Text(index);
         current_ = index;
     }
     if(cinema_&&(action=="video"||action=="video_audio"||action=="group"||action=="add_subtrack"||action=="assign"||action=="view"||action=="container"||action=="add_track"))return cinemaCommand(request);
     auto* tab = this->tab();
     if(action=="processing") {
-        if(!tab)return juce::String("no session open");
+        if(!tab)return cydaw::base::Text("no session open");
         syncProcessing(*tab);const auto result=tab->processing->command(request);commitProcessing(*tab, true);
         return static_cast<bool>(result.getProperty("ok",false))?result.getProperty("result",{}):result.getProperty("error",{});
     }
@@ -2740,7 +2740,7 @@ cydaw::base::Value FoundryView::command(const cydaw::base::Value& request)
         commitProcessing(*tab, action == "save" || action == "save_session" || action == "export" || action == "send_to_studio");
     }
 
-    const auto needTab = [&]() -> juce::String { return tab == nullptr ? juce::String("no session open") : juce::String(); };
+    const auto needTab = [&]() -> cydaw::base::Text { return tab == nullptr ? cydaw::base::Text("no session open") : cydaw::base::Text(); };
     const auto rate = tab != nullptr ? tab->document->session().rate : 48'000.0;
     const auto frameOf = [&](const char* key, const std::int64_t fallback) {
         if (!request.hasProperty(key))
@@ -2752,10 +2752,10 @@ cydaw::base::Value FoundryView::command(const cydaw::base::Value& request)
     const auto trackOf = [&](const char* key, const int fallback) {
         return request.hasProperty(key) ? static_cast<int>(request.getProperty(key, fallback)) : fallback;
     };
-    juce::String error;
+    cydaw::base::Text error;
     if (action == "status" || action.isEmpty()) {
     } else if (action == "open") {
-        if (!open(juce::File(request.getProperty("file", cydaw::base::Value()).toString())))
+        if (!open(cydaw::base::File(request.getProperty("file", cydaw::base::Value()).toString())))
             error = state_.status;
     } else if (action == "new") {
         Tab created;
@@ -2767,7 +2767,7 @@ cydaw::base::Value FoundryView::command(const cydaw::base::Value& request)
         closeTab(current_);
     } else if (action == "import") {
         if ((error = needTab()).isEmpty())
-            if (!importFile(*tab, juce::File(request.getProperty("file", cydaw::base::Value()).toString()), trackOf("track", -1), frameOf("at", tab->cursor)))
+            if (!importFile(*tab, cydaw::base::File(request.getProperty("file", cydaw::base::Value()).toString()), trackOf("track", -1), frameOf("at", tab->cursor)))
                 error = state_.status;
     } else if (action == "add_track") {
         if ((error = needTab()).isEmpty())
@@ -2797,7 +2797,7 @@ cydaw::base::Value FoundryView::command(const cydaw::base::Value& request)
             const auto index = trackOf("track", 0);
             auto next = tab->document->session();
             if (index < 0 || index >= static_cast<int>(next.tracks.size())) {
-                error = "no track " + juce::String(index);
+                error = "no track " + cydaw::base::Text(index);
             } else {
                 auto& track = next.tracks[static_cast<std::size_t>(index)];
                 track.gainDb = static_cast<float>(number(request, "gainDb", track.gainDb));
@@ -2940,8 +2940,8 @@ cydaw::base::Value FoundryView::command(const cydaw::base::Value& request)
         if ((error = needTab()).isEmpty()) {
             const auto path = request.getProperty("path", cydaw::base::Value()).toString();
             const auto bits = static_cast<int>(number(request, "bits", tab->document->bitsPerSample()));
-            const auto file = path.isNotEmpty() ? juce::File(path) : tab->document->file();
-            if (file == juce::File())
+            const auto file = path.isNotEmpty() ? cydaw::base::File(path) : tab->document->file();
+            if (file == cydaw::base::File())
                 error = "path: where to save it";
             else if (const auto result = tab->document->save(file, bits); result.failed())
                 error = result.getErrorMessage();
@@ -2949,8 +2949,8 @@ cydaw::base::Value FoundryView::command(const cydaw::base::Value& request)
     } else if (action == "save_session") {
         if ((error = needTab()).isEmpty()) {
             const auto path = request.getProperty("path", cydaw::base::Value()).toString();
-            const auto file = path.isNotEmpty() ? juce::File(path) : tab->document->sessionFile();
-            if (file == juce::File())
+            const auto file = path.isNotEmpty() ? cydaw::base::File(path) : tab->document->sessionFile();
+            if (file == cydaw::base::File())
                 error = "path: where to save it";
             else if (const auto result = tab->document->saveSession(file.withFileExtension(cinema_?"cycinema":"cyfoundry")); result.failed())
                 error = result.getErrorMessage();
@@ -2961,7 +2961,7 @@ cydaw::base::Value FoundryView::command(const cydaw::base::Value& request)
             const auto path = request.getProperty("path", cydaw::base::Value()).toString();
             if (path.isEmpty())
                 error = "path: where to write the mix";
-            else if (const auto result = tab->document->exportMix(juce::File(path), static_cast<int>(number(request, "bits", 24.0)),
+            else if (const auto result = tab->document->exportMix(cydaw::base::File(path), static_cast<int>(number(request, "bits", 24.0)),
                                                                   frameOf("start", 0), frameOf("end", 0));
                      result.failed())
                 error = result.getErrorMessage();

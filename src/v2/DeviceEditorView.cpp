@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #include "DeviceEditorView.h"
 
 #include "DeviceBody.h"
@@ -23,11 +24,11 @@ DeviceEditorView::~DeviceEditorView() = default;
 
 std::string DeviceEditorView::windowId(const TrackRef& track, const std::uint64_t nodeId)
 {
-    const auto kind = track.isBus()   ? "b" + juce::String(static_cast<juce::int64>(track.bus))
-                      : track.master  ? juce::String("m")
-                      : track.midi    ? "i" + juce::String(static_cast<juce::int64>(track.midiId))
-                                      : "a" + juce::String(static_cast<juce::int64>(track.audioIndex));
-    return ("###device-" + kind + "-" + juce::String(static_cast<juce::int64>(nodeId))).toStdString();
+    const auto kind = track.isBus()   ? "b" + cydaw::base::Text(static_cast<juce::int64>(track.bus))
+                      : track.master  ? cydaw::base::Text("m")
+                      : track.midi    ? "i" + cydaw::base::Text(static_cast<juce::int64>(track.midiId))
+                                      : "a" + cydaw::base::Text(static_cast<juce::int64>(track.audioIndex));
+    return ("###device-" + kind + "-" + cydaw::base::Text(static_cast<juce::int64>(nodeId))).toStdString();
 }
 
 void DeviceEditorView::draw()
@@ -92,8 +93,8 @@ bool DeviceEditorView::drawWindow(ExpandedPane& expanded, const int order)
         expanded.focus = false;
     }
     auto open = true;
-    const auto title = node.title + juce::String::fromUTF8("  \xe2\x80\x94  ") + studio_.trackName(expanded.track);
-    const auto name = juce::String::fromUTF8(L("Périphérique", "Device")) + " : " + title + juce::String(id);
+    const auto title = node.title + cydaw::base::Text::fromUTF8("  \xe2\x80\x94  ") + studio_.trackName(expanded.track);
+    const auto name = cydaw::base::Text::fromUTF8(L("Périphérique", "Device")) + " : " + title + cydaw::base::Text(id);
     auto flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoCollapse;
     if (ui::isDetached(id.c_str()))
         flags |= ImGuiWindowFlags_NoDocking;
@@ -101,7 +102,7 @@ bool DeviceEditorView::drawWindow(ExpandedPane& expanded, const int order)
         ImGui::PushID(id.c_str());
         // Where the modulation puts each parameter it moves: the graph's own
         // cables, then the track's modulation.
-        std::map<juce::String, float> modulated = graph.editorModulatedParameters();
+        std::map<cydaw::base::Text, float> modulated = graph.editorModulatedParameters();
         if (!expanded.track.midi && studio_.modulationActive(expanded.track)) {
             const auto output = studio_.modulationOutput(expanded.track);
             for (const auto& target : studio_.modulationTargets(expanded.track)) {

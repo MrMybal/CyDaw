@@ -43,21 +43,21 @@ namespace cydaw::app {
 // ---- Paths ------------------------------------------------------------------------
 // Where the factory content lives: "Factory" next to the executable, else the
 // source tree's (a development build); an exported plug-in is told.
-[[nodiscard]] juce::File factoryContentFolder();
-void setFactoryContentFolder(const juce::File& folder);
+[[nodiscard]] cydaw::base::File factoryContentFolder();
+void setFactoryContentFolder(const cydaw::base::File& folder);
 // Where the downloaded sound banks are: as CyDAW was told (Options ›
 // Emplacements; an exported plug-in, by its state), else CYDAW_BANKS_DIR,
 // else %LOCALAPPDATA%/CyDAW/Banks.
-[[nodiscard]] juce::File banksFolder();
-void setBanksFolder(const juce::File& folder);
-[[nodiscard]] juce::File resolveSamplePath(const juce::String& stored);
+[[nodiscard]] cydaw::base::File banksFolder();
+void setBanksFolder(const cydaw::base::File& folder);
+[[nodiscard]] cydaw::base::File resolveSamplePath(const cydaw::base::Text& stored);
 // "factory:…" for a file inside the factory folder, "bank:…" for one inside
 // the banks' folder, else its full path.
-[[nodiscard]] juce::String storedSamplePath(const juce::File& file);
+[[nodiscard]] cydaw::base::Text storedSamplePath(const cydaw::base::File& file);
 // The bank a stored path is in ("vcsl" for "bank:vcsl/…"), else empty; and
 // the path inside it.
-[[nodiscard]] juce::String bankOfSamplePath(const juce::String& stored);
-[[nodiscard]] juce::String pathInBank(const juce::String& stored);
+[[nodiscard]] cydaw::base::Text bankOfSamplePath(const cydaw::base::Text& stored);
+[[nodiscard]] cydaw::base::Text pathInBank(const cydaw::base::Text& stored);
 
 // ---- The store ----------------------------------------------------------------------
 // Every decoded file once, shared by the zones, cards and tracks that play
@@ -77,7 +77,7 @@ public:
     // zone starts; a recording long past it keeps only its head in memory
     // (from there, through `until`: its loop) and is read from the disk as
     // it plays (CYDAW_SAMPLE_STREAMING=0: every file whole).
-    [[nodiscard]] cydaw::engine::SampleDataRef acquire(const juce::File& file, bool deferred = false,
+    [[nodiscard]] cydaw::engine::SampleDataRef acquire(const cydaw::base::File& file, bool deferred = false,
                                                        juce::int64 first = -1, juce::int64 until = -1);
     // Asks for every sample of the zones a map reaches with these controllers
     // and articulation (a card's settings moved: a microphone raised).
@@ -105,7 +105,7 @@ private:
 
 // Decodes a file now, on this thread, into `data` (the store's loader; a
 // test). False with `error` set when it cannot be read.
-bool decodeSampleFile(const juce::File& file, cydaw::engine::SampleData& data, juce::String& error);
+bool decodeSampleFile(const cydaw::base::File& file, cydaw::engine::SampleData& data, cydaw::base::Text& error);
 
 // ---- Maps -----------------------------------------------------------------------------
 // The map as this version plays it: the zones of factory instruments made
@@ -115,10 +115,10 @@ bool decodeSampleFile(const juce::File& file, cydaw::engine::SampleData& data, j
 [[nodiscard]] cydaw::base::Value upgradedSamplerMap(const cydaw::base::Value& json);
 // The JSON as parsed, every sample asked of the store. Null with `error` set
 // when it holds no zone this version can play.
-[[nodiscard]] cydaw::engine::SamplerMapRef samplerMapFromVar(const cydaw::base::Value& json, juce::String& error);
-[[nodiscard]] cydaw::base::Value loadSamplerMapFile(const juce::File& file, juce::String& error);
+[[nodiscard]] cydaw::engine::SamplerMapRef samplerMapFromVar(const cydaw::base::Value& json, cydaw::base::Text& error);
+[[nodiscard]] cydaw::base::Value loadSamplerMapFile(const cydaw::base::File& file, cydaw::base::Text& error);
 // "Steinway B · 63 zones · A0–C8 · 3 layers".
-[[nodiscard]] juce::String describeSamplerMap(const cydaw::base::Value& json);
+[[nodiscard]] cydaw::base::Text describeSamplerMap(const cydaw::base::Value& json);
 
 // Files made into a map: each file's note from its name ("C#4", "A-1",
 // "_60_") checked against the pitch heard in it, or the pitch alone; files
@@ -126,14 +126,14 @@ bool decodeSampleFile(const juce::File& file, cydaw::engine::SampleData& data, j
 // by loudness) or round robins ("rr2"); every key between two notes goes to
 // the nearer. A file with no pitch (a drum) gets one key of its own, from C1
 // up. `name` names the map.
-[[nodiscard]] cydaw::base::Value samplerMapFromFiles(const juce::Array<juce::File>& files, const juce::String& name);
+[[nodiscard]] cydaw::base::Value samplerMapFromFiles(const cydaw::base::Array<cydaw::base::File>& files, const cydaw::base::Text& name);
 // The simple sampler's map: this one file over the whole keyboard, around
 // its note (its name's, its pitch's; middle C for a sound without one),
 // without settings of its own (the card keeps its own).
-[[nodiscard]] cydaw::base::Value simpleSamplerMap(const juce::File& file);
+[[nodiscard]] cydaw::base::Value simpleSamplerMap(const cydaw::base::File& file);
 // The zones of `json` with these files added, mapped as above among the
 // notes already there.
-[[nodiscard]] cydaw::base::Value withFilesAdded(const cydaw::base::Value& json, const juce::Array<juce::File>& files);
+[[nodiscard]] cydaw::base::Value withFilesAdded(const cydaw::base::Value& json, const cydaw::base::Array<cydaw::base::File>& files);
 // Every zone's keys spread again around the roots (after a root moved).
 [[nodiscard]] cydaw::base::Value withKeysSpread(const cydaw::base::Value& json);
 
@@ -148,14 +148,14 @@ bool decodeSampleFile(const juce::File& file, cydaw::engine::SampleData& data, j
 // rt_decay). Regions of a held keyswitch (sw_down/up/previous) are skipped.
 // A sample not where the SFZ says is looked for without an undefined $name,
 // then in ../Samples (a mapping meant to be included).
-[[nodiscard]] cydaw::base::Value samplerMapFromSfz(const juce::File& file, juce::String& error,
+[[nodiscard]] cydaw::base::Value samplerMapFromSfz(const cydaw::base::File& file, cydaw::base::Text& error,
                                           const std::map<int, double>& controllers = {});
 // The map written as SFZ, its samples by path relative to the SFZ's folder
 // when they are under it.
-[[nodiscard]] juce::String samplerMapToSfz(const cydaw::base::Value& json, const juce::File& sfzFile);
+[[nodiscard]] cydaw::base::Text samplerMapToSfz(const cydaw::base::Value& json, const cydaw::base::File& sfzFile);
 
 // The note a name holds ("C#4" 61, "Db3" 49, "A-1" 9; "60" in "_60_"), or -1.
-[[nodiscard]] int noteFromName(const juce::String& name);
+[[nodiscard]] int noteFromName(const cydaw::base::Text& name);
 // The pitch heard in a decoded sample, in MIDI notes (fractional), or -1.
 [[nodiscard]] double detectSamplePitch(const cydaw::engine::SampleData& data);
 

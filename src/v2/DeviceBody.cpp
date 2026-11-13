@@ -60,7 +60,7 @@ void drawDeviceBody(DeviceBody& body, int& pane, DeviceHost& host, UiState& stat
     if (const auto holder = host.devicePresetHolder(track, nodeId)) {
         auto* devices = &host;
         presets.bar("devicePresets", *holder, [devices, track, nodeId] { return devices->devicePresetState(track, nodeId); },
-                    [devices, track, nodeId](const cydaw::base::Value& preset, juce::String& error) {
+                    [devices, track, nodeId](const cydaw::base::Value& preset, cydaw::base::Text& error) {
                         return devices->applyDevicePreset(track, nodeId, preset, error);
                     },
                     std::min(ImGui::GetContentRegionAvail().x * 0.42f, dp(380.0f)));
@@ -114,8 +114,8 @@ void drawDeviceBody(DeviceBody& body, int& pane, DeviceHost& host, UiState& stat
     const CardFileScope cardFile(host, state, track, graph, node.id, node.typeKey);
     if (pane == -2) {
         ImGui::SetCursorScreenPos(origin);
-        designed.drawPlayed(("designed" + juce::String(static_cast<juce::int64>(node.id))).toRawUTF8(), body.interface, size,
-                            [&graph](const juce::String& key, const double value) { (void) graph.editorSetParameter(key, value); }, &graph.editorAnalysis());
+        designed.drawPlayed(("designed" + cydaw::base::Text(static_cast<juce::int64>(node.id))).toRawUTF8(), body.interface, size,
+                            [&graph](const cydaw::base::Text& key, const double value) { (void) graph.editorSetParameter(key, value); }, &graph.editorAnalysis());
     } else if (pane < 0) {
         auto chosen = -1;
         (void) visual::drawOverview("##overview", surface.panes, body.parameters, origin, size, colour, live, set, surface.knobs, &chosen);

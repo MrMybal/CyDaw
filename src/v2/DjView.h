@@ -39,9 +39,9 @@ public:
     void drawTransport();
     // The control port's "dj" command.
     [[nodiscard]] cydaw::base::Value command(const cydaw::base::Value& request);
-    void loadFile(int deck, const juce::File& file);
+    void loadFile(int deck, const cydaw::base::File& file);
     // Files dropped on the window: the first deck that is not playing.
-    bool dropFiles(const juce::StringArray& files);
+    bool dropFiles(const cydaw::base::TextList& files);
     [[nodiscard]] DjLibrary& library();
     // Saved now (on quitting).
     void flush();
@@ -58,7 +58,7 @@ private:
         float meter {};
         // The track whose analysis went into the collection, and whose
         // gain was set by it.
-        juce::File learned;
+        cydaw::base::File learned;
         bool wasPlaying {};
         std::array<double, 8> cues {};
         double cuePoint {};
@@ -106,7 +106,7 @@ private:
     float browserShare_ { 0.36f };
     // The collection as shown: filtered and sorted.
     std::array<char, 160> search_ {};
-    juce::String shownQuery_;
+    cydaw::base::Text shownQuery_;
     int folder_ { -1 };        // -1 every track, -2 played this session, else a folder
     int shownFolder_ { -3 };
     int shownRevision_ { -1 };
@@ -114,8 +114,8 @@ private:
     bool sortAscending_ { true };
     bool sortChanged_ {};
     std::vector<DjTrack> rows_;
-    juce::File selected_;
-    std::vector<juce::File> history_;
+    cydaw::base::File selected_;
+    std::vector<cydaw::base::File> history_;
     std::unique_ptr<juce::FileChooser> chooser_;
 };
 

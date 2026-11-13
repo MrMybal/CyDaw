@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #include "NodeTree.h"
 
 #include "Widgets.h"
@@ -13,13 +14,13 @@ using ui::Ls;
 
 namespace {
 
-bool among(const juce::String& key, const std::initializer_list<const char*> keys)
+bool among(const cydaw::base::Text& key, const std::initializer_list<const char*> keys)
 {
     return std::any_of(keys.begin(), keys.end(), [&key](const char* candidate) { return key == candidate; });
 }
 
 // The order branches come in; others follow, by name.
-int rank(const juce::String& name)
+int rank(const cydaw::base::Text& name)
 {
     static const std::initializer_list<std::pair<const char*, const char*>> order {
         { "Audio", "Audio" },
@@ -87,7 +88,7 @@ void drawBranch(const Branch& branch, const bool openAll, const int depth, const
         // The first level open, but for the long list of inputs and outputs.
         if (depth == 0 && child.name != Ls("Entrées et sorties", "Inputs and outputs"))
             flags |= ImGuiTreeNodeFlags_DefaultOpen;
-        const auto label = child.name + "  " + juce::String(child.count) + "###branch";
+        const auto label = child.name + "  " + cydaw::base::Text(child.count) + "###branch";
         if (ImGui::TreeNodeEx(label.toRawUTF8(), flags)) {
             drawBranch(child, openAll, depth + 1, leaf);
             ImGui::TreePop();
@@ -109,7 +110,7 @@ void drawBranch(const Branch& branch, const bool openAll, const int depth, const
 
 } // namespace
 
-std::vector<juce::String> pathOf(const Type& type)
+std::vector<cydaw::base::Text> pathOf(const Type& type)
 {
     const auto& key = type.key;
     const auto& category = type.categoryKey;
@@ -181,8 +182,8 @@ std::vector<juce::String> pathOf(const Type& type)
     }
     if (category == "nodes.category.modules") {
         // A factory graph under its own category: Graphes › Effets › Délai et espace.
-        std::vector<juce::String> path { Ls("Graphes", "Graphs") };
-        for (const auto& part : juce::StringArray::fromTokens(type.moduleCategory, "/", ""))
+        std::vector<cydaw::base::Text> path { Ls("Graphes", "Graphs") };
+        for (const auto& part : cydaw::base::TextList::fromTokens(type.moduleCategory, "/", ""))
             if (part.trim().isNotEmpty())
                 path.push_back(part.trim());
         if (path.size() == 1)
@@ -192,8 +193,8 @@ std::vector<juce::String> pathOf(const Type& type)
     if (category == "nodes.category.inlineGraphs")
         return { Ls("Graphes", "Graphs"), Ls("Ce projet", "This project") };
     // Anything else: its category's own levels ("A / B").
-    std::vector<juce::String> path;
-    for (const auto& part : juce::StringArray::fromTokens(type.category, "/", ""))
+    std::vector<cydaw::base::Text> path;
+    for (const auto& part : cydaw::base::TextList::fromTokens(type.category, "/", ""))
         if (part.trim().isNotEmpty())
             path.push_back(part.trim());
     if (path.empty())
@@ -201,11 +202,11 @@ std::vector<juce::String> pathOf(const Type& type)
     return path;
 }
 
-juce::String pathText(const Type& type)
+cydaw::base::Text pathText(const Type& type)
 {
-    juce::String text;
+    cydaw::base::Text text;
     for (const auto& part : pathOf(type))
-        text << (text.isEmpty() ? "" : juce::String::fromUTF8(" \xe2\x80\xba ")) << part;
+        text << (text.isEmpty() ? "" : cydaw::base::Text::fromUTF8(" \xe2\x80\xba ")) << part;
     return text;
 }
 

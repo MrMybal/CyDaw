@@ -1,3 +1,5 @@
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #include "ExtraPluginFormats.h"
 #include "HostedInstance.h"
 #include <array>
@@ -27,13 +29,13 @@ struct ClapModule
     const clap_plugin_entry_t *entry{};
     const clap_plugin_factory_t *factory{};
     bool initialized{};
-    explicit ClapModule(const juce::File &file)
+    explicit ClapModule(const cydaw::base::File &file)
     {
         auto binary = file;
 #if JUCE_MAC
         if (file.isDirectory())
         {
-            auto files = file.getChildFile("Contents/MacOS").findChildFiles(juce::File::findFiles, false);
+            auto files = file.getChildFile("Contents/MacOS").findChildFiles(cydaw::base::File::findFiles, false);
             if (!files.isEmpty())
                 binary = files[0];
         }
@@ -103,8 +105,8 @@ class ClapInstance final : public HostedInstance, private juce::Timer
     std::array<clap_audio_buffer_t, 16> inputs{}, outputs{};
     std::vector<float> scratch;
     std::array<float *, 64> inputPointers{}, outputPointers{};
-    juce::File source;
-    explicit ClapInstance(const juce::File &f) : module(std::make_shared<ClapModule>(f)), source(f)
+    cydaw::base::File source;
+    explicit ClapInstance(const cydaw::base::File &f) : module(std::make_shared<ClapModule>(f)), source(f)
     {
         host.clap_version = CLAP_VERSION;
         host.host_data = this;
@@ -122,7 +124,7 @@ class ClapInstance final : public HostedInstance, private juce::Timer
                 [](const clap_host_t *h) { return self(h).audioThread; }};
             static const clap_host_log_t log{
                 [](const clap_host_t *, clap_log_severity, const char *message)
-                { juce::Logger::writeToLog("CLAP: " + juce::String::fromUTF8(message)); }};
+                { juce::Logger::writeToLog("CLAP: " + cydaw::base::Text::fromUTF8(message)); }};
             static const clap_host_params_t params{
                 [](const clap_host_t *h, clap_param_rescan_flags flags)
                 {
@@ -144,7 +146,7 @@ class ClapInstance final : public HostedInstance, private juce::Timer
                     auto &s = self(h);
                     *id = s.nextTimer++;
                     s.timers.push_back(
-                        {*id, std::max(1u, ms), juce::Time::getMillisecondCounterHiRes() + ms});
+                        {*id, std::max(1u, ms), cydaw::base::Time::getMillisecondCounterHiRes() + ms});
                     return true;
                 },
                 [](const clap_host_t *h, clap_id id)
@@ -199,7 +201,7 @@ class ClapInstance final : public HostedInstance, private juce::Timer
         };
     }
     static ClapInstance &self(const clap_host_t *h) { return *static_cast<ClapInstance *>(h->host_data); }
-    bool load(const juce::String &id, juce::String &error)
+    bool load(const cydaw::base::Text &id, cydaw::base::Text &error)
     {
         if (!module->factory)
         {
@@ -227,13 +229,13 @@ class ClapInstance final : public HostedInstance, private juce::Timer
             error = "CLAP: plugin initialization failed";
             return false;
         }
-        description.name = juce::String::fromUTF8(descriptor->name);
-        description.manufacturerName = juce::String::fromUTF8(descriptor->vendor);
-        description.version = juce::String::fromUTF8(descriptor->version);
+        description.name = cydaw::base::Text::fromUTF8(descriptor->name);
+        description.manufacturerName = cydaw::base::Text::fromUTF8(descriptor->vendor);
+        description.version = cydaw::base::Text::fromUTF8(descriptor->version);
         description.pluginFormatName = "CLAP";
         description.fileOrIdentifier = source.getFullPathName();
-        description.uniqueId = juce::String::fromUTF8(descriptor->id).hashCode();
-        description.descriptiveName = juce::String::fromUTF8(descriptor->id);
+        description.uniqueId = cydaw::base::Text::fromUTF8(descriptor->id).hashCode();
+        description.descriptiveName = cydaw::base::Text::fromUTF8(descriptor->id);
         if (descriptor->features)
             for (auto f = descriptor->features; *f; ++f)
                 if (!std::strcmp(*f, CLAP_PLUGIN_FEATURE_INSTRUMENT))
@@ -286,7 +288,7 @@ class ClapInstance final : public HostedInstance, private juce::Timer
                 if (!params->get_info(plugin, i, &info))
                     continue;
                 auto p =
-                    std::make_unique<HostedControl>(juce::String(info.id), juce::String::fromUTF8(info.name),
+                    std::make_unique<HostedControl>(cydaw::base::Text(info.id), cydaw::base::Text::fromUTF8(info.name),
                                                     info.min_value, info.max_value, info.default_value);
                 if (info.flags & CLAP_PARAM_IS_STEPPED)
                     p->steps = std::max(2, int(info.max_value - info.min_value + 1));
@@ -298,12 +300,12 @@ class ClapInstance final : public HostedInstance, private juce::Timer
                 {
                     char text[256]{};
                     return params->value_to_text(plugin, id, value, text, sizeof(text))
-                               ? juce::String::fromUTF8(text)
-                               : juce::String(value, 3);
+                               ? cydaw::base::Text::fromUTF8(text)
+                               : cydaw::base::Text(value, 3);
                 };
                 if (presetControl < 0 && (info.flags & CLAP_PARAM_IS_ENUM) &&
                     (info.flags & CLAP_PARAM_IS_STEPPED) &&
-                    juce::String::fromUTF8(info.name).equalsIgnoreCase("Preset") &&
+                    cydaw::base::Text::fromUTF8(info.name).equalsIgnoreCase("Preset") &&
                     info.max_value - info.min_value < 2048)
                     presetControl = int(controls.size());
                 controls.push_back({info, p.get(), std::numeric_limits<double>::quiet_NaN()});
@@ -591,7 +593,7 @@ class ClapInstance final : public HostedInstance, private juce::Timer
             audioThread = false;
         }
         auto copy = timers;
-        double now = juce::Time::getMillisecondCounterHiRes();
+        double now = cydaw::base::Time::getMillisecondCounterHiRes();
         for (auto t : copy)
             if (now >= t.next)
             {
@@ -700,8 +702,8 @@ class ClapInstance final : public HostedInstance, private juce::Timer
         const auto &p = controls[size_t(presetControl)];
         char text[256]{};
         return params->value_to_text(plugin, p.info.id, p.info.min_value + index, text, sizeof(text))
-                   ? juce::String::fromUTF8(text)
-                   : juce::String(index + 1);
+                   ? cydaw::base::Text::fromUTF8(text)
+                   : cydaw::base::Text(index + 1);
     }
     void setCurrentProgram(int index) override
     {
@@ -778,15 +780,15 @@ void ClapEditor::resized()
     }
 #endif
 }
-std::unique_ptr<juce::AudioPluginInstance> createClap(const juce::File &f, const juce::String &id,
-                                                      juce::String &error)
+std::unique_ptr<juce::AudioPluginInstance> createClap(const cydaw::base::File &f, const cydaw::base::Text &id,
+                                                      cydaw::base::Text &error)
 {
     auto p = std::make_unique<ClapInstance>(f);
     if (!p->load(id, error))
         return {};
     return p;
 }
-void scanClap(const juce::File &f, juce::OwnedArray<juce::PluginDescription> &result, juce::String &error)
+void scanClap(const cydaw::base::File &f, juce::OwnedArray<juce::PluginDescription> &result, cydaw::base::Text &error)
 {
     ClapModule module(f);
     if (!module.factory)
@@ -800,10 +802,10 @@ void scanClap(const juce::File &f, juce::OwnedArray<juce::PluginDescription> &re
         if (!d)
             continue;
         auto desc = std::make_unique<juce::PluginDescription>();
-        desc->name = juce::String::fromUTF8(d->name);
-        desc->manufacturerName = juce::String::fromUTF8(d->vendor);
-        desc->version = juce::String::fromUTF8(d->version);
-        desc->descriptiveName = juce::String::fromUTF8(d->id);
+        desc->name = cydaw::base::Text::fromUTF8(d->name);
+        desc->manufacturerName = cydaw::base::Text::fromUTF8(d->vendor);
+        desc->version = cydaw::base::Text::fromUTF8(d->version);
+        desc->descriptiveName = cydaw::base::Text::fromUTF8(d->id);
         desc->uniqueId = desc->descriptiveName.hashCode();
         desc->fileOrIdentifier = f.getFullPathName();
         desc->pluginFormatName = "CLAP";

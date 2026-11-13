@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "Studio.h"
@@ -19,13 +20,13 @@ public:
 private:
     void drawProgress();
     void drawDetails(const SoundBanks::Bank& bank);
-    void report(const juce::String& text, bool error);
+    void report(const cydaw::base::Text& text, bool error);
 
     Studio& studio_;
     UiState& state_;
     bool shown_ {};
-    juce::String selected_;
-    juce::String removing_;
+    cydaw::base::Text selected_;
+    cydaw::base::Text removing_;
 };
 
 } // namespace cydaw::v2

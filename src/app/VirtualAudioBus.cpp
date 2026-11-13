@@ -73,8 +73,8 @@ std::uint64_t VirtualBusRouter::addBus(const VirtualBusDirection direction)
     bus.id = nextBusId_++;
     bus.direction = direction;
     bus.name = direction == VirtualBusDirection::input
-        ? "Input " + juce::String(ordinal)
-        : "Output " + juce::String(ordinal);
+        ? "Input " + cydaw::base::Text(ordinal)
+        : "Output " + cydaw::base::Text(ordinal);
     bus.monitor = false;
     buses_.push_back(bus);
     graphs_[bus.id] = makeBusRuntime(

@@ -1260,10 +1260,10 @@ void NodeGraphComponent::initialiseCatalog()
     for (const auto& effect : cydaw::engine::effectCatalogue) {
         // The MIDI effects carry notes; the modulators values.
         const auto carried = effect.midi ? midi : effect.control ? control : audio;
-        NodeType type { juce::String(std::string(effect.typeKey)), juce::String(std::string(effect.titleKey)), {},
-                        juce::String(std::string(effect.categoryKey)), juce::Colour(effect.colour),
+        NodeType type { cydaw::base::Text(std::string(effect.typeKey)), cydaw::base::Text(std::string(effect.titleKey)), {},
+                        cydaw::base::Text(std::string(effect.categoryKey)), juce::Colour(effect.colour),
                         true, carried, true, carried, false, false };
-        type.descriptionKey = juce::String(std::string(effect.descriptionKey));
+        type.descriptionKey = cydaw::base::Text(std::string(effect.descriptionKey));
         if (effect.convertsChannels()) {
             type.inputChannels = effect.inputChannels;
             type.outputChannels = effect.outputChannels;
@@ -1273,7 +1273,7 @@ void NodeGraphComponent::initialiseCatalog()
     std::vector<NodeType> audioBoundaries;
     audioBoundaries.reserve(16);
     for (int channels = 1; channels <= 8; ++channels) {
-        const auto suffix = juce::String(channels);
+        const auto suffix = cydaw::base::Text(channels);
         audioBoundaries.push_back({
             graphAudioBoundaryKey(true, channels),
             "node.graphAudioInput." + suffix, {}, "nodes.category.graphPorts",
@@ -1326,8 +1326,8 @@ void NodeGraphComponent::initialiseCatalog()
                     channels = legacyChannels;
             }
             type.ports.push_back({
-                port.id, juce::String(port.key),
-                juce::String(port.displayName.empty() ? port.key
+                port.id, cydaw::base::Text(port.key),
+                cydaw::base::Text(port.displayName.empty() ? port.key
                                                       : port.displayName),
                 port.type,
                 port.direction == cydaw::graph::PortDirection::input,
@@ -1380,7 +1380,7 @@ void NodeGraphComponent::ensureFactoryModules()
     // rebuilds them.
     if (factoryModulesInstalled_
         && std::all_of(factoryModuleKeys_.begin(), factoryModuleKeys_.end(),
-                       [this](const juce::String& key) {
+                       [this](const cydaw::base::Text& key) {
                            // The class has to be loaded and its type has to be
                            // in the catalogue: restore() rebuilds the catalogue
                            // from the primitives alone, and a class that is
@@ -1392,8 +1392,8 @@ void NodeGraphComponent::ensureFactoryModules()
     using Parameters = cydaw::engine::NativeDspNodeParameters;
     using Role = cydaw::graph::GraphRole;
     const auto describeFactory = [](SavedModule& module, const Role role,
-                                    const juce::StringRef categoryKey,
-                                    const juce::StringRef descriptionKey,
+                                    const cydaw::base::Text categoryKey,
+                                    const cydaw::base::Text descriptionKey,
                                     std::initializer_list<const char*> tags) {
         module.role = role;
         module.category = tr(categoryKey);
@@ -2681,7 +2681,7 @@ void NodeGraphComponent::initialiseDefaultGraph()
     activeFactoryPresetKey_.clear();
     nextNodeId_ = 1;
 
-    const auto addDefault = [this](const juce::String& key, const juce::Point<float> position) {
+    const auto addDefault = [this](const cydaw::base::Text& key, const juce::Point<float> position) {
         if (const auto* type = findType(key))
             addNodeFromType(*type, position);
     };

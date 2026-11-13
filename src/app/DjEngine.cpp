@@ -1,3 +1,6 @@
+#include <cydaw/base/TextMap.h>
+#include <cydaw/integration/AudioFiles.h>
+#include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "DjEngine.h"
@@ -32,14 +35,14 @@ double wrapHalf(double value) noexcept
 } // namespace
 
 // The tags a reader found, else "Artist - Title" from the file's name.
-void djTrackTags(const juce::File& file, const juce::StringPairArray& tags, juce::String& title, juce::String& artist)
+void djTrackTags(const cydaw::base::File& file, const cydaw::base::TextMap& tags, cydaw::base::Text& title, cydaw::base::Text& artist)
 {
     const auto find = [&](std::initializer_list<const char*> keys) {
         for (const auto* key : keys)
             for (const auto& name : tags.getAllKeys())
                 if (name.equalsIgnoreCase(key) && tags[name].trim().isNotEmpty())
                     return tags[name].trim();
-        return juce::String();
+        return cydaw::base::Text();
     };
     title = find({ "title", "INAM", "TIT2", "name" });
     artist = find({ "artist", "IART", "TPE1", "author" });
@@ -71,22 +74,22 @@ DjEngine::DecodingThreadScope::~DecodingThreadScope()
 #endif
 }
 
-std::shared_ptr<TrackAudio> DjEngine::decode(juce::AudioFormatManager& formats, const juce::File& file, juce::String& error,
-                                             juce::String& title, juce::String& artist, const std::function<bool()>& cancelled)
+std::shared_ptr<TrackAudio> DjEngine::decode(cydaw::audio::AudioFormatManager& formats, const cydaw::base::File& file, cydaw::base::Text& error,
+                                             cydaw::base::Text& title, cydaw::base::Text& artist, const std::function<bool()>& cancelled)
 {
-    std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
+    std::unique_ptr<cydaw::audio::AudioFormatReader> reader(formats.createReaderFor(file));
     if (reader == nullptr) {
-        error = juce::String::fromUTF8(file.existsAsFile() ? "Format non lu" : "Fichier introuvable");
+        error = cydaw::base::Text::fromUTF8(file.existsAsFile() ? "Format non lu" : "Fichier introuvable");
         return nullptr;
     }
     const auto rate = reader->sampleRate > 0.0 ? reader->sampleRate : 44'100.0;
     const auto frames = reader->lengthInSamples;
     if (frames <= 0) {
-        error = juce::String::fromUTF8("Fichier vide");
+        error = cydaw::base::Text::fromUTF8("Fichier vide");
         return nullptr;
     }
     if (static_cast<double>(frames) / rate > longestTrackSeconds) {
-        error = juce::String::fromUTF8("Trop long pour une platine (45 min au plus)");
+        error = cydaw::base::Text::fromUTF8("Trop long pour une platine (45 min au plus)");
         return nullptr;
     }
     auto audio = std::make_shared<TrackAudio>();
@@ -101,7 +104,7 @@ std::shared_ptr<TrackAudio> DjEngine::decode(juce::AudioFormatManager& formats, 
         const auto n = static_cast<int>(std::min<juce::int64>(chunk, frames - at));
         buffer.clear();
         if (!reader->read(&buffer, 0, n, at, true, true)) {
-            error = juce::String::fromUTF8("Lecture impossible");
+            error = cydaw::base::Text::fromUTF8("Lecture impossible");
             return nullptr;
         }
         for (int c = 0; c < channels; ++c)
@@ -122,10 +125,10 @@ struct DjEngine::Deck {
     std::shared_ptr<const TrackAudio> audio;
     std::shared_ptr<const TrackAnalysis> analysis;
     LoadState state { LoadState::empty };
-    juce::File file;
-    juce::String title;
-    juce::String artist;
-    juce::String error;
+    cydaw::base::File file;
+    cydaw::base::Text title;
+    cydaw::base::Text artist;
+    cydaw::base::Text error;
     Known known;
     std::atomic<std::uint64_t> ticket {};
 
@@ -184,7 +187,7 @@ class DjEngine::Loader final : public juce::Thread {
 public:
     struct Job {
         int deck {};
-        juce::File file;
+        cydaw::base::File file;
         std::uint64_t ticket {};
     };
 
@@ -211,7 +214,7 @@ public:
     void run() override
     {
         const DecodingThreadScope decoding;
-        juce::AudioFormatManager formats;
+        cydaw::audio::AudioFormatManager formats;
         cydaw::integration::registerCyAudioCoreReaders(formats);
         while (!threadShouldExit()) {
             wake_.wait(500);
@@ -235,11 +238,11 @@ private:
         return threadShouldExit() || owner_.decks_[static_cast<std::size_t>(job.deck)]->ticket.load() != job.ticket;
     }
 
-    void load(juce::AudioFormatManager& formats, const Job& job)
+    void load(cydaw::audio::AudioFormatManager& formats, const Job& job)
     {
-        juce::String error;
-        juce::String title;
-        juce::String artist;
+        cydaw::base::Text error;
+        cydaw::base::Text title;
+        cydaw::base::Text artist;
         auto audio = DjEngine::decode(formats, job.file, error, title, artist, [&] { return stale(job); });
         if (audio == nullptr) {
             if (!stale(job))
@@ -310,7 +313,7 @@ void DjEngine::releaseResources() {}
 
 // ---- Tracks ------------------------------------------------------------------------------------
 
-void DjEngine::load(const int index, const juce::File& file, const Known& known)
+void DjEngine::load(const int index, const cydaw::base::File& file, const Known& known)
 {
     if (index < 0 || index >= deckCount)
         return;
@@ -339,7 +342,7 @@ void DjEngine::eject(const int index)
     {
         const std::scoped_lock lock(stateLock_);
         deck.state = LoadState::empty;
-        deck.file = juce::File {};
+        deck.file = cydaw::base::File {};
         deck.title = {};
         deck.artist = {};
         deck.analysis = nullptr;
@@ -353,8 +356,8 @@ void DjEngine::eject(const int index)
     }
 }
 
-void DjEngine::publish(const int index, std::shared_ptr<const TrackAudio> audio, const juce::String& title,
-                       const juce::String& artist, const std::uint64_t ticket)
+void DjEngine::publish(const int index, std::shared_ptr<const TrackAudio> audio, const cydaw::base::Text& title,
+                       const cydaw::base::Text& artist, const std::uint64_t ticket)
 {
     auto& deck = *decks_[static_cast<std::size_t>(index)];
     if (deck.ticket.load() != ticket)
@@ -401,7 +404,7 @@ void DjEngine::publishAnalysis(const int index, std::shared_ptr<const TrackAnaly
     }
 }
 
-void DjEngine::fail(const int index, const juce::String& error, const std::uint64_t ticket)
+void DjEngine::fail(const int index, const cydaw::base::Text& error, const std::uint64_t ticket)
 {
     auto& deck = *decks_[static_cast<std::size_t>(index)];
     if (deck.ticket.load() != ticket)
@@ -1042,26 +1045,26 @@ void DjEngine::getNextAudioBlock(const juce::AudioSourceChannelInfo& output)
 
 // ---- Recording ---------------------------------------------------------------------------------
 
-cydaw::base::Result DjEngine::startRecording(const juce::File& file)
+cydaw::base::Result DjEngine::startRecording(const cydaw::base::File& file)
 {
     stopRecording();
     if (!file.getParentDirectory().createDirectory())
-        return cydaw::base::Result::fail(juce::String::fromUTF8("Dossier impossible à créer : ") + file.getParentDirectory().getFullPathName());
+        return cydaw::base::Result::fail(cydaw::base::Text::fromUTF8("Dossier impossible à créer : ") + file.getParentDirectory().getFullPathName());
     file.deleteFile();
     auto stream = file.createOutputStream();
     if (stream == nullptr)
-        return cydaw::base::Result::fail(juce::String::fromUTF8("Fichier impossible à écrire : ") + file.getFullPathName());
-    std::unique_ptr<juce::OutputStream> output { std::move(stream) };
+        return cydaw::base::Result::fail(cydaw::base::Text::fromUTF8("Fichier impossible à écrire : ") + file.getFullPathName());
+    std::unique_ptr<cydaw::base::OutputStream> output { std::move(stream) };
     cydaw::integration::WaveFormat wav;
-    const auto options = juce::AudioFormatWriterOptions().withSampleRate(rate_).withNumChannels(2).withBitsPerSample(24);
+    const auto options = cydaw::audio::AudioFormatWriterOptions().withSampleRate(rate_).withNumChannels(2).withBitsPerSample(24);
     auto writer = wav.createWriterFor(output, options);
     if (writer == nullptr)
-        return cydaw::base::Result::fail(juce::String::fromUTF8("Format impossible à écrire"));
+        return cydaw::base::Result::fail(cydaw::base::Text::fromUTF8("Format impossible à écrire"));
     if (!writerThread_.isThreadRunning())
         writerThread_.startThread();
     {
         const juce::ScopedLock lock(writerLock_);
-        writer_ = std::make_unique<juce::AudioFormatWriter::ThreadedWriter>(writer.release(), writerThread_,
+        writer_ = std::make_unique<cydaw::audio::AudioFormatWriter::ThreadedWriter>(writer.release(), writerThread_,
                                                                             static_cast<int>(rate_ * 4.0));
         recordingFile_ = file;
         recordedFrames_.store(0, std::memory_order_relaxed);
@@ -1082,7 +1085,7 @@ double DjEngine::recordedSeconds() const noexcept
     return static_cast<double>(recordedFrames_.load(std::memory_order_relaxed)) / rate_;
 }
 
-juce::File DjEngine::recordingFile() const
+cydaw::base::File DjEngine::recordingFile() const
 {
     const juce::ScopedLock lock(writerLock_);
     return recordingFile_;

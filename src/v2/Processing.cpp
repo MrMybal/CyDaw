@@ -1,3 +1,4 @@
+#include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/File.h>
 #include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "Processing.h"
@@ -75,16 +76,16 @@ const std::vector<Builtin>& builtins(const StepType type)
     return none;
 }
 
-double settingOf(const Step& step, const juce::String& key, const double fallback)
+double settingOf(const Step& step, const cydaw::base::Text& key, const double fallback)
 {
     const auto it = step.settings.find(key);
     return it != step.settings.end() ? it->second : fallback;
 }
 
 // A value: the run's (by its id), else the step's own, else the default.
-double valueOf(const Values& values, const int index, const Step& step, const juce::String& key, const double fallback)
+double valueOf(const Values& values, const int index, const Step& step, const cydaw::base::Text& key, const double fallback)
 {
-    if (const auto it = values.find(juce::String(index) + "/" + key); it != values.end())
+    if (const auto it = values.find(cydaw::base::Text(index) + "/" + key); it != values.end())
         return it->second;
     return settingOf(step, key, fallback);
 }
@@ -118,7 +119,7 @@ const char* keyOf(const StepType type)
     return "gain";
 }
 
-std::optional<StepType> stepTypeOf(const juce::String& key)
+std::optional<StepType> stepTypeOf(const cydaw::base::Text& key)
 {
     for (const auto type : { StepType::chain, StepType::code, StepType::denoise, StepType::hum, StepType::declick,
                              StepType::highpass, StepType::lowpass, StepType::gain, StepType::normalise, StepType::trim })
@@ -127,7 +128,7 @@ std::optional<StepType> stepTypeOf(const juce::String& key)
     return std::nullopt;
 }
 
-juce::String nameOf(const StepType type)
+cydaw::base::Text nameOf(const StepType type)
 {
     switch (type) {
     case StepType::chain: return ui::Ls("Chaîne d'effets", "Effect chain");
@@ -144,7 +145,7 @@ juce::String nameOf(const StepType type)
     return {};
 }
 
-juce::String hintOf(const StepType type)
+cydaw::base::Text hintOf(const StepType type)
 {
     switch (type) {
     case StepType::chain:
@@ -187,7 +188,7 @@ cydaw::base::Value withUsedModules(const cydaw::base::Value& graphState)
     const auto* modules = graph != nullptr ? graph->getProperty("modules").getArray() : nullptr;
     if (modules == nullptr)
         return graphState;
-    std::set<juce::String> used;
+    std::set<cydaw::base::Text> used;
     const auto addTypes = [&used](const cydaw::base::Value& nodes) {
         if (const auto* list = nodes.getArray())
             for (const auto& node : *list)
@@ -195,7 +196,7 @@ cydaw::base::Value withUsedModules(const cydaw::base::Value& graphState)
     };
     addTypes(graph->getProperty("nodes"));
     cydaw::base::Array<cydaw::base::Value> kept;
-    std::set<juce::String> keptKeys;
+    std::set<cydaw::base::Text> keptKeys;
     for (auto grew = true; grew;) {
         grew = false;
         for (const auto& module : *modules) {
@@ -299,7 +300,7 @@ cydaw::base::Value toJson(const Processing& processing)
     return cydaw::base::Value(root);
 }
 
-std::optional<Processing> fromJson(const cydaw::base::Value& json, juce::String& error)
+std::optional<Processing> fromJson(const cydaw::base::Value& json, cydaw::base::Text& error)
 {
     if (json.getProperty("format", {}).toString() != format) {
         error = "not a CyDAW processing";
@@ -342,7 +343,7 @@ std::optional<Processing> fromJson(const cydaw::base::Value& json, juce::String&
     return processing;
 }
 
-std::optional<Processing> load(const juce::File& file, juce::String& error)
+std::optional<Processing> load(const cydaw::base::File& file, cydaw::base::Text& error)
 {
     auto processing = fromJson(cydaw::base::JSON::parse(file), error);
     if (processing)
@@ -350,7 +351,7 @@ std::optional<Processing> load(const juce::File& file, juce::String& error)
     return processing;
 }
 
-cydaw::base::Result save(const Processing& processing, const juce::File& file)
+cydaw::base::Result save(const Processing& processing, const cydaw::base::File& file)
 {
     (void) file.getParentDirectory().createDirectory();
     if (!file.replaceWithText(cydaw::base::JSON::toString(toJson(processing))))
@@ -358,8 +359,8 @@ cydaw::base::Result save(const Processing& processing, const juce::File& file)
     return cydaw::base::Result::ok();
 }
 
-juce::File userFolder() { return locations::folder(Location::processings); }
-juce::File factoryFolder() { return app::factoryContentFolder().getChildFile("Processings"); }
+cydaw::base::File userFolder() { return locations::folder(Location::processings); }
+cydaw::base::File factoryFolder() { return app::factoryContentFolder().getChildFile("Processings"); }
 
 std::vector<Processing> library(const std::optional<Kind> kind)
 {
@@ -367,10 +368,10 @@ std::vector<Processing> library(const std::optional<Kind> kind)
     for (const auto& [folder, factory] : { std::pair { factoryFolder(), true }, std::pair { userFolder(), false } }) {
         if (!folder.isDirectory())
             continue;
-        auto files = folder.findChildFiles(juce::File::findFiles, false, juce::String("*") + fileExtension);
+        auto files = folder.findChildFiles(cydaw::base::File::findFiles, false, cydaw::base::Text("*") + fileExtension);
         files.sort();
         for (const auto& file : files) {
-            juce::String error;
+            cydaw::base::Text error;
             if (auto processing = load(file, error); processing && (!kind || processing->kind == *kind)) {
                 processing->factory = factory;
                 all.push_back(std::move(*processing));
@@ -380,7 +381,7 @@ std::vector<Processing> library(const std::optional<Kind> kind)
     return all;
 }
 
-std::optional<Processing> find(const juce::String& name, const std::optional<Kind> kind)
+std::optional<Processing> find(const cydaw::base::Text& name, const std::optional<Kind> kind)
 {
     // The person's first: theirs may hide one of the factory's with its name.
     auto all = library(kind);
@@ -404,7 +405,7 @@ std::vector<Parameter> builtinSettings(const StepType type)
         parameter.step = item.step;
         parameter.value = item.value;
         for (const auto* choice : item.choices)
-            parameter.choices.add(juce::String::fromUTF8(choice));
+            parameter.choices.add(cydaw::base::Text::fromUTF8(choice));
         parameters.push_back(parameter);
     }
     return parameters;
@@ -419,7 +420,7 @@ Step newStep(const StepType type)
     if (type == StepType::code) {
         step.code = starterCode;
         for (const auto& slider : inspectJsfx(step.code).sliders)
-            step.settings["slider" + juce::String(slider.index + 1)] = slider.defaultValue;
+            step.settings["slider" + cydaw::base::Text(slider.index + 1)] = slider.defaultValue;
     }
     if (type == StepType::chain) {
         ModeProcessing mixer;
@@ -434,7 +435,7 @@ std::vector<Parameter> parametersOf(const Processing& processing)
     std::vector<Parameter> parameters;
     if (processing.kind == Kind::midi) {
         for (const auto& setting : noteScriptSettings(processing.script))
-            parameters.push_back({ "param" + juce::String(setting.index + 1), setting.name, setting.minimum, setting.maximum,
+            parameters.push_back({ "param" + cydaw::base::Text(setting.index + 1), setting.name, setting.minimum, setting.maximum,
                                    setting.step, setting.defaultValue, setting.choices });
         return parameters;
     }
@@ -447,10 +448,10 @@ std::vector<Parameter> parametersOf(const Processing& processing)
         auto prefix = nameOf(step.type);
         if (number > 1)
             prefix << " " << number;
-        const auto id = juce::String(static_cast<int>(i)) + "/";
+        const auto id = cydaw::base::Text(static_cast<int>(i)) + "/";
         if (step.type == StepType::code) {
             for (const auto& slider : inspectJsfx(step.code).sliders) {
-                const auto key = "slider" + juce::String(slider.index + 1);
+                const auto key = "slider" + cydaw::base::Text(slider.index + 1);
                 parameters.push_back({ id + key, prefix + " \xc2\xb7 " + slider.name, slider.minimum, slider.maximum, slider.step,
                                        settingOf(step, key, slider.defaultValue), slider.choices });
             }
@@ -505,7 +506,7 @@ cydaw::base::Result renderChain(const cydaw::base::Value& state, engine::repair:
 {
     if (!state.isObject())
         return cydaw::base::Result::ok(); // an empty chain: the sound as it is
-    juce::String error;
+    cydaw::base::Text error;
     auto native = app::restoreNativeDspGraphState(state.getProperty("native", {}), error);
     if (!native)
         return cydaw::base::Result::fail(ui::Ls("La chaîne ne se relit pas : ", "The chain does not restore: ") + error);
@@ -596,7 +597,7 @@ static AudioResult renderAudioUnguarded(const Prepared& prepared, engine::repair
                 if (key.startsWith("slider"))
                     sliders[key.substring(6).getIntValue() - 1] = valueOf(prepared.values, index, step, key, number);
             for (const auto& [id, number] : prepared.values)
-                if (id.startsWith(juce::String(index) + "/slider"))
+                if (id.startsWith(cydaw::base::Text(index) + "/slider"))
                     sliders[id.fromFirstOccurrenceOf("/slider", false, false).getIntValue() - 1] = number;
             if (const auto done = renderJsfx(step.code, sliders, channels, rate, frames, cancel); done.failed()) {
                 result.error = "JSFX: " + done.getErrorMessage();
@@ -613,13 +614,13 @@ static AudioResult renderAudioUnguarded(const Prepared& prepared, engine::repair
             const auto found = repair::removeHum(channels, rate, { choice == 1 ? 50.0f : choice == 2 ? 60.0f : 0.0f,
                                                                     static_cast<int>(std::lround(value("harmonics", 6.0))),
                                                                     static_cast<float>(value("width", 30.0)) });
-            result.notes.add(ui::Ls("ronflement : ", "hum: ") + juce::String(found, 0) + " Hz");
+            result.notes.add(ui::Ls("ronflement : ", "hum: ") + cydaw::base::Text(found, 0) + " Hz");
             break;
         }
         case StepType::declick: {
             const auto mended = repair::declick(channels, rate, { static_cast<float>(value("sensitivity", 0.5)),
                                                                    static_cast<float>(value("maxClick", 2.0)) });
-            result.notes.add(ui::Ls("clics : ", "clicks: ") + juce::String(mended));
+            result.notes.add(ui::Ls("clics : ", "clicks: ") + cydaw::base::Text(mended));
             break;
         }
         case StepType::highpass:
@@ -670,16 +671,16 @@ AudioResult renderAudio(const Prepared& prepared, engine::repair::Channels chann
         return failed;
     } catch (const std::exception& error) {
         AudioResult failed;
-        failed.error = juce::String::fromUTF8(error.what());
+        failed.error = cydaw::base::Text::fromUTF8(error.what());
         return failed;
     }
 }
 
-cydaw::base::Result readAudioFile(const juce::File& file, engine::repair::Channels& channels, double& rate)
+cydaw::base::Result readAudioFile(const cydaw::base::File& file, engine::repair::Channels& channels, double& rate)
 {
-    juce::AudioFormatManager formats;
+    cydaw::audio::AudioFormatManager formats;
     cydaw::integration::registerCyAudioCoreReaders(formats);
-    std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
+    std::unique_ptr<cydaw::audio::AudioFormatReader> reader(formats.createReaderFor(file));
     if (reader == nullptr || reader->lengthInSamples <= 0 || !std::isfinite(reader->sampleRate) || reader->sampleRate < 1'000.0
         || reader->sampleRate > 384'000.0)
         return cydaw::base::Result::fail(ui::Ls("Fichier son illisible : ", "Unreadable sound file: ") + file.getFileName());
@@ -707,7 +708,7 @@ cydaw::base::Result readAudioFile(const juce::File& file, engine::repair::Channe
     return cydaw::base::Result::ok();
 }
 
-cydaw::base::Result writeAudioFile(const juce::File& file, const engine::repair::Channels& channels, const double rate)
+cydaw::base::Result writeAudioFile(const cydaw::base::File& file, const engine::repair::Channels& channels, const double rate)
 {
     const auto frames = channels.empty() ? 0 : static_cast<int>(channels.front().size());
     juce::AudioBuffer<float> buffer(std::max(1, static_cast<int>(channels.size())), frames);
@@ -716,8 +717,8 @@ cydaw::base::Result writeAudioFile(const juce::File& file, const engine::repair:
     (void) file.getParentDirectory().createDirectory();
     (void) file.deleteFile();
     cydaw::integration::WaveFormat wav;
-    std::unique_ptr<juce::OutputStream> stream(file.createOutputStream());
-    std::unique_ptr<juce::AudioFormatWriter> writer(
+    std::unique_ptr<cydaw::base::OutputStream> stream(file.createOutputStream());
+    std::unique_ptr<cydaw::audio::AudioFormatWriter> writer(
         stream != nullptr ? wav.createWriterFor(stream.get(), rate, static_cast<unsigned>(buffer.getNumChannels()), 24, {}, 0) : nullptr);
     if (writer == nullptr)
         return cydaw::base::Result::fail(ui::Ls("Impossible d'écrire ", "Cannot write ") + file.getFullPathName());

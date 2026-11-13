@@ -1,3 +1,5 @@
+#include <cydaw/integration/AudioFiles.h>
+#include <cydaw/base/Properties.h>
 #include <cydaw/base/File.h>
 #include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "NodeGraphComponent.h"
@@ -273,7 +275,7 @@ void writeCardAssets(cydaw::base::Object& value,
                      const cydaw::base::Value& impulseJson,
                      const bool bypassed,
                      const cydaw::base::Value& instrumentJson,
-                     const juce::StringArray& branchNames)
+                     const cydaw::base::TextList& branchNames)
 {
     // Written as a top-level card writes them.
     if (bypassed)
@@ -321,7 +323,7 @@ void readCardAssets(const cydaw::base::Object& object, Card& card)
         card.wavetableBank = cydaw::engine::buildWavetableBank(shape);
     }
     if (const auto model = object.getProperty(jsonKeys::soundModel); model.isObject()) {
-        juce::String error;
+        cydaw::base::Text error;
         if (auto parsed = cydaw::app::soundModelFromVar(model, error)) {
             card.soundModel = std::move(parsed);
             card.soundModelJson = model;
@@ -331,7 +333,7 @@ void readCardAssets(const cydaw::base::Object& object, Card& card)
         }
     }
     if (const auto map = cydaw::app::upgradedSamplerMap(object.getProperty(jsonKeys::sampler)); map.isObject()) {
-        juce::String error;
+        cydaw::base::Text error;
         if (auto parsed = cydaw::app::samplerMapFromVar(map, error)) {
             card.samplerMap = std::move(parsed);
             card.samplerJson = map;
@@ -413,7 +415,7 @@ float graphCoordinate(const double value, const bool legacyClamped) noexcept
 // size that fits. Callers that carry an identity — a name, a value — pass a
 // floor and shrink to it; callers that carry a detail keep their size and let
 // the tail go.
-[[nodiscard]] float fittedLabelHeight(const juce::String& text,
+[[nodiscard]] float fittedLabelHeight(const cydaw::base::Text& text,
                                       const float height, const int width,
                                       const bool emphasised = true)
 {
@@ -425,7 +427,7 @@ float graphCoordinate(const double value, const bool legacyClamped) noexcept
                      / static_cast<float>(natural);
 }
 
-[[nodiscard]] juce::Font fittedLabelFont(const juce::String& text,
+[[nodiscard]] juce::Font fittedLabelFont(const cydaw::base::Text& text,
                                          const float height, const float floor,
                                          const int width,
                                          const bool emphasised = true)
@@ -482,30 +484,30 @@ cydaw::base::Value serialisePluginExportPlan(
 
     auto identity = cydaw::base::Object::Ptr(new cydaw::base::Object());
     identity->setProperty(jsonKeys::productName,
-                          juce::String(plan.identity.productName));
+                          cydaw::base::Text(plan.identity.productName));
     identity->setProperty(jsonKeys::companyName,
-                          juce::String(plan.identity.companyName));
+                          cydaw::base::Text(plan.identity.companyName));
     identity->setProperty(jsonKeys::manufacturerCode,
-                          juce::String(plan.identity.manufacturerCode));
+                          cydaw::base::Text(plan.identity.manufacturerCode));
     identity->setProperty(jsonKeys::pluginCode,
-                          juce::String(plan.identity.pluginCode));
+                          cydaw::base::Text(plan.identity.pluginCode));
     identity->setProperty(jsonKeys::version,
-                          juce::String(plan.identity.version.toString()));
+                          cydaw::base::Text(plan.identity.version.toString()));
     root->setProperty(jsonKeys::identity, cydaw::base::Value(identity.get()));
 
     auto contract = cydaw::base::Object::Ptr(new cydaw::base::Object());
-    contract->setProperty(jsonKeys::graphId, juce::String(plan.graph.id));
+    contract->setProperty(jsonKeys::graphId, cydaw::base::Text(plan.graph.id));
     contract->setProperty(jsonKeys::graphVersion,
-                          juce::String(plan.graph.version.toString()));
+                          cydaw::base::Text(plan.graph.version.toString()));
     contract->setProperty(jsonKeys::role, cydaw::graph::toString(plan.role));
-    contract->setProperty(jsonKeys::category, juce::String(plan.vst3Category));
+    contract->setProperty(jsonKeys::category, cydaw::base::Text(plan.vst3Category));
     contract->setProperty(jsonKeys::isSynth, plan.isSynth);
     contract->setProperty(jsonKeys::acceptsMidi, plan.acceptsMidi);
     contract->setProperty(jsonKeys::producesMidi, plan.producesMidi);
     contract->setProperty(jsonKeys::hasEditor, plan.hasEditor);
     contract->setProperty(
         "sourceFingerprint",
-        juce::String::toHexString(
+        cydaw::base::Text::toHexString(
             static_cast<juce::int64>(plan.sourceFingerprint)).toUpperCase());
 
     cydaw::base::Array<cydaw::base::Value> buses;
@@ -513,8 +515,8 @@ cydaw::base::Value serialisePluginExportPlan(
         auto value = cydaw::base::Object::Ptr(new cydaw::base::Object());
         value->setProperty(jsonKeys::graphPortId,
                            static_cast<juce::int64>(bus.graphPortId));
-        value->setProperty(jsonKeys::key, juce::String(bus.key));
-        value->setProperty(jsonKeys::name, juce::String(bus.displayName));
+        value->setProperty(jsonKeys::key, cydaw::base::Text(bus.key));
+        value->setProperty(jsonKeys::name, cydaw::base::Text(bus.displayName));
         value->setProperty(
             "media", bus.mediaType == cydaw::graph::PluginBusMediaType::audio
                          ? "audio" : "midi");
@@ -536,9 +538,9 @@ cydaw::base::Value serialisePluginExportPlan(
                            static_cast<juce::int64>(parameter.pluginParameterId));
         value->setProperty(jsonKeys::graphParameterId,
                            static_cast<juce::int64>(parameter.graphParameterId));
-        value->setProperty(jsonKeys::key, juce::String(parameter.key));
-        value->setProperty(jsonKeys::name, juce::String(parameter.displayName));
-        value->setProperty(jsonKeys::unit, juce::String(parameter.unit));
+        value->setProperty(jsonKeys::key, cydaw::base::Text(parameter.key));
+        value->setProperty(jsonKeys::name, cydaw::base::Text(parameter.displayName));
+        value->setProperty(jsonKeys::unit, cydaw::base::Text(parameter.unit));
         value->setProperty(jsonKeys::minimum, parameter.minimum);
         value->setProperty(jsonKeys::maximum, parameter.maximum);
         value->setProperty(jsonKeys::default_, parameter.defaultValue);
@@ -551,7 +553,7 @@ cydaw::base::Value serialisePluginExportPlan(
     return cydaw::base::Value(root.get());
 }
 
-juce::String makeSearchable(const juce::String& value)
+cydaw::base::Text makeSearchable(const cydaw::base::Text& value)
 {
     return value.toLowerCase().removeCharacters("-_./");
 }
@@ -561,11 +563,11 @@ struct PortValueDomain {
     double maximum { 1.0 };
     double interval { 0.001 };
     double skewMidpoint {};
-    juce::String suffix;
+    cydaw::base::Text suffix;
 };
 
-PortValueDomain portValueDomain(const juce::String& nodeKey,
-                                const juce::String& portKey,
+PortValueDomain portValueDomain(const cydaw::base::Text& nodeKey,
+                                const cydaw::base::Text& portKey,
                                 const cydaw::graph::PortType type,
                                 const double current,
                                 const double reset)
@@ -620,7 +622,7 @@ PortValueDomain portValueDomain(const juce::String& nodeKey,
 }
 
 
-bool primitiveSupportsVariableAudioChannels(const juce::String& typeKey)
+bool primitiveSupportsVariableAudioChannels(const cydaw::base::Text& typeKey)
 {
     const auto processorKey = primitiveProcessorKeyForType(typeKey);
     if (processorKey.isEmpty())
@@ -637,10 +639,10 @@ bool primitiveSupportsVariableAudioChannels(const juce::String& typeKey)
 // looks for the port a knob is fed by has to ask this, not the parameter
 // mapping below — asking the wrong one left gain knobs unmodulatable and
 // undisabled when a cable already drove them.
-juce::String primitiveParameterKeyForBinding(const juce::String& suffix);
+cydaw::base::Text primitiveParameterKeyForBinding(const cydaw::base::Text& suffix);
 
 // A sampler card's controller binding ("sampler.cc70"): its number, else -1.
-int samplerControllerOfBinding(const juce::String& suffix)
+int samplerControllerOfBinding(const cydaw::base::Text& suffix)
 {
     if (!suffix.startsWith("sampler.cc"))
         return -1;
@@ -651,17 +653,17 @@ int samplerControllerOfBinding(const juce::String& suffix)
     return number >= 0 && number < 128 ? number : -1;
 }
 
-juce::String valuePortKeyForBinding(const juce::String& suffix)
+cydaw::base::Text valuePortKeyForBinding(const cydaw::base::Text& suffix)
 {
     if (suffix == "gain.db") return "gain";
     if (suffix == "drive.db") return "drive";
     return primitiveParameterKeyForBinding(suffix);
 }
 
-juce::String primitiveParameterKeyForBinding(const juce::String& suffix)
+cydaw::base::Text primitiveParameterKeyForBinding(const cydaw::base::Text& suffix)
 {
     if (const auto* effect = cydaw::engine::effectParameterForSuffix(suffix.toStdString()))
-        return juce::String(std::string(effect->key));
+        return cydaw::base::Text(std::string(effect->key));
     if (suffix.startsWith("batterie."))
         return suffix.substring(9);
     if (suffix.startsWith("prism."))
@@ -679,9 +681,9 @@ juce::String primitiveParameterKeyForBinding(const juce::String& suffix)
     if (suffix == "model.level" || suffix == "sampler.level")
         return "level";
     if (const auto index = cydaw::engine::soundModelSettingIndex(suffix.toStdString()); index >= 0)
-        return juce::String(std::string(cydaw::engine::soundModelSettings[static_cast<std::size_t>(index)].key));
+        return cydaw::base::Text(std::string(cydaw::engine::soundModelSettings[static_cast<std::size_t>(index)].key));
     if (const auto index = cydaw::engine::samplerSettingIndex(suffix.toStdString()); index >= 0)
-        return juce::String(std::string(cydaw::engine::samplerSettings[static_cast<std::size_t>(index)].key));
+        return cydaw::base::Text(std::string(cydaw::engine::samplerSettings[static_cast<std::size_t>(index)].key));
     if (suffix == "drive.db") return "drive-db";
     if (suffix == "gain.db") return "gain-db";
     if (suffix == "lowpass.cutoff" || suffix == "highpass.cutoff"
@@ -743,7 +745,7 @@ juce::String primitiveParameterKeyForBinding(const juce::String& suffix)
 // A module's knob key names the node inside that carries it, through every
 // device it sits in ("node.12.node.4.lowpass.cutoff"): what is left once
 // they are taken off is the binding on the node itself.
-juce::String innermostParameterSuffix(juce::String key)
+cydaw::base::Text innermostParameterSuffix(cydaw::base::Text key)
 {
     while (key.startsWith("node.")) {
         const auto separator = key.indexOfChar(5, '.');
@@ -766,7 +768,7 @@ std::pair<double, double> primitiveParameterRange(const std::string& processorKe
 }
 
 std::optional<double> primitiveParameterValueForType(
-    const juce::String& typeKey, const juce::String& parameterKey,
+    const cydaw::base::Text& typeKey, const cydaw::base::Text& parameterKey,
     const cydaw::engine::NativeDspNodeParameters& parameters)
 {
     // A few cards name a socket and its parameter differently — the gain
@@ -779,7 +781,7 @@ std::optional<double> primitiveParameterValueForType(
             parameterKey.toStdString());
         !mapped.empty() && mapped != parameterKey.toStdString())
         return primitiveParameterValueForType(
-            typeKey, juce::String(std::string(mapped)), parameters);
+            typeKey, cydaw::base::Text(std::string(mapped)), parameters);
     if (const auto* effect = cydaw::engine::effectForType(typeKey.toStdString())) {
         if (const auto* parameter = cydaw::engine::effectParameter(*effect, parameterKey.toStdString()))
             return static_cast<double>(cydaw::engine::effectValue(parameters, *parameter));
@@ -966,7 +968,7 @@ cydaw::base::Value serialiseNativeParameters(
         auto controllers = cydaw::base::Object::Ptr(new cydaw::base::Object());
         for (std::size_t number = 0; number < parameters.samplerControllers.size(); ++number)
             if (parameters.samplerControllers[number] != -1.0f)
-                controllers->setProperty(cydaw::base::Identifier(juce::String(static_cast<int>(number))),
+                controllers->setProperty(cydaw::base::Identifier(cydaw::base::Text(static_cast<int>(number))),
                                          parameters.samplerControllers[number]);
         if (!controllers->getProperties().isEmpty())
             value->setProperty("samplerControllers", cydaw::base::Value(controllers.get()));
@@ -1009,7 +1011,7 @@ cydaw::base::Value serialiseNativeParameters(
         auto selector = cydaw::base::Object::Ptr(new cydaw::base::Object());
         for (int index = 0; index < container::valueCount; ++index)
             if (parameters.selector[static_cast<std::size_t>(index)] != rest[static_cast<std::size_t>(index)])
-                selector->setProperty(cydaw::base::Identifier(juce::String(std::string(container::settings[static_cast<std::size_t>(index)].key))),
+                selector->setProperty(cydaw::base::Identifier(cydaw::base::Text(std::string(container::settings[static_cast<std::size_t>(index)].key))),
                                       parameters.selector[static_cast<std::size_t>(index)]);
         if (!selector->getProperties().isEmpty())
             value->setProperty("selectorValues", cydaw::base::Value(selector.get()));
@@ -1279,21 +1281,21 @@ cydaw::engine::NativeDspNodeParameters restoreNativeParameters(
     return parameters;
 }
 
-juce::String nodeParameterBinding(const std::uint64_t nodeId,
-                                  const juce::String& suffix)
+cydaw::base::Text nodeParameterBinding(const std::uint64_t nodeId,
+                                  const cydaw::base::Text& suffix)
 {
-    return "node." + juce::String(static_cast<juce::int64>(nodeId)) + "." + suffix;
+    return "node." + cydaw::base::Text(static_cast<juce::int64>(nodeId)) + "." + suffix;
 }
 
-juce::String graphInstanceClassParameterKey(const std::uint64_t instanceId,
-                                            const juce::String& binding)
+cydaw::base::Text graphInstanceClassParameterKey(const std::uint64_t instanceId,
+                                            const cydaw::base::Text& binding)
 {
     const auto prefix = nodeParameterBinding(instanceId, {});
     return binding.startsWith(prefix) ? binding.substring(prefix.length())
                                       : binding;
 }
 
-juce::String parameterSuffix(const juce::String& binding)
+cydaw::base::Text parameterSuffix(const cydaw::base::Text& binding)
 {
     if (!binding.startsWith("node."))
         return binding;
@@ -1301,7 +1303,7 @@ juce::String parameterSuffix(const juce::String& binding)
     return separator >= 0 ? binding.substring(separator + 1) : binding;
 }
 
-bool bindingMatchesType(const juce::String& typeKey, const juce::String& binding)
+bool bindingMatchesType(const cydaw::base::Text& typeKey, const cydaw::base::Text& binding)
 {
     const auto suffix = parameterSuffix(binding);
     return (typeKey == "drive" && suffix == "drive.db")
@@ -1343,7 +1345,7 @@ bool bindingMatchesType(const juce::String& typeKey, const juce::String& binding
                   const auto model = cydaw::engine::synth::modelForType(typeKey.toStdString());
                   if (model == cydaw::engine::synth::Model::none)
                       return false;
-                  const auto prefix = juce::String(cydaw::engine::synth::info(model).prefix) + ".";
+                  const auto prefix = cydaw::base::Text(cydaw::engine::synth::info(model).prefix) + ".";
                   return suffix == prefix + "level"
                          || (suffix.startsWith(prefix)
                              && cydaw::engine::synth::parameterIndex(model, suffix.substring(prefix.length()).toStdString()) >= 0);
@@ -1386,7 +1388,7 @@ bool bindingMatchesType(const juce::String& typeKey, const juce::String& binding
 }
 
 bool setNativeParameter(cydaw::engine::NativeDspNodeParameters& parameters,
-                        const juce::String& binding,
+                        const cydaw::base::Text& binding,
                         const double value)
 {
     const auto suffix = parameterSuffix(binding);
@@ -1626,7 +1628,7 @@ bool setNativeParameter(cydaw::engine::NativeDspNodeParameters& parameters,
 }
 
 double nativeParameterValue(const cydaw::engine::NativeDspNodeParameters& parameters,
-                            const juce::String& binding)
+                            const cydaw::base::Text& binding)
 {
     const auto suffix = parameterSuffix(binding);
     if (suffix == "prism.level")
@@ -1732,7 +1734,7 @@ double nativeParameterValue(const cydaw::engine::NativeDspNodeParameters& parame
 // with its settings named in French reads them in English again).
 void relabelPublishedParameters(ModuleInterfaceState& state, const ModuleInterfaceState& fresh)
 {
-    std::map<juce::String, juce::String> labels;
+    std::map<cydaw::base::Text, cydaw::base::Text> labels;
     for (const auto& made : fresh.parameters)
         labels.emplace(made.key, made.label);
     for (auto& parameter : state.parameters)
@@ -1745,14 +1747,14 @@ void relabelPublishedParameters(ModuleInterfaceState& state, const ModuleInterfa
 
 void appendPublishedParameters(
     ModuleInterfaceState& state,
-    const juce::String& typeKey,
+    const cydaw::base::Text& typeKey,
     const std::uint64_t nodeId,
     const cydaw::engine::NativeDspNodeParameters& parameters,
     const cydaw::engine::SamplerMap* samplerMap = nullptr)
 {
-    const auto add = [&state, nodeId](juce::String suffix,
-                                      juce::String label,
-                                      juce::String unit,
+    const auto add = [&state, nodeId](cydaw::base::Text suffix,
+                                      cydaw::base::Text label,
+                                      cydaw::base::Text unit,
                                       const double minimum,
                                       const double maximum,
                                       const double value) {
@@ -1768,7 +1770,7 @@ void appendPublishedParameters(
     if (const auto* effect = cydaw::engine::effectForType(typeKey.toStdString())) {
         for (const auto& item : effect->parameters)
             if (!item.key.empty())
-                add(juce::String(std::string(item.suffix)),
+                add(cydaw::base::Text(std::string(item.suffix)),
                     item.band >= 0 ? tr(effect->typeKey == "filter-pro"    ? "effect.parameter.filterUnit"
                                         : effect->typeKey == "pompe"       ? "effect.parameter.pointWord"
                                         : effect->typeKey == "resonateurs" ? "effect.parameter.resonatorWord"
@@ -1777,10 +1779,10 @@ void appendPublishedParameters(
                                         : effect->typeKey == "fx-layer"    ? "container.parameter.layerWord"
                                         : effect->typeKey == "fx-selector" ? "container.parameter.chainWord"
                                                                            : "effect.parameter.band") + " "
-                                         + juce::String(item.band + 1) + juce::String::fromUTF8(" \xc2\xb7 ")
-                                         + tr(juce::String(std::string(item.labelKey)))
-                                   : tr(juce::String(std::string(item.labelKey))),
-                    juce::String(std::string(item.unit)), item.minimum, item.maximum,
+                                         + cydaw::base::Text(item.band + 1) + cydaw::base::Text::fromUTF8(" \xc2\xb7 ")
+                                         + tr(cydaw::base::Text(std::string(item.labelKey)))
+                                   : tr(cydaw::base::Text(std::string(item.labelKey))),
+                    cydaw::base::Text(std::string(item.unit)), item.minimum, item.maximum,
                     cydaw::engine::effectValue(parameters, item));
         // A modulator's card it belongs to is no knob.
         for (auto& parameter : state.parameters)
@@ -1807,8 +1809,8 @@ void appendPublishedParameters(
         add("model.level", tr("node.parameter.level"), {}, 0.0, 1.0, parameters.oscillatorLevel);
         for (std::size_t index = 0; index < cydaw::engine::soundModelSettingCount; ++index) {
             const auto& setting = cydaw::engine::soundModelSettings[index];
-            add(juce::String(std::string(setting.suffix)), tr(juce::String(std::string(setting.labelKey))),
-                juce::String(std::string(setting.unit)), setting.minimum, setting.maximum,
+            add(cydaw::base::Text(std::string(setting.suffix)), tr(cydaw::base::Text(std::string(setting.labelKey))),
+                cydaw::base::Text(std::string(setting.unit)), setting.minimum, setting.maximum,
                 parameters.soundModel[index]);
         }
     }
@@ -1823,11 +1825,11 @@ void appendPublishedParameters(
             if (index == cydaw::engine::prism::drawBase(0))
                 index = cydaw::engine::prism::oscCBase;
             const auto& setting = cydaw::engine::prism::parameter(index);
-            const auto section = juce::String(setting.key).upToFirstOccurrenceOf(".", false, false);
-            const auto label = (setting.group == cydaw::engine::prism::Group::macro ? juce::String()
+            const auto section = cydaw::base::Text(setting.key).upToFirstOccurrenceOf(".", false, false);
+            const auto label = (setting.group == cydaw::engine::prism::Group::macro ? cydaw::base::Text()
                                                                                     : section.toUpperCase() + " · ")
-                               + juce::String::fromUTF8(setting.english.c_str());
-            add("prism." + juce::String(setting.key), label, juce::String::fromUTF8(setting.unit.c_str()), setting.minimum,
+                               + cydaw::base::Text::fromUTF8(setting.english.c_str());
+            add("prism." + cydaw::base::Text(setting.key), label, cydaw::base::Text::fromUTF8(setting.unit.c_str()), setting.minimum,
                 setting.maximum, parameters.prism[static_cast<std::size_t>(index)]);
             // A host takes 32 at most: the ones a performance moves are
             // offered, the rest wait to be ticked (workshop, Parameters).
@@ -1855,9 +1857,9 @@ void appendPublishedParameters(
             case Group::tone: section = "TONE"; break;
             case Group::global: section = ""; break;
             }
-            const auto label = (juce::String(section).isEmpty() ? juce::String() : juce::String(section) + " · ")
-                               + juce::String::fromUTF8(setting.english.c_str());
-            add("kick." + juce::String(setting.key), label, juce::String::fromUTF8(setting.unit.c_str()), setting.minimum,
+            const auto label = (cydaw::base::Text(section).isEmpty() ? cydaw::base::Text() : cydaw::base::Text(section) + " · ")
+                               + cydaw::base::Text::fromUTF8(setting.english.c_str());
+            add("kick." + cydaw::base::Text(setting.key), label, cydaw::base::Text::fromUTF8(setting.unit.c_str()), setting.minimum,
                 setting.maximum, parameters.kick[static_cast<std::size_t>(index)]);
         }
     }
@@ -1865,7 +1867,7 @@ void appendPublishedParameters(
         // A synth of the family: every setting named by its section (in
         // English); the ones a performance moves offered to a host (32 at most).
         const auto& info = cydaw::engine::synth::info(model);
-        const auto prefix = juce::String(info.prefix) + ".";
+        const auto prefix = cydaw::base::Text(info.prefix) + ".";
         static const std::set<std::string> performed { "voice.glide", "voice.master", "filter.cutoff", "filter.resonance", "filter.env",
                                                        "filter.drive", "amp.attack", "amp.decay", "amp.sustain", "amp.release",
                                                        "lfo1.rate", "lfo1.pitch", "lfo2.rate", "lfo2.cutoff", "osc1.pw", "osc2.fine",
@@ -1874,11 +1876,11 @@ void appendPublishedParameters(
             const auto& setting = cydaw::engine::synth::parameter(model, index);
             const auto& section = info.sections[static_cast<std::size_t>(
                 std::clamp(setting.section, 0, std::max(0, static_cast<int>(info.sections.size()) - 1)))];
-            const auto name = juce::String::fromUTF8(setting.english.c_str());
-            const auto label = setting.section == 0 || name.contains(juce::String::fromUTF8("\xc2\xb7"))
+            const auto name = cydaw::base::Text::fromUTF8(setting.english.c_str());
+            const auto label = setting.section == 0 || name.contains(cydaw::base::Text::fromUTF8("\xc2\xb7"))
                                    ? name
-                                   : juce::String::fromUTF8(section.english.c_str()) + juce::String::fromUTF8(" \xc2\xb7 ") + name;
-            add(prefix + juce::String(setting.key), label, juce::String::fromUTF8(setting.unit.c_str()), setting.minimum, setting.maximum,
+                                   : cydaw::base::Text::fromUTF8(section.english.c_str()) + cydaw::base::Text::fromUTF8(" \xc2\xb7 ") + name;
+            add(prefix + cydaw::base::Text(setting.key), label, cydaw::base::Text::fromUTF8(setting.unit.c_str()), setting.minimum, setting.maximum,
                 parameters.synth[static_cast<std::size_t>(index)]);
             const auto offered = performed.contains(setting.key);
             state.parameters.back().publishToHost = offered;
@@ -1889,7 +1891,7 @@ void appendPublishedParameters(
         // How it chooses its layer (InstrumentContainers.h), in English.
         for (const auto& setting : cydaw::engine::instrument_container::settings) {
             const auto index = cydaw::engine::instrument_container::settingIndex(setting.key);
-            add("selector." + juce::String(std::string(setting.key)), juce::String(setting.label), {}, setting.minimum, setting.maximum,
+            add("selector." + cydaw::base::Text(std::string(setting.key)), cydaw::base::Text(setting.label), {}, setting.minimum, setting.maximum,
                 parameters.selector[static_cast<std::size_t>(index)]);
         }
     }
@@ -1898,14 +1900,14 @@ void appendPublishedParameters(
         if (typeKey == "batterie")
             for (int index = 0; index < cydaw::engine::drum::valueCount; ++index) {
                 const auto& setting = cydaw::engine::drum::parameter(index);
-                add("batterie." + juce::String(setting.key), juce::String::fromUTF8((french ? setting.french : setting.english).c_str()),
-                    juce::String(setting.unit), setting.minimum, setting.maximum, parameters.drum[static_cast<std::size_t>(index)]);
+                add("batterie." + cydaw::base::Text(setting.key), cydaw::base::Text::fromUTF8((french ? setting.french : setting.english).c_str()),
+                    cydaw::base::Text(setting.unit), setting.minimum, setting.maximum, parameters.drum[static_cast<std::size_t>(index)]);
             }
         add("sampler.level", tr("node.parameter.level"), {}, 0.0, 1.0, parameters.oscillatorLevel);
         for (std::size_t index = 0; index < cydaw::engine::samplerSettingCount; ++index) {
             const auto& setting = cydaw::engine::samplerSettings[index];
-            add(juce::String(std::string(setting.suffix)), tr(juce::String(std::string(setting.labelKey))),
-                juce::String(std::string(setting.unit)), setting.minimum, setting.maximum,
+            add(cydaw::base::Text(std::string(setting.suffix)), tr(cydaw::base::Text(std::string(setting.labelKey))),
+                cydaw::base::Text(std::string(setting.unit)), setting.minimum, setting.maximum,
                 parameters.sampler[index]);
             // The articulation is chosen by its name (the controls' tab), not on a
             // knob; the simple card is what the card is, not a setting to play.
@@ -1926,7 +1928,7 @@ void appendPublishedParameters(
             for (const auto& control : samplerMap->controls) {
                 const auto number = static_cast<std::size_t>(std::clamp(control.controller, 0, 127));
                 const auto set = parameters.samplerControllers[number];
-                add("sampler.cc" + juce::String(static_cast<int>(number)), juce::String::fromUTF8(control.label.c_str()), {}, 0.0,
+                add("sampler.cc" + cydaw::base::Text(static_cast<int>(number)), cydaw::base::Text::fromUTF8(control.label.c_str()), {}, 0.0,
                     127.0, set >= 0.0f ? set : samplerMap->controllerStart[number]);
                 state.parameters.back().publishToHost = false;
                 state.parameters.back().showInDevice = false;
@@ -2081,11 +2083,11 @@ void appendPublishedParameters(
 }
 
 void layoutPublishedInterface(ModuleInterfaceState& state,
-                               const juce::String& fallbackTitle,
+                               const cydaw::base::Text& fallbackTitle,
                                const bool includeSpectrum,
                                const bool includeSignalVisual = true)
 {
-    const auto findParameterWithSuffix = [&state](const juce::String& suffix) {
+    const auto findParameterWithSuffix = [&state](const cydaw::base::Text& suffix) {
         return std::find_if(
             state.parameters.begin(), state.parameters.end(),
             [&suffix](const auto& parameter) {
@@ -2112,8 +2114,8 @@ void layoutPublishedInterface(ModuleInterfaceState& state,
               [&cutoff](const auto& parameter) {
                   const auto cutoffSuffix = cutoff->key.endsWith(
                       "voiceFilter.cutoff")
-                      ? juce::String("voiceFilter.cutoff")
-                      : juce::String("lowpass.cutoff");
+                      ? cydaw::base::Text("voiceFilter.cutoff")
+                      : cydaw::base::Text("lowpass.cutoff");
                   const auto resonanceSuffix = cutoffSuffix.upToLastOccurrenceOf(
                       ".", false, false) + ".resonance";
                   const auto prefix = cutoff->key.dropLastCharacters(
@@ -2126,12 +2128,12 @@ void layoutPublishedInterface(ModuleInterfaceState& state,
     // Every complete frequency / gain / Q triple published by an EQ band,
     // in the order the bands appear. One triple is a bell; several are a
     // curve, and either way the reader wants the shape, not twelve knobs.
-    std::vector<std::array<juce::String, 3>> eqBands;
+    std::vector<std::array<cydaw::base::Text, 3>> eqBands;
     for (const auto& parameter : state.parameters) {
         if (!parameter.key.endsWith("eqBand.frequency"))
             continue;
         const auto prefix = parameter.key.dropLastCharacters(
-            juce::String("eqBand.frequency").length());
+            cydaw::base::Text("eqBand.frequency").length());
         const auto sibling = [&state, &prefix](const char* suffix) {
             const auto key = prefix + suffix;
             return std::any_of(state.parameters.begin(),
@@ -2145,7 +2147,7 @@ void layoutPublishedInterface(ModuleInterfaceState& state,
                                 prefix + "eqBand.q" });
     }
     const auto hasEqCurve = !eqBands.empty();
-    const auto boundToCurve = [&eqBands](const juce::String& key) {
+    const auto boundToCurve = [&eqBands](const cydaw::base::Text& key) {
         return std::any_of(eqBands.begin(), eqBands.end(),
                            [&key](const auto& band) {
                                return band[0] == key || band[1] == key
@@ -2387,21 +2389,21 @@ void layoutPublishedInterface(ModuleInterfaceState& state,
 void appendInterfacePorts(ModuleInterfaceState& state,
                           const bool hasInput, const std::uint8_t inputKind,
                           const bool hasOutput, const std::uint8_t outputKind,
-                          const juce::String& inputBinding = {},
-                          const juce::String& outputBinding = {},
+                          const cydaw::base::Text& inputBinding = {},
+                          const cydaw::base::Text& outputBinding = {},
                           const float inputY = 0.40f,
                           const float outputY = 0.40f,
-                          const juce::String& inputLabel = {},
-                          const juce::String& outputLabel = {},
+                          const cydaw::base::Text& inputLabel = {},
+                          const cydaw::base::Text& outputLabel = {},
                           const std::uint8_t inputChannels = 1,
                           const std::uint8_t outputChannels = 1)
 {
     const auto append = [&state](std::vector<ModuleInterfaceControl>& controls,
                                  const ModuleControlKind kind,
-                                 const juce::String& label,
+                                 const cydaw::base::Text& label,
                                  const float y,
                                  const std::uint8_t portKind,
-                                 const juce::String& binding,
+                                 const cydaw::base::Text& binding,
                                  const std::uint8_t channels) {
         const auto width = 0.13f;
         controls.push_back({ state.nextControlId++, kind, label, binding,
@@ -2453,10 +2455,10 @@ void insetGeneratedControlsForPorts(ModuleInterfaceState& state)
 // primary alone left the rest addressing the node it was copied from: the
 // duplicate showed the original's plot and edited the original's knobs.
 void rebindControlPrefix(ModuleInterfaceControl& control,
-                         const juce::String& previousPrefix,
-                         const juce::String& nextPrefix)
+                         const cydaw::base::Text& previousPrefix,
+                         const cydaw::base::Text& nextPrefix)
 {
-    const auto rebind = [&previousPrefix, &nextPrefix](juce::String& binding) {
+    const auto rebind = [&previousPrefix, &nextPrefix](cydaw::base::Text& binding) {
         if (binding.startsWith(previousPrefix))
             binding = nextPrefix
                       + binding.substring(previousPrefix.length());
@@ -2470,7 +2472,7 @@ void rebindControlPrefix(ModuleInterfaceControl& control,
 }
 
 double presentationParameter(const ModuleInterfaceState& state,
-                             const juce::String& suffix,
+                             const cydaw::base::Text& suffix,
                              const double fallback = 0.0)
 {
     const auto found = std::find_if(
@@ -2761,7 +2763,7 @@ void paintPresentationPreview(
                 graphics.fillRoundedRectangle(display, 1.5f);
                 const auto value = parameter != state.parameters.end()
                     ? moduleSelectorValueLabel(*parameter, parameter->value)
-                    : juce::String("--");
+                    : cydaw::base::Text("--");
                 graphics.setColour(accent.brighter(0.55f));
                 // A reading is the one thing on a card that must never be
                 // guessed at: it shrinks, it is not flattened or clipped.
@@ -2780,7 +2782,7 @@ void paintPresentationPreview(
                 graphics.drawRoundedRectangle(display, 1.5f, 0.8f);
                 const auto value = parameter != state.parameters.end()
                     ? moduleSelectorValueLabel(*parameter, parameter->value)
-                    : juce::String("—");
+                    : cydaw::base::Text("—");
                 graphics.setColour(juce::Colour(0xffe3e7eb));
                 const auto selectorArea = display.toNearestInt().reduced(3);
                 graphics.setFont(fittedLabelFont(value, 8.8f, 6.0f,
@@ -2914,7 +2916,7 @@ void paintPresentationPreview(
             const auto& bindings = control.extraParameterBindings;
             for (std::size_t index = 0; index + 2 < bindings.size();
                  index += 3) {
-                const auto value = [&state](const juce::String& key,
+                const auto value = [&state](const cydaw::base::Text& key,
                                             const double fallback) {
                     const auto found = std::find_if(
                         state.parameters.begin(), state.parameters.end(),
@@ -3095,7 +3097,7 @@ void paintPresentationPreview(
 
 class ModuleEditorDocumentWindow final : public juce::DocumentWindow {
 public:
-    explicit ModuleEditorDocumentWindow(const juce::String& title)
+    explicit ModuleEditorDocumentWindow(const cydaw::base::Text& title)
         : juce::DocumentWindow(title, juce::Colour(0xff17191c),
                                juce::DocumentWindow::allButtons)
     {
@@ -3108,38 +3110,38 @@ public:
 };
 
 struct NodeBrowserItem final {
-    juce::String key;
-    juce::String title;
-    juce::String category;
-    juce::String description;
-    juce::String inputSignature;
-    juce::String outputSignature;
-    juce::String parameterSignature;
-    juce::String capabilities;
-    juce::String searchTerms;
+    cydaw::base::Text key;
+    cydaw::base::Text title;
+    cydaw::base::Text category;
+    cydaw::base::Text description;
+    cydaw::base::Text inputSignature;
+    cydaw::base::Text outputSignature;
+    cydaw::base::Text parameterSignature;
+    cydaw::base::Text capabilities;
+    cydaw::base::Text searchTerms;
     juce::Colour colour;
     bool composite {};
 };
 
 struct NodeBrowserStrings final {
-    juce::String title;
-    juce::String searchHint;
-    juce::String allCategories;
-    juce::String details;
-    juce::String inputs;
-    juce::String outputs;
-    juce::String parameters;
-    juce::String insert;
-    juce::String primitive;
-    juce::String graph;
-    juce::String noPorts;
-    juce::String favorites;
-    juce::String recent;
-    juce::String favorite;
-    juce::String unfavorite;
-    juce::String favoriteHelp;
-    juce::String categoryHelp;
-    juce::String insertHelp;
+    cydaw::base::Text title;
+    cydaw::base::Text searchHint;
+    cydaw::base::Text allCategories;
+    cydaw::base::Text details;
+    cydaw::base::Text inputs;
+    cydaw::base::Text outputs;
+    cydaw::base::Text parameters;
+    cydaw::base::Text insert;
+    cydaw::base::Text primitive;
+    cydaw::base::Text graph;
+    cydaw::base::Text noPorts;
+    cydaw::base::Text favorites;
+    cydaw::base::Text recent;
+    cydaw::base::Text favorite;
+    cydaw::base::Text unfavorite;
+    cydaw::base::Text favoriteHelp;
+    cydaw::base::Text categoryHelp;
+    cydaw::base::Text insertHelp;
 };
 
 class NodeBrowserPopup final : public juce::Component,
@@ -3147,7 +3149,7 @@ class NodeBrowserPopup final : public juce::Component,
 public:
     NodeBrowserPopup(std::vector<NodeBrowserItem> items,
                      NodeBrowserStrings strings,
-                     std::function<void(const juce::String&)> choose)
+                     std::function<void(const cydaw::base::Text&)> choose)
         : items_(std::move(items)), strings_(std::move(strings)),
           choose_(std::move(choose)), list_({}, this)
     {
@@ -3195,13 +3197,13 @@ public:
         category_.addItem(strings_.favorites, 2);
         category_.addItem(strings_.recent, 3);
         for (const auto& item : items_) {
-            auto segments = juce::StringArray::fromTokens(
+            auto segments = cydaw::base::TextList::fromTokens(
                 item.category, "/", "");
             segments.trim();
             segments.removeEmptyStrings();
-            juce::String path;
+            cydaw::base::Text path;
             for (const auto& segment : segments) {
-                path += (path.isEmpty() ? juce::String {} : " / ")
+                path += (path.isEmpty() ? cydaw::base::Text {} : " / ")
                         + segment;
                 categoryPaths_.addIfNotAlreadyThere(path);
             }
@@ -3209,14 +3211,14 @@ public:
         categoryPaths_.sortNatural();
         for (int index = 0; index < categoryPaths_.size(); ++index) {
             const auto& path = categoryPaths_[index];
-            auto displaySegments = juce::StringArray::fromTokens(
+            auto displaySegments = cydaw::base::TextList::fromTokens(
                 path, "/", "");
             displaySegments.removeEmptyStrings();
             const auto depth = juce::jmax(0, displaySegments.size() - 1);
             const auto label = depth == 0
                 ? path
-                : juce::String::repeatedString("  ", depth)
-                    + juce::String::fromUTF8("\xe2\x86\xb3 ")
+                : cydaw::base::Text::repeatedString("  ", depth)
+                    + cydaw::base::Text::fromUTF8("\xe2\x86\xb3 ")
                     + path.fromLastOccurrenceOf("/", false, false).trim();
             category_.addItem(label, index + 4);
         }
@@ -3279,14 +3281,14 @@ public:
             toggleFavorite(list_.getSelectedRow());
         };
 
-        juce::PropertiesFile::Options options;
+        cydaw::base::PropertiesFile::Options options;
         options.applicationName = "CyDAW";
         options.filenameSuffix = "node-browser.settings";
         options.folderName = "CyDAW";
-        preferences_ = std::make_unique<juce::PropertiesFile>(options);
-        favoriteKeys_ = juce::StringArray::fromLines(
+        preferences_ = std::make_unique<cydaw::base::PropertiesFile>(options);
+        favoriteKeys_ = cydaw::base::TextList::fromLines(
             preferences_->getValue("favoriteNodeTypes"));
-        recentKeys_ = juce::StringArray::fromLines(
+        recentKeys_ = cydaw::base::TextList::fromLines(
             preferences_->getValue("recentNodeTypes"));
         refreshFilter();
         juce::Component::SafePointer<NodeBrowserPopup> safeThis(this);
@@ -3296,7 +3298,7 @@ public:
         });
     }
 
-    bool selectKey(const juce::String& key)
+    bool selectKey(const cydaw::base::Text& key)
     {
         for (int row = 0; row < static_cast<int>(filtered_.size()); ++row) {
             const auto index = filtered_[static_cast<std::size_t>(row)];
@@ -3359,7 +3361,7 @@ private:
     {
         filtered_.clear();
         const auto query = makeSearchable(search_.getText().trim());
-        juce::StringArray queryTokens;
+        cydaw::base::TextList queryTokens;
         queryTokens.addTokens(search_.getText().trim(), " \t", "\"");
         queryTokens.removeEmptyStrings();
         for (auto& token : queryTokens)
@@ -3367,7 +3369,7 @@ private:
         const auto categoryIndex = category_.getSelectedId() - 4;
         const auto category = categoryIndex >= 0
                 && categoryIndex < categoryPaths_.size()
-            ? categoryPaths_[categoryIndex] : juce::String {};
+            ? categoryPaths_[categoryIndex] : cydaw::base::Text {};
         const auto favoritesOnly = category_.getSelectedId() == 2;
         const auto recentOnly = category_.getSelectedId() == 3;
         std::vector<std::pair<int, int>> ranked;
@@ -3451,7 +3453,7 @@ private:
         if (favorite) {
             graphics.setColour(juce::Colour(0xffffb347));
             graphics.setFont(juce::FontOptions(11.0f));
-            graphics.drawText(juce::String::charToString(0x2605),
+            graphics.drawText(cydaw::base::Text::charToString(0x2605),
                               width - 22, 2, 18, 20,
                               juce::Justification::centred);
         }
@@ -3546,7 +3548,7 @@ private:
                                     + item.key
                                     + (item.capabilities.isNotEmpty()
                                            ? "\n" + item.capabilities
-                                           : juce::String {}),
+                                           : cydaw::base::Text {}),
                                 juce::dontSendNotification);
         detailDescription_.setText(item.description,
                                    juce::dontSendNotification);
@@ -3579,7 +3581,7 @@ private:
         selectKey(key);
     }
 
-    void touchRecent(const juce::String& key)
+    void touchRecent(const cydaw::base::Text& key)
     {
         recentKeys_.removeString(key);
         recentKeys_.insert(0, key);
@@ -3593,16 +3595,16 @@ private:
         if (preferences_ == nullptr)
             return;
         preferences_->setValue("favoriteNodeTypes",
-                               favoriteKeys_.joinIntoString("\n"));
+                               cydaw::base::Value(favoriteKeys_.joinIntoString("\n")));
         preferences_->setValue("recentNodeTypes",
-                               recentKeys_.joinIntoString("\n"));
+                               cydaw::base::Value(recentKeys_.joinIntoString("\n")));
         preferences_->saveIfNeeded();
     }
 
     std::vector<NodeBrowserItem> items_;
     std::vector<int> filtered_;
     NodeBrowserStrings strings_;
-    std::function<void(const juce::String&)> choose_;
+    std::function<void(const cydaw::base::Text&)> choose_;
     juce::Label title_;
     juce::TextEditor search_;
     juce::ComboBox category_;
@@ -3619,10 +3621,10 @@ private:
     juce::Label parameters_;
     juce::TextButton favoriteButton_;
     juce::TextButton insertButton_;
-    std::unique_ptr<juce::PropertiesFile> preferences_;
-    juce::StringArray favoriteKeys_;
-    juce::StringArray recentKeys_;
-    juce::StringArray categoryPaths_;
+    std::unique_ptr<cydaw::base::PropertiesFile> preferences_;
+    cydaw::base::TextList favoriteKeys_;
+    cydaw::base::TextList recentKeys_;
+    cydaw::base::TextList categoryPaths_;
 };
 }
 
@@ -3635,9 +3637,9 @@ public:
     struct Entry {
         Kind kind { Kind::section };
         NodeId nodeId {};
-        juce::String key;
-        juce::String title;
-        juce::String detail;
+        cydaw::base::Text key;
+        cydaw::base::Text title;
+        cydaw::base::Text detail;
         juce::Colour colour { 0xff67b9ff };
         int childCount {};
     };
@@ -3738,7 +3740,7 @@ public:
             }));
     }
 
-    void setSearchText(const juce::String& query)
+    void setSearchText(const cydaw::base::Text& query)
     {
         search_.setText(query, false);
         applyFilter();
@@ -3787,7 +3789,7 @@ private:
                                     juce::Justification::centredLeft, 1);
             graphics.setColour(juce::Colour(0xff899198));
             graphics.setFont(juce::FontOptions(8.5f, juce::Font::bold));
-            graphics.drawText(juce::String(entry.childCount), width - 36, 1,
+            graphics.drawText(cydaw::base::Text(entry.childCount), width - 36, 1,
                               28, height - 2,
                               juce::Justification::centredRight);
             return;
@@ -3940,11 +3942,11 @@ private:
             && entries_[static_cast<std::size_t>(row)].kind != Kind::section;
     }
 
-    [[nodiscard]] juce::String selectedEntryKey() const
+    [[nodiscard]] cydaw::base::Text selectedEntryKey() const
     {
         const auto row = list_.getSelectedRow();
         return validMemberRow(row)
-            ? entries_[static_cast<std::size_t>(row)].key : juce::String {};
+            ? entries_[static_cast<std::size_t>(row)].key : cydaw::base::Text {};
     }
 
     void chooseRow(const int row, const bool frame)
@@ -3963,7 +3965,7 @@ private:
             owner_.selectedPortId_ = 0;
             owner_.selectedCommentId_ = 0;
             owner_.selectedPublishedParameterKey_ =
-                entry.kind == Kind::parameter ? entry.key : juce::String {};
+                entry.kind == Kind::parameter ? entry.key : cydaw::base::Text {};
             owner_.refreshSelectionDetails();
             owner_.resized();
             owner_.repaint(owner_.canvasBounds());
@@ -4030,15 +4032,15 @@ private:
     juce::TextButton addButton_;
     juce::TextEditor search_;
     juce::ListBox list_;
-    juce::String showHelp_;
-    juce::String frameHelp_;
-    juce::String showInDeviceText_;
-    juce::String exposeToHostText_;
-    juce::String editText_;
-    juce::String typeText_;
-    juce::String moveUpText_;
-    juce::String moveDownText_;
-    juce::String removeText_;
+    cydaw::base::Text showHelp_;
+    cydaw::base::Text frameHelp_;
+    cydaw::base::Text showInDeviceText_;
+    cydaw::base::Text exposeToHostText_;
+    cydaw::base::Text editText_;
+    cydaw::base::Text typeText_;
+    cydaw::base::Text moveUpText_;
+    cydaw::base::Text moveDownText_;
+    cydaw::base::Text removeText_;
 };
 
 NodeGraphComponent::NodeGraphComponent()
@@ -4264,10 +4266,10 @@ NodeGraphComponent::NodeGraphComponent()
         selectedCategoryKey_ = id == 1 ? "@nodes"
                              : id == 2 ? "@ports"
                              : id == 3 ? "@graphs"
-                             : id == 4 ? juce::String("@all")
+                             : id == 4 ? cydaw::base::Text("@all")
                              : id >= 100 && id - 100 < categoryKeys_.size()
                                    ? categoryKeys_[id - 100]
-                                   : juce::String("@nodes");
+                                   : cydaw::base::Text("@nodes");
         applyLibraryFilter();
     };
     graphRoleSelector_.onChange = [this] {
@@ -4432,7 +4434,7 @@ NodeGraphComponent::NodeGraphComponent()
             selectedPublishedParameterKey_ = index >= 0
                     && static_cast<std::size_t>(index) < parameters.size()
                 ? parameters[static_cast<std::size_t>(index)].key
-                : juce::String {};
+                : cydaw::base::Text {};
         }
         refreshPublishedParameterDetails();
     };
@@ -4866,9 +4868,9 @@ cydaw::base::Value NodeGraphComponent::serialise() const
     root->setProperty(jsonKeys::nextCommentId,
                       static_cast<juce::int64>(nextCommentId_));
     root->setProperty(jsonKeys::factoryPreset, activeFactoryPresetKey_);
-    root->setProperty(jsonKeys::definitionId, juce::String(graphReference_.id));
+    root->setProperty(jsonKeys::definitionId, cydaw::base::Text(graphReference_.id));
     root->setProperty(jsonKeys::definitionVersion,
-                      juce::String(graphReference_.version.toString()));
+                      cydaw::base::Text(graphReference_.version.toString()));
     root->setProperty(jsonKeys::graphRole, cydaw::graph::toString(inferCurrentGraphRole()));
     root->setProperty(jsonKeys::graphScope, cydaw::graph::toString(graphScope_));
     root->setProperty(jsonKeys::graphName, graphName_);
@@ -4884,15 +4886,15 @@ cydaw::base::Value NodeGraphComponent::serialise() const
     const auto exportIdentity = pluginExportIdentity();
     auto exportProfile = cydaw::base::Object::Ptr(new cydaw::base::Object());
     exportProfile->setProperty(jsonKeys::productName,
-                               juce::String(exportIdentity.productName));
+                               cydaw::base::Text(exportIdentity.productName));
     exportProfile->setProperty(jsonKeys::companyName,
-                               juce::String(exportIdentity.companyName));
+                               cydaw::base::Text(exportIdentity.companyName));
     exportProfile->setProperty(jsonKeys::manufacturerCode,
-                               juce::String(exportIdentity.manufacturerCode));
+                               cydaw::base::Text(exportIdentity.manufacturerCode));
     exportProfile->setProperty(jsonKeys::pluginCode,
-                               juce::String(exportIdentity.pluginCode));
+                               cydaw::base::Text(exportIdentity.pluginCode));
     exportProfile->setProperty(jsonKeys::version,
-                               juce::String(exportIdentity.version.toString()));
+                               cydaw::base::Text(exportIdentity.version.toString()));
     root->setProperty(jsonKeys::vst3Export, cydaw::base::Value(exportProfile.get()));
     root->setProperty(jsonKeys::viewZoom, viewZoom_);
     root->setProperty(jsonKeys::viewOffsetX, viewOffset_.x);
@@ -5071,7 +5073,7 @@ cydaw::base::Value NodeGraphComponent::serialise() const
         moduleValue->setProperty(jsonKeys::key, module.key);
         moduleValue->setProperty(jsonKeys::name, module.name);
         moduleValue->setProperty(jsonKeys::version,
-                                 juce::String(module.version.toString()));
+                                 cydaw::base::Text(module.version.toString()));
         moduleValue->setProperty(jsonKeys::parentClassKey, module.parentClassKey);
         moduleValue->setProperty("programs", serialiseGraphPrograms(module.programs));
         moduleValue->setProperty(jsonKeys::description, module.description);
@@ -5220,9 +5222,9 @@ std::map<std::uint64_t, NodeGraphComponent::EditorNativeSpan> NodeGraphComponent
             members.insert(card.id);
         }
         if (exportCache_.has_value()) {
-            const auto prefix = "node." + juce::String(static_cast<juce::int64>(card.id)) + ".";
+            const auto prefix = "node." + cydaw::base::Text(static_cast<juce::int64>(card.id)) + ".";
             for (const auto& parameter : exportCache_->publishedParameters)
-                if (juce::String(parameter.key).startsWith(prefix) && audioNodes.contains(parameter.targetNodeId)
+                if (cydaw::base::Text(parameter.key).startsWith(prefix) && audioNodes.contains(parameter.targetNodeId)
                     && audioNodes.at(parameter.targetNodeId) != Kind::input
                     && audioNodes.at(parameter.targetNodeId) != Kind::output)
                     members.insert(parameter.targetNodeId);
@@ -5279,7 +5281,7 @@ cydaw::engine::NativeDspGraph NodeGraphComponent::exportedNativeGraph() const
     return exportCache_->nativeGraph;
 }
 
-std::optional<std::pair<std::uint64_t, juce::String>> NodeGraphComponent::editorNativeNodeFor(const juce::String& binding) const
+std::optional<std::pair<std::uint64_t, cydaw::base::Text>> NodeGraphComponent::editorNativeNodeFor(const cydaw::base::Text& binding) const
 {
     // Two levels at least: a module's card, then a node inside it.
     if (!binding.startsWith("node."))
@@ -5376,9 +5378,9 @@ bool NodeGraphComponent::patchNativeGraphParameters(
             continue;
         const auto* node = readNode(native.id);
         if (node == nullptr) {
-            exportCacheProfile_ = "no-card:" + juce::String(
+            exportCacheProfile_ = "no-card:" + cydaw::base::Text(
                 static_cast<juce::int64>(native.id)) + ":kind="
-                + juce::String(static_cast<int>(native.kind));
+                + cydaw::base::Text(static_cast<int>(native.kind));
             return false;
         }
         // Not the card's whole payload: the typed compiler derives fields the
@@ -5437,13 +5439,13 @@ bool NodeGraphComponent::patchNativeGraphParameters(
 NodeGraphComponent::RuntimeGraphExport
 NodeGraphComponent::runtimeGraphExport() const
 {
-    auto exportMark = juce::Time::getHighResolutionTicks();
+    auto exportMark = cydaw::base::Time::getHighResolutionTicks();
     const auto exportSince = [&exportMark] {
-        const auto now = juce::Time::getHighResolutionTicks();
-        const auto ms = juce::Time::highResolutionTicksToSeconds(
+        const auto now = cydaw::base::Time::getHighResolutionTicks();
+        const auto ms = cydaw::base::Time::highResolutionTicksToSeconds(
                             now - exportMark) * 1000.0;
         exportMark = now;
-        return juce::String(ms, 2);
+        return cydaw::base::Text(ms, 2);
     };
     std::vector<NativeParameterTarget> targets;
     std::vector<cydaw::engine::CompiledGraphParameterTarget> typedTargets;
@@ -5510,8 +5512,8 @@ NodeGraphComponent::runtimeGraphExport() const
             if (!reportsAudioCompilation || validation.ok())
                 return;
             const auto message = validation.issues.empty()
-                ? juce::String("Typed Graph compilation failed")
-                : juce::String(validation.issues.front().message);
+                ? cydaw::base::Text("Typed Graph compilation failed")
+                : cydaw::base::Text(validation.issues.front().message);
             result.compilationResult = cydaw::base::Result::fail(message);
         };
         if (!definitions.empty()) {
@@ -5565,7 +5567,7 @@ NodeGraphComponent::runtimeGraphExport() const
             targets.begin(), targets.end(), [&parameter](const auto& candidate) {
                 return candidate.instanceNodeId == parameter.targetNodeId
                        && candidate.parameterKey
-                              == juce::String(parameter.targetParameterKey);
+                              == cydaw::base::Text(parameter.targetParameterKey);
             });
         if (target != targets.end())
             parameter.targetNodeId = target->nativeNodeId;
@@ -5591,12 +5593,12 @@ NodeGraphComponent::instrumentVoiceBoundary() const
         return found != nodes_.end() ? &*found : nullptr;
     };
     const auto is = [](const char* key) {
-        return [key](const juce::String& candidate) {
+        return [key](const cydaw::base::Text& candidate) {
             return candidate == key;
         };
     };
     const auto* allocator = firstOf(is("core.voice-allocator"));
-    const auto* source = firstOf([](const juce::String& key) {
+    const auto* source = firstOf([](const cydaw::base::Text& key) {
         return cydaw::graph::isPolyphonicVoiceSource(key.toStdString());
     });
     const auto* envelope = firstOf(is("core.adsr"));
@@ -5620,7 +5622,7 @@ cydaw::engine::NativeDspGraph NodeGraphComponent::buildNativeDspGraph(
 {
     using Kind = cydaw::engine::NativeDspNodeKind;
     cydaw::engine::NativeDspGraph graph;
-    const auto kindForType = [](const juce::String& typeKey) {
+    const auto kindForType = [](const cydaw::base::Text& typeKey) {
         if (typeKey == "audio-clips"
             || typeKey.startsWith("graph-audio-input-"))
             return Kind::input;
@@ -5660,7 +5662,7 @@ cydaw::engine::NativeDspGraph NodeGraphComponent::buildNativeDspGraph(
     struct Expansion {
         std::vector<NodeId> entries;
         std::vector<NodeId> exits;
-        std::vector<std::pair<juce::String, NodeId>> parameterTargets;
+        std::vector<std::pair<cydaw::base::Text, NodeId>> parameterTargets;
     };
     NodeId generatedId = nextNodeId_;
     for (const auto& node : nodes_)
@@ -5681,11 +5683,11 @@ cydaw::engine::NativeDspGraph NodeGraphComponent::buildNativeDspGraph(
         return Expansion { { id }, { id }, {} };
     };
 
-    std::function<Expansion(const SavedModule&, juce::StringArray&)> expandModule;
+    std::function<Expansion(const SavedModule&, cydaw::base::TextList&)> expandModule;
     expandModule = [this, &graph, &generatedId, &kindForType, &connectExpansions,
                     &addPassthrough, &expandModule](
                        const SavedModule& module,
-                       juce::StringArray& expansionStack) -> Expansion {
+                       cydaw::base::TextList& expansionStack) -> Expansion {
         // A cycle, or devices inside devices past what any real graph holds
         // (a crafted file multiplying them): passed through.
         if (expansionStack.contains(module.key) || graph.nodes.size() >= 65'536)
@@ -5820,7 +5822,7 @@ cydaw::engine::NativeDspGraph NodeGraphComponent::buildNativeDspGraph(
             continue;
         }
         if (const auto* module = findModule(node.typeKey)) {
-            juce::StringArray expansionStack;
+            cydaw::base::TextList expansionStack;
             auto expansion = expandModule(*module, expansionStack);
             // The children were built with the class's values; the knobs
             // turned on this instance go over them, as the typed compiler
@@ -5981,13 +5983,13 @@ cydaw::base::Result NodeGraphComponent::compilePolySynthGraph(
     // The versioned Graph contract is the primary instrument compiler. The
     // legacy UI-node traversal below remains only as a migration path for old
     // projects containing the pre-Graph `poly-synth` device.
-    auto polyMark = juce::Time::getHighResolutionTicks();
+    auto polyMark = cydaw::base::Time::getHighResolutionTicks();
     const auto polySince = [&polyMark] {
-        const auto now = juce::Time::getHighResolutionTicks();
-        const auto ms = juce::Time::highResolutionTicksToSeconds(now - polyMark)
+        const auto now = cydaw::base::Time::getHighResolutionTicks();
+        const auto ms = cydaw::base::Time::highResolutionTicksToSeconds(now - polyMark)
                         * 1000.0;
         polyMark = now;
-        return juce::String(ms, 2);
+        return cydaw::base::Text(ms, 2);
     };
     const auto typedDefinitions = graphDefinitions();
     const auto profileDefinitions = polySince();
@@ -6033,7 +6035,7 @@ cydaw::base::Result NodeGraphComponent::compilePolySynthGraph(
 
     struct FlatNode {
         NodeId id {};
-        juce::String typeKey;
+        cydaw::base::Text typeKey;
         cydaw::engine::NativeDspNodeParameters parameters;
     };
     struct Expansion {
@@ -6054,10 +6056,10 @@ cydaw::base::Result NodeGraphComponent::compilePolySynthGraph(
             for (const auto destinationId : destination.entries)
                 flatConnections.push_back({ sourceId, destinationId, kind });
     };
-    std::function<Expansion(const SavedModule&, juce::StringArray&)> expandModule;
+    std::function<Expansion(const SavedModule&, cydaw::base::TextList&)> expandModule;
     expandModule = [this, &flatNodes, &flatConnections, &generatedId, &connect,
                     &expandModule](const SavedModule& module,
-                                   juce::StringArray& stack) -> Expansion {
+                                   cydaw::base::TextList& stack) -> Expansion {
         if (stack.contains(module.key) || flatNodes.size() >= 65'536)
             return {};
         stack.add(module.key);
@@ -6112,7 +6114,7 @@ cydaw::base::Result NodeGraphComponent::compilePolySynthGraph(
     std::unordered_map<NodeId, Expansion> expandedTopLevel;
     for (const auto& node : nodes_) {
         if (const auto* module = findModule(node.typeKey)) {
-            juce::StringArray stack;
+            cydaw::base::TextList stack;
             expandedTopLevel.emplace(node.id, expandModule(*module, stack));
         } else {
             flatNodes.push_back({ node.id, node.typeKey, node.parameters });
@@ -6130,7 +6132,7 @@ cydaw::base::Result NodeGraphComponent::compilePolySynthGraph(
                     connection.kind);
     }
 
-    const auto firstNodeOfType = [&flatNodes](const juce::String& typeKey)
+    const auto firstNodeOfType = [&flatNodes](const cydaw::base::Text& typeKey)
         -> const FlatNode* {
         const auto found = std::find_if(flatNodes.begin(), flatNodes.end(),
                                         [&typeKey](const FlatNode& node) {
@@ -6393,10 +6395,10 @@ cydaw::base::Result NodeGraphComponent::compilePolySynthGraph(
 // The first card of a type as the instrument compiler meets them: the
 // graph's cards in turn, a device's inside before the card after it.
 template <typename Result, typename Pick>
-Result NodeGraphComponent::firstVoiceCard(const juce::String& typeKey, Pick pick) const
+Result NodeGraphComponent::firstVoiceCard(const cydaw::base::Text& typeKey, Pick pick) const
 {
-    std::set<juce::String> visiting;
-    std::function<std::optional<Result>(const juce::String&)> inside = [&](const juce::String& key) -> std::optional<Result> {
+    std::set<cydaw::base::Text> visiting;
+    std::function<std::optional<Result>(const cydaw::base::Text&)> inside = [&](const cydaw::base::Text& key) -> std::optional<Result> {
         const auto* module = findModule(key);
         if (module == nullptr || !visiting.insert(key).second)
             return std::nullopt;
@@ -6463,11 +6465,11 @@ cydaw::engine::prism::TablesRef NodeGraphComponent::voicePrismTables() const
     return firstVoiceCard<cydaw::engine::prism::TablesRef>("prism-synth", [](const auto& card) { return card.prismTables; });
 }
 
-bool NodeGraphComponent::setNodePrismTables(const std::uint64_t nodeId, const cydaw::base::Value& json, juce::String& error)
+bool NodeGraphComponent::setNodePrismTables(const std::uint64_t nodeId, const cydaw::base::Value& json, cydaw::base::Text& error)
 {
     auto* node = findNode(nodeId);
     if (node == nullptr || node->typeKey != "prism-synth") {
-        error = "no Prisme card " + juce::String(static_cast<juce::int64>(nodeId));
+        error = "no Prisme card " + cydaw::base::Text(static_cast<juce::int64>(nodeId));
         return false;
     }
     auto built = prismTablesFromVar(json);
@@ -6482,11 +6484,11 @@ bool NodeGraphComponent::setNodePrismTables(const std::uint64_t nodeId, const cy
     return true;
 }
 
-bool NodeGraphComponent::setNodeImpulse(const std::uint64_t nodeId, const cydaw::base::Value& json, juce::String& error)
+bool NodeGraphComponent::setNodeImpulse(const std::uint64_t nodeId, const cydaw::base::Value& json, cydaw::base::Text& error)
 {
     auto* node = findNode(nodeId);
     if (node == nullptr || node->typeKey != "cab-sim") {
-        error = "no cabinet card " + juce::String(static_cast<juce::int64>(nodeId));
+        error = "no cabinet card " + cydaw::base::Text(static_cast<juce::int64>(nodeId));
         return false;
     }
     auto read = impulseFromVar(json);
@@ -6525,11 +6527,11 @@ cydaw::engine::prism::TablesRef NodeGraphComponent::nodePrismTables(const std::u
     return node != nullptr ? node->prismTables : cydaw::engine::prism::TablesRef {};
 }
 
-bool NodeGraphComponent::setNodeSampler(const std::uint64_t nodeId, const cydaw::base::Value& json, juce::String& error)
+bool NodeGraphComponent::setNodeSampler(const std::uint64_t nodeId, const cydaw::base::Value& json, cydaw::base::Text& error)
 {
     auto* node = findNode(nodeId);
     if (node == nullptr || (node->typeKey != "sampler" && node->typeKey != "batterie")) {
-        error = "no sampler card " + juce::String(static_cast<juce::int64>(nodeId));
+        error = "no sampler card " + cydaw::base::Text(static_cast<juce::int64>(nodeId));
         return false;
     }
     const auto upgraded = upgradedSamplerMap(json);
@@ -6571,11 +6573,11 @@ cydaw::engine::SamplerMapRef NodeGraphComponent::nodeSampler(const std::uint64_t
     return node != nullptr ? node->samplerMap : cydaw::engine::SamplerMapRef {};
 }
 
-bool NodeGraphComponent::setNodeSoundModel(const std::uint64_t nodeId, const cydaw::base::Value& json, juce::String& error)
+bool NodeGraphComponent::setNodeSoundModel(const std::uint64_t nodeId, const cydaw::base::Value& json, cydaw::base::Text& error)
 {
     auto* node = findNode(nodeId);
     if (node == nullptr || node->typeKey != "sound-model") {
-        error = "no sound-model card " + juce::String(static_cast<juce::int64>(nodeId));
+        error = "no sound-model card " + cydaw::base::Text(static_cast<juce::int64>(nodeId));
         return false;
     }
     auto model = soundModelFromVar(json, error);
@@ -6588,10 +6590,10 @@ bool NodeGraphComponent::setNodeSoundModel(const std::uint64_t nodeId, const cyd
     return true;
 }
 
-juce::String NodeGraphComponent::nodeSoundModelDescription(const std::uint64_t nodeId) const
+cydaw::base::Text NodeGraphComponent::nodeSoundModelDescription(const std::uint64_t nodeId) const
 {
     const auto* node = findNode(nodeId);
-    return node != nullptr && node->soundModel != nullptr ? describeSoundModel(*node->soundModel) : juce::String();
+    return node != nullptr && node->soundModel != nullptr ? describeSoundModel(*node->soundModel) : cydaw::base::Text();
 }
 
 cydaw::base::Value NodeGraphComponent::nodeSoundModelJson(const std::uint64_t nodeId) const
@@ -6615,13 +6617,13 @@ cydaw::engine::WavetableBankRef NodeGraphComponent::voiceWavetableBank() const
 
 void NodeGraphComponent::restore(const cydaw::base::Value& state)
 {
-    const auto profileEntry = juce::Time::getHighResolutionTicks();
+    const auto profileEntry = cydaw::base::Time::getHighResolutionTicks();
     // Counted for this restore, not for the session: sitting next to the
     // per-call timings below, a running total reads as one of them.
     restoreReusedModules_ = 0;
     restoreParsedModules_ = 0;
     if (!restoringHistory_)
-        currentGraphPresetFile_ = juce::File {};
+        currentGraphPresetFile_ = cydaw::base::File {};
     closeModuleGraphEditor();
     closeModuleInterfaceEditor();
     if (const auto* legacyNodes = state.getArray()) {
@@ -6794,17 +6796,17 @@ void NodeGraphComponent::restore(const cydaw::base::Value& state)
 
     activeFactoryPresetKey_ = root->getProperty(jsonKeys::factoryPreset).toString();
 
-    const auto profileStart = juce::Time::getHighResolutionTicks();
-    const auto profileHead = juce::String(
-        juce::Time::highResolutionTicksToSeconds(profileStart - profileEntry)
+    const auto profileStart = cydaw::base::Time::getHighResolutionTicks();
+    const auto profileHead = cydaw::base::Text(
+        cydaw::base::Time::highResolutionTicksToSeconds(profileStart - profileEntry)
             * 1000.0, 2);
     auto profileMark = profileStart;
     const auto profileSince = [&profileMark] {
-        const auto now = juce::Time::getHighResolutionTicks();
-        const auto ms = juce::Time::highResolutionTicksToSeconds(
+        const auto now = cydaw::base::Time::getHighResolutionTicks();
+        const auto ms = cydaw::base::Time::highResolutionTicksToSeconds(
                             now - profileMark) * 1000.0;
         profileMark = now;
-        return juce::String(ms, 2);
+        return cydaw::base::Text(ms, 2);
     };
     initialiseCatalog();
     // Every class the state carries is authoritative, factory keys included:
@@ -7148,7 +7150,7 @@ void NodeGraphComponent::restore(const cydaw::base::Value& state)
                     = object->getProperty(jsonKeys::wavetable).getArray())
                     applyWavetableHarmonics(restoredNode, *harmonics);
             if (const auto model = object->getProperty(jsonKeys::soundModel); model.isObject()) {
-                juce::String modelError;
+                cydaw::base::Text modelError;
                 if (auto parsed = soundModelFromVar(model, modelError)) {
                     restoredNode.soundModel = std::move(parsed);
                     restoredNode.soundModelJson = model;
@@ -7158,7 +7160,7 @@ void NodeGraphComponent::restore(const cydaw::base::Value& state)
                 }
             }
             if (const auto map = upgradedSamplerMap(object->getProperty(jsonKeys::sampler)); map.isObject()) {
-                juce::String mapError;
+                cydaw::base::Text mapError;
                 if (auto parsed = samplerMapFromVar(map, mapError)) {
                     restoredNode.samplerMap = std::move(parsed);
                     restoredNode.samplerJson = map;
@@ -7305,8 +7307,8 @@ void NodeGraphComponent::restore(const cydaw::base::Value& state)
     const auto profileValidation = profileSince();
     if (!restoringHistory_)
         resetEditHistory(&state);
-    restoreProfile_ = "reused=" + juce::String(restoreReusedModules_)
-                      + " parsed=" + juce::String(restoreParsedModules_)
+    restoreProfile_ = "reused=" + cydaw::base::Text(restoreReusedModules_)
+                      + " parsed=" + cydaw::base::Text(restoreParsedModules_)
                       + " head=" + profileHead + " modules=" + profileModules
                       + " factory=" + profileFactory
                       + " ports=" + profilePorts
@@ -7337,12 +7339,12 @@ void NodeGraphComponent::setDspCompilationStatus(const cydaw::base::Result& resu
     dspCompilationOk_ = result.wasOk();
     dspCompilationNodeCount_ = nodeCount;
     dspCompilationError_ = result.failed() ? result.getErrorMessage()
-                                           : juce::String {};
+                                           : cydaw::base::Text {};
     refreshDspCompilationBadge();
 
     if (dspCompilationOk_)
         setStatus(tr("nodes.status.dspCompiled", "count",
-                     juce::String(static_cast<int>(nodeCount))));
+                     cydaw::base::Text(static_cast<int>(nodeCount))));
     else
         setStatus(tr("nodes.status.dspCompileFailed", "error",
                      result.getErrorMessage()), true);
@@ -7471,7 +7473,7 @@ bool NodeGraphComponent::cableCarriesControl() const
 }
 
 NodeGraphComponent::NodeId NodeGraphComponent::modulationRangeNodeFor(
-    const Node& node, const juce::String& binding) const
+    const Node& node, const cydaw::base::Text& binding) const
 {
     const auto primitiveParameter = valuePortKeyForBinding(
         parameterSuffix(binding));
@@ -7495,7 +7497,7 @@ NodeGraphComponent::NodeId NodeGraphComponent::modulationRangeNodeFor(
 bool NodeGraphComponent::modulateParameter(const NodeId sourceNodeId,
                                            const cydaw::graph::PortId sourcePort,
                                            const NodeId targetNodeId,
-                                           const juce::String& binding)
+                                           const cydaw::base::Text& binding)
 {
     modulateFailure_.clear();
     if (editingLocked_) {
@@ -7517,7 +7519,7 @@ bool NodeGraphComponent::modulateParameter(const NodeId sourceNodeId,
                    && candidate.key == primitiveParameter;
         });
     if (port == target->ports.end()) {
-        juce::StringArray keys;
+        cydaw::base::TextList keys;
         for (const auto& candidate : target->ports)
             keys.add((candidate.input ? "in:" : "out:") + candidate.key);
         modulateFailure_ = "no value port '" + primitiveParameter + "' for '"
@@ -7593,8 +7595,8 @@ bool NodeGraphComponent::modulateParameter(const NodeId sourceNodeId,
     return true;
 }
 
-bool NodeGraphComponent::modulateWithNewSource(const juce::String& sourceTypeKey, const juce::String& targetTypeKey,
-                                               const juce::String& parameterSuffix)
+bool NodeGraphComponent::modulateWithNewSource(const cydaw::base::Text& sourceTypeKey, const cydaw::base::Text& targetTypeKey,
+                                               const cydaw::base::Text& parameterSuffix)
 {
     const auto target = nodeIdForType(targetTypeKey);
     const auto* type = findType(sourceTypeKey);
@@ -7614,8 +7616,8 @@ bool NodeGraphComponent::modulateWithNewSource(const juce::String& sourceTypeKey
 }
 
 bool NodeGraphComponent::modulateParameterForTest(
-    const juce::String& sourceTypeKey, const juce::String& targetTypeKey,
-    const juce::String& parameterSuffix)
+    const cydaw::base::Text& sourceTypeKey, const cydaw::base::Text& targetTypeKey,
+    const cydaw::base::Text& parameterSuffix)
 {
     const auto source = nodeIdForType(sourceTypeKey);
     const auto target = nodeIdForType(targetTypeKey);
@@ -7629,7 +7631,7 @@ bool NodeGraphComponent::modulateParameterForTest(
 }
 
 juce::Range<double> NodeGraphComponent::modulationRingForTest(
-    const juce::String& targetTypeKey, const juce::String& parameterSuffix) const
+    const cydaw::base::Text& targetTypeKey, const cydaw::base::Text& parameterSuffix) const
 {
     const auto target = nodeIdForType(targetTypeKey);
     const auto binding = nodeParameterBinding(target, parameterSuffix);
@@ -7643,7 +7645,7 @@ juce::Range<double> NodeGraphComponent::modulationRingForTest(
 }
 
 bool NodeGraphComponent::feedModulationPositionForTest(
-    const juce::String& targetTypeKey, const juce::String& parameterSuffix,
+    const cydaw::base::Text& targetTypeKey, const cydaw::base::Text& parameterSuffix,
     const double value)
 {
     const auto target = nodeIdForType(targetTypeKey);
@@ -7659,7 +7661,7 @@ bool NodeGraphComponent::feedModulationPositionForTest(
 }
 
 std::optional<double> NodeGraphComponent::modulationPositionForTest(
-    const juce::String& targetTypeKey, const juce::String& parameterSuffix) const
+    const cydaw::base::Text& targetTypeKey, const cydaw::base::Text& parameterSuffix) const
 {
     const auto target = nodeIdForType(targetTypeKey);
     const auto binding = nodeParameterBinding(target, parameterSuffix);
@@ -7672,7 +7674,7 @@ std::optional<double> NodeGraphComponent::modulationPositionForTest(
 }
 
 void NodeGraphComponent::setModulationDepth(const NodeId nodeId,
-                                            const juce::String& binding,
+                                            const cydaw::base::Text& binding,
                                             const double depth)
 {
     auto* stored = findNode(nodeId);
@@ -7702,7 +7704,7 @@ void NodeGraphComponent::setModulationDepth(const NodeId nodeId,
 }
 
 void NodeGraphComponent::removeModulation(const NodeId nodeId,
-                                          const juce::String& binding)
+                                          const cydaw::base::Text& binding)
 {
     if (editingLocked_)
         return;
@@ -7752,7 +7754,7 @@ void NodeGraphComponent::removeModulation(const NodeId nodeId,
 }
 
 bool NodeGraphComponent::removeModulationForTest(
-    const juce::String& targetTypeKey, const juce::String& parameterSuffix)
+    const cydaw::base::Text& targetTypeKey, const cydaw::base::Text& parameterSuffix)
 {
     const auto target = nodeIdForType(targetTypeKey);
     const auto binding = nodeParameterBinding(target, parameterSuffix);
@@ -7764,7 +7766,7 @@ bool NodeGraphComponent::removeModulationForTest(
 }
 
 bool NodeGraphComponent::invertModulationForTest(
-    const juce::String& targetTypeKey, const juce::String& parameterSuffix)
+    const cydaw::base::Text& targetTypeKey, const cydaw::base::Text& parameterSuffix)
 {
     const auto target = nodeIdForType(targetTypeKey);
     const auto binding = nodeParameterBinding(target, parameterSuffix);
@@ -7778,8 +7780,8 @@ bool NodeGraphComponent::invertModulationForTest(
     return false;
 }
 
-juce::String NodeGraphComponent::modulationReadoutForTest(
-    const juce::String& targetTypeKey, const juce::String& parameterSuffix) const
+cydaw::base::Text NodeGraphComponent::modulationReadoutForTest(
+    const cydaw::base::Text& targetTypeKey, const cydaw::base::Text& parameterSuffix) const
 {
     const auto target = nodeIdForType(targetTypeKey);
     const auto binding = nodeParameterBinding(target, parameterSuffix);
@@ -7792,7 +7794,7 @@ juce::String NodeGraphComponent::modulationReadoutForTest(
 }
 
 bool NodeGraphComponent::modulationBubbleShownForTest(
-    const juce::String& targetTypeKey, const juce::String& parameterSuffix) const
+    const cydaw::base::Text& targetTypeKey, const cydaw::base::Text& parameterSuffix) const
 {
     const auto target = nodeIdForType(targetTypeKey);
     const auto binding = nodeParameterBinding(target, parameterSuffix);
@@ -7805,7 +7807,7 @@ bool NodeGraphComponent::modulationBubbleShownForTest(
 }
 
 bool NodeGraphComponent::dragModulationRingForTest(
-    const juce::String& targetTypeKey, const juce::String& parameterSuffix,
+    const cydaw::base::Text& targetTypeKey, const cydaw::base::Text& parameterSuffix,
     const float deltaY)
 {
     const auto target = nodeIdForType(targetTypeKey);
@@ -7821,7 +7823,7 @@ bool NodeGraphComponent::dragModulationRingForTest(
 }
 
 bool NodeGraphComponent::modulationRingHitForTest(
-    const juce::String& targetTypeKey, const juce::String& parameterSuffix)
+    const cydaw::base::Text& targetTypeKey, const cydaw::base::Text& parameterSuffix)
 {
     const auto target = nodeIdForType(targetTypeKey);
     const auto binding = nodeParameterBinding(target, parameterSuffix);
@@ -7837,7 +7839,7 @@ bool NodeGraphComponent::modulationRingHitForTest(
 }
 
 bool NodeGraphComponent::modulationInvertedForTest(
-    const juce::String& targetTypeKey, const juce::String& parameterSuffix) const
+    const cydaw::base::Text& targetTypeKey, const cydaw::base::Text& parameterSuffix) const
 {
     const auto target = nodeIdForType(targetTypeKey);
     const auto binding = nodeParameterBinding(target, parameterSuffix);
@@ -7850,7 +7852,7 @@ bool NodeGraphComponent::modulationInvertedForTest(
 }
 
 bool NodeGraphComponent::turnModulatedKnobForTest(
-    const juce::String& targetTypeKey, const juce::String& parameterSuffix,
+    const cydaw::base::Text& targetTypeKey, const cydaw::base::Text& parameterSuffix,
     const double value)
 {
     const auto target = nodeIdForType(targetTypeKey);
@@ -7870,7 +7872,7 @@ juce::RectangleList<int> NodeGraphComponent::analysisRepaintRegionForTest() cons
 }
 
 double NodeGraphComponent::eqCurveFirstBandFrequencyForTest(
-    const juce::String& nodeTypeKey) const
+    const cydaw::base::Text& nodeTypeKey) const
 {
     const auto nodeId = nodeIdForType(nodeTypeKey);
     for (const auto& embedded : embeddedEqCurves_)
@@ -7889,7 +7891,7 @@ double NodeGraphComponent::eqCurveSpectrumPeakHzForTest() const
 }
 
 std::optional<double> NodeGraphComponent::inputPortDefaultForTest(
-    const juce::String& nodeTypeKey, const juce::String& portKey) const
+    const cydaw::base::Text& nodeTypeKey, const cydaw::base::Text& portKey) const
 {
     const auto* node = readNode(nodeIdForType(nodeTypeKey));
     if (node == nullptr)
@@ -7901,7 +7903,7 @@ std::optional<double> NodeGraphComponent::inputPortDefaultForTest(
 }
 
 std::optional<double> NodeGraphComponent::eqCurveMagnitudeDbForTest(
-    const juce::String& nodeTypeKey, const double frequency) const
+    const cydaw::base::Text& nodeTypeKey, const double frequency) const
 {
     const auto nodeId = nodeIdForType(nodeTypeKey);
     for (const auto& embedded : embeddedEqCurves_)
@@ -7912,7 +7914,7 @@ std::optional<double> NodeGraphComponent::eqCurveMagnitudeDbForTest(
 }
 
 std::optional<double> NodeGraphComponent::filterResponseMagnitudeDbForTest(
-    const juce::String& nodeTypeKey, const double frequency) const
+    const cydaw::base::Text& nodeTypeKey, const double frequency) const
 {
     const auto nodeId = nodeIdForType(nodeTypeKey);
     for (const auto& embedded : embeddedFilterResponses_)
@@ -7924,7 +7926,7 @@ std::optional<double> NodeGraphComponent::filterResponseMagnitudeDbForTest(
 }
 
 std::optional<double> NodeGraphComponent::dynamicsResponseOutputDbForTest(
-    const juce::String& nodeTypeKey, const double inputDb) const
+    const cydaw::base::Text& nodeTypeKey, const double inputDb) const
 {
     const auto nodeId = nodeIdForType(nodeTypeKey);
     for (const auto& embedded : embeddedDynamicsResponses_)
@@ -7936,7 +7938,7 @@ std::optional<double> NodeGraphComponent::dynamicsResponseOutputDbForTest(
 }
 
 bool NodeGraphComponent::setInputPortDefaultForTest(
-    const juce::String& nodeTypeKey, const juce::String& portKey,
+    const cydaw::base::Text& nodeTypeKey, const cydaw::base::Text& portKey,
     const double value)
 {
     const auto nodeId = nodeIdForType(nodeTypeKey);
@@ -7949,9 +7951,9 @@ bool NodeGraphComponent::setInputPortDefaultForTest(
     return false;
 }
 
-juce::StringArray NodeGraphComponent::deviceNames(const int limit) const
+cydaw::base::TextList NodeGraphComponent::deviceNames(const int limit) const
 {
-    juce::StringArray names;
+    cydaw::base::TextList names;
     for (const auto& node : nodes_) {
         const auto& type = node.typeKey;
         if (type == "audio-clips" || type == "master" || type == "midi-input"
@@ -7967,7 +7969,7 @@ juce::StringArray NodeGraphComponent::deviceNames(const int limit) const
 }
 
 juce::Rectangle<int> NodeGraphComponent::nodeBoundsForTest(
-    const juce::String& nodeTypeKey) const
+    const cydaw::base::Text& nodeTypeKey) const
 {
     const auto* node = readNode(nodeIdForType(nodeTypeKey));
     return node != nullptr ? nodeBounds(*node).toNearestInt()
@@ -8065,20 +8067,20 @@ NodeGraphComponent::factoryPresetBoundaries(const FactoryPreset& preset) const
             });
     };
     FactoryPresetBoundaries boundaries;
-    boundaries.midiInput = anyNode([](const juce::String& key) {
+    boundaries.midiInput = anyNode([](const cydaw::base::Text& key) {
         return key == "midi-input" || key == "graph-midi-input";
     });
-    boundaries.midiOutput = anyNode([](const juce::String& key) {
+    boundaries.midiOutput = anyNode([](const cydaw::base::Text& key) {
         return key == "midi-output" || key == "graph-midi-output";
     });
-    boundaries.audioInput = anyNode([](const juce::String& key) {
+    boundaries.audioInput = anyNode([](const cydaw::base::Text& key) {
         return key == "audio-clips" || key.startsWith("graph-audio-input-");
     });
-    boundaries.audioOutput = anyNode([](const juce::String& key) {
+    boundaries.audioOutput = anyNode([](const cydaw::base::Text& key) {
         return key == "master" || key.startsWith("graph-audio-output-");
     });
     boundaries.soundSource
-        = anyNode([](const juce::String& key) {
+        = anyNode([](const cydaw::base::Text& key) {
               return key == "poly-synth"
                      || cydaw::graph::isSoundSourcePrimitive(
                             detail::primitiveProcessorKeyForType(
@@ -8121,7 +8123,7 @@ NodeGraphComponent::factoryPresetSummaries() const
     return summaries;
 }
 
-cydaw::base::Result NodeGraphComponent::replaceInstrument(const juce::String& presetKey)
+cydaw::base::Result NodeGraphComponent::replaceInstrument(const cydaw::base::Text& presetKey)
 {
     const auto preset = std::find_if(factoryPresets_.begin(), factoryPresets_.end(),
                                      [&presetKey](const auto& candidate) { return candidate.key == presetKey; });
@@ -8129,7 +8131,7 @@ cydaw::base::Result NodeGraphComponent::replaceInstrument(const juce::String& pr
         return cydaw::base::Result::fail("Unknown instrument preset: " + presetKey);
     // A voice section's place, by what its node does: 0 allocator, 1 source,
     // 2 envelope, 3 gain, 4 voice filter.
-    const auto roleOfType = [](const juce::String& typeKey) {
+    const auto roleOfType = [](const cydaw::base::Text& typeKey) {
         const auto key = primitiveProcessorKeyForType(typeKey);
         if (key == "core.voice-allocator")
             return 0;
@@ -8181,7 +8183,7 @@ cydaw::base::Result NodeGraphComponent::replaceInstrument(const juce::String& pr
 
     // The old voice: each node's place and type, and the cables between it
     // and the rest.
-    std::map<NodeId, std::pair<int, juce::String>> oldVoice;
+    std::map<NodeId, std::pair<int, cydaw::base::Text>> oldVoice;
     for (const auto id : boundary.voiceNodes)
         if (const auto* node = findNode(id))
             oldVoice[id] = { roleOfType(node->typeKey), node->typeKey };
@@ -8191,7 +8193,7 @@ cydaw::base::Result NodeGraphComponent::replaceInstrument(const juce::String& pr
     // instrument's too, while the chain still starts with them.
     auto soundOut = missing != 0 ? missing : boundary.outputNodeId;
     {
-        juce::String sourceType;
+        cydaw::base::Text sourceType;
         for (const auto& [id, entry] : oldVoice)
             if (entry.first == 1)
                 sourceType = entry.second;
@@ -8199,7 +8201,7 @@ cydaw::base::Result NodeGraphComponent::replaceInstrument(const juce::String& pr
             return std::any_of(candidate.nodes.begin(), candidate.nodes.end(),
                                [&sourceType](const PresetNode& node) { return node.typeKey == sourceType; });
         });
-        std::vector<juce::String> extras;
+        std::vector<cydaw::base::Text> extras;
         if (sourceType.isNotEmpty() && made != factoryPresets_.end()) {
             std::optional<std::size_t> filterIndex, masterIndex;
             for (std::size_t index = 0; index < made->nodes.size(); ++index) {
@@ -8244,7 +8246,7 @@ cydaw::base::Result NodeGraphComponent::replaceInstrument(const juce::String& pr
     }
     const auto previousNodes = nodes_;
     const auto previousConnections = connections_;
-    const auto rollBack = [&](const juce::String& why) {
+    const auto rollBack = [&](const cydaw::base::Text& why) {
         nodes_ = previousNodes;
         connections_ = previousConnections;
         synchroniseGraphInterface();
@@ -8258,7 +8260,7 @@ cydaw::base::Result NodeGraphComponent::replaceInstrument(const juce::String& pr
     selectedNodes_.clear();
     std::vector<NodeId> ids(preset->nodes.size());
     std::array<NodeId, 5> newByRole {};
-    std::array<juce::String, 5> newTypeByRole {};
+    std::array<cydaw::base::Text, 5> newTypeByRole {};
     for (std::size_t index = 0; index < preset->nodes.size(); ++index) {
         if (index == *presetMidi) {
             ids[index] = midiInput;
@@ -8363,7 +8365,7 @@ cydaw::base::Result NodeGraphComponent::replaceInstrument(const juce::String& pr
 }
 
 cydaw::base::Result NodeGraphComponent::insertFactoryDevice(
-    const juce::String& deviceKey)
+    const cydaw::base::Text& deviceKey)
 {
     const auto preset = std::find_if(
         factoryPresets_.begin(), factoryPresets_.end(),
@@ -8506,20 +8508,20 @@ cydaw::base::Result NodeGraphComponent::insertFactoryDevice(
     return cydaw::base::Result::ok();
 }
 
-cydaw::base::Result NodeGraphComponent::insertNode(const juce::String& nodeTypeKey)
+cydaw::base::Result NodeGraphComponent::insertNode(const cydaw::base::Text& nodeTypeKey)
 {
     if (editingLocked_)
         return cydaw::base::Result::fail("The Graph is locked");
     const auto* type = findType(nodeTypeKey);
     if (type == nullptr)
         return cydaw::base::Result::fail("Unknown Graph node: " + nodeTypeKey);
-    auto mark = juce::Time::getHighResolutionTicks();
+    auto mark = cydaw::base::Time::getHighResolutionTicks();
     const auto since = [&mark] {
-        const auto now = juce::Time::getHighResolutionTicks();
-        const auto elapsed = juce::Time::highResolutionTicksToSeconds(
+        const auto now = cydaw::base::Time::getHighResolutionTicks();
+        const auto elapsed = cydaw::base::Time::highResolutionTicksToSeconds(
                                  now - mark) * 1000.0;
         mark = now;
-        return juce::String(elapsed, 2);
+        return cydaw::base::Text(elapsed, 2);
     };
     layoutChangeCalls_ = 0;
     layoutChangeOrigins_.clear();
@@ -8537,14 +8539,14 @@ cydaw::base::Result NodeGraphComponent::insertNode(const juce::String& nodeTypeK
     notifyLayoutChanged("insertNode");
     insertProfile_ = "add=" + added + " selection=" + selection
                      + " status=" + status + " notify=" + since()
-                     + " passes=" + juce::String(layoutChangeCalls_)
+                     + " passes=" + cydaw::base::Text(layoutChangeCalls_)
                      + " [" + layoutChangeProfile_ + "]";
     return cydaw::base::Result::ok();
 }
 
 cydaw::base::Result NodeGraphComponent::replaceNode(
-    const juce::String& currentNodeTypeKey,
-    const juce::String& replacementNodeTypeKey)
+    const cydaw::base::Text& currentNodeTypeKey,
+    const cydaw::base::Text& replacementNodeTypeKey)
 {
     if (editingLocked_)
         return cydaw::base::Result::fail("The Graph is locked");
@@ -8565,9 +8567,9 @@ cydaw::base::Result NodeGraphComponent::replaceNode(
 }
 
 cydaw::base::Result NodeGraphComponent::insertNodeOnConnection(
-    const juce::String& sourceNodeTypeKey,
-    const juce::String& destinationNodeTypeKey,
-    const juce::String& insertedNodeTypeKey)
+    const cydaw::base::Text& sourceNodeTypeKey,
+    const cydaw::base::Text& destinationNodeTypeKey,
+    const cydaw::base::Text& insertedNodeTypeKey)
 {
     if (editingLocked_)
         return cydaw::base::Result::fail("The Graph is locked");
@@ -8607,7 +8609,7 @@ cydaw::base::Result NodeGraphComponent::insertNodeOnConnection(
 }
 
 cydaw::base::Result NodeGraphComponent::insertNodeBeforeOutput(
-    const juce::String& insertedNodeTypeKey)
+    const cydaw::base::Text& insertedNodeTypeKey)
 {
     if (editingLocked_)
         return cydaw::base::Result::fail("The Graph is locked");
@@ -8641,7 +8643,7 @@ cydaw::base::Result NodeGraphComponent::insertNodeBeforeOutput(
 }
 
 cydaw::base::Result NodeGraphComponent::insertNodeBeforeInstrument(
-    const juce::String& insertedNodeTypeKey)
+    const cydaw::base::Text& insertedNodeTypeKey)
 {
     if (editingLocked_)
         return cydaw::base::Result::fail("The Graph is locked");
@@ -8676,16 +8678,16 @@ cydaw::base::Result NodeGraphComponent::insertNodeBeforeInstrument(
 }
 
 cydaw::base::Result NodeGraphComponent::connectNodePorts(
-    const juce::String& sourceNodeTypeKey,
-    const juce::String& sourcePortKey,
-    const juce::String& destinationNodeTypeKey,
-    const juce::String& destinationPortKey,
+    const cydaw::base::Text& sourceNodeTypeKey,
+    const cydaw::base::Text& sourcePortKey,
+    const cydaw::base::Text& destinationNodeTypeKey,
+    const cydaw::base::Text& destinationPortKey,
     const bool replaceDestination)
 {
     if (editingLocked_)
         return cydaw::base::Result::fail("The Graph is locked");
 
-    const auto findLastNodeOfType = [this](const juce::String& typeKey)
+    const auto findLastNodeOfType = [this](const cydaw::base::Text& typeKey)
         -> const Node* {
         const auto found = std::find_if(
             nodes_.rbegin(), nodes_.rend(), [&typeKey](const Node& node) {
@@ -8694,7 +8696,7 @@ cydaw::base::Result NodeGraphComponent::connectNodePorts(
         return found != nodes_.rend() ? &*found : nullptr;
     };
     const auto findNamedPort = [](const Node& node,
-                                  const juce::String& portKey,
+                                  const cydaw::base::Text& portKey,
                                   const bool input) -> const NodePort* {
         const auto found = std::find_if(
             node.ports.begin(), node.ports.end(),
@@ -8735,8 +8737,8 @@ cydaw::base::Result NodeGraphComponent::connectNodePorts(
 }
 
 cydaw::base::Result NodeGraphComponent::addConnectionRoutingPoint(
-    const juce::String& sourceNodeTypeKey,
-    const juce::String& destinationNodeTypeKey,
+    const cydaw::base::Text& sourceNodeTypeKey,
+    const cydaw::base::Text& destinationNodeTypeKey,
     const juce::Point<float> graphPoint)
 {
     const auto source = std::find_if(
@@ -8771,7 +8773,7 @@ cydaw::base::Result NodeGraphComponent::addConnectionRoutingPoint(
 }
 
 cydaw::base::Result NodeGraphComponent::setNodeCollapsed(
-    const juce::String& nodeTypeKey, const bool collapsed)
+    const cydaw::base::Text& nodeTypeKey, const bool collapsed)
 {
     const auto node = std::find_if(
         nodes_.rbegin(), nodes_.rend(), [&nodeTypeKey](const Node& value) {
@@ -8791,7 +8793,7 @@ cydaw::base::Result NodeGraphComponent::setNodeCollapsed(
 }
 
 cydaw::base::Result NodeGraphComponent::createCommentFromSelection(
-    const juce::String& title)
+    const cydaw::base::Text& title)
 {
     if (editingLocked_)
         return cydaw::base::Result::fail("The Graph is locked");
@@ -8813,7 +8815,7 @@ cydaw::base::Result NodeGraphComponent::saveViewBookmark(const int slot)
     viewBookmarks_[static_cast<std::size_t>(slot - 1)] = GraphViewBookmark {
         viewZoom_, viewOffset_
     };
-    setStatus(tr("nodes.viewBookmark.saved", "slot", juce::String(slot)));
+    setStatus(tr("nodes.viewBookmark.saved", "slot", cydaw::base::Text(slot)));
     notifyLayoutChanged();
     return cydaw::base::Result::ok();
 }
@@ -8824,7 +8826,7 @@ cydaw::base::Result NodeGraphComponent::recallViewBookmark(const int slot)
         return cydaw::base::Result::fail("Invalid Graph view bookmark slot");
     const auto& bookmark = viewBookmarks_[static_cast<std::size_t>(slot - 1)];
     if (!bookmark.has_value()) {
-        setStatus(tr("nodes.viewBookmark.empty", "slot", juce::String(slot)),
+        setStatus(tr("nodes.viewBookmark.empty", "slot", cydaw::base::Text(slot)),
                   true);
         return cydaw::base::Result::fail("The Graph view bookmark is empty");
     }
@@ -8833,7 +8835,7 @@ cydaw::base::Result NodeGraphComponent::recallViewBookmark(const int slot)
     restoredViewCentre_.reset();
     resized();
     repaint(canvasBounds());
-    setStatus(tr("nodes.viewBookmark.recalled", "slot", juce::String(slot)));
+    setStatus(tr("nodes.viewBookmark.recalled", "slot", cydaw::base::Text(slot)));
     notifyViewChanged();
     return cydaw::base::Result::ok();
 }
@@ -8846,13 +8848,13 @@ cydaw::base::Result NodeGraphComponent::clearViewBookmark(const int slot)
     if (!bookmark.has_value())
         return cydaw::base::Result::fail("The Graph view bookmark is empty");
     bookmark.reset();
-    setStatus(tr("nodes.viewBookmark.cleared", "slot", juce::String(slot)));
+    setStatus(tr("nodes.viewBookmark.cleared", "slot", cydaw::base::Text(slot)));
     notifyLayoutChanged();
     return cydaw::base::Result::ok();
 }
 
-bool NodeGraphComponent::selectNodePort(const juce::String& nodeTypeKey,
-                                        const juce::String& portKey)
+bool NodeGraphComponent::selectNodePort(const cydaw::base::Text& nodeTypeKey,
+                                        const cydaw::base::Text& portKey)
 {
     if (inPlaceModuleGraphEditor_ != nullptr)
         return inPlaceModuleGraphEditor_->selectNodePort(nodeTypeKey,
@@ -8881,7 +8883,7 @@ bool NodeGraphComponent::selectNodePort(const juce::String& nodeTypeKey,
 }
 
 cydaw::base::Result NodeGraphComponent::openSubgraphEditor(
-    const juce::String& moduleKey, const bool detached)
+    const cydaw::base::Text& moduleKey, const bool detached)
 {
     if (findModule(moduleKey) == nullptr)
         return cydaw::base::Result::fail("Unknown reusable Graph: " + moduleKey);
@@ -8912,7 +8914,7 @@ cydaw::base::Result NodeGraphComponent::validateUserGraphPresetState(
         || (modules != nullptr && modules->size() > 128))
         return invalid();
 
-    juce::StringArray moduleKeys;
+    cydaw::base::TextList moduleKeys;
     if (modules != nullptr) {
         for (const auto& moduleValue : *modules) {
             const auto* module = moduleValue.getDynamicObject();
@@ -8925,7 +8927,7 @@ cydaw::base::Result NodeGraphComponent::validateUserGraphPresetState(
         }
     }
 
-    const auto typeIsKnown = [this, &moduleKeys](const juce::String& key) {
+    const auto typeIsKnown = [this, &moduleKeys](const cydaw::base::Text& key) {
         return key.isNotEmpty()
                && (findType(key) != nullptr || moduleKeys.contains(key));
     };
@@ -8985,15 +8987,15 @@ cydaw::base::Result NodeGraphComponent::validateUserGraphPresetState(
 }
 
 cydaw::base::Result NodeGraphComponent::saveUserGraphPreset(
-    const juce::File& file, const juce::String& name) const
+    const cydaw::base::File& file, const cydaw::base::Text& name) const
 {
-    if (name.trim().isEmpty() || file == juce::File {})
+    if (name.trim().isEmpty() || file == cydaw::base::File {})
         return cydaw::base::Result::fail(tr("nodes.error.invalidUserPresetName"));
     const auto graphValidation = validateGraphAsset();
     if (!graphValidation) {
         const auto message = graphValidation.issues.empty()
-            ? juce::String("Graph validation failed")
-            : juce::String(graphValidation.issues.front().message);
+            ? cydaw::base::Text("Graph validation failed")
+            : cydaw::base::Text(graphValidation.issues.front().message);
         return cydaw::base::Result::fail(message);
     }
     auto destination = file;
@@ -9020,7 +9022,7 @@ cydaw::base::Result NodeGraphComponent::saveUserGraphPreset(
     return cydaw::base::Result::ok();
 }
 
-cydaw::base::Result NodeGraphComponent::loadUserGraphPreset(const juce::File& file)
+cydaw::base::Result NodeGraphComponent::loadUserGraphPreset(const cydaw::base::File& file)
 {
     if (!file.existsAsFile() || file.getSize() <= 0
         || file.getSize() > maximumGraphPresetBytes)
@@ -9089,8 +9091,8 @@ cydaw::base::Result NodeGraphComponent::loadUserGraphPreset(const juce::File& fi
 }
 
 cydaw::base::Result NodeGraphComponent::saveNodeParameterPreset(
-    const juce::String& nodeTypeKey, const juce::File& file,
-    const juce::String& name) const
+    const cydaw::base::Text& nodeTypeKey, const cydaw::base::File& file,
+    const cydaw::base::Text& name) const
 {
     const auto node = std::ranges::find(nodes_, nodeTypeKey, &Node::typeKey);
     if (node == nodes_.end())
@@ -9099,7 +9101,7 @@ cydaw::base::Result NodeGraphComponent::saveNodeParameterPreset(
 }
 
 cydaw::base::Result NodeGraphComponent::loadNodeParameterPreset(
-    const juce::String& nodeTypeKey, const juce::File& file)
+    const cydaw::base::Text& nodeTypeKey, const cydaw::base::File& file)
 {
     const auto node = std::ranges::find(nodes_, nodeTypeKey, &Node::typeKey);
     if (node == nodes_.end())
@@ -9108,12 +9110,12 @@ cydaw::base::Result NodeGraphComponent::loadNodeParameterPreset(
 }
 
 cydaw::base::Result NodeGraphComponent::saveNodeParameterPresetForNode(
-    const NodeId nodeId, const juce::File& file,
-    const juce::String& name) const
+    const NodeId nodeId, const cydaw::base::File& file,
+    const cydaw::base::Text& name) const
 {
     const auto* node = findNode(nodeId);
     const auto safeName = name.trim();
-    if (node == nullptr || safeName.isEmpty() || file == juce::File {})
+    if (node == nullptr || safeName.isEmpty() || file == cydaw::base::File {})
         return cydaw::base::Result::fail(tr("nodes.error.invalidNodePresetName"));
     const auto* type = findType(node->typeKey);
     if (type == nullptr || findModule(node->typeKey) != nullptr)
@@ -9150,7 +9152,7 @@ cydaw::base::Result NodeGraphComponent::saveNodeParameterPresetForNode(
 }
 
 cydaw::base::Result NodeGraphComponent::loadNodeParameterPresetForNode(
-    const NodeId nodeId, const juce::File& file)
+    const NodeId nodeId, const cydaw::base::File& file)
 {
     if (editingLocked_)
         return cydaw::base::Result::fail(tr("nodes.status.graphLocked"));
@@ -9212,12 +9214,12 @@ void NodeGraphComponent::promptSaveNodeParameterPreset(const NodeId nodeId)
         setStatus(tr("nodes.error.saveNodePreset"), true);
         return;
     }
-    auto defaultName = juce::File::createLegalFileName(displayTitle(*node));
+    auto defaultName = cydaw::base::File::createLegalFileName(displayTitle(*node));
     nodeParameterPresetChooser_ = std::make_unique<juce::FileChooser>(
         tr("nodes.chooseSaveNodePreset"),
         directory.getChildFile(defaultName).withFileExtension(
             nodeParameterPresetFileExtension),
-        "*" + juce::String(nodeParameterPresetFileExtension));
+        "*" + cydaw::base::Text(nodeParameterPresetFileExtension));
     juce::Component::SafePointer<NodeGraphComponent> safeThis(this);
     nodeParameterPresetChooser_->launchAsync(
         juce::FileBrowserComponent::saveMode
@@ -9227,7 +9229,7 @@ void NodeGraphComponent::promptSaveNodeParameterPreset(const NodeId nodeId)
             if (safeThis == nullptr)
                 return;
             auto destination = chooser.getResult();
-            if (destination == juce::File {})
+            if (destination == cydaw::base::File {})
                 return;
             destination = destination.withFileExtension(
                 nodeParameterPresetFileExtension);
@@ -9251,13 +9253,13 @@ void NodeGraphComponent::promptLoadNodeParameterPreset(const NodeId nodeId)
     (void) directory.createDirectory();
     nodeParameterPresetChooser_ = std::make_unique<juce::FileChooser>(
         tr("nodes.chooseOpenNodePreset"), directory,
-        "*" + juce::String(nodeParameterPresetFileExtension));
+        "*" + cydaw::base::Text(nodeParameterPresetFileExtension));
     juce::Component::SafePointer<NodeGraphComponent> safeThis(this);
     nodeParameterPresetChooser_->launchAsync(
         juce::FileBrowserComponent::openMode
             | juce::FileBrowserComponent::canSelectFiles,
         [safeThis, nodeId](const juce::FileChooser& chooser) {
-            if (safeThis == nullptr || chooser.getResult() == juce::File {})
+            if (safeThis == nullptr || chooser.getResult() == cydaw::base::File {})
                 return;
             const auto result = safeThis->loadNodeParameterPresetForNode(
                 nodeId, chooser.getResult());
@@ -9293,13 +9295,13 @@ void NodeGraphComponent::promptSaveUserGraphPreset()
         setStatus(tr("nodes.error.saveUserPreset"), true);
         return;
     }
-    auto defaultName = juce::File::createLegalFileName(
+    auto defaultName = cydaw::base::File::createLegalFileName(
         contextName_.isNotEmpty() ? contextName_ : tr("nodes.defaultUserPreset"));
     graphPresetChooser_ = std::make_unique<juce::FileChooser>(
         tr("nodes.chooseSaveUserPreset"),
         directory.getChildFile(defaultName)
             .withFileExtension(graphPresetFileExtension),
-        "*" + juce::String(graphPresetFileExtension));
+        "*" + cydaw::base::Text(graphPresetFileExtension));
     juce::Component::SafePointer<NodeGraphComponent> safeThis(this);
     graphPresetChooser_->launchAsync(
         juce::FileBrowserComponent::saveMode
@@ -9309,7 +9311,7 @@ void NodeGraphComponent::promptSaveUserGraphPreset()
             if (safeThis == nullptr)
                 return;
             auto destination = chooser.getResult();
-            if (destination == juce::File {})
+            if (destination == cydaw::base::File {})
                 return;
             destination = destination.withFileExtension(
                 graphPresetFileExtension);
@@ -9348,7 +9350,7 @@ void NodeGraphComponent::showGraphInterfaceEditor()
 }
 
 bool NodeGraphComponent::saveGraphInterfaceSnapshot(
-    const juce::File& destination) const
+    const cydaw::base::File& destination) const
 {
     if (inPlaceModuleGraphEditor_ != nullptr)
         return inPlaceModuleGraphEditor_->saveGraphInterfaceSnapshot(
@@ -9356,7 +9358,7 @@ bool NodeGraphComponent::saveGraphInterfaceSnapshot(
     if (moduleInterfaceEditor_ == nullptr)
         return false;
     destination.getParentDirectory().createDirectory();
-    auto stream = destination.createOutputStream();
+    auto stream = juce::File(destination).createOutputStream();
     if (stream == nullptr)
         return false;
     const auto image = moduleInterfaceEditor_->createComponentSnapshot(
@@ -9365,7 +9367,7 @@ bool NodeGraphComponent::saveGraphInterfaceSnapshot(
     return image.isValid() && format.writeImageToStream(image, *stream);
 }
 
-void NodeGraphComponent::setContextName(juce::String name)
+void NodeGraphComponent::setContextName(cydaw::base::Text name)
 {
     if (contextName_ == name)
         return;
@@ -9417,14 +9419,14 @@ cydaw::graph::PluginIdentity NodeGraphComponent::pluginExportIdentity() const
 void NodeGraphComponent::setPluginExportIdentity(
     cydaw::graph::PluginIdentity identity)
 {
-    identity.productName = juce::String(identity.productName).trim()
+    identity.productName = cydaw::base::Text(identity.productName).trim()
                                .substring(0, 128).toStdString();
-    identity.companyName = juce::String(identity.companyName).trim()
+    identity.companyName = cydaw::base::Text(identity.companyName).trim()
                                .substring(0, 128).toStdString();
-    identity.manufacturerCode = juce::String(identity.manufacturerCode)
+    identity.manufacturerCode = cydaw::base::Text(identity.manufacturerCode)
                                     .trim().toUpperCase().substring(0, 4)
                                     .toStdString();
-    identity.pluginCode = juce::String(identity.pluginCode)
+    identity.pluginCode = cydaw::base::Text(identity.pluginCode)
                               .trim().toUpperCase().substring(0, 4)
                               .toStdString();
     pluginExportIdentity_ = std::move(identity);
@@ -9495,16 +9497,16 @@ cydaw::base::Value NodeGraphComponent::createVst3RuntimeState() const
     for (const auto& parameter : runtimeExport.publishedParameters) {
         auto value = cydaw::base::Object::Ptr(new cydaw::base::Object());
         value->setProperty(jsonKeys::id, static_cast<juce::int64>(parameter.id));
-        value->setProperty(jsonKeys::key, juce::String(parameter.key));
-        value->setProperty(jsonKeys::name, juce::String(parameter.displayName));
-        value->setProperty(jsonKeys::unit, juce::String(parameter.unit));
+        value->setProperty(jsonKeys::key, cydaw::base::Text(parameter.key));
+        value->setProperty(jsonKeys::name, cydaw::base::Text(parameter.displayName));
+        value->setProperty(jsonKeys::unit, cydaw::base::Text(parameter.unit));
         value->setProperty(jsonKeys::minimum, parameter.minimum);
         value->setProperty(jsonKeys::maximum, parameter.maximum);
         value->setProperty(jsonKeys::default_, parameter.defaultValue);
         value->setProperty(jsonKeys::targetNodeId,
                            static_cast<juce::int64>(parameter.targetNodeId));
         value->setProperty(jsonKeys::targetParameter,
-                           juce::String(parameter.targetParameterKey));
+                           cydaw::base::Text(parameter.targetParameterKey));
         value->setProperty(jsonKeys::automatable, parameter.automatable);
         value->setProperty(jsonKeys::modulatable, parameter.modulatable);
         value->setProperty(jsonKeys::visibleInDevice, parameter.visibleInDevice);
@@ -9540,7 +9542,7 @@ cydaw::base::Value NodeGraphComponent::createVst3RuntimeState() const
             cydaw::base::Array<cydaw::base::Value> values, allProgramValues;
             for (const auto& parameter : runtimeExport.publishedParameters) {
                 auto value = parameter.defaultValue;
-                const auto key = juce::String(parameter.key);
+                const auto key = cydaw::base::Text(parameter.key);
                 for (const auto& [programKey, programValue] : program.values)
                     if (programKey == key)
                         value = programValue;
@@ -9562,14 +9564,14 @@ cydaw::base::Value NodeGraphComponent::createVst3RuntimeState() const
 }
 
 cydaw::base::Result NodeGraphComponent::generateVst3Project(
-    const juce::File& destination, const juce::String& format) const
+    const cydaw::base::File& destination, const cydaw::base::Text& format) const
 {
     const auto exportResult = planVst3Export();
     if (!exportResult)
         return cydaw::base::Result::fail(
             exportResult.issues.empty()
                 ? "The Graph is not ready for VST3 export"
-                : juce::String(exportResult.issues.front().message));
+                : cydaw::base::Text(exportResult.issues.front().message));
     const auto runtime=runtimeGraphExport();
     if(runtime.compilationResult.failed())return runtime.compilationResult;
     return generateGraphVst3Project(
@@ -9633,7 +9635,7 @@ cydaw::graph::GraphRole NodeGraphComponent::inferCurrentGraphRole() const
     return Role::generic;
 }
 
-juce::String NodeGraphComponent::graphRoleLabel() const
+cydaw::base::Text NodeGraphComponent::graphRoleLabel() const
 {
     using Role = cydaw::graph::GraphRole;
     switch (inferCurrentGraphRole()) {
@@ -9685,7 +9687,7 @@ bool NodeGraphComponent::setNodeWavetable(
 void NodeGraphComponent::chooseWavetableFile(const NodeId nodeId)
 {
     wavetableChooser_ = std::make_unique<juce::FileChooser>(
-        tr("module.ui.wavetableImport"), juce::File {},
+        tr("module.ui.wavetableImport"), cydaw::base::File {},
         "*.wav;*.wave;*.aif;*.aiff;*.flac");
     juce::Component::SafePointer<NodeGraphComponent> safeThis(this);
     wavetableChooser_->launchAsync(
@@ -9704,13 +9706,13 @@ void NodeGraphComponent::chooseWavetableFile(const NodeId nodeId)
 }
 
 cydaw::base::Result NodeGraphComponent::importWavetableFile(const NodeId nodeId,
-                                                     const juce::File& file)
+                                                     const cydaw::base::File& file)
 {
     if (file.getSize() > maximumWavetableFileBytes)
         return cydaw::base::Result::fail(tr("module.ui.wavetableTooLarge"));
-    juce::AudioFormatManager formats;
+    cydaw::audio::AudioFormatManager formats;
     cydaw::integration::registerCyAudioCoreReaders(formats);
-    const auto reader = std::unique_ptr<juce::AudioFormatReader>(
+    const auto reader = std::unique_ptr<cydaw::audio::AudioFormatReader>(
         formats.createReaderFor(file));
     if (reader == nullptr || reader->lengthInSamples < 8)
         return cydaw::base::Result::fail(tr("module.ui.wavetableUnreadable"));
@@ -9737,18 +9739,18 @@ cydaw::base::Result NodeGraphComponent::importWavetableFile(const NodeId nodeId,
     setStatus(imported.singleCycle
                   ? tr("module.ui.wavetableImportedCycle")
                   : tr("module.ui.wavetableImported", "count",
-                       juce::String(static_cast<int>(imported.framesFound))));
+                       cydaw::base::Text(static_cast<int>(imported.framesFound))));
     return cydaw::base::Result::ok();
 }
 
 cydaw::base::Result NodeGraphComponent::importWavetableFileForTest(
-    const juce::String& nodeTypeKey, const juce::File& file)
+    const cydaw::base::Text& nodeTypeKey, const cydaw::base::File& file)
 {
     return importWavetableFile(nodeIdForType(nodeTypeKey), file);
 }
 
 bool NodeGraphComponent::drawWavetableForTest(
-    const juce::String& nodeTypeKey, const cydaw::engine::WavetableShape& shape)
+    const cydaw::base::Text& nodeTypeKey, const cydaw::engine::WavetableShape& shape)
 {
     beginParameterGesture();
     const auto shaped = setNodeWavetable(nodeTypeKey, shape);
@@ -9758,19 +9760,19 @@ bool NodeGraphComponent::drawWavetableForTest(
 }
 
 bool NodeGraphComponent::setNodeWavetable(
-    const juce::String& nodeTypeKey, const cydaw::engine::WavetableShape& shape)
+    const cydaw::base::Text& nodeTypeKey, const cydaw::engine::WavetableShape& shape)
 {
     return setNodeWavetable(nodeIdForType(nodeTypeKey), shape);
 }
 
 cydaw::engine::WavetableShape NodeGraphComponent::nodeWavetable(
-    const juce::String& nodeTypeKey) const
+    const cydaw::base::Text& nodeTypeKey) const
 {
     return nodeWavetable(nodeIdForType(nodeTypeKey));
 }
 
 NodeGraphComponent::NodeId NodeGraphComponent::nodeIdForType(
-    const juce::String& typeKey) const
+    const cydaw::base::Text& typeKey) const
 {
     const auto found = std::find_if(
         nodes_.begin(), nodes_.end(), [&typeKey](const Node& node) {
@@ -9792,13 +9794,13 @@ void NodeGraphComponent::setEffectParameters(const float driveDb,
                                              const float filterCutoffHz,
                                              const bool enabled)
 {
-    auto mark = juce::Time::getHighResolutionTicks();
+    auto mark = cydaw::base::Time::getHighResolutionTicks();
     const auto since = [&mark] {
-        const auto now = juce::Time::getHighResolutionTicks();
-        const auto elapsed = juce::Time::highResolutionTicksToSeconds(
+        const auto now = cydaw::base::Time::getHighResolutionTicks();
+        const auto elapsed = cydaw::base::Time::highResolutionTicksToSeconds(
                                  now - mark) * 1000.0;
         mark = now;
-        return juce::String(elapsed, 3);
+        return cydaw::base::Text(elapsed, 3);
     };
     driveSlider_.setEnabled(enabled);
     cutoffSlider_.setEnabled(enabled);
@@ -9880,7 +9882,7 @@ void NodeGraphComponent::setEffectParameters(const float driveDb,
     effectParametersProfile_ = "write=" + written
                                + " synchronise=" + synchronised
                                + " embedded=" + since()
-                               + " nodes=" + juce::String(
+                               + " nodes=" + cydaw::base::Text(
                                    static_cast<int>(nodes_.size()));
 }
 
@@ -10317,7 +10319,7 @@ void NodeGraphComponent::paint(juce::Graphics& graphics)
                               ? enginePortKind(badgePort->type)
                               : node.hasOutput ? node.outputKind
                                                : node.inputKind;
-        juce::String signalBadge;
+        cydaw::base::Text signalBadge;
         switch (signalKind) {
         case PortKind::audio: {
             const auto channels = badgePort != nullptr
@@ -10325,7 +10327,7 @@ void NodeGraphComponent::paint(juce::Graphics& graphics)
                                       : node.hasOutput
                                             ? audioOutputChannels(node)
                                             : audioInputChannels(node);
-            signalBadge = juce::String(
+            signalBadge = cydaw::base::Text(
                 std::max(1, static_cast<int>(channels))) + "CH";
             break;
         }
@@ -10588,7 +10590,7 @@ void NodeGraphComponent::paint(juce::Graphics& graphics)
                     && (port.type == cydaw::graph::PortType::value
                         || port.type == cydaw::graph::PortType::trigger)) {
                     const auto magnitude = std::abs(port.defaultValue);
-                    socketText += "  = " + juce::String(
+                    socketText += "  = " + cydaw::base::Text(
                         port.defaultValue,
                         magnitude > 0.0 && magnitude < 0.01 ? 3
                             : magnitude < 10.0 ? 2 : 1);
@@ -10602,7 +10604,7 @@ void NodeGraphComponent::paint(juce::Graphics& graphics)
                 // already decided not to show.
                 const auto socketFont = CyDawLookAndFeel::labelFont(
                     juce::jlimit(8.5f, 11.5f, 9.4f * viewZoom_), true);
-                const auto measure = [&socketFont](const juce::String& text) {
+                const auto measure = [&socketFont](const cydaw::base::Text& text) {
                     return static_cast<float>(
                         juce::GlyphArrangement::getStringWidthInt(socketFont,
                                                                   text));
@@ -10670,7 +10672,7 @@ void NodeGraphComponent::paint(juce::Graphics& graphics)
             graphics.drawRoundedRectangle(badge.toFloat(), 3.0f, 1.0f);
             graphics.setFont(juce::FontOptions(8.0f, juce::Font::bold));
             graphics.drawFittedText(
-                juce::String(live->second, std::abs(live->second) < 10.0f
+                cydaw::base::Text(live->second, std::abs(live->second) < 10.0f
                                                ? 3 : 1),
                 badge.reduced(4, 0), juce::Justification::centred, 1);
         }
@@ -10777,17 +10779,17 @@ void NodeGraphComponent::paint(juce::Graphics& graphics)
     auto statusContent = status.reduced(7, 1);
     auto zoomReadout = statusContent.removeFromRight(58);
     graphics.setColour(juce::Colour(0xffaeb5ba));
-    graphics.drawText(juce::String(juce::roundToInt(viewZoom_ * 100.0f)) + "%",
+    graphics.drawText(cydaw::base::Text(juce::roundToInt(viewZoom_ * 100.0f)) + "%",
                       zoomReadout, juce::Justification::centredRight, false);
     statusContent.removeFromRight(8);
     {
         auto graphAsset = statusContent.removeFromRight(
             std::min(270, std::max(150, statusContent.getWidth() / 3)));
-        const auto version = juce::String(graphReference_.version.toString());
+        const auto version = cydaw::base::Text(graphReference_.version.toString());
         const auto validation = tr(graphAssetValid_
                                        ? "graph.validation.valid"
                                        : "graph.validation.invalid");
-        const auto fullIdentity = juce::String(graphReference_.id);
+        const auto fullIdentity = cydaw::base::Text(graphReference_.id);
         const auto identity = fullIdentity.substring(
             std::max(0, fullIdentity.length() - 8));
         const auto label = graphRoleLabel() + "  v" + version + "  #" + identity
@@ -10806,11 +10808,11 @@ void NodeGraphComponent::paint(juce::Graphics& graphics)
         auto summary = tr(selectedNodes_.empty()
                               ? "nodes.status.graphSummary"
                               : "nodes.status.graphSummarySelection");
-        summary = summary.replace("{nodes}", juce::String(nodes_.size()))
+        summary = summary.replace("{nodes}", cydaw::base::Text(nodes_.size()))
                          .replace("{connections}",
-                                  juce::String(connections_.size()))
+                                  cydaw::base::Text(connections_.size()))
                          .replace("{selected}",
-                                  juce::String(selectedNodes_.size()));
+                                  cydaw::base::Text(selectedNodes_.size()));
         graphics.setColour(selectedNodes_.empty()
                                ? juce::Colour(0xff8f969c)
                                : juce::Colour(0xffffb45d));
@@ -11294,7 +11296,7 @@ void NodeGraphComponent::resized()
             continue;
         }
         const auto controlledByCable = [this, node](
-            const juce::String& binding) {
+            const cydaw::base::Text& binding) {
             const auto primitiveParameter = primitiveParameterKeyForBinding(
                 parameterSuffix(binding));
             const auto port = std::find_if(
@@ -11434,7 +11436,7 @@ void NodeGraphComponent::resized()
             continue;
         }
         const auto controlledByCable = [this, node](
-            const juce::String& binding) {
+            const cydaw::base::Text& binding) {
             const auto primitiveParameter = primitiveParameterKeyForBinding(
                 parameterSuffix(binding));
             const auto port = std::find_if(
@@ -11499,7 +11501,7 @@ void NodeGraphComponent::resized()
             continue;
         }
         const auto controlledByCable = [this, node](
-            const juce::String& binding) {
+            const cydaw::base::Text& binding) {
             const auto primitiveParameter = primitiveParameterKeyForBinding(
                 parameterSuffix(binding));
             const auto port = std::find_if(
@@ -11565,7 +11567,7 @@ void NodeGraphComponent::resized()
             continue;
         }
         const auto controlledByCable = [this, node](
-            const juce::String& parameterBinding) {
+            const cydaw::base::Text& parameterBinding) {
             const auto primitiveParameter = primitiveParameterKeyForBinding(
                 parameterSuffix(parameterBinding));
             const auto port = std::find_if(
@@ -12322,7 +12324,7 @@ void NodeGraphComponent::mouseDrag(const juce::MouseEvent& event)
                 connectionHoverTarget_ = knob.nodeId;
                 connectionHoverPort_ = 0;
                 connectionHoverCompatible_ = true;
-                juce::String label = knob.binding;
+                cydaw::base::Text label = knob.binding;
                 if (const auto* node = readNode(knob.nodeId))
                     for (const auto& parameter : node->interfaceState.parameters)
                         if (parameter.key == knob.binding)
@@ -12458,14 +12460,14 @@ juce::RectangleList<int> NodeGraphComponent::moveDraggedNodes(
     return dirty;
 }
 
-juce::String NodeGraphComponent::historyCostForTest()
+cydaw::base::Text NodeGraphComponent::historyCostForTest()
 {
-    const auto ticks = [] { return juce::Time::getHighResolutionTicks(); };
+    const auto ticks = [] { return cydaw::base::Time::getHighResolutionTicks(); };
     const auto ms = [](const juce::int64 from, const juce::int64 to) {
-        return juce::String(
-            juce::Time::highResolutionTicksToSeconds(to - from) * 1000.0, 3);
+        return cydaw::base::Text(
+            cydaw::base::Time::highResolutionTicksToSeconds(to - from) * 1000.0, 3);
     };
-    auto best = juce::String();
+    auto best = cydaw::base::Text();
     auto bestSerialise = 1.0e9, bestClone = 1.0e9, bestMatch = 1.0e9;
     for (auto pass = 0; pass < 20; ++pass) {
         const auto a = ticks();
@@ -12476,16 +12478,16 @@ juce::String NodeGraphComponent::historyCostForTest()
         (void) jsonValuesMatch(copy, state);
         const auto e = ticks();
         const auto seconds = [](const juce::int64 from, const juce::int64 to) {
-            return juce::Time::highResolutionTicksToSeconds(to - from) * 1000.0;
+            return cydaw::base::Time::highResolutionTicksToSeconds(to - from) * 1000.0;
         };
         bestSerialise = std::min(bestSerialise, seconds(a, b));
         bestClone = std::min(bestClone, seconds(b, d));
         bestMatch = std::min(bestMatch, seconds(d, e));
         juce::ignoreUnused(ms);
     }
-    return "serialise=" + juce::String(bestSerialise, 3)
-           + " clone=" + juce::String(bestClone, 3)
-           + " match=" + juce::String(bestMatch, 3);
+    return "serialise=" + cydaw::base::Text(bestSerialise, 3)
+           + " clone=" + cydaw::base::Text(bestClone, 3)
+           + " match=" + cydaw::base::Text(bestMatch, 3);
 }
 
 void NodeGraphComponent::undoForTest()
@@ -12529,7 +12531,7 @@ void NodeGraphComponent::spreadNodesForTest()
 }
 
 juce::RectangleList<int> NodeGraphComponent::dragNodeForTest(
-    const juce::String& nodeTypeKey, const juce::Point<float> screenDelta)
+    const cydaw::base::Text& nodeTypeKey, const juce::Point<float> screenDelta)
 {
     const auto found = std::find_if(nodes_.begin(), nodes_.end(),
                                     [&nodeTypeKey](const Node& candidate) {
@@ -12618,7 +12620,7 @@ void NodeGraphComponent::mouseUp(const juce::MouseEvent& event)
                 connectionHoverMessage_.clear();
                 if (modulateParameter(source, sourcePort, knob.nodeId,
                                       knob.binding)) {
-                    juce::String label = knob.binding;
+                    cydaw::base::Text label = knob.binding;
                     if (const auto* node = readNode(knob.nodeId))
                         for (const auto& parameter
                              : node->interfaceState.parameters)
@@ -12712,8 +12714,8 @@ bool NodeGraphComponent::isInterestedInFileDrag(
 {
     if (editingLocked_)
         return false;
-    return std::ranges::any_of(files, [](const juce::String& path) {
-        const juce::File file(path);
+    return std::ranges::any_of(files, [](const cydaw::base::Text& path) {
+        const cydaw::base::File file(path);
         return file.hasFileExtension(graphPresetFileExtension)
             || file.hasFileExtension(nodeParameterPresetFileExtension);
     });
@@ -12737,8 +12739,8 @@ void NodeGraphComponent::fileDragMove(const juce::StringArray& files,
         return;
     }
     const auto nodePreset = std::ranges::find_if(
-        files, [](const juce::String& path) {
-            return juce::File(path).hasFileExtension(
+        files, [](const cydaw::base::Text& path) {
+            return cydaw::base::File(path).hasFileExtension(
                 nodeParameterPresetFileExtension);
         });
     if (nodePreset != files.end()) {
@@ -12761,8 +12763,8 @@ void NodeGraphComponent::fileDragMove(const juce::StringArray& files,
         }
     } else {
         graphPresetFileDragOver_ = std::ranges::any_of(
-            files, [](const juce::String& path) {
-                return juce::File(path).hasFileExtension(
+            files, [](const cydaw::base::Text& path) {
+                return cydaw::base::File(path).hasFileExtension(
                     graphPresetFileExtension);
             });
     }
@@ -12786,8 +12788,8 @@ void NodeGraphComponent::filesDropped(const juce::StringArray& files,
         || !canvasBounds().contains(juce::Point<int> { x, y }))
         return;
     const auto nodePreset = std::ranges::find_if(
-        files, [](const juce::String& path) {
-            return juce::File(path).hasFileExtension(
+        files, [](const cydaw::base::Text& path) {
+            return cydaw::base::File(path).hasFileExtension(
                 nodeParameterPresetFileExtension);
         });
     if (nodePreset != files.end()) {
@@ -12796,18 +12798,18 @@ void NodeGraphComponent::filesDropped(const juce::StringArray& files,
             return;
         }
         const auto result = loadNodeParameterPresetForNode(
-            nodePresetTarget, juce::File(*nodePreset));
+            nodePresetTarget, cydaw::base::File(*nodePreset));
         if (result.failed())
             setStatus(result.getErrorMessage(), true);
         return;
     }
     const auto graphPreset = std::ranges::find_if(
-        files, [](const juce::String& path) {
-            return juce::File(path).hasFileExtension(
+        files, [](const cydaw::base::Text& path) {
+            return cydaw::base::File(path).hasFileExtension(
                 graphPresetFileExtension);
         });
     if (graphPreset != files.end()) {
-        const auto result = loadUserGraphPreset(juce::File(*graphPreset));
+        const auto result = loadUserGraphPreset(cydaw::base::File(*graphPreset));
         if (result.failed())
             setStatus(result.getErrorMessage(), true);
     }
@@ -12844,7 +12846,7 @@ void NodeGraphComponent::itemDropped(
         return;
     }
     const auto key = factoryDeviceFromDragPayload(details.description)
-                         .value_or(juce::String {});
+                         .value_or(cydaw::base::Text {});
     if (const auto* type = findType(key)) {
         addNodeFromType(*type, normalisedCanvasPosition(position));
         setStatus(tr("nodes.status.added"));
@@ -12893,7 +12895,7 @@ void NodeGraphComponent::mouseDoubleClick(const juce::MouseEvent& event)
     if (node.composite) {
         if (const auto* module = findModule(node.typeKey)) {
             setStatus(tr("nodes.status.moduleContents", "count",
-                         juce::String(static_cast<int>(module->nodes.size()))));
+                         cydaw::base::Text(static_cast<int>(module->nodes.size()))));
             openModuleGraphEditor(node.typeKey);
         } else {
             openNodeInterfaceEditor(node.id);
@@ -12970,7 +12972,7 @@ void NodeGraphComponent::mouseMove(const juce::MouseEvent& event)
         return;
     }
     const auto socketTooltip = [this](const PortHit& hit,
-                                      const bool input) -> juce::String {
+                                      const bool input) -> cydaw::base::Text {
         if (!hit || hit.nodeIndex < 0
             || hit.nodeIndex >= static_cast<int>(nodes_.size()))
             return {};
@@ -12978,7 +12980,7 @@ void NodeGraphComponent::mouseMove(const juce::MouseEvent& event)
         const auto* port = findPort(node, hit.portId);
         if (port == nullptr)
             return {};
-        juce::String type;
+        cydaw::base::Text type;
         switch (port->type) {
         case cydaw::graph::PortType::audio:
             type = tr(audioFormatKey(port->channels));
@@ -13004,7 +13006,7 @@ void NodeGraphComponent::mouseMove(const juce::MouseEvent& event)
                                                : "module.ui.outputPort"))
             .replace("{name}", port->name.isNotEmpty() ? port->name : port->key)
             .replace("{type}", type)
-            .replace("{id}", juce::String(
+            .replace("{id}", cydaw::base::Text(
                 static_cast<juce::int64>(port->id)));
         const auto connectionCount = static_cast<int>(std::ranges::count_if(
             connections_, [&node, port, input](const Connection& link) {
@@ -13015,7 +13017,7 @@ void NodeGraphComponent::mouseMove(const juce::MouseEvent& event)
                           && link.sourcePort == port->id;
             }));
         tooltip += "\n" + tr("nodes.port.connectionCount", "count",
-                               juce::String(connectionCount));
+                               cydaw::base::Text(connectionCount));
         if (input && (port->type == cydaw::graph::PortType::value
                       || port->type == cydaw::graph::PortType::trigger)) {
             const auto controlledByCable = std::ranges::any_of(
@@ -13027,8 +13029,8 @@ void NodeGraphComponent::mouseMove(const juce::MouseEvent& event)
                                       ? "nodes.port.defaultControlledByCable"
                                       : "nodes.port.defaultValue")
                        + (controlledByCable
-                              ? juce::String {}
-                              : ": " + juce::String(port->defaultValue, 4));
+                              ? cydaw::base::Text {}
+                              : ": " + cydaw::base::Text(port->defaultValue, 4));
         }
         return tooltip;
     };
@@ -13046,7 +13048,7 @@ void NodeGraphComponent::mouseMove(const juce::MouseEvent& event)
         && hoveredConnection < static_cast<int>(connections_.size())) {
         const auto& connection = connections_[static_cast<std::size_t>(
             hoveredConnection)];
-        juce::String type;
+        cydaw::base::Text type;
         if (connection.kind == PortKind::audio)
             type = tr(audioFormatKey(connection.audioChannels));
         else if (connection.kind == PortKind::midi)
@@ -13299,7 +13301,7 @@ void NodeGraphComponent::applyLibraryFilter()
     const auto compatibilityFilter = compatibleOnlyToggle_.getToggleState()
         && selectedLibraryPort() != nullptr;
     const auto query = makeSearchable(librarySearch_.getText().trim());
-    juce::StringArray queryTokens;
+    cydaw::base::TextList queryTokens;
     queryTokens.addTokens(librarySearch_.getText().trim(), " \t", "\"");
     queryTokens.removeEmptyStrings();
     for (auto& token : queryTokens)
@@ -13329,7 +13331,7 @@ void NodeGraphComponent::applyLibraryFilter()
         const auto searchable = makeSearchable(
             type.title + " " + category + " " + type.key + " "
             + (type.descriptionKey.isNotEmpty() ? tr(type.descriptionKey)
-                                                : juce::String {}));
+                                                : cydaw::base::Text {}));
         if (std::ranges::any_of(queryTokens, [&searchable](const auto& token) {
                 return token.isNotEmpty() && !searchable.contains(token);
             }))
@@ -13360,7 +13362,7 @@ void NodeGraphComponent::applyLibraryFilter()
     // change; only a query that drops it moves the selection.
     const auto* previousType = libraryRowType(libraryList_.getSelectedRow());
     const auto previousKey = previousType != nullptr ? previousType->key
-                                                     : juce::String {};
+                                                     : cydaw::base::Text {};
     // A search deploys every fold, the way Unreal's menu does: what you are
     // looking for is never hidden behind a heading you left closed.
     rebuildLibraryRows(ranked, !queryTokens.isEmpty());
@@ -13379,25 +13381,25 @@ void NodeGraphComponent::applyLibraryFilter()
         libraryList_.selectRow(selection);
     libraryTitle_.setText(
         tr("nodes.library.results", "count",
-           juce::String(static_cast<int>(filteredCatalog_.size()))),
+           cydaw::base::Text(static_cast<int>(filteredCatalog_.size()))),
         juce::dontSendNotification);
     refreshLibrarySelectionContext();
     repaint();
 }
 
 namespace {
-// juce::String::toUpperCase defers to towupper, which under the default C
+// cydaw::base::Text::toUpperCase defers to towupper, which under the default C
 // locale leaves accented letters where they are: "Booleen" came back as
 // "BOOLeEN" with the e still lowercase. The Latin-1 supplement is what the
 // interface languages need, and there it is one subtraction.
-juce::String upperCasedLabel(const juce::String& text)
+cydaw::base::Text upperCasedLabel(const cydaw::base::Text& text)
 {
-    juce::String result;
-    for (auto source = text.getCharPointer(); !source.isEmpty();) {
-        const auto character = source.getAndAdvance();
-        result += character >= 0xe0 && character <= 0xfe && character != 0xf7
+    cydaw::base::Text result;
+    for (int characterIndex=0;characterIndex<text.length();++characterIndex) {
+        const auto character = text[characterIndex];
+        result += cydaw::base::Text::charToString(character >= 0xe0 && character <= 0xfe && character != 0xf7
                       ? static_cast<juce::juce_wchar>(character - 0x20)
-                      : juce::CharacterFunctions::toUpperCase(character);
+                      : juce::CharacterFunctions::toUpperCase(character));
     }
     return result;
 }
@@ -13408,12 +13410,12 @@ void NodeGraphComponent::rebuildLibraryRows(
 {
     libraryRows_.clear();
     struct Leaf {
-        juce::String name;
+        cydaw::base::Text name;
         int bestScore { std::numeric_limits<int>::lowest() };
         std::vector<int> entries;
     };
     struct Group {
-        juce::String name;
+        cydaw::base::Text name;
         int bestScore { std::numeric_limits<int>::lowest() };
         std::vector<Leaf> leaves;
     };
@@ -13428,7 +13430,7 @@ void NodeGraphComponent::rebuildLibraryRows(
                                              : category;
         const auto leafName = separator > 0
                                   ? category.substring(separator + 3).trim()
-                                  : juce::String {};
+                                  : cydaw::base::Text {};
         auto group = std::find_if(groups.begin(), groups.end(),
                                   [&groupName](const Group& candidate) {
                                       return candidate.name == groupName;
@@ -13512,12 +13514,12 @@ void NodeGraphComponent::rebuildLibraryRows(
     }
 }
 
-juce::String NodeGraphComponent::paintProfile() const
+cydaw::base::Text NodeGraphComponent::paintProfile() const
 {
-    return "cards=" + juce::String(paintedCards_) + "/"
-           + juce::String(static_cast<int>(nodes_.size()))
-           + " cables=" + juce::String(paintedCables_) + "/"
-           + juce::String(static_cast<int>(connections_.size()));
+    return "cards=" + cydaw::base::Text(paintedCards_) + "/"
+           + cydaw::base::Text(static_cast<int>(nodes_.size()))
+           + " cables=" + cydaw::base::Text(paintedCables_) + "/"
+           + cydaw::base::Text(static_cast<int>(connections_.size()));
 }
 
 void NodeGraphComponent::invalidateSerialisedNodes()
@@ -13543,7 +13545,7 @@ int NodeGraphComponent::nodeCount() const
     return static_cast<int>(nodes_.size());
 }
 
-juce::String NodeGraphComponent::historyFootprint() const
+cydaw::base::Text NodeGraphComponent::historyFootprint() const
 {
     std::set<const void*> seen;
     const std::function<void(const cydaw::base::Value&)> walk =
@@ -13567,9 +13569,9 @@ juce::String NodeGraphComponent::historyFootprint() const
         walk(state);
     walk(currentHistoryState_);
     return "states="
-           + juce::String(static_cast<int>(undoHistory_.size()
+           + cydaw::base::Text(static_cast<int>(undoHistory_.size()
                                            + redoHistory_.size()))
-           + " objects=" + juce::String(static_cast<int>(seen.size()));
+           + " objects=" + cydaw::base::Text(static_cast<int>(seen.size()));
 }
 
 int NodeGraphComponent::paletteSelectedRow() const
@@ -13582,32 +13584,32 @@ void NodeGraphComponent::movePaletteSelection(const int delta)
     moveLibrarySelection(delta);
 }
 
-juce::String NodeGraphComponent::paletteRowKey(const int row) const
+cydaw::base::Text NodeGraphComponent::paletteRowKey(const int row) const
 {
     const auto* type = libraryRowType(row);
-    return type != nullptr ? type->key : juce::String {};
+    return type != nullptr ? type->key : cydaw::base::Text {};
 }
 
-juce::String NodeGraphComponent::paletteDragPayload(const int row)
+cydaw::base::Text NodeGraphComponent::paletteDragPayload(const int row)
 {
     juce::SparseSet<int> rows;
     rows.addRange({ row, row + 1 });
     return getDragSourceDescription(rows).toString();
 }
 
-bool NodeGraphComponent::acceptsDragPayload(const juce::String& payload)
+bool NodeGraphComponent::acceptsDragPayload(const cydaw::base::Text& payload)
 {
     const juce::DragAndDropTarget::SourceDetails details {
-        payload, nullptr, {}
+        cydaw::base::Value(payload), nullptr, {}
     };
     return isInterestedInDragSource(details);
 }
 
-juce::String NodeGraphComponent::paletteOutline() const
+cydaw::base::Text NodeGraphComponent::paletteOutline() const
 {
-    juce::String outline;
+    cydaw::base::Text outline;
     for (const auto& row : libraryRows_) {
-        outline += juce::String::repeatedString("  ", row.depth);
+        outline += cydaw::base::Text::repeatedString("  ", row.depth);
         if (row.catalogIndex < 0) {
             outline << (row.collapsed ? "> " : "v ") << row.foldKey
                     << " (" << row.count << ")\n";
@@ -13634,7 +13636,7 @@ void NodeGraphComponent::setCanvasZoom(const float zoom)
 }
 
 juce::Point<float> NodeGraphComponent::portSocketPoint(
-    const juce::String& nodeTypeKey, const juce::String& portKey) const
+    const cydaw::base::Text& nodeTypeKey, const cydaw::base::Text& portKey) const
 {
     for (const auto& node : nodes_) {
         if (node.typeKey != nodeTypeKey)
@@ -13646,7 +13648,7 @@ juce::Point<float> NodeGraphComponent::portSocketPoint(
     return {};
 }
 
-juce::String NodeGraphComponent::portKeyAtPoint(
+cydaw::base::Text NodeGraphComponent::portKeyAtPoint(
     const juce::Point<float> point, const bool input) const
 {
     const auto hit = input ? inputPortHit(point) : outputPortHit(point);
@@ -13655,13 +13657,13 @@ juce::String NodeGraphComponent::portKeyAtPoint(
         return {};
     const auto& node = nodes_[static_cast<std::size_t>(hit.nodeIndex)];
     const auto* port = findPort(node, hit.portId);
-    return port != nullptr ? port->key : juce::String {};
+    return port != nullptr ? port->key : cydaw::base::Text {};
 }
 
-juce::StringArray NodeGraphComponent::nodePortKeys(
-    const juce::String& nodeTypeKey, const bool input) const
+cydaw::base::TextList NodeGraphComponent::nodePortKeys(
+    const cydaw::base::Text& nodeTypeKey, const bool input) const
 {
-    juce::StringArray keys;
+    cydaw::base::TextList keys;
     for (const auto& node : nodes_) {
         if (node.typeKey != nodeTypeKey)
             continue;
@@ -13673,7 +13675,7 @@ juce::StringArray NodeGraphComponent::nodePortKeys(
     return keys;
 }
 
-void NodeGraphComponent::setPaletteSearch(const juce::String& query)
+void NodeGraphComponent::setPaletteSearch(const cydaw::base::Text& query)
 {
     // setText posts its change through the message queue, which a test does
     // not pump. Filtering here is what the keystroke ends up doing anyway.
@@ -13681,12 +13683,12 @@ void NodeGraphComponent::setPaletteSearch(const juce::String& query)
     applyLibraryFilter();
 }
 
-void NodeGraphComponent::togglePaletteFold(const juce::String& foldKey)
+void NodeGraphComponent::togglePaletteFold(const cydaw::base::Text& foldKey)
 {
     toggleLibraryFold(foldKey);
 }
 
-void NodeGraphComponent::toggleLibraryFold(const juce::String& foldKey)
+void NodeGraphComponent::toggleLibraryFold(const cydaw::base::Text& foldKey)
 {
     if (foldKey.isEmpty())
         return;
@@ -13921,7 +13923,7 @@ cydaw::base::Result NodeGraphComponent::applyFactoryPreset(const FactoryPreset& 
             return cydaw::base::Result::fail("Factory preset contains an invalid connection");
 
     nodes_.clear();
-    currentGraphPresetFile_ = juce::File {};
+    currentGraphPresetFile_ = cydaw::base::File {};
     connections_.clear();
     selectedNodes_.clear();
     // The old graph's programs and notes go with it: their values name its
@@ -13999,7 +14001,7 @@ cydaw::base::Result NodeGraphComponent::applyFactoryPreset(const FactoryPreset& 
 }
 
 cydaw::engine::NativeDspNodeParameters NodeGraphComponent::defaultParametersForType(
-    const juce::String& typeKey) const
+    const cydaw::base::Text& typeKey) const
 {
     cydaw::engine::NativeDspNodeParameters parameters;
     if (const auto* effect = cydaw::engine::effectForType(typeKey.toStdString()))
@@ -14118,9 +14120,9 @@ ModuleInterfaceState NodeGraphComponent::createNodeInterface(const Node& node) c
                              static_cast<std::uint8_t>(node.inputKind),
                              node.hasOutput,
                              static_cast<std::uint8_t>(node.outputKind),
-                             "node." + juce::String(static_cast<juce::int64>(node.id))
+                             "node." + cydaw::base::Text(static_cast<juce::int64>(node.id))
                                  + ".input",
-                             "node." + juce::String(static_cast<juce::int64>(node.id))
+                             "node." + cydaw::base::Text(static_cast<juce::int64>(node.id))
                                  + ".output",
                              0.40f, 0.40f, {}, {},
                              audioInputChannels(node),
@@ -14133,7 +14135,7 @@ ModuleInterfaceState NodeGraphComponent::createGraphInstanceInterface(
 {
     auto state = module.interfaceState;
     const auto prefix = nodeParameterBinding(instanceId, {});
-    std::vector<std::pair<juce::String, juce::String>> bindings;
+    std::vector<std::pair<cydaw::base::Text, cydaw::base::Text>> bindings;
     bindings.reserve(state.parameters.size());
 
     // A module holds each value twice: on the child node that the user edits,
@@ -14142,7 +14144,7 @@ ModuleInterfaceState NodeGraphComponent::createGraphInstanceInterface(
     // instance, and the instance override then won — so editing a reusable
     // Graph's oscillator changed nothing about what it played. The node is the
     // source of truth; the template only says which parameters are published.
-    const auto childNodeId = [](const juce::String& key) -> NodeId {
+    const auto childNodeId = [](const cydaw::base::Text& key) -> NodeId {
         if (!key.startsWith("node."))
             return 0;
         const auto separator = key.indexOfChar(5, '.');
@@ -14178,7 +14180,7 @@ ModuleInterfaceState NodeGraphComponent::createGraphInstanceInterface(
             // module's own keys, so an instance showed an empty ADSR and an
             // empty filter plot that nothing could edit.
             {
-                std::vector<juce::String*> targets {
+                std::vector<cydaw::base::Text*> targets {
                     &control.parameterBinding,
                     &control.secondaryParameterBinding,
                     &control.tertiaryParameterBinding,
@@ -14274,8 +14276,8 @@ juce::Point<float> NodeGraphComponent::freePlacementFor(
             });
     };
     const auto reportPlacement = [this, &candidates, &occupied] {
-        placementProfile_ = "candidates=" + juce::String(candidates)
-                            + " sizes=" + juce::String(
+        placementProfile_ = "candidates=" + cydaw::base::Text(candidates)
+                            + " sizes=" + cydaw::base::Text(
                                 static_cast<int>(occupied.size()));
     };
 
@@ -14379,13 +14381,13 @@ void NodeGraphComponent::addNodeFromType(const NodeType& type, juce::Point<float
             if (port.type == cydaw::graph::PortType::audio)
                 port.channels = graphChannels;
     }
-    auto mark = juce::Time::getHighResolutionTicks();
+    auto mark = cydaw::base::Time::getHighResolutionTicks();
     const auto since = [&mark] {
-        const auto now = juce::Time::getHighResolutionTicks();
-        const auto elapsed = juce::Time::highResolutionTicksToSeconds(
+        const auto now = cydaw::base::Time::getHighResolutionTicks();
+        const auto elapsed = cydaw::base::Time::highResolutionTicksToSeconds(
                                  now - mark) * 1000.0;
         mark = now;
-        return juce::String(elapsed, 2);
+        return cydaw::base::Text(elapsed, 2);
     };
     node.parameters = defaultParametersForType(type.key);
     applyLegacyPortDefaults(node.typeKey, node.parameters, node.ports);
@@ -14989,8 +14991,8 @@ void NodeGraphComponent::createModuleFromSelection()
         return;
     }
     SavedModule module;
-    module.key = "user-module-" + juce::String(nextModuleIndex_);
-    module.name = tr("nodes.moduleDefault", "index", juce::String(nextModuleIndex_));
+    module.key = "user-module-" + cydaw::base::Text(nextModuleIndex_);
+    module.name = tr("nodes.moduleDefault", "index", cydaw::base::Text(nextModuleIndex_));
     ++nextModuleIndex_;
     for (const auto id : selectedNodes_)
         if (const auto* node = findNode(id)) {
@@ -15043,7 +15045,7 @@ cydaw::base::Result NodeGraphComponent::createEditableGraphModule(
     module.inlineModule = true;
     module.factoryModule = false;
     module.role = role;
-    const auto index = juce::String(nextModuleIndex_++);
+    const auto index = cydaw::base::Text(nextModuleIndex_++);
     if (role == Role::instrument)
         module.name = tr("nodes.newInstrumentName", "index", index);
     else if (role == Role::midiEffect)
@@ -15068,7 +15070,7 @@ cydaw::base::Result NodeGraphComponent::createEditableGraphModule(
     module.author = graphAuthor_;
 
     const auto append = [this, &module](const NodeId id,
-                                        const juce::String& key,
+                                        const cydaw::base::Text& key,
                                         const juce::Point<float> position) {
         if (const auto* type = findType(key)) {
             module.nodes.push_back({ id, key, type->title, position,
@@ -15133,7 +15135,7 @@ cydaw::base::Result NodeGraphComponent::createEditableGraphModule(
 }
 
 cydaw::base::Result NodeGraphComponent::createGraphVariant(
-    const juce::String& sourceModuleKey, const juce::String& name,
+    const cydaw::base::Text& sourceModuleKey, const cydaw::base::Text& name,
     const bool replaceSelectedInstance, const bool openEditor)
 {
     if (editingLocked_)
@@ -15210,7 +15212,7 @@ void NodeGraphComponent::promptCreateGraphVariant(const NodeId nodeId)
 }
 
 void NodeGraphComponent::promptCreateGraphVariant(
-    const juce::String& sourceModuleKey,
+    const cydaw::base::Text& sourceModuleKey,
     const bool replaceSelectedInstance)
 {
     const auto* module = findModule(sourceModuleKey);
@@ -15483,7 +15485,7 @@ ModuleInterfaceState NodeGraphComponent::createDefaultModuleInterface(
 {
     ModuleInterfaceState state;
     auto includeSpectrum = false;
-    std::set<juce::String> publishedKeys;
+    std::set<cydaw::base::Text> publishedKeys;
     for (const auto& node : module.nodes) {
         ModuleInterfaceState candidate;
         if (const auto* nested = findModule(node.typeKey))
@@ -15656,7 +15658,7 @@ void NodeGraphComponent::registerModuleType(const SavedModule& module)
             return cydaw::graph::PortType::transport;
         return cydaw::graph::PortType::value;
     };
-    const auto boundaryDirection = [](const juce::String& key)
+    const auto boundaryDirection = [](const cydaw::base::Text& key)
         -> std::optional<bool> {
         bool audioInput = false;
         if (isGraphAudioBoundaryKey(key, &audioInput))
@@ -15688,7 +15690,7 @@ void NodeGraphComponent::registerModuleType(const SavedModule& module)
         found->ports.push_back({
             boundary.id,
             (input ? "input-" : "output-")
-                + juce::String(static_cast<juce::int64>(boundary.id)),
+                + cydaw::base::Text(static_cast<juce::int64>(boundary.id)),
             boundary.alias.isNotEmpty() ? boundary.alias : boundary.title,
             portType(kind), input, channels, false, 0.0
         });
@@ -15745,10 +15747,10 @@ ModuleInterfaceState* NodeGraphComponent::editablePresentationForNode(
 ModuleInterfaceState NodeGraphComponent::createDefaultGraphInterface() const
 {
     ModuleInterfaceState state;
-    std::set<juce::String> keys;
+    std::set<cydaw::base::Text> keys;
     // Which node each published parameter came from, so a label repeated by
     // two nodes can say which one it belongs to.
-    std::vector<juce::String> owners;
+    std::vector<cydaw::base::Text> owners;
     auto includeSpectrum = false;
     for (const auto& node : nodes_) {
         auto presentation = presentationForNode(node);
@@ -15781,13 +15783,13 @@ ModuleInterfaceState NodeGraphComponent::createDefaultGraphInterface() const
     // when they are not — three identical drive stages — only its position
     // in the chain can.
     {
-        std::map<juce::String, std::vector<std::size_t>> byLabel;
+        std::map<cydaw::base::Text, std::vector<std::size_t>> byLabel;
         for (std::size_t index = 0; index < state.parameters.size(); ++index)
             byLabel[state.parameters[index].label].push_back(index);
         for (const auto& [label, indices] : byLabel) {
             if (indices.size() < 2)
                 continue;
-            std::set<juce::String> distinctOwners;
+            std::set<cydaw::base::Text> distinctOwners;
             for (const auto index : indices)
                 if (index < owners.size())
                     distinctOwners.insert(owners[index]);
@@ -15798,7 +15800,7 @@ ModuleInterfaceState NodeGraphComponent::createDefaultGraphInterface() const
                 ++ordinal;
                 auto& parameter = state.parameters[index];
                 if (!ownersIdentify) {
-                    parameter.label = label + " " + juce::String(ordinal);
+                    parameter.label = label + " " + cydaw::base::Text(ordinal);
                     continue;
                 }
                 const auto& owner = owners[index];
@@ -15848,7 +15850,7 @@ ModuleInterfaceState NodeGraphComponent::createDefaultGraphInterface() const
             appendInterfacePorts(
                 state, true, static_cast<std::uint8_t>(node->outputKind),
                 false, 0,
-                "node." + juce::String(static_cast<juce::int64>(node->id))
+                "node." + cydaw::base::Text(static_cast<juce::int64>(node->id))
                     + ".published-input",
                 {}, y, 0.40f, displayTitle(*node), {},
                 node->outputKind == PortKind::audio
@@ -15863,7 +15865,7 @@ ModuleInterfaceState NodeGraphComponent::createDefaultGraphInterface() const
             appendInterfacePorts(
                 state, false, 0, true,
                 static_cast<std::uint8_t>(node->inputKind), {},
-                "node." + juce::String(static_cast<juce::int64>(node->id))
+                "node." + cydaw::base::Text(static_cast<juce::int64>(node->id))
                     + ".published-output",
                 0.40f, y, {}, displayTitle(*node), std::uint8_t { 1 },
                 node->inputKind == PortKind::audio
@@ -15888,7 +15890,7 @@ void NodeGraphComponent::synchroniseGraphInterface()
         return;
     }
 
-    std::set<juce::String> validKeys;
+    std::set<cydaw::base::Text> validKeys;
     for (const auto& parameter : current.parameters)
         validKeys.insert(parameter.key);
     std::erase_if(graphInterfaceState_.parameters,
@@ -15947,7 +15949,7 @@ void NodeGraphComponent::synchroniseGraphInterface()
                            == control.parameterBinding;
             if (control.kind != ModuleControlKind::envelope)
                 return false;
-            const std::set<juce::String> bindings {
+            const std::set<cydaw::base::Text> bindings {
                 control.parameterBinding,
                 control.secondaryParameterBinding,
                 control.tertiaryParameterBinding,
@@ -16020,11 +16022,11 @@ void NodeGraphComponent::rebuildEmbeddedSliders()
     // card's knob keeps its component across the rebuilds a zoom or a
     // restore triggers; only its fitting runs again. What is not claimed
     // again is destroyed with this map.
-    std::unordered_map<juce::String, std::unique_ptr<juce::Slider>> keptSliders;
+    std::unordered_map<cydaw::base::Text, std::unique_ptr<juce::Slider>> keptSliders;
     for (auto& embedded : embeddedSliders_)
         if (embedded.slider != nullptr)
             keptSliders.insert_or_assign(
-                juce::String(static_cast<juce::int64>(embedded.nodeId)) + "\n"
+                cydaw::base::Text(static_cast<juce::int64>(embedded.nodeId)) + "\n"
                     + embedded.binding,
                 std::move(embedded.slider));
     embeddedSliders_.clear();
@@ -16078,7 +16080,7 @@ void NodeGraphComponent::rebuildEmbeddedSliders()
                 const auto& bindings = control.extraParameterBindings;
                 if (bindings.empty() || bindings.size() % 3 != 0)
                     continue;
-                const auto lookup = [&presentation](const juce::String& key) {
+                const auto lookup = [&presentation](const cydaw::base::Text& key) {
                     return std::ranges::find_if(
                         presentation.parameters,
                         [&key](const auto& value) { return value.key == key; });
@@ -16484,7 +16486,7 @@ void NodeGraphComponent::rebuildEmbeddedSliders()
                             return;
                         const auto applyAxis =
                             [this, stored, presentation, nodeId](
-                                const juce::String& binding,
+                                const cydaw::base::Text& binding,
                                 const double normalised) {
                                 const auto found = std::ranges::find_if(
                                     presentation->parameters,
@@ -16552,7 +16554,7 @@ void NodeGraphComponent::rebuildEmbeddedSliders()
                         return;
                     const auto& presentation = presentationForNode(*stored);
                     const auto valueFor = [&presentation](
-                        const juce::String& binding,
+                        const cydaw::base::Text& binding,
                         const double value) {
                         const auto found = std::ranges::find_if(
                             presentation.parameters,
@@ -16860,7 +16862,7 @@ void NodeGraphComponent::rebuildEmbeddedSliders()
             std::unique_ptr<juce::Slider> slider;
             const auto wantsKnob = control.kind == ModuleControlKind::knob;
             if (const auto kept = keptSliders.find(
-                    juce::String(static_cast<juce::int64>(node.id)) + "\n"
+                    cydaw::base::Text(static_cast<juce::int64>(node.id)) + "\n"
                     + control.parameterBinding);
                 kept != keptSliders.end() && kept->second != nullptr
                 && (dynamic_cast<KnobSlider*>(kept->second.get()) != nullptr)
@@ -16893,7 +16895,7 @@ void NodeGraphComponent::rebuildEmbeddedSliders()
             slider->setValue(parameter->value, juce::dontSendNotification);
             slider->setTextValueSuffix(parameter->unit.isNotEmpty()
                                            ? " " + parameter->unit
-                                           : juce::String {});
+                                           : cydaw::base::Text {});
             slider->setColour(juce::Slider::rotarySliderFillColourId,
                               node.colour);
             slider->setColour(juce::Slider::trackColourId, node.colour);
@@ -17054,7 +17056,7 @@ void NodeGraphComponent::rebuildEmbeddedSliders()
 }
 
 void NodeGraphComponent::synchroniseEmbeddedXyPads(
-    const NodeId nodeId, const juce::String& binding)
+    const NodeId nodeId, const cydaw::base::Text& binding)
 {
     const auto normalise = [](const ModulePublishedParameter& value) {
         return value.maximum > value.minimum
@@ -17092,7 +17094,7 @@ void NodeGraphComponent::synchroniseEmbeddedXyPads(
 }
 
 void NodeGraphComponent::synchroniseEmbeddedEnvelopes(
-    const NodeId nodeId, const juce::String& binding)
+    const NodeId nodeId, const cydaw::base::Text& binding)
 {
     const auto normalise = [](const ModulePublishedParameter& value) {
         return value.maximum > value.minimum
@@ -17166,7 +17168,7 @@ void NodeGraphComponent::rebuildPendingWavetableBanks()
 }
 
 void NodeGraphComponent::synchroniseEmbeddedEqCurves(
-    const NodeId nodeId, const juce::String& binding)
+    const NodeId nodeId, const cydaw::base::Text& binding)
 {
     for (auto& embedded : embeddedEqCurves_) {
         if (nodeId != 0 && embedded.nodeId != nodeId)
@@ -17183,7 +17185,7 @@ void NodeGraphComponent::synchroniseEmbeddedEqCurves(
         auto complete = true;
         for (std::size_t index = 0; index + 2 < embedded.bindings.size();
              index += 3) {
-            const auto lookup = [&presentation](const juce::String& key) {
+            const auto lookup = [&presentation](const cydaw::base::Text& key) {
                 return std::ranges::find_if(
                     presentation.parameters,
                     [&key](const auto& value) { return value.key == key; });
@@ -17206,7 +17208,7 @@ void NodeGraphComponent::synchroniseEmbeddedEqCurves(
 }
 
 void NodeGraphComponent::synchroniseEmbeddedFilterResponses(
-    const NodeId nodeId, const juce::String& binding)
+    const NodeId nodeId, const cydaw::base::Text& binding)
 {
     for (auto& embedded : embeddedFilterResponses_) {
         if (nodeId != 0 && embedded.nodeId != nodeId)
@@ -17238,7 +17240,7 @@ void NodeGraphComponent::synchroniseEmbeddedFilterResponses(
 }
 
 void NodeGraphComponent::synchroniseEmbeddedDynamicsResponses(
-    const NodeId nodeId, const juce::String& binding)
+    const NodeId nodeId, const cydaw::base::Text& binding)
 {
     for (auto& embedded : embeddedDynamicsResponses_) {
         if (nodeId != 0 && embedded.nodeId != nodeId)
@@ -17274,7 +17276,7 @@ ModuleInterfaceState NodeGraphComponent::graphInterfaceState() const
     return graphInterfaceState_;
 }
 
-bool NodeGraphComponent::containsNodeType(const juce::String& typeKey) const
+bool NodeGraphComponent::containsNodeType(const cydaw::base::Text& typeKey) const
 {
     return std::ranges::any_of(nodes_, [&typeKey](const Node& node) {
         return node.typeKey == typeKey;
@@ -17302,10 +17304,10 @@ NodeGraphComponent::graphDefinitions() const
         return graph::PortRate::event;
     };
     const auto makePort = [&portType, &portRate](
-        const graph::PortId id, const juce::String& key,
+        const graph::PortId id, const cydaw::base::Text& key,
         const PortKind kind, const graph::PortDirection direction,
         const int channels = 0,
-        const juce::String& displayName = {}) {
+        const cydaw::base::Text& displayName = {}) {
         graph::GraphPort port;
         port.id = id;
         port.key = key.toStdString();
@@ -17348,14 +17350,14 @@ NodeGraphComponent::graphDefinitions() const
         port.defaultValue = source.defaultValue;
         return port;
     };
-    const auto isBoundaryInput = [](const juce::String& key) {
+    const auto isBoundaryInput = [](const cydaw::base::Text& key) {
         bool audioInput = false;
         return (NodeGraphComponent::isGraphAudioBoundaryKey(key, &audioInput)
                 && audioInput)
             || (key.startsWith("graph-") && key.endsWith("-input"))
             || key == "audio-clips" || key == "midi-input";
     };
-    const auto isBoundaryOutput = [](const juce::String& key) {
+    const auto isBoundaryOutput = [](const cydaw::base::Text& key) {
         bool audioInput = false;
         return (NodeGraphComponent::isGraphAudioBoundaryKey(key, &audioInput)
                 && !audioInput)
@@ -17399,8 +17401,8 @@ NodeGraphComponent::graphDefinitions() const
         const NodeId instanceId, const graph::GraphDefinition& graphClass) {
         for (const auto& published : graphClass.parameters) {
             const auto namespaced = nodeParameterBinding(
-                instanceId, juce::String(published.key));
-            const auto classKey = juce::String(published.key);
+                instanceId, cydaw::base::Text(published.key));
+            const auto classKey = cydaw::base::Text(published.key);
             const auto value = std::ranges::find_if(
                 state.parameters,
                 [&namespaced, &classKey](const auto& parameter) {
@@ -17415,7 +17417,7 @@ NodeGraphComponent::graphDefinitions() const
         }
     };
     const auto appendPrimitiveContract = [this](
-        graph::GraphNode& destination, const juce::String& typeKey,
+        graph::GraphNode& destination, const cydaw::base::Text& typeKey,
         const cydaw::engine::NativeDspNodeParameters& values) {
         const auto* type = findType(typeKey);
         if (type == nullptr)
@@ -17424,7 +17426,7 @@ NodeGraphComponent::graphDefinitions() const
         destination.parameters = type->parameterSchema;
         for (auto& parameter : destination.parameters) {
             const auto current = primitiveParameterValueForType(
-                typeKey, juce::String(parameter.key), values);
+                typeKey, cydaw::base::Text(parameter.key), values);
             if (!current.has_value())
                 continue;
             const auto value = juce::jlimit(parameter.minimum,
@@ -17470,7 +17472,7 @@ NodeGraphComponent::graphDefinitions() const
                 if (!key.starts_with(prefix))
                     continue;
                 const auto primitiveKey = primitiveParameterKeyForBinding(
-                    juce::String(key.substr(prefix.size()))).toStdString();
+                    cydaw::base::Text(key.substr(prefix.size()))).toStdString();
                 if (primitiveKey.empty()
                     || !std::ranges::any_of(
                         node.parameters,
@@ -17531,7 +17533,7 @@ NodeGraphComponent::graphDefinitions() const
                     found != parameterIds.end())
                     control.quaternaryParameterBinding = found->second;
                 for (const auto& port : definition.ports) {
-                    const auto idText = juce::String(
+                    const auto idText = cydaw::base::Text(
                         static_cast<juce::int64>(port.id));
                     if (source.parameterBinding.contains("node." + idText + ".")
                         && (source.kind == ModuleControlKind::inputPort
@@ -17564,7 +17566,7 @@ NodeGraphComponent::graphDefinitions() const
                         state.deviceControls, 640.0f, 240.0f);
     };
 
-    const auto definitionsMark = juce::Time::getHighResolutionTicks();
+    const auto definitionsMark = cydaw::base::Time::getHighResolutionTicks();
     // Each class after the ones it holds: its definition reads theirs (their
     // ports, their published knobs), which must be built first, whatever
     // order the library lists them in (a class made inside another comes
@@ -17572,8 +17574,8 @@ NodeGraphComponent::graphDefinitions() const
     std::vector<const SavedModule*> ordered;
     {
         ordered.reserve(savedModules_.size());
-        std::set<juce::String> placed;
-        std::set<juce::String> visiting;
+        std::set<cydaw::base::Text> placed;
+        std::set<cydaw::base::Text> visiting;
         std::function<void(const SavedModule&)> place = [&](const SavedModule& module) {
             if (placed.contains(module.key) || !visiting.insert(module.key).second)
                 return;
@@ -17632,9 +17634,9 @@ NodeGraphComponent::graphDefinitions() const
                              ? boundary.inputChannels
                              : type->inputChannels))
                 : 1;
-            const auto key = (input ? juce::String("input-")
-                                    : juce::String("output-"))
-                             + juce::String(
+            const auto key = (input ? cydaw::base::Text("input-")
+                                    : cydaw::base::Text("output-"))
+                             + cydaw::base::Text(
                                  static_cast<juce::int64>(boundary.id));
             definition.ports.push_back(makePort(
                 boundary.id, key, kind,
@@ -17830,10 +17832,10 @@ NodeGraphComponent::graphDefinitions() const
         definitions.push_back(std::move(definition));
     }
 
-    const auto moduleMs = juce::Time::highResolutionTicksToSeconds(
-                              juce::Time::getHighResolutionTicks()
+    const auto moduleMs = cydaw::base::Time::highResolutionTicksToSeconds(
+                              cydaw::base::Time::getHighResolutionTicks()
                               - definitionsMark) * 1000.0;
-    const auto rootMark = juce::Time::getHighResolutionTicks();
+    const auto rootMark = cydaw::base::Time::getHighResolutionTicks();
     graph::GraphDefinition root;
     root.reference = graphReference_;
     root.displayName = (graphName_.isNotEmpty()
@@ -17859,7 +17861,7 @@ NodeGraphComponent::graphDefinitions() const
     for (const auto& node : nodes_) {
         if (isBoundaryInput(node.typeKey)) {
             root.ports.push_back(makePort(
-                node.id, node.typeKey + "-" + juce::String(
+                node.id, node.typeKey + "-" + cydaw::base::Text(
                     static_cast<juce::int64>(node.id)),
                 node.outputKind, graph::PortDirection::input,
                 audioOutputChannels(node), displayTitle(node)));
@@ -17868,7 +17870,7 @@ NodeGraphComponent::graphDefinitions() const
         }
         if (isBoundaryOutput(node.typeKey)) {
             root.ports.push_back(makePort(
-                node.id, node.typeKey + "-" + juce::String(
+                node.id, node.typeKey + "-" + cydaw::base::Text(
                     static_cast<juce::int64>(node.id)),
                 node.inputKind, graph::PortDirection::output,
                 audioInputChannels(node), displayTitle(node)));
@@ -17989,8 +17991,8 @@ NodeGraphComponent::graphDefinitions() const
     }
     appendPresentation(root, graphInterfaceState_);
     definitions.push_back(std::move(root));
-    const auto rootMs = juce::Time::highResolutionTicksToSeconds(
-                            juce::Time::getHighResolutionTicks() - rootMark)
+    const auto rootMs = cydaw::base::Time::highResolutionTicksToSeconds(
+                            cydaw::base::Time::getHighResolutionTicks() - rootMark)
                         * 1000.0;
     // Numbers only: this runs on the click path, and formatting them here
     // would put a handful of string allocations on it.
@@ -18001,17 +18003,17 @@ NodeGraphComponent::graphDefinitions() const
     return definitions;
 }
 
-cydaw::graph::PortId NodeGraphComponent::knobPortId(const juce::String& classKey)
+cydaw::graph::PortId NodeGraphComponent::knobPortId(const cydaw::base::Text& classKey)
 {
     // Far above node ids, which a module's own sockets are named by.
     return (cydaw::graph::PortId { 1 } << 40) + stableModuleParameterId(classKey);
 }
 
-juce::String NodeGraphComponent::knobNodeType(const juce::String& moduleKey, const juce::String& classKey) const
+cydaw::base::Text NodeGraphComponent::knobNodeType(const cydaw::base::Text& moduleKey, const cydaw::base::Text& classKey) const
 {
     const auto* module = findModule(moduleKey);
     auto rest = classKey;
-    juce::String typeKey;
+    cydaw::base::Text typeKey;
     for (auto depth = 0; module != nullptr && rest.startsWith("node.") && depth < 16; ++depth) {
         const auto separator = rest.indexOfChar(5, '.');
         if (separator < 0)
@@ -18024,10 +18026,10 @@ juce::String NodeGraphComponent::knobNodeType(const juce::String& moduleKey, con
         typeKey = child->typeKey;
         module = findModule(typeKey);
     }
-    return module == nullptr ? typeKey : juce::String();
+    return module == nullptr ? typeKey : cydaw::base::Text();
 }
 
-std::pair<double, double> NodeGraphComponent::knobRange(const juce::String& moduleKey, const juce::String& classKey) const
+std::pair<double, double> NodeGraphComponent::knobRange(const cydaw::base::Text& moduleKey, const cydaw::base::Text& classKey) const
 {
     const auto typeKey = knobNodeType(moduleKey, classKey);
     if (typeKey.isNotEmpty())
@@ -18055,10 +18057,10 @@ void NodeGraphComponent::applyDefaultCableMode(const std::uint64_t source, const
         }
 }
 
-juce::String NodeGraphComponent::knobOfSocket(const Node& node, const juce::String& portKey) const
+cydaw::base::Text NodeGraphComponent::knobOfSocket(const Node& node, const cydaw::base::Text& portKey) const
 {
     const auto prefix = nodeParameterBinding(node.id, {});
-    juce::String found;
+    cydaw::base::Text found;
     for (const auto& parameter : presentationForNode(node).parameters) {
         if (!parameter.key.startsWith(prefix))
             continue;
@@ -18125,7 +18127,7 @@ void NodeGraphComponent::remapModulatorOwners(const std::unordered_map<NodeId, N
     }
 }
 
-std::uint64_t NodeGraphComponent::editorAddModulator(const std::uint64_t owner, const juce::String& typeKey)
+std::uint64_t NodeGraphComponent::editorAddModulator(const std::uint64_t owner, const cydaw::base::Text& typeKey)
 {
     const auto* effect = cydaw::engine::effectForType(typeKey.toStdString());
     const auto* card = readNode(owner);
@@ -18160,7 +18162,7 @@ std::uint64_t NodeGraphComponent::editorAddModulator(const std::uint64_t owner, 
     return id;
 }
 
-std::uint64_t NodeGraphComponent::editorParameterSocket(const std::uint64_t id, const juce::String& binding) const
+std::uint64_t NodeGraphComponent::editorParameterSocket(const std::uint64_t id, const cydaw::base::Text& binding) const
 {
     const auto* node = readNode(id);
     if (node == nullptr)
@@ -18184,7 +18186,7 @@ std::uint64_t NodeGraphComponent::editorParameterSocket(const std::uint64_t id, 
     return 0;
 }
 
-juce::String NodeGraphComponent::editorModulate(const std::uint64_t modulator, const juce::String& binding, const float amount)
+cydaw::base::Text NodeGraphComponent::editorModulate(const std::uint64_t modulator, const cydaw::base::Text& binding, const float amount)
 {
     if (editingLocked_)
         return "locked";
@@ -18236,14 +18238,14 @@ bool NodeGraphComponent::editorSetModulationAmount(const std::uint64_t source, c
             node.serialised = cydaw::base::Value();
     // As a knob: heard at once, the undo step once it rests.
     parameterHistoryPending_ = true;
-    lastParameterUiChangeTimeMs_ = juce::Time::currentTimeMillis();
+    lastParameterUiChangeTimeMs_ = cydaw::base::Time::currentTimeMillis();
     dispatchParameterNotification();
     if (!isTimerRunning())
         startTimerHz(30);
     return true;
 }
 
-bool NodeGraphComponent::editorUnmodulate(const std::uint64_t modulator, const juce::String& binding)
+bool NodeGraphComponent::editorUnmodulate(const std::uint64_t modulator, const cydaw::base::Text& binding)
 {
     for (const auto& modulation : editorModulations())
         if (modulation.source == modulator && modulation.binding == binding)
@@ -18309,7 +18311,7 @@ cydaw::graph::ValidationResult NodeGraphComponent::validateGraphAsset() const
     for (const auto& definition : definitions)
         for (const auto& node : definition.nodes) {
             if (node.kind != cydaw::graph::GraphNodeKind::primitive
-                || !juce::String(node.processorKey).startsWith("core."))
+                || !cydaw::base::Text(node.processorKey).startsWith("core."))
                 continue;
             auto primitiveResult = primitives.validateNode(node);
             primitiveIssues.insert(
@@ -18533,7 +18535,7 @@ double NodeGraphComponent::evaluateValueOutput(const double timeSeconds) const
 }
 
 bool NodeGraphComponent::setGraphInterfaceParameter(
-    const juce::String& binding, const double value)
+    const cydaw::base::Text& binding, const double value)
 {
     auto changed = false;
     for (auto& node : nodes_) {
@@ -18587,7 +18589,7 @@ bool NodeGraphComponent::setGraphInterfaceParameter(
 }
 
 bool NodeGraphComponent::updateNodeParameter(Node& node,
-                                             const juce::String& binding,
+                                             const cydaw::base::Text& binding,
                                              const double value)
 {
     if (binding.startsWith("node.")) {
@@ -18605,7 +18607,7 @@ bool NodeGraphComponent::updateNodeParameter(Node& node,
 }
 
 bool NodeGraphComponent::updateModuleParameter(SavedModule& module,
-                                               const juce::String& binding,
+                                               const cydaw::base::Text& binding,
                                                const double value)
 {
     for (auto& node : module.nodes) {
@@ -18632,7 +18634,7 @@ bool NodeGraphComponent::updateModuleParameter(SavedModule& module,
 }
 
 bool NodeGraphComponent::updateGraphInstanceParameter(
-    Node& node, const juce::String& binding, const double value)
+    Node& node, const cydaw::base::Text& binding, const double value)
 {
     if (findModule(node.typeKey) == nullptr)
         return false;
@@ -18666,7 +18668,7 @@ void NodeGraphComponent::openGraphInterfaceEditor()
     moduleInterfaceEditor_ = editor.get();
     juce::Component::SafePointer<NodeGraphComponent> safeThis(this);
     editor->setParameterChangedHandler(
-        [safeThis](const juce::String& key, const double value) {
+        [safeThis](const cydaw::base::Text& key, const double value) {
             if (safeThis != nullptr
                 && safeThis->setGraphInterfaceParameter(key, value))
                 safeThis->editorParameterChangePending_ = true;
@@ -18736,7 +18738,7 @@ void NodeGraphComponent::openNodeInterfaceEditor(const NodeId nodeId)
     moduleInterfaceEditor_ = editor.get();
     juce::Component::SafePointer<NodeGraphComponent> safeThis(this);
     editor->setParameterChangedHandler(
-        [safeThis, nodeId](const juce::String& key, const double value) {
+        [safeThis, nodeId](const cydaw::base::Text& key, const double value) {
             if (safeThis == nullptr)
                 return;
             if (auto* stored = safeThis->findNode(nodeId);
@@ -18804,7 +18806,7 @@ void NodeGraphComponent::openNodeInterfaceEditor(const NodeId nodeId)
     setStatus(tr("nodes.status.nodeEditorOpened", "name", title));
 }
 
-void NodeGraphComponent::openModuleInterfaceEditor(const juce::String& moduleKey)
+void NodeGraphComponent::openModuleInterfaceEditor(const cydaw::base::Text& moduleKey)
 {
     auto* module = findModule(moduleKey);
     if (module == nullptr)
@@ -18841,7 +18843,7 @@ void NodeGraphComponent::openModuleInterfaceEditor(const juce::String& moduleKey
     moduleInterfaceEditor_ = editor.get();
     juce::Component::SafePointer<NodeGraphComponent> safeThis(this);
     editor->setParameterChangedHandler(
-        [safeThis, moduleKey](const juce::String& key, const double value) {
+        [safeThis, moduleKey](const cydaw::base::Text& key, const double value) {
             if (safeThis == nullptr)
                 return;
             if (auto* stored = safeThis->findModule(moduleKey);
@@ -18949,7 +18951,7 @@ cydaw::base::Value NodeGraphComponent::moduleGraphState(const SavedModule& modul
     root->setProperty(jsonKeys::presentation,
                       serialiseModuleInterface(module.interfaceState));
     root->setProperty(jsonKeys::nextNodeId, static_cast<juce::int64>(highestId + 1));
-    root->setProperty(jsonKeys::factoryPreset, juce::String {});
+    root->setProperty(jsonKeys::factoryPreset, cydaw::base::Text {});
     root->setProperty(jsonKeys::graphName, module.name);
     root->setProperty(jsonKeys::graphCategory, module.category);
     root->setProperty(jsonKeys::graphAuthor, module.author);
@@ -18961,9 +18963,9 @@ cydaw::base::Value NodeGraphComponent::moduleGraphState(const SavedModule& modul
     root->setProperty(jsonKeys::graphTags, moduleTags);
     const auto role = inferModuleRole(module);
     root->setProperty(jsonKeys::definitionId,
-                      juce::String(graphReference_.id) + ".module." + module.key);
+                      cydaw::base::Text(graphReference_.id) + ".module." + module.key);
     root->setProperty(jsonKeys::definitionVersion,
-                      juce::String(module.version.toString()));
+                      cydaw::base::Text(module.version.toString()));
     root->setProperty(jsonKeys::graphRole, cydaw::graph::toString(role));
     root->setProperty(jsonKeys::graphScope, cydaw::graph::toString(
         module.factoryModule ? cydaw::graph::GraphScope::factory
@@ -18982,7 +18984,7 @@ cydaw::base::Value NodeGraphComponent::moduleGraphState(const SavedModule& modul
     return state;
 }
 
-void NodeGraphComponent::applyModuleGraphState(const juce::String& moduleKey,
+void NodeGraphComponent::applyModuleGraphState(const cydaw::base::Text& moduleKey,
                                                 const cydaw::base::Value& state,
                                                 const bool structureChanged)
 {
@@ -19002,12 +19004,12 @@ void NodeGraphComponent::applyModuleGraphState(const juce::String& moduleKey,
         // class of the library as it was when this device was opened, and
         // another device's class, edited meanwhile elsewhere (another
         // workshop tab), would be put back as it was.
-        std::map<juce::String, const cydaw::base::Object*> incoming;
+        std::map<cydaw::base::Text, const cydaw::base::Object*> incoming;
         for (const auto& moduleValue : *moduleValues)
             if (const auto* object = moduleValue.getDynamicObject())
                 if (const auto key = object->getProperty(jsonKeys::key).toString(); key.isNotEmpty())
                     incoming[key] = object;
-        std::set<juce::String> used;
+        std::set<cydaw::base::Text> used;
         std::vector<const cydaw::base::Value*> pendingNodes { &root->getProperty(jsonKeys::nodes) };
         while (!pendingNodes.empty()) {
             const auto* nodesValue = pendingNodes.back();
@@ -19022,7 +19024,7 @@ void NodeGraphComponent::applyModuleGraphState(const juce::String& moduleKey,
             const auto* object = moduleValue.getDynamicObject();
             const auto key = object != nullptr
                                  ? object->getProperty(jsonKeys::key).toString()
-                                 : juce::String {};
+                                 : cydaw::base::Text {};
             if (object == nullptr || key.isEmpty() || key == moduleKey)
                 continue;
             if (findModule(key) != nullptr && !used.contains(key))
@@ -19378,7 +19380,7 @@ void NodeGraphComponent::applyModuleGraphState(const juce::String& moduleKey,
                     if (!parameterControl)
                         return false;
                     const auto bindingExists = [&updated](
-                        const juce::String& binding) {
+                        const cydaw::base::Text& binding) {
                         return std::ranges::any_of(
                             updated.parameters,
                             [&binding](const auto& parameter) {
@@ -19396,7 +19398,7 @@ void NodeGraphComponent::applyModuleGraphState(const juce::String& moduleKey,
                                    control.secondaryParameterBinding);
                     if (control.kind != ModuleControlKind::envelope)
                         return false;
-                    const std::set<juce::String> bindings {
+                    const std::set<cydaw::base::Text> bindings {
                         control.parameterBinding,
                         control.secondaryParameterBinding,
                         control.tertiaryParameterBinding,
@@ -19476,7 +19478,7 @@ void NodeGraphComponent::applyModuleGraphState(const juce::String& moduleKey,
         queueParameterNotification();
 }
 
-void NodeGraphComponent::openModuleGraphEditor(const juce::String& moduleKey)
+void NodeGraphComponent::openModuleGraphEditor(const cydaw::base::Text& moduleKey)
 {
     const auto* module = findModule(moduleKey);
     if (module == nullptr) {
@@ -19565,7 +19567,7 @@ void NodeGraphComponent::openModuleGraphEditor(const juce::String& moduleKey)
 }
 
 void NodeGraphComponent::openModuleGraphEditorDetached(
-    const juce::String& moduleKey)
+    const cydaw::base::Text& moduleKey)
 {
     const auto* module = findModule(moduleKey);
     if (module == nullptr) {
@@ -19906,7 +19908,7 @@ void NodeGraphComponent::addPublishedIoNode(const bool input,
 {
     if (editingLocked_)
         return;
-    juce::String stem;
+    cydaw::base::Text stem;
     if (kind == PortKind::midi) {
         stem = "graph-midi-";
     } else if (kind == PortKind::control) {
@@ -19961,8 +19963,8 @@ void NodeGraphComponent::addPublishedIoPair(const PortKind kind,
 {
     if (editingLocked_)
         return;
-    juce::String inputKey;
-    juce::String outputKey;
+    cydaw::base::Text inputKey;
+    cydaw::base::Text outputKey;
     if (kind == PortKind::midi) {
         inputKey = "graph-midi-input";
         outputKey = "graph-midi-output";
@@ -20057,9 +20059,9 @@ void NodeGraphComponent::showEditorLayoutMenu()
         });
 }
 
-juce::String NodeGraphComponent::viewBookmarkLabel(const int slot) const
+cydaw::base::Text NodeGraphComponent::viewBookmarkLabel(const int slot) const
 {
-    auto label = tr("nodes.viewBookmark.slot", "slot", juce::String(slot));
+    auto label = tr("nodes.viewBookmark.slot", "slot", cydaw::base::Text(slot));
     if (slot >= 1 && slot <= static_cast<int>(viewBookmarks_.size())
         && viewBookmarks_[static_cast<std::size_t>(slot - 1)].has_value())
         label += "  •";
@@ -20068,7 +20070,7 @@ juce::String NodeGraphComponent::viewBookmarkLabel(const int slot) const
 
 void NodeGraphComponent::applyEditorLayoutPreset(const int preset)
 {
-    juce::String presetName;
+    cydaw::base::Text presetName;
     if (preset == 1) {
         selectionPanelVisible_ = true;
         configurationPanelVisible_ = true;
@@ -20104,11 +20106,11 @@ void NodeGraphComponent::applyEditorLayoutPreset(const int preset)
 
 void NodeGraphComponent::saveCustomEditorLayout()
 {
-    juce::PropertiesFile::Options options;
+    cydaw::base::PropertiesFile::Options options;
     options.applicationName = "CyDAW";
     options.filenameSuffix = "graph-editor-layout.settings";
     options.folderName = "CyDAW";
-    juce::PropertiesFile preferences(options);
+    cydaw::base::PropertiesFile preferences(options);
     preferences.setValue("hasCustomLayout", true);
     preferences.setValue("selectionPanelVisible", selectionPanelVisible_);
     preferences.setValue("configurationPanelVisible",
@@ -20119,7 +20121,7 @@ void NodeGraphComponent::saveCustomEditorLayout()
                          configurationPanelShowsMembers_);
     preferences.setValue("minimapVisible", minimapVisible_);
     preferences.setValue("paletteCollapsedFolds",
-                         collapsedLibraryFolds_.joinIntoString("\n"));
+                         cydaw::base::Value(collapsedLibraryFolds_.joinIntoString("\n")));
     preferences.setValue("selectionPanelWidth", selectionPanelWidth_);
     preferences.setValue("configurationPanelWidth", configurationPanelWidth_);
     preferences.saveIfNeeded();
@@ -20128,11 +20130,11 @@ void NodeGraphComponent::saveCustomEditorLayout()
 
 bool NodeGraphComponent::loadCustomEditorLayout(const bool apply)
 {
-    juce::PropertiesFile::Options options;
+    cydaw::base::PropertiesFile::Options options;
     options.applicationName = "CyDAW";
     options.filenameSuffix = "graph-editor-layout.settings";
     options.folderName = "CyDAW";
-    juce::PropertiesFile preferences(options);
+    cydaw::base::PropertiesFile preferences(options);
     if (!preferences.getBoolValue("hasCustomLayout", false)) {
         if (apply)
             setStatus(tr("nodes.layout.noCustom"), true);
@@ -20218,7 +20220,7 @@ void NodeGraphComponent::showNodeMenu(const NodeId nodeId)
     if (type != nullptr)
         menu.addItem(101, tr(type->categoryKey), false);
     if (type != nullptr) {
-        juce::StringArray capabilities;
+        cydaw::base::TextList capabilities;
         if (type->stateful)
             capabilities.add(tr("nodes.browser.stateful"));
         if (type->supportsPolyphony)
@@ -20235,7 +20237,7 @@ void NodeGraphComponent::showNodeMenu(const NodeId nodeId)
         for (const auto& port : node->ports) {
             auto text = (port.name.isNotEmpty() ? port.name : port.key)
                 + "  :  " + portTypeName(port)
-                + "  [" + juce::String(static_cast<juce::int64>(port.id)) + "]";
+                + "  [" + cydaw::base::Text(static_cast<juce::int64>(port.id)) + "]";
             if (port.acceptsMultipleConnections)
                 text += "  *";
             if (port.input)
@@ -20252,16 +20254,16 @@ void NodeGraphComponent::showNodeMenu(const NodeId nodeId)
         auto parameterCount = 0;
         const auto number = [](const double value) {
             const auto magnitude = std::abs(value);
-            return juce::String(value,
+            return cydaw::base::Text(value,
                 magnitude > 0.0 && magnitude < 0.01 ? 4
                 : magnitude < 10.0 ? 2 : 1);
         };
         for (const auto& parameter : type->parameterSchema) {
-            auto text = juce::String(parameter.key) + "  "
+            auto text = cydaw::base::Text(parameter.key) + "  "
                 + number(parameter.minimum) + ".." + number(parameter.maximum)
                 + "  [" + number(parameter.defaultValue) + "]";
             if (const auto current = primitiveParameterValueForType(
-                    node->typeKey, juce::String(parameter.key), node->parameters))
+                    node->typeKey, cydaw::base::Text(parameter.key), node->parameters))
                 text += "  = " + number(*current);
             parameters.addItem(1200 + parameterCount++, text, false);
         }
@@ -20288,7 +20290,7 @@ void NodeGraphComponent::showNodeMenu(const NodeId nodeId)
                                             : popupPort->key));
         auto portDescription = portTypeName(*popupPort)
             + "  |  ID "
-            + juce::String(static_cast<juce::int64>(popupPort->id));
+            + cydaw::base::Text(static_cast<juce::int64>(popupPort->id));
         if (popupPort->acceptsMultipleConnections)
             portDescription += "  |  *";
         menu.addItem(104, portDescription, false);
@@ -20341,7 +20343,7 @@ void NodeGraphComponent::showNodeMenu(const NodeId nodeId)
     }
     const auto hasPrimitiveParameters = module == nullptr && type != nullptr
         && !type->parameterSchema.empty();
-    std::vector<juce::File> compatibleNodePresetFiles;
+    std::vector<cydaw::base::File> compatibleNodePresetFiles;
     if (hasPrimitiveParameters) {
         juce::PopupMenu settings;
         settings.addItem(14, tr("nodes.menu.copyParameters"));
@@ -20357,10 +20359,10 @@ void NodeGraphComponent::showNodeMenu(const NodeId nodeId)
                          !editingLocked_);
         const auto presetDirectory = userNodeParameterPresetDirectory();
         if (presetDirectory.isDirectory()) {
-            juce::Array<juce::File> files;
+            cydaw::base::Array<cydaw::base::File> files;
             presetDirectory.findChildFiles(
-                files, juce::File::findFiles, true,
-                "*" + juce::String(nodeParameterPresetFileExtension));
+                files, cydaw::base::File::findFiles, true,
+                "*" + cydaw::base::Text(nodeParameterPresetFileExtension));
             auto currentProcessor = primitiveProcessorKeyForType(
                 node->typeKey);
             if (currentProcessor.isEmpty())
@@ -20380,7 +20382,7 @@ void NodeGraphComponent::showNodeMenu(const NodeId nodeId)
             }
             std::ranges::sort(
                 compatibleNodePresetFiles, {},
-                [](const juce::File& file) {
+                [](const cydaw::base::File& file) {
                     return file.getFileNameWithoutExtension().toLowerCase();
                 });
         }
@@ -20736,7 +20738,7 @@ void NodeGraphComponent::createGraphComment(
     GraphComment comment;
     comment.id = nextCommentId_++;
     comment.title = tr("nodes.comment.defaultTitle") + " "
-                    + juce::String(static_cast<juce::int64>(comment.id));
+                    + cydaw::base::Text(static_cast<juce::int64>(comment.id));
     comment.position = graphPosition({
         (baseTopLeft.x - canvas.getX()) / worldWidth,
         (baseTopLeft.y - canvas.getY()) / worldHeight
@@ -20815,7 +20817,7 @@ void NodeGraphComponent::openNodeBrowser(
     };
     const auto signatures = [&typeName](const NodeType& type,
                                         const bool inputs) {
-        juce::String text;
+        cydaw::base::Text text;
         const auto variableAudio =
             primitiveSupportsVariableAudioChannels(type.key);
         for (const auto& port : type.ports) {
@@ -20823,26 +20825,26 @@ void NodeGraphComponent::openNodeBrowser(
                 continue;
             if (text.isNotEmpty())
                 text += "\n";
-            text += juce::String::fromUTF8("• ") + port.name + "  —  "
+            text += cydaw::base::Text::fromUTF8("• ") + port.name + "  —  "
                     + typeName(port, variableAudio);
             if (port.acceptsMultipleConnections)
-                text += juce::String::fromUTF8("  ∞");
+                text += cydaw::base::Text::fromUTF8("  ∞");
         }
         return text;
     };
     const auto parameters = [](const NodeType& type) {
-        juce::String text;
+        cydaw::base::Text text;
         for (const auto& parameter : type.parameterSchema) {
             if (text.isNotEmpty())
                 text += "\n";
             const auto number = [](const double value) {
                 const auto magnitude = std::abs(value);
-                return juce::String(value,
+                return cydaw::base::Text(value,
                     magnitude > 0.0 && magnitude < 0.01 ? 4
                     : magnitude < 10.0 ? 2 : 1);
             };
-            text += juce::String::fromUTF8("• ")
-                    + juce::String(parameter.key) + "  "
+            text += cydaw::base::Text::fromUTF8("• ")
+                    + cydaw::base::Text(parameter.key) + "  "
                     + number(parameter.minimum) + "…"
                     + number(parameter.maximum) + "  ["
                     + number(parameter.defaultValue) + "]";
@@ -20888,7 +20890,7 @@ void NodeGraphComponent::openNodeBrowser(
                  || (type.hasOutput && type.outputKind == PortKind::control)))
             continue;
         auto description = type.descriptionKey.isNotEmpty()
-                               ? tr(type.descriptionKey) : juce::String {};
+                               ? tr(type.descriptionKey) : cydaw::base::Text {};
         if (description.isEmpty() || description == type.descriptionKey)
             description = tr("nodes.browser.defaultDescription")
                 .replace("{name}", type.title)
@@ -20896,7 +20898,7 @@ void NodeGraphComponent::openNodeBrowser(
         const auto inputSignature = signatures(type, true);
         const auto outputSignature = signatures(type, false);
         const auto parameterSignature = parameters(type);
-        juce::StringArray capabilities;
+        cydaw::base::TextList capabilities;
         if (type.stateful)
             capabilities.add(tr("nodes.browser.stateful"));
         if (type.supportsPolyphony)
@@ -20909,7 +20911,7 @@ void NodeGraphComponent::openNodeBrowser(
                           description, inputSignature, outputSignature,
                           parameterSignature,
                           capabilities.joinIntoString(
-                              juce::String::fromUTF8(" · ")),
+                              cydaw::base::Text::fromUTF8(" · ")),
                           inputSignature + " " + outputSignature + " "
                               + parameterSignature,
                           type.colour, type.composite });
@@ -20945,7 +20947,7 @@ void NodeGraphComponent::openNodeBrowser(
         [safeThis, normalisedPosition, browserConnectionAnchor,
          browserConnectionAnchorPort,
          anchorIsInput, replacementNode,
-         spliceConnection](const juce::String& key) {
+         spliceConnection](const cydaw::base::Text& key) {
             if (safeThis == nullptr)
                 return;
             if (const auto* type = safeThis->findType(key)) {
@@ -21011,7 +21013,7 @@ void NodeGraphComponent::openNodeBrowser(
     juce::CallOutBox::launchAsynchronously(std::move(browser), anchor, this);
 }
 
-void NodeGraphComponent::showNodeBrowser(const juce::String& selectedKey)
+void NodeGraphComponent::showNodeBrowser(const cydaw::base::Text& selectedKey)
 {
     const auto position = juce::Point<float>(
         static_cast<float>(getWidth()) * 0.52f,
@@ -21025,13 +21027,13 @@ void NodeGraphComponent::showNodeBrowser(const juce::String& selectedKey)
 }
 
 bool NodeGraphComponent::saveNodeBrowserSnapshot(
-    const juce::File& destination) const
+    const cydaw::base::File& destination) const
 {
     auto* browser = nodeBrowserForSnapshot_.getComponent();
     if (browser == nullptr)
         return false;
     destination.getParentDirectory().createDirectory();
-    auto stream = destination.createOutputStream();
+    auto stream = juce::File(destination).createOutputStream();
     if (stream == nullptr)
         return false;
     const auto image = browser->createComponentSnapshot(
@@ -21043,20 +21045,20 @@ bool NodeGraphComponent::saveNodeBrowserSnapshot(
 void NodeGraphComponent::notifyLayoutChanged(const char* origin)
 {
     if (layoutChangeOrigins_.length() < 400)
-        layoutChangeOrigins_ += juce::String(origin) + ",";
+        layoutChangeOrigins_ += cydaw::base::Text(origin) + ",";
     // Counted and nested-counted: the parts below sum to half the time the
     // whole call takes, which is either a profile from another call or a
     // second pass hiding inside the first.
     ++layoutChangeCalls_;
     const juce::ScopedValueSetter<int> depth(layoutChangeDepth_,
                                              layoutChangeDepth_ + 1);
-    auto mark = juce::Time::getHighResolutionTicks();
+    auto mark = cydaw::base::Time::getHighResolutionTicks();
     const auto since = [&mark] {
-        const auto now = juce::Time::getHighResolutionTicks();
-        const auto elapsed = juce::Time::highResolutionTicksToSeconds(
+        const auto now = cydaw::base::Time::getHighResolutionTicks();
+        const auto elapsed = cydaw::base::Time::highResolutionTicksToSeconds(
                                  now - mark) * 1000.0;
         mark = now;
-        return juce::String(elapsed, 2);
+        return cydaw::base::Text(elapsed, 2);
     };
     // The factory preset list never changes; only which of its entries is
     // marked, and only when one was. Rebuilding the whole combo box on every
@@ -21077,8 +21079,8 @@ void NodeGraphComponent::notifyLayoutChanged(const char* origin)
         layoutChangedHandler_();
     layoutChangeProfile_ = "presets=" + presets + " validation=" + validation
                            + " history=" + history + " handler=" + since()
-                           + " calls=" + juce::String(layoutChangeCalls_)
-                           + " depth=" + juce::String(layoutChangeDepth_);
+                           + " calls=" + cydaw::base::Text(layoutChangeCalls_)
+                           + " depth=" + cydaw::base::Text(layoutChangeDepth_);
 }
 
 void NodeGraphComponent::notifyViewChanged()
@@ -21145,7 +21147,7 @@ void NodeGraphComponent::commitEditHistory(const bool parameterChange)
     if (jsonValuesMatch(nextState, currentHistoryState_))
         return;
 
-    const auto now = juce::Time::currentTimeMillis();
+    const auto now = cydaw::base::Time::currentTimeMillis();
     const auto coalesceParameterChange = parameterChange
         && lastHistoryWasParameter_
         && now - lastParameterHistoryTimeMs_ < 650;
@@ -21219,7 +21221,7 @@ void NodeGraphComponent::queueParameterNotification()
 {
     parameterNotificationPending_ = true;
     parameterHistoryPending_ = true;
-    lastParameterUiChangeTimeMs_ = juce::Time::currentTimeMillis();
+    lastParameterUiChangeTimeMs_ = cydaw::base::Time::currentTimeMillis();
     if (!isTimerRunning())
         startTimerHz(30);
 }
@@ -21268,7 +21270,7 @@ void NodeGraphComponent::timerCallback()
         dispatchParameterNotification();
     }
     if (parameterHistoryPending_ && !parameterGestureActive_
-        && juce::Time::currentTimeMillis() - lastParameterUiChangeTimeMs_
+        && cydaw::base::Time::currentTimeMillis() - lastParameterUiChangeTimeMs_
                >= 180)
         commitQueuedParameterHistory();
     if (!parameterNotificationPending_
@@ -21276,14 +21278,14 @@ void NodeGraphComponent::timerCallback()
         stopTimer();
 }
 
-juce::String NodeGraphComponent::graphAudioBoundaryKey(const bool input,
+cydaw::base::Text NodeGraphComponent::graphAudioBoundaryKey(const bool input,
                                                         const int channels)
 {
-    return "graph-audio-" + juce::String(input ? "input-" : "output-")
-           + juce::String(juce::jlimit(1, 8, channels));
+    return "graph-audio-" + cydaw::base::Text(input ? "input-" : "output-")
+           + cydaw::base::Text(juce::jlimit(1, 8, channels));
 }
 
-bool NodeGraphComponent::isGraphAudioBoundaryKey(const juce::String& key,
+bool NodeGraphComponent::isGraphAudioBoundaryKey(const cydaw::base::Text& key,
                                                   bool* input)
 {
     constexpr auto inputPrefix = "graph-audio-input-";
@@ -21292,17 +21294,17 @@ bool NodeGraphComponent::isGraphAudioBoundaryKey(const juce::String& key,
     const auto isOutput = key.startsWith(outputPrefix);
     if (!isInput && !isOutput)
         return false;
-    const auto suffix = key.substring(isInput ? juce::String(inputPrefix).length()
-                                               : juce::String(outputPrefix).length());
+    const auto suffix = key.substring(isInput ? cydaw::base::Text(inputPrefix).length()
+                                               : cydaw::base::Text(outputPrefix).length());
     const auto channels = suffix.getIntValue();
-    if (channels < 1 || channels > 8 || suffix != juce::String(channels))
+    if (channels < 1 || channels > 8 || suffix != cydaw::base::Text(channels))
         return false;
     if (input != nullptr)
         *input = isInput;
     return true;
 }
 
-int NodeGraphComponent::graphAudioBoundaryChannels(const juce::String& key)
+int NodeGraphComponent::graphAudioBoundaryChannels(const cydaw::base::Text& key)
 {
     bool input = false;
     if (!isGraphAudioBoundaryKey(key, &input))
@@ -21310,9 +21312,9 @@ int NodeGraphComponent::graphAudioBoundaryChannels(const juce::String& key)
     return key.fromLastOccurrenceOf("-", false, false).getIntValue();
 }
 
-juce::String NodeGraphComponent::audioFormatKey(const int channels)
+cydaw::base::Text NodeGraphComponent::audioFormatKey(const int channels)
 {
-    return "nodes.audioFormat." + juce::String(juce::jlimit(1, 8, channels));
+    return "nodes.audioFormat." + cydaw::base::Text(juce::jlimit(1, 8, channels));
 }
 
 bool NodeGraphComponent::isBoundaryNode(const Node& node) const
@@ -21325,12 +21327,12 @@ bool NodeGraphComponent::isBoundaryNode(const Node& node) const
            || node.typeKey == "master" || node.typeKey == "midi-output";
 }
 
-juce::String NodeGraphComponent::displayTitle(const Node& node) const
+cydaw::base::Text NodeGraphComponent::displayTitle(const Node& node) const
 {
     return node.alias.trim().isNotEmpty() ? node.alias.trim() : node.title;
 }
 
-juce::String NodeGraphComponent::nodeTooltip(const Node& node) const
+cydaw::base::Text NodeGraphComponent::nodeTooltip(const Node& node) const
 {
     auto tooltip = node.description.trim();
     const auto* type = findType(node.typeKey);
@@ -21368,8 +21370,8 @@ juce::String NodeGraphComponent::nodeTooltip(const Node& node) const
                 return tr("nodes.port.analysis");
             return tr("nodes.port.control");
         };
-        juce::String inputs;
-        juce::String outputs;
+        cydaw::base::Text inputs;
+        cydaw::base::Text outputs;
         for (const auto& port : node.ports) {
             auto& target = port.input ? inputs : outputs;
             if (target.isNotEmpty())
@@ -21385,11 +21387,11 @@ juce::String NodeGraphComponent::nodeTooltip(const Node& node) const
                        + (outputs.isNotEmpty() ? outputs
                                               : tr("nodes.port.none"));
         if (!type->parameterSchema.empty()) {
-            juce::String parameters;
+            cydaw::base::Text parameters;
             for (const auto& parameter : type->parameterSchema) {
                 if (parameters.isNotEmpty())
                     parameters += ", ";
-                parameters += juce::String(parameter.key);
+                parameters += cydaw::base::Text(parameter.key);
             }
             tooltip += "\n" + tr("nodes.browser.parameters") + ": "
                        + parameters;
@@ -21402,9 +21404,9 @@ juce::String NodeGraphComponent::nodeTooltip(const Node& node) const
     return tooltip;
 }
 
-juce::String NodeGraphComponent::embeddedParameterTooltip(
+cydaw::base::Text NodeGraphComponent::embeddedParameterTooltip(
     const Node& node,
-    const juce::String& binding,
+    const cydaw::base::Text& binding,
     const double currentValue) const
 {
     const auto& presentation = presentationForNode(node);
@@ -21428,9 +21430,9 @@ juce::String NodeGraphComponent::embeddedParameterTooltip(
         const auto span = parameter->maximum - parameter->minimum;
         const auto decimals = span <= 4.0 ? 3 : span <= 100.0 ? 2 : 1;
         const auto formatted = [parameter, decimals](const double value) {
-            return juce::String(value, decimals)
+            return cydaw::base::Text(value, decimals)
                 + (parameter->unit.isNotEmpty()
-                       ? " " + parameter->unit : juce::String {});
+                       ? " " + parameter->unit : cydaw::base::Text {});
         };
         if (parameter->description.isNotEmpty())
             tooltip += "\n" + parameter->description;
@@ -21464,7 +21466,7 @@ juce::String NodeGraphComponent::embeddedParameterTooltip(
     return tooltip;
 }
 
-juce::String NodeGraphComponent::graphTooltip() const
+cydaw::base::Text NodeGraphComponent::graphTooltip() const
 {
     if (graphDescription_.trim().isNotEmpty())
         return graphDescription_.trim();
@@ -21512,7 +21514,7 @@ void NodeGraphComponent::refreshGraphMetadataSummary()
         : contextName_.isNotEmpty() ? contextName_
                                     : tr("nodes.graphNamePlaceholder");
     const auto role = graphRoleLabel();
-    juce::String scope;
+    cydaw::base::Text scope;
     using Scope = cydaw::graph::GraphScope;
     if (graphScope_ == Scope::factory)
         scope = tr("graph.scope.factory");
@@ -21536,14 +21538,14 @@ void NodeGraphComponent::refreshGraphMetadataSummary()
     metadataCategory_.setText(
         tr("nodes.metadataCategory") + ": " + classification,
         juce::dontSendNotification);
-    const auto identity = juce::String(graphReference_.id)
-        + "  |  v" + juce::String(graphReference_.version.toString());
+    const auto identity = cydaw::base::Text(graphReference_.id)
+        + "  |  v" + cydaw::base::Text(graphReference_.version.toString());
     metadataIdentity_.setText(
         tr("nodes.metadataIdentity") + ": " + identity,
         juce::dontSendNotification);
 
-    juce::StringArray graphInputs;
-    juce::StringArray graphOutputs;
+    cydaw::base::TextList graphInputs;
+    cydaw::base::TextList graphOutputs;
     for (const auto& node : nodes_) {
         if (!isBoundaryNode(node))
             continue;
@@ -21586,7 +21588,7 @@ void NodeGraphComponent::refreshGraphMetadataSummary()
     metadataIdentity_.setTooltip(tooltip);
 }
 
-void SelectionSummary::setText(const juce::String& text,
+void SelectionSummary::setText(const cydaw::base::Text& text,
                                juce::NotificationType)
 {
     const auto before = preferredHeight();
@@ -21597,7 +21599,7 @@ void SelectionSummary::setText(const juce::String& text,
         onHeightChanged();
 }
 
-int SelectionSummary::wrappedRows(const juce::String& line,
+int SelectionSummary::wrappedRows(const cydaw::base::Text& line,
                                   const bool heading) const
 {
     // Only a line with no key is prose; a "key: value" pair is one row by
@@ -21644,7 +21646,7 @@ void SelectionSummary::paint(juce::Graphics& graphics)
         // with no colon is left whole rather than cut at some other mark.
         const auto separator = line.indexOfChar(':');
         const auto key = separator > 0 ? line.substring(0, separator + 1)
-                                       : juce::String {};
+                                       : cydaw::base::Text {};
         const auto value = separator > 0 ? line.substring(separator + 1).trim()
                                          : line;
         const auto font = CyDawLookAndFeel::labelFont(10.0f);
@@ -21692,11 +21694,11 @@ void NodeGraphComponent::refreshSelectionDetails()
         const auto primitive = node != nullptr
             && findModule(node->typeKey) == nullptr;
         auto processorKey = primitive
-            ? primitiveProcessorKeyForType(node->typeKey) : juce::String {};
+            ? primitiveProcessorKeyForType(node->typeKey) : cydaw::base::Text {};
         if (primitive && processorKey.isEmpty())
             processorKey = node->typeKey;
         graphManager_->setNodeParameterPresetTarget(
-            primitive ? node->typeKey : juce::String {},
+            primitive ? node->typeKey : cydaw::base::Text {},
             processorKey, primitive && !editingLocked_);
     }
     const auto* comment = selectedCommentId_ != 0
@@ -21726,7 +21728,7 @@ void NodeGraphComponent::refreshSelectionDetails()
     if (!hasNode && !hasComment && !hasConnection
         && selectedNodes_.size() > 1) {
         selectedPortId_ = 0;
-        std::map<juce::String, int> types;
+        std::map<cydaw::base::Text, int> types;
         auto collapsedCount = 0;
         for (const auto nodeId : selectedNodes_)
             if (const auto* selected = findNode(nodeId)) {
@@ -21734,16 +21736,16 @@ void NodeGraphComponent::refreshSelectionDetails()
                 if (selected->collapsed)
                     ++collapsedCount;
             }
-        juce::StringArray breakdown;
+        cydaw::base::TextList breakdown;
         for (const auto& [name, count] : types)
-            breakdown.add(name + "  ×" + juce::String(count));
-        const auto count = juce::String(
+            breakdown.add(name + "  ×" + cydaw::base::Text(count));
+        const auto count = cydaw::base::Text(
             static_cast<int>(selectedNodes_.size()));
         auto details = tr("nodes.selection.multiple", "count", count);
         if (!breakdown.isEmpty())
             details += "\n\n" + breakdown.joinIntoString("\n");
         details += "\n\n" + tr("nodes.selection.collapsedCount", "count",
-                                  juce::String(collapsedCount));
+                                  cydaw::base::Text(collapsedCount));
         selectedTypeLabel_.setText(details, juce::dontSendNotification);
         selectedTypeLabel_.setTooltip(details);
         metadataName_.setText(tr("nodes.metadataName") + ": "
@@ -21751,7 +21753,7 @@ void NodeGraphComponent::refreshSelectionDetails()
                                        count),
                               juce::dontSendNotification);
         metadataCategory_.setText(tr("nodes.metadataCategory") + ": "
-                                      + juce::String(
+                                      + cydaw::base::Text(
                                           static_cast<int>(types.size()))
                                       + " "
                                       + tr("nodes.selection.nodeTypes"),
@@ -21818,14 +21820,14 @@ void NodeGraphComponent::refreshSelectionDetails()
         const auto sourcePortName = sourcePort != nullptr
             ? (sourcePort->name.isNotEmpty() ? sourcePort->name
                                              : sourcePort->key)
-            : juce::String("#")
-                + juce::String(static_cast<juce::int64>(
+            : cydaw::base::Text("#")
+                + cydaw::base::Text(static_cast<juce::int64>(
                     selectedConnection->sourcePort));
         const auto destinationPortName = destinationPort != nullptr
             ? (destinationPort->name.isNotEmpty() ? destinationPort->name
                                                   : destinationPort->key)
-            : juce::String("#")
-                + juce::String(static_cast<juce::int64>(
+            : cydaw::base::Text("#")
+                + cydaw::base::Text(static_cast<juce::int64>(
                     selectedConnection->destinationPort));
         const auto details = tr("nodes.connection.classification") + "\n"
             + tr("nodes.connection.detailType") + ": " + type + "\n"
@@ -21834,7 +21836,7 @@ void NodeGraphComponent::refreshSelectionDetails()
             + tr("nodes.connection.detailDestination") + ": "
             + destinationName + " / " + destinationPortName + "\n"
             + tr("nodes.connection.detailRoutes") + ": "
-            + juce::String(static_cast<int>(
+            + cydaw::base::Text(static_cast<int>(
                 selectedConnection->routingPoints.size())) + "\n\n"
             + tr("nodes.connection.tooltip", "type", type);
         selectedTypeLabel_.setText(details, juce::dontSendNotification);
@@ -21846,16 +21848,16 @@ void NodeGraphComponent::refreshSelectionDetails()
                                       + type,
                                   juce::dontSendNotification);
         metadataIdentity_.setText(tr("nodes.metadataIdentity") + ": "
-                                      + juce::String(static_cast<juce::int64>(
+                                      + cydaw::base::Text(static_cast<juce::int64>(
                                           selectedConnection->source))
                                       + ":"
-                                      + juce::String(static_cast<juce::int64>(
+                                      + cydaw::base::Text(static_cast<juce::int64>(
                                           selectedConnection->sourcePort))
                                       + " → "
-                                      + juce::String(static_cast<juce::int64>(
+                                      + cydaw::base::Text(static_cast<juce::int64>(
                                           selectedConnection->destination))
                                       + ":"
-                                      + juce::String(static_cast<juce::int64>(
+                                      + cydaw::base::Text(static_cast<juce::int64>(
                                           selectedConnection->destinationPort)),
                                   juce::dontSendNotification);
         audioChannelsLabel_.setVisible(false);
@@ -21876,7 +21878,7 @@ void NodeGraphComponent::refreshSelectionDetails()
         selectedPortId_ = 0;
         const auto details = tr("nodes.comment.classification") + "\n"
             + tr("nodes.comment.help") + "\nID "
-            + juce::String(static_cast<juce::int64>(comment->id));
+            + cydaw::base::Text(static_cast<juce::int64>(comment->id));
         selectedTypeLabel_.setText(details, juce::dontSendNotification);
         selectedTypeLabel_.setTooltip(details);
         metadataName_.setText(tr("nodes.metadataName") + ": "
@@ -21886,7 +21888,7 @@ void NodeGraphComponent::refreshSelectionDetails()
                                       + tr("nodes.comment.classification"),
                                   juce::dontSendNotification);
         metadataIdentity_.setText(tr("nodes.metadataIdentity") + ": COMMENT #"
-                                      + juce::String(static_cast<juce::int64>(
+                                      + cydaw::base::Text(static_cast<juce::int64>(
                                           comment->id)),
                                   juce::dontSendNotification);
         aliasEditor_.setText(comment->title, false);
@@ -21931,9 +21933,9 @@ void NodeGraphComponent::refreshSelectionDetails()
                                     ? tr("nodes.class.subgraph")
                                     : tr("nodes.class.primitive");
     const auto category = type != nullptr ? tr(type->categoryKey)
-                                          : juce::String {};
-    juce::StringArray inputPorts;
-    juce::StringArray outputPorts;
+                                          : cydaw::base::Text {};
+    cydaw::base::TextList inputPorts;
+    cydaw::base::TextList outputPorts;
     for (const auto& port : node->ports) {
         auto name = port.name.isNotEmpty() ? port.name : port.key;
         if (port.type == cydaw::graph::PortType::audio)
@@ -21950,7 +21952,7 @@ void NodeGraphComponent::refreshSelectionDetails()
                 ? tr(audioFormatKey(audioOutputChannels(*node)))
                 : tr(portKindKey(node->outputKind)));
     }
-    juce::StringArray capabilities;
+    cydaw::base::TextList capabilities;
     if (type != nullptr) {
         if (type->stateful)
             capabilities.add(tr("nodes.browser.stateful"));
@@ -21959,24 +21961,24 @@ void NodeGraphComponent::refreshSelectionDetails()
         if (type->breaksFeedbackCycle)
             capabilities.add(tr("nodes.browser.feedbackBoundary"));
     }
-    auto parameterDetails = juce::String {};
+    auto parameterDetails = cydaw::base::Text {};
     if (type != nullptr) {
         const auto number = [](const double value) {
             const auto magnitude = std::abs(value);
-            return juce::String(value,
+            return cydaw::base::Text(value,
                 magnitude > 0.0 && magnitude < 0.01 ? 4
                 : magnitude < 10.0 ? 2 : 1);
         };
         for (const auto& parameter : type->parameterSchema) {
-            parameterDetails += "\n  " + juce::String(parameter.key) + "  "
+            parameterDetails += "\n  " + cydaw::base::Text(parameter.key) + "  "
                 + number(parameter.minimum) + ".." + number(parameter.maximum)
                 + "  [" + number(parameter.defaultValue) + "]";
             if (const auto current = primitiveParameterValueForType(
-                    node->typeKey, juce::String(parameter.key), node->parameters))
+                    node->typeKey, cydaw::base::Text(parameter.key), node->parameters))
                 parameterDetails += "  = " + number(*current);
         }
     }
-    auto instanceSummary = juce::String {};
+    auto instanceSummary = cydaw::base::Text {};
     auto instanceOverrideCount = 0;
     if (module != nullptr) {
         for (const auto& parameter : node->interfaceState.parameters) {
@@ -21992,11 +21994,11 @@ void NodeGraphComponent::refreshSelectionDetails()
                 ++instanceOverrideCount;
         }
         instanceSummary = tr("nodes.instanceClassVersion", "version",
-                             juce::String(module->version.toString()))
+                             cydaw::base::Text(module->version.toString()))
                           + "  |  "
                           + tr("nodes.instanceOverrides", "count",
-                               juce::String(instanceOverrideCount))
-                              .replace("{total}", juce::String(
+                               cydaw::base::Text(instanceOverrideCount))
+                              .replace("{total}", cydaw::base::Text(
                                   static_cast<int>(
                                       node->interfaceState.parameters.size())));
         if (node->interfaceLayoutOverridden)
@@ -22043,16 +22045,16 @@ void NodeGraphComponent::refreshSelectionDetails()
                                       ? port->name : port->key;
             portDetails = classification + "\nDSP: " + processorKey
                 + (instanceSummary.isNotEmpty()
-                       ? "\n" + instanceSummary : juce::String {})
+                       ? "\n" + instanceSummary : cydaw::base::Text {})
                 + "\n" + tr(port->input ? "module.ui.inputPort"
                                           : "module.ui.outputPort")
                 + "\n" + portName + "  |  " + typeName
                 + "\nID "
-                + juce::String(static_cast<juce::int64>(port->id))
+                + cydaw::base::Text(static_cast<juce::int64>(port->id))
                 + "  |  " + tr("nodes.port.multiple") + ": "
                 + tr(port->acceptsMultipleConnections
                          ? "nodes.port.yes" : "nodes.port.no");
-            juce::StringArray neighbours;
+            cydaw::base::TextList neighbours;
             for (const auto& link : connections_) {
                 const auto matches = port->input
                     ? link.destination == node->id
@@ -22076,7 +22078,7 @@ void NodeGraphComponent::refreshSelectionDetails()
                 neighbours.add(neighbour);
             }
             portDetails += "\n" + tr("nodes.port.connectionCount", "count",
-                                       juce::String(neighbours.size()));
+                                       cydaw::base::Text(neighbours.size()));
             if (!neighbours.isEmpty())
                 portDetails += "\n" + tr("nodes.port.connectedTo") + ": "
                     + neighbours.joinIntoString(", ");
@@ -22089,7 +22091,7 @@ void NodeGraphComponent::refreshSelectionDetails()
                                && link.destinationPort == port->id;
                     });
                 portDetails += "\n" + tr("nodes.port.defaultValue") + ": "
-                    + juce::String(port->defaultValue, 4)
+                    + cydaw::base::Text(port->defaultValue, 4)
                     + "  |  "
                     + tr(controlledByCable
                              ? "nodes.port.defaultControlledByCable"
@@ -22111,9 +22113,9 @@ void NodeGraphComponent::refreshSelectionDetails()
                               juce::dontSendNotification);
     auto identity = tr("nodes.metadataIdentity") + ": " + processorKey
                     + "  | UI " + node->typeKey
-                    + "  #" + juce::String(static_cast<juce::int64>(node->id))
-                    + "  IN " + juce::String(inputPorts.size())
-                    + "  OUT " + juce::String(outputPorts.size());
+                    + "  #" + cydaw::base::Text(static_cast<juce::int64>(node->id))
+                    + "  IN " + cydaw::base::Text(inputPorts.size())
+                    + "  OUT " + cydaw::base::Text(outputPorts.size());
     metadataIdentity_.setText(identity, juce::dontSendNotification);
     metadataCategory_.setTooltip(allContractDetails);
     metadataIdentity_.setTooltip(allContractDetails);
@@ -22291,7 +22293,7 @@ void NodeGraphComponent::refreshPublishedParameterDetails()
         parameter->minimum, parameter->maximum, interval);
     publishedParameterValueSlider_.setTextValueSuffix(
         parameter->unit.isNotEmpty() ? " " + parameter->unit
-                                     : juce::String {});
+                                     : cydaw::base::Text {});
     publishedParameterValueSlider_.setValue(
         parameter->value, juce::dontSendNotification);
     auto resetValue = moduleParameterDefaultValue(*parameter);
@@ -22314,15 +22316,15 @@ void NodeGraphComponent::refreshPublishedParameterDetails()
     publishedParameterSetDefaultButton_.setTooltip(
         tr("nodes.parameterSetDefaultHelp") + "\n"
         + tr("nodes.parameterCurrentDefault", "value",
-             juce::String(moduleParameterDefaultValue(*parameter), 4)
+             cydaw::base::Text(moduleParameterDefaultValue(*parameter), 4)
                  + (parameter->unit.isNotEmpty()
-                        ? " " + parameter->unit : juce::String {})));
+                        ? " " + parameter->unit : cydaw::base::Text {})));
     publishedParameterNameEditor_.setText(parameter->label, false);
     publishedParameterIdEditor_.setText(
-        juce::String(static_cast<juce::int64>(hostId)), false);
+        cydaw::base::Text(static_cast<juce::int64>(hostId)), false);
     publishedParameterIdEditor_.setTooltip(
         tr("nodes.hostParameterIdHelp") + "\n0x"
-        + juce::String::toHexString(static_cast<juce::int64>(hostId)));
+        + cydaw::base::Text::toHexString(static_cast<juce::int64>(hostId)));
     publishedParameterDescriptionEditor_.setText(parameter->description, false);
     showInDeviceToggle_.setToggleState(parameter->showInDevice,
                                         juce::dontSendNotification);
@@ -22374,7 +22376,7 @@ void NodeGraphComponent::setPublishedParameterDefaultToCurrent()
     notifyLayoutChanged();
     repaint();
     setStatus(tr("nodes.status.parameterDefaultSet", "value",
-                 juce::String(authoredDefault, 4)));
+                 cydaw::base::Text(authoredDefault, 4)));
 }
 
 void NodeGraphComponent::commitPublishedParameterDetails()
@@ -22407,7 +22409,7 @@ void NodeGraphComponent::commitPublishedParameterDetails()
         });
     if (duplicate) {
         publishedParameterIdEditor_.setText(
-            juce::String(static_cast<juce::int64>(previousId)), false);
+            cydaw::base::Text(static_cast<juce::int64>(previousId)), false);
         setStatus(tr("nodes.hostParameterIdDuplicate"), true);
         return;
     }
@@ -22529,9 +22531,9 @@ void NodeGraphComponent::commitGraphMetadata()
                                 .substring(0, 128);
     const auto nextDescription = graphDescriptionEditor_.getText().trim()
                                      .substring(0, 2'048);
-    auto nextTags = juce::StringArray::fromTokens(
+    auto nextTags = cydaw::base::TextList::fromTokens(
         graphTagsEditor_.getText(), ",;", "\"");
-    juce::StringArray cleanTags;
+    cydaw::base::TextList cleanTags;
     for (auto tag : nextTags) {
         tag = tag.trim().substring(0, 48);
         if (tag.isNotEmpty())
@@ -22595,7 +22597,7 @@ void NodeGraphComponent::bumpGraphVersion(const int component)
     refreshGraphAssetValidation();
     refreshGraphManager();
     setStatus(tr("nodes.status.versionBumped", "version",
-                 juce::String(next.toString())));
+                 cydaw::base::Text(next.toString())));
     notifyLayoutChanged();
     repaint();
 }
@@ -22609,7 +22611,7 @@ void NodeGraphComponent::forkGraphDefinition()
         ? graphName_
         : contextName_.isNotEmpty() ? contextName_
                                     : tr("nodes.graphNamePlaceholder");
-    auto slug = juce::File::createLegalFileName(previousName)
+    auto slug = cydaw::base::File::createLegalFileName(previousName)
                     .toLowerCase()
                     .replaceCharacter(' ', '-');
     slug = slug.retainCharacters(
@@ -22626,7 +22628,7 @@ void NodeGraphComponent::forkGraphDefinition()
                                   .toLowerCase().substring(0, 12);
     graphReference_.id = ("user." + slug.substring(0, 96)
                           + "." + uniqueSuffix).toStdString();
-    currentGraphPresetFile_ = juce::File {};
+    currentGraphPresetFile_ = cydaw::base::File {};
     graphReference_.version = { 1, 0, 0 };
     graphScope_ = cydaw::graph::GraphScope::user;
     graphName_ = tr("nodes.forkedGraphName", "name", previousName)
@@ -22669,13 +22671,13 @@ NodeGraphComponent::defaultVst3ExportIdentity() const
         hash *= 16'777'619u;
     }
     const auto pluginCode = "G"
-        + juce::String::toHexString(static_cast<int>(hash & 0xfffu))
+        + cydaw::base::Text::toHexString(static_cast<int>(hash & 0xfffu))
               .paddedLeft('0', 3).toUpperCase();
     const auto productName = graphName_.isNotEmpty()
                                  ? graphName_
                                  : (contextName_.isNotEmpty()
                                         ? contextName_
-                                        : juce::String("CyDAW Graph"));
+                                        : cydaw::base::Text("CyDAW Graph"));
     return {
         productName.toStdString(), "CyDAW User", "CyDw",
         pluginCode.toStdString(), graphReference_.version
@@ -22787,12 +22789,12 @@ void NodeGraphComponent::openVst3ExportPanel()
     if (!result) {
         setStatus(result.issues.empty()
                       ? tr("nodes.status.vst3Invalid")
-                      : juce::String(result.issues.front().message),
+                      : cydaw::base::Text(result.issues.front().message),
                   true);
         return;
     }
     setStatus(tr("nodes.status.vst3Ready", "name",
-                 juce::String(result.plan->identity.productName)));
+                 cydaw::base::Text(result.plan->identity.productName)));
 }
 
 void NodeGraphComponent::saveVst3ExportManifest(
@@ -22800,13 +22802,13 @@ void NodeGraphComponent::saveVst3ExportManifest(
     const cydaw::graph::PluginExportPlan& plan)
 {
     setPluginExportIdentity(identity);
-    auto directory = juce::File::getSpecialLocation(
-                         juce::File::userDocumentsDirectory)
+    auto directory = cydaw::base::File::getSpecialLocation(
+                         cydaw::base::File::userDocumentsDirectory)
                          .getChildFile("CyDAW")
                          .getChildFile("Plugin Exports");
     (void) directory.createDirectory();
-    auto name = juce::File::createLegalFileName(
-        juce::String(identity.productName).trim());
+    auto name = cydaw::base::File::createLegalFileName(
+        cydaw::base::Text(identity.productName).trim());
     if (name.isEmpty())
         name = "CyDAW Graph";
     vst3ManifestChooser_ = std::make_unique<juce::FileChooser>(
@@ -22823,7 +22825,7 @@ void NodeGraphComponent::saveVst3ExportManifest(
             if (safeThis == nullptr)
                 return;
             auto destination = chooser.getResult();
-            if (destination == juce::File {})
+            if (destination == cydaw::base::File {})
                 return;
             if (!destination.getFileName().endsWithIgnoreCase(
                     ".cydawvst3.json"))
@@ -22846,13 +22848,13 @@ void NodeGraphComponent::chooseVst3ProjectDirectory(
     const cydaw::graph::PluginExportPlan& plan)
 {
     setPluginExportIdentity(identity);
-    auto directory = juce::File::getSpecialLocation(
-                         juce::File::userDocumentsDirectory)
+    auto directory = cydaw::base::File::getSpecialLocation(
+                         cydaw::base::File::userDocumentsDirectory)
                          .getChildFile("CyDAW")
                          .getChildFile("Plugin Exports");
     (void) directory.createDirectory();
-    auto name = juce::File::createLegalFileName(
-        juce::String(identity.productName).trim());
+    auto name = cydaw::base::File::createLegalFileName(
+        cydaw::base::Text(identity.productName).trim());
     if (name.isEmpty())
         name = "CyDAW Graph";
     auto suggested = directory.getChildFile(name + " VST3 Project");
@@ -22870,7 +22872,7 @@ void NodeGraphComponent::chooseVst3ProjectDirectory(
             if (safeThis == nullptr)
                 return;
             const auto destination = chooser.getResult();
-            if (destination == juce::File {})
+            if (destination == cydaw::base::File {})
                 return;
             const auto result = generateGraphVst3Project(
                 destination, plan, manifest, runtimeState);
@@ -23059,7 +23061,7 @@ void NodeGraphComponent::setSelectedNodesCollapsed(const bool collapsed)
     repaint(canvasBounds());
     setStatus(tr(collapsed ? "nodes.status.collapsed"
                            : "nodes.status.expanded", "count",
-                 juce::String(static_cast<int>(placements.size()))));
+                 cydaw::base::Text(static_cast<int>(placements.size()))));
     notifyLayoutChanged();
 }
 
@@ -23094,7 +23096,7 @@ void NodeGraphComponent::selectConnectedNodes(const int direction)
                                : direction > 0
                                    ? "nodes.flow.downstreamSelected"
                                    : "nodes.flow.connectedSelected",
-                 "count", juce::String(
+                 "count", cydaw::base::Text(
                      static_cast<int>(selectedNodes_.size()))));
 }
 
@@ -23130,7 +23132,7 @@ void NodeGraphComponent::selectNodesConnectedToPort(
         repaint(canvasBounds());
     setStatus(tr(frameSelection ? "nodes.port.connectedFramed"
                                 : "nodes.port.connectedSelected",
-                 "count", juce::String(
+                 "count", cydaw::base::Text(
                      static_cast<int>(selectedNodes_.size()) - 1)));
 }
 
@@ -23212,7 +23214,7 @@ void NodeGraphComponent::openGraphManager()
     graphManager_ = manager.get();
     juce::Component::SafePointer<NodeGraphComponent> safeThis(this);
     manager->setFactoryPresetLoadHandler(
-        [safeThis](const juce::String& key) {
+        [safeThis](const cydaw::base::Text& key) {
             if (safeThis == nullptr)
                 return;
             const auto preset = std::find_if(
@@ -23223,7 +23225,7 @@ void NodeGraphComponent::openGraphManager()
                 (void) safeThis->applyFactoryPreset(*preset);
         });
     manager->setUserPresetLoadHandler(
-        [safeThis](const juce::File& file) {
+        [safeThis](const cydaw::base::File& file) {
             if (safeThis == nullptr)
                 return;
             const auto result = safeThis->loadUserGraphPreset(file);
@@ -23231,7 +23233,7 @@ void NodeGraphComponent::openGraphManager()
                 safeThis->setStatus(result.getErrorMessage(), true);
         });
     manager->setNodeParameterPresetLoadHandler(
-        [safeThis](const juce::File& file) {
+        [safeThis](const cydaw::base::File& file) {
             if (safeThis == nullptr)
                 return;
             if (safeThis->selectedNodes_.size() != 1) {
@@ -23249,12 +23251,12 @@ void NodeGraphComponent::openGraphManager()
             safeThis->refreshGraphManager();
     });
     manager->setSubgraphOpenHandler(
-        [safeThis](const juce::String& key) {
+        [safeThis](const cydaw::base::Text& key) {
             if (safeThis != nullptr)
                 safeThis->openModuleGraphEditor(key);
         });
     manager->setSubgraphVariantHandler(
-        [safeThis](const juce::String& key) {
+        [safeThis](const cydaw::base::Text& key) {
             if (safeThis != nullptr)
                 safeThis->promptCreateGraphVariant(key, false);
         });
@@ -23291,7 +23293,7 @@ std::size_t NodeGraphComponent::graphMemberCount() const noexcept
         ? graphMembersPanel_->memberCount() : 0;
 }
 
-void NodeGraphComponent::setGraphMemberSearch(const juce::String& query)
+void NodeGraphComponent::setGraphMemberSearch(const cydaw::base::Text& query)
 {
     if (graphMembersPanel_ != nullptr)
         graphMembersPanel_->setSearchText(query);
@@ -23304,8 +23306,8 @@ std::size_t NodeGraphComponent::visibleGraphMemberCount() const noexcept
 }
 
 bool NodeGraphComponent::setGraphMemberMetadata(
-    const juce::String& key, const juce::String& displayName,
-    const juce::String& description)
+    const cydaw::base::Text& key, const cydaw::base::Text& displayName,
+    const cydaw::base::Text& description)
 {
     if (editingLocked_)
         return false;
@@ -23363,10 +23365,10 @@ bool NodeGraphComponent::setGraphMemberMetadata(
     return true;
 }
 
-void NodeGraphComponent::editGraphMemberDetails(const juce::String& key)
+void NodeGraphComponent::editGraphMemberDetails(const cydaw::base::Text& key)
 {
-    juce::String name;
-    juce::String description;
+    cydaw::base::Text name;
+    cydaw::base::Text description;
     if (const auto parameter = std::ranges::find_if(
             graphInterfaceState_.parameters, [&key](const auto& candidate) {
                 return candidate.key == key;
@@ -23411,7 +23413,7 @@ void NodeGraphComponent::editGraphMemberDetails(const juce::String& key)
 }
 
 bool NodeGraphComponent::setGraphMemberType(
-    const juce::String& key, const PortKind kind, const int audioChannels)
+    const cydaw::base::Text& key, const PortKind kind, const int audioChannels)
 {
     if (editingLocked_ || !key.startsWith("node."))
         return false;
@@ -23430,17 +23432,17 @@ bool NodeGraphComponent::setGraphMemberType(
         inputBoundary = node->typeKey.endsWith("-input");
 
     const auto safeChannels = juce::jlimit(1, 8, audioChannels);
-    juce::String targetKey;
+    cydaw::base::Text targetKey;
     if (kind == PortKind::audio)
         targetKey = graphAudioBoundaryKey(inputBoundary, safeChannels);
     else if (kind == PortKind::midi)
-        targetKey = "graph-midi-" + juce::String(
+        targetKey = "graph-midi-" + cydaw::base::Text(
             inputBoundary ? "input" : "output");
     else if (kind == PortKind::control)
-        targetKey = "graph-value-" + juce::String(
+        targetKey = "graph-value-" + cydaw::base::Text(
             inputBoundary ? "input" : "output");
     else
-        targetKey = "graph-transport-" + juce::String(
+        targetKey = "graph-transport-" + cydaw::base::Text(
             inputBoundary ? "input" : "output");
     if (node->typeKey == targetKey)
         return true;
@@ -23538,12 +23540,12 @@ bool NodeGraphComponent::setGraphMemberType(
     repaint();
     setStatus(disconnected > 0
         ? tr("nodes.status.memberRetypedDisconnected", "count",
-             juce::String(disconnected))
+             cydaw::base::Text(disconnected))
         : tr("nodes.status.memberRetyped"));
     return true;
 }
 
-bool NodeGraphComponent::moveGraphMember(const juce::String& key,
+bool NodeGraphComponent::moveGraphMember(const cydaw::base::Text& key,
                                          const int delta)
 {
     if (editingLocked_ || delta == 0)
@@ -23617,7 +23619,7 @@ bool NodeGraphComponent::moveGraphMember(const juce::String& key,
 }
 
 bool NodeGraphComponent::setPublishedParameterExposure(
-    const juce::String& binding, const bool showInDevice,
+    const cydaw::base::Text& binding, const bool showInDevice,
     const bool publishToHost)
 {
     return updateGraphMemberParameterVisibility(
@@ -23704,7 +23706,7 @@ void NodeGraphComponent::refreshGraphMembersPanel()
         Member member;
         member.kind = input ? Kind::input : Kind::output;
         member.nodeId = node.id;
-        member.key = "node." + juce::String(
+        member.key = "node." + cydaw::base::Text(
             static_cast<juce::int64>(node.id));
         member.title = displayTitle(node);
         member.detail = std::move(detail);
@@ -23712,7 +23714,7 @@ void NodeGraphComponent::refreshGraphMembersPanel()
         (input ? inputs : outputs).push_back(std::move(member));
     }
 
-    const auto parameterNodeId = [](const juce::String& key) -> NodeId {
+    const auto parameterNodeId = [](const cydaw::base::Text& key) -> NodeId {
         if (!key.startsWith("node."))
             return 0;
         const auto separator = key.indexOfChar(5, '.');
@@ -23735,10 +23737,10 @@ void NodeGraphComponent::refreshGraphMembersPanel()
         const auto decimals = parameter.maximum - parameter.minimum <= 4.0
             ? 3 : 1;
         member.detail = displayTitle(*node) + "  -  "
-            + juce::String(parameter.minimum, decimals) + " ... "
-            + juce::String(parameter.maximum, decimals)
+            + cydaw::base::Text(parameter.minimum, decimals) + " ... "
+            + cydaw::base::Text(parameter.maximum, decimals)
             + (parameter.unit.isNotEmpty() ? " " + parameter.unit
-                                           : juce::String {})
+                                           : cydaw::base::Text {})
             + "  -  "
             + tr(parameter.publishToHost ? "nodes.members.hostPublished"
                                          : "nodes.members.graphOnly")
@@ -23751,7 +23753,7 @@ void NodeGraphComponent::refreshGraphMembersPanel()
 
     std::vector<Member> members;
     members.reserve(inputs.size() + outputs.size() + parameters.size() + 3);
-    const auto appendSection = [&members](juce::String title,
+    const auto appendSection = [&members](cydaw::base::Text title,
                                           const juce::Colour colour,
                                           std::vector<Member>& values) {
         Member section;
@@ -23772,7 +23774,7 @@ void NodeGraphComponent::refreshGraphMembersPanel()
 }
 
 bool NodeGraphComponent::updateGraphMemberParameterVisibility(
-    const juce::String& key,
+    const cydaw::base::Text& key,
     const std::optional<bool> showInDevice,
     const std::optional<bool> publishToHost)
 {
@@ -23830,7 +23832,7 @@ bool NodeGraphComponent::updateGraphMemberParameterVisibility(
     return true;
 }
 
-bool NodeGraphComponent::selectGraphManagerAsset(const juce::String& key)
+bool NodeGraphComponent::selectGraphManagerAsset(const cydaw::base::Text& key)
 {
     openGraphManager();
     return graphManager_ != nullptr && graphManager_->selectAssetByKey(key);
@@ -23844,7 +23846,7 @@ void NodeGraphComponent::showGraphManagerFileBrowser()
 }
 
 bool NodeGraphComponent::saveGraphManagerSnapshot(
-    const juce::File& destination)
+    const cydaw::base::File& destination)
 {
     if (graphManager_ == nullptr)
         openGraphManager();
@@ -23852,7 +23854,7 @@ bool NodeGraphComponent::saveGraphManagerSnapshot(
         return false;
 
     destination.getParentDirectory().createDirectory();
-    auto stream = destination.createOutputStream();
+    auto stream = juce::File(destination).createOutputStream();
     if (stream == nullptr)
         return false;
 
@@ -23899,12 +23901,12 @@ void NodeGraphComponent::refreshGraphManager()
             ? tr(audioFormatKey(std::max<std::uint8_t>(1, channels)))
             : tr(portKindKey(kind));
     };
-    const auto bullet = [](const juce::String& value) {
-        return juce::String::fromUTF8("• ") + value;
+    const auto bullet = [](const cydaw::base::Text& value) {
+        return cydaw::base::Text::fromUTF8("• ") + value;
     };
     const auto previewNode = [this](const std::uint64_t id,
-                                    const juce::String& typeKey,
-                                    const juce::String& authoredTitle,
+                                    const cydaw::base::Text& typeKey,
+                                    const cydaw::base::Text& authoredTitle,
                                     const juce::Point<float> position) {
         const auto* type = findType(typeKey);
         return GraphManagerComponent::PreviewNode {
@@ -23964,7 +23966,7 @@ void NodeGraphComponent::refreshGraphManager()
                            tr("graph.manager.factoryCategory"),
                            tr("graph.scope.factory"),
                            tr("graph.manager.nodeCount", "count",
-                              juce::String(static_cast<int>(preset.nodes.size()))) });
+                              cydaw::base::Text(static_cast<int>(preset.nodes.size()))) });
         const auto boundaries = factoryPresetBoundaries(preset);
         const auto midiInput = boundaries.midiInput;
         const auto audioInput = boundaries.audioInput;
@@ -23973,7 +23975,7 @@ void NodeGraphComponent::refreshGraphManager()
         auto& asset = assets.back();
         asset.role = roleCategory(role);
         asset.accentColour = roleColour(role);
-        asset.version = juce::String(graphReference_.version.toString());
+        asset.version = cydaw::base::Text(graphReference_.version.toString());
         if (midiInput)
             asset.inputs = bullet(tr("nodes.port.midi"));
         else if (audioInput)
@@ -24012,14 +24014,14 @@ void NodeGraphComponent::refreshGraphManager()
                               : module.inlineModule ? "graph.scope.inlineTrack"
                                                     : "graph.scope.project"),
                            tr("graph.manager.nodeCount", "count",
-                              juce::String(static_cast<int>(module.nodes.size())))
+                              cydaw::base::Text(static_cast<int>(module.nodes.size())))
                                + (module.locked
                                       ? "  •  " + tr("graph.manager.locked")
-                                      : juce::String {}) });
+                                      : cydaw::base::Text {}) });
         auto& asset = assets.back();
         asset.role = roleCategory(role);
         asset.accentColour = roleColour(role);
-        asset.version = juce::String(module.version.toString());
+        asset.version = cydaw::base::Text(module.version.toString());
         if (module.parentClassKey.isNotEmpty()) {
             const auto* parent = findModule(module.parentClassKey);
             asset.detail += "\n" + tr(
@@ -24053,9 +24055,9 @@ void NodeGraphComponent::refreshGraphManager()
 
     const auto directory = userGraphPresetDirectory();
     if (directory.isDirectory()) {
-        juce::Array<juce::File> files;
-        directory.findChildFiles(files, juce::File::findFiles, true,
-                                 "*" + juce::String(graphPresetFileExtension));
+        cydaw::base::Array<cydaw::base::File> files;
+        directory.findChildFiles(files, cydaw::base::File::findFiles, true,
+                                 "*" + cydaw::base::Text(graphPresetFileExtension));
         for (const auto& file : files) {
             if (file.getSize() <= 0 || file.getSize() > maximumGraphPresetBytes)
                 continue;
@@ -24075,7 +24077,7 @@ void NodeGraphComponent::refreshGraphManager()
             auto& asset = assets.back();
             asset.role = roleCategory(document->metadata.role);
             asset.accentColour = roleColour(document->metadata.role);
-            asset.version = juce::String(
+            asset.version = cydaw::base::Text(
                 document->metadata.version.toString());
             asset.tags = document->metadata.tags;
             asset.author = document->metadata.author;
@@ -24084,10 +24086,10 @@ void NodeGraphComponent::refreshGraphManager()
     }
     const auto nodePresetDirectory = userNodeParameterPresetDirectory();
     if (nodePresetDirectory.isDirectory()) {
-        juce::Array<juce::File> files;
+        cydaw::base::Array<cydaw::base::File> files;
         nodePresetDirectory.findChildFiles(
-            files, juce::File::findFiles, true,
-            "*" + juce::String(nodeParameterPresetFileExtension));
+            files, cydaw::base::File::findFiles, true,
+            "*" + cydaw::base::Text(nodeParameterPresetFileExtension));
         for (const auto& file : files) {
             if (file.getSize() <= 0
                 || file.getSize() > maximumNodeParameterPresetBytes)
@@ -24111,7 +24113,7 @@ void NodeGraphComponent::refreshGraphManager()
             auto& asset = assets.back();
             asset.role = tr("graph.manager.nodePreset");
             asset.accentColour = juce::Colour(0xff62d6b0);
-            asset.version = juce::String(nodeParameterPresetFileSchema);
+            asset.version = cydaw::base::Text(nodeParameterPresetFileSchema);
             asset.tags = preset->tags;
             asset.nodeTypeKey = preset->nodeTypeKey;
             asset.processorKey = preset->processorKey;
@@ -24121,13 +24123,13 @@ void NodeGraphComponent::refreshGraphManager()
     const auto* target = selectedNodes_.size() == 1
         ? findNode(*selectedNodes_.begin()) : nullptr;
     auto processorKey = target != nullptr
-        ? primitiveProcessorKeyForType(target->typeKey) : juce::String {};
+        ? primitiveProcessorKeyForType(target->typeKey) : cydaw::base::Text {};
     if (target != nullptr && processorKey.isEmpty()
         && findModule(target->typeKey) == nullptr)
         processorKey = target->typeKey;
     graphManager_->setNodeParameterPresetTarget(
         target != nullptr && findModule(target->typeKey) == nullptr
-            ? target->typeKey : juce::String {},
+            ? target->typeKey : cydaw::base::Text {},
         processorKey,
         target != nullptr && findModule(target->typeKey) == nullptr
             && !editingLocked_);
@@ -24219,7 +24221,7 @@ void NodeGraphComponent::refreshGraphAssetValidation()
             continue;
         invalidGraphNodes_.insert(nodeId);
         graphNodeValidationMessages_.try_emplace(
-            nodeId, juce::String(issue.message));
+            nodeId, cydaw::base::Text(issue.message));
         if (issue.portId.has_value())
             invalidGraphPorts_.insert({ nodeId, *issue.portId });
     }
@@ -24277,7 +24279,7 @@ void NodeGraphComponent::refreshDspCompilationBadge()
     }
 
     if (dspCompilationOk_) {
-        const auto count = juce::String(
+        const auto count = cydaw::base::Text(
             static_cast<int>(dspCompilationNodeCount_));
         dspCompilationBadge_.setText(
             tr("nodes.status.dspReadyShort", "count", count),
@@ -24304,7 +24306,7 @@ void NodeGraphComponent::refreshDspCompilationBadge()
                                    juce::Colour(0xffffa4ac));
 }
 
-void NodeGraphComponent::setStatus(const juce::String& message, const bool error)
+void NodeGraphComponent::setStatus(const cydaw::base::Text& message, const bool error)
 {
     statusMessage_ = message;
     statusIsError_ = error;
@@ -25016,8 +25018,8 @@ void NodeGraphComponent::paintMinimap(juce::Graphics& graphics) const
         tr("nodes.minimap.title"),
         bounds.withHeight(16.0f).toNearestInt().reduced(8, 1),
         juce::Justification::centredLeft, 1, 0.76f);
-    const auto countText = juce::String(nodes_.size()) + " / "
-                         + juce::String(connections_.size());
+    const auto countText = cydaw::base::Text(nodes_.size()) + " / "
+                         + cydaw::base::Text(connections_.size());
     graphics.setColour(juce::Colour(0xff66717a));
     graphics.drawFittedText(
         countText,
@@ -25336,7 +25338,7 @@ void NodeGraphComponent::restorePortDefaults(const cydaw::base::Value& state, st
 }
 
 void NodeGraphComponent::applyParameterPortDefaults(
-    const juce::String& typeKey,
+    const cydaw::base::Text& typeKey,
     const cydaw::engine::NativeDspNodeParameters& parameters,
     std::vector<NodePort>& ports)
 {
@@ -25352,7 +25354,7 @@ void NodeGraphComponent::applyParameterPortDefaults(
 }
 
 void NodeGraphComponent::applyLegacyPortDefaults(
-    const juce::String& typeKey,
+    const cydaw::base::Text& typeKey,
     const cydaw::engine::NativeDspNodeParameters& parameters,
     std::vector<NodePort>& ports)
 {
@@ -25394,7 +25396,7 @@ const NodeGraphComponent::Node* NodeGraphComponent::findNode(const NodeId id) co
     return found == nodes_.end() ? nullptr : &*found;
 }
 
-const NodeGraphComponent::NodeType* NodeGraphComponent::findType(const juce::String& key) const
+const NodeGraphComponent::NodeType* NodeGraphComponent::findType(const cydaw::base::Text& key) const
 {
     const auto found = std::find_if(catalog_.begin(), catalog_.end(), [&key](const auto& type) {
         return type.key == key;
@@ -25403,7 +25405,7 @@ const NodeGraphComponent::NodeType* NodeGraphComponent::findType(const juce::Str
 }
 
 NodeGraphComponent::SavedModule* NodeGraphComponent::findModule(
-    const juce::String& key)
+    const cydaw::base::Text& key)
 {
     const auto found = std::find_if(savedModules_.begin(), savedModules_.end(),
                                     [&key](const auto& module) {
@@ -25412,7 +25414,7 @@ NodeGraphComponent::SavedModule* NodeGraphComponent::findModule(
     return found == savedModules_.end() ? nullptr : &*found;
 }
 
-const NodeGraphComponent::SavedModule* NodeGraphComponent::findModule(const juce::String& key) const
+const NodeGraphComponent::SavedModule* NodeGraphComponent::findModule(const cydaw::base::Text& key) const
 {
     const auto found = std::find_if(savedModules_.begin(), savedModules_.end(), [&key](const auto& module) {
         return module.key == key;
@@ -25549,7 +25551,7 @@ bool NodeGraphComponent::connectNodes(
             if (auto* adapted = findNode(adaptedNodeId); adapted != nullptr)
                 *adapted = std::move(*adaptedNodeBackup);
         if (result.error == cydaw::engine::GraphError::incompatiblePortKinds) {
-            const auto message = juce::String(result.message);
+            const auto message = cydaw::base::Text(result.message);
             setStatus(message.containsIgnoreCase("channel")
                           ? tr("nodes.status.channelMismatch")
                           : tr("nodes.status.incompatible"), true);
@@ -25559,7 +25561,7 @@ bool NodeGraphComponent::connectNodes(
         else if (result.error == cydaw::engine::GraphError::duplicateConnection)
             setStatus(tr("nodes.status.duplicateConnection"), true);
         else
-            setStatus(juce::String(result.message), true);
+            setStatus(cydaw::base::Text(result.message), true);
         return false;
     }
     const auto kind = sourceSocket != nullptr
@@ -25764,7 +25766,7 @@ NodeGraphComponent::PortKind NodeGraphComponent::enginePortKind(
     return PortKind::control;
 }
 
-juce::String NodeGraphComponent::portKindKey(const PortKind kind)
+cydaw::base::Text NodeGraphComponent::portKindKey(const PortKind kind)
 {
     if (kind == PortKind::midi)
         return "nodes.port.midi";
@@ -25823,7 +25825,7 @@ void NodeGraphComponent::paintLibraryHeading(const LibraryRow& entry,
     graphics.setColour(juce::Colour(top ? 0xffffab4d : 0xff959ca3));
     graphics.fillPath(arrow);
 
-    const auto countText = juce::String(entry.count);
+    const auto countText = cydaw::base::Text(entry.count);
     const auto countFont = CyDawLookAndFeel::labelFont(9.5f);
     const auto countWidth = juce::GlyphArrangement::getStringWidthInt(
                                 countFont, countText) + 10;
@@ -25895,13 +25897,13 @@ void NodeGraphComponent::paintListBoxItem(const int row,
     const auto boundaryKind = graphInput ? type.outputKind : type.inputKind;
     const auto boundaryChannels = graphInput ? type.outputChannels
                                              : type.inputChannels;
-    auto badge = type.composite ? juce::String("GRAPH")
-                                : juce::String("NODE");
+    auto badge = type.composite ? cydaw::base::Text("GRAPH")
+                                : cydaw::base::Text("NODE");
     if (graphPort) {
         badge = tr(graphInput ? "nodes.port.inputShort"
                               : "nodes.port.outputShort");
         if (boundaryKind == PortKind::audio && boundaryChannels > 0)
-            badge += " " + juce::String(boundaryChannels);
+            badge += " " + cydaw::base::Text(boundaryChannels);
         else
             badge += " " + tr(portKindKey(boundaryKind)).toUpperCase();
     } else if (variableAudio) {
@@ -25937,7 +25939,7 @@ void NodeGraphComponent::paintListBoxItem(const int row,
                              : "nodes.port.outputShort")
                     + " " + tr(portKindKey(kind));
         if (kind == PortKind::audio && channels > 0)
-            text += " " + juce::String(channels)
+            text += " " + cydaw::base::Text(channels)
                     + tr("nodes.port.channelsShort");
         return text;
     };
@@ -25946,15 +25948,15 @@ void NodeGraphComponent::paintListBoxItem(const int row,
     const auto exactOutputs = static_cast<int>(type.ports.size()) - exactInputs;
     // The category used to open this line on every row. The heading above
     // says it once, which is the whole point of the fold.
-    juce::String detail;
+    cydaw::base::Text detail;
     if (!type.ports.empty()) {
-        detail = "IN " + juce::String(exactInputs)
-                 + "  >  OUT " + juce::String(exactOutputs);
+        detail = "IN " + cydaw::base::Text(exactInputs)
+                 + "  >  OUT " + cydaw::base::Text(exactOutputs);
     } else {
         if (type.hasInput)
             detail = connectorText(true, type.inputKind, type.inputChannels);
         if (type.hasOutput)
-            detail += (detail.isNotEmpty() ? "  >  " : juce::String {})
+            detail += (detail.isNotEmpty() ? "  >  " : cydaw::base::Text {})
                       + connectorText(false, type.outputKind,
                                       type.outputChannels);
     }
@@ -25971,7 +25973,7 @@ juce::String NodeGraphComponent::getTooltipForRow(const int row)
     if (const auto& entry = libraryRows_[static_cast<std::size_t>(row)];
         entry.catalogIndex < 0)
         return entry.foldKey + "  \xe2\x80\x94  "
-               + juce::String(entry.count) + "\n"
+               + cydaw::base::Text(entry.count) + "\n"
                + tr(entry.collapsed ? "nodes.library.foldOpen"
                                     : "nodes.library.foldClose");
     const auto* rowType = libraryRowType(row);
@@ -25995,15 +25997,15 @@ juce::String NodeGraphComponent::getTooltipForRow(const int row)
     };
     const auto portList = [this, &type, &portTypeName,
                            variableAudio](const bool inputs) {
-        juce::String result;
+        cydaw::base::Text result;
         for (const auto& port : type.ports) {
             if (port.input != inputs)
                 continue;
             if (result.isNotEmpty())
                 result += "\n";
-            result += juce::String::charToString(0x2022) + " "
+            result += cydaw::base::Text::charToString(0x2022) + " "
                       + port.name + "  "
-                      + juce::String::charToString(0x2014) + "  "
+                      + cydaw::base::Text::charToString(0x2014) + "  "
                       + portTypeName(port);
         }
         if (result.isNotEmpty())
@@ -26062,7 +26064,7 @@ juce::var NodeGraphComponent::getDragSourceDescription(
     const auto* type = libraryRowType(selectedRows[0]);
     if (type == nullptr)
         return {};
-    return "cydaw-node:" + type->key;
+    return juce::var(juce::String::fromUTF8(("cydaw-node:" + type->key).toRawUTF8()));
 }
 
 cydaw::base::Result NodeGraphComponent::selfTestNativeParameterPlumbing()
@@ -26092,10 +26094,10 @@ cydaw::base::Result NodeGraphComponent::selfTestNativeParameterPlumbing()
         if (std::abs(readBack[field] - expected)
             > 1.0e-4f * std::max(1.0f, std::abs(expected)))
             return cydaw::base::Result::fail(
-                "Node parameter field " + juce::String(static_cast<int>(field))
+                "Node parameter field " + cydaw::base::Text(static_cast<int>(field))
                 + " does not survive a save and reload: wrote "
-                + juce::String(expected) + ", read "
-                + juce::String(readBack[field]));
+                + cydaw::base::Text(expected) + ", read "
+                + cydaw::base::Text(readBack[field]));
     }
 
     // Every parameter any node type publishes has to be one the writer will
@@ -26128,7 +26130,7 @@ std::vector<NodeGraphComponent::DeviceCatalogueEntry>
 NodeGraphComponent::deviceCatalogue() const
 {
     const auto portKindName = [](const bool present, const PortKind kind)
-        -> juce::String {
+        -> cydaw::base::Text {
         if (!present)
             return "none";
         switch (kind) {
@@ -26151,7 +26153,7 @@ NodeGraphComponent::deviceCatalogue() const
             continue;
         entries.push_back({ module.key, module.name, "module",
                             module.category.isNotEmpty() ? tr(module.category)
-                                                         : juce::String(),
+                                                         : cydaw::base::Text(),
                             module.description,
                             module.hasInput && module.inputKind != PortKind::audio
                                 && module.outputKind == PortKind::audio,
@@ -26171,9 +26173,9 @@ NodeGraphComponent::deviceCatalogue() const
                                                     : tr(type.translationKey),
                             "node",
                             type.categoryKey.isNotEmpty() ? tr(type.categoryKey)
-                                                          : juce::String(),
+                                                          : cydaw::base::Text(),
                             type.descriptionKey.isNotEmpty()
-                                ? tr(type.descriptionKey) : juce::String(),
+                                ? tr(type.descriptionKey) : cydaw::base::Text(),
                             type.hasInput && type.inputKind == PortKind::midi
                                 && type.outputKind == PortKind::audio,
                             portKindName(type.hasInput, type.inputKind),
@@ -26187,7 +26189,7 @@ NodeGraphComponent::deviceCatalogue() const
     return entries;
 }
 
-std::uint64_t NodeGraphComponent::lastNodeIdOfType(const juce::String& typeKey) const
+std::uint64_t NodeGraphComponent::lastNodeIdOfType(const cydaw::base::Text& typeKey) const
 {
     return nodeIdForType(typeKey);
 }
@@ -26213,7 +26215,7 @@ bool NodeGraphComponent::removeNodeById(const std::uint64_t id)
     return findNode(id) == nullptr;
 }
 
-bool NodeGraphComponent::removeNodeByType(const juce::String& typeKey)
+bool NodeGraphComponent::removeNodeByType(const cydaw::base::Text& typeKey)
 {
     return removeNodeById(nodeIdForType(typeKey));
 }
@@ -26364,13 +26366,13 @@ bool NodeGraphComponent::removeNodeFromChain(const std::uint64_t id)
     return editorRemoveFromChain(id);
 }
 
-bool NodeGraphComponent::removeNodeFromChainByType(const juce::String& typeKey)
+bool NodeGraphComponent::removeNodeFromChainByType(const cydaw::base::Text& typeKey)
 {
     return removeNodeFromChain(nodeIdForType(typeKey));
 }
 
 namespace {
-juce::String remotePortTypeName(const cydaw::graph::PortType type)
+cydaw::base::Text remotePortTypeName(const cydaw::graph::PortType type)
 {
     switch (type) {
         case cydaw::graph::PortType::audio: return "audio";
@@ -26400,7 +26402,7 @@ cydaw::base::Value remotePorts(const Ports& ports)
 }
 } // namespace
 
-std::uint64_t NodeGraphComponent::addNodeForRemote(const juce::String& typeKey,
+std::uint64_t NodeGraphComponent::addNodeForRemote(const cydaw::base::Text& typeKey,
                                                    const juce::Point<float> position)
 {
     const auto* type = findType(typeKey);
@@ -26464,7 +26466,7 @@ int NodeGraphComponent::disconnectNodesForRemote(const std::uint64_t source,
 }
 
 bool NodeGraphComponent::setNodePresentationForRemote(
-    const std::uint64_t id, const juce::String& title,
+    const std::uint64_t id, const cydaw::base::Text& title,
     const std::optional<juce::Point<float>> position)
 {
     auto* node = findNode(id);
@@ -26482,7 +26484,7 @@ bool NodeGraphComponent::setNodePresentationForRemote(
     return true;
 }
 
-cydaw::base::Value NodeGraphComponent::describeNodeTypeForRemote(const juce::String& typeKey) const
+cydaw::base::Value NodeGraphComponent::describeNodeTypeForRemote(const cydaw::base::Text& typeKey) const
 {
     const auto* type = findType(typeKey);
     if (type == nullptr)
@@ -26493,15 +26495,15 @@ cydaw::base::Value NodeGraphComponent::describeNodeTypeForRemote(const juce::Str
     object->setProperty("name", type->title.isNotEmpty() ? type->title
                                                          : tr(type->translationKey));
     object->setProperty("category", type->categoryKey.isNotEmpty()
-                                        ? tr(type->categoryKey) : juce::String());
+                                        ? tr(type->categoryKey) : cydaw::base::Text());
     object->setProperty("description", type->descriptionKey.isNotEmpty()
-                                           ? tr(type->descriptionKey) : juce::String());
+                                           ? tr(type->descriptionKey) : cydaw::base::Text());
     object->setProperty("hasInput", type->hasInput);
     object->setProperty("hasOutput", type->hasOutput);
     cydaw::base::Array<cydaw::base::Value> parameters;
     for (const auto& parameter : type->parameterSchema) {
         auto* entry = new cydaw::base::Object();
-        entry->setProperty("key", juce::String(parameter.key));
+        entry->setProperty("key", cydaw::base::Text(parameter.key));
         entry->setProperty("minimum", parameter.minimum);
         entry->setProperty("maximum", parameter.maximum);
         entry->setProperty("default", parameter.defaultValue);
@@ -26531,8 +26533,8 @@ cydaw::base::Value NodeGraphComponent::describeNodeForRemote(const std::uint64_t
     return result;
 }
 
-std::uint64_t NodeGraphComponent::addCommentForRemote(const juce::String& title,
-                                                      const juce::String& description,
+std::uint64_t NodeGraphComponent::addCommentForRemote(const cydaw::base::Text& title,
+                                                      const cydaw::base::Text& description,
                                                       const juce::Point<float> position,
                                                       const juce::Point<float> size)
 {

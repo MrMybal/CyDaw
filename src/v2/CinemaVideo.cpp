@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -17,10 +18,10 @@ extern "C" {
 #include <vector>
 namespace cydaw::v2 {
 namespace {
-juce::String mediaError(const char* action,int code)
+cydaw::base::Text mediaError(const char* action,int code)
 {
     char message[AV_ERROR_MAX_STRING_SIZE]{};av_strerror(code,message,sizeof(message));
-    return juce::String::fromUTF8(action)+" : "+juce::String::fromUTF8(message);
+    return cydaw::base::Text::fromUTF8(action)+" : "+cydaw::base::Text::fromUTF8(message);
 }
 // One demuxer and decoder per worker; FFmpeg never touches the audio device.
 class MediaStream final {
@@ -29,7 +30,7 @@ public:
     int index{-1},error{};bool draining{};double origin{},lastTime{};
     std::function<bool()> cancelled;
     ~MediaStream(){av_frame_free(&frame);av_packet_free(&packet);avcodec_free_context(&codec);avformat_close_input(&format);}
-    cydaw::base::Result open(const juce::File& file,AVMediaType type,int threads,const std::function<bool()>& cancel)
+    cydaw::base::Result open(const cydaw::base::File& file,AVMediaType type,int threads,const std::function<bool()>& cancel)
     {
         cancelled=cancel;format=avformat_alloc_context();if(!format)return cydaw::base::Result::fail("FFmpeg : mémoire insuffisante");
         format->interrupt_callback={[](void* self){const auto& f=static_cast<MediaStream*>(self)->cancelled;return f&&f()?1:0;},this};
@@ -89,26 +90,26 @@ class CinemaVideo::Worker final:public juce::Thread {
 public:
     explicit Worker(int width):Thread("CyDAW cinema video"),maximumWidth(width){startThread();}
     ~Worker()override{signalThreadShouldExit();notify();stopThread(10000);}
-    const int maximumWidth;mutable std::mutex mutex;Snapshot state;juce::File requested;
+    const int maximumWidth;mutable std::mutex mutex;Snapshot state;cydaw::base::File requested;
     double requestedTime{};std::uint64_t sequence{};
-    void request(const juce::File& f,double t){
+    void request(const cydaw::base::File& f,double t){
         std::lock_guard guard(mutex);
         const auto fps=std::clamp(state.fps,1.0,240.0);
         t=std::floor(std::max(0.0,t)*fps+1.0e-8)/fps;
         if(f==requested&&std::abs(t-requestedTime)<.001)return;
-        if(f!=requested){const auto revision=state.revision;state={};state.revision=revision;state.file=f.getFullPathName();state.loading=f!=juce::File();}
+        if(f!=requested){const auto revision=state.revision;state={};state.revision=revision;state.file=f.getFullPathName();state.loading=f!=cydaw::base::File();}
         requested=f;requestedTime=t;++sequence;notify();
     }
     void run()override{
-        std::unique_ptr<MediaStream> reader;juce::File loaded;std::uint64_t handled=0;
+        std::unique_ptr<MediaStream> reader;cydaw::base::File loaded;std::uint64_t handled=0;
         Snapshot metadata;double last=-1;SwsContext* scaler=nullptr;
         struct ScaleCleanup{SwsContext*& context;~ScaleCleanup(){sws_freeContext(context);}} cleanup{scaler};
-        auto problem=[&](const juce::String& error,std::uint64_t seq){std::lock_guard guard(mutex);if(seq==sequence){state.error=error;state.loading=false;++state.revision;}};
+        auto problem=[&](const cydaw::base::Text& error,std::uint64_t seq){std::lock_guard guard(mutex);if(seq==sequence){state.error=error;state.loading=false;++state.revision;}};
         while(!threadShouldExit()){
-            juce::File file;double wanted;std::uint64_t seq;
+            cydaw::base::File file;double wanted;std::uint64_t seq;
             {std::lock_guard guard(mutex);file=requested;wanted=requestedTime;seq=sequence;}
             if(seq==handled){wait(20);continue;}handled=seq;
-            if(file==juce::File()){reader.reset();loaded={};continue;}
+            if(file==cydaw::base::File()){reader.reset();loaded={};continue;}
             if(file!=loaded||!reader){
                 reader=std::make_unique<MediaStream>();loaded={};metadata={};metadata.file=file.getFullPathName();
                 const auto result=reader->open(file,AVMEDIA_TYPE_VIDEO,maximumWidth<=160?1:2,[this]{return threadShouldExit();});
@@ -152,10 +153,10 @@ public:
 };
 CinemaVideo::CinemaVideo(int width):worker_(std::make_unique<Worker>(std::clamp(width,80,1920))){}
 CinemaVideo::~CinemaVideo()=default;
-void CinemaVideo::request(const juce::File& file,double seconds){worker_->request(file,seconds);}
+void CinemaVideo::request(const cydaw::base::File& file,double seconds){worker_->request(file,seconds);}
 CinemaVideo::Snapshot CinemaVideo::snapshot()const{std::lock_guard guard(worker_->mutex);return worker_->state;}
 
-cydaw::base::Result CinemaVideo::extractAudio(const juce::File& source,const juce::File& wav,const std::function<bool()>& cancel,bool* hasAudio)
+cydaw::base::Result CinemaVideo::extractAudio(const cydaw::base::File& source,const cydaw::base::File& wav,const std::function<bool()>& cancel,bool* hasAudio)
 {
     if(hasAudio)*hasAudio=false;
     MediaStream input;const auto opened=input.open(source,AVMEDIA_TYPE_AUDIO,2,cancel);

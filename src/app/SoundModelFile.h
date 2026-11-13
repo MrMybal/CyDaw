@@ -19,9 +19,9 @@ namespace cydaw::app {
 
 // The JSON as parsed; null with `error` set when it is not a model this
 // version can play.
-[[nodiscard]] cydaw::engine::SoundModelRef soundModelFromVar(const cydaw::base::Value& value, juce::String& error);
-[[nodiscard]] cydaw::engine::SoundModelRef loadSoundModelFile(const juce::File& file, cydaw::base::Value& json,
-                                                              juce::String& error);
+[[nodiscard]] cydaw::engine::SoundModelRef soundModelFromVar(const cydaw::base::Value& value, cydaw::base::Text& error);
+[[nodiscard]] cydaw::engine::SoundModelRef loadSoundModelFile(const cydaw::base::File& file, cydaw::base::Value& json,
+                                                              cydaw::base::Text& error);
 
 // ---- Factory models named, not copied, in a project ---------------------------------------
 // A sound-model card holds its whole model, and so does every state made of
@@ -29,18 +29,18 @@ namespace cydaw::app {
 // instead ("soundModelFile": "factory:Sound Models/….cysound"): a factory
 // file is read once and its JSON shared (loadSoundModelFile), so a card still
 // holding that very JSON has its model as it came from the file.
-[[nodiscard]] juce::String factoryModelReference(const cydaw::base::Value& json);
+[[nodiscard]] cydaw::base::Text factoryModelReference(const cydaw::base::Value& json);
 // The document with each such model named instead (copied where it changes,
 // the rest shared with it).
 [[nodiscard]] cydaw::base::Value withFactoryModelReferences(const cydaw::base::Value& document);
 // The named models read back into it (in place); the names not found listed.
 // A model not found stays named: its card keeps {"soundModelFile": name} as
 // its model (silent), written back as the name, so a save never loses it.
-void expandFactoryModelReferences(cydaw::base::Value& document, juce::StringArray& missing);
+void expandFactoryModelReferences(cydaw::base::Value& document, cydaw::base::TextList& missing);
 // That stand-in for a factory model not found.
 [[nodiscard]] bool isMissingFactoryModel(const cydaw::base::Value& model);
 // A short line about it: "brass-c4 · 1 zone · C4 · 82 partials".
-[[nodiscard]] juce::String describeSoundModel(const cydaw::engine::SoundModel& model);
+[[nodiscard]] cydaw::base::Text describeSoundModel(const cydaw::engine::SoundModel& model);
 
 // The instrument's voice data in a saved graph (NodeGraphComponent's JSON, as
 // a project and an exported plug-in's state carry it): the first sound-model
@@ -62,7 +62,7 @@ struct VoiceAssets {
 // project, a preset, an exported plug-in): {"a": table, "b": table}, a table
 // being {name, source (the file's name), frameLength, frames, pcm: base64 of
 // little-endian 16-bit samples, frame after frame}.
-[[nodiscard]] cydaw::base::Value prismTableVar(const juce::String& name, const juce::String& source, int frameLength,
+[[nodiscard]] cydaw::base::Value prismTableVar(const cydaw::base::Text& name, const cydaw::base::Text& source, int frameLength,
                                       const std::vector<std::vector<float>>& frames);
 // The card's tables built (null when it has none).
 [[nodiscard]] cydaw::engine::prism::TablesRef prismTablesFromVar(const cydaw::base::Value& value);
@@ -70,12 +70,12 @@ struct VoiceAssets {
 // takes it out); void when no table is left.
 [[nodiscard]] cydaw::base::Value withPrismTable(const cydaw::base::Value& tables, int oscillator, const cydaw::base::Value& table);
 // One table's name and frame count, as the JSON says.
-[[nodiscard]] juce::String prismTableName(const cydaw::base::Value& tables, int oscillator);
+[[nodiscard]] cydaw::base::Text prismTableName(const cydaw::base::Value& tables, int oscillator);
 
 // ---- An impulse response on an effect's card (Baffle et micro) --------------------------
 // {name, source (the file's name), sampleRate, channels, frames, pcm: base64
 // of little-endian 32-bit floats, channel after channel}.
-[[nodiscard]] cydaw::base::Value impulseVar(const cydaw::engine::ImpulseResponse& response, const juce::String& source);
+[[nodiscard]] cydaw::base::Value impulseVar(const cydaw::engine::ImpulseResponse& response, const cydaw::base::Text& source);
 [[nodiscard]] cydaw::engine::ImpulseResponseRef impulseFromVar(const cydaw::base::Value& value);
 // The cards of a saved graph (top level) that hold a response, by id: what
 // an exported plug-in puts back into its effects.

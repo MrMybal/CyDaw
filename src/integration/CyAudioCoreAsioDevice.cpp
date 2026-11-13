@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #include <algorithm>
 #include <cmath>
 #include <cydaw/integration/CyAudioCoreDeviceManager.h>
@@ -5,10 +6,10 @@
 namespace cydaw::integration {
 namespace {
 using namespace cyaudio;
-juce::String error(Status s) {
+cydaw::base::Text error(Status s) {
   return s == Status::ok
-             ? juce::String{}
-             : "CyAudioCore / PortAudio ASIO: status " + juce::String(int(s));
+             ? cydaw::base::Text{}
+             : "CyAudioCore / PortAudio ASIO: status " + cydaw::base::Text(int(s));
 }
 class AsioDevice final : public juce::AudioIODevice {
 public:
@@ -20,19 +21,19 @@ public:
   AudioStreamDescription stream;
   juce::BigInteger inputMask, outputMask;
   juce::AudioIODeviceCallback *callback = nullptr;
-  juce::String lastError;
+  cydaw::base::Text lastError;
   bool opened = false;
-  AsioDevice(const juce::String &name, std::string key)
+  AsioDevice(const cydaw::base::Text &name, std::string key)
       : juce::AudioIODevice(name, "ASIO"), id(std::move(key)) {
     lastError = error(driver.details(id, details));
     if (lastError.isEmpty())
       lastError = error(manager.prepare(driver.interface()));
   }
   ~AsioDevice() override { close(); }
-  static juce::StringArray names(const std::vector<std::string> &list) {
-    juce::StringArray out;
+  static cydaw::base::TextList names(const std::vector<std::string> &list) {
+    cydaw::base::TextList out;
     for (const auto &n : list)
-      out.add(juce::String::fromUTF8(n.c_str()));
+      out.add(cydaw::base::Text::fromUTF8(n.c_str()));
     return out;
   }
   juce::StringArray getOutputChannelNames() override {
@@ -175,21 +176,21 @@ public:
 class AsioType final : public juce::AudioIODeviceType {
   platform::AsioDriver driver;
   std::vector<AudioDeviceInfo> devices;
-  juce::StringArray names(bool input) const {
-    juce::StringArray out;
+  cydaw::base::TextList names(bool input) const {
+    cydaw::base::TextList out;
     for (const auto &d : devices)
       if (d.input == input) {
-        auto n = juce::String::fromUTF8(d.name.c_str());
+        auto n = cydaw::base::Text::fromUTF8(d.name.c_str());
         if (std::count_if(devices.begin(), devices.end(),
                           [&](const auto &other) {
                             return other.input == input && other.name == d.name;
                           }) > 1)
-          n += " [" + juce::String(d.id) + "]";
+          n += " [" + cydaw::base::Text(d.id) + "]";
         out.add(n);
       }
     return out;
   }
-  const AudioDeviceInfo *lookup(const juce::String &name, bool input) const {
+  const AudioDeviceInfo *lookup(const cydaw::base::Text &name, bool input) const {
     auto list = names(input);
     const auto index = list.indexOf(name);
     if (index < 0)
@@ -225,7 +226,7 @@ public:
     return n ? 0 : -1;
   }
   int getIndexOfDevice(juce::AudioIODevice *device, bool input) const override {
-    return names(input).indexOf(device ? device->getName() : juce::String{});
+    return names(input).indexOf(device ? cydaw::base::Text(device->getName()) : cydaw::base::Text{});
   }
   bool hasSeparateInputsAndOutputs() const override { return false; }
   juce::AudioIODevice *createDevice(const juce::String &output,

@@ -11,55 +11,55 @@ constexpr ImU32 kHarmonieVoiceA = IM_COL32(255, 190, 92, 255);
 constexpr ImU32 kHarmonieVoiceB = IM_COL32(118, 188, 255, 255);
 
 // A note's name ("A3", "La3"); empty for none.
-juce::String pitchNoteText(const int note)
+cydaw::base::Text pitchNoteText(const int note)
 {
     if (note < 0 || note > 127)
         return {};
     const auto& spelled = ui::french() ? pitchfxd::pitchNoteNamesFrench : pitchfxd::pitchNoteNames;
-    return juce::String::fromUTF8(spelled[static_cast<std::size_t>(pitchfxd::pitchClassOf(note))]) + juce::String(note / 12 - 1);
+    return cydaw::base::Text::fromUTF8(spelled[static_cast<std::size_t>(pitchfxd::pitchClassOf(note))]) + cydaw::base::Text(note / 12 - 1);
 }
 
 // A whole number with its sign and unit: "+12 st", "-5 ct", "0 st".
-juce::String pitchSignedText(const double value, const char* unit)
+cydaw::base::Text pitchSignedText(const double value, const char* unit)
 {
     const auto rounded = juce::roundToInt(value);
-    return (rounded > 0 ? juce::String("+") : juce::String()) + juce::String(rounded) + unit;
+    return (rounded > 0 ? cydaw::base::Text("+") : cydaw::base::Text()) + cydaw::base::Text(rounded) + unit;
 }
 
-juce::String harmonieModeName(const int index)
+cydaw::base::Text harmonieModeName(const int index)
 {
     const auto& mode = pitchfxd::harmonieModes[static_cast<std::size_t>(std::clamp(index, 0, pitchfxd::harmonieModeCount - 1))];
-    return juce::String::fromUTF8(ui::french() ? mode.french : mode.english);
+    return cydaw::base::Text::fromUTF8(ui::french() ? mode.french : mode.english);
 }
-juce::String harmonieModeHint(const int index)
+cydaw::base::Text harmonieModeHint(const int index)
 {
     const auto& mode = pitchfxd::harmonieModes[static_cast<std::size_t>(std::clamp(index, 0, pitchfxd::harmonieModeCount - 1))];
-    return juce::String::fromUTF8(ui::french() ? mode.frenchHint : mode.englishHint);
+    return cydaw::base::Text::fromUTF8(ui::french() ? mode.frenchHint : mode.englishHint);
 }
-juce::String harmonieIntervalName(const double semitones)
+cydaw::base::Text harmonieIntervalName(const double semitones)
 {
     const auto& interval = pitchfxd::harmonieIntervalOf(semitones);
-    return juce::String::fromUTF8(ui::french() ? interval.french : interval.english);
+    return cydaw::base::Text::fromUTF8(ui::french() ? interval.french : interval.english);
 }
 
-juce::String justesseKeyName(const int index)
+cydaw::base::Text justesseKeyName(const int index)
 {
     const auto& spelled = ui::french() ? pitchfxd::pitchNoteNamesFrench : pitchfxd::pitchNoteNames;
-    return juce::String::fromUTF8(spelled[static_cast<std::size_t>(std::clamp(index, 0, 11))]);
+    return cydaw::base::Text::fromUTF8(spelled[static_cast<std::size_t>(std::clamp(index, 0, 11))]);
 }
-juce::String justesseKeyHint(const int index)
+cydaw::base::Text justesseKeyHint(const int index)
 {
     return ui::Ls("La tonique de la gamme : ", "The scale's root: ") + justesseKeyName(index);
 }
-juce::String justesseScaleName(const int index)
+cydaw::base::Text justesseScaleName(const int index)
 {
     const auto& scale = pitchfxd::justesseScales[static_cast<std::size_t>(std::clamp(index, 0, pitchfxd::justesseScaleCount - 1))];
-    return juce::String::fromUTF8(ui::french() ? scale.french : scale.english);
+    return cydaw::base::Text::fromUTF8(ui::french() ? scale.french : scale.english);
 }
-juce::String justesseScaleHint(const int index)
+cydaw::base::Text justesseScaleHint(const int index)
 {
     const auto& scale = pitchfxd::justesseScales[static_cast<std::size_t>(std::clamp(index, 0, pitchfxd::justesseScaleCount - 1))];
-    return juce::String::fromUTF8(ui::french() ? scale.frenchHint : scale.englishHint);
+    return cydaw::base::Text::fromUTF8(ui::french() ? scale.frenchHint : scale.englishHint);
 }
 
 // ---- Harmonie -------------------------------------------------------------------------------------
@@ -112,7 +112,7 @@ bool harmonieDisplay(std::vector<Param>& parameters, const Pane& pane, const Box
         auto line = y + textSize("+12", big).y + dp(2.0f);
         for (const auto& voice : voices) {
             const auto tint = value(voice.level) > 0.005f ? theme::alpha(voice.tint, 0.85f) : theme::alpha(voice.tint, 0.35f);
-            const auto name = juce::String(voice.name) + "  " + harmonieIntervalName(semitonesOf(voice));
+            const auto name = cydaw::base::Text(voice.name) + "  " + harmonieIntervalName(semitonesOf(voice));
             text(list, ImVec2(area.min.x + dp(4.0f), line), tint, name.toRawUTF8(), 0.56f);
             line += ImGui::GetFontSize() * 0.62f;
         }
@@ -156,10 +156,10 @@ bool harmonieDisplay(std::vector<Param>& parameters, const Pane& pane, const Box
     // The sound itself at 0, its note when the voice mode follows it.
     const auto zero = yOf(0.0);
     list->AddLine(ImVec2(ruler.min.x, zero), ImVec2(ruler.max.x, zero), theme::alpha(p.text, 0.75f), dp(large ? 2.0f : 1.5f));
-    juce::String heard;
+    cydaw::base::Text heard;
     if (heardHz > 0.0f)
         heard = pitchNoteText(static_cast<int>(std::lround(pitchfxd::pitchNoteOfHz(heardHz))))
-                + (large ? "  " + juce::String(juce::roundToInt(heardHz)) + " Hz" : juce::String());
+                + (large ? "  " + cydaw::base::Text(juce::roundToInt(heardHz)) + " Hz" : cydaw::base::Text());
     else if (large)
         heard = modeIndex == pitchfxd::harmonieModeVoice ? ui::Ls("Entrée (pas de hauteur)", "Input (no pitch)") : ui::Ls("Entrée", "Input");
     if (heard.isNotEmpty()) {
@@ -186,7 +186,7 @@ bool harmonieDisplay(std::vector<Param>& parameters, const Pane& pane, const Box
             list->AddRectFilled(ImVec2(x - halfWidth, y - halfHeight), ImVec2(x + halfWidth, y + halfHeight), tint, halfHeight);
         }
         if (large) {
-            auto label = juce::String(voice.name) + "  " + pitchSignedText(value(voice.shift), " st");
+            auto label = cydaw::base::Text(voice.name) + "  " + pitchSignedText(value(voice.shift), " st");
             if (std::abs(value(voice.fine)) >= 0.5f)
                 label += " " + pitchSignedText(value(voice.fine), " ct");
             label += "  " + harmonieIntervalName(semitones);
@@ -199,7 +199,7 @@ bool harmonieDisplay(std::vector<Param>& parameters, const Pane& pane, const Box
     }
     // The echo after the voices.
     if (large && value(pitchfxd::harmonieDelay) >= 0.5f) {
-        const auto echo = ui::Ls("Écho ", "Echo ") + juce::String(juce::roundToInt(value(pitchfxd::harmonieDelay))) + " ms  "
+        const auto echo = ui::Ls("Écho ", "Echo ") + cydaw::base::Text(juce::roundToInt(value(pitchfxd::harmonieDelay))) + " ms  "
                           + ui::Ls("retour ", "feedback ") + percent(value(pitchfxd::harmonieFeedback));
         text(list, ImVec2(xOfPan(-1.0) + dp(16.0f), ruler.max.y - ImGui::GetFontSize() * 0.62f - dp(2.0f)), p.textFaint, echo.toRawUTF8(),
              0.58f);
@@ -502,7 +502,7 @@ std::vector<int> pitchCardFields(const PaneKind kind, std::vector<Param>& parame
 }
 
 // A value as these effects show it; empty for none of theirs.
-juce::String pitchFormat(const juce::String& binding, const double value)
+cydaw::base::Text pitchFormat(const cydaw::base::Text& binding, const double value)
 {
     const auto off = [] { return ui::Ls("Coupé", "Off"); };
     if (binding.contains("harmonie.")) {
@@ -516,12 +516,12 @@ juce::String pitchFormat(const juce::String& binding, const double value)
         if (suffix == "feedback")
             return percent(value);
         if (suffix == "delay")
-            return value < 0.5 ? off() : juce::String(juce::roundToInt(value)) + " ms";
+            return value < 0.5 ? off() : cydaw::base::Text(juce::roundToInt(value)) + " ms";
         if (suffix == "panA" || suffix == "panB") {
             const auto amount = juce::roundToInt(std::abs(value) * 100.0);
             if (amount == 0)
                 return ui::Ls("Centre", "Centre");
-            return (value < 0.0 ? ui::Ls("G ", "L ") : ui::Ls("D ", "R ")) + juce::String(amount);
+            return (value < 0.0 ? ui::Ls("G ", "L ") : ui::Ls("D ", "R ")) + cydaw::base::Text(amount);
         }
         if (suffix == "mode")
             return harmonieModeName(whole(static_cast<float>(value), pitchfxd::harmonieModeCount));
@@ -530,7 +530,7 @@ juce::String pitchFormat(const juce::String& binding, const double value)
     if (binding.contains("justesse.")) {
         const auto suffix = binding.fromLastOccurrenceOf("justesse.", false, false);
         if (suffix == "speed")
-            return value < 0.5 ? juce::String("Robot") : juce::String(juce::roundToInt(value)) + " ms";
+            return value < 0.5 ? cydaw::base::Text("Robot") : cydaw::base::Text(juce::roundToInt(value)) + " ms";
         if (suffix == "amount" || suffix == "mix" || suffix == "sensitivity")
             return percent(value);
         if (suffix == "humanize")
@@ -542,7 +542,7 @@ juce::String pitchFormat(const juce::String& binding, const double value)
         if (suffix == "scale")
             return justesseScaleName(whole(static_cast<float>(value), pitchfxd::justesseScaleCount));
         if (suffix == "lowPitch" || suffix == "highPitch")
-            return juce::String(juce::roundToInt(value)) + " Hz  "
+            return cydaw::base::Text(juce::roundToInt(value)) + " Hz  "
                    + pitchNoteText(static_cast<int>(std::lround(pitchfxd::pitchNoteOfHz(std::max(1.0, value)))));
         return {};
     }
@@ -550,7 +550,7 @@ juce::String pitchFormat(const juce::String& binding, const double value)
 }
 
 // A parameter of theirs that takes whole steps (a choice, a switch).
-bool pitchStepped(const juce::String& binding)
+bool pitchStepped(const cydaw::base::Text& binding)
 {
     for (const auto* suffix : { "harmonie.shiftA", "harmonie.shiftB", "harmonie.mode", "justesse.transpose", "justesse.key", "justesse.scale" })
         if (binding.endsWith(suffix))

@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "SystemLoad.h"
 
 #include <juce_core/juce_core.h>
@@ -25,7 +26,7 @@ Reading read()
     static unsigned long long lastBusy {};
     static unsigned long long lastWall {};
 #endif
-    const auto now = juce::Time::getMillisecondCounterHiRes() * 0.001;
+    const auto now = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
     if (now - readAt < 0.5)
         return last;
     readAt = now;
@@ -39,7 +40,7 @@ Reading read()
         const auto busy = ticks(kernel) + ticks(user);
         const auto wallNow = ticks(wall);
         if (lastWall != 0 && wallNow > lastWall) {
-            const auto cores = std::max(1, juce::SystemStats::getNumCpus());
+            const auto cores = std::max(1, cydaw::base::SystemStats::getNumCpus());
             last.cpuPercent = std::clamp(static_cast<double>(busy - lastBusy) / static_cast<double>(wallNow - lastWall) / cores * 100.0,
                                          0.0, 100.0);
         }

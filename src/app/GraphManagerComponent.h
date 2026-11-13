@@ -1,3 +1,6 @@
+#include <cydaw/base/File.h>
+#include <cydaw/base/Properties.h>
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include <cydaw/graph/GraphDefinition.h>
@@ -23,7 +26,7 @@ public:
 
     struct PreviewNode {
         std::uint64_t id {};
-        juce::String label;
+        cydaw::base::Text label;
         juce::Point<float> position;
         juce::Colour colour { 0xff76808a };
     };
@@ -36,22 +39,22 @@ public:
 
     struct Asset {
         AssetKind kind { AssetKind::factoryPreset };
-        juce::String key;
-        juce::String name;
-        juce::String category;
-        juce::String scope;
-        juce::String detail;
-        juce::File file;
-        juce::String role;
-        juce::String version;
-        juce::String inputs;
-        juce::String outputs;
+        cydaw::base::Text key;
+        cydaw::base::Text name;
+        cydaw::base::Text category;
+        cydaw::base::Text scope;
+        cydaw::base::Text detail;
+        cydaw::base::File file;
+        cydaw::base::Text role;
+        cydaw::base::Text version;
+        cydaw::base::Text inputs;
+        cydaw::base::Text outputs;
         bool valid { true };
-        juce::String validationMessage;
-        juce::StringArray tags;
-        juce::String author;
-        juce::String nodeTypeKey;
-        juce::String processorKey;
+        cydaw::base::Text validationMessage;
+        cydaw::base::TextList tags;
+        cydaw::base::Text author;
+        cydaw::base::Text nodeTypeKey;
+        cydaw::base::Text processorKey;
         juce::Colour accentColour { 0x00000000 };
         std::vector<PreviewNode> previewNodes;
         std::vector<PreviewConnection> previewConnections;
@@ -62,22 +65,22 @@ public:
 
     void setAssets(std::vector<Asset> assets);
     void setFactoryPresetLoadHandler(
-        std::function<void(const juce::String&)> handler);
-    void setUserPresetLoadHandler(std::function<void(const juce::File&)> handler);
+        std::function<void(const cydaw::base::Text&)> handler);
+    void setUserPresetLoadHandler(std::function<void(const cydaw::base::File&)> handler);
     void setNodeParameterPresetLoadHandler(
-        std::function<void(const juce::File&)> handler);
+        std::function<void(const cydaw::base::File&)> handler);
     void setRefreshHandler(std::function<void()> handler);
-    void setNodeParameterPresetTarget(const juce::String& nodeTypeKey,
-                                      const juce::String& processorKey,
+    void setNodeParameterPresetTarget(const cydaw::base::Text& nodeTypeKey,
+                                      const cydaw::base::Text& processorKey,
                                       bool editable);
     void setSubgraphOpenHandler(
-        std::function<void(const juce::String&)> handler);
+        std::function<void(const cydaw::base::Text&)> handler);
     void setSubgraphVariantHandler(
-        std::function<void(const juce::String&)> handler);
+        std::function<void(const cydaw::base::Text&)> handler);
     void refreshTranslations();
     void refreshFiles();
-    [[nodiscard]] bool selectAssetByKey(const juce::String& key);
-    [[nodiscard]] juce::String selectedAssetKey() const;
+    [[nodiscard]] bool selectAssetByKey(const cydaw::base::Text& key);
+    [[nodiscard]] cydaw::base::Text selectedAssetKey() const;
     [[nodiscard]] std::size_t selectedPreviewNodeCount() const noexcept;
     [[nodiscard]] std::size_t selectedPreviewConnectionCount() const noexcept;
     void showFileBrowser();
@@ -96,10 +99,10 @@ private:
     void rebuildFileView();
     void selectAsset(const Asset& asset);
     void openAsset(const Asset& asset);
-    void openFileAsset(const juce::File& file);
+    void openFileAsset(const cydaw::base::File& file);
     [[nodiscard]] bool canOpenAsset(const Asset& asset) const;
     [[nodiscard]] bool isActiveAsset(const Asset& asset) const;
-    [[nodiscard]] juce::String assetIdentity(const Asset& asset) const;
+    [[nodiscard]] cydaw::base::Text assetIdentity(const Asset& asset) const;
     [[nodiscard]] bool isFavorite(const Asset& asset) const;
     void toggleFavorite(const Asset& asset);
     void revealAsset(const Asset& asset);
@@ -107,7 +110,7 @@ private:
     void duplicateUserGraph(const Asset& asset);
     void touchRecent(const Asset& asset);
     void saveCollections();
-    [[nodiscard]] juce::String roleLabel(
+    [[nodiscard]] cydaw::base::Text roleLabel(
         cydaw::graph::GraphRole role) const;
 
     void selectionChanged() override;
@@ -117,13 +120,13 @@ private:
     void browserRootChanged(const juce::File& newRoot) override;
 
     std::vector<Asset> assets_;
-    std::function<void(const juce::String&)> factoryPresetLoadHandler_;
-    std::function<void(const juce::File&)> userPresetLoadHandler_;
-    std::function<void(const juce::File&)>
+    std::function<void(const cydaw::base::Text&)> factoryPresetLoadHandler_;
+    std::function<void(const cydaw::base::File&)> userPresetLoadHandler_;
+    std::function<void(const cydaw::base::File&)>
         nodeParameterPresetLoadHandler_;
     std::function<void()> refreshHandler_;
-    std::function<void(const juce::String&)> subgraphOpenHandler_;
-    std::function<void(const juce::String&)> subgraphVariantHandler_;
+    std::function<void(const cydaw::base::Text&)> subgraphOpenHandler_;
+    std::function<void(const cydaw::base::Text&)> subgraphVariantHandler_;
 
     juce::TextButton categoryViewButton_;
     juce::TextButton fileViewButton_;
@@ -146,11 +149,11 @@ private:
     std::unique_ptr<juce::FileTreeComponent> fileTree_;
     bool showingFiles_ {};
     std::optional<Asset> selectedAsset_;
-    std::unique_ptr<juce::PropertiesFile> preferences_;
-    juce::StringArray favoriteAssetIds_;
-    juce::StringArray recentAssetIds_;
-    juce::String targetNodeTypeKey_;
-    juce::String targetProcessorKey_;
+    std::unique_ptr<cydaw::base::PropertiesFile> preferences_;
+    cydaw::base::TextList favoriteAssetIds_;
+    cydaw::base::TextList recentAssetIds_;
+    cydaw::base::Text targetNodeTypeKey_;
+    cydaw::base::Text targetProcessorKey_;
     bool targetNodeEditable_ {};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(GraphManagerComponent)

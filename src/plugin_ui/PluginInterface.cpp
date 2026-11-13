@@ -32,7 +32,7 @@ namespace {
 // The plug-in's graph as the device views see a track's: its only track.
 class PluginDeviceHost final : public DeviceHost {
 public:
-    PluginDeviceHost(juce::String name, const bool instrument, PluginSound& sound, std::function<void(bool)> changed)
+    PluginDeviceHost(cydaw::base::Text name, const bool instrument, PluginSound& sound, std::function<void(bool)> changed)
         : name_(std::move(name)), sound_(sound), changed_(std::move(changed)),
           slot_(GraphSlot::Owner::plugin, [this](GraphSlot&, const bool structural) { publish(structural); })
     {
@@ -52,7 +52,7 @@ public:
     GraphSlot* graphFor(const TrackRef& track) override { return isValid(track) ? &slot_ : nullptr; }
     const GraphSlot* graphFor(const TrackRef& track) const override { return isValid(track) ? &slot_ : nullptr; }
     bool isValid(const TrackRef& track) const override { return track.owner() == track_; }
-    juce::String trackName(const TrackRef&) const override { return name_; }
+    cydaw::base::Text trackName(const TrackRef&) const override { return name_; }
 
     std::optional<PresetHolder> devicePresetHolder(const TrackRef& track, const std::uint64_t nodeId) const override
     {
@@ -60,43 +60,43 @@ public:
             return std::nullopt;
         for (const auto& node : slot_.graph().editorNodes())
             if (node.id == nodeId)
-                return PresetHolder { "device", node.typeKey, "plugin/device/" + juce::String(static_cast<juce::int64>(nodeId)) };
+                return PresetHolder { "device", node.typeKey, "plugin/device/" + cydaw::base::Text(static_cast<juce::int64>(nodeId)) };
         return std::nullopt;
     }
     cydaw::base::Value devicePresetState(const TrackRef& track, const std::uint64_t nodeId) const override
     {
         return isValid(track) ? device_ops::presetState(slot_.graph(), nodeId) : cydaw::base::Value();
     }
-    bool applyDevicePreset(const TrackRef& track, const std::uint64_t nodeId, const cydaw::base::Value& state, juce::String& error) override
+    bool applyDevicePreset(const TrackRef& track, const std::uint64_t nodeId, const cydaw::base::Value& state, cydaw::base::Text& error) override
     {
         if (!isValid(track) || !device_ops::applyPreset(slot_.graph(), nodeId, state, error, {}))
             return false;
         publish(true);
         return true;
     }
-    juce::String presetName(const juce::String& holderKey) const override
+    cydaw::base::Text presetName(const cydaw::base::Text& holderKey) const override
     {
         const auto found = presetNames_.find(holderKey);
-        return found != presetNames_.end() ? found->second : juce::String();
+        return found != presetNames_.end() ? found->second : cydaw::base::Text();
     }
-    void setPresetName(const juce::String& holderKey, const juce::String& name) override { presetNames_[holderKey] = name; }
+    void setPresetName(const cydaw::base::Text& holderKey, const cydaw::base::Text& name) override { presetNames_[holderKey] = name; }
 
     // The host automates the plug-in's parameters: no lanes of its own.
-    bool canAutomate(const TrackRef&, const juce::String&) const override { return false; }
-    bool hasLane(const TrackRef&, const juce::String&) const override { return false; }
-    void clearLane(const TrackRef&, const juce::String&) override {}
-    std::vector<juce::String> automatedParameters(const TrackRef&) const override { return {}; }
-    void setShownLane(const TrackRef&, const juce::String&) override {}
+    bool canAutomate(const TrackRef&, const cydaw::base::Text&) const override { return false; }
+    bool hasLane(const TrackRef&, const cydaw::base::Text&) const override { return false; }
+    void clearLane(const TrackRef&, const cydaw::base::Text&) override {}
+    std::vector<cydaw::base::Text> automatedParameters(const TrackRef&) const override { return {}; }
+    void setShownLane(const TrackRef&, const cydaw::base::Text&) override {}
     void setAutomationVisible(const TrackRef&, bool) override {}
-    std::optional<float> laneValueNow(const TrackRef&, const juce::String&) const override { return std::nullopt; }
+    std::optional<float> laneValueNow(const TrackRef&, const cydaw::base::Text&) const override { return std::nullopt; }
 
     bool voiceLive(const TrackRef& track, engine::VoiceLive& out) const override
     {
         return isValid(track) && sound_.voiceLive && sound_.voiceLive(out);
     }
 
-    bool importPrismTable(const TrackRef& track, const std::uint64_t nodeId, const int oscillator, const juce::File& file,
-                          juce::String& error) override
+    bool importPrismTable(const TrackRef& track, const std::uint64_t nodeId, const int oscillator, const cydaw::base::File& file,
+                          cydaw::base::Text& error) override
     {
         if (!isValid(track) || !device_ops::importPrismTable(slot_.graph(), nodeId, oscillator, file, error))
             return false;
@@ -110,7 +110,7 @@ public:
         publish(true);
         return true;
     }
-    bool loadCabImpulse(const TrackRef& track, const std::uint64_t nodeId, const juce::File& file, juce::String& error) override
+    bool loadCabImpulse(const TrackRef& track, const std::uint64_t nodeId, const cydaw::base::File& file, cydaw::base::Text& error) override
     {
         if (!isValid(track) || !device_ops::loadImpulse(slot_.graph(), nodeId, file, error))
             return false;
@@ -119,7 +119,7 @@ public:
     }
     bool clearCabImpulse(const TrackRef& track, const std::uint64_t nodeId) override
     {
-        juce::String error;
+        cydaw::base::Text error;
         if (!isValid(track) || !slot_.graph().nodeImpulseJson(nodeId).isObject() || !slot_.graph().setNodeImpulse(nodeId, {}, error))
             return false;
         publish(true);
@@ -128,7 +128,7 @@ public:
 
     // An effect after the instrument (its effects tab): the instrument
     // itself is the plug-in's, never replaced.
-    cydaw::base::Result insertDevice(const TrackRef& track, const juce::String& key) override
+    cydaw::base::Result insertDevice(const TrackRef& track, const cydaw::base::Text& key) override
     {
         if (!isValid(track))
             return cydaw::base::Result::fail("no such track");
@@ -154,12 +154,12 @@ public:
     }
 
 private:
-    juce::String name_;
+    cydaw::base::Text name_;
     PluginSound& sound_;
     std::function<void(bool)> changed_;
     GraphSlot slot_;
     TrackRef track_;
-    std::map<juce::String, juce::String> presetNames_;
+    std::map<cydaw::base::Text, cydaw::base::Text> presetNames_;
 };
 
 DeviceSignals::Source signalsFrom(PluginSound& sound)
@@ -215,7 +215,7 @@ bool beginWhole(const char* id)
 } // namespace
 
 struct PluginInterface::Impl {
-    Impl(PluginInterface& owner, const juce::String& productName, const bool instrument, PluginSound soundIn,
+    Impl(PluginInterface& owner, const cydaw::base::Text& productName, const bool instrument, PluginSound soundIn,
          std::function<void(bool)> changed)
         : sound(std::move(soundIn)),
           host(productName, instrument, sound, std::move(changed)),
@@ -232,7 +232,7 @@ struct PluginInterface::Impl {
         surface.ownWindows = false;
         surface.onFrame = [this] { frame(); };
         // Tests: a frame written once the window has settled.
-        snapshot = juce::SystemStats::getEnvironmentVariable("CYDAW_PLUGIN_SNAPSHOT", {});
+        snapshot = cydaw::base::SystemStats::getEnvironmentVariable("CYDAW_PLUGIN_SNAPSHOT", {});
         owner.addAndMakeVisible(surface);
     }
 
@@ -266,7 +266,7 @@ struct PluginInterface::Impl {
         // A plug-in's window is a module: English, whatever the language.
         const ui::ModuleText english;
         if (snapshot.isNotEmpty() && ++frames == 45)
-            surface.captureNextFrame(juce::File(snapshot));
+            surface.captureNextFrame(cydaw::base::File(snapshot));
         auto& slot = host.slot();
         const auto& track = host.track();
         signals.update(track, slot);
@@ -315,7 +315,7 @@ struct PluginInterface::Impl {
         auto& graph = host.slot().graph();
         if (beginWhole("##drawn")) {
             designed.drawPlayed("plugin", graph.graphInterfaceState(), ImGui::GetContentRegionAvail(),
-                                [&graph](const juce::String& key, const double value) { (void) graph.setGraphInterfaceParameter(key, value); });
+                                [&graph](const cydaw::base::Text& key, const double value) { (void) graph.setGraphInterfaceParameter(key, value); });
         }
         ImGui::End();
     }
@@ -366,7 +366,7 @@ struct PluginInterface::Impl {
                 ImGui::TextColored(theme::vec(colour), "%s", node.title.toUpperCase().toRawUTF8());
                 ImGui::PopFont();
                 ImGui::SameLine(0.0f, dp(16.0f));
-                std::map<juce::String, float> modulated = graph.editorModulatedParameters();
+                std::map<cydaw::base::Text, float> modulated = graph.editorModulatedParameters();
                 DeviceSignals::Histories histories;
                 auto live = signals.live(node.id, histories);
                 live.modulated = &modulated;
@@ -393,13 +393,13 @@ struct PluginInterface::Impl {
     InterfaceEditor designed;
     ImGuiHost surface;
     Shown opened;
-    juce::String snapshot;
+    cydaw::base::Text snapshot;
     int frames {};
     std::uint64_t chosenDevice {};
     int pane { -1 };
 };
 
-PluginInterface::PluginInterface(const juce::String& productName, const bool instrument, PluginSound sound,
+PluginInterface::PluginInterface(const cydaw::base::Text& productName, const bool instrument, PluginSound sound,
                                  std::function<void(bool)> changed)
     : impl_(std::make_unique<Impl>(*this, productName, instrument, std::move(sound), std::move(changed)))
 {
@@ -438,7 +438,7 @@ void PluginInterface::resized()
     impl_->surface.setBounds(getLocalBounds());
 }
 
-void PluginInterface::captureNextFrame(const juce::File& target, std::function<void(bool)> done)
+void PluginInterface::captureNextFrame(const cydaw::base::File& target, std::function<void(bool)> done)
 {
     impl_->surface.captureNextFrame(target, std::move(done));
 }

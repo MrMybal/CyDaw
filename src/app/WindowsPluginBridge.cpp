@@ -1,3 +1,5 @@
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #include "WindowsPluginBridge.h"
 
 #include <array>
@@ -6,30 +8,30 @@
 namespace cydaw::app {
 namespace {
 
-juce::File architectureDirectory(const juce::File& pluginFile,
-                                 const juce::String& architecture)
+cydaw::base::File architectureDirectory(const cydaw::base::File& pluginFile,
+                                 const cydaw::base::Text& architecture)
 {
     return pluginFile.getChildFile("Contents").getChildFile(architecture);
 }
 
-juce::File environmentFile(const juce::String& name)
+cydaw::base::File environmentFile(const cydaw::base::Text& name)
 {
-    const auto value = juce::SystemStats::getEnvironmentVariable(name, {}).trim();
-    return value.isNotEmpty() ? juce::File(value) : juce::File {};
+    const auto value = cydaw::base::SystemStats::getEnvironmentVariable(name, {}).trim();
+    return value.isNotEmpty() ? cydaw::base::File(value) : cydaw::base::File {};
 }
 
-bool environmentFlag(const juce::String& name)
+bool environmentFlag(const cydaw::base::Text& name)
 {
-    const auto value = juce::SystemStats::getEnvironmentVariable(name, {}).trim().toLowerCase();
+    const auto value = cydaw::base::SystemStats::getEnvironmentVariable(name, {}).trim().toLowerCase();
     return value == "1" || value == "true" || value == "yes" || value == "on";
 }
 
-bool isUmuRunner(const juce::File& runner)
+bool isUmuRunner(const cydaw::base::File& runner)
 {
     return runner.getFileNameWithoutExtension().containsIgnoreCase("umu-run");
 }
 
-std::array<std::uint8_t, 4> binaryMagic(const juce::File& file)
+std::array<std::uint8_t, 4> binaryMagic(const cydaw::base::File& file)
 {
     std::array<std::uint8_t, 4> magic {};
     if (auto input = file.createInputStream(); input != nullptr)
@@ -39,7 +41,7 @@ std::array<std::uint8_t, 4> binaryMagic(const juce::File& file)
 
 } // namespace
 
-bool WindowsPluginBridge::isWindowsVst3Bundle(const juce::File& pluginFile)
+bool WindowsPluginBridge::isWindowsVst3Bundle(const cydaw::base::File& pluginFile)
 {
     if (!pluginFile.hasFileExtension("vst3"))
         return false;
@@ -52,7 +54,7 @@ bool WindowsPluginBridge::isWindowsVst3Bundle(const juce::File& pluginFile)
            || architectureDirectory(pluginFile, "arm64-win").isDirectory();
 }
 
-bool WindowsPluginBridge::isLinuxVst3Bundle(const juce::File& pluginFile)
+bool WindowsPluginBridge::isLinuxVst3Bundle(const cydaw::base::File& pluginFile)
 {
     if (!pluginFile.hasFileExtension("vst3"))
         return false;
@@ -66,7 +68,7 @@ bool WindowsPluginBridge::isLinuxVst3Bundle(const juce::File& pluginFile)
                || architectureDirectory(pluginFile, "aarch64-linux").isDirectory();
 }
 
-bool WindowsPluginBridge::isWindowsVst2Binary(const juce::File& pluginFile)
+bool WindowsPluginBridge::isWindowsVst2Binary(const cydaw::base::File& pluginFile)
 {
     if (!pluginFile.existsAsFile() || !pluginFile.hasFileExtension("dll"))
         return false;
@@ -74,7 +76,7 @@ bool WindowsPluginBridge::isWindowsVst2Binary(const juce::File& pluginFile)
     return magic[0] == 'M' && magic[1] == 'Z';
 }
 
-bool WindowsPluginBridge::isLinuxVst2Binary(const juce::File& pluginFile)
+bool WindowsPluginBridge::isLinuxVst2Binary(const cydaw::base::File& pluginFile)
 {
     if (!pluginFile.existsAsFile() || !pluginFile.hasFileExtension("so"))
         return false;
@@ -83,12 +85,12 @@ bool WindowsPluginBridge::isLinuxVst2Binary(const juce::File& pluginFile)
            && magic[2] == 'L' && magic[3] == 'F';
 }
 
-juce::String WindowsPluginBridge::pathForWindowsGuest(const juce::File& file)
+cydaw::base::Text WindowsPluginBridge::pathForWindowsGuest(const cydaw::base::File& file)
 {
     return pathForWindowsGuest(file.getFullPathName());
 }
 
-juce::String WindowsPluginBridge::pathForWindowsGuest(juce::String hostPath)
+cydaw::base::Text WindowsPluginBridge::pathForWindowsGuest(cydaw::base::Text hostPath)
 {
     if (hostPath.length() >= 2 && hostPath[1] == ':')
         return hostPath.replaceCharacter('/', '\\');
@@ -138,7 +140,7 @@ PluginWorkerLaunch WindowsPluginBridge::planWorkerLaunch(
              { runner.getFullPathName(), toolchain.windowsWorker.getFullPathName() }, {} };
 }
 
-PluginWorkerLaunch WindowsPluginBridge::workerLaunchFor(const juce::File& pluginFile)
+PluginWorkerLaunch WindowsPluginBridge::workerLaunchFor(const cydaw::base::File& pluginFile)
 {
 #if JUCE_LINUX
     const auto windowsVst3 = isWindowsVst3Bundle(pluginFile)
@@ -167,7 +169,7 @@ WindowsPluginBridgeStatus WindowsPluginBridge::inspect()
     const auto directLaunch = planWorkerLaunch(true, toolchain);
     status.directRuntime = directLaunch.runtime;
     if (directLaunch.isValid())
-        status.selectedDirectRunner = juce::File(directLaunch.command[0]);
+        status.selectedDirectRunner = cydaw::base::File(directLaunch.command[0]);
     return status;
 }
 
@@ -177,9 +179,9 @@ PluginWorkerToolchain WindowsPluginBridge::discoverToolchain()
     toolchain.nativeWorker = nativeWorkerFile();
     toolchain.windowsWorker = windowsWorkerFile();
     toolchain.configuredRunner = findExecutable(
-        juce::SystemStats::getEnvironmentVariable("CYDAW_WINDOWS_VST_RUNNER", {}).trim());
+        cydaw::base::SystemStats::getEnvironmentVariable("CYDAW_WINDOWS_VST_RUNNER", {}).trim());
     toolchain.wineRunner = findExecutable(
-        juce::SystemStats::getEnvironmentVariable("WINELOADER", {}).trim());
+        cydaw::base::SystemStats::getEnvironmentVariable("WINELOADER", {}).trim());
     if (!toolchain.wineRunner.existsAsFile())
         toolchain.wineRunner = findExecutable("wine64");
     if (!toolchain.wineRunner.existsAsFile())
@@ -189,32 +191,32 @@ PluginWorkerToolchain WindowsPluginBridge::discoverToolchain()
     return toolchain;
 }
 
-juce::File WindowsPluginBridge::findExecutable(const juce::String& nameOrPath)
+cydaw::base::File WindowsPluginBridge::findExecutable(const cydaw::base::Text& nameOrPath)
 {
     if (nameOrPath.isEmpty())
         return {};
-    const juce::File direct(nameOrPath);
+    const cydaw::base::File direct(nameOrPath);
     if (direct.existsAsFile())
         return direct;
 
-    const auto path = juce::SystemStats::getEnvironmentVariable("PATH", {});
+    const auto path = cydaw::base::SystemStats::getEnvironmentVariable("PATH", {});
 #if JUCE_WINDOWS
     const auto separator = ";";
 #else
     const auto separator = ":";
 #endif
-    const auto folders = juce::StringArray::fromTokens(path, separator, {});
+    const auto folders = cydaw::base::TextList::fromTokens(path, separator, {});
     for (const auto& folder : folders) {
-        const auto candidate = juce::File(folder).getChildFile(nameOrPath);
+        const auto candidate = cydaw::base::File(folder).getChildFile(nameOrPath);
         if (candidate.existsAsFile())
             return candidate;
     }
     return {};
 }
 
-juce::File WindowsPluginBridge::nativeWorkerFile()
+cydaw::base::File WindowsPluginBridge::nativeWorkerFile()
 {
-    return juce::File::getSpecialLocation(juce::File::currentExecutableFile)
+    return cydaw::base::File::getSpecialLocation(cydaw::base::File::currentExecutableFile)
         .getSiblingFile(
 #if JUCE_WINDOWS
             "CyDAWPluginWorker.exe"
@@ -224,12 +226,12 @@ juce::File WindowsPluginBridge::nativeWorkerFile()
         );
 }
 
-juce::File WindowsPluginBridge::windowsWorkerFile()
+cydaw::base::File WindowsPluginBridge::windowsWorkerFile()
 {
     const auto configured = environmentFile("CYDAW_WINDOWS_VST_WORKER");
     if (configured.existsAsFile())
         return configured;
-    return juce::File::getSpecialLocation(juce::File::currentExecutableFile)
+    return cydaw::base::File::getSpecialLocation(cydaw::base::File::currentExecutableFile)
         .getSiblingFile("windows-bridge")
         .getChildFile("CyDAWPluginWorker.exe");
 }

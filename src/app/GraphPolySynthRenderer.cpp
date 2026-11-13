@@ -363,7 +363,7 @@ cydaw::base::Value serialisePolySynthGraphPlan(
         const cydaw::base::Value controllersVar(controllers);
         for (std::size_t number = 0; number < plan.samplerControllers.size(); ++number)
             if (plan.samplerControllers[number] >= 0.0f)
-                controllers->setProperty(cydaw::base::Identifier(juce::String(static_cast<int>(number))), plan.samplerControllers[number]);
+                controllers->setProperty(cydaw::base::Identifier(cydaw::base::Text(static_cast<int>(number))), plan.samplerControllers[number]);
         if (!controllers->getProperties().isEmpty())
             root->setProperty("samplerControllers", controllersVar);
     }
@@ -421,7 +421,7 @@ void attachReplacerInstruments(cydaw::engine::NativeDspGraph& graph, const cydaw
         return;
     for (const auto& entry : *replacers) {
         const auto id = static_cast<std::uint64_t>(static_cast<juce::int64>(entry.getProperty("node", 0)));
-        juce::String error;
+        cydaw::base::Text error;
         auto plan = restorePolySynthGraphPlan(entry.getProperty("polySynth", cydaw::base::Value()), error);
         if (!plan)
             continue;
@@ -446,7 +446,7 @@ void attachVoiceAssets(cydaw::engine::PolySynthGraphPlan& plan, const cydaw::bas
 }
 
 std::optional<cydaw::engine::PolySynthGraphPlan>
-restorePolySynthGraphPlan(const cydaw::base::Value& state, juce::String& error)
+restorePolySynthGraphPlan(const cydaw::base::Value& state, cydaw::base::Text& error)
 {
     const auto* root = state.getDynamicObject();
     if (root == nullptr || static_cast<int>(root->getProperty("schema")) != 1) {

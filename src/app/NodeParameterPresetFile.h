@@ -14,12 +14,12 @@ inline constexpr int nodeParameterPresetFileSchema = 1;
 inline constexpr juce::int64 maximumNodeParameterPresetBytes = 512 * 1024;
 
 struct NodeParameterPresetDocument {
-    juce::String name;
-    juce::String nodeTypeKey;
-    juce::String processorKey;
-    juce::String categoryKey;
-    juce::String description;
-    juce::StringArray tags;
+    cydaw::base::Text name;
+    cydaw::base::Text nodeTypeKey;
+    cydaw::base::Text processorKey;
+    cydaw::base::Text categoryKey;
+    cydaw::base::Text description;
+    cydaw::base::TextList tags;
     cydaw::base::Value parameters;
     cydaw::base::Value portDefaults;
 };
@@ -85,10 +85,10 @@ parseNodeParameterPresetDocument(const cydaw::base::Value& value)
     return document;
 }
 
-[[nodiscard]] inline juce::File userNodeParameterPresetDirectory()
+[[nodiscard]] inline cydaw::base::File userNodeParameterPresetDirectory()
 {
-    return juce::File::getSpecialLocation(
-               juce::File::userDocumentsDirectory)
+    return cydaw::base::File::getSpecialLocation(
+               cydaw::base::File::userDocumentsDirectory)
         .getChildFile("CyDAW")
         .getChildFile("Node Presets");
 }

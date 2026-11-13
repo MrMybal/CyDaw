@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #include "SamplerControlsView.h"
 
 #include "Theme.h"
@@ -16,10 +17,10 @@ using ui::L;
 
 namespace {
 
-juce::String noteName(const int note)
+cydaw::base::Text noteName(const int note)
 {
     static const char* names[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
-    return juce::String(names[((note % 12) + 12) % 12]) + juce::String(note / 12 - 1);
+    return cydaw::base::Text(names[((note % 12) + 12) % 12]) + cydaw::base::Text(note / 12 - 1);
 }
 
 // The words SFZ instruments name their controls with, in French.
@@ -56,19 +57,19 @@ constexpr std::array<std::pair<const char*, const char*>, 26> frenchPhrases { {
 } };
 
 // Words in the interface's language, a capital first.
-juce::String translated(const juce::String& text)
+cydaw::base::Text translated(const cydaw::base::Text& text)
 {
     if (!ui::french())
         return text.substring(0, 1).toUpperCase() + text.substring(1);
     for (const auto& [english, french] : frenchPhrases)
         if (text.trim().equalsIgnoreCase(english))
-            return juce::String::fromUTF8(french);
-    juce::StringArray words;
+            return cydaw::base::Text::fromUTF8(french);
+    cydaw::base::TextList words;
     words.addTokens(text, " ", "");
     for (auto& word : words)
         for (const auto& [english, french] : frenchWords)
             if (word.equalsIgnoreCase(english)) {
-                word = juce::String::fromUTF8(french);
+                word = cydaw::base::Text::fromUTF8(french);
                 break;
             }
     const auto named = words.joinIntoString(" ");
@@ -77,20 +78,20 @@ juce::String translated(const juce::String& text)
 
 // A control's name in the interface's language: the SFZ's words where it
 // has some, the usual controllers' own names when it gives none.
-juce::String controlName(const engine::SamplerMap::Control& control)
+cydaw::base::Text controlName(const engine::SamplerMap::Control& control)
 {
-    const auto label = juce::String::fromUTF8(control.label.c_str());
+    const auto label = cydaw::base::Text::fromUTF8(control.label.c_str());
     if (label.startsWith("CC ")) {
         switch (control.controller) {
-        case 1: return juce::String::fromUTF8(L("Molette", "Mod wheel"));
-        case 2: return juce::String::fromUTF8(L("Souffle", "Breath"));
-        case 4: return juce::String::fromUTF8(L("Pédale", "Foot pedal"));
-        case 7: return juce::String::fromUTF8(L("Volume", "Volume"));
-        case 10: return juce::String::fromUTF8(L("Panoramique", "Pan"));
-        case 11: return juce::String::fromUTF8(L("Expression", "Expression"));
-        case 64: return juce::String::fromUTF8(L("Pédale forte", "Sustain pedal"));
-        case 66: return juce::String::fromUTF8(L("Sostenuto", "Sostenuto"));
-        case 67: return juce::String::fromUTF8(L("Pédale douce", "Soft pedal"));
+        case 1: return cydaw::base::Text::fromUTF8(L("Molette", "Mod wheel"));
+        case 2: return cydaw::base::Text::fromUTF8(L("Souffle", "Breath"));
+        case 4: return cydaw::base::Text::fromUTF8(L("Pédale", "Foot pedal"));
+        case 7: return cydaw::base::Text::fromUTF8(L("Volume", "Volume"));
+        case 10: return cydaw::base::Text::fromUTF8(L("Panoramique", "Pan"));
+        case 11: return cydaw::base::Text::fromUTF8(L("Expression", "Expression"));
+        case 64: return cydaw::base::Text::fromUTF8(L("Pédale forte", "Sustain pedal"));
+        case 66: return cydaw::base::Text::fromUTF8(L("Sostenuto", "Sostenuto"));
+        case 67: return cydaw::base::Text::fromUTF8(L("Pédale douce", "Soft pedal"));
         default: return label;
         }
     }
@@ -101,18 +102,18 @@ juce::String controlName(const engine::SamplerMap::Control& control)
 // piece of a kit, a microphone) together, under that word; the others
 // gathered, by their whole names.
 struct Group {
-    juce::String title;
-    std::vector<std::pair<std::size_t, juce::String>> members;
+    cydaw::base::Text title;
+    std::vector<std::pair<std::size_t, cydaw::base::Text>> members;
 };
 
 std::vector<Group> groupsOf(const engine::SamplerMap& map)
 {
     std::vector<Group> groups;
     // Grouped by the SFZ's own words, then shown in the interface's.
-    const auto firstWord = [](const juce::String& name) { return name.upToFirstOccurrenceOf(" ", false, false).toLowerCase(); };
-    std::vector<juce::String> labels;
+    const auto firstWord = [](const cydaw::base::Text& name) { return name.upToFirstOccurrenceOf(" ", false, false).toLowerCase(); };
+    std::vector<cydaw::base::Text> labels;
     for (const auto& control : map.controls)
-        labels.push_back(juce::String::fromUTF8(control.label.c_str()));
+        labels.push_back(cydaw::base::Text::fromUTF8(control.label.c_str()));
     for (std::size_t index = 0; index < labels.size();) {
         const auto word = firstWord(labels[index]);
         auto end = index + 1;
@@ -121,7 +122,7 @@ std::vector<Group> groupsOf(const engine::SamplerMap& map)
         if (labels[index].contains(" ") && !labels[index].startsWith("CC ") && end - index >= 2) {
             const auto title = labels[index].upToFirstOccurrenceOf(" ", false, false);
             // A drum by its size: 18 is 18 inches.
-            Group group { title.containsOnly("0123456789") ? title + juce::String::fromUTF8("″") : translated(title), {} };
+            Group group { title.containsOnly("0123456789") ? title + cydaw::base::Text::fromUTF8("″") : translated(title), {} };
             for (auto at = index; at < end; ++at)
                 group.members.emplace_back(at, translated(labels[at].fromFirstOccurrenceOf(" ", false, false)));
             groups.push_back(std::move(group));
@@ -160,8 +161,8 @@ void draw(Studio& studio, UiState& state, const TrackRef& track, app::NodeGraphC
         ImGui::TextDisabled("%s", L("Cet instrument n'a ni contrôle ni articulation.", "This instrument has no control and no articulation."));
         return;
     }
-    const auto prefix = "node." + juce::String(static_cast<juce::int64>(nodeId)) + ".sampler.";
-    const auto set = [&](const juce::String& suffix, const double value) {
+    const auto prefix = "node." + cydaw::base::Text(static_cast<juce::int64>(nodeId)) + ".sampler.";
+    const auto set = [&](const cydaw::base::Text& suffix, const double value) {
         (void) graph.editorSetParameter(prefix + suffix, value);
         state.focused = Panel::devices;
     };
@@ -182,7 +183,7 @@ void draw(Studio& studio, UiState& state, const TrackRef& track, app::NodeGraphC
             auto label = noteName(key);
             for (const auto& [labelled, name] : map->keyswitchLabels)
                 if (labelled == key)
-                    label = juce::String::fromUTF8(name.c_str()) + " · " + label;
+                    label = cydaw::base::Text::fromUTF8(name.c_str()) + " · " + label;
             const auto width = ImGui::CalcTextSize(label.toRawUTF8()).x + dp(16.0f);
             if (index > 0) {
                 ImGui::SameLine();
@@ -225,7 +226,7 @@ void draw(Studio& studio, UiState& state, const TrackRef& track, app::NodeGraphC
                 const auto setOnCard = card->controllers[number];
                 const auto value = setOnCard >= 0.0f ? setOnCard : start;
                 const auto name = controlName(control);
-                const auto suffix = "cc" + juce::String(static_cast<int>(number));
+                const auto suffix = "cc" + cydaw::base::Text(static_cast<int>(number));
                 if (static_cast<int>(member) % columns == 0) {
                     if (member > 0)
                         ImGui::NewLine();
@@ -280,7 +281,7 @@ void draw(Studio& studio, UiState& state, const TrackRef& track, app::NodeGraphC
                 // Its name under it (its value while it moves).
                 auto* list = ImGui::GetWindowDrawList();
                 ImGui::PushFont(nullptr, ui::currentFontBase() * 0.76f);
-                const auto text = hovered || active ? juce::String(static_cast<int>(std::lround(value))) : shortName;
+                const auto text = hovered || active ? cydaw::base::Text(static_cast<int>(std::lround(value))) : shortName;
                 const auto y = origin.y + dp(diameter) + dp(2.0f);
                 const auto size = ImGui::CalcTextSize(text.toRawUTF8());
                 const auto x = origin.x + std::max(dp(2.0f), (cell - size.x) * 0.5f);

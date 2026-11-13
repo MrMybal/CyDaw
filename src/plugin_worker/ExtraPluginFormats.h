@@ -3,10 +3,10 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 namespace cydaw::plugins
 {
-std::unique_ptr<juce::AudioPluginFormat> extraPluginFormat(const juce::File &);
+std::unique_ptr<juce::AudioPluginFormat> extraPluginFormat(const cydaw::base::File &);
 cydaw::base::Value validateJsfxGraphics(juce::AudioPluginInstance &);
-bool isExtraFormat(const juce::File &);
-std::unique_ptr<juce::AudioPluginInstance> createExtraPlugin(const juce::File &, double, int, juce::String &,
-                                                             const juce::String &id = {});
-void scanExtraPlugin(const juce::File &, juce::OwnedArray<juce::PluginDescription> &, juce::String &);
+bool isExtraFormat(const cydaw::base::File &);
+std::unique_ptr<juce::AudioPluginInstance> createExtraPlugin(const cydaw::base::File &, double, int, cydaw::base::Text &,
+                                                             const cydaw::base::Text &id = {});
+void scanExtraPlugin(const cydaw::base::File &, juce::OwnedArray<juce::PluginDescription> &, cydaw::base::Text &);
 } // namespace cydaw::plugins

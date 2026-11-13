@@ -1,3 +1,5 @@
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #include "CardFiles.h"
 
 #include "Widgets.h"
@@ -56,13 +58,13 @@ const std::vector<float>& curveOf(const engine::ImpulseResponseRef& response)
 } // namespace
 
 CardFileScope::CardFileScope(DeviceHost& studio, UiState& state, const TrackRef& track, app::NodeGraphComponent& graph,
-                             const std::uint64_t nodeId, const juce::String& typeKey)
+                             const std::uint64_t nodeId, const cydaw::base::Text& typeKey)
 {
     if (typeKey != "cab-sim" && typeKey != "empreinte")
         return;
     const auto room = typeKey == "empreinte";
     if (const auto response = graph.nodeImpulse(nodeId); response != nullptr && !response->channels.empty()) {
-        file_.name = juce::String(response->name);
+        file_.name = cydaw::base::Text(response->name);
         file_.curveDb = &curveOf(response);
     }
     auto* studioPointer = &studio;
@@ -70,13 +72,13 @@ CardFileScope::CardFileScope(DeviceHost& studio, UiState& state, const TrackRef&
     file_.load = [studioPointer, statePointer, track, nodeId, room] {
         chooser = std::make_unique<juce::FileChooser>(room ? ui::Ls("La réponse impulsionnelle d'un lieu", "A place's impulse response")
                                                            : ui::Ls("Une réponse impulsionnelle de baffle", "A cabinet impulse response"),
-                                                      juce::File(), "*.wav;*.wave;*.aif;*.aiff;*.flac");
+                                                      cydaw::base::File(), "*.wav;*.wave;*.aif;*.aiff;*.flac");
         chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                              [studioPointer, statePointer, track, nodeId](const juce::FileChooser& picked) {
                                  const auto file = picked.getResult();
-                                 if (file == juce::File())
+                                 if (file == cydaw::base::File())
                                      return;
-                                 juce::String error;
+                                 cydaw::base::Text error;
                                  const auto done = studioPointer->loadCabImpulse(track, nodeId, file, error);
                                  statePointer->status = done ? ui::Ls("Réponse chargée : ", "Response loaded: ") + file.getFileName() : error;
                                  statePointer->statusIsError = !done;

@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "Studio.h"
@@ -91,7 +92,7 @@ private:
     // the pointer, else after the last ones.
     void copyNotes(const MidiClip& clip);
     void pasteNotes(const TrackRef& track, const MidiClip& clip);
-    void report(const juce::String& text);
+    void report(const cydaw::base::Text& text);
     void drawMidiPopups(const TrackRef& track, const MidiClip& clip);
     // Adds a shape to the notes it is for (the one right-clicked, or the
     // selection), over what they have.

@@ -68,3 +68,68 @@ AGENTS.md was found. All changes since 58f8c87 currently belong to this work.
 - Source File/Value/Result/Identifier ports compile in the desktop. Generic
   text/document boundary adapters still exist and the application STILL links
   JUCE. Continue with actual text/file/window/source/MIDI/plugin-host removal.
+
+## Native text, files, preferences and audio-file checkpoint (current work)
+
+- Source text and file/time APIs now use original base::Text/TextList/File/Time.
+  Only explicit old external ABI overrides remain typed with JUCE until those
+  interfaces are removed. Generic boundary conversion templates still exist.
+- Added original XML tree and preference storage using pinned pugixml 1.15 MIT.
+  Existing PROPERTIES XML, nested device XML, Unicode and case-sensitive keys
+  are preserved. Malformed settings are not overwritten. Saves are atomic.
+- Added original audio::AudioFormatReader/Writer/Manager and options. Real
+  sample decoding/encoding runs through CyAudioCore; no JUCE codec fallback.
+  Typed markers/regions/loops and opaque native preservation use Core's metadata.
+  Unsupported metadata export fails explicitly rather than silently dropping it.
+- Recording uses a preallocated bounded SPSC sample queue and a disk worker.
+  Waveform thumbnails now use two background readers and immutable peak data;
+  no JUCE AudioThumbnail. The preview uses the existing application segment
+  source pending the source/transport port.
+- Moved original plugin-interface data/serialization/validation out of graphical
+  ModuleInterfaceEditor into document/ModuleInterface.h + ModuleInterfaceState.cpp.
+  The actual implementation now compiles and tests in the common no-JUCE core.
+- Base and native audio-file tests pass without JUCE, including graph/interface
+  documents, old preferences, atomic saves, recording drain, actual PCM samples,
+  bounds/silence and markers. The actual app format session passed:
+  output/cyaudio-native-files-runtime/5e66d34482db485b85010e802771bfaf/checks.json.
+- Initial regressions: Mix passed. Foundry correctly edited/exported audio but
+  timed out saving session; text replacement copied the remaining string at
+  each newline (quadratic). Fixed exact replacement with a linear byte scan.
+  Project import passed Reaper/FL/Ardour/LMMS/Zrythm/AAF except MIDI-neighbour
+  stems; native findChildFiles now supports semicolon-separated masks.
+  Both unchanged regression scenarios are being rerun; inspect
+  output/cyaudio-native-files-regression-fixes.log. No assertions were weakened.
+- Native export build found a pre-existing notices path problem when called
+  from an exported project: PROJECT_SOURCE_DIR named the outer export project.
+  cydaw_copy_audio_notices now anchors to its own definition directory. Inspect
+  output/cyaudio-native-text-export-build2.log for the rerun.
+- Formatting reordered Windows includes; fixed windows.h before shell headers.
+
+Next: finish these reruns and commit this validated checkpoint, then CONTINUE
+complete retirement (do not end the user task with another partial report).
+The desktop STILL links JUCE. Audio device/source/MIDI/plugin/window/platform
+boundaries and the hidden graph model need actual removal.
+
+Graph separation preparation: tree-sitter installed ONLY under ignored
+output/migration-tools (MIT helper tooling, not an app dependency). Method maps
+are in output/graph-model-functions.json, graph-model-roots.json and
+ graph-model-reached.json. About 292 methods / 15k lines remain after excluding
+old UI refresh paths. New V2 uses these original data/compile/edit methods but
+never shows the old JUCE component. Separate those from UI, preserving actual
+algorithms, notifications, validation and history. Do not create dummy GUI
+compatibility classes. Existing modern GraphEditor already handles its own
+navigation, drawing, selection and embedded device editors. The old model's
+refreshTranslations should only apply translated type titles in the new model.
+ModuleInterface data has already been separated; do not duplicate it again.
+The maps are analysis artifacts, not final generated source, and may have old
+line numbers after edits. Parse the current files when extracting.
+
+Confirmed: both unchanged failing scenarios now PASS (Foundry 5.70s, project
+import 7.26s), including session reload. Base/native audio-file tests PASS.
+Native CLAP/LV2 exports rebuild after the notices fix; check their protocol/editor
+runner results in output/cyaudio-native-text-export-tests.log before committing.
+
+Native runner in build/cyaudio-native currently selects LV2: its real audio,
+state/parameters and editor protocol test PASSED (0.70s). Do not infer a fresh
+CLAP build from this single configured target. The app session independently
+hosted the existing CLAP/LV2/VST3 fixtures. Staged Gitleaks scan: 3.26MB, clean.

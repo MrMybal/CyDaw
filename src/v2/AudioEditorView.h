@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #pragma once
 
@@ -76,15 +77,15 @@ private:
     void drawLanes(const TrackRef& track, const AudioClip& clip, float headerLeft, float top, float height);
     // The lanes shown (the volume's at least, and any with points, the
     // shown sound's too).
-    [[nodiscard]] std::vector<juce::String> laneRows(const AudioClip& clip, const std::vector<AudioEvent>& events);
+    [[nodiscard]] std::vector<cydaw::base::Text> laneRows(const AudioClip& clip, const std::vector<AudioEvent>& events);
     // A sound's own lanes ("sound.volume", "sound.pan", "sound.pitch"),
     // shown for the sound picked (or the only one): its key in
     // AudioEvent::lanes, the sound, the curve editor's key (one per sound).
-    [[nodiscard]] static bool isSoundLane(const juce::String& name);
-    [[nodiscard]] static juce::String soundKeyOf(const juce::String& name);
+    [[nodiscard]] static bool isSoundLane(const cydaw::base::Text& name);
+    [[nodiscard]] static cydaw::base::Text soundKeyOf(const cydaw::base::Text& name);
     [[nodiscard]] const AudioEvent* soundTarget(const std::vector<AudioEvent>& events) const;
-    [[nodiscard]] juce::String editorKey(const juce::String& name, const std::vector<AudioEvent>& events) const;
-    [[nodiscard]] static juce::String laneLabel(const std::vector<Studio::MasterLaneChoice>& choices, const juce::String& name);
+    [[nodiscard]] cydaw::base::Text editorKey(const cydaw::base::Text& name, const std::vector<AudioEvent>& events) const;
+    [[nodiscard]] static cydaw::base::Text laneLabel(const std::vector<Studio::MasterLaneChoice>& choices, const cydaw::base::Text& name);
     // The grid as seen: from 16 bars down to a sixteenth of a beat.
     [[nodiscard]] double gridStep() const;
     // The darker lines' step and the brighter ones'.
@@ -92,13 +93,13 @@ private:
     void drawGrid(ImDrawList* list, ImVec2 min, ImVec2 max) const;
     // The wheel over the timeline: zoom around the pointer (Shift: along).
     void wheel(const AudioClip& clip, const std::vector<AudioEvent>& events);
-    bool setLanes(const TrackRef& track, const AudioClip& clip, std::map<juce::String, std::vector<AutomationPoint>> lanes,
-                  const juce::String& label);
+    bool setLanes(const TrackRef& track, const AudioClip& clip, std::map<cydaw::base::Text, std::vector<AutomationPoint>> lanes,
+                  const cydaw::base::Text& label);
     // A lane as the curve editor sees it, its points, and back.
-    [[nodiscard]] curves::Lane laneDescription(const std::vector<Studio::MasterLaneChoice>& choices, const juce::String& name) const;
+    [[nodiscard]] curves::Lane laneDescription(const std::vector<Studio::MasterLaneChoice>& choices, const cydaw::base::Text& name) const;
     [[nodiscard]] std::vector<curves::Point> curvePoints(const AudioClip& clip, const std::vector<AudioEvent>& events,
-                                                        const juce::String& name) const;
-    bool setCurve(const TrackRef& track, const AudioClip& clip, const std::vector<AudioEvent>& events, const juce::String& name,
+                                                        const cydaw::base::Text& name) const;
+    bool setCurve(const TrackRef& track, const AudioClip& clip, const std::vector<AudioEvent>& events, const cydaw::base::Text& name,
                   const std::vector<curves::Point>& points);
     // The picked points' bar, under the toolbar: their time and value, or
     // the multi-edit.
@@ -124,7 +125,7 @@ private:
     // A time on the beat grid, unless Shift is held.
     [[nodiscard]] double snap(double seconds) const;
     [[nodiscard]] double beatSeconds() const;
-    void report(const juce::String& message, bool error);
+    void report(const cydaw::base::Text& message, bool error);
 
     // ---- The clip, wherever it is -----------------------------------------------------------
     [[nodiscard]] AudioClip launcherView(const TrackRef& track, int scene, const LauncherClip& clip);
@@ -150,22 +151,22 @@ private:
     // Sounds and bounds put in together; anything before the content's
     // start moves everything later by as much (a launcher clip): one step.
     bool commitTimeline(const TrackRef& track, const AudioClip& clip, std::vector<AudioEvent> events, AudioClipBounds next,
-                        const juce::String& label, bool eventsChanged = false);
-    void addEvent(const TrackRef& track, const AudioClip& clip, const juce::File& file, double at);
+                        const cydaw::base::Text& label, bool eventsChanged = false);
+    void addEvent(const TrackRef& track, const AudioClip& clip, const cydaw::base::File& file, double at);
     // A process on a sound, or on a part of it (seconds of its file).
     void process(const TrackRef& track, const AudioClip& clip, const AudioEvent& event, const app::AudioEditRequest& request,
-                 const juce::String& label, std::optional<std::pair<double, double>> part);
+                 const cydaw::base::Text& label, std::optional<std::pair<double, double>> part);
     void duplicate(const TrackRef& track, const AudioClip& clip, const std::vector<AudioEvent>& events, std::uint64_t event);
     void fitToTempo(const TrackRef& track, const AudioClip& clip, const AudioEvent& event);
     // Where the selection falls in a sound: seconds of its file.
     [[nodiscard]] std::optional<std::pair<double, double>> selectionIn(const AudioEvent& event) const;
 
     // ---- A launcher clip's undo (the engine keeps none for them) ------------------------------
-    void remember(const TrackRef& track, const juce::String& label);
+    void remember(const TrackRef& track, const cydaw::base::Text& label);
     struct Step {
         TrackRef track;
         LauncherClip clip;
-        juce::String label;
+        cydaw::base::Text label;
     };
     std::vector<Step> undo_;
     std::vector<Step> redo_;
@@ -181,8 +182,8 @@ private:
         int bits {};
         double length {};
     };
-    [[nodiscard]] const Format& formatOf(const juce::File& file);
-    std::map<juce::String, Format> formats_;
+    [[nodiscard]] const Format& formatOf(const cydaw::base::File& file);
+    std::map<cydaw::base::Text, Format> formats_;
 
     Studio& studio_;
     UiState& state_;
@@ -243,10 +244,10 @@ private:
     // Where bars and beats count from (the clip's loop start).
     double gridOrigin_ {};
     // The lanes shown for a clip; a point dragged.
-    std::map<std::uint64_t, std::vector<juce::String>> laneRows_;
+    std::map<std::uint64_t, std::vector<cydaw::base::Text>> laneRows_;
     // Each lane's curve editor (its picked points), and the lane last clicked.
-    std::map<juce::String, curves::Editor> curveEditors_;
-    juce::String focusedLane_;
+    std::map<cydaw::base::Text, curves::Editor> curveEditors_;
+    cydaw::base::Text focusedLane_;
     // Processes.
     int process_ {};
     float gainDb_ { 3.0f };

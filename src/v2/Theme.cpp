@@ -9,7 +9,7 @@ const std::vector<Theme>& builtInThemes()
         std::vector<Theme> result;
         for (const auto& entry : cyui::builtInThemes()) {
             const auto key = entry.key == "amber-night" ? "dark" : entry.key;
-            result.push_back({juce::String(key), juce::String(entry.name), extended(entry.palette), true, {}});
+            result.push_back({cydaw::base::Text(key), cydaw::base::Text(entry.name), extended(entry.palette), true, {}});
         }
         return result;
     }();
@@ -60,9 +60,9 @@ cydaw::base::Value paletteToJson(const Palette& palette)
         const auto g = (colour >> 8) & 0xffu;
         const auto b = (colour >> 16) & 0xffu;
         const auto a = (colour >> 24) & 0xffu;
-        auto text = "#" + juce::String::toHexString(static_cast<int>((r << 16) | (g << 8) | b)).paddedLeft('0', 6).toUpperCase();
+        auto text = "#" + cydaw::base::Text::toHexString(static_cast<int>((r << 16) | (g << 8) | b)).paddedLeft('0', 6).toUpperCase();
         if (a != 0xffu)
-            text << juce::String::toHexString(static_cast<int>(a)).paddedLeft('0', 2).toUpperCase();
+            text << cydaw::base::Text::toHexString(static_cast<int>(a)).paddedLeft('0', 2).toUpperCase();
         colours->setProperty(field.key, text);
     }
     return cydaw::base::Value(colours);
@@ -85,7 +85,7 @@ Palette paletteFromJson(const cydaw::base::Value& colours, const Palette& base)
 
 void loadFonts()
 {
-    const auto folder = juce::File::getSpecialLocation(juce::File::currentExecutableFile).getSiblingFile("fonts").getFullPathName().toStdString();
+    const auto folder = cydaw::base::File::getSpecialLocation(cydaw::base::File::currentExecutableFile).getSiblingFile("fonts").getFullPathName().toStdString();
     cyui::FontConfig fonts;
     fonts.fallbackFolder = folder.c_str();
     cyui::loadFonts(fonts);

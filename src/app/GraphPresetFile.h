@@ -16,24 +16,24 @@ inline constexpr int nodeGraphStateSchema = 29;
 inline constexpr juce::int64 maximumGraphPresetBytes = 4 * 1024 * 1024;
 
 struct GraphPresetMetadata {
-    juce::String definitionId;
+    cydaw::base::Text definitionId;
     cydaw::graph::SemanticVersion version;
     cydaw::graph::GraphRole role { cydaw::graph::GraphRole::generic };
     cydaw::graph::GraphScope scope { cydaw::graph::GraphScope::user };
-    juce::StringArray tags;
-    juce::String category;
-    juce::String description;
-    juce::String author;
+    cydaw::base::TextList tags;
+    cydaw::base::Text category;
+    cydaw::base::Text description;
+    cydaw::base::Text author;
 };
 
 struct GraphPresetDocument {
-    juce::String name;
+    cydaw::base::Text name;
     cydaw::base::Value graph;
     GraphPresetMetadata metadata;
 };
 
 [[nodiscard]] inline cydaw::graph::GraphRole graphRoleFromString(
-    const juce::String& value)
+    const cydaw::base::Text& value)
 {
     using Role = cydaw::graph::GraphRole;
     if (value == "audio-effect") return Role::audioEffect;
@@ -46,7 +46,7 @@ struct GraphPresetDocument {
 }
 
 [[nodiscard]] inline cydaw::graph::GraphScope graphScopeFromString(
-    const juce::String& value)
+    const cydaw::base::Text& value)
 {
     using Scope = cydaw::graph::GraphScope;
     if (value == "factory") return Scope::factory;
@@ -57,9 +57,9 @@ struct GraphPresetDocument {
 }
 
 [[nodiscard]] inline std::optional<cydaw::graph::SemanticVersion>
-parseGraphVersion(const juce::String& value)
+parseGraphVersion(const cydaw::base::Text& value)
 {
-    const auto parts = juce::StringArray::fromTokens(value, ".", "");
+    const auto parts = cydaw::base::TextList::fromTokens(value, ".", "");
     if (parts.size() != 3)
         return std::nullopt;
     for (const auto& part : parts)
@@ -76,12 +76,12 @@ parseGraphVersion(const juce::String& value)
 }
 
 [[nodiscard]] inline cydaw::base::Value makeGraphPresetDocument(
-    const juce::String& name, const cydaw::base::Value& graph,
+    const cydaw::base::Text& name, const cydaw::base::Value& graph,
     GraphPresetMetadata metadata = {})
 {
     const auto safeName = name.trim().substring(0, 128);
     if (metadata.definitionId.isEmpty()) {
-        auto slug = juce::File::createLegalFileName(safeName)
+        auto slug = cydaw::base::File::createLegalFileName(safeName)
                         .toLowerCase().replaceCharacter(' ', '-');
         while (slug.contains("--"))
             slug = slug.replace("--", "-");
@@ -93,7 +93,7 @@ parseGraphVersion(const juce::String& value)
     root->setProperty("schema", graphPresetFileSchema);
     root->setProperty("name", safeName);
     root->setProperty("definitionId", metadata.definitionId.substring(0, 192));
-    root->setProperty("version", juce::String(metadata.version.toString()));
+    root->setProperty("version", cydaw::base::Text(metadata.version.toString()));
     root->setProperty("role", cydaw::graph::toString(metadata.role));
     root->setProperty("scope", cydaw::graph::toString(metadata.scope));
     root->setProperty("category", metadata.category.trim().substring(0, 192));
@@ -165,10 +165,10 @@ parseGraphPresetDocument(const cydaw::base::Value& value)
     return GraphPresetDocument { name, graph, std::move(metadata) };
 }
 
-[[nodiscard]] inline juce::File userGraphPresetDirectory()
+[[nodiscard]] inline cydaw::base::File userGraphPresetDirectory()
 {
-    return juce::File::getSpecialLocation(
-               juce::File::userDocumentsDirectory)
+    return cydaw::base::File::getSpecialLocation(
+               cydaw::base::File::userDocumentsDirectory)
         .getChildFile("CyDAW")
         .getChildFile("Graphs");
 }

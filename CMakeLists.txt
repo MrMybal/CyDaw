@@ -152,9 +152,17 @@ function(cydaw_configure_plugin_formats target_name)
     )
 endfunction()
 
-add_library(cydaw_base STATIC src/base/Value.cpp src/base/File.cpp)
+add_library(cydaw_base STATIC src/base/Value.cpp src/base/File.cpp src/base/Xml.cpp src/base/Properties.cpp third_party/pugixml/pugixml.cpp)
 target_include_directories(cydaw_base PUBLIC include PRIVATE third_party)
 target_compile_features(cydaw_base PUBLIC cxx_std_20)
+add_library(cydaw_audio_files STATIC src/integration/CyAudioCoreAudioFormats.cpp)
+target_link_libraries(cydaw_audio_files PUBLIC cydaw_base CyAudioCore::Files)
+target_compile_features(cydaw_audio_files PUBLIC cxx_std_20)
+set_target_properties(cydaw_audio_files PROPERTIES POSITION_INDEPENDENT_CODE ON)
+if(MSVC)
+    target_compile_options(cydaw_audio_files PRIVATE /utf-8 /W4 /permissive-)
+endif()
+
 set_target_properties(cydaw_base PROPERTIES POSITION_INDEPENDENT_CODE ON)
 if(WIN32)
     target_link_libraries(cydaw_base PRIVATE shell32 ole32)
@@ -165,6 +173,7 @@ endif()
 
 add_library(cydaw_core STATIC
     src/app/ProjectRecovery.cpp
+    src/app/ModuleInterfaceState.cpp
     src/app/NativeDspGraphState.cpp
     src/native_plugin/NativeRuntime.cpp
     src/graph/GraphDefinition.cpp
@@ -314,6 +323,10 @@ if(CYDAW_BUILD_TESTS)
 endif()
 
 if(CYDAW_BUILD_TESTS)
+    add_executable(cydaw_audio_files_tests tests/AudioFilesTests.cpp)
+    target_link_libraries(cydaw_audio_files_tests PRIVATE cydaw_audio_files)
+    add_test(NAME cydaw_audio_files_tests COMMAND cydaw_audio_files_tests)
+    cydaw_configure_test(cydaw_audio_files_tests 60)
     add_executable(cydaw_base_tests tests/BaseTests.cpp)
     target_link_libraries(cydaw_base_tests PRIVATE CyDAW::Core)
     add_test(NAME cydaw_base_tests COMMAND cydaw_base_tests)
@@ -356,7 +369,7 @@ if(CYDAW_BUILD_DESKTOP)
     # Transitional source interfaces remain JUCE; every application reader
     # decodes samples through CyAudioCore. Explicit legacy metadata parser is retained.
     if(TARGET juce_audio_formats)
-        target_sources(juce_audio_formats INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/src/integration/CyAudioCoreAudioFormats.cpp")
+        target_link_libraries(juce_audio_formats INTERFACE cydaw_audio_files)
         target_include_directories(juce_audio_formats INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/include")
         target_link_libraries(juce_audio_formats INTERFACE CyAudioCore::Files)
     endif()

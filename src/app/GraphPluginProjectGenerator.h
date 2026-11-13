@@ -11,9 +11,9 @@ namespace cydaw::app {
 // generated project embeds the complete initial runtime state in the binary and
 // consumes the common CyDAW Graph runtime, avoiding a second DSP engine.
 [[nodiscard]] cydaw::base::Result generateGraphVst3Project(
-    const juce::File& destination,
+    const cydaw::base::File& destination,
     const cydaw::graph::PluginExportPlan& plan,
     const cydaw::base::Value& manifest,
-    const cydaw::base::Value& runtimeState, const juce::String& format = "VST3");
+    const cydaw::base::Value& runtimeState, const cydaw::base::Text& format = "VST3");
 
 } // namespace cydaw::app

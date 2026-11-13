@@ -1,3 +1,5 @@
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #include "MidiDevices.h"
 
 #include <imgui.h>
@@ -18,7 +20,7 @@ struct Lists {
 Lists& lists()
 {
     static Lists cached;
-    const auto now = juce::Time::getMillisecondCounterHiRes() * 0.001;
+    const auto now = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
     if (now - cached.readAt > 2.0) {
         cached.inputs = juce::MidiInput::getAvailableDevices();
         cached.outputs = juce::MidiOutput::getAvailableDevices();
@@ -27,7 +29,7 @@ Lists& lists()
     return cached;
 }
 
-juce::String nameIn(const juce::Array<juce::MidiDeviceInfo>& devices, const juce::String& identifier)
+cydaw::base::Text nameIn(const juce::Array<juce::MidiDeviceInfo>& devices, const cydaw::base::Text& identifier)
 {
     for (const auto& device : devices)
         if (device.identifier == identifier)
@@ -47,12 +49,12 @@ const juce::Array<juce::MidiDeviceInfo>& outputs()
     return lists().outputs;
 }
 
-juce::String inputName(const juce::String& identifier)
+cydaw::base::Text inputName(const cydaw::base::Text& identifier)
 {
     return nameIn(inputs(), identifier);
 }
 
-juce::String outputName(const juce::String& identifier)
+cydaw::base::Text outputName(const cydaw::base::Text& identifier)
 {
     return nameIn(outputs(), identifier);
 }

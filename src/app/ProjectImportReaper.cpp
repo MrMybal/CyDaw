@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #include "ProjectImport.h"
 #include "ProjectImportShared.h"
@@ -18,34 +19,34 @@ namespace {
 using namespace shared;
 
 struct Block {
-    juce::StringArray head; // "<NAME a b": NAME, a, b
+    cydaw::base::TextList head; // "<NAME a b": NAME, a, b
     // Its fields and inner blocks in their order (a take's fields follow its
     // TAKE line).
     struct Entry {
-        juce::StringArray tokens;
+        cydaw::base::TextList tokens;
         std::unique_ptr<Block> block;
     };
     std::vector<Entry> entries;
 
-    [[nodiscard]] juce::String name() const { return head.isEmpty() ? juce::String() : head[0]; }
-    [[nodiscard]] const juce::StringArray* field(const juce::String& key) const
+    [[nodiscard]] cydaw::base::Text name() const { return head.isEmpty() ? cydaw::base::Text() : head[0]; }
+    [[nodiscard]] const cydaw::base::TextList* field(const cydaw::base::Text& key) const
     {
         for (const auto& entry : entries)
             if (entry.block == nullptr && !entry.tokens.isEmpty() && entry.tokens[0] == key)
                 return &entry.tokens;
         return nullptr;
     }
-    [[nodiscard]] juce::String text(const juce::String& key, const int index = 1, const juce::String& fallback = {}) const
+    [[nodiscard]] cydaw::base::Text text(const cydaw::base::Text& key, const int index = 1, const cydaw::base::Text& fallback = {}) const
     {
         const auto* tokens = field(key);
         return tokens != nullptr && index < tokens->size() ? (*tokens)[index] : fallback;
     }
-    [[nodiscard]] double number(const juce::String& key, const int index, const double fallback) const
+    [[nodiscard]] double number(const cydaw::base::Text& key, const int index, const double fallback) const
     {
         const auto* tokens = field(key);
         return tokens != nullptr && index < tokens->size() ? (*tokens)[index].getDoubleValue() : fallback;
     }
-    [[nodiscard]] const Block* child(const juce::String& blockName) const
+    [[nodiscard]] const Block* child(const cydaw::base::Text& blockName) const
     {
         for (const auto& entry : entries)
             if (entry.block != nullptr && entry.block->name() == blockName)
@@ -56,9 +57,9 @@ struct Block {
 
 // A line as Reaper writes it: words, or strings in " ' or ` (the quote the
 // string does not hold).
-juce::StringArray tokenise(const juce::String& line)
+cydaw::base::TextList tokenise(const cydaw::base::Text& line)
 {
-    juce::StringArray tokens;
+    cydaw::base::TextList tokens;
     auto pointer = line.getCharPointer();
     while (!pointer.isEmpty()) {
         while (!pointer.isEmpty() && juce::CharacterFunctions::isWhitespace(*pointer))
@@ -66,7 +67,7 @@ juce::StringArray tokenise(const juce::String& line)
         if (pointer.isEmpty())
             break;
         const auto first = *pointer;
-        juce::String token;
+        cydaw::base::Text token;
         if (first == '"' || first == '\'' || first == '`') {
             ++pointer;
             while (!pointer.isEmpty() && *pointer != first)
@@ -82,11 +83,11 @@ juce::StringArray tokenise(const juce::String& line)
     return tokens;
 }
 
-std::unique_ptr<Block> parse(const juce::String& content)
+std::unique_ptr<Block> parse(const cydaw::base::Text& content)
 {
     auto root = std::make_unique<Block>();
     std::vector<Block*> open { root.get() };
-    juce::StringArray lines;
+    cydaw::base::TextList lines;
     lines.addLines(content);
     for (const auto& raw : lines) {
         const auto line = raw.trim();
@@ -121,7 +122,7 @@ juce::uint32 reaperColour(const juce::int64 value)
 
 class ReaperReader {
 public:
-    ReaperReader(const juce::File& file, ImportedProject& out) : file_(file), out_(out), folder_(file.getParentDirectory()) {}
+    ReaperReader(const cydaw::base::File& file, ImportedProject& out) : file_(file), out_(out), folder_(file.getParentDirectory()) {}
 
     cydaw::base::Result read()
     {
@@ -136,7 +137,7 @@ public:
         if (project == nullptr)
             return cydaw::base::Result::fail("The Reaper project holds no REAPER_PROJECT block");
         out_.format = "reaper";
-        out_.application = "Reaper " + (project->head.size() > 2 ? project->head[2] : juce::String());
+        out_.application = "Reaper " + (project->head.size() > 2 ? project->head[2] : cydaw::base::Text());
         out_.tempo = juce::jlimit(20.0, 960.0, project->number("TEMPO", 1, 120.0));
         out_.numerator = juce::jlimit(1, 32, static_cast<int>(project->number("TEMPO", 2, 4.0)));
         out_.denominator = juce::jlimit(1, 32, static_cast<int>(project->number("TEMPO", 3, 4.0)));
@@ -145,7 +146,7 @@ public:
             for (const auto& entry : envelope->entries)
                 if (entry.block == nullptr && !entry.tokens.isEmpty() && entry.tokens[0] == "PT" && entry.tokens.size() > 2
                     && std::abs(entry.tokens[2].getDoubleValue() - out_.tempo) > 0.01) {
-                    out_.warnings.add("The tempo changes along the project: CyDAW keeps " + juce::String(out_.tempo, 2) + " BPM.");
+                    out_.warnings.add("The tempo changes along the project: CyDAW keeps " + cydaw::base::Text(out_.tempo, 2) + " BPM.");
                     break;
                 }
         for (const auto& entry : project->entries)
@@ -192,7 +193,7 @@ private:
             if (kind != "VST" && kind != "CLAP" && kind != "JS" && kind != "AU" && kind != "LV2" && kind != "DX")
                 continue;
             ImportedDevice device;
-            auto written = entry.block->head.size() > 1 ? entry.block->head[1] : juce::String();
+            auto written = entry.block->head.size() > 1 ? entry.block->head[1] : cydaw::base::Text();
             auto prefix = written.upToFirstOccurrenceOf(":", false, false).trim();
             if (kind == "JS") {
                 prefix = "JS";
@@ -211,10 +212,10 @@ private:
             // Reaper's own (Cockos) devices are the application's; the rest
             // are plug-ins it hosts.
             device.plugin = !(device.vendor == "Cockos" && device.name.startsWith("Rea"));
-            device.type = device.plugin ? juce::String() : device.name;
+            device.type = device.plugin ? cydaw::base::Text() : device.name;
             if (device.name.isEmpty())
                 device.name = written;
-            track.devices.add(device.name + (bypassed ? " (bypassed)" : juce::String()));
+            track.devices.add(device.name + (bypassed ? " (bypassed)" : cydaw::base::Text()));
             track.hadInstrument = track.hadInstrument || device.instrument;
             track.chain.push_back(std::move(device));
             bypassed = false;
@@ -225,7 +226,7 @@ private:
     void readItem(const Block& item, ImportedTrack& track)
     {
         struct Take {
-            juce::String name;
+            cydaw::base::Text name;
             double sourceOffset {};
             double rate { 1.0 };
             const Block* source {};
@@ -281,7 +282,7 @@ private:
             if (const auto* inner = source->child("SOURCE"))
                 source = inner;
         }
-        const auto type = source->head.size() > 1 ? source->head[1] : juce::String();
+        const auto type = source->head.size() > 1 ? source->head[1] : cydaw::base::Text();
         const auto name = take->name.isNotEmpty() ? take->name : item.text("NAME");
         if (type == "MIDI") {
             readMidi(*source, track, name, position, length, looping, muted, sourceOffset, take->rate);
@@ -307,7 +308,7 @@ private:
         track.audioClips.push_back(std::move(clip));
     }
 
-    void readMidi(const Block& source, ImportedTrack& track, const juce::String& name, const double position, const double length,
+    void readMidi(const Block& source, ImportedTrack& track, const cydaw::base::Text& name, const double position, const double length,
                   const bool looping, const bool muted, const double sourceOffset, const double rate)
     {
         const auto ticksPerQuarter = std::max(1.0, source.number("HASDATA", 2, 960.0));
@@ -378,14 +379,14 @@ private:
         track.midi = true;
     }
 
-    juce::File file_;
+    cydaw::base::File file_;
     ImportedProject& out_;
-    juce::File folder_;
+    cydaw::base::File folder_;
 };
 
 } // namespace
 
-cydaw::base::Result importReaperProject(const juce::File& file, ImportedProject& out)
+cydaw::base::Result importReaperProject(const cydaw::base::File& file, ImportedProject& out)
 {
     out.source = file;
     ReaperReader reader(file, out);

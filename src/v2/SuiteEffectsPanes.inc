@@ -52,13 +52,13 @@ struct Assistant {
     double power {};
     double peak {};
     Loudness loudness;
-    juce::String verdict;
+    cydaw::base::Text verdict;
 };
 Assistant& assistantOf(std::vector<Param>& parameters, const Pane& pane)
 {
-    static std::map<juce::String, Assistant> assistants;
+    static std::map<cydaw::base::Text, Assistant> assistants;
     const auto* first = at(parameters, pane, 0);
-    return assistants[first != nullptr ? first->binding : juce::String("?")];
+    return assistants[first != nullptr ? first->binding : cydaw::base::Text("?")];
 }
 
 // What the assistant hears while it listens; true once it has heard enough.
@@ -113,8 +113,8 @@ bool assistantButton(Assistant& assistant, const ImVec2 origin, const float widt
     auto* list = ImGui::GetWindowDrawList();
     ImGui::SetCursorScreenPos(origin);
     ImGui::PushStyleColor(ImGuiCol_Button, theme::alpha(colour, assistant.listening ? 0.55f : 0.3f));
-    const auto label = assistant.listening ? juce::String(ui::Ls("Écoute… ", "Listening… ")) + juce::String(std::max(0, static_cast<int>(std::ceil(seconds - assistant.heard)))) + " s"
-                                           : juce::String(ui::Ls("Assistant : écouter", "Assistant: listen"));
+    const auto label = assistant.listening ? cydaw::base::Text(ui::Ls("Écoute… ", "Listening… ")) + cydaw::base::Text(std::max(0, static_cast<int>(std::ceil(seconds - assistant.heard)))) + " s"
+                                           : cydaw::base::Text(ui::Ls("Assistant : écouter", "Assistant: listen"));
     const auto clicked = ImGui::Button(label.toRawUTF8(), ImVec2(width, dp(24.0f)));
     ImGui::PopStyleColor();
     if (ImGui::IsItemHovered())
@@ -126,7 +126,7 @@ bool assistantButton(Assistant& assistant, const ImVec2 origin, const float widt
         assistant.listening = true;
         assistant.verdict = verdict;
     }
-    const auto said = assistant.listening && !live.running ? juce::String(ui::Ls("Lancez la lecture pour qu'il écoute.", "Start playback for it to listen."))
+    const auto said = assistant.listening && !live.running ? cydaw::base::Text(ui::Ls("Lancez la lecture pour qu'il écoute.", "Start playback for it to listen."))
                                                            : assistant.verdict;
     if (said.isNotEmpty())
         text(list, ImVec2(origin.x + width + dp(8.0f), origin.y + dp(5.0f)), p.textDim, said.toRawUTF8(), 0.66f);
@@ -330,7 +330,7 @@ double prominence(const std::array<double, kOctaves>& deviation, const int octav
 
 // The assistant's conclusions for a track: its equaliser and compressor,
 // judged on the track's own shape (a hi-hat has no lows to lift).
-juce::String trancheSuggest(std::vector<Param>& parameters, const Pane& pane, const Assistant& assistant, const Setter& set)
+cydaw::base::Text trancheSuggest(std::vector<Param>& parameters, const Pane& pane, const Assistant& assistant, const Setter& set)
 {
     const auto deviation = balance(assistant);
     const auto put = [&](const int index, const double value) { apply(at(parameters, pane, index), value, set); };
@@ -371,24 +371,24 @@ juce::String trancheSuggest(std::vector<Param>& parameters, const Pane& pane, co
     put(suited::trancheCompMakeup, std::clamp(-0.5 * suited::compressorGainDb(peak, threshold, 3.0, 6.0), 0.0, 9.0));
     put(suited::trancheEqOn, 1.0);
     put(suited::trancheCompOn, 1.0);
-    juce::StringArray done;
+    cydaw::base::TextList done;
     if (lowCut > 10.5)
-        done.add(juce::String::fromUTF8(ui::french() ? "coupe-bas " : "low cut ") + juce::String(juce::roundToInt(lowCut)) + " Hz");
+        done.add(cydaw::base::Text::fromUTF8(ui::french() ? "coupe-bas " : "low cut ") + cydaw::base::Text(juce::roundToInt(lowCut)) + " Hz");
     const auto describe = [&done](const char* french, const char* english, const double db) {
         if (std::abs(db) > 0.05)
-            done.add(juce::String::fromUTF8(ui::french() ? french : english) + " " + (db > 0.0 ? "+" : "") + juce::String(db, 1) + " dB");
+            done.add(cydaw::base::Text::fromUTF8(ui::french() ? french : english) + " " + (db > 0.0 ? "+" : "") + cydaw::base::Text(db, 1) + " dB");
     };
     describe("graves", "lows", lowShelf);
     describe("aigus", "highs", highShelf);
     if (cutFor(mids) < -0.05)
-        done.add(juce::String::fromUTF8(ui::french() ? "cloche " : "bell ") + juce::String(juce::roundToInt(kOctaveHz[static_cast<std::size_t>(mids)]))
-                 + " Hz " + juce::String(cutFor(mids), 1) + " dB");
+        done.add(cydaw::base::Text::fromUTF8(ui::french() ? "cloche " : "bell ") + cydaw::base::Text(juce::roundToInt(kOctaveHz[static_cast<std::size_t>(mids)]))
+                 + " Hz " + cydaw::base::Text(cutFor(mids), 1) + " dB");
     if (cutFor(presence) < -0.05)
-        done.add(juce::String::fromUTF8(ui::french() ? "cloche " : "bell ")
-                 + juce::String(juce::roundToInt(kOctaveHz[static_cast<std::size_t>(presence)])) + " Hz " + juce::String(cutFor(presence), 1)
+        done.add(cydaw::base::Text::fromUTF8(ui::french() ? "cloche " : "bell ")
+                 + cydaw::base::Text(juce::roundToInt(kOctaveHz[static_cast<std::size_t>(presence)])) + " Hz " + cydaw::base::Text(cutFor(presence), 1)
                  + " dB");
-    done.add(juce::String::fromUTF8(ui::french() ? "compresseur à " : "compressor at ") + juce::String(juce::roundToInt(threshold)) + " dB");
-    return juce::String::fromUTF8(ui::french() ? "Réglé : " : "Set: ") + done.joinIntoString(", ") + ".";
+    done.add(cydaw::base::Text::fromUTF8(ui::french() ? "compresseur à " : "compressor at ") + cydaw::base::Text(juce::roundToInt(threshold)) + " dB");
+    return cydaw::base::Text::fromUTF8(ui::french() ? "Réglé : " : "Set: ") + done.joinIntoString(", ") + ".";
 }
 
 bool trancheLarge(const Pane& pane, std::vector<Param>& parameters, const ImVec2 position, const ImVec2 size, const ImU32 colour,
@@ -568,7 +568,7 @@ bool finitionDisplay(std::vector<Param>& parameters, const Pane& pane, const Box
 
 // The assistant's conclusions for a master: the gain to the target, the tone
 // a little towards the balance.
-juce::String finitionSuggest(std::vector<Param>& parameters, const Pane& pane, const Assistant& assistant, const Setter& set)
+cydaw::base::Text finitionSuggest(std::vector<Param>& parameters, const Pane& pane, const Assistant& assistant, const Setter& set)
 {
     const auto values = studioValues<suited::finitionParameterCount>(parameters, pane, "finition");
     const auto put = [&](const int index, const double value) { apply(at(parameters, pane, index), value, set); };
@@ -589,7 +589,7 @@ juce::String finitionSuggest(std::vector<Param>& parameters, const Pane& pane, c
     std::snprintf(said, sizeof(said), ui::french() ? "Entendu %.1f LUFS : gain %.1f dB pour viser %.0f LUFS. Relancez pour affiner."
                                                    : "Heard %.1f LUFS: gain %.1f dB to aim at %.0f LUFS. Listen again to refine.",
                   heard, gain, target.lufs);
-    return juce::String::fromUTF8(said);
+    return cydaw::base::Text::fromUTF8(said);
 }
 
 bool finitionLarge(const Pane& pane, std::vector<Param>& parameters, const ImVec2 position, const ImVec2 size, const ImU32 colour,
@@ -615,7 +615,7 @@ bool finitionLarge(const Pane& pane, std::vector<Param>& parameters, const ImVec
     }
     auto y = outer.max.y + dp(6.0f);
     assistantButton(assistant, ImVec2(position.x + dp(4.0f), y), dp(190.0f), colour, live, 10.0);
-    std::vector<juce::String> targets;
+    std::vector<cydaw::base::Text> targets;
     for (int index = 0; index < mixd::loudnessTargetCount; ++index)
         targets.push_back(targetName(index));
     const auto comboWidth = std::min(dp(320.0f), size.x * 0.3f);

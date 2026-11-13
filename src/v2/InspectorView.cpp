@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #include "InspectorView.h"
 #include "ControlTargets.h"
 
@@ -128,7 +129,7 @@ void InspectorView::draw()
         std::snprintf(name, sizeof(name), "%s", studio_.trackName(track).toRawUTF8());
         row(L("Nom", "Name"));
         if (ImGui::InputText("##trackName", name, sizeof(name), ImGuiInputTextFlags_EnterReturnsTrue))
-            studio_.setTrackName(track, juce::String::fromUTF8(name));
+            studio_.setTrackName(track, cydaw::base::Text::fromUTF8(name));
         row(L("Couleur", "Colour"));
         for (auto index = 0; index < 12; ++index) {
             ImGui::PushID(index);
@@ -151,7 +152,7 @@ void InspectorView::draw()
         auto changed = false;
         row(L("Volume", "Volume"));
         // A controller can move each of them (learn mode).
-        const auto learn = [&](const char* what, const juce::String& label) {
+        const auto learn = [&](const char* what, const cydaw::base::Text& label) {
             return control_targets::forTrackLearn(studio_, track, what, label);
         };
         changed |= ImGui::SliderFloat("##gain", &mix.gainDb, -60.0f, 12.0f, "%.1f dB");
@@ -195,7 +196,7 @@ void InspectorView::draw()
 
         // Its format, what it records from, and each of its channels' level
         // (the track itself shows two sides only).
-        juce::String formatError;
+        cydaw::base::Text formatError;
         row("Format");
         routing_ui::formatCombo(studio_, track, -1.0f, formatError);
         if (formatError.isNotEmpty()) {
@@ -233,7 +234,7 @@ void InspectorView::draw()
         ui::sectionTitle(L("ROUTAGE", "ROUTING"));
         if (studio_.isBusTrack(track) || !studio_.trackSenders(track).empty())
             routing_ui::sendersLine(studio_, track, dp(78.0f));
-        juce::String routingError;
+        cydaw::base::Text routingError;
         routing_ui::inputsEditor(studio_, track, dp(78.0f), routingError);
         ImGui::Spacing();
         routing_ui::outputsEditor(studio_, track, dp(78.0f), routingError);
@@ -299,7 +300,7 @@ void InspectorView::draw()
             std::snprintf(name, sizeof(name), "%s", clip->name.toRawUTF8());
             row(L("Nom", "Name"));
             if (ImGui::InputText("##clipName", name, sizeof(name), ImGuiInputTextFlags_EnterReturnsTrue))
-                (void) engine.setMidiClipPresentation(ref.track.midiId, ref.clipId, juce::String::fromUTF8(name), 0);
+                (void) engine.setMidiClipPresentation(ref.track.midiId, ref.clipId, cydaw::base::Text::fromUTF8(name), 0);
             auto start = static_cast<float>(clip->startBeats);
             row(L("Début", "Start"));
             if (ImGui::DragFloat("##startBeats", &start, 0.05f, 0.0f, 100'000.0f, L("%.2f temps", "%.2f beats"))) {
@@ -403,7 +404,7 @@ void InspectorView::drawBus(const TrackRef& busRef)
     std::snprintf(name, sizeof(name), "%s", bus->name.toRawUTF8());
     row(L("Nom", "Name"));
     if (ImGui::InputText("##busName", name, sizeof(name), ImGuiInputTextFlags_EnterReturnsTrue))
-        studio_.setTrackName(busRef, juce::String::fromUTF8(name));
+        studio_.setTrackName(busRef, cydaw::base::Text::fromUTF8(name));
     row("Format");
     ImGui::TextDisabled("%s  (%s %s)", Studio::formatName(bus->channels).toRawUTF8(), L("carte", "card"),
                         routing_ui::deviceChannelsText(*bus).toRawUTF8());
@@ -451,7 +452,7 @@ void InspectorView::drawBus(const TrackRef& busRef)
                                         "Its effects (Devices, Graph) treat what leaves; a track sent to it goes before or after them."));
     ImGui::PopTextWrapPos();
     if (input) {
-        juce::StringArray users;
+        cydaw::base::TextList users;
         for (const auto& track : studio_.tracks())
             if (!track.midi && studio_.engine().trackMixState(track.audioIndex).inputBusId == bus->id)
                 users.add(studio_.trackName(track)

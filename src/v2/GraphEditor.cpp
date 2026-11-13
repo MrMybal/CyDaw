@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #include "GraphEditor.h"
 
 #include "CardFiles.h"
@@ -39,14 +40,14 @@ constexpr float kKnobCellH = graph_layout::knobCellH;
 constexpr float kSocket = 5.0f;
 constexpr float kGridStep = 24.0f;
 
-juce::String fold(const juce::String& text)
+cydaw::base::Text fold(const cydaw::base::Text& text)
 {
     auto out = text.toLowerCase();
     static const char* pairs[][2] = { { "é", "e" }, { "è", "e" }, { "ê", "e" }, { "ë", "e" }, { "à", "a" }, { "â", "a" },
                                       { "ä", "a" }, { "î", "i" }, { "ï", "i" }, { "ô", "o" }, { "ö", "o" }, { "ù", "u" },
                                       { "û", "u" }, { "ü", "u" }, { "ç", "c" } };
     for (const auto& pair : pairs)
-        out = out.replace(juce::String::fromUTF8(pair[0]), pair[1]);
+        out = out.replace(cydaw::base::Text::fromUTF8(pair[0]), pair[1]);
     return out;
 }
 
@@ -133,7 +134,7 @@ std::string valueFormat(const double minimum, const double maximum)
 
 // A module's sockets are named after their ids ("input-37001"): the kind of
 // signal says more. A value input takes the name of the knob it drives.
-juce::String portLabel(const app::NodeGraphComponent::EditorPort& port, const app::NodeGraphComponent::EditorNode* node = nullptr)
+cydaw::base::Text portLabel(const app::NodeGraphComponent::EditorPort& port, const app::NodeGraphComponent::EditorNode* node = nullptr)
 {
     const auto name = port.name.trim();
     const auto lower = name.toLowerCase();
@@ -162,20 +163,20 @@ juce::String portLabel(const app::NodeGraphComponent::EditorPort& port, const ap
     };
     for (const auto& entry : known)
         if (name == entry[0])
-            return juce::String::fromUTF8(ui::french() ? entry[1] : entry[2]);
+            return cydaw::base::Text::fromUTF8(ui::french() ? entry[1] : entry[2]);
     const auto generated = (name.startsWith("input-") || name.startsWith("output-"))
                            && name.fromFirstOccurrenceOf("-", false, false).containsOnly("0123456789");
     if (!generated && name.isNotEmpty())
         return name;
     switch (port.kind) {
-        case 0: return port.channels == 2 ? "Audio" : "Audio " + juce::String(port.channels);
+        case 0: return port.channels == 2 ? "Audio" : "Audio " + cydaw::base::Text(port.channels);
         case 1: return "MIDI";
         case 2: return ui::Ls("Contrôle", "Control");
         default: return "Transport";
     }
 }
 
-bool isLogUnit(const juce::String& unit, const double minimum)
+bool isLogUnit(const cydaw::base::Text& unit, const double minimum)
 {
     return minimum > 0.0 && (unit == "Hz" || unit == "ms" || unit == "s");
 }
@@ -328,7 +329,7 @@ GraphSlot* GraphEditor::trackSlot(const TrackRef& track)
     return studio_.graphFor(track);
 }
 
-void GraphEditor::addNode(const juce::String& typeKey)
+void GraphEditor::addNode(const cydaw::base::Text& typeKey)
 {
     auto* slot = inWorkshop() ? studio_.workshopGraph() : (state_.selectedTrack ? trackSlot(*state_.selectedTrack) : nullptr);
     if (slot == nullptr || view_ == nullptr || currentGraph_ != slot)
@@ -369,7 +370,7 @@ void GraphEditor::addNode(const juce::String& typeKey)
     }
 }
 
-void GraphEditor::addBoundary(GraphSlot& slot, const juce::String& typeKey, const bool input)
+void GraphEditor::addBoundary(GraphSlot& slot, const cydaw::base::Text& typeKey, const bool input)
 {
     // At the edge of what is there: inputs on the left, outputs on the
     // right, under those of their side.
@@ -481,14 +482,14 @@ void GraphEditor::ioMenu(GraphSlot& slot)
     ImGui::Separator();
     const auto widths = [&](const bool input) {
         const auto key = [input](const int channels) {
-            return juce::String(input ? "graph-audio-input-" : "graph-audio-output-") + juce::String(channels);
+            return cydaw::base::Text(input ? "graph-audio-input-" : "graph-audio-output-") + cydaw::base::Text(channels);
         };
         if (ImGui::MenuItem("Mono"))
             addBoundary(slot, key(1), input);
         if (ImGui::MenuItem(L("Stéréo", "Stereo")))
             addBoundary(slot, key(2), input);
         for (const auto channels : { 3, 4, 5, 6, 8 })
-            if (ImGui::MenuItem((juce::String(channels) + ui::Ls(" canaux", " channels")).toRawUTF8()))
+            if (ImGui::MenuItem((cydaw::base::Text(channels) + ui::Ls(" canaux", " channels")).toRawUTF8()))
                 addBoundary(slot, key(channels), input);
     };
     if (ImGui::BeginMenu(L("Entrée audio", "Audio input"))) {
@@ -519,7 +520,7 @@ void GraphEditor::groupSelection(GraphSlot& slot)
 {
     if (selection_.empty())
         return;
-    juce::String error;
+    cydaw::base::Text error;
     const auto card = studio_.createDeviceFromSelection(slot, { selection_.begin(), selection_.end() }, {}, error);
     if (card == 0) {
         lastError_ = error;
@@ -687,7 +688,7 @@ void GraphEditor::drawToolbar(GraphSlot& slot, const std::optional<TrackRef>& tr
     const auto error = slot.lastCompileError();
     const auto message = error.isNotEmpty() ? error
                          : lastError_.isNotEmpty() && ImGui::GetTime() - lastErrorTime_ < 5.0 ? lastError_
-                                                                                               : juce::String();
+                                                                                               : cydaw::base::Text();
     const auto text = message.isNotEmpty() ? message
                       : showingModulation_ ? ui::Ls("Modulation : sa sortie bouge les paramètres choisis",
                                                      "Modulation: its output moves the parameters picked")
@@ -823,7 +824,7 @@ void GraphEditor::drawCanvas(GraphSlot& slot, const std::optional<TrackRef>& tra
     // A node type dragged from the workshop's palette lands where it drops.
     if (ImGui::BeginDragDropTarget()) {
         if (const auto* payload = ImGui::AcceptDragDropPayload(nodeTypePayload); payload != nullptr && payload->DataSize > 0) {
-            const auto key = juce::String::fromUTF8(static_cast<const char*>(payload->Data), payload->DataSize - 1);
+            const auto key = cydaw::base::Text::fromUTF8(static_cast<const char*>(payload->Data), payload->DataSize - 1);
             if (const auto id = slot.graph().editorAddNode(key, worldToFraction(screenToWorld(mouse))); id != 0)
                 selection_ = { id };
         }
@@ -1239,7 +1240,7 @@ void GraphEditor::drawWires(ImDrawList* list, const std::vector<EditorConnection
         if (hovered && connection.kind == 2 && connection.drivesParameter) {
             const auto what = connection.mode == 1
                                   ? ui::Ls("Module le bouton autour de sa valeur, profondeur ", "Modulates the knob around its value, depth ")
-                                        + juce::String(juce::roundToInt(connection.amount * 100.0f)) + " %"
+                                        + cydaw::base::Text(juce::roundToInt(connection.amount * 100.0f)) + " %"
                                   : ui::Ls("Règle la valeur du bouton", "Sets the knob's value");
             ImGui::SetTooltip("%s\n%s", what.toRawUTF8(),
                               L("Clic droit : régler ou moduler, profondeur. Alt+clic : couper",
@@ -1363,7 +1364,7 @@ void GraphEditor::drawNode(app::NodeGraphComponent& graph, const NodeLayout& lay
         }
         if (ImGui::InputText("##rename", renameBuffer_, sizeof(renameBuffer_),
                              ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll)) {
-            graph.editorSetAlias(node.id, juce::String::fromUTF8(renameBuffer_));
+            graph.editorSetAlias(node.id, cydaw::base::Text::fromUTF8(renameBuffer_));
             renaming_.reset();
         } else if (ImGui::IsItemDeactivated()) {
             renaming_.reset();
@@ -1752,7 +1753,7 @@ void GraphEditor::searchPopup(GraphSlot& slot, const std::optional<TrackRef>& tr
     ImGui::SetNextItemWidth(-1.0f);
     const auto entered = ImGui::InputTextWithHint("##search", L("Rechercher un nœud…", "Search a node…"), searchText_,
                                                   sizeof(searchText_), ImGuiInputTextFlags_EnterReturnsTrue);
-    const auto query = fold(juce::String::fromUTF8(searchText_).trim());
+    const auto query = fold(cydaw::base::Text::fromUTF8(searchText_).trim());
 
     // Candidates, ranked.
     struct Candidate {
@@ -1855,7 +1856,7 @@ void GraphEditor::searchPopup(GraphSlot& slot, const std::optional<TrackRef>& tr
         if (query.isNotEmpty()) {
             // Where it sits in the tree, its last level.
             const auto path = node_tree::pathOf(type);
-            const auto where = path.empty() ? juce::String() : path.back();
+            const auto where = path.empty() ? cydaw::base::Text() : path.back();
             const auto width = ImGui::CalcTextSize(where.toRawUTF8()).x;
             list->AddText(ImVec2(origin.x + ImGui::GetContentRegionAvail().x - width - dp(4.0f), origin.y + dp(2.0f)), p.textFaint,
                           where.toRawUTF8());
@@ -2010,7 +2011,7 @@ void GraphEditor::handleKeys(GraphSlot& slot)
 
 
 void GraphEditor::promoteValue(app::NodeGraphComponent& graph, std::uint64_t node, std::uint64_t port,
-    const juce::String& binding, bool input)
+    const cydaw::base::Text& binding, bool input)
 {
     std::uint64_t created{};
     const auto result=graph.editorPromoteValue(node,port,binding,input,created);
@@ -2049,7 +2050,7 @@ void GraphEditor::drawDetails()
     ui::sectionTitle(node.title.toRawUTF8());
     ImGui::TextDisabled("%s",node.typeKey.toRawUTF8());
     if (selection_.size()>1) ImGui::TextDisabled(L("%d nœuds sélectionnés","%d nodes selected"),static_cast<int>(selection_.size()));
-    const auto field = [](const char* id,char* buffer,std::size_t size,const juce::String& value,bool multiline=false) {
+    const auto field = [](const char* id,char* buffer,std::size_t size,const cydaw::base::Text& value,bool multiline=false) {
         if(ImGui::GetActiveID()!=ImGui::GetID(id)) std::snprintf(buffer,size,"%s",value.toRawUTF8());
         ImGui::SetNextItemWidth(-1);
         if(multiline) ImGui::InputTextMultiline(id,buffer,size,ImVec2(-1,dp(66)));
@@ -2057,14 +2058,14 @@ void GraphEditor::drawDetails()
         return ImGui::IsItemDeactivatedAfterEdit();
     };
     ImGui::TextDisabled("%s",L("Nom","Name"));
-    if(field("##name",detailName_,sizeof(detailName_),node.title)) graph.editorSetAlias(node.id,juce::String::fromUTF8(detailName_));
+    if(field("##name",detailName_,sizeof(detailName_),node.title)) graph.editorSetAlias(node.id,cydaw::base::Text::fromUTF8(detailName_));
     ImGui::TextDisabled("%s",L("Description","Description"));
     if(field("##description",detailDescription_,sizeof(detailDescription_),node.description,true))
-        graph.editorSetDescription(node.id,juce::String::fromUTF8(detailDescription_));
+        graph.editorSetDescription(node.id,cydaw::base::Text::fromUTF8(detailDescription_));
     if(!node.boundary) { auto bypass=node.bypassed; if(ImGui::Checkbox("Bypass",&bypass)) graph.editorSetBypassed(node.id,bypass); }
     ImGui::Separator();
     ImGui::SetNextItemWidth(-1); ImGui::InputTextWithHint("##filter",L("Filtrer les paramètres…","Filter parameters…"),detailFilter_,sizeof(detailFilter_));
-    const auto filter=juce::String::fromUTF8(detailFilter_);
+    const auto filter=cydaw::base::Text::fromUTF8(detailFilter_);
     if(ImGui::CollapsingHeader(L("Paramètres du nœud","Node parameters"),ImGuiTreeNodeFlags_DefaultOpen)) {
         for(const auto& param:node.parameters) {
             if(filter.isNotEmpty() && !param.label.containsIgnoreCase(filter) && !param.binding.containsIgnoreCase(filter)) continue;
@@ -2072,7 +2073,7 @@ void GraphEditor::drawDetails()
             ImGui::TextUnformatted(param.label.toRawUTF8());
             auto v=static_cast<float>(param.value);
             ImGui::SetNextItemWidth(-1);
-            const auto fmt=param.unit.isNotEmpty()?juce::String("%.3f ")+param.unit.replace("%","%%"):"%.3f";
+            const auto fmt=param.unit.isNotEmpty()?cydaw::base::Text("%.3f ")+param.unit.replace("%","%%"):"%.3f";
             if(ImGui::DragFloat("##value",&v,static_cast<float>(std::max(0.0001,(param.maximum-param.minimum)/400)),
                 static_cast<float>(param.minimum),static_cast<float>(param.maximum),fmt.toRawUTF8(),ImGuiSliderFlags_AlwaysClamp)) graph.editorSetParameter(param.binding,v);
             valueActions(graph,node,param);
@@ -2106,7 +2107,7 @@ void GraphEditor::drawDetails()
             ImGui::SameLine(); ImGui::TextDisabled(port.kind==0?"audio %d ch":port.kind==1?"MIDI":port.kind==2?"valeur":"transport",port.channels);
             auto& category=detailPortCategories_[{node.id,port.id}];
             if(field("##category",category.data(),category.size(),port.category))
-                (void)graph.editorSetPortDetails(node.id,port.id,port.name,juce::String::fromUTF8(category.data()));
+                (void)graph.editorSetPortDetails(node.id,port.id,port.name,cydaw::base::Text::fromUTF8(category.data()));
             ui::tooltip(L("Catégorie de la prise","Socket category"));
             if(port.input) {
                 if(ImGui::SmallButton("Create Input")) promoteValue(graph,node.id,port.id,{},true);
@@ -2132,13 +2133,13 @@ void GraphEditor::drawPorts()
     if(boundaryKind_==0) { ImGui::SetNextItemWidth(-1); ImGui::SliderInt(L("Canaux","Channels"),&boundaryChannels_,1,8); }
     if(ImGui::Button(L("Ajouter la prise","Add socket"),ImVec2(-1,0))) {
         const auto in=boundaryDirection_==0;
-        const auto key=boundaryKind_==0?juce::String(in?"graph-audio-input-":"graph-audio-output-")+juce::String(boundaryChannels_)
-            :juce::String(boundaryKind_==1?(in?"graph-midi-input":"graph-midi-output"):(boundaryKind_==2?(in?"graph-value-input":"graph-value-output"):(in?"graph-transport-input":"graph-transport-output")));
+        const auto key=boundaryKind_==0?cydaw::base::Text(in?"graph-audio-input-":"graph-audio-output-")+cydaw::base::Text(boundaryChannels_)
+            :cydaw::base::Text(boundaryKind_==1?(in?"graph-midi-input":"graph-midi-output"):(boundaryKind_==2?(in?"graph-value-input":"graph-value-output"):(in?"graph-transport-input":"graph-transport-output")));
         addBoundary(*slot,key,in);
         if(!selection_.empty()) { const auto id=*selection_.begin();
-            if(boundaryName_[0]) slot->graph().editorSetAlias(id,juce::String::fromUTF8(boundaryName_));
+            if(boundaryName_[0]) slot->graph().editorSetAlias(id,cydaw::base::Text::fromUTF8(boundaryName_));
             for(const auto& n:slot->graph().editorNodes()) if(n.id==id) for(const auto& p:n.ports)
-                slot->graph().editorSetPortDetails(id,p.id,boundaryName_[0]?juce::String::fromUTF8(boundaryName_):p.name,juce::String::fromUTF8(boundaryCategory_));
+                slot->graph().editorSetPortDetails(id,p.id,boundaryName_[0]?cydaw::base::Text::fromUTF8(boundaryName_):p.name,cydaw::base::Text::fromUTF8(boundaryCategory_));
         }
     }
     ImGui::Separator();
@@ -2175,9 +2176,9 @@ void GraphEditor::drawPrograms()
     ImGui::Spacing();
 
     if (ImGui::Button(L("Créer Init (valeurs par défaut)", "Create Init (default values)"))) {
-        auto initName = juce::String("Init");
+        auto initName = cydaw::base::Text("Init");
         for (int n = 2; std::any_of(programs.begin(), programs.end(), [&](const auto& preset) { return preset.name == initName; }); ++n)
-            initName = "Init " + juce::String(n);
+            initName = "Init " + cydaw::base::Text(n);
         programs.push_back(graph.editorCaptureProgram(initName, true));
         graph.editorSetPrograms(programs);
         state_.status = ui::Ls("Préréglage créé : ", "Preset created: ") + initName;
@@ -2190,7 +2191,7 @@ void GraphEditor::drawPrograms()
     const auto entered = ImGui::InputTextWithHint("##programName", L("Nom du préréglage", "Preset name"), programName_.data(),
                                                   programName_.size(), ImGuiInputTextFlags_EnterReturnsTrue);
     ImGui::SameLine();
-    const auto name = juce::String::fromUTF8(programName_.data()).trim();
+    const auto name = cydaw::base::Text::fromUTF8(programName_.data()).trim();
     const auto existing = std::find_if(programs.begin(), programs.end(), [&name](const auto& program) { return program.name == name; });
     ImGui::BeginDisabled(name.isEmpty());
     if (ui::primaryButton(existing != programs.end() ? L("Remplacer", "Replace") : L("Ajouter", "Add"), ImVec2(dp(88.0f), 0.0f))
@@ -2230,7 +2231,7 @@ void GraphEditor::drawPrograms()
                                                ImGuiInputTextFlags_EnterReturnsTrue);
             ImGui::SameLine();
             if (done || ImGui::Button("OK")) {
-                const auto renamed = juce::String::fromUTF8(programRename_.data()).trim();
+                const auto renamed = cydaw::base::Text::fromUTF8(programRename_.data()).trim();
                 if (renamed.isNotEmpty() && std::none_of(programs.begin(), programs.end(), [&](const auto& other) { return &other != &program && other.name == renamed; })) {
                     if (program_ == program.name)
                         program_ = renamed;
@@ -2242,14 +2243,14 @@ void GraphEditor::drawPrograms()
             if (ImGui::IsKeyPressed(ImGuiKey_Escape))
                 renamingProgram_ = -1;
         } else {
-            const auto label = juce::String(static_cast<int>(index) + 1) + ".  " + program.name;
+            const auto label = cydaw::base::Text(static_cast<int>(index) + 1) + ".  " + program.name;
             if (ImGui::Selectable(label.toRawUTF8(), program.name == program_)) {
                 (void) graph.editorApplyProgram(program);
                 program_ = program.name;
                 state_.status = ui::Ls("Préréglage : ", "Preset: ") + program.name;
             }
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("%s", (juce::String(static_cast<int>(program.values.size()))
+                ImGui::SetTooltip("%s", (cydaw::base::Text(static_cast<int>(program.values.size()))
                                          + ui::Ls(" réglages", " settings")).toRawUTF8());
             if (ImGui::BeginPopupContextItem("##programMenu")) {
                 if (ImGui::MenuItem(L("Charger", "Load"))) {

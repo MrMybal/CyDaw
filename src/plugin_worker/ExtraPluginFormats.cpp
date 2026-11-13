@@ -1,21 +1,23 @@
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #include "ExtraPluginFormats.h"
 namespace cydaw::plugins
 {
-std::unique_ptr<juce::AudioPluginInstance> createJsfx(const juce::File &, juce::String &);
-std::unique_ptr<juce::AudioPluginInstance> createClap(const juce::File &, const juce::String &,
-                                                      juce::String &);
-void scanClap(const juce::File &, juce::OwnedArray<juce::PluginDescription> &, juce::String &);
-bool isExtraFormat(const juce::File &file)
+std::unique_ptr<juce::AudioPluginInstance> createJsfx(const cydaw::base::File &, cydaw::base::Text &);
+std::unique_ptr<juce::AudioPluginInstance> createClap(const cydaw::base::File &, const cydaw::base::Text &,
+                                                      cydaw::base::Text &);
+void scanClap(const cydaw::base::File &, juce::OwnedArray<juce::PluginDescription> &, cydaw::base::Text &);
+bool isExtraFormat(const cydaw::base::File &file)
 {
     return file.hasFileExtension("clap;jsfx") || file.getFileExtension().isEmpty();
 }
-std::unique_ptr<juce::AudioPluginInstance> createExtraPlugin(const juce::File &file, double, int,
-                                                             juce::String &error, const juce::String &id)
+std::unique_ptr<juce::AudioPluginInstance> createExtraPlugin(const cydaw::base::File &file, double, int,
+                                                             cydaw::base::Text &error, const cydaw::base::Text &id)
 {
     return file.hasFileExtension("clap") ? createClap(file, id, error) : createJsfx(file, error);
 }
-void scanExtraPlugin(const juce::File &file, juce::OwnedArray<juce::PluginDescription> &result,
-                     juce::String &error)
+void scanExtraPlugin(const cydaw::base::File &file, juce::OwnedArray<juce::PluginDescription> &result,
+                     cydaw::base::Text &error)
 {
     if (file.hasFileExtension("clap"))
     {
@@ -32,10 +34,10 @@ void scanExtraPlugin(const juce::File &file, juce::OwnedArray<juce::PluginDescri
 }
 class ExtraFormat final : public juce::AudioPluginFormat
 {
-    juce::String name_;
+    cydaw::base::Text name_;
 
   public:
-    explicit ExtraFormat(juce::String name) : name_(std::move(name)) {}
+    explicit ExtraFormat(cydaw::base::Text name) : name_(std::move(name)) {}
     juce::String getName() const override
     {
         return name_;
@@ -43,18 +45,18 @@ class ExtraFormat final : public juce::AudioPluginFormat
     void findAllTypesForFile(juce::OwnedArray<juce::PluginDescription> &result,
                              const juce::String &path) override
     {
-        juce::String error;
-        scanExtraPlugin(juce::File(path), result, error);
+        cydaw::base::Text error;
+        scanExtraPlugin(cydaw::base::File(path), result, error);
         if (error.isNotEmpty())
             juce::Logger::writeToLog(error);
     }
     bool fileMightContainThisPluginType(const juce::String &path) override
     {
-        return isExtraFormat(juce::File(path));
+        return isExtraFormat(cydaw::base::File(path));
     }
     juce::String getNameOfPluginFromIdentifier(const juce::String &path) override
     {
-        return juce::File(path).getFileNameWithoutExtension();
+        return cydaw::base::File(path).getFileNameWithoutExtension();
     }
     bool pluginNeedsRescanning(const juce::PluginDescription &) override
     {
@@ -62,7 +64,7 @@ class ExtraFormat final : public juce::AudioPluginFormat
     }
     bool doesPluginStillExist(const juce::PluginDescription &d) override
     {
-        return juce::File(d.fileOrIdentifier).exists();
+        return cydaw::base::File(d.fileOrIdentifier).exists();
     }
     bool canScanForPlugins() const override
     {
@@ -74,9 +76,9 @@ class ExtraFormat final : public juce::AudioPluginFormat
     }
     juce::StringArray searchPathsForPlugins(const juce::FileSearchPath &paths, bool recursive, bool) override
     {
-        juce::StringArray result;
+        cydaw::base::TextList result;
         for (int i = 0; i < paths.getNumPaths(); ++i)
-            for (auto f : paths[i].findChildFiles(juce::File::findFiles, recursive, "*.clap;*.jsfx"))
+            for (auto f : paths[i].findChildFiles(cydaw::base::File::findFiles, recursive, "*.clap;*.jsfx"))
                 result.add(f.getFullPathName());
         return result;
     }
@@ -91,13 +93,13 @@ class ExtraFormat final : public juce::AudioPluginFormat
     void createPluginInstance(const juce::PluginDescription &d, double rate, int block,
                               PluginCreationCallback callback) override
     {
-        juce::String error;
-        auto plugin = createExtraPlugin(juce::File(d.fileOrIdentifier), rate, block, error,
-                                        d.pluginFormatName == "CLAP" ? d.descriptiveName : juce::String());
+        cydaw::base::Text error;
+        auto plugin = createExtraPlugin(cydaw::base::File(d.fileOrIdentifier), rate, block, error,
+                                        d.pluginFormatName == "CLAP" ? cydaw::base::Text(d.descriptiveName) : cydaw::base::Text());
         callback(std::move(plugin), error);
     }
 };
-std::unique_ptr<juce::AudioPluginFormat> extraPluginFormat(const juce::File &f)
+std::unique_ptr<juce::AudioPluginFormat> extraPluginFormat(const cydaw::base::File &f)
 {
     return std::make_unique<ExtraFormat>(f.hasFileExtension("clap") ? "CLAP" : "JSFX");
 }

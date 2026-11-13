@@ -1,3 +1,5 @@
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #include "ArrangementView.h"
 #include "ControlTargets.h"
 #include "AddTrackMenu.h"
@@ -454,8 +456,8 @@ void ArrangementView::drawCanvas()
     // A sample dragged from the browser.
     if (ImGui::BeginDragDropTarget()) {
         if (const auto* payload = ImGui::AcceptDragDropPayload(kFilePayload)) {
-            const auto path = juce::String::fromUTF8(static_cast<const char*>(payload->Data));
-            dropFiles(juce::StringArray(path), ImGui::GetIO().MousePos);
+            const auto path = cydaw::base::Text::fromUTF8(static_cast<const char*>(payload->Data));
+            dropFiles(cydaw::base::TextList(path), ImGui::GetIO().MousePos);
         }
         ImGui::EndDragDropTarget();
     }
@@ -796,7 +798,7 @@ void ArrangementView::drawAudioClip(ImDrawList* list, const ClipHit& hit, const 
     list->PushClipRect(ImVec2(std::max(hit.min.x, lanesMin_.x), hit.min.y), ImVec2(std::min(hit.max.x, lanesMax_.x), hit.max.y), true);
     // `sourceAt`: where a moment of the segment (from its start) plays in
     // the file.
-    const auto drawSegment = [&](const juce::File& file, const double timelineStart, const double timelineDuration,
+    const auto drawSegment = [&](const cydaw::base::File& file, const double timelineStart, const double timelineDuration,
                                  const auto& sourceAt) {
         auto* thumbnail = waveforms_.get(file);
         if (thumbnail == nullptr || timelineDuration <= 0.0)
@@ -890,18 +892,18 @@ void ArrangementView::drawAudioClip(ImDrawList* list, const ClipHit& hit, const 
     }
     ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 0.8f);
     // What it does beyond its sound: takes, transposition, stretch.
-    juce::String badges;
+    cydaw::base::Text badges;
     if (clip.takes.size() > 1)
-        badges << static_cast<int>(clip.takes.size()) << juce::String::fromUTF8(L(" prises", " takes")) << (clip.comp.empty() ? "" : "*")
+        badges << static_cast<int>(clip.takes.size()) << cydaw::base::Text::fromUTF8(L(" prises", " takes")) << (clip.comp.empty() ? "" : "*")
                << "  ";
     if (std::abs(clip.pitchSemitones) > 1.0e-6)
-        badges << (clip.pitchSemitones > 0 ? "+" : "") << juce::String(clip.pitchSemitones, std::abs(clip.pitchSemitones - std::round(clip.pitchSemitones)) > 1.0e-6 ? 2 : 0)
+        badges << (clip.pitchSemitones > 0 ? "+" : "") << cydaw::base::Text(clip.pitchSemitones, std::abs(clip.pitchSemitones - std::round(clip.pitchSemitones)) > 1.0e-6 ? 2 : 0)
                << " st  ";
     // A clip of events has no speed of its own (each event has its own).
     if (clip.usesEventTimeline)
-        badges << static_cast<int>(clip.events.size()) << juce::String::fromUTF8(L(" sons", " sounds"));
+        badges << static_cast<int>(clip.events.size()) << cydaw::base::Text::fromUTF8(L(" sons", " sounds"));
     else if (std::abs(sourceDuration - clip.durationSeconds) > 1.0e-4)
-        badges << juce::String(clip.durationSeconds / std::max(1.0e-6, sourceDuration) * 100.0, 0) << " %";
+        badges << cydaw::base::Text(clip.durationSeconds / std::max(1.0e-6, sourceDuration) * 100.0, 0) << " %";
     if (badges.isNotEmpty() && hit.max.x - hit.min.x > dp(90.0f)) {
         const auto width = ImGui::CalcTextSize(badges.toRawUTF8()).x;
         list->AddText(ImVec2(std::min(hit.max.x, lanesMax_.x) - width - dp(4.0f), hit.min.y + (headerHeight - ImGui::GetFontSize()) * 0.5f),
@@ -1037,7 +1039,7 @@ void ArrangementView::drawHeader(const TrackRef& track, const ImVec2 min, const 
         }
         if (ImGui::InputText("##rename", renameBuffer_, sizeof(renameBuffer_),
                              ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll)) {
-            studio_.setTrackName(track, juce::String::fromUTF8(renameBuffer_));
+            studio_.setTrackName(track, cydaw::base::Text::fromUTF8(renameBuffer_));
             renamingTrack_.reset();
         } else if (ImGui::IsItemDeactivated()) {
             renamingTrack_.reset();
@@ -1635,7 +1637,7 @@ void ArrangementView::openInEditor(const ClipRef& clip)
     state_.bringToFront = Panel::editor;
 }
 
-bool ArrangementView::dropFiles(const juce::StringArray& files, const ImVec2 screenPoint)
+bool ArrangementView::dropFiles(const cydaw::base::TextList& files, const ImVec2 screenPoint)
 {
     if (screenPoint.x < lanesMin_.x || screenPoint.x > lanesMax_.x || screenPoint.y < lanesMin_.y - dp(30.0f)
         || screenPoint.y > lanesMax_.y)
@@ -1658,7 +1660,7 @@ bool ArrangementView::dropFiles(const juce::StringArray& files, const ImVec2 scr
             target = part->audioIndex;
     auto added = false;
     for (const auto& path : files) {
-        const juce::File file(path);
+        const cydaw::base::File file(path);
         if (!file.existsAsFile())
             continue;
         if (target) {
@@ -1695,7 +1697,7 @@ void ArrangementView::clipContextMenu()
             if (const auto* clip = findAudioClip(engine, contextClip_->track.audioIndex, contextClip_->clipId)) {
                 const auto index = contextClip_->track.audioIndex;
                 const auto id = clip->id;
-                const auto reportStatus = [this](const juce::String& message) {
+                const auto reportStatus = [this](const cydaw::base::Text& message) {
                     state_.status = message;
                     state_.statusIsError = true;
                     state_.statusTime = ImGui::GetTime();
@@ -1748,7 +1750,7 @@ void ArrangementView::clipContextMenu()
                     request.levelDb = -1.0f;
                     if (const auto done = studio_.editAudioClip(contextClip_->track, id, request, clip->sourceOffsetSeconds,
                                                                 clip->sourceDurationSeconds > 0.0 ? clip->sourceDurationSeconds : clip->durationSeconds,
-                                                                juce::String::fromUTF8("Normaliser"));
+                                                                cydaw::base::Text::fromUTF8("Normaliser"));
                         done.failed())
                         reportStatus(done.getErrorMessage());
                 }
@@ -1792,10 +1794,10 @@ const std::vector<app::IsolatedPluginHost::ParameterSnapshot>&
 ArrangementView::pluginParameters(const std::size_t trackIndex, const std::size_t plugin, const bool refresh) const
 {
     const auto plugins = studio_.engine().trackPlugins(trackIndex);
-    const auto key = juce::String(static_cast<juce::int64>(trackIndex)) + ":" + juce::String(static_cast<juce::int64>(plugin)) + ":"
-                     + (plugin < plugins.size() ? plugins[plugin].file.getFullPathName() : juce::String());
+    const auto key = cydaw::base::Text(static_cast<juce::int64>(trackIndex)) + ":" + cydaw::base::Text(static_cast<juce::int64>(plugin)) + ":"
+                     + (plugin < plugins.size() ? plugins[plugin].file.getFullPathName() : cydaw::base::Text());
     auto& entry = pluginParameters_[key];
-    const auto now = juce::Time::getMillisecondCounterHiRes() * 0.001;
+    const auto now = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
     if (refresh && now - entry.fetchedAt > 3.0 && plugin < plugins.size() && plugins[plugin].running) {
         entry.fetchedAt = now;
         std::vector<app::IsolatedPluginHost::ParameterSnapshot> fresh;
@@ -1805,7 +1807,7 @@ ArrangementView::pluginParameters(const std::size_t trackIndex, const std::size_
     return entry.values;
 }
 
-ArrangementView::LaneScale ArrangementView::laneScale(const TrackRef& track, juce::String& lane) const
+ArrangementView::LaneScale ArrangementView::laneScale(const TrackRef& track, cydaw::base::Text& lane) const
 {
     LaneScale scale;
     scale.label = ui::Ls("Volume", "Volume");
@@ -1829,7 +1831,7 @@ ArrangementView::LaneScale ArrangementView::laneScale(const TrackRef& track, juc
         const auto name = studio_.pluginParameterName(track, lane);
         scale.volume = false;
         scale.parameter = { lane, name, {}, 0.0, 1.0, value, 0.5 };
-        scale.label = plugins[plugin].name + juce::String::fromUTF8(" \xc2\xb7 ") + name;
+        scale.label = plugins[plugin].name + cydaw::base::Text::fromUTF8(" \xc2\xb7 ") + name;
         return scale;
     }
     if (const auto* slot = studio_.graphFor(track))
@@ -1839,29 +1841,29 @@ ArrangementView::LaneScale ArrangementView::laneScale(const TrackRef& track, juc
                     scale.volume = false;
                     scale.parameter = { parameter.binding, parameter.label, parameter.unit, parameter.minimum,
                                         parameter.maximum, parameter.value, parameter.defaultValue };
-                    scale.label = node.title + juce::String::fromUTF8(" \xc2\xb7 ") + parameter.label;
+                    scale.label = node.title + cydaw::base::Text::fromUTF8(" \xc2\xb7 ") + parameter.label;
                     return scale;
                 }
     lane.clear();
     return scale;
 }
 
-juce::String ArrangementView::formatLaneValue(const float value, const LaneScale& scale)
+cydaw::base::Text ArrangementView::formatLaneValue(const float value, const LaneScale& scale)
 {
     if (scale.volume)
-        return juce::String(value, 1) + " dB";
+        return cydaw::base::Text(value, 1) + " dB";
     return visual::formatValue(scale.parameter, value);
 }
 
-juce::String ArrangementView::curveKey(const TrackRef& track, const juce::String& lane)
+cydaw::base::Text ArrangementView::curveKey(const TrackRef& track, const cydaw::base::Text& lane)
 {
-    const auto owner = track.master ? juce::String("master")
-                       : track.midi ? "midi" + juce::String(static_cast<juce::int64>(track.midiId))
-                                    : "audio" + juce::String(static_cast<juce::int64>(track.audioIndex));
+    const auto owner = track.master ? cydaw::base::Text("master")
+                       : track.midi ? "midi" + cydaw::base::Text(static_cast<juce::int64>(track.midiId))
+                                    : "audio" + cydaw::base::Text(static_cast<juce::int64>(track.audioIndex));
     return owner + "|" + lane;
 }
 
-curves::Lane ArrangementView::curveLane(const TrackRef& track, const juce::String& name, const LaneScale& scale) const
+curves::Lane ArrangementView::curveLane(const TrackRef& track, const cydaw::base::Text& name, const LaneScale& scale) const
 {
     const auto& p = theme::palette();
     curves::Lane lane;
@@ -1894,8 +1896,8 @@ curves::Lane ArrangementView::curveLane(const TrackRef& track, const juce::Strin
         const auto inBar = beats - bar * beatsPerBar;
         const auto beat = std::floor(inBar + 1.0e-6);
         const auto sixteenth = std::floor((inBar - beat) * 4.0 + 1.0e-6);
-        return juce::String(static_cast<int>(bar) + 1) + "." + juce::String(static_cast<int>(beat) + 1) + "."
-               + juce::String(static_cast<int>(sixteenth) + 1) + "  (" + juce::String(seconds, 3) + " s)";
+        return cydaw::base::Text(static_cast<int>(bar) + 1) + "." + cydaw::base::Text(static_cast<int>(beat) + 1) + "."
+               + cydaw::base::Text(static_cast<int>(sixteenth) + 1) + "  (" + cydaw::base::Text(seconds, 3) + " s)";
     };
     return lane;
 }
@@ -1912,7 +1914,7 @@ curves::View ArrangementView::curveView() const
     return view;
 }
 
-std::vector<curves::Point> ArrangementView::laneCurve(const TrackRef& track, const juce::String& lane) const
+std::vector<curves::Point> ArrangementView::laneCurve(const TrackRef& track, const cydaw::base::Text& lane) const
 {
     std::vector<curves::Point> points;
     for (const auto& point : studio_.lanePoints(track, lane))
@@ -1920,7 +1922,7 @@ std::vector<curves::Point> ArrangementView::laneCurve(const TrackRef& track, con
     return points;
 }
 
-void ArrangementView::setLaneCurve(const TrackRef& track, const juce::String& lane, const std::vector<curves::Point>& points)
+void ArrangementView::setLaneCurve(const TrackRef& track, const cydaw::base::Text& lane, const std::vector<curves::Point>& points)
 {
     rememberAutomation(track, lane);
     std::vector<Studio::AutomationPoint> stored;
@@ -1962,7 +1964,7 @@ void ArrangementView::drawCurveBar()
     auto shown = focusedCurveLane_;
     const auto scale = laneScale(track, shown);
     ImGui::TextColored(theme::vec(scale.volume ? p.control : p.modulation), "%s",
-                       (studio_.trackName(track) + juce::String::fromUTF8(" \xc2\xb7 ") + scale.label).toRawUTF8());
+                       (studio_.trackName(track) + cydaw::base::Text::fromUTF8(" \xc2\xb7 ") + scale.label).toRawUTF8());
     ImGui::SameLine(0.0f, dp(10.0f));
     auto points = laneCurve(track, focusedCurveLane_);
     const auto gridSeconds = state_.snapBeats > 0.0 ? state_.snapBeats * secondsPerBeat() : secondsPerBeat();
@@ -1973,7 +1975,7 @@ void ArrangementView::drawCurveBar()
 ImRect ArrangementView::laneLabelRect(const LaneHit& lane) const
 {
     const auto size = ImGui::GetStyle().FontSizeBase * 0.78f * ImGui::GetStyle().FontScaleMain * ImGui::GetStyle().FontScaleDpi;
-    const auto text = lane.scale.label + "  " + juce::String::fromUTF8(icon::chevronDown);
+    const auto text = lane.scale.label + "  " + cydaw::base::Text::fromUTF8(icon::chevronDown);
     const auto width = ImGui::GetFont()->CalcTextSizeA(size, FLT_MAX, 0.0f, text.toRawUTF8()).x;
     const ImVec2 min(lanesMin_.x + dp(3.0f), lane.clipBottom + dp(1.0f));
     return { min, ImVec2(min.x + width + dp(8.0f), min.y + size + dp(3.0f)) };
@@ -2038,7 +2040,7 @@ void ArrangementView::drawAutomation(ImDrawList* list, const LaneHit& lane)
                               || ImGui::IsMouseHoveringRect(label.Min, label.Max);
     list->AddRectFilled(label.Min, label.Max, labelHovered ? theme::mix(p.bg2, colour, 0.35f) : theme::alpha(p.bg1, 0.92f), dp(3.0f));
     ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 0.78f);
-    const auto text = lane.scale.label + "  " + juce::String::fromUTF8(icon::chevronDown);
+    const auto text = lane.scale.label + "  " + cydaw::base::Text::fromUTF8(icon::chevronDown);
     list->AddText(ImVec2(label.Min.x + dp(4.0f), label.Min.y + dp(1.0f)), labelHovered ? p.text : theme::alpha(colour, 0.95f), text.toRawUTF8());
     if (points.empty())
         list->AddText(ImVec2(label.Max.x + dp(8.0f), label.Min.y + dp(1.0f)), p.textFaint,
@@ -2046,7 +2048,7 @@ void ArrangementView::drawAutomation(ImDrawList* list, const LaneHit& lane)
     ImGui::PopFont();
 }
 
-void ArrangementView::rememberAutomation(const TrackRef& track, const juce::String& lane)
+void ArrangementView::rememberAutomation(const TrackRef& track, const cydaw::base::Text& lane)
 {
     dropStaleRefs();
     automationUndo_.push_back({ track, lane, studio_.lanePoints(track, lane) });
@@ -2273,7 +2275,7 @@ void ArrangementView::laneChooserMenu()
     const auto track = *laneChooserTrack_;
     const auto shown = studio_.shownLane(track);
     const auto automated = studio_.automatedParameters(track);
-    const auto isAutomated = [&automated](const juce::String& binding) {
+    const auto isAutomated = [&automated](const cydaw::base::Text& binding) {
         return std::find(automated.begin(), automated.end(), binding) != automated.end();
     };
     const auto mark = "\xe2\x97\x8f";
@@ -2292,7 +2294,7 @@ void ArrangementView::laneChooserMenu()
         return a.position.y < b.position.y;
     });
     const auto nameOf = [](const auto& node, const auto& parameter) {
-        return node.title + juce::String::fromUTF8(" \xc2\xb7 ") + parameter.label;
+        return node.title + cydaw::base::Text::fromUTF8(" \xc2\xb7 ") + parameter.label;
     };
     if (!automated.empty()) {
         ImGui::Separator();
@@ -2309,8 +2311,8 @@ void ArrangementView::laneChooserMenu()
         if (!Studio::parsePluginLane(binding, plugin, parameter))
             continue;
         const auto plugins = studio_.engine().trackPlugins(track.audioIndex);
-        const auto name = (plugin < plugins.size() ? plugins[plugin].name : juce::String("Plugin"))
-                          + juce::String::fromUTF8(" \xc2\xb7 ") + studio_.pluginParameterName(track, binding);
+        const auto name = (plugin < plugins.size() ? plugins[plugin].name : cydaw::base::Text("Plugin"))
+                          + cydaw::base::Text::fromUTF8(" \xc2\xb7 ") + studio_.pluginParameterName(track, binding);
         if (ImGui::MenuItem(name.toRawUTF8(), mark, shown == binding))
             studio_.setShownLane(track, binding);
     }
@@ -2323,7 +2325,7 @@ void ArrangementView::laneChooserMenu()
         if (ImGui::BeginMenu(node.title.toRawUTF8())) {
             // What the engine can follow: the chain's cards, the knobs
             // inside its modules, the instrument's own settings.
-            const auto item = [&](const auto& parameter, const juce::String& label) {
+            const auto item = [&](const auto& parameter, const cydaw::base::Text& label) {
                 const auto reachable = studio_.canAutomate(track, parameter.binding);
                 if (ImGui::MenuItem(label.toRawUTF8(), isAutomated(parameter.binding) ? mark : nullptr, shown == parameter.binding,
                                     reachable))
@@ -2332,8 +2334,8 @@ void ArrangementView::laneChooserMenu()
             // Many values (an equaliser's eight bands and their dynamics):
             // a menu for each group their names start with ("Bande 3 · Gain").
             const auto grouped = node.parameters.size() > 16;
-            const auto separator = juce::String::fromUTF8(" \xc2\xb7 ");
-            std::vector<juce::String> groups;
+            const auto separator = cydaw::base::Text::fromUTF8(" \xc2\xb7 ");
+            std::vector<cydaw::base::Text> groups;
             for (const auto& parameter : node.parameters) {
                 const auto at = parameter.label.indexOf(separator);
                 if (!grouped || at <= 0) {

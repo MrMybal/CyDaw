@@ -37,11 +37,11 @@ void setPalette(const Palette& palette);
 
 // A colour theme: a built-in one, or a file of the person's (.cytheme).
 struct Theme {
-    juce::String key;
-    juce::String name;
+    cydaw::base::Text key;
+    cydaw::base::Text name;
     Palette palette {};
     bool builtIn {};
-    juce::File file;
+    cydaw::base::File file;
 };
 // Shared built-in themes with legacy CyDAW keys. Mid grey remains the default;
 // ThemesView translates their display names in the application's language.

@@ -1,3 +1,5 @@
+#include <cydaw/base/File.h>
+#include <cydaw/base/Xml.h>
 #include <cydaw/base/Text.h>
 #include "ProjectImport.h"
 #include "ProjectImportShared.h"
@@ -22,20 +24,20 @@ constexpr double ticksPerBeat = 48.0;
 
 class LmmsReader {
 public:
-    LmmsReader(const juce::File& file, ImportedProject& out) : file_(file), out_(out), folder_(file.getParentDirectory()) {}
+    LmmsReader(const cydaw::base::File& file, ImportedProject& out) : file_(file), out_(out), folder_(file.getParentDirectory()) {}
 
     cydaw::base::Result read()
     {
-        std::unique_ptr<juce::XmlElement> document;
+        std::unique_ptr<cydaw::base::XmlElement> document;
         if (file_.hasFileExtension("mmpz")) {
-            juce::MemoryBlock bytes;
+            cydaw::base::MemoryBlock bytes;
             if (!file_.loadFileAsData(bytes) || bytes.getSize() < 6)
                 return cydaw::base::Result::fail("The file could not be opened: " + file_.getFullPathName());
             juce::MemoryInputStream compressed(static_cast<const char*>(bytes.getData()) + 4, bytes.getSize() - 4, false);
             juce::GZIPDecompressorInputStream unzipped(&compressed, false, juce::GZIPDecompressorInputStream::zlibFormat);
-            document = juce::XmlDocument::parse(readBounded(unzipped));
+            document = cydaw::base::XmlDocument::parse(readBounded(unzipped));
         } else {
-            document = juce::XmlDocument::parse(file_);
+            document = cydaw::base::XmlDocument::parse(file_);
         }
         if (document == nullptr || !document->hasTagName("lmms-project"))
             return cydaw::base::Result::fail("Not an LMMS project: " + file_.getFileName());
@@ -54,7 +56,7 @@ public:
         // The beat/bassline tracks in their order: the n-th plays the
         // patterns at place n of the instruments of the one container they
         // share (written in the first of them).
-        std::vector<const juce::XmlElement*> beatTracks;
+        std::vector<const cydaw::base::XmlElement*> beatTracks;
         for (const auto* track : container->getChildWithTagNameIterator("track")) {
             switch (track->getIntAttribute("type")) {
             case 0: readInstrument(*track); break;
@@ -75,7 +77,7 @@ private:
     [[nodiscard]] static double beats(const double ticks) { return ticks / ticksPerBeat; }
 
     // An instrument track's own: its name, mix, instrument and effects.
-    ImportedTrack instrumentTrack(const juce::XmlElement& element)
+    ImportedTrack instrumentTrack(const cydaw::base::XmlElement& element)
     {
         ImportedTrack track;
         track.midi = true;
@@ -98,16 +100,16 @@ private:
     }
 
     // Its clips ("pattern", "midiclip" since LMMS 1.3), in the song.
-    static std::vector<const juce::XmlElement*> patternsOf(const juce::XmlElement& element)
+    static std::vector<const cydaw::base::XmlElement*> patternsOf(const cydaw::base::XmlElement& element)
     {
-        std::vector<const juce::XmlElement*> patterns;
+        std::vector<const cydaw::base::XmlElement*> patterns;
         for (const auto* child : element.getChildIterator())
             if (child->hasTagName("pattern") || child->hasTagName("midiclip"))
                 patterns.push_back(child);
         return patterns;
     }
 
-    void readInstrument(const juce::XmlElement& element)
+    void readInstrument(const cydaw::base::XmlElement& element)
     {
         auto track = instrumentTrack(element);
         for (const auto* pattern : patternsOf(element)) {
@@ -122,7 +124,7 @@ private:
         out_.tracks.push_back(std::move(track));
     }
 
-    [[nodiscard]] static double patternLength(const juce::XmlElement& pattern)
+    [[nodiscard]] static double patternLength(const cydaw::base::XmlElement& pattern)
     {
         auto last = 0.0;
         for (const auto* note : pattern.getChildWithTagNameIterator("note"))
@@ -133,7 +135,7 @@ private:
         return length > 0.0 ? std::ceil(length / 192.0 - 1.0e-9) * 192.0 : 192.0;
     }
 
-    [[nodiscard]] static std::vector<ImportedNote> notesOf(const juce::XmlElement& pattern)
+    [[nodiscard]] static std::vector<ImportedNote> notesOf(const cydaw::base::XmlElement& pattern)
     {
         std::vector<ImportedNote> notes;
         for (const auto* note : pattern.getChildWithTagNameIterator("note")) {
@@ -148,7 +150,7 @@ private:
 
     // A sound LMMS names relative to its samples folder ("drums/kick01.ogg"):
     // next to the project, else in LMMS's own folders.
-    juce::File sampleFile(const juce::String& written)
+    cydaw::base::File sampleFile(const cydaw::base::Text& written)
     {
         // LMMS 1.3 marks where a path starts from: its own samples
         // ("factorysample:"), the person's ("usersample:").
@@ -158,12 +160,12 @@ private:
                 path = path.fromFirstOccurrenceOf(prefix, false, false);
         if (path.isEmpty())
             return {};
-        if (const auto found = resolveProjectAudioFile(folder_, path); found != juce::File())
+        if (const auto found = resolveProjectAudioFile(folder_, path); found != cydaw::base::File())
             return found;
-        if (!juce::File::isAbsolutePath(path))
-            for (const auto& root : { juce::File::getSpecialLocation(juce::File::globalApplicationsDirectory).getChildFile("LMMS/data/samples"),
-                                      juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("lmms/samples"),
-                                      juce::File("/usr/share/lmms/samples") })
+        if (!cydaw::base::File::isAbsolutePath(path))
+            for (const auto& root : { cydaw::base::File::getSpecialLocation(cydaw::base::File::globalApplicationsDirectory).getChildFile("LMMS/data/samples"),
+                                      cydaw::base::File::getSpecialLocation(cydaw::base::File::userDocumentsDirectory).getChildFile("lmms/samples"),
+                                      cydaw::base::File("/usr/share/lmms/samples") })
                 if (const auto candidate = root.getChildFile(path); candidate.existsAsFile())
                     return candidate;
         out_.missingFiles.addIfNotAlreadyThere(written);
@@ -172,7 +174,7 @@ private:
 
     // LMMS's own instruments, as CyDAW reads them (ImportedInstruments);
     // VeSTige hosts a plug-in, AudioFileProcessor plays a sound.
-    ImportedDevice deviceOf(const juce::XmlElement& instrument)
+    ImportedDevice deviceOf(const cydaw::base::XmlElement& instrument)
     {
         ImportedDevice device;
         device.instrument = true;
@@ -190,7 +192,7 @@ private:
         return device;
     }
 
-    void readEffects(const juce::XmlElement& chain, ImportedTrack& track)
+    void readEffects(const cydaw::base::XmlElement& chain, ImportedTrack& track)
     {
         for (const auto* effect : chain.getChildWithTagNameIterator("effect")) {
             ImportedDevice device;
@@ -216,9 +218,9 @@ private:
     // placements play, on every instrument of their shared container, that
     // instrument's pattern at the track's place — a clip a placement on the
     // instrument's own track.
-    void readBeats(const std::vector<const juce::XmlElement*>& beatTracks)
+    void readBeats(const std::vector<const cydaw::base::XmlElement*>& beatTracks)
     {
-        const juce::XmlElement* container = nullptr;
+        const cydaw::base::XmlElement* container = nullptr;
         for (const auto* beatTrack : beatTracks)
             for (const auto* holder : { beatTrack->getChildByName("bbtrack"), beatTrack->getChildByName("patterntrack") })
                 if (container == nullptr && holder != nullptr)
@@ -232,7 +234,7 @@ private:
             const auto patterns = patternsOf(*instrument);
             for (std::size_t index = 0; index < beatTracks.size(); ++index) {
                 // Its pattern at this place (one a bar: at index * 192).
-                const juce::XmlElement* pattern = nullptr;
+                const cydaw::base::XmlElement* pattern = nullptr;
                 for (const auto* candidate : patterns)
                     if (static_cast<std::size_t>(std::lround(candidate->getDoubleAttribute("pos") / 192.0)) == index)
                         pattern = candidate;
@@ -261,7 +263,7 @@ private:
         }
     }
 
-    void readSamples(const juce::XmlElement& element)
+    void readSamples(const cydaw::base::XmlElement& element)
     {
         ImportedTrack track;
         track.name = element.getStringAttribute("name");
@@ -289,15 +291,15 @@ private:
         out_.tracks.push_back(std::move(track));
     }
 
-    juce::File file_;
+    cydaw::base::File file_;
     ImportedProject& out_;
-    juce::File folder_;
+    cydaw::base::File folder_;
     bool automation_ {};
 };
 
 } // namespace
 
-cydaw::base::Result importLmmsProject(const juce::File& file, ImportedProject& out)
+cydaw::base::Result importLmmsProject(const cydaw::base::File& file, ImportedProject& out)
 {
     out.source = file;
     LmmsReader reader(file, out);

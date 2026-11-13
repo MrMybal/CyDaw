@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "StudioTypes.h"
@@ -31,14 +32,14 @@ namespace control_targets {
 
 [[nodiscard]] std::string forTrack(std::uint64_t trackKey, const char* what);
 [[nodiscard]] std::string forMaster(const char* what);
-[[nodiscard]] std::string forParameter(std::uint64_t trackKey, const juce::String& binding);
+[[nodiscard]] std::string forParameter(std::uint64_t trackKey, const cydaw::base::Text& binding);
 [[nodiscard]] std::string forDeck(int deck, const char* what);
 [[nodiscard]] std::string forTransport(const char* what);
 [[nodiscard]] std::string forDj(const char* what);
 // A track's mix control in learn mode: its target and its name (both empty
 // for what is not a track of the project: a bus of the software, a pad).
 [[nodiscard]] std::pair<std::string, std::string> forTrackLearn(const Studio& studio, const TrackRef& track, const char* what,
-                                                                const juce::String& label);
+                                                                const cydaw::base::Text& label);
 
 } // namespace control_targets
 
@@ -53,7 +54,7 @@ public:
         hold,       // on while the control is pressed (a deck's CUE)
     };
     struct Info {
-        juce::String label;
+        cydaw::base::Text label;
         Kind kind { Kind::continuous };
         // Kept with the project (a track's or a card's); else with the
         // controllers, for every project.

@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "Studio.h"
@@ -22,7 +23,7 @@ public:
 
 private:
     void drawBuses(bool inputs);
-    void report(const juce::String& error);
+    void report(const cydaw::base::Text& error);
 
     Studio& studio_;
     UiState& state_;

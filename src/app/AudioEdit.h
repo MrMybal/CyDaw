@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #pragma once
 
 #include <juce_core/juce_core.h>
@@ -38,7 +39,7 @@ struct AudioEditRequest final {
     float levelDb {};
     FadeCurve curve { FadeCurve::linear };
     // paste: what is put in, a stretch of a file (this one or another).
-    juce::File pasteFile;
+    cydaw::base::File pasteFile;
     double pasteStartSeconds {};
     double pasteDurationSeconds {};
 };

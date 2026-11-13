@@ -1,3 +1,5 @@
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "PresetMenu.h"
@@ -61,7 +63,7 @@ private:
         GraphSlot* slot {};
         app::NodeGraphComponent& graph;
         const std::vector<app::NodeGraphComponent::EditorNode>& nodes;
-        std::map<juce::String, float>& modulated;
+        std::map<cydaw::base::Text, float>& modulated;
         const visual::Setter& setParameter;
         std::optional<std::uint64_t> removeNode;
         std::optional<CardMove> moveCard;
@@ -99,27 +101,27 @@ private:
     void drawCatalogueTree(const TrackRef& track,
                            const std::vector<const app::NodeGraphComponent::DeviceCatalogueEntry*>& shown,
                            const app::NodeGraphComponent::DeviceCatalogueEntry*& chosen,
-                           std::optional<juce::File>& chosenFile);
+                           std::optional<cydaw::base::File>& chosenFile);
     void drawPlugins(const TrackRef& track, float height);
     // A plug-in's parameters in a window of their own: knobs or a list.
     void drawPluginParameters();
-    void openPluginWindow(const TrackRef& track, std::size_t plugin, const juce::File& file, const juce::String& name);
+    void openPluginWindow(const TrackRef& track, std::size_t plugin, const cydaw::base::File& file, const cydaw::base::Text& name);
     // One of its parameters as a knob: its value as the plug-in writes it;
     // a right click automates it.
-    void pluginKnob(const TrackRef& track, std::size_t plugin, const juce::String& pluginName,
+    void pluginKnob(const TrackRef& track, std::size_t plugin, const cydaw::base::Text& pluginName,
                     app::IsolatedPluginHost::ParameterSnapshot& parameter, float diameter, int labelLength);
     // A parameter's right-click menu: automate it in the arrangement.
-    void openParameterMenu(const TrackRef& track, const juce::String& binding, const juce::String& label);
+    void openParameterMenu(const TrackRef& track, const cydaw::base::Text& binding, const cydaw::base::Text& label);
     void drawParameterMenu();
     // A card's list of values: every parameter it has, raw, searched, the
     // last touched first (a knob turned anywhere goes to the top).
     void drawValueList(const TrackRef& track, app::NodeGraphComponent& graph, const app::NodeGraphComponent::EditorNode& node,
-                       ImVec2 at, ImVec2 size, ImU32 colour, const std::map<juce::String, float>& modulated);
+                       ImVec2 at, ImVec2 size, ImU32 colour, const std::map<cydaw::base::Text, float>& modulated);
     std::map<std::pair<std::uint64_t, std::uint64_t>, std::array<char, 64>> valueSearch_;
     // A plug-in card's list of values: every parameter, searched, the last
     // touched first (a value that moved, from its own window too, is a touch).
     struct PluginParameters;
-    void drawPluginValueList(const TrackRef& track, std::size_t plugin, const juce::String& pluginName, PluginParameters& parameters,
+    void drawPluginValueList(const TrackRef& track, std::size_t plugin, const cydaw::base::Text& pluginName, PluginParameters& parameters,
                              ImVec2 at, ImVec2 size);
     std::map<std::pair<std::size_t, std::size_t>, std::array<char, 64>> pluginListSearch_;
     std::map<std::pair<std::size_t, std::size_t>, std::map<std::uint32_t, std::pair<float, std::uint64_t>>> pluginTouches_;
@@ -143,9 +145,9 @@ private:
     struct PluginParameters {
         std::vector<app::IsolatedPluginHost::ParameterSnapshot> values;
         double fetchedAt { -1.0e9 };
-        juce::String error;
+        cydaw::base::Text error;
     };
-    PluginParameters& pluginParameters(std::size_t trackIndex, std::size_t pluginIndex, const juce::File& file,
+    PluginParameters& pluginParameters(std::size_t trackIndex, std::size_t pluginIndex, const cydaw::base::File& file,
                                        bool refresh);
     [[nodiscard]] std::vector<std::uint32_t> shownParameters(const TrackRef& track, std::size_t plugin,
                                                              const PluginParameters& parameters) const;
@@ -163,17 +165,17 @@ private:
     bool openCatalogue_ {};
     ImGuiID parameterPopup_ {};
     std::optional<TrackRef> menuTrack_;
-    juce::String menuBinding_;
-    juce::String menuLabel_;
-    std::map<juce::String, PluginParameters> pluginParameters_;
+    cydaw::base::Text menuBinding_;
+    cydaw::base::Text menuLabel_;
+    std::map<cydaw::base::Text, PluginParameters> pluginParameters_;
     // The plug-ins' output levels (left, right), falling as a meter's.
     std::vector<std::pair<float, float>> pluginLevels_;
     std::size_t pluginLevelsTrack_ { static_cast<std::size_t>(-1) };
     double pluginLevelsTaken_ {};
     std::size_t pluginPopupTrack_ {};
     std::size_t pluginPopupIndex_ {};
-    juce::File pluginPopupFile_;
-    juce::String pluginPopupName_;
+    cydaw::base::File pluginPopupFile_;
+    cydaw::base::Text pluginPopupName_;
     char pluginSearch_[64] {};
     TrackRef pluginWindowTrack_;
     bool pluginWindowOpen_ {};

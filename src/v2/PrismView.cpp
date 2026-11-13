@@ -42,20 +42,20 @@ ImU32 sourceColour(const int source)
     return IM_COL32(0x81, 0xe6, 0x8f, 0xff);
 }
 
-juce::String sourceName(const int source)
+cydaw::base::Text sourceName(const int source)
 {
     const auto& choices = prism::parameter(prism::slotBase(0) + prism::slotSource).choices;
     if (source < 0 || source >= static_cast<int>(choices.size()))
         return {};
-    return juce::String::fromUTF8((ui::french() ? choices[static_cast<std::size_t>(source)].first
+    return cydaw::base::Text::fromUTF8((ui::french() ? choices[static_cast<std::size_t>(source)].first
                                                 : choices[static_cast<std::size_t>(source)].second)
                                       .c_str());
 }
 
-juce::String parameterName(const int index)
+cydaw::base::Text parameterName(const int index)
 {
     const auto& p = prism::parameter(index);
-    return juce::String::fromUTF8((ui::french() ? p.french : p.english).c_str());
+    return cydaw::base::Text::fromUTF8((ui::french() ? p.french : p.english).c_str());
 }
 
 // Where a parameter sits in the slots' destination list (0: none).
@@ -116,7 +116,7 @@ bool PrismView::bind(const TrackRef& track, app::NodeGraphComponent& graph, cons
     card_.live = studio_.voiceLive(track, card_.heard);
     // As it plays: the lanes at the playhead, then the voice's modulations.
     card_.played = card_.values;
-    const auto prefix = "node." + juce::String(static_cast<juce::int64>(nodeId)) + ".prism.";
+    const auto prefix = "node." + cydaw::base::Text(static_cast<juce::int64>(nodeId)) + ".prism.";
     for (const auto& binding : studio_.automatedParameters(track))
         if (binding.startsWith(prefix))
             if (const auto index = prism::parameterIndex(binding.substring(prefix.length()).toStdString()); index >= 0)
@@ -151,13 +151,13 @@ void PrismView::chooseTableFile(const int osc)
     const auto nodeId = card_.nodeId;
     chooser_ = std::make_unique<juce::FileChooser>(
         ui::Ls("Une table d'ondes (ou un son) pour l'oscillateur ", "A wavetable (or a sound) for oscillator ") + (osc == 0 ? "A" : "B"),
-        juce::File(), "*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg");
+        cydaw::base::File(), "*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg");
     chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                           [this, track, nodeId, osc](const juce::FileChooser& chooser) {
                               const auto file = chooser.getResult();
-                              if (file == juce::File())
+                              if (file == cydaw::base::File())
                                   return;
-                              juce::String error;
+                              cydaw::base::Text error;
                               const auto done = studio_.importPrismTable(track, nodeId, osc, file, error);
                               state_.status = done ? ui::Ls("Table importée : ", "Table imported: ") + file.getFileName() : error;
                               state_.statusIsError = !done;
@@ -176,8 +176,8 @@ void PrismView::set(const int index, const float newValue)
         return;
     const auto clamped = prism::clampValue(index, newValue);
     card_.values[static_cast<std::size_t>(index)] = clamped;
-    const auto binding = "node." + juce::String(static_cast<juce::int64>(card_.nodeId)) + ".prism."
-                         + juce::String(prism::parameter(index).key);
+    const auto binding = "node." + cydaw::base::Text(static_cast<juce::int64>(card_.nodeId)) + ".prism."
+                         + cydaw::base::Text(prism::parameter(index).key);
     (void) card_.graph->editorSetParameter(binding, clamped);
     state_.focused = Panel::devices;
 }
@@ -256,8 +256,8 @@ void PrismView::modulationMenu(const int index)
     if (ImGui::MenuItem(L("Valeur par défaut", "Default value")))
         set(index, prism::parameter(index).defaultValue);
     // A lane in the arrangement, as any card's knob.
-    const auto binding = "node." + juce::String(static_cast<juce::int64>(card_.nodeId)) + ".prism."
-                         + juce::String(prism::parameter(index).key);
+    const auto binding = "node." + cydaw::base::Text(static_cast<juce::int64>(card_.nodeId)) + ".prism."
+                         + cydaw::base::Text(prism::parameter(index).key);
     if (studio_.isValid(card_.track) && studio_.canAutomate(card_.track, binding)) {
         const auto automated = studio_.hasLane(card_.track, binding);
         if (ImGui::MenuItem(automated ? L("Afficher l'automation", "Show the automation")
@@ -330,9 +330,9 @@ bool PrismView::knob(const int index, const char* label, const float diameter)
     const auto origin = ImGui::GetCursorScreenPos();
     bool changed {};
     {
-        const ui::LearnParameterScope learn("node." + juce::String(static_cast<juce::int64>(card_.nodeId)) + ".prism."
-                                                + juce::String(parameter.key),
-                                            juce::String::fromUTF8(label), studio_.learnPrefix(card_.track), studio_.trackName(card_.track));
+        const ui::LearnParameterScope learn("node." + cydaw::base::Text(static_cast<juce::int64>(card_.nodeId)) + ".prism."
+                                                + cydaw::base::Text(parameter.key),
+                                            cydaw::base::Text::fromUTF8(label), studio_.learnPrefix(card_.track), studio_.trackName(card_.track));
         changed = ui::knob("##knob", &normalised, 0.0f, 1.0f, defaultNormalised, style);
     }
     const auto hovered = ImGui::IsItemHovered();
@@ -357,8 +357,8 @@ bool PrismView::knob(const int index, const char* label, const float diameter)
         arc(ImGui::GetWindowDrawList(), centre, radius, from, to, p.modulation, dp(2.2f));
     }
     // Its name, its value while touched.
-    const auto text = hovered || active ? juce::String::fromUTF8(prism::displayValue(index, value(index), ui::french()).c_str())
-                                        : juce::String::fromUTF8(label != nullptr ? label : "");
+    const auto text = hovered || active ? cydaw::base::Text::fromUTF8(prism::displayValue(index, value(index), ui::french()).c_str())
+                                        : cydaw::base::Text::fromUTF8(label != nullptr ? label : "");
     auto* list = ImGui::GetWindowDrawList();
     ImGui::PushFont(nullptr, ui::currentFontBase() * 0.78f);
     const auto textHeight = ImGui::GetFontSize();
@@ -804,10 +804,10 @@ void PrismView::drawOscillator(const int osc, const float width, const float hei
     if (own != nullptr) {
         // Its name, and a cross back to the factory's.
         ImGui::PushStyleColor(ImGuiCol_Button, theme::alpha(prismOrange, 0.30f));
-        (void) ImGui::Button((juce::String::fromUTF8("\xe2\x99\xaa ") + juce::String(own->name) + "##own").toRawUTF8(),
+        (void) ImGui::Button((cydaw::base::Text::fromUTF8("\xe2\x99\xaa ") + cydaw::base::Text(own->name) + "##own").toRawUTF8(),
                              ImVec2(listWidth - dp(24.0f), 0.0f));
         ImGui::PopStyleColor();
-        ui::tooltip((ui::Ls("Table importée, ", "Imported table, ") + juce::String(own->frameCount)
+        ui::tooltip((ui::Ls("Table importée, ", "Imported table, ") + cydaw::base::Text(own->frameCount)
                      + ui::Ls(" images", " frames"))
                         .toRawUTF8());
         ImGui::SameLine(0.0f, dp(2.0f));
@@ -1103,9 +1103,9 @@ void PrismView::drawOscTab()
             if (osc == 2)
                 ImGui::SameLine(0.0f, dp(2.0f));
             const auto playing = value(prism::oscBase(osc) + prism::oscOn) >= 0.5f;
-            const auto label = juce::String(osc == 1 ? "OSC B" : "OSC C") + (playing ? juce::String::fromUTF8(" \xe2\x97\x8f") : "");
+            const auto label = cydaw::base::Text(osc == 1 ? "OSC B" : "OSC C") + (playing ? cydaw::base::Text::fromUTF8(" \xe2\x97\x8f") : "");
             auto shown = secondOscillator_ == osc;
-            if (ui::toggle((label + "##second" + juce::String(osc)).toRawUTF8(), &shown, prismOrange, ImVec2(dp(80.0f), 0.0f)))
+            if (ui::toggle((label + "##second" + cydaw::base::Text(osc)).toRawUTF8(), &shown, prismOrange, ImVec2(dp(80.0f), 0.0f)))
                 secondOscillator_ = osc;
         }
         drawOscillator(secondOscillator_, oscWidth, topHeight - tabHeight);
@@ -1337,7 +1337,7 @@ bool PrismView::drawEditorWindow(const bool focus)
     if (focus)
         ImGui::SetNextWindowFocus();
     auto open = true;
-    const auto title = juce::String::fromUTF8("Prisme — ") + studio_.trackName(target.track) + juce::String(windowId_);
+    const auto title = cydaw::base::Text::fromUTF8("Prisme — ") + studio_.trackName(target.track) + cydaw::base::Text(windowId_);
     ImGui::PushStyleColor(ImGuiCol_TitleBgActive, theme::mix(prismOrange, p.bg2 | 0xff000000u, 0.65f));
     const auto visible = ui::beginEditorWindow(title.toRawUTF8(), &open, ImGuiWindowFlags_NoCollapse);
     ImGui::PopStyleColor();
@@ -1358,7 +1358,7 @@ bool PrismView::drawEditorWindow(const bool focus)
             const auto track = target.track;
             const auto nodeId = target.nodeId;
             presets_.bar("prismPresets", *holder, [this, track, nodeId] { return studio_.devicePresetState(track, nodeId); },
-                         [this, track, nodeId](const cydaw::base::Value& preset, juce::String& error) {
+                         [this, track, nodeId](const cydaw::base::Value& preset, cydaw::base::Text& error) {
                              return studio_.applyDevicePreset(track, nodeId, preset, error);
                          },
                          dp(330.0f));

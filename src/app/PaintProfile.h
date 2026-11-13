@@ -1,3 +1,5 @@
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include <juce_core/juce_core.h>
@@ -31,14 +33,14 @@ inline Counters& counters()
 class Scoped {
 public:
     explicit Scoped(double& slot) noexcept
-        : slot_(slot), start_(juce::Time::getMillisecondCounterHiRes())
+        : slot_(slot), start_(cydaw::base::Time::getMillisecondCounterHiRes())
     {
         ++counters().paints;
     }
 
     ~Scoped() noexcept
     {
-        slot_ += juce::Time::getMillisecondCounterHiRes() - start_;
+        slot_ += cydaw::base::Time::getMillisecondCounterHiRes() - start_;
     }
 
 private:
@@ -62,12 +64,12 @@ inline Counters& operator+=(Counters& total, const Counters& part)
     return total;
 }
 
-inline juce::String describe(const Counters& current)
+inline cydaw::base::Text describe(const Counters& current)
 {
-    juce::String text;
+    cydaw::base::Text text;
     const auto add = [&text](const char* name, const double ms) {
         if (ms >= 0.05)
-            text << name << "=" << juce::String(ms, 1) << " ";
+            text << name << "=" << cydaw::base::Text(ms, 1) << " ";
     };
     add("waveform", current.waveform);
     add("automation", current.automation);
@@ -83,7 +85,7 @@ inline juce::String describe(const Counters& current)
     return text;
 }
 
-inline juce::String describeAndReset()
+inline cydaw::base::Text describeAndReset()
 {
     auto& current = counters();
     auto text = describe(current);

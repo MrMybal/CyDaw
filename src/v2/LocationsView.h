@@ -1,3 +1,5 @@
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "Studio.h"
@@ -23,8 +25,8 @@ public:
 
 private:
     void choose(Location location);
-    void apply(Location location, const juce::File& folder);
-    void report(const juce::String& text, bool error);
+    void apply(Location location, const cydaw::base::File& folder);
+    void report(const cydaw::base::Text& text, bool error);
 
     Studio& studio_;
     UiState& state_;

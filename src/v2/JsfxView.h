@@ -22,15 +22,15 @@ class JsfxView final
     UiState &state_;
     std::unique_ptr<Compiler> compiler_;
     std::unique_ptr<juce::FileChooser> chooser_;
-    juce::File file_;
+    cydaw::base::File file_;
     std::vector<char> code_;
     bool changed_{}, applyAfterCompile_{}, insertAfterCompile_{};
-    juce::String status_;
+    cydaw::base::Text status_;
     bool error_{};
     std::function<void()> pending_;
     bool quitting_{};
     int drawnFrame_{-1};
-    void load(const juce::File &);
+    void load(const cydaw::base::File &);
     void fresh();
     bool save();
     void choose(bool saving);

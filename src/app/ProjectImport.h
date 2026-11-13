@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #pragma once
 
@@ -19,7 +20,7 @@ struct ImportedNote {
 };
 
 struct ImportedMidiClip {
-    juce::String name;
+    cydaw::base::Text name;
     double startBeats {};   // in the arrangement; a launcher clip sits at scene * 16
     double lengthBeats { 16.0 };
     bool looping {};
@@ -30,9 +31,9 @@ struct ImportedMidiClip {
 };
 
 struct ImportedAudioClip {
-    juce::String name;
-    juce::File file;
-    juce::String originalPath;
+    cydaw::base::Text name;
+    cydaw::base::File file;
+    cydaw::base::Text originalPath;
     double startSeconds {};
     double durationSeconds {};        // on the timeline
     double sourceOffsetSeconds {};
@@ -53,20 +54,20 @@ struct ImportedAudioClip {
 // an instrument or an effect. Its settings, when they could be read, by the
 // other application's own names.
 struct ImportedDevice {
-    juce::String name;
-    juce::String vendor;
-    juce::String format;      // "VST3", "VST2", "CLAP", "AU" for a plug-in
-    juce::String type;        // the other application's own device ("Polysynth", "Operator")
+    cydaw::base::Text name;
+    cydaw::base::Text vendor;
+    cydaw::base::Text format;      // "VST3", "VST2", "CLAP", "AU" for a plug-in
+    cydaw::base::Text type;        // the other application's own device ("Polysynth", "Operator")
     bool plugin {};
     bool instrument {};
     bool noteEffect {};
-    std::vector<std::pair<juce::String, double>> settings;
+    std::vector<std::pair<cydaw::base::Text, double>> settings;
     // A sampler's sound, when the other application's sampler played one.
-    juce::File sample;
+    cydaw::base::File sample;
 };
 
 struct ImportedTrack {
-    juce::String name;
+    cydaw::base::Text name;
     bool midi {};
     float gainDb {};
     float pan {};
@@ -75,7 +76,7 @@ struct ImportedTrack {
     juce::uint32 colour {};
     // The devices and plugins the track carried, by name: not translated,
     // reported.
-    juce::StringArray devices;
+    cydaw::base::TextList devices;
     // The same in order, with what each one is.
     std::vector<ImportedDevice> chain;
     bool hadInstrument {};
@@ -84,17 +85,17 @@ struct ImportedTrack {
 };
 
 struct ImportedProject {
-    juce::File source;
-    juce::String name;
-    juce::String format;      // "dawproject", "ableton", "studio-one", "bitwig"
-    juce::String application; // what wrote the file, when it says
+    cydaw::base::File source;
+    cydaw::base::Text name;
+    cydaw::base::Text format;      // "dawproject", "ableton", "studio-one", "bitwig"
+    cydaw::base::Text application; // what wrote the file, when it says
     double tempo { 120.0 };
     int numerator { 4 };
     int denominator { 4 };
     float masterGainDb {};
     std::vector<ImportedTrack> tracks;
-    juce::StringArray warnings;
-    juce::StringArray missingFiles;
+    cydaw::base::TextList warnings;
+    cydaw::base::TextList missingFiles;
 
     [[nodiscard]] double beatsToSeconds(const double beats) const
     {
@@ -113,34 +114,34 @@ struct ImportedProject {
 // Studio One and others), .zpj (Zrythm), .mid (a MIDI file and the audio
 // files beside it, as any application exports them). The result is what could be read;
 // the warnings say what could not.
-[[nodiscard]] cydaw::base::Result importProjectFile(const juce::File& file, ImportedProject& out);
-[[nodiscard]] cydaw::base::Result importReaperProject(const juce::File& file, ImportedProject& out);
-[[nodiscard]] cydaw::base::Result importFlStudioProject(const juce::File& file, ImportedProject& out);
-[[nodiscard]] cydaw::base::Result importArdourSession(const juce::File& file, ImportedProject& out);
-[[nodiscard]] cydaw::base::Result importLmmsProject(const juce::File& file, ImportedProject& out);
-[[nodiscard]] cydaw::base::Result importAafComposition(const juce::File& file, ImportedProject& out);
-[[nodiscard]] cydaw::base::Result importZrythmProject(const juce::File& file, ImportedProject& out);
+[[nodiscard]] cydaw::base::Result importProjectFile(const cydaw::base::File& file, ImportedProject& out);
+[[nodiscard]] cydaw::base::Result importReaperProject(const cydaw::base::File& file, ImportedProject& out);
+[[nodiscard]] cydaw::base::Result importFlStudioProject(const cydaw::base::File& file, ImportedProject& out);
+[[nodiscard]] cydaw::base::Result importArdourSession(const cydaw::base::File& file, ImportedProject& out);
+[[nodiscard]] cydaw::base::Result importLmmsProject(const cydaw::base::File& file, ImportedProject& out);
+[[nodiscard]] cydaw::base::Result importAafComposition(const cydaw::base::File& file, ImportedProject& out);
+[[nodiscard]] cydaw::base::Result importZrythmProject(const cydaw::base::File& file, ImportedProject& out);
 // A standard MIDI file and the audio files beside it (stems): what any other
 // application exports (Reason…).
-[[nodiscard]] cydaw::base::Result importMidiAndStems(const juce::File& file, ImportedProject& out);
+[[nodiscard]] cydaw::base::Result importMidiAndStems(const cydaw::base::File& file, ImportedProject& out);
 // Where audio made by an import goes (two mono files made one stereo file):
 // the application's own folder for it; the system's temporary one until set.
-void setImportedAudioFolder(const juce::File& folder);
-[[nodiscard]] juce::File importedAudioFolder();
-[[nodiscard]] cydaw::base::Result importDawProject(const juce::File& file, ImportedProject& out);
-[[nodiscard]] cydaw::base::Result importAbletonLiveSet(const juce::File& file, ImportedProject& out);
-[[nodiscard]] cydaw::base::Result importStudioOneSong(const juce::File& file, ImportedProject& out);
-[[nodiscard]] cydaw::base::Result importBitwigProject(const juce::File& file, ImportedProject& out);
-[[nodiscard]] juce::StringArray supportedProjectExtensions();
-[[nodiscard]] juce::String supportedProjectWildcard();
+void setImportedAudioFolder(const cydaw::base::File& folder);
+[[nodiscard]] cydaw::base::File importedAudioFolder();
+[[nodiscard]] cydaw::base::Result importDawProject(const cydaw::base::File& file, ImportedProject& out);
+[[nodiscard]] cydaw::base::Result importAbletonLiveSet(const cydaw::base::File& file, ImportedProject& out);
+[[nodiscard]] cydaw::base::Result importStudioOneSong(const cydaw::base::File& file, ImportedProject& out);
+[[nodiscard]] cydaw::base::Result importBitwigProject(const cydaw::base::File& file, ImportedProject& out);
+[[nodiscard]] cydaw::base::TextList supportedProjectExtensions();
+[[nodiscard]] cydaw::base::Text supportedProjectWildcard();
 
 // An audio file named by a project, found next to it when the path it
 // carries no longer holds: the same name anywhere under the project's
 // folder.
-[[nodiscard]] juce::File resolveProjectAudioFile(const juce::File& projectFolder,
-                                                  const juce::String& path);
+[[nodiscard]] cydaw::base::File resolveProjectAudioFile(const cydaw::base::File& projectFolder,
+                                                  const cydaw::base::Text& path);
 
 // A short, readable account of what was read, for a dialog or a log.
-[[nodiscard]] juce::String describeImportedProject(const ImportedProject& project);
+[[nodiscard]] cydaw::base::Text describeImportedProject(const ImportedProject& project);
 
 } // namespace cydaw::app::project_import

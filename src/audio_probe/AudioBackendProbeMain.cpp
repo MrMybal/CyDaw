@@ -9,7 +9,7 @@
 
 namespace {
 
-cydaw::base::Value stringArrayToVar(const juce::StringArray& values)
+cydaw::base::Value stringArrayToVar(const cydaw::base::TextList& values)
 {
     cydaw::base::Array<cydaw::base::Value> result;
     for (const auto& value : values)
@@ -17,22 +17,22 @@ cydaw::base::Value stringArrayToVar(const juce::StringArray& values)
     return result;
 }
 
-bool containsIgnoreCase(const juce::StringArray& values, const juce::String& expected)
+bool containsIgnoreCase(const cydaw::base::TextList& values, const cydaw::base::Text& expected)
 {
     return std::any_of(values.begin(), values.end(), [&expected](const auto& value) {
         return value.containsIgnoreCase(expected);
     });
 }
 
-juce::String argumentValue(const juce::StringArray& arguments,
-                           const juce::String& key,
-                           const juce::String& fallback = {})
+cydaw::base::Text argumentValue(const cydaw::base::TextList& arguments,
+                           const cydaw::base::Text& key,
+                           const cydaw::base::Text& fallback = {})
 {
     const auto index = arguments.indexOf(key);
     return index >= 0 && index + 1 < arguments.size() ? arguments[index + 1] : fallback;
 }
 
-juce::String matchingName(const juce::StringArray& values, const juce::String& requested)
+cydaw::base::Text matchingName(const cydaw::base::TextList& values, const cydaw::base::Text& requested)
 {
     for (const auto& value : values)
         if (value.containsIgnoreCase(requested))
@@ -61,14 +61,14 @@ struct SilentCallback final : juce::AudioIODeviceCallback {
 int main(const int argc, char* argv[])
 {
     juce::ScopedJuceInitialiser_GUI initialiseJuce;
-    juce::StringArray arguments;
+    cydaw::base::TextList arguments;
     for (int index = 1; index < argc; ++index)
-        arguments.add(juce::String::fromUTF8(argv[index]));
+        arguments.add(cydaw::base::Text::fromUTF8(argv[index]));
 
     cydaw::integration::DeviceManager manager;
     cydaw::base::Array<cydaw::base::Value> deviceTypes;
-    juce::StringArray availableTypeNames;
-    juce::StringArray allDeviceNames;
+    cydaw::base::TextList availableTypeNames;
+    cydaw::base::TextList allDeviceNames;
     for (auto* type : manager.getAvailableDeviceTypes()) {
         type->scanForDevices();
         const auto inputs = type->getDeviceNames(true);

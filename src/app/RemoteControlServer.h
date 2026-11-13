@@ -16,7 +16,7 @@ public:
     using Handler = std::function<cydaw::base::Value(const cydaw::base::Value&)>;
 
     // With a token, a request must carry {"token": …} to be answered.
-    RemoteControlServer(int port, Handler handler, juce::String token = {});
+    RemoteControlServer(int port, Handler handler, cydaw::base::Text token = {});
     ~RemoteControlServer() override;
 
     [[nodiscard]] bool isListening() const noexcept { return listening_; }
@@ -26,11 +26,11 @@ private:
     void run() override;
     void serve(juce::StreamingSocket& client);
     // The reply to one line: the handler's answer, or why there is none.
-    [[nodiscard]] juce::String respond(const juce::String& line) const;
+    [[nodiscard]] cydaw::base::Text respond(const cydaw::base::Text& line) const;
 
     int port_ {};
     Handler handler_;
-    juce::String token_;
+    cydaw::base::Text token_;
     juce::StreamingSocket listener_;
     bool listening_ {};
 };

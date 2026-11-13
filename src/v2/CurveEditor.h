@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include <cydaw/engine/AutomationCurve.h>
@@ -55,8 +56,8 @@ struct Lane {
     // its range's straight or logarithmic scale (the volume's, squared).
     std::function<double(double)> toPart;
     std::function<double(double)> fromPart;
-    std::function<juce::String(double)> formatValue;
-    std::function<juce::String(double)> formatTime;
+    std::function<cydaw::base::Text(double)> formatValue;
+    std::function<cydaw::base::Text(double)> formatTime;
     ImU32 colour {};
     // The curve filled under (the master's clips).
     bool filled {};

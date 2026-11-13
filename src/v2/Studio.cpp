@@ -1,3 +1,5 @@
+#include <cydaw/integration/AudioFiles.h>
+#include <cydaw/base/Properties.h>
 #include <cydaw/base/File.h>
 #include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "Studio.h"
@@ -43,10 +45,10 @@ bool isGraphState(const cydaw::base::Value& state)
     return state.getDynamicObject() != nullptr;
 }
 
-juce::String keyOf(const cydaw::base::Value& module)
+cydaw::base::Text keyOf(const cydaw::base::Value& module)
 {
     const auto* object = module.getDynamicObject();
-    return object != nullptr ? object->getProperty("key").toString() : juce::String();
+    return object != nullptr ? object->getProperty("key").toString() : cydaw::base::Text();
 }
 
 bool isInline(const cydaw::base::Value& module)
@@ -66,9 +68,9 @@ juce::uint32 defaultColour(const std::size_t index)
     return kTrackColours[index % (sizeof(kTrackColours) / sizeof(kTrackColours[0]))];
 }
 
-cydaw::base::Result reverseEvents(std::vector<app::AudioTrackController::AudioEvent>& events, double duration, const juce::File& folder)
+cydaw::base::Result reverseEvents(std::vector<app::AudioTrackController::AudioEvent>& events, double duration, const cydaw::base::File& folder)
 {
-    std::vector<juce::File> made;
+    std::vector<cydaw::base::File> made;
     for (auto& event : events) {
         const auto file = folder.getNonexistentChildFile(event.sourceFile.getFileNameWithoutExtension() + " ~reverse", ".wav", false);
         app::AudioEditRequest request;
@@ -103,16 +105,16 @@ struct Studio::SynthSearch {
     std::atomic<bool> done { false };
     std::atomic<double> progress { 0.0 };
     std::mutex mutex;
-    juce::String message;
+    cydaw::base::Text message;
     engine::synth_match::Result result;
     engine::synth::Model model { engine::synth::Model::opale };
-    juce::String name;
+    cydaw::base::Text name;
 };
 
 Studio::Studio(const bool auxiliary) : auxiliary_(auxiliary)
 {
     // The same settings file as CyDAW 1, so the audio device carries over.
-    juce::PropertiesFile::Options options;
+    cydaw::base::PropertiesFile::Options options;
     options.applicationName = "CyDAW";
     options.folderName = "CyDAW";
     options.filenameSuffix = auxiliary ? ".processing.settings" : ".layout.settings";
@@ -133,7 +135,7 @@ Studio::Studio(const bool auxiliary) : auxiliary_(auxiliary)
     // The factory instruments' maps read ahead (26 MB of zones): their list
     // then opens at once.
     if (!auxiliary) {
-        std::vector<juce::File> maps;
+        std::vector<cydaw::base::File> maps;
         const auto folder = app::factoryContentFolder();
         const auto catalogue = cydaw::base::JSON::parse(folder.getChildFile("catalogue.json"));
         if (const auto* list = catalogue.getProperty("instruments", {}).getArray())
@@ -208,9 +210,9 @@ struct Studio::Opening {
         std::atomic<bool> done {};
         cydaw::base::Value document;
         cydaw::base::Result result { cydaw::base::Result::ok() };
-        juce::StringArray missingModels;
+        cydaw::base::TextList missingModels;
     };
-    juce::File file;
+    cydaw::base::File file;
     std::shared_ptr<Read> read;
     double started {};
     juce::int64 bytes {};
@@ -242,12 +244,12 @@ Studio::~Studio()
     clearSession();
 }
 
-juce::PropertiesFile& Studio::settings()
+cydaw::base::PropertiesFile& Studio::settings()
 {
     return *properties_.getUserSettings();
 }
 
-juce::String Studio::startAudio(const bool restoreSavedDevice)
+cydaw::base::Text Studio::startAudio(const bool restoreSavedDevice)
 {
     std::unique_ptr<juce::XmlElement> saved;
     if (restoreSavedDevice)
@@ -263,7 +265,7 @@ void Studio::saveAudioSetup()
     }
 }
 
-juce::String Studio::audioStatus() const
+cydaw::base::Text Studio::audioStatus() const
 {
     return const_cast<app::AudioTrackController&>(engine_).audioDeviceDescription();
 }
@@ -402,7 +404,7 @@ AudioTrackState& Studio::adoptAudioTrack(const std::size_t index, const cydaw::b
     while (audioTracks_.size() <= index) {
         AudioTrackState state;
         state.uid = nextTrackUid_++;
-        state.name = "Audio " + juce::String(static_cast<int>(audioTracks_.size() + 1));
+        state.name = "Audio " + cydaw::base::Text(static_cast<int>(audioTracks_.size() + 1));
         state.colour = defaultColour(audioTracks_.size() + midiTracks_.size());
         audioTracks_.push_back(std::move(state));
     }
@@ -604,14 +606,14 @@ int Studio::trackChannels(const TrackRef& track) const
     return engine_.trackChannelCount(track.audioIndex);
 }
 
-juce::String Studio::formatName(const int channels)
+cydaw::base::Text Studio::formatName(const int channels)
 {
     switch (cydaw::engine::clampTrackChannels(channels)) {
     case 1: return "Mono";
     case 2: return ui::Ls("Stéréo", "Stereo");
     case 3: return "LCR";
     case 4: return "Quad";
-    default: return juce::String(std::string(cydaw::engine::layoutKey(channels)));
+    default: return cydaw::base::Text(std::string(cydaw::engine::layoutKey(channels)));
     }
 }
 
@@ -633,7 +635,7 @@ cydaw::base::Result Studio::setTrackChannels(const TrackRef& track, const int ch
         const auto [in, out] = audioEnds(graph);
         for (const auto node : { in, out })
             if (node != 0)
-                (void) graph.setGraphMemberType("node." + juce::String(static_cast<juce::int64>(node)),
+                (void) graph.setGraphMemberType("node." + cydaw::base::Text(static_cast<juce::int64>(node)),
                                                 cydaw::engine::PortKind::audio, count);
         (void) publishGraph(track, true);
     }
@@ -667,13 +669,13 @@ std::optional<app::VirtualAudioBus> Studio::hardwareBus(const std::uint64_t id) 
     return engine_.virtualBus(id);
 }
 
-juce::File Studio::virtualIoFile()
+cydaw::base::File Studio::virtualIoFile()
 {
     // CYDAW_VIRTUAL_IO_FILE: another file (a test's), read and written even
     // by an automated session.
-    if (const auto other = juce::SystemStats::getEnvironmentVariable("CYDAW_VIRTUAL_IO_FILE", {}); other.isNotEmpty())
-        return juce::File(other);
-    return juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+    if (const auto other = cydaw::base::SystemStats::getEnvironmentVariable("CYDAW_VIRTUAL_IO_FILE", {}); other.isNotEmpty())
+        return cydaw::base::File(other);
+    return cydaw::base::File::getSpecialLocation(cydaw::base::File::userApplicationDataDirectory)
         .getChildFile("CyDAW")
         .getChildFile("VirtualIO.json");
 }
@@ -814,7 +816,7 @@ bool Studio::isBusTrack(const TrackRef& track) const
     return !track.master && !track.midi && track.audioIndex < audioTracks_.size() && audioTracks_[track.audioIndex].bus;
 }
 
-std::optional<TrackRef> Studio::addBusTrack(const juce::String& name)
+std::optional<TrackRef> Studio::addBusTrack(const cydaw::base::Text& name)
 {
     std::size_t index {};
     if (engine_.addEmptyAudioTrack(&index).failed())
@@ -824,7 +826,7 @@ std::optional<TrackRef> Studio::addBusTrack(const juce::String& name)
     auto buses = 0;
     for (const auto& other : audioTracks_)
         buses += other.bus ? 1 : 0;
-    state.name = name.trim().isNotEmpty() ? name.trim() : "Bus " + juce::String(buses);
+    state.name = name.trim().isNotEmpty() ? name.trim() : "Bus " + cydaw::base::Text(buses);
     const TrackRef track { false, index, 0 };
     (void) publishGraph(track, true);
     publishRouting();
@@ -870,13 +872,13 @@ std::vector<TrackInput> Studio::trackInputs(const TrackRef& track) const
         // Each input's own name, not the whole graph described (every frame).
         input.name = graph.editorNodeAlias(node).trim();
         if (input.name.isEmpty())
-            input.name = ui::Ls("Entrée ", "Input ") + juce::String(static_cast<int>(bus) + 1);
+            input.name = ui::Ls("Entrée ", "Input ") + cydaw::base::Text(static_cast<int>(bus) + 1);
         inputs.push_back(std::move(input));
     }
     return inputs;
 }
 
-std::optional<std::uint64_t> Studio::addTrackInput(const TrackRef& track, const juce::String& name)
+std::optional<std::uint64_t> Studio::addTrackInput(const TrackRef& track, const cydaw::base::Text& name)
 {
     auto* slot = track.master ? nullptr : graphFor(track);
     if (slot == nullptr || trackInputs(track).size() >= maximumTrackInputs)
@@ -899,7 +901,7 @@ std::optional<std::uint64_t> Studio::addTrackInput(const TrackRef& track, const 
         return std::nullopt;
     const auto count = static_cast<int>(trackInputs(track).size());
     (void) graph.editorSetAlias(id, name.trim().isNotEmpty() ? name.trim()
-                                                             : ui::Ls("Entrée ", "Input ") + juce::String(count + 1));
+                                                             : ui::Ls("Entrée ", "Input ") + cydaw::base::Text(count + 1));
     dirty_ = true;
     (void) publishGraph(track, true);
     return id;
@@ -928,7 +930,7 @@ cydaw::base::Result Studio::removeTrackInput(const TrackRef& track, const std::u
     return cydaw::base::Result::ok();
 }
 
-juce::String Studio::trackInputName(const TrackRef& track, const std::uint64_t node) const
+cydaw::base::Text Studio::trackInputName(const TrackRef& track, const std::uint64_t node) const
 {
     if (node == 0)
         return ui::Ls("entrée principale", "main input");
@@ -1153,7 +1155,7 @@ cydaw::base::Result Studio::publishGraph(const TrackRef& track, const bool struc
         if (compiled.failed())
             result = compiled;
         publishRackPadMix(track.owner(), static_cast<std::size_t>(track.pad));
-        slot->setLastCompileError(result.failed() ? result.getErrorMessage() : juce::String());
+        slot->setLastCompileError(result.failed() ? result.getErrorMessage() : cydaw::base::Text());
         return result;
     } else {
         engine::PolySynthGraphPlan plan;
@@ -1171,7 +1173,7 @@ cydaw::base::Result Studio::publishGraph(const TrackRef& track, const bool struc
         if (compiled.failed())
             result = compiled;
     }
-    slot->setLastCompileError(result.failed() ? result.getErrorMessage() : juce::String());
+    slot->setLastCompileError(result.failed() ? result.getErrorMessage() : cydaw::base::Text());
     // The nodes the compiler makes inside a module can take other ids when
     // the graph's shape changes: their lanes follow.
     if (structural && !track.master)
@@ -1238,7 +1240,7 @@ void Studio::compileReplacer(ReplacerSlot& slot)
     engine::PolySynthGraphPlan plan;
     const auto compiled = slot.graph->graph().compilePolySynthGraph(plan);
     slot.plan = compiled.wasOk() ? std::make_shared<const engine::PolySynthGraphPlan>(std::move(plan)) : nullptr;
-    slot.graph->setLastCompileError(compiled.failed() ? compiled.getErrorMessage() : juce::String());
+    slot.graph->setLastCompileError(compiled.failed() ? compiled.getErrorMessage() : cydaw::base::Text());
     // Kept on the card: saved with the track.
     if (auto* ownerSlot = graphFor(slot.owner)) {
         auto kept = cydaw::base::Object::Ptr(new cydaw::base::Object());
@@ -1261,33 +1263,33 @@ std::optional<TrackRef> Studio::replacerInstrument(const TrackRef& owner, const 
     return track;
 }
 
-juce::String Studio::replacerInstrumentName(const TrackRef& owner, const std::uint64_t head)
+cydaw::base::Text Studio::replacerInstrumentName(const TrackRef& owner, const std::uint64_t head)
 {
     const auto* slot = replacerSlotFor(owner, head, true);
-    return slot != nullptr ? slot->name : juce::String();
+    return slot != nullptr ? slot->name : cydaw::base::Text();
 }
 
-juce::String Studio::padName(const TrackRef& track) const
+cydaw::base::Text Studio::padName(const TrackRef& track) const
 {
     if (track.pad >= replacerPadBase) {
         if (!isReplacerPad(track))
             return {};
         const auto& slot = replacerSlots_[static_cast<std::size_t>(track.pad - replacerPadBase)];
-        return slot.name.isNotEmpty() ? slot.name : juce::String("Instrument");
+        return slot.name.isNotEmpty() ? slot.name : cydaw::base::Text("Instrument");
     }
     if (const auto* pad = track.pad >= 0 ? rackPad(track.owner(), static_cast<std::size_t>(track.pad)) : nullptr)
         return pad->name;
     return trackName(track);
 }
 
-cydaw::base::Result Studio::setReplacerInstrument(const TrackRef& owner, const std::uint64_t head, const juce::String& instrumentKey)
+cydaw::base::Result Studio::setReplacerInstrument(const TrackRef& owner, const std::uint64_t head, const cydaw::base::Text& instrumentKey)
 {
     auto* ownerSlot = graphFor(owner);
     if (ownerSlot == nullptr)
         return cydaw::base::Result::fail(ui::Ls("Piste introuvable", "No such track"));
     const auto container = ownerSlot->graph().editorContainer(head);
     if (!container || container->typeKey != "replacer")
-        return cydaw::base::Result::fail("no Replacer " + juce::String(static_cast<juce::int64>(head)) + " on that track");
+        return cydaw::base::Result::fail("no Replacer " + cydaw::base::Text(static_cast<juce::int64>(head)) + " on that track");
     auto* slot = replacerSlotFor(owner, head, true);
     if (slot == nullptr) {
         ReplacerSlot made;
@@ -1302,7 +1304,7 @@ cydaw::base::Result Studio::setReplacerInstrument(const TrackRef& owner, const s
     ref.pad = replacerPadBase + static_cast<int>(slot - replacerSlots_.data());
     // An instrument of CyDAW's or of the factory's (its kit for a Batterie,
     // its samples for a sampler), named in English (the card's).
-    juce::String error;
+    cydaw::base::Text error;
     const auto name = applyInstrument(ref, instrumentKey, error);
     if (!name)
         return cydaw::base::Result::fail(error);
@@ -1315,7 +1317,7 @@ cydaw::base::Result Studio::setReplacerInstrument(const TrackRef& owner, const s
     if (const auto* effect = engine::effectForType("replacer"))
         if (const auto* generator = engine::effectParameter(*effect, "generator"))
             (void) ownerSlot->graph().editorSetParameter(
-                "node." + juce::String(static_cast<juce::int64>(head)) + "." + juce::String(std::string(generator->suffix)),
+                "node." + cydaw::base::Text(static_cast<juce::int64>(head)) + "." + cydaw::base::Text(std::string(generator->suffix)),
                 engine::container::instrumentGenerator);
     dirty_ = true;
     return publishGraph(ref, true);
@@ -1329,7 +1331,7 @@ void Studio::attachReplacerInstruments(const TrackRef& track, engine::NativeDspG
                 node.instrument = slot->plan;
 }
 
-cydaw::base::Result Studio::insertDeviceInBranch(const TrackRef& track, const juce::String& key, const std::uint64_t head, const int branch,
+cydaw::base::Result Studio::insertDeviceInBranch(const TrackRef& track, const cydaw::base::Text& key, const std::uint64_t head, const int branch,
                                           const std::uint64_t before)
 {
     auto* slot = graphFor(track);
@@ -1350,7 +1352,7 @@ cydaw::base::Result Studio::insertDeviceInBranch(const TrackRef& track, const ju
     return publishGraph(track, true);
 }
 
-cydaw::base::Result Studio::insertDeviceBefore(const TrackRef& track, const juce::String& key, const std::uint64_t before)
+cydaw::base::Result Studio::insertDeviceBefore(const TrackRef& track, const cydaw::base::Text& key, const std::uint64_t before)
 {
     std::vector<std::uint64_t> had;
     if (const auto* slot = graphFor(track))
@@ -1360,7 +1362,7 @@ cydaw::base::Result Studio::insertDeviceBefore(const TrackRef& track, const juce
     return result.failed() || before == 0 ? result : placeNewCard(track, had, before);
 }
 
-cydaw::base::Result Studio::insertLibraryDeviceBefore(const TrackRef& track, const juce::File& file, const std::uint64_t before)
+cydaw::base::Result Studio::insertLibraryDeviceBefore(const TrackRef& track, const cydaw::base::File& file, const std::uint64_t before)
 {
     std::vector<std::uint64_t> had;
     if (const auto* slot = graphFor(track))
@@ -1394,7 +1396,7 @@ cydaw::base::Result Studio::placeNewCard(const TrackRef& track, const std::vecto
     return publishGraph(track, true);
 }
 
-cydaw::base::Result Studio::insertDevice(const TrackRef& track, const juce::String& key)
+cydaw::base::Result Studio::insertDevice(const TrackRef& track, const cydaw::base::Text& key)
 {
     auto* slot = graphFor(track);
     if (slot == nullptr)
@@ -1427,7 +1429,7 @@ cydaw::base::Result Studio::insertDevice(const TrackRef& track, const juce::Stri
     // Batterie): alone it has no voices for the notes, and nothing wires it
     // in. On an instrument track, the whole instrument it is the heart of
     // goes in place of the one it plays (a missing plug-in's too).
-    if (const auto instrument = track.midi && device->kind != "preset" ? instrumentOfCard(key) : juce::String(); instrument.isNotEmpty())
+    if (const auto instrument = track.midi && device->kind != "preset" ? instrumentOfCard(key) : cydaw::base::Text(); instrument.isNotEmpty())
         if (const auto whole = std::find_if(catalogue.begin(), catalogue.end(),
                                             [&instrument](const auto& entry) { return entry.key == instrument; });
             whole != catalogue.end())
@@ -1457,17 +1459,17 @@ cydaw::base::Result Studio::insertDevice(const TrackRef& track, const juce::Stri
     // A Batterie comes with a kit: the first, if its card has none yet.
     for (const auto& node : graph.editorNodes())
         if (node.typeKey == "batterie" && !graph.nodeSamplerJson(node.id).isObject()) {
-            juce::String error;
+            cydaw::base::Text error;
             if (!setBatterieKit(track, node.id, 0, error))
                 return cydaw::base::Result::fail(error);
         }
     return publishGraph(track, true);
 }
 
-juce::String Studio::instrumentOfCard(const juce::String& key)
+cydaw::base::Text Studio::instrumentOfCard(const cydaw::base::Text& key)
 {
     if (const auto model = engine::synth::modelForType(key.toStdString()); model != engine::synth::Model::none)
-        return juce::String(engine::synth::info(model).instrument);
+        return cydaw::base::Text(engine::synth::info(model).instrument);
     if (key == "prism-synth")
         return "prism-instrument";
     if (key == "kick-synth")
@@ -1477,14 +1479,14 @@ juce::String Studio::instrumentOfCard(const juce::String& key)
     return {};
 }
 
-std::uint64_t Studio::addMissingPlugin(const TrackRef& track, const juce::String& name, const juce::String& vendor,
-                                       const juce::String& format, const bool instrument)
+std::uint64_t Studio::addMissingPlugin(const TrackRef& track, const cydaw::base::Text& name, const cydaw::base::Text& vendor,
+                                       const cydaw::base::Text& format, const bool instrument)
 {
     auto* slot = graphFor(track);
     if (slot == nullptr || (instrument && !track.midi))
         return 0;
     auto& graph = slot->graph();
-    const auto type = instrument ? juce::String("missing-instrument") : juce::String("missing-plugin");
+    const auto type = instrument ? cydaw::base::Text("missing-instrument") : cydaw::base::Text("missing-plugin");
     // The card made now: the one of its type that was not there before.
     std::set<std::uint64_t> before;
     for (const auto& node : graph.editorNodes())
@@ -1499,7 +1501,7 @@ std::uint64_t Studio::addMissingPlugin(const TrackRef& track, const juce::String
             id = node.id;
     if (id == 0)
         return 0;
-    (void) graph.editorSetAlias(id, name.isNotEmpty() ? name : juce::String("Plugin"));
+    (void) graph.editorSetAlias(id, name.isNotEmpty() ? name : cydaw::base::Text("Plugin"));
     auto* about = new cydaw::base::Object();
     about->setProperty("name", name);
     about->setProperty("vendor", vendor);
@@ -1522,18 +1524,18 @@ int Studio::setSynthSettings(const TrackRef& track, const std::vector<std::pair<
         const auto model = synth::modelForType(node.typeKey.toStdString());
         if (model == synth::Model::none)
             continue;
-        const auto prefix = "node." + juce::String(static_cast<juce::int64>(node.id)) + "." + juce::String(synth::info(model).prefix) + ".";
+        const auto prefix = "node." + cydaw::base::Text(static_cast<juce::int64>(node.id)) + "." + cydaw::base::Text(synth::info(model).prefix) + ".";
         auto set = 0;
         for (const auto& [key, value] : settings)
             if (const auto index = synth::parameterIndex(model, key); index >= 0)
-                set += graph.editorSetParameter(prefix + juce::String(key), synth::clampValue(model, index, value)) ? 1 : 0;
+                set += graph.editorSetParameter(prefix + cydaw::base::Text(key), synth::clampValue(model, index, value)) ? 1 : 0;
         dirty_ = true;
         return set;
     }
     return 0;
 }
 
-cydaw::base::Result Studio::replaceInstrument(const TrackRef& track, const juce::String& key, const juce::String& name)
+cydaw::base::Result Studio::replaceInstrument(const TrackRef& track, const cydaw::base::Text& key, const cydaw::base::Text& name)
 {
     auto* slot = graphFor(track);
     // An instrument track's, a pad's, a Replacer's (on any track).
@@ -1576,7 +1578,7 @@ cydaw::base::Result Studio::replaceInstrument(const TrackRef& track, const juce:
     dirty_ = true;
     for (const auto& node : graph.editorNodes())
         if (node.typeKey == "batterie" && !graph.nodeSamplerJson(node.id).isObject()) {
-            juce::String error;
+            cydaw::base::Text error;
             if (!setBatterieKit(track, node.id, 0, error))
                 return cydaw::base::Result::fail(error);
         }
@@ -1820,13 +1822,13 @@ std::optional<std::pair<TrackRef, std::uint64_t>> Studio::newSlotMidiClip(const 
     return std::make_pair(*part, id);
 }
 
-cydaw::base::Result Studio::placeSlotAudio(const TrackRef& track, const int scene, const juce::File& file)
+cydaw::base::Result Studio::placeSlotAudio(const TrackRef& track, const int scene, const cydaw::base::File& file)
 {
     if (scene < 0 || scene >= app::AudioTrackController::maximumLauncherScenes)
         return cydaw::base::Result::fail(ui::Ls("Pas de case ici", "No slot there"));
-    juce::AudioFormatManager formats;
+    cydaw::audio::AudioFormatManager formats;
     cydaw::integration::registerCyAudioCoreReaders(formats);
-    std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
+    std::unique_ptr<cydaw::audio::AudioFormatReader> reader(formats.createReaderFor(file));
     if (!reader || reader->sampleRate <= 0)
         return cydaw::base::Result::fail(ui::Ls("Fichier audio illisible : ", "Unreadable audio file: ") + file.getFileName());
     const auto part = makePartFor(track, false);
@@ -1919,7 +1921,7 @@ std::optional<TrackRef> Studio::groupTracks(const std::vector<TrackRef>& picked)
             members.push_back(track);
     if (members.empty())
         return std::nullopt;
-    const auto group = addBusTrack(ui::Ls("Groupe ", "Group ") + juce::String(static_cast<int>(groups_.size() + 1)));
+    const auto group = addBusTrack(ui::Ls("Groupe ", "Group ") + cydaw::base::Text(static_cast<int>(groups_.size() + 1)));
     if (!group)
         return std::nullopt;
     const auto groupKey = routingKey(*group);
@@ -2053,30 +2055,30 @@ bool Studio::isValid(const TrackRef& track) const
     return track.midi ? midiTracks_.contains(track.midiId) : track.audioIndex < engine_.trackCount();
 }
 
-juce::String Studio::trackName(const TrackRef& track) const
+cydaw::base::Text Studio::trackName(const TrackRef& track) const
 {
     if (track.isBus()) {
         const auto bus = engine_.virtualBus(track.bus);
-        return bus ? bus->name : juce::String();
+        return bus ? bus->name : cydaw::base::Text();
     }
     if (track.master)
         return "Master";
     // A hybrid track's companion: the track's name.
     const auto shown = shownTrackOf(track.owner());
-    const auto ownName = !(shown == track.owner()) ? std::optional<juce::String>(trackName(shown)) : std::nullopt;
+    const auto ownName = !(shown == track.owner()) ? std::optional<cydaw::base::Text>(trackName(shown)) : std::nullopt;
     if (track.midi) {
         for (const auto& summary : engine_.midiTrackSummaries())
             if (summary.id == track.midiId) {
                 // A pad: the rack's name, then its own.
                 if (const auto* pad = track.pad >= 0 ? rackPad(track.owner(), static_cast<std::size_t>(track.pad)) : nullptr)
-                    return ownName.value_or(summary.name) + juce::String::fromUTF8(" › ") + pad->name;
+                    return ownName.value_or(summary.name) + cydaw::base::Text::fromUTF8(" › ") + pad->name;
                 return ownName.value_or(summary.name);
             }
         return {};
     }
     if (ownName)
         return *ownName;
-    return track.audioIndex < audioTracks_.size() ? audioTracks_[track.audioIndex].name : juce::String();
+    return track.audioIndex < audioTracks_.size() ? audioTracks_[track.audioIndex].name : cydaw::base::Text();
 }
 
 juce::uint32 Studio::trackColour(const TrackRef& track) const
@@ -2096,7 +2098,7 @@ juce::uint32 Studio::trackColour(const TrackRef& track) const
     return track.audioIndex < audioTracks_.size() ? audioTracks_[track.audioIndex].colour : 0xff5ab0f0;
 }
 
-void Studio::setTrackName(const TrackRef& track, const juce::String& name)
+void Studio::setTrackName(const TrackRef& track, const cydaw::base::Text& name)
 {
     if (track.isBus()) {
         if (auto bus = engine_.virtualBus(track.bus); bus && name.trim().isNotEmpty()) {
@@ -2277,12 +2279,12 @@ const ParameterLanes* Studio::lanesOf(const TrackRef& track) const
     return const_cast<Studio*>(this)->lanesOf(track);
 }
 
-juce::String Studio::pluginLaneName(const std::size_t plugin, const std::uint32_t parameter)
+cydaw::base::Text Studio::pluginLaneName(const std::size_t plugin, const std::uint32_t parameter)
 {
-    return "plugin:" + juce::String(static_cast<int>(plugin)) + ":" + juce::String(static_cast<juce::int64>(parameter));
+    return "plugin:" + cydaw::base::Text(static_cast<int>(plugin)) + ":" + cydaw::base::Text(static_cast<juce::int64>(parameter));
 }
 
-bool Studio::parsePluginLane(const juce::String& lane, std::size_t& plugin, std::uint32_t& parameter)
+bool Studio::parsePluginLane(const cydaw::base::Text& lane, std::size_t& plugin, std::uint32_t& parameter)
 {
     if (!lane.startsWith("plugin:"))
         return false;
@@ -2295,13 +2297,13 @@ bool Studio::parsePluginLane(const juce::String& lane, std::size_t& plugin, std:
     return true;
 }
 
-void Studio::rememberPluginParameterName(const juce::String& lane, const juce::String& name)
+void Studio::rememberPluginParameterName(const cydaw::base::Text& lane, const cydaw::base::Text& name)
 {
     if (name.isNotEmpty())
         pluginParameterNames_[lane] = name;
 }
 
-juce::String Studio::pluginParameterName(const TrackRef& track, const juce::String& lane) const
+cydaw::base::Text Studio::pluginParameterName(const TrackRef& track, const cydaw::base::Text& lane) const
 {
     if (track.master)
         return {};
@@ -2313,12 +2315,12 @@ juce::String Studio::pluginParameterName(const TrackRef& track, const juce::Stri
         for (const auto& item : engine_.pluginAutomationLanes(track.audioIndex))
             if (item.pluginIndex == plugin && item.parameterIndex == parameter && item.parameterName.isNotEmpty())
                 return item.parameterName;
-        return "#" + juce::String(static_cast<juce::int64>(parameter) + 1);
+        return "#" + cydaw::base::Text(static_cast<juce::int64>(parameter) + 1);
     }
     return {};
 }
 
-std::vector<Studio::AutomationPoint> Studio::lanePoints(const TrackRef& track, const juce::String& lane) const
+std::vector<Studio::AutomationPoint> Studio::lanePoints(const TrackRef& track, const cydaw::base::Text& lane) const
 {
     if (lane.isEmpty())
         return automationPoints(track);
@@ -2348,7 +2350,7 @@ void sortPoints(std::vector<Studio::AutomationPoint>& points)
 
 } // namespace
 
-std::uint64_t Studio::addLanePoint(const TrackRef& track, const juce::String& lane, const double seconds, const float value)
+std::uint64_t Studio::addLanePoint(const TrackRef& track, const cydaw::base::Text& lane, const double seconds, const float value)
 {
     if (lane.isEmpty())
         return addAutomationPoint(track, seconds, value);
@@ -2376,7 +2378,7 @@ std::uint64_t Studio::addLanePoint(const TrackRef& track, const juce::String& la
     return point.id;
 }
 
-bool Studio::updateLanePoint(const TrackRef& track, const juce::String& lane, const std::uint64_t id, const double seconds,
+bool Studio::updateLanePoint(const TrackRef& track, const cydaw::base::Text& lane, const std::uint64_t id, const double seconds,
                              const float value)
 {
     if (lane.isEmpty())
@@ -2408,7 +2410,7 @@ bool Studio::updateLanePoint(const TrackRef& track, const juce::String& lane, co
     return false;
 }
 
-bool Studio::setLanePointCurve(const TrackRef& track, const juce::String& lane, const std::uint64_t id,
+bool Studio::setLanePointCurve(const TrackRef& track, const cydaw::base::Text& lane, const std::uint64_t id,
                                const AutomationCurve curve, const float amount)
 {
     if (lane.isEmpty())
@@ -2438,7 +2440,7 @@ bool Studio::setLanePointCurve(const TrackRef& track, const juce::String& lane, 
     return false;
 }
 
-bool Studio::removeLanePoint(const TrackRef& track, const juce::String& lane, const std::uint64_t id)
+bool Studio::removeLanePoint(const TrackRef& track, const cydaw::base::Text& lane, const std::uint64_t id)
 {
     if (lane.isEmpty())
         return removeAutomationPoint(track, id);
@@ -2466,7 +2468,7 @@ bool Studio::removeLanePoint(const TrackRef& track, const juce::String& lane, co
     return removed;
 }
 
-void Studio::setLanePoints(const TrackRef& track, const juce::String& lane, const std::vector<AutomationPoint>& points)
+void Studio::setLanePoints(const TrackRef& track, const cydaw::base::Text& lane, const std::vector<AutomationPoint>& points)
 {
     if (lane.isEmpty()) {
         setAutomationPoints(track, points);
@@ -2504,9 +2506,9 @@ void Studio::setLanePoints(const TrackRef& track, const juce::String& lane, cons
     dirty_ = true;
 }
 
-std::vector<juce::String> Studio::automatedParameters(const TrackRef& track) const
+std::vector<cydaw::base::Text> Studio::automatedParameters(const TrackRef& track) const
 {
-    std::vector<juce::String> bindings;
+    std::vector<cydaw::base::Text> bindings;
     if (const auto* lanes = lanesOf(track))
         for (const auto& [binding, points] : lanes->lanes)
             if (!points.empty())
@@ -2518,13 +2520,13 @@ std::vector<juce::String> Studio::automatedParameters(const TrackRef& track) con
     return bindings;
 }
 
-juce::String Studio::shownLane(const TrackRef& track) const
+cydaw::base::Text Studio::shownLane(const TrackRef& track) const
 {
     const auto* lanes = lanesOf(track);
-    return lanes != nullptr ? lanes->shown : juce::String();
+    return lanes != nullptr ? lanes->shown : cydaw::base::Text();
 }
 
-void Studio::setShownLane(const TrackRef& track, const juce::String& lane)
+void Studio::setShownLane(const TrackRef& track, const cydaw::base::Text& lane)
 {
     if (auto* lanes = lanesOf(track); lanes != nullptr && lanes->shown != lane) {
         lanes->shown = lane;
@@ -2532,7 +2534,7 @@ void Studio::setShownLane(const TrackRef& track, const juce::String& lane)
     }
 }
 
-bool Studio::logarithmicParameter(const TrackRef& track, const juce::String& binding) const
+bool Studio::logarithmicParameter(const TrackRef& track, const cydaw::base::Text& binding) const
 {
     if (const auto* slot = graphFor(track))
         for (const auto& parameter : slot->graph().editorGraphParameters())
@@ -2542,7 +2544,7 @@ bool Studio::logarithmicParameter(const TrackRef& track, const juce::String& bin
     return false;
 }
 
-std::optional<float> Studio::laneValueNow(const TrackRef& track, const juce::String& lane) const
+std::optional<float> Studio::laneValueNow(const TrackRef& track, const cydaw::base::Text& lane) const
 {
     const auto points = lanePoints(track, lane);
     if (points.empty())
@@ -2565,7 +2567,7 @@ std::string Studio::learnPrefix(const TrackRef& track) const
     return "param/" + (track.master ? std::string("master") : std::to_string(key)) + "/";
 }
 
-bool Studio::canAutomate(const TrackRef& track, const juce::String& binding) const
+bool Studio::canAutomate(const TrackRef& track, const cydaw::base::Text& binding) const
 {
     if (track.master)
         return false;
@@ -2583,11 +2585,11 @@ bool Studio::canAutomate(const TrackRef& track, const juce::String& binding) con
     return target.has_value() && !(track.midi && slot->graph().editorIsVoiceNode(target->nodeId));
 }
 
-juce::String Studio::nativeBinding(const GraphSlot* slot, const juce::String& binding) const
+cydaw::base::Text Studio::nativeBinding(const GraphSlot* slot, const cydaw::base::Text& binding) const
 {
     if (slot != nullptr)
         if (const auto inner = slot->graph().editorNativeNodeFor(binding))
-            return "node." + juce::String(static_cast<juce::int64>(inner->first)) + "." + inner->second;
+            return "node." + cydaw::base::Text(static_cast<juce::int64>(inner->first)) + "." + inner->second;
     return binding;
 }
 
@@ -2696,7 +2698,7 @@ std::vector<Studio::MasterLaneChoice> Studio::clipLaneChoices(const TrackRef& tr
                 continue;
             for (const auto& parameter : node.parameters)
                 if (canAutomate(track, parameter.binding) && !parameter.binding.startsWith("plugin:"))
-                    choices.push_back({ parameter.binding, node.title + juce::String::fromUTF8(" \xc2\xb7 ") + parameter.label, parameter.unit,
+                    choices.push_back({ parameter.binding, node.title + cydaw::base::Text::fromUTF8(" \xc2\xb7 ") + parameter.label, parameter.unit,
                                         parameter.minimum, parameter.maximum, parameter.value, logarithmicParameter(track, parameter.binding) });
         }
     return choices;
@@ -2719,7 +2721,7 @@ void Studio::publishParameterAutomation(const TrackRef& track)
         std::vector<LanePoint> pan;
         const auto scene = engine_.activeLauncherScene(track.audioIndex);
         const auto playing = scene >= 0 ? engine_.launcherClip(track.audioIndex, scene) : std::nullopt;
-        const auto knob = [&](const juce::String& binding) {
+        const auto knob = [&](const cydaw::base::Text& binding) {
             if (slot != nullptr)
                 for (const auto& parameter : slot->graph().editorGraphParameters())
                     if (parameter.binding == binding)
@@ -2736,7 +2738,7 @@ void Studio::publishParameterAutomation(const TrackRef& track)
                     lanes.lanes[name] = points;
             }
         } else if (const auto* clips = engine_.audioClipsView(track.audioIndex)) {
-            std::map<juce::String, std::vector<ClipSpan>> byLane;
+            std::map<cydaw::base::Text, std::vector<ClipSpan>> byLane;
             for (const auto& clip : *clips)
                 for (const auto& [name, points] : clip.lanes)
                     if (!points.empty())
@@ -3020,7 +3022,7 @@ void Studio::setWorkshopInfo(const app::NodeGraphComponent::EditorGraphInfo& inf
     auto identity = graph.pluginExportIdentity();
     graph.editorSetGraphInfo(info);
     const auto after = graph.editorGraphInfo().name;
-    if (after != before && (juce::String(identity.productName) == before || identity.productName == "CyDAW Graph")) {
+    if (after != before && (cydaw::base::Text(identity.productName) == before || identity.productName == "CyDAW Graph")) {
         identity.productName = after.toStdString();
         graph.setPluginExportIdentity(identity);
     }
@@ -3046,8 +3048,8 @@ cydaw::base::Result Studio::setDeviceChannels(app::NodeGraphComponent& graph, co
     if (in == 0 || out == 0 || graph.editorAudioChannels(out, 0, true) == 0)
         return cydaw::base::Result::fail(ui::Ls("Ce périphérique n'a pas d'entrée et de sortie audio à régler",
                                          "This device has no audio input and output to set"));
-    const auto inKey = "node." + juce::String(static_cast<juce::int64>(in));
-    const auto outKey = "node." + juce::String(static_cast<juce::int64>(out));
+    const auto inKey = "node." + cydaw::base::Text(static_cast<juce::int64>(in));
+    const auto outKey = "node." + cydaw::base::Text(static_cast<juce::int64>(out));
     const auto widths = [&graph, in = in, out = out] {
         return std::make_pair(graph.editorAudioChannels(in, 0, false), graph.editorAudioChannels(out, 0, true));
     };
@@ -3089,7 +3091,7 @@ cydaw::base::Result Studio::setDeviceChannels(app::NodeGraphComponent& graph, co
     for (const auto& connection : graph.editorConnections())
         if (connection.destination == out && connection.kind == 0)
             feeding = connection;
-    const juce::String converterKey = input == 1 ? "mono-to-stereo" : "stereo-to-mono";
+    const cydaw::base::Text converterKey = input == 1 ? "mono-to-stereo" : "stereo-to-mono";
     auto converterFeeds = false;
     if (feeding)
         for (const auto& node : graph.editorNodes())
@@ -3145,7 +3147,7 @@ std::pair<int, int> Studio::workshopChannels()
              out != 0 ? root->graph().editorAudioChannels(out, 0, true) : 0 };
 }
 
-void Studio::newWorkshopDevice(const bool instrument, const juce::String& name, const int inputChannels, const int outputChannels)
+void Studio::newWorkshopDevice(const bool instrument, const cydaw::base::Text& name, const int inputChannels, const int outputChannels)
 {
     Workshop made;
     made.instrument = instrument;
@@ -3165,7 +3167,7 @@ void Studio::newWorkshopDevice(const bool instrument, const juce::String& name, 
     openWorkshopTab(std::move(made));
 }
 
-cydaw::base::Result Studio::openWorkshopFile(const juce::File& file)
+cydaw::base::Result Studio::openWorkshopFile(const cydaw::base::File& file)
 {
     if (file.getSize() > 16 * 1024 * 1024)
         return cydaw::base::Result::fail(ui::Ls("Trop gros pour un périphérique : ", "Too large for a device: ") + file.getFullPathName());
@@ -3332,14 +3334,14 @@ cydaw::base::Value Studio::deviceDocument(app::NodeGraphComponent& graph, const 
     document->setProperty("role", instrument ? "instrument" : "audio-effect");
     document->setProperty("description", info.description);
     document->setProperty("author", info.author);
-    document->setProperty("modified", juce::Time::getCurrentTime().toISO8601(true));
+    document->setProperty("modified", cydaw::base::Time::getCurrentTime().toISO8601(true));
     // The device's own graph; the factory modules it uses come back from the
     // application's library when it is opened.
     document->setProperty("graph", withoutSharedModules(graph.serialise()));
     return cydaw::base::Value(document.get());
 }
 
-cydaw::base::Result Studio::saveWorkshop(juce::File& written, const bool asNewFile)
+cydaw::base::Result Studio::saveWorkshop(cydaw::base::File& written, const bool asNewFile)
 {
     auto* root = workshopRoot();
     if (root == nullptr)
@@ -3348,21 +3350,21 @@ cydaw::base::Result Studio::saveWorkshop(juce::File& written, const bool asNewFi
     auto& graph = root->graph();
     auto name = graph.editorGraphName().trim();
     if (name.isEmpty()) {
-        name = workshop_->track ? trackName(*workshop_->track) : juce::String("Device");
+        name = workshop_->track ? trackName(*workshop_->track) : cydaw::base::Text("Device");
         graph.editorSetGraphName(name);
     }
     auto target = workshop_->file;
-    if (asNewFile || target == juce::File()) {
+    if (asNewFile || target == cydaw::base::File()) {
         const auto folder = deviceLibraryFolder();
         if (const auto made = folder.createDirectory(); made.failed())
             return made;
-        auto base = juce::File::createLegalFileName(name).trim();
+        auto base = cydaw::base::File::createLegalFileName(name).trim();
         if (base.isEmpty())
             base = "Device";
         // Never over another device: a number tells them apart.
         target = folder.getChildFile(base + ".cydawdevice");
         for (auto number = 2; target.exists() && target != workshop_->file && number < 1'000; ++number)
-            target = folder.getChildFile(base + " " + juce::String(number) + ".cydawdevice");
+            target = folder.getChildFile(base + " " + cydaw::base::Text(number) + ".cydawdevice");
     }
     if (!target.replaceWithText(cydaw::base::JSON::toString(deviceDocument(graph, workshop_->instrument), false)))
         return cydaw::base::Result::fail(ui::Ls("Impossible d'écrire ", "Could not write ") + target.getFullPathName());
@@ -3372,7 +3374,7 @@ cydaw::base::Result Studio::saveWorkshop(juce::File& written, const bool asNewFi
     return cydaw::base::Result::ok();
 }
 
-cydaw::base::Result Studio::exportWorkshop(const juce::File& file, juce::StringArray& externalFiles)
+cydaw::base::Result Studio::exportWorkshop(const cydaw::base::File& file, cydaw::base::TextList& externalFiles)
 {
     externalFiles.clear();
     auto* slot = workshopRoot();
@@ -3547,7 +3549,7 @@ float Studio::simulatorLevelDb()
     const auto peak = engine_.takeSimulationPeak();
     const auto db = peak > 0.0f ? juce::Decibels::gainToDecibels(peak, -120.0f) : -120.0f;
     // Rises at once, falls 24 dB a second, however often it is asked.
-    const auto now = juce::Time::getMillisecondCounterHiRes() * 0.001;
+    const auto now = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
     const auto elapsed = std::clamp(now - simulatorLevelTime_, 0.0, 1.0);
     simulatorLevelTime_ = now;
     simulatorLevel_ = std::max(db, simulatorLevel_ - static_cast<float>(elapsed * 24.0));
@@ -3570,7 +3572,7 @@ cydaw::base::Result Studio::setSimulatorSettings(const SimulatorSettings& settin
     engine_.setSimulationSideSource(static_cast<app::AudioTrackController::SimulationSideSource>(simulator_.sideSource));
     if (patternChanged)
         publishSimulatorPattern();
-    if (sampleChanged && simulator_.sample != juce::File()) {
+    if (sampleChanged && simulator_.sample != cydaw::base::File()) {
         if (const auto loaded = engine_.setSimulationSample(simulator_.sample); loaded.failed())
             return cydaw::base::Result::fail(ui::Ls("Ce fichier audio ne s'ouvre pas : ", "This audio file does not open: ")
                                       + simulator_.sample.getFileName());
@@ -3658,7 +3660,7 @@ void Studio::publishSimulation(const bool force)
 }
 
 std::uint64_t Studio::createDeviceFromSelection(GraphSlot& slot, const std::vector<std::uint64_t>& ids,
-                                                const juce::String& name, juce::String& error)
+                                                const cydaw::base::Text& name, cydaw::base::Text& error)
 {
     const auto card = slot.graph().editorCreateModuleFromSelection(ids, name, error);
     if (card != 0)
@@ -3668,17 +3670,17 @@ std::uint64_t Studio::createDeviceFromSelection(GraphSlot& slot, const std::vect
 
 // ---- Sound matching ------------------------------------------------------------------
 
-juce::File Studio::soundModelFolder()
+cydaw::base::File Studio::soundModelFolder()
 {
     return locations::folder(Location::soundModels);
 }
 
-cydaw::base::Result Studio::recreateSound(const juce::Array<juce::File>& files, const juce::String& name, const bool refine,
-                                   const juce::StringArray& options)
+cydaw::base::Result Studio::recreateSound(const cydaw::base::Array<cydaw::base::File>& files, const cydaw::base::Text& name, const bool refine,
+                                   const cydaw::base::TextList& options)
 {
     if (soundMatching_.running)
         return cydaw::base::Result::fail(ui::Ls("Une analyse est déjà en cours", "An analysis is already running"));
-    juce::StringArray arguments { "analyse" };
+    cydaw::base::TextList arguments { "analyse" };
     for (const auto& file : files) {
         if (!file.existsAsFile())
             return cydaw::base::Result::fail(ui::Ls("Fichier introuvable : ", "No such file: ") + file.getFullPathName());
@@ -3693,7 +3695,7 @@ cydaw::base::Result Studio::recreateSound(const juce::Array<juce::File>& files, 
     const auto title = name.trim().isNotEmpty() ? name.trim() : files.getFirst().getFileNameWithoutExtension();
     const auto folder = soundModelFolder();
     (void) folder.createDirectory();
-    pendingModel_ = folder.getNonexistentChildFile(juce::File::createLegalFileName(title), ".cysound", false);
+    pendingModel_ = folder.getNonexistentChildFile(cydaw::base::File::createLegalFileName(title), ".cysound", false);
     arguments.addArray({ "--out", pendingModel_.getFullPathName(), "--name", title });
     if (refine)
         arguments.add("--refine");
@@ -3717,15 +3719,15 @@ void Studio::cancelSoundMatching()
 
 // ---- A synth patch for a recorded note ----
 
-cydaw::base::Result Studio::matchSynth(const juce::File& file, const juce::String& synth, const int note, const int evaluations)
+cydaw::base::Result Studio::matchSynth(const cydaw::base::File& file, const cydaw::base::Text& synth, const int note, const int evaluations)
 {
     namespace synths = engine::synth;
     namespace match = engine::synth_match;
     if (soundMatching_.running)
         return cydaw::base::Result::fail(ui::Ls("Une analyse est déjà en cours", "An analysis is already running"));
-    juce::AudioFormatManager formats;
+    cydaw::audio::AudioFormatManager formats;
     cydaw::integration::registerCyAudioCoreReaders(formats);
-    std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
+    std::unique_ptr<cydaw::audio::AudioFormatReader> reader(formats.createReaderFor(file));
     if (reader == nullptr || reader->sampleRate <= 0.0 || reader->lengthInSamples <= 0)
         return cydaw::base::Result::fail(ui::Ls("Fichier audio illisible : ", "Unreadable audio file: ") + file.getFileName());
     const auto length = static_cast<int>(std::min<juce::int64>(reader->lengthInSamples, static_cast<juce::int64>(reader->sampleRate * 6.0)));
@@ -3763,11 +3765,11 @@ cydaw::base::Result Studio::matchSynth(const juce::File& file, const juce::Strin
             options.model = models[index];
             options.evaluations = budget;
             options.cancel = &search->cancel;
-            const auto modelName = juce::String(synths::info(models[index]).english);
+            const auto modelName = cydaw::base::Text(synths::info(models[index]).english);
             options.progress = [search, index, count = models.size(), modelName](const double done, const double loss) {
                 search->progress = (static_cast<double>(index) + std::clamp(done, 0.0, 1.0)) / static_cast<double>(count);
                 const std::lock_guard lock(search->mutex);
-                search->message = modelName + ui::Ls(" : écart ", ": distance ") + juce::String(loss, 3);
+                search->message = modelName + ui::Ls(" : écart ", ": distance ") + cydaw::base::Text(loss, 3);
                 return !search->cancel.load();
             };
             const auto found = match::match(target, options);
@@ -3804,7 +3806,7 @@ void Studio::finishSynthSearch()
         soundMatching_.error = ui::Ls("Aucun patch trouvé", "No patch found");
         return;
     }
-    const auto instrument = juce::String(synths::info(search->model).instrument);
+    const auto instrument = cydaw::base::Text(synths::info(search->model).instrument);
     const auto track = addMidiTrack(search->name, instrument);
     if (!track) {
         soundMatching_.error = ui::Ls("La piste n'a pas pu être créée", "The track could not be made");
@@ -3817,9 +3819,9 @@ void Studio::finishSynthSearch()
     mix.gainDb = static_cast<float>(std::clamp(result.gainDb, -24.0, 12.0));
     setTrackMix(*track, mix);
     soundMatching_.track = track;
-    soundMatching_.description = search->name + " (" + juce::String(synths::info(search->model).english) + ")";
+    soundMatching_.description = search->name + " (" + cydaw::base::Text(synths::info(search->model).english) + ")";
     auto* report = new cydaw::base::Object();
-    report->setProperty("synth", juce::String(synths::info(search->model).english));
+    report->setProperty("synth", cydaw::base::Text(synths::info(search->model).english));
     report->setProperty("loss", result.loss);
     report->setProperty("gainDb", result.gainDb);
     report->setProperty("evaluations", result.evaluations);
@@ -3838,7 +3840,7 @@ void Studio::applySoundMatching(const Companion::Status& finished)
         return;
     }
     soundMatching_.zones = finished.result.getProperty("zones", {});
-    juce::String error;
+    cydaw::base::Text error;
     if (const auto track = loadSoundModel(pendingModel_, std::nullopt, error)) {
         soundMatching_.track = track;
         soundMatching_.model = pendingModel_;
@@ -3847,7 +3849,7 @@ void Studio::applySoundMatching(const Companion::Status& finished)
     }
 }
 
-std::optional<TrackRef> Studio::loadSoundModel(const juce::File& file, std::optional<TrackRef> track, juce::String& error)
+std::optional<TrackRef> Studio::loadSoundModel(const cydaw::base::File& file, std::optional<TrackRef> track, cydaw::base::Text& error)
 {
     cydaw::base::Value json;
     const auto model = app::loadSoundModelFile(file, json, error);
@@ -3890,7 +3892,7 @@ cydaw::base::Value Studio::soundModelJsonOf(const TrackRef& track) const
     return {};
 }
 
-std::optional<TrackRef> Studio::buildReadablePatch(const cydaw::base::Value& json, juce::String& error)
+std::optional<TrackRef> Studio::buildReadablePatch(const cydaw::base::Value& json, cydaw::base::Text& error)
 {
     const auto model = app::soundModelFromVar(json, error);
     if (model == nullptr)
@@ -3898,7 +3900,7 @@ std::optional<TrackRef> Studio::buildReadablePatch(const cydaw::base::Value& jso
     const auto& zone = model->zones.front();
     const auto musical = json.getProperty("musical", {});
     const auto name = json.getProperty("name", {}).toString();
-    const auto track = addMidiTrack((name.isNotEmpty() ? name : juce::String("Sound")) + ui::Ls(" (lisible)", " (readable)"),
+    const auto track = addMidiTrack((name.isNotEmpty() ? name : cydaw::base::Text("Sound")) + ui::Ls(" (lisible)", " (readable)"),
                                     "table-synth");
     if (!track) {
         error = ui::Ls("La piste instrument n'a pas pu être créée", "The instrument track could not be made");
@@ -3954,7 +3956,7 @@ std::optional<TrackRef> Studio::buildReadablePatch(const cydaw::base::Value& jso
         return value.isVoid() || value.isUndefined() ? fallback : static_cast<double>(value);
     };
     const auto sustainDb = number("sustainDb", -120.0);
-    const std::map<juce::String, double> settings {
+    const std::map<cydaw::base::Text, double> settings {
         { "wavetable.position", lastLoud > 0 ? juce::jlimit(0.0, 1.0, static_cast<double>(peakFrame) / lastLoud) : 0.0 },
         { "wavetable.detune", 0.0 },
         { "wavetable.level", 0.4 },
@@ -4214,7 +4216,7 @@ MasterClip& Studio::createMasterClip(const int scene)
 {
     auto& clip = masterClips_[std::clamp(scene, 0, app::AudioTrackController::maximumLauncherScenes - 1)];
     if (clip.name.isEmpty())
-        clip.name = "Master " + juce::String(scene + 1);
+        clip.name = "Master " + cydaw::base::Text(scene + 1);
     dirty_ = true;
     return clip;
 }
@@ -4309,7 +4311,7 @@ std::vector<Studio::MasterLaneChoice> Studio::masterLaneChoices() const
                 continue;
             for (const auto& parameter : node.parameters)
                 if (modulation::nativeTargetFor(nativeBinding(slot, parameter.binding)))
-                    choices.push_back({ parameter.binding, node.title + juce::String::fromUTF8(" \xc2\xb7 ") + parameter.label,
+                    choices.push_back({ parameter.binding, node.title + cydaw::base::Text::fromUTF8(" \xc2\xb7 ") + parameter.label,
                                         parameter.unit, parameter.minimum, parameter.maximum, parameter.value,
                                         logarithmicParameter(masterTrack(), parameter.binding) });
         }
@@ -4412,17 +4414,17 @@ namespace {
 // most of its files have, its instrument when it has one only; a kit's,
 // what its name says or a percussion; a bank no instrument plays, what its
 // name or its description (the registry's) says.
-std::map<juce::String, app::SampleHint> sampleHintsOf(const juce::File& factory, const juce::File& banks, const juce::File& registry,
+std::map<cydaw::base::Text, app::SampleHint> sampleHintsOf(const cydaw::base::File& factory, const cydaw::base::File& banks, const cydaw::base::File& registry,
                                                       const bool french)
 {
-    std::map<juce::String, app::SampleHint> hints;
+    std::map<cydaw::base::Text, app::SampleHint> hints;
     struct BankSummary {
-        std::map<juce::String, int> categories;
-        juce::StringArray instruments;
+        std::map<cydaw::base::Text, int> categories;
+        cydaw::base::TextList instruments;
         bool kit {};
         int files {};
     };
-    std::map<juce::String, BankSummary> summaries;
+    std::map<cydaw::base::Text, BankSummary> summaries;
     const auto catalogue = cydaw::base::JSON::parse(factory.getChildFile("catalogue.json").loadFileAsString());
     const auto* list = catalogue.getProperty("instruments", {}).getArray();
     if (list == nullptr)
@@ -4434,7 +4436,7 @@ std::map<juce::String, app::SampleHint> sampleHintsOf(const juce::File& factory,
         const auto map = factory.getChildFile(item.getProperty("map", {}).toString());
         if (!map.existsAsFile())
             continue;
-        juce::String error;
+        cydaw::base::Text error;
         const auto json = app::loadSamplerMapFile(map, error);
         const auto* zones = json.getProperty("zones", {}).getArray();
         if (zones == nullptr)
@@ -4465,7 +4467,7 @@ std::map<juce::String, app::SampleHint> sampleHintsOf(const juce::File& factory,
     }
     // The registry's titles and descriptions (in English, the words the
     // rules know).
-    std::map<juce::String, std::pair<juce::String, juce::String>> described;
+    std::map<cydaw::base::Text, std::pair<cydaw::base::Text, cydaw::base::Text>> described;
     const auto registryJson = cydaw::base::JSON::parse(registry.loadFileAsString());
     if (const auto* registered = registryJson.getProperty("banks", {}).getArray())
         for (const auto& bank : *registered) {
@@ -4483,13 +4485,13 @@ std::map<juce::String, app::SampleHint> sampleHintsOf(const juce::File& factory,
         if (summary.instruments.size() == 1)
             hint.instrument = summary.instruments[0];
         const auto found = described.find(bank);
-        const auto title = found != described.end() ? found->second.first : juce::String();
-        const auto description = found != described.end() ? found->second.second : juce::String();
+        const auto title = found != described.end() ? found->second.first : cydaw::base::Text();
+        const auto description = found != described.end() ? found->second.second : cydaw::base::Text();
         if (summary.kit) {
             // A kit's files differ one from the next: what its name says when
             // it is a drum, a percussion otherwise.
             const auto named = app::SampleLibrary::categoryFromName(title, bank);
-            hint.category = app::SampleLibrary::familyOf(named) == "drums" && named != "drums" ? named : juce::String("perc");
+            hint.category = app::SampleLibrary::familyOf(named) == "drums" && named != "drums" ? named : cydaw::base::Text("perc");
         } else {
             for (const auto& [category, count] : summary.categories)
                 if (category.isNotEmpty() && count * 10 >= summary.files * 6)
@@ -4544,7 +4546,7 @@ void Studio::ensureSamples()
     });
 }
 
-bool Studio::setLocation(const Location location, const juce::File& folder, const bool takeContent, juce::String& error)
+bool Studio::setLocation(const Location location, const cydaw::base::File& folder, const bool takeContent, cydaw::base::Text& error)
 {
     if (locationMove_ != nullptr) {
         error = ui::Ls("Un déplacement est déjà en cours", "A move is already running");
@@ -4554,7 +4556,7 @@ bool Studio::setLocation(const Location location, const juce::File& folder, cons
         error = ui::Ls("Un téléchargement est en cours", "A download is running");
         return false;
     }
-    const auto target = folder == juce::File {} ? locations::defaultFolder(location) : folder;
+    const auto target = folder == cydaw::base::File {} ? locations::defaultFolder(location) : folder;
     const auto current = locations::folder(location);
     if (target != current) {
         if (takeContent && target.isAChildOf(current)) {
@@ -4594,13 +4596,13 @@ void Studio::cancelLocationMove()
         locationMove_->cancel();
 }
 
-bool Studio::setAllLocations(const juce::File& root, const bool creations, const bool takeContent, juce::String& error)
+bool Studio::setAllLocations(const cydaw::base::File& root, const bool creations, const bool takeContent, cydaw::base::Text& error)
 {
     if (locationMove_ != nullptr || !pendingLocations_.empty()) {
         error = ui::Ls("Un déplacement est déjà en cours", "A move is already running");
         return false;
     }
-    if (root == juce::File {} || root.createDirectory().failed()) {
+    if (root == cydaw::base::File {} || root.createDirectory().failed()) {
         error = ui::Ls("Impossible de créer ", "Cannot make ") + root.getFullPathName();
         return false;
     }
@@ -4619,7 +4621,7 @@ void Studio::nextLocation()
     while (locationMove_ == nullptr && !pendingLocations_.empty()) {
         const auto [location, folder] = pendingLocations_.front();
         pendingLocations_.erase(pendingLocations_.begin());
-        juce::String error;
+        cydaw::base::Text error;
         if (!setLocation(location, folder, pendingTake_, error)) {
             notices_.emplace_back(ui::Ls("Emplacement non changé : ", "Location not changed: ") + error, true);
             pendingLocations_.clear();
@@ -4627,9 +4629,9 @@ void Studio::nextLocation()
     }
 }
 
-std::vector<std::pair<juce::String, bool>> Studio::takeNotices()
+std::vector<std::pair<cydaw::base::Text, bool>> Studio::takeNotices()
 {
-    std::vector<std::pair<juce::String, bool>> taken;
+    std::vector<std::pair<cydaw::base::Text, bool>> taken;
     taken.swap(notices_);
     return taken;
 }
@@ -4644,8 +4646,8 @@ std::optional<Studio::PresetHolder> Studio::devicePresetHolder(const TrackRef& t
     // Asked for by every card the device panel draws: its type alone.
     if (const auto typeKey = slot->graph().editorNodeTypeKey(nodeId); typeKey.isNotEmpty())
         return PresetHolder { "device", typeKey,
-                              juce::String(static_cast<juce::int64>(routingKey(track))) + "/device/"
-                                  + juce::String(static_cast<juce::int64>(nodeId)) };
+                              cydaw::base::Text(static_cast<juce::int64>(routingKey(track))) + "/device/"
+                                  + cydaw::base::Text(static_cast<juce::int64>(nodeId)) };
     return std::nullopt;
 }
 
@@ -4657,7 +4659,7 @@ std::optional<Studio::PresetHolder> Studio::pluginPresetHolder(const TrackRef& t
     if (pluginIndex < 0 || pluginIndex >= static_cast<int>(plugins.size()))
         return std::nullopt;
     return PresetHolder { "plugin", plugins[static_cast<std::size_t>(pluginIndex)].name,
-                          juce::String(static_cast<juce::int64>(routingKey(track))) + "/plugin/" + juce::String(pluginIndex) };
+                          cydaw::base::Text(static_cast<juce::int64>(routingKey(track))) + "/plugin/" + cydaw::base::Text(pluginIndex) };
 }
 
 std::optional<Studio::PresetHolder> Studio::chainPresetHolder(const TrackRef& track) const
@@ -4665,7 +4667,7 @@ std::optional<Studio::PresetHolder> Studio::chainPresetHolder(const TrackRef& tr
     if (graphFor(track) == nullptr)
         return std::nullopt;
     const auto role = track.isBus() ? "bus" : track.master ? "master" : track.midi ? "instrument" : "audio";
-    return PresetHolder { "chain", role, juce::String(static_cast<juce::int64>(routingKey(track))) + "/chain" };
+    return PresetHolder { "chain", role, cydaw::base::Text(static_cast<juce::int64>(routingKey(track))) + "/chain" };
 }
 
 cydaw::base::Value Studio::devicePresetState(const TrackRef& track, const std::uint64_t nodeId) const
@@ -4692,7 +4694,7 @@ cydaw::base::Value Studio::devicePresetState(const TrackRef& track, const std::u
 }
 
 bool Studio::applyDevicePreset(const TrackRef& track, const std::uint64_t nodeId, const cydaw::base::Value& state,
-                               juce::String& error)
+                               cydaw::base::Text& error)
 {
     auto* slot = graphFor(track);
     if (slot == nullptr) {
@@ -4709,7 +4711,7 @@ bool Studio::applyDevicePreset(const TrackRef& track, const std::uint64_t nodeId
         dirty_ = true;
         return publishGraph(track, true).wasOk();
     }
-    const auto kit = [this, &track, nodeId](const int number, juce::String& problem) {
+    const auto kit = [this, &track, nodeId](const int number, cydaw::base::Text& problem) {
         return setBatterieKit(track, nodeId, number, problem);
     };
     if (!device_ops::applyPreset(slot->graph(), nodeId, state, error, kit))
@@ -4725,8 +4727,8 @@ bool Studio::applyDevicePreset(const TrackRef& track, const std::uint64_t nodeId
 }
 
 
-bool Studio::importPrismTable(const TrackRef& track, const std::uint64_t nodeId, const int oscillator, const juce::File& file,
-                              juce::String& error)
+bool Studio::importPrismTable(const TrackRef& track, const std::uint64_t nodeId, const int oscillator, const cydaw::base::File& file,
+                              cydaw::base::Text& error)
 {
     auto* slot = graphFor(track);
     if (slot == nullptr) {
@@ -4739,7 +4741,7 @@ bool Studio::importPrismTable(const TrackRef& track, const std::uint64_t nodeId,
     return true;
 }
 
-bool Studio::loadCabImpulse(const TrackRef& track, const std::uint64_t nodeId, const juce::File& file, juce::String& error)
+bool Studio::loadCabImpulse(const TrackRef& track, const std::uint64_t nodeId, const cydaw::base::File& file, cydaw::base::Text& error)
 {
     auto* slot = graphFor(track);
     if (slot == nullptr) {
@@ -4757,7 +4759,7 @@ bool Studio::clearCabImpulse(const TrackRef& track, const std::uint64_t nodeId)
     auto* slot = graphFor(track);
     if (slot == nullptr || !slot->graph().nodeImpulseJson(nodeId).isObject())
         return false;
-    juce::String error;
+    cydaw::base::Text error;
     if (!slot->graph().setNodeImpulse(nodeId, {}, error))
         return false;
     dirty_ = true;
@@ -4787,7 +4789,7 @@ void Studio::setPluginPins(const TrackRef& track, const std::size_t plugin, std:
 
 namespace {
 // "plugin:<p>:<param>" moved to another plug-in index (or nothing to drop).
-juce::String movedPluginBinding(const juce::String& binding, const std::size_t from, const std::optional<std::size_t> to)
+cydaw::base::Text movedPluginBinding(const cydaw::base::Text& binding, const std::size_t from, const std::optional<std::size_t> to)
 {
     if (!binding.startsWith("plugin:"))
         return binding;
@@ -4795,8 +4797,8 @@ juce::String movedPluginBinding(const juce::String& binding, const std::size_t f
     const auto plugin = static_cast<std::size_t>(rest.upToFirstOccurrenceOf(":", false, false).getLargeIntValue());
     if (plugin != from)
         return binding;
-    return to ? "plugin:" + juce::String(static_cast<juce::int64>(*to)) + ":" + rest.fromFirstOccurrenceOf(":", false, false)
-              : juce::String();
+    return to ? "plugin:" + cydaw::base::Text(static_cast<juce::int64>(*to)) + ":" + rest.fromFirstOccurrenceOf(":", false, false)
+              : cydaw::base::Text();
 }
 } // namespace
 
@@ -4873,7 +4875,7 @@ cydaw::base::Value Studio::pluginPresetState(const TrackRef& track, const int pl
     return cydaw::base::Value(state);
 }
 
-bool Studio::applyPluginPreset(const TrackRef& track, const int pluginIndex, const cydaw::base::Value& state, juce::String& error)
+bool Studio::applyPluginPreset(const TrackRef& track, const int pluginIndex, const cydaw::base::Value& state, cydaw::base::Text& error)
 {
     const auto holder = pluginPresetHolder(track, pluginIndex);
     if (!holder) {
@@ -4898,7 +4900,7 @@ bool Studio::applyPluginPreset(const TrackRef& track, const int pluginIndex, con
     return true;
 }
 
-bool Studio::pluginPrograms(const TrackRef& track, const int pluginIndex, juce::StringArray& names, int& current)
+bool Studio::pluginPrograms(const TrackRef& track, const int pluginIndex, cydaw::base::TextList& names, int& current)
 {
     names.clear();
     current = -1;
@@ -4907,7 +4909,7 @@ bool Studio::pluginPrograms(const TrackRef& track, const int pluginIndex, juce::
     return engine_.getTrackPluginPrograms(track.audioIndex, static_cast<std::size_t>(pluginIndex), names, current).wasOk();
 }
 
-bool Studio::selectPluginProgram(const TrackRef& track, const int pluginIndex, const int program, juce::String& error)
+bool Studio::selectPluginProgram(const TrackRef& track, const int pluginIndex, const int program, cydaw::base::Text& error)
 {
     if (!pluginPresetHolder(track, pluginIndex)) {
         error = ui::Ls("Plug-in introuvable", "No such plug-in");
@@ -4937,7 +4939,7 @@ cydaw::base::Value Studio::chainPresetState(const TrackRef& track) const
     return cydaw::base::Value(state);
 }
 
-bool Studio::applyChainPreset(const TrackRef& track, const cydaw::base::Value& state, juce::String& error)
+bool Studio::applyChainPreset(const TrackRef& track, const cydaw::base::Value& state, cydaw::base::Text& error)
 {
     auto* slot = graphFor(track);
     const auto graph = state.getProperty("graph", {});
@@ -4975,9 +4977,9 @@ bool Studio::applyChainPreset(const TrackRef& track, const cydaw::base::Value& s
     return true;
 }
 
-std::vector<std::pair<juce::String, juce::String>> Studio::factoryChains(const TrackRef& track) const
+std::vector<std::pair<cydaw::base::Text, cydaw::base::Text>> Studio::factoryChains(const TrackRef& track) const
 {
-    std::vector<std::pair<juce::String, juce::String>> chains;
+    std::vector<std::pair<cydaw::base::Text, cydaw::base::Text>> chains;
     const auto* slot = graphFor(track);
     if (slot == nullptr || track.midi)
         return chains;
@@ -4988,7 +4990,7 @@ std::vector<std::pair<juce::String, juce::String>> Studio::factoryChains(const T
     return chains;
 }
 
-cydaw::base::Result Studio::applyFactoryChain(const TrackRef& track, const juce::String& key)
+cydaw::base::Result Studio::applyFactoryChain(const TrackRef& track, const cydaw::base::Text& key)
 {
     auto* slot = graphFor(track);
     if (slot == nullptr)
@@ -5006,20 +5008,20 @@ cydaw::base::Result Studio::applyFactoryChain(const TrackRef& track, const juce:
     return publishGraph(track, true);
 }
 
-juce::String Studio::presetName(const juce::String& holderKey) const
+cydaw::base::Text Studio::presetName(const cydaw::base::Text& holderKey) const
 {
     const auto found = presetNames_.find(holderKey);
-    return found != presetNames_.end() ? found->second : juce::String();
+    return found != presetNames_.end() ? found->second : cydaw::base::Text();
 }
 
-void Studio::setPresetName(const juce::String& holderKey, const juce::String& name)
+void Studio::setPresetName(const cydaw::base::Text& holderKey, const cydaw::base::Text& name)
 {
     presetNames_[holderKey] = name;
 }
 
 // ---- Sound banks ------------------------------------------------------------------------
 
-bool Studio::downloadFactoryInstrument(const juce::String& key, juce::String& error)
+bool Studio::downloadFactoryInstrument(const cydaw::base::Text& key, cydaw::base::Text& error)
 {
     for (const auto& instrument : factoryInstruments())
         if (instrument.key == key) {
@@ -5040,7 +5042,7 @@ bool Studio::downloadFactoryInstrument(const juce::String& key, juce::String& er
 SoundBanks::Missing Studio::missingSamples(const TrackRef& track)
 {
     SoundBanks::Missing all;
-    std::set<juce::String> seen;
+    std::set<cydaw::base::Text> seen;
     if (auto* slot = graphFor(track))
         for (const auto& node : slot->graph().editorNodes()) {
             if (node.typeKey != "sampler" && node.typeKey != "batterie")
@@ -5066,7 +5068,7 @@ bool Studio::generateMissingSounds(const std::optional<TrackRef> only)
         all.push_back(masterTrack());
     // Only the zones of generated banks: the disk asked for them alone.
     cydaw::base::Array<cydaw::base::Value> zones;
-    std::set<juce::String> seen;
+    std::set<cydaw::base::Text> seen;
     for (const auto& track : all) {
         auto* slot = graphFor(track);
         if (slot == nullptr)
@@ -5099,7 +5101,7 @@ bool Studio::generateMissingSounds(const std::optional<TrackRef> only)
     return true;
 }
 
-void Studio::reloadSamplers(const juce::StringArray& banks)
+void Studio::reloadSamplers(const cydaw::base::TextList& banks)
 {
     auto all = allTracks();
     all.push_back(masterTrack());
@@ -5124,7 +5126,7 @@ void Studio::reloadSamplers(const juce::StringArray& banks)
             // The same map again: its samples asked of the store anew, now
             // that they are here. Not an edit of the project.
             const juce::ScopedValueSetter<bool> quiet(loading_, true);
-            juce::String error;
+            cydaw::base::Text error;
             changed = graph.setNodeSampler(id, json, error) || changed;
         }
         if (changed)
@@ -5138,7 +5140,7 @@ std::vector<Studio::FactoryInstrument> Studio::factoryInstruments() const
 {
     // Kept until the disk or the language changes; a list still waiting for
     // maps or bank counts made again now and then.
-    const auto now = juce::Time::getMillisecondCounterHiRes();
+    const auto now = cydaw::base::Time::getMillisecondCounterHiRes();
     if (factoryCacheGeneration_ == banks_.diskGeneration() && factoryCacheLanguage_ == ui::language()
         && (!factoryCachePending_ || now - factoryCacheTime_ < 1'500.0))
         return factoryCache_;
@@ -5168,7 +5170,7 @@ std::vector<Studio::FactoryInstrument> Studio::factoryInstruments() const
             instrument.bank = item.getProperty("bank", {}).toString();
             instrument.licence = item.getProperty("licence", {}).toString();
             if (const auto* range = item.getProperty("range", {}).getArray(); range != nullptr && range->size() == 2)
-                instrument.range = (*range)[0].toString() + juce::String::fromUTF8(" \xe2\x80\x93 ") + (*range)[1].toString();
+                instrument.range = (*range)[0].toString() + cydaw::base::Text::fromUTF8(" \xe2\x80\x93 ") + (*range)[1].toString();
             if (const auto model = item.getProperty("model", {}).toString(); model.isNotEmpty())
                 if (const auto file = folder.getChildFile(model); file.existsAsFile()) {
                     instrument.model = file;
@@ -5219,10 +5221,10 @@ std::uint64_t Studio::samplerCardOf(const TrackRef& track) const
     return 0;
 }
 
-bool Studio::setBatterieKit(const TrackRef& track, const std::uint64_t nodeId, int kit, juce::String& error)
+bool Studio::setBatterieKit(const TrackRef& track, const std::uint64_t nodeId, int kit, cydaw::base::Text& error)
 {
     kit = std::clamp(kit, 0, static_cast<int>(engine::drum::kits.size()) - 1);
-    const auto key = juce::String(engine::drum::kits[static_cast<std::size_t>(kit)].instrument);
+    const auto key = cydaw::base::Text(engine::drum::kits[static_cast<std::size_t>(kit)].instrument);
     const auto instruments = factoryInstruments();
     const auto found = std::ranges::find_if(instruments, [&key](const FactoryInstrument& item) { return item.key == key; });
     if (found == instruments.end()) {
@@ -5240,21 +5242,21 @@ bool Studio::setBatterieKit(const TrackRef& track, const std::uint64_t nodeId, i
     if (!setSamplerMap(track, nodeId, json, true, error))
         return false;
     if (auto* slot = graphFor(track)) {
-        const auto prefix = "node." + juce::String(static_cast<juce::int64>(nodeId)) + ".";
+        const auto prefix = "node." + cydaw::base::Text(static_cast<juce::int64>(nodeId)) + ".";
         (void) slot->graph().editorSetParameter(prefix + "batterie.kit.kit", static_cast<double>(kit));
         // Another kit has other microphones: none of the last kit's stays on
         // the card, each starts where the new kit's map puts it.
         if (const auto controls = slot->graph().editorSamplerControls(nodeId))
             for (std::size_t number = 0; number < controls->controllers.size(); ++number)
                 if (controls->controllers[number] >= 0.0f)
-                    (void) slot->graph().editorSetParameter(prefix + "sampler.cc" + juce::String(static_cast<int>(number)), -1.0);
+                    (void) slot->graph().editorSetParameter(prefix + "sampler.cc" + cydaw::base::Text(static_cast<int>(number)), -1.0);
     }
     (void) generateMissingSounds(track);
     return publishGraph(track, true).wasOk();
 }
 
 std::uint64_t Studio::addGrooveClip(const TrackRef& track, const int groove, const int bars, const int fill, double startBeats,
-                                    juce::String& error)
+                                    cydaw::base::Text& error)
 {
     const auto& list = engine::drum::grooves();
     if (!track.midi || groove < 0 || groove >= static_cast<int>(list.size())) {
@@ -5268,7 +5270,7 @@ std::uint64_t Studio::addGrooveClip(const TrackRef& track, const int groove, con
         startBeats = std::floor(beats / 4.0) * 4.0;
     }
     const auto& played = list[static_cast<std::size_t>(groove)];
-    const auto name = juce::String::fromUTF8((ui::french() ? played.french : played.english).c_str());
+    const auto name = cydaw::base::Text::fromUTF8((ui::french() ? played.french : played.english).c_str());
     const auto clip = engine_.addMidiClip(track.midiId, name, startBeats, 4.0 * count, false, 0xffe8c06au);
     if (clip == 0) {
         error = ui::Ls("Le clip n'a pas pu être créé", "The clip could not be made");
@@ -5301,7 +5303,7 @@ std::uint64_t Studio::addGrooveClip(const TrackRef& track, const int groove, con
     return clip;
 }
 
-std::optional<TrackRef> Studio::addBatterieTrack(const int kit, juce::String& error)
+std::optional<TrackRef> Studio::addBatterieTrack(const int kit, cydaw::base::Text& error)
 {
     const auto track = addMidiTrack("Batterie", "batterie-instrument");
     if (!track) {
@@ -5315,7 +5317,7 @@ std::optional<TrackRef> Studio::addBatterieTrack(const int kit, juce::String& er
 }
 
 bool Studio::setSamplerMap(const TrackRef& track, const std::uint64_t nodeId, const cydaw::base::Value& json,
-                           const bool applySettings, juce::String& error)
+                           const bool applySettings, cydaw::base::Text& error)
 {
     auto* slot = graphFor(track);
     if (slot == nullptr) {
@@ -5331,7 +5333,7 @@ bool Studio::setSamplerMap(const TrackRef& track, const std::uint64_t nodeId, co
                 const auto index = engine::samplerSettingIndex(key.toString().toStdString());
                 if (index < 0)
                     continue;
-                const auto suffix = juce::String(std::string(engine::samplerSettings[static_cast<std::size_t>(index)].suffix));
+                const auto suffix = cydaw::base::Text(std::string(engine::samplerSettings[static_cast<std::size_t>(index)].suffix));
                 for (const auto& node : graph.editorNodes())
                     if (node.id == nodeId)
                         for (const auto& parameter : node.parameters)
@@ -5343,7 +5345,7 @@ bool Studio::setSamplerMap(const TrackRef& track, const std::uint64_t nodeId, co
     return true;
 }
 
-std::optional<TrackRef> Studio::loadSamplerFile(const juce::File& file, std::optional<TrackRef> track, juce::String& error)
+std::optional<TrackRef> Studio::loadSamplerFile(const cydaw::base::File& file, std::optional<TrackRef> track, cydaw::base::Text& error)
 {
     // A sound onto a simple sampler: its one sample.
     if (track && file.hasFileExtension("wav;aif;aiff;flac;ogg;mp3;wv")) {
@@ -5374,7 +5376,7 @@ std::optional<TrackRef> Studio::loadSamplerFile(const juce::File& file, std::opt
     return track;
 }
 
-std::optional<TrackRef> Studio::newSamplerTrack(const juce::Array<juce::File>& files, juce::String& error)
+std::optional<TrackRef> Studio::newSamplerTrack(const cydaw::base::Array<cydaw::base::File>& files, cydaw::base::Text& error)
 {
     if (files.isEmpty()) {
         error = ui::Ls("Aucun fichier", "No file");
@@ -5393,7 +5395,7 @@ std::optional<TrackRef> Studio::newSamplerTrack(const juce::Array<juce::File>& f
     return track;
 }
 
-std::optional<TrackRef> Studio::addFactoryInstrument(const juce::String& key, juce::String& error, const bool model,
+std::optional<TrackRef> Studio::addFactoryInstrument(const cydaw::base::Text& key, cydaw::base::Text& error, const bool model,
                                                      std::optional<TrackRef> onto)
 {
     if (onto && (!onto->midi || !isValid(*onto)))
@@ -5406,7 +5408,7 @@ std::optional<TrackRef> Studio::addFactoryInstrument(const juce::String& key, ju
     }
     if (model) {
         // The sound model: a sound-model synth, its card's settings as made.
-        if (found->model == juce::File()) {
+        if (found->model == cydaw::base::File()) {
             error = ui::Ls("Pas de modèle de son pour ", "No sound model for ") + found->name;
             return std::nullopt;
         }
@@ -5429,7 +5431,7 @@ std::optional<TrackRef> Studio::addFactoryInstrument(const juce::String& key, ju
                     const auto index = engine::soundModelSettingIndex(name.toString().toStdString());
                     if (index < 0)
                         continue;
-                    const auto suffix = juce::String(std::string(engine::soundModelSettings[static_cast<std::size_t>(index)].suffix));
+                    const auto suffix = cydaw::base::Text(std::string(engine::soundModelSettings[static_cast<std::size_t>(index)].suffix));
                     for (const auto& node : graph.editorNodes())
                         for (const auto& parameter : node.parameters)
                             if (parameter.binding.endsWith("." + suffix))
@@ -5451,7 +5453,7 @@ std::optional<TrackRef> Studio::addFactoryInstrument(const juce::String& key, ju
     return track;
 }
 
-bool Studio::applyFactoryInstrument(const TrackRef& target, const FactoryInstrument& instrument, juce::String& error)
+bool Studio::applyFactoryInstrument(const TrackRef& target, const FactoryInstrument& instrument, cydaw::base::Text& error)
 {
     const auto* found = &instrument;
     auto json = app::loadSamplerMapFile(found->map, error);
@@ -5505,7 +5507,7 @@ std::vector<Studio::InstrumentChoice> Studio::instrumentChoices()
     return choices;
 }
 
-std::optional<juce::String> Studio::applyInstrument(const TrackRef& target, const juce::String& key, juce::String& error)
+std::optional<cydaw::base::Text> Studio::applyInstrument(const TrackRef& target, const cydaw::base::Text& key, cydaw::base::Text& error)
 {
     if (key.startsWith("factory:")) {
         const auto wanted = key.fromFirstOccurrenceOf("factory:", false, false);
@@ -5517,7 +5519,7 @@ std::optional<juce::String> Studio::applyInstrument(const TrackRef& target, cons
         }
         // Its samples fetched when they are not here: it plays once they are.
         if (found->missingFiles > 0) {
-            juce::String ignored;
+            cydaw::base::Text ignored;
             (void) downloadFactoryInstrument(found->key, ignored);
         }
         if (!applyFactoryInstrument(target, *found, error))
@@ -5543,7 +5545,7 @@ std::optional<juce::String> Studio::applyInstrument(const TrackRef& target, cons
     return name;
 }
 
-juce::File Studio::deviceLibraryFolder()
+cydaw::base::File Studio::deviceLibraryFolder()
 {
     return locations::folder(Location::devices);
 }
@@ -5554,7 +5556,7 @@ std::vector<Studio::LibraryDevice> Studio::libraryDevices() const
     const auto folder = deviceLibraryFolder();
     if (!folder.isDirectory())
         return devices;
-    for (const auto& file : folder.findChildFiles(juce::File::findFiles, false, "*.cydawdevice")) {
+    for (const auto& file : folder.findChildFiles(cydaw::base::File::findFiles, false, "*.cydawdevice")) {
         if (file.getSize() > 16 * 1024 * 1024)
             continue;
         const auto document = cydaw::base::JSON::parse(file);
@@ -5575,7 +5577,7 @@ std::vector<Studio::LibraryDevice> Studio::libraryDevices() const
     return devices;
 }
 
-cydaw::base::Result Studio::insertLibraryDevice(const TrackRef& track, const juce::File& file)
+cydaw::base::Result Studio::insertLibraryDevice(const TrackRef& track, const cydaw::base::File& file)
 {
     auto* slot = graphFor(track);
     if (slot == nullptr)
@@ -5607,14 +5609,14 @@ cydaw::base::Result Studio::insertLibraryDevice(const TrackRef& track, const juc
     return publishGraph(track, true);
 }
 
-cydaw::base::Result Studio::removeLibraryDevice(const juce::File& file)
+cydaw::base::Result Studio::removeLibraryDevice(const cydaw::base::File& file)
 {
     if (file.getParentDirectory() != deviceLibraryFolder() || !file.hasFileExtension("cydawdevice"))
         return cydaw::base::Result::fail(ui::Ls("Pas un périphérique de Mes périphériques : ", "Not a device of My devices: ") + file.getFullPathName());
     if (!file.moveToTrash())
         return cydaw::base::Result::fail(ui::Ls("Impossible de mettre à la corbeille : ", "Could not move to the recycle bin: ") + file.getFullPathName());
     if (workshop_ && workshop_->file == file) {
-        workshop_->file = juce::File();
+        workshop_->file = cydaw::base::File();
         workshop_->unsaved = true;
     }
     return cydaw::base::Result::ok();
@@ -5672,7 +5674,7 @@ void Studio::setTrackMix(const TrackRef& track, const Mix& mix)
     dirty_ = true;
 }
 
-std::optional<TrackRef> Studio::addAudioTrack(const juce::File& file, const double startSeconds)
+std::optional<TrackRef> Studio::addAudioTrack(const cydaw::base::File& file, const double startSeconds)
 {
     std::size_t index {};
     const auto result = file.existsAsFile() ? engine_.addAudioTrack(file, &index, startSeconds)
@@ -5688,11 +5690,11 @@ std::optional<TrackRef> Studio::addAudioTrack(const juce::File& file, const doub
     return track;
 }
 
-std::optional<TrackRef> Studio::addMidiTrack(const juce::String& name, const juce::String& instrumentKey)
+std::optional<TrackRef> Studio::addMidiTrack(const cydaw::base::Text& name, const cydaw::base::Text& instrumentKey)
 {
     auto trackName = name.trim();
     if (trackName.isEmpty())
-        trackName = "Inst " + juce::String(static_cast<int>(midiTracks_.size() + 1));
+        trackName = "Inst " + cydaw::base::Text(static_cast<int>(midiTracks_.size() + 1));
     const auto id = engine_.addMidiTrack(trackName);
     if (id == 0)
         return std::nullopt;
@@ -5837,19 +5839,19 @@ void Studio::newProject()
     loopEnabled_ = false;
     engine_.setPosition(0.0);
     engine_.setArrangementPlaybackEnabled(true);
-    projectFile_ = juce::File {};
+    projectFile_ = cydaw::base::File {};
     loadWarnings_.clear();
     dirty_ = false;
 }
 
-cydaw::base::Result Studio::loadProject(const juce::File& file)
+cydaw::base::Result Studio::loadProject(const cydaw::base::File& file)
 {
     cydaw::base::Value document;
     if (const auto read = app::ProjectRecovery::readDocument(file, document); read.failed())
         return read;
     if (document.getProperty("format", cydaw::base::Value()).toString() != "CyDAW Project")
         return cydaw::base::Result::fail("not a CyDAW project: " + file.getFullPathName());
-    juce::StringArray missingModels;
+    cydaw::base::TextList missingModels;
     app::expandFactoryModelReferences(document, missingModels);
     beginApplying(file, document);
     noteMissingModels(missingModels);
@@ -5858,7 +5860,7 @@ cydaw::base::Result Studio::loadProject(const juce::File& file)
     return finishApplying(file, applying_->result());
 }
 
-void Studio::beginApplying(const juce::File& file, const cydaw::base::Value& document)
+void Studio::beginApplying(const cydaw::base::File& file, const cydaw::base::Value& document)
 {
     loading_ = true;
     clearSession();
@@ -5866,14 +5868,14 @@ void Studio::beginApplying(const juce::File& file, const cydaw::base::Value& doc
     applying_ = std::make_unique<project_io::DocumentLoad>(*this, document, file, loadWarnings_);
 }
 
-void Studio::noteMissingModels(const juce::StringArray& missing)
+void Studio::noteMissingModels(const cydaw::base::TextList& missing)
 {
     for (const auto& stored : missing)
         loadWarnings_.add(ui::Ls("Modèle de son d'usine introuvable : ", "Factory sound model not found: ")
                           + stored.fromFirstOccurrenceOf(":", false, false));
 }
 
-cydaw::base::Result Studio::finishApplying(const juce::File& file, const cydaw::base::Result& applied)
+cydaw::base::Result Studio::finishApplying(const cydaw::base::File& file, const cydaw::base::Result& applied)
 {
     applying_.reset();
     loading_ = false;
@@ -5881,17 +5883,17 @@ cydaw::base::Result Studio::finishApplying(const juce::File& file, const cydaw::
         publishParameterAutomation(track);
     // Projects shipped next to the application are opened as new work: a
     // plain save must not overwrite the template.
-    const auto templatesFolder = juce::File::getSpecialLocation(juce::File::currentExecutableFile)
+    const auto templatesFolder = cydaw::base::File::getSpecialLocation(cydaw::base::File::currentExecutableFile)
                                      .getSiblingFile("templates");
-    projectFile_ = file.isAChildOf(templatesFolder) ? juce::File {} : file;
-    dirty_ = projectFile_ == juce::File {};
+    projectFile_ = file.isAChildOf(templatesFolder) ? cydaw::base::File {} : file;
+    dirty_ = projectFile_ == cydaw::base::File {};
     // Sounds CyDAW makes that its samplers play: made if they are not here.
     if (applied.wasOk())
         (void) generateMissingSounds();
     return applied;
 }
 
-bool Studio::startOpeningProject(const juce::File& file)
+bool Studio::startOpeningProject(const cydaw::base::File& file)
 {
     if (opening_ != nullptr || !file.existsAsFile())
         return false;
@@ -5900,7 +5902,7 @@ bool Studio::startOpeningProject(const juce::File& file)
     auto opening = std::make_unique<Opening>();
     opening->file = file;
     opening->bytes = file.getSize();
-    opening->started = juce::Time::getMillisecondCounterHiRes() * 0.001;
+    opening->started = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
     opening->read = std::make_shared<Opening::Read>();
     auto read = opening->read;
     juce::Thread::launch([read, file] {
@@ -5918,7 +5920,7 @@ bool Studio::startOpeningProject(const juce::File& file)
     return true;
 }
 
-bool Studio::startImportingProject(const juce::File& file)
+bool Studio::startImportingProject(const cydaw::base::File& file)
 {
     if (opening_ != nullptr || !file.exists())
         return false;
@@ -5928,7 +5930,7 @@ bool Studio::startImportingProject(const juce::File& file)
     auto opening = std::make_unique<Opening>();
     opening->file = file;
     opening->bytes = file.isDirectory() ? 0 : file.getSize();
-    opening->started = juce::Time::getMillisecondCounterHiRes() * 0.001;
+    opening->started = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
     opening->imported = std::make_shared<Opening::ImportRead>();
     auto imported = opening->imported;
     juce::Thread::launch([imported, file] {
@@ -5956,14 +5958,14 @@ std::optional<cydaw::base::Result> Studio::continueOpeningProject(const double b
             opening.build = std::make_unique<ImportBuild>();
             opening.build->project = std::move(opening.imported->project);
         }
-        const auto until = juce::Time::getMillisecondCounterHiRes() + budgetMs;
+        const auto until = cydaw::base::Time::getMillisecondCounterHiRes() + budgetMs;
         do {
             if (!importStep(*opening.build)) {
                 importSummary_ = describeImportedProject(opening.build->project);
                 opening_.reset();
                 return cydaw::base::Result::ok();
             }
-        } while (juce::Time::getMillisecondCounterHiRes() < until);
+        } while (cydaw::base::Time::getMillisecondCounterHiRes() < until);
         return std::nullopt;
     }
     if (applying_ == nullptr) {
@@ -5980,7 +5982,7 @@ std::optional<cydaw::base::Result> Studio::continueOpeningProject(const double b
         opening.read->document = cydaw::base::Value();
         return std::nullopt;
     }
-    const auto until = juce::Time::getMillisecondCounterHiRes() + budgetMs;
+    const auto until = cydaw::base::Time::getMillisecondCounterHiRes() + budgetMs;
     do {
         if (!applying_->next()) {
             const auto file = opening.file;
@@ -5988,7 +5990,7 @@ std::optional<cydaw::base::Result> Studio::continueOpeningProject(const double b
             opening_.reset();
             return applied;
         }
-    } while (juce::Time::getMillisecondCounterHiRes() < until);
+    } while (cydaw::base::Time::getMillisecondCounterHiRes() < until);
     return std::nullopt;
 }
 
@@ -6000,7 +6002,7 @@ Studio::ProjectOpening Studio::projectOpening() const
     state.active = true;
     state.file = opening_->file;
     state.bytes = opening_->bytes;
-    state.seconds = juce::Time::getMillisecondCounterHiRes() * 0.001 - opening_->started;
+    state.seconds = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001 - opening_->started;
     if (opening_->imported != nullptr) {
         state.import = true;
         if (opening_->build == nullptr) {
@@ -6014,7 +6016,7 @@ Studio::ProjectOpening Studio::projectOpening() const
             state.progress = 0.2f + 0.8f * build.progress();
             const auto count = build.phase <= 1 ? build.project.tracks.size() : build.tracks.size();
             state.doing = (build.phase <= 1 ? ui::Ls("Pistes : ", "Tracks: ") : ui::Ls("Instruments et effets : ", "Instruments and effects: "))
-                          + juce::String(static_cast<int>(std::min(build.next, count))) + " / " + juce::String(static_cast<int>(count));
+                          + cydaw::base::Text(static_cast<int>(std::min(build.next, count))) + " / " + cydaw::base::Text(static_cast<int>(count));
         }
         return state;
     }
@@ -6031,7 +6033,7 @@ Studio::ProjectOpening Studio::projectOpening() const
     return state;
 }
 
-cydaw::base::Result Studio::saveProject(const juce::File& file)
+cydaw::base::Result Studio::saveProject(const cydaw::base::File& file)
 {
     // A take being recorded goes on: the notes played so far are saved, and
     // the session is still to be saved once it ends.
@@ -6048,22 +6050,22 @@ cydaw::base::Result Studio::saveProject(const juce::File& file)
     return cydaw::base::Result::ok();
 }
 
-juce::String Studio::projectName() const
+cydaw::base::Text Studio::projectName() const
 {
-    return projectFile_ == juce::File {} ? juce::String() : projectFile_.getFileNameWithoutExtension();
+    return projectFile_ == cydaw::base::File {} ? cydaw::base::Text() : projectFile_.getFileNameWithoutExtension();
 }
 
-juce::Array<juce::File> Studio::templates() const
+cydaw::base::Array<cydaw::base::File> Studio::templates() const
 {
-    juce::Array<juce::File> files;
-    juce::File::getSpecialLocation(juce::File::currentExecutableFile)
+    cydaw::base::Array<cydaw::base::File> files;
+    cydaw::base::File::getSpecialLocation(cydaw::base::File::currentExecutableFile)
         .getSiblingFile("templates")
-        .findChildFiles(files, juce::File::findFiles, false, "*.cydaw");
+        .findChildFiles(files, cydaw::base::File::findFiles, false, "*.cydaw");
     files.sort();
     return files;
 }
 
-cydaw::base::Result Studio::importProject(const juce::File& file, juce::String& summary)
+cydaw::base::Result Studio::importProject(const cydaw::base::File& file, cydaw::base::Text& summary)
 {
     // The same steps as the staged import, one after the other.
     ImportBuild build;
@@ -6188,7 +6190,7 @@ bool Studio::importStep(ImportBuild& build)
                     // A sampler's sound, when the other application's played one.
                     if (instrument->sample.existsAsFile()
                         && (equivalent->instrument == "simple-sampler-instrument" || equivalent->instrument == "sampler-instrument")) {
-                        juce::String error;
+                        cydaw::base::Text error;
                         if (!loadSamplerFile(instrument->sample, track, error))
                             project.warnings.add(trackName(track) + ": " + error);
                     }
@@ -6204,14 +6206,14 @@ bool Studio::importStep(ImportBuild& build)
         }
         return true;
     }
-    projectFile_ = juce::File {};
+    projectFile_ = cydaw::base::File {};
     dirty_ = true;
     return false;
 }
 
 // ---- Autosave and recovery ------------------------------------------------------------------------
 
-juce::File Studio::recoveryFile()
+cydaw::base::File Studio::recoveryFile()
 {
     // Its own file: CyDAW 1 keeps last-session.cydaw-recovery.
     return app::ProjectRecovery::defaultRecoveryFile().getSiblingFile("last-session-v2.cydaw-recovery");
@@ -6226,7 +6228,7 @@ bool Studio::ownsRecovery() const
     return ownsRecovery_;
 }
 
-juce::String Studio::pendingRecoveryDescription() const
+cydaw::base::Text Studio::pendingRecoveryDescription() const
 {
     // A session that keeps nothing (automated runs) leaves it for the next.
     if (auxiliary_ || !autosaveEnabled_ || !ownsRecovery())
@@ -6244,11 +6246,11 @@ cydaw::base::Result Studio::restoreRecovery()
     if (const auto read = app::ProjectRecovery::readDocument(file, document); read.failed())
         return read;
     const auto original = app::ProjectRecovery::originalProject(document);
-    const auto known = original != juce::File {} && (original.existsAsFile() || original.getParentDirectory().isDirectory());
+    const auto known = original != cydaw::base::File {} && (original.existsAsFile() || original.getParentDirectory().isDirectory());
     // Its sounds' paths were written from the project's folder, not the
     // recovery's: read from there, or the clips beside the project are lost.
     const auto base = known ? original : file;
-    juce::StringArray missingModels;
+    cydaw::base::TextList missingModels;
     app::expandFactoryModelReferences(document, missingModels);
     beginApplying(base, document);
     noteMissingModels(missingModels);
@@ -6257,7 +6259,7 @@ cydaw::base::Result Studio::restoreRecovery()
     const auto loaded = finishApplying(base, applying_->result());
     if (loaded.failed())
         return loaded;
-    projectFile_ = known ? original : juce::File {};
+    projectFile_ = known ? original : cydaw::base::File {};
     dirty_ = true;
     return cydaw::base::Result::ok();
 }
@@ -6281,7 +6283,7 @@ void Studio::discardChanges()
 void Studio::autosaveIfDue()
 {
     if (auxiliary_) return;
-    const auto now = juce::Time::getMillisecondCounterHiRes() * 0.001;
+    const auto now = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
     if (!autosaveEnabled_ || !dirty_ || isRecording() || autosaveWriting_.load() || now - lastAutosaveSeconds_ < 45.0
         || !ownsRecovery())
         return;
@@ -6397,7 +6399,7 @@ void Studio::tick()
                 applyLocations();
                 notices_.emplace_back(ui::Ls("Déplacé dans ", "Moved to ") + to.getFullPathName(), false);
                 if (progress.kept > 0)
-                    notices_.emplace_back(juce::String(progress.kept)
+                    notices_.emplace_back(cydaw::base::Text(progress.kept)
                                               + ui::Ls(" fichier(s) laissé(s) dans l'ancien dossier : un fichier différent du même nom était déjà dans le nouveau",
                                                        " file(s) left in the old folder: a different file of the same name was already in the new one"),
                                           true);
@@ -6415,7 +6417,7 @@ void Studio::tick()
         if (done.cancelled)
             notices_.emplace_back(ui::Ls("Téléchargement annulé : ", "Download cancelled: ") + done.label, false);
         else if (done.failed > 0)
-            notices_.emplace_back(done.label + ui::Ls(" : ", ": ") + juce::String(done.failed)
+            notices_.emplace_back(done.label + ui::Ls(" : ", ": ") + cydaw::base::Text(done.failed)
                                       + ui::Ls(" fichier(s) non téléchargé(s) — ", " file(s) not downloaded — ") + done.error,
                                   true);
         else
@@ -6424,7 +6426,7 @@ void Studio::tick()
     }
     // The virtual inputs and outputs written a second after their last change.
     if (virtualIoDirty_) {
-        const auto now = juce::Time::getMillisecondCounterHiRes() * 0.001;
+        const auto now = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
         if (virtualIoChangedAt_ <= 0.0)
             virtualIoChangedAt_ = now;
         else if (now - virtualIoChangedAt_ > 1.0) {
@@ -6527,7 +6529,7 @@ std::vector<modulation::Assignment> Studio::syncModulationTargets(AudioTrackStat
     // sweep, nor is anything of a band that is off, nor its dynamics but
     // its range and threshold while they are on: eight bands would
     // otherwise bury the list under 96 rows.
-    const auto sweepable = [&parameters](const juce::String& binding) {
+    const auto sweepable = [&parameters](const cydaw::base::Text& binding) {
         // Which band is heard alone is a held button's, not a modulator's;
         // the card a modulator belongs to is no setting.
         if (binding.endsWith("eqpro.listen") || binding.endsWith(".ownerLow") || binding.endsWith(".ownerHigh"))
@@ -6589,7 +6591,7 @@ std::vector<modulation::Assignment> Studio::syncModulationTargets(AudioTrackStat
             if (found == parameters.end())
                 continue;
             const auto binding = pluginLaneName(plugin, index);
-            modulation::Assignment assignment { binding, plugins[plugin].name + juce::String::fromUTF8(" \xc2\xb7 ") + found->name,
+            modulation::Assignment assignment { binding, plugins[plugin].name + cydaw::base::Text::fromUTF8(" \xc2\xb7 ") + found->name,
                                                 found->value, 0.0, 1.0, 0.25, false };
             const auto existing = std::find_if(stored.begin(), stored.end(), [&binding](const auto& value) { return value.binding == binding; });
             if (existing != stored.end()) {
@@ -6616,7 +6618,7 @@ std::vector<modulation::Assignment> Studio::modulationTargets(const TrackRef& tr
     return syncModulationTargets(audioTracks_[track.audioIndex]);
 }
 
-void Studio::setModulationAssignment(const TrackRef& track, const juce::String& binding, const bool enabled,
+void Studio::setModulationAssignment(const TrackRef& track, const cydaw::base::Text& binding, const bool enabled,
                                      const double amount)
 {
     if (track.master)
@@ -6657,7 +6659,7 @@ namespace {
 // The first LFO card of a value graph and where its four settings are.
 struct LfoCard {
     std::uint64_t id {};
-    juce::String rate, depth, offset, shape; // bindings
+    cydaw::base::Text rate, depth, offset, shape; // bindings
     double rateValue { 1.0 }, depthValue { 1.0 }, offsetValue {}, shapeValue {};
 };
 
@@ -6743,7 +6745,7 @@ void Studio::setModulationLfo(const TrackRef& track, const modulation::LfoSettin
     const auto card = firstLfoCard(graph);
     if (!card)
         return;
-    const auto setting = [&graph](const juce::String& binding, const double now, const double wanted) {
+    const auto setting = [&graph](const cydaw::base::Text& binding, const double now, const double wanted) {
         if (binding.isNotEmpty() && std::abs(now - wanted) > 1.0e-9)
             (void) graph.editorSetParameter(binding, wanted);
     };
@@ -6955,14 +6957,14 @@ bool Studio::isRecording() const noexcept
     return recordingTrack_.has_value();
 }
 
-juce::File Studio::newRecordingFile(const TrackRef& track) const
+cydaw::base::File Studio::newRecordingFile(const TrackRef& track) const
 {
-    auto folder = projectFile_ != juce::File {} ? projectFile_.getParentDirectory().getChildFile("recordings")
-                                                : juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
+    auto folder = projectFile_ != cydaw::base::File {} ? projectFile_.getParentDirectory().getChildFile("recordings")
+                                                : cydaw::base::File::getSpecialLocation(cydaw::base::File::userDocumentsDirectory)
                                                       .getChildFile("CyDAW")
                                                       .getChildFile("Recordings");
     folder.createDirectory();
-    return folder.getNonexistentChildFile(trackName(track) + " " + juce::Time::getCurrentTime().formatted("%Y-%m-%d %H-%M-%S"), ".wav",
+    return folder.getNonexistentChildFile(trackName(track) + " " + cydaw::base::Time::getCurrentTime().formatted("%Y-%m-%d %H-%M-%S"), ".wav",
                                           false);
 }
 
@@ -7050,7 +7052,7 @@ cydaw::base::Result Studio::startRecording(std::optional<TrackRef> track, const 
             track = armed;
     }
     if (!track || !isValid(*track))
-        return cydaw::base::Result::fail(juce::String::fromUTF8("Sélectionnez ou armez une piste à enregistrer."));
+        return cydaw::base::Result::fail(cydaw::base::Text::fromUTF8("Sélectionnez ou armez une piste à enregistrer."));
 
     if (track->midi) {
         auto clip = midiClip;
@@ -7181,10 +7183,10 @@ cydaw::base::Result Studio::stopSlotRecording(const bool keep)
             return result;
         }
         // The file from where the recording started: the clip from the bar.
-        juce::AudioFormatManager formats;
+        cydaw::audio::AudioFormatManager formats;
         cydaw::integration::registerCyAudioCoreReaders(formats);
         double recorded {};
-        if (const std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(recordingFile_));
+        if (const std::unique_ptr<cydaw::audio::AudioFormatReader> reader(formats.createReaderFor(recordingFile_));
             reader != nullptr && reader->sampleRate > 0.0)
             recorded = static_cast<double>(reader->lengthInSamples) / reader->sampleRate;
         const auto offset = std::max(0.0, slotRecordStartBeats_ * secondsPerBeat - recordingStart_);
@@ -7250,10 +7252,10 @@ cydaw::base::Result Studio::stopRecording(const bool keep)
 // a clip, a new take of it; otherwise a clip of its own.
 cydaw::base::Result Studio::keepRecordedAudio(const TrackRef& track)
 {
-    juce::AudioFormatManager formats;
+    cydaw::audio::AudioFormatManager formats;
     cydaw::integration::registerCyAudioCoreReaders(formats);
     double length {};
-    if (const std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(recordingFile_));
+    if (const std::unique_ptr<cydaw::audio::AudioFormatReader> reader(formats.createReaderFor(recordingFile_));
         reader != nullptr && reader->sampleRate > 0.0)
         length = static_cast<double>(reader->lengthInSamples) / reader->sampleRate;
     if (length <= 0.0)
@@ -7291,7 +7293,7 @@ cydaw::base::Result Studio::keepRecordedAudio(const TrackRef& track)
             std::vector<app::AudioTrackController::AudioTake> takes;
             const auto hostLocalLoop = loopStart - host->startSeconds;
             for (auto pass = first; pass < passes; ++pass)
-                takes.push_back({ name + " " + juce::String(pass + 1), recordingFile_, 0.0,
+                takes.push_back({ name + " " + cydaw::base::Text(pass + 1), recordingFile_, 0.0,
                                   firstFull + pass * loopLength - hostLocalLoop - host->sourceOffsetSeconds });
             dirty_ = true;
             return engine_.addAudioTakes(index, host->id, std::move(takes), true);
@@ -7312,7 +7314,7 @@ cydaw::base::Result Studio::keepRecordedAudio(const TrackRef& track)
     if (over && recordTakesOnClips_) {
         const auto localStart = recordingStart_ - over->startSeconds;
         std::vector<app::AudioTrackController::AudioTake> takes;
-        takes.push_back({ name + " " + juce::String(static_cast<int>(std::max<std::size_t>(1, over->takes.size())) + 1), recordingFile_,
+        takes.push_back({ name + " " + cydaw::base::Text(static_cast<int>(std::max<std::size_t>(1, over->takes.size())) + 1), recordingFile_,
                           0.0, -localStart - over->sourceOffsetSeconds });
         dirty_ = true;
         return engine_.addAudioTakes(index, over->id, std::move(takes), true);
@@ -7326,16 +7328,16 @@ cydaw::base::Result Studio::keepRecordedAudio(const TrackRef& track)
 
 // ---- Audio editing --------------------------------------------------------------------------
 
-juce::File Studio::audioEditFolder() const
+cydaw::base::File Studio::audioEditFolder() const
 {
-    return projectFile_ != juce::File {} ? projectFile_.getParentDirectory().getChildFile("edits")
-                                         : juce::File::getSpecialLocation(juce::File::userDocumentsDirectory)
+    return projectFile_ != cydaw::base::File {} ? projectFile_.getParentDirectory().getChildFile("edits")
+                                         : cydaw::base::File::getSpecialLocation(cydaw::base::File::userDocumentsDirectory)
                                                .getChildFile("CyDAW")
                                                .getChildFile("Edits");
 }
 
 cydaw::base::Result Studio::editAudioClip(const TrackRef& track, const std::uint64_t clipId, const app::AudioEditRequest& request,
-                                   const double sourceStart, const double sourceLength, const juce::String& label)
+                                   const double sourceStart, const double sourceLength, const cydaw::base::Text& label)
 {
     if (track.midi || track.master || !isValid(track))
         return cydaw::base::Result::fail(ui::Ls("Pas une piste audio", "Not an audio track"));
@@ -7355,7 +7357,7 @@ cydaw::base::Result Studio::editAudioClip(const TrackRef& track, const std::uint
     auto folder = audioEditFolder();
     (void) folder.createDirectory();
     const auto base = clip->sourceFile.getFileNameWithoutExtension().upToLastOccurrenceOf(" ~", false, false);
-    const auto destination = folder.getNonexistentChildFile(base + " ~" + juce::Time::getCurrentTime().formatted("%H%M%S"), ".wav", false);
+    const auto destination = folder.getNonexistentChildFile(base + " ~" + cydaw::base::Time::getCurrentTime().formatted("%H%M%S"), ".wav", false);
     const auto rendered = app::AudioTrackController::renderAudioEdit(clip->sourceFile, sourceStart, sourceLength, request2, destination);
     if (rendered.failed())
         return rendered;
@@ -7382,9 +7384,9 @@ cydaw::base::Result Studio::readAudioClipSound(const TrackRef& track, const std:
         return cydaw::base::Result::fail(ui::Ls("Clip introuvable", "No such clip"));
     if (const auto problem = engine_.audioClipEditProblem(track.audioIndex, clipId, app::AudioEditOperation::amplify); problem.isNotEmpty())
         return cydaw::base::Result::fail(problem);
-    juce::AudioFormatManager formats;
+    cydaw::audio::AudioFormatManager formats;
     cydaw::integration::registerCyAudioCoreReaders(formats);
-    std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(clip->sourceFile));
+    std::unique_ptr<cydaw::audio::AudioFormatReader> reader(formats.createReaderFor(clip->sourceFile));
     if (reader == nullptr || reader->lengthInSamples <= 0)
         return cydaw::base::Result::fail(ui::Ls("Fichier illisible : ", "Unreadable file: ") + clip->sourceFile.getFileName());
     if (reader->lengthInSamples > static_cast<juce::int64>(reader->sampleRate * 60.0 * 30.0))
@@ -7401,7 +7403,7 @@ cydaw::base::Result Studio::readAudioClipSound(const TrackRef& track, const std:
 }
 
 cydaw::base::Result Studio::applyAudioProcessing(const TrackRef& track, const std::uint64_t clipId, const processing::AudioResult& result,
-                                          const double rate, const std::int64_t sourceFrames, const juce::String& label)
+                                          const double rate, const std::int64_t sourceFrames, const cydaw::base::Text& label)
 {
     if (track.midi || track.master || !isValid(track))
         return cydaw::base::Result::fail(ui::Ls("Pas une piste audio", "Not an audio track"));
@@ -7413,15 +7415,15 @@ cydaw::base::Result Studio::applyAudioProcessing(const TrackRef& track, const st
     auto folder = audioEditFolder();
     (void) folder.createDirectory();
     const auto base = clip->sourceFile.getFileNameWithoutExtension().upToLastOccurrenceOf(" ~", false, false);
-    const auto destination = folder.getNonexistentChildFile(base + " ~" + juce::Time::getCurrentTime().formatted("%H%M%S"), ".wav", false);
+    const auto destination = folder.getNonexistentChildFile(base + " ~" + cydaw::base::Time::getCurrentTime().formatted("%H%M%S"), ".wav", false);
     {
         const auto frames = static_cast<int>(result.channels.front().size());
         juce::AudioBuffer<float> buffer(static_cast<int>(result.channels.size()), frames);
         for (int c = 0; c < buffer.getNumChannels(); ++c)
             std::copy_n(result.channels[static_cast<std::size_t>(c)].data(), frames, buffer.getWritePointer(c));
         cydaw::integration::WaveFormat wav;
-        std::unique_ptr<juce::OutputStream> stream(destination.createOutputStream());
-        std::unique_ptr<juce::AudioFormatWriter> writer(
+        std::unique_ptr<cydaw::base::OutputStream> stream(destination.createOutputStream());
+        std::unique_ptr<cydaw::audio::AudioFormatWriter> writer(
             stream != nullptr ? wav.createWriterFor(stream.get(), rate, static_cast<unsigned>(buffer.getNumChannels()), 24, {}, 0) : nullptr);
         if (writer == nullptr)
             return cydaw::base::Result::fail(ui::Ls("Impossible d'écrire ", "Cannot write ") + destination.getFullPathName());
@@ -7566,7 +7568,7 @@ cydaw::base::Result Studio::flattenAudioClipComp(const TrackRef& track, const st
     (void) folder.createDirectory();
     const auto base = (clip->name.isNotEmpty() ? clip->name : clip->sourceFile.getFileNameWithoutExtension())
                           .upToLastOccurrenceOf(" ~", false, false);
-    const auto destination = folder.getNonexistentChildFile(base + " ~comp " + juce::Time::getCurrentTime().formatted("%H%M%S"), ".wav", false);
+    const auto destination = folder.getNonexistentChildFile(base + " ~comp " + cydaw::base::Time::getCurrentTime().formatted("%H%M%S"), ".wav", false);
     if (const auto rendered = app::AudioTrackController::renderAudioClipComp(*clip, destination); rendered.failed())
         return rendered;
     const auto committed = engine_.commitAudioClipCompFlatten(track.audioIndex, clipId, destination,
@@ -7596,7 +7598,7 @@ cydaw::base::Result Studio::editAudioEvent(const TrackRef& track, const std::uin
     auto folder = audioEditFolder();
     (void) folder.createDirectory();
     const auto base = event->sourceFile.getFileNameWithoutExtension().upToLastOccurrenceOf(" ~", false, false);
-    const auto destination = folder.getNonexistentChildFile(base + " ~" + juce::Time::getCurrentTime().formatted("%H%M%S"), ".wav", false);
+    const auto destination = folder.getNonexistentChildFile(base + " ~" + cydaw::base::Time::getCurrentTime().formatted("%H%M%S"), ".wav", false);
     // What it plays of its file (or the part asked), edited; the rest of
     // the file as it is.
     const auto partial = sourceStart >= 0.0 && sourceLength > 0.0;
@@ -7632,7 +7634,7 @@ cydaw::base::Result Studio::editLauncherAudioEvent(const TrackRef& track, const 
     auto folder = audioEditFolder();
     (void) folder.createDirectory();
     const auto base = event->sourceFile.getFileNameWithoutExtension().upToLastOccurrenceOf(" ~", false, false);
-    const auto destination = folder.getNonexistentChildFile(base + " ~" + juce::Time::getCurrentTime().formatted("%H%M%S"), ".wav", false);
+    const auto destination = folder.getNonexistentChildFile(base + " ~" + cydaw::base::Time::getCurrentTime().formatted("%H%M%S"), ".wav", false);
     // What it plays of its file (or the part asked), edited; the rest of
     // the file as it is: its place in the file does not move.
     const auto partial = sourceStart >= 0.0 && sourceLength > 0.0;
@@ -7651,7 +7653,7 @@ cydaw::base::Result Studio::editLauncherAudioEvent(const TrackRef& track, const 
     return cydaw::base::Result::ok();
 }
 
-void Studio::copyAudio(const juce::File& file, const double start, const double length)
+void Studio::copyAudio(const cydaw::base::File& file, const double start, const double length)
 {
     if (file.existsAsFile() && length > 0.0)
         audioClipboard_ = AudioClipboard { file, std::max(0.0, start), length };
@@ -7662,7 +7664,7 @@ void Studio::rewind()
     engine_.setPosition(0.0);
 }
 
-cydaw::base::Result Studio::auditionSample(const juce::String& path, const double startSeconds, const bool atTempo)
+cydaw::base::Result Studio::auditionSample(const cydaw::base::Text& path, const double startSeconds, const bool atTempo)
 {
     app::AudioTrackController::SamplePreviewTempo tempo;
     // A loop of a sure tempo: named for it, or typed in, or heard clearly
@@ -7683,10 +7685,10 @@ cydaw::base::Result Studio::auditionSample(const juce::String& path, const doubl
                                   ? static_cast<int>(app::AudioTrackController::StretchMode::beats)
                                   : static_cast<int>(app::AudioTrackController::StretchMode::tonal);
         }
-    return engine_.startSamplePreview(juce::File(path), std::max(0.0, startSeconds), tempo);
+    return engine_.startSamplePreview(cydaw::base::File(path), std::max(0.0, startSeconds), tempo);
 }
 
-double Studio::auditionTempoOf(const juce::String& path) const
+double Studio::auditionTempoOf(const cydaw::base::Text& path) const
 {
     if (engine_.samplePreviewLoopBeats() <= 0)
         return 0.0;
@@ -7802,7 +7804,7 @@ void Studio::clearPads(const TrackRef& track)
     dirty_ = true;
 }
 
-std::optional<std::size_t> Studio::addRackPad(const TrackRef& track, const int note, const juce::String& instrumentKey, juce::String& error)
+std::optional<std::size_t> Studio::addRackPad(const TrackRef& track, const int note, const cydaw::base::Text& instrumentKey, cydaw::base::Text& error)
 {
     const auto found = track.midi ? midiTracks_.find(track.midiId) : midiTracks_.end();
     if (found == midiTracks_.end()) {
@@ -7825,7 +7827,7 @@ std::optional<std::size_t> Studio::addRackPad(const TrackRef& track, const int n
     pad.graph->restore(withLibrary(cydaw::base::Value(), factoryMidiGraph_));
     pads.push_back(std::move(pad));
     const auto index = pads.size() - 1;
-    const auto fallback = layers ? juce::String("opale-instrument") : juce::String("kick-instrument");
+    const auto fallback = layers ? cydaw::base::Text("opale-instrument") : cydaw::base::Text("kick-instrument");
     if (!setRackPadInstrument(track.owner(), index, instrumentKey.isNotEmpty() ? instrumentKey : fallback, error)) {
         // The slots of the pads may have moved: looked for again.
         if (const auto again = midiTracks_.find(track.midiId); again != midiTracks_.end() && again->second.pads.size() == index + 1)
@@ -7837,12 +7839,12 @@ std::optional<std::size_t> Studio::addRackPad(const TrackRef& track, const int n
     return index;
 }
 
-std::optional<std::size_t> Studio::addLayer(const TrackRef& track, const juce::String& instrumentKey, juce::String& error)
+std::optional<std::size_t> Studio::addLayer(const TrackRef& track, const cydaw::base::Text& instrumentKey, cydaw::base::Text& error)
 {
     return addRackPad(track, 0, instrumentKey, error);
 }
 
-bool Studio::setRackPadInstrument(const TrackRef& track, const std::size_t pad, const juce::String& instrumentKey, juce::String& error)
+bool Studio::setRackPadInstrument(const TrackRef& track, const std::size_t pad, const cydaw::base::Text& instrumentKey, cydaw::base::Text& error)
 {
     auto ref = track.owner();
     ref.pad = static_cast<int>(pad);
@@ -7907,7 +7909,7 @@ bool Studio::setRackPadMix(const TrackRef& track, const std::size_t pad, const R
     return true;
 }
 
-bool Studio::loadRackPadSample(const TrackRef& track, const int note, const juce::File& file, juce::String& error)
+bool Studio::loadRackPadSample(const TrackRef& track, const int note, const cydaw::base::File& file, cydaw::base::Text& error)
 {
     auto pad = rackPadOfNote(track, note);
     if (!pad)
@@ -7955,7 +7957,7 @@ void Studio::fillDefaultRack(const TrackRef& track)
         { 46, "Charleston ouvert", "Open Hat", "silex-instrument", 1 },
     };
     for (const auto& piece : pieces) {
-        juce::String error;
+        cydaw::base::Text error;
         if (const auto pad = addRackPad(track, piece.note, piece.instrument, error)) {
             RackPadMix mix;
             mix.note = piece.note;
@@ -7973,10 +7975,10 @@ void Studio::fillDefaultLayers(const TrackRef& track)
     // A layer: an electric piano over a pad; a selector: three synths to
     // choose from.
     const auto selector = containerKind(track) == engine::instrument_container::Kind::selector;
-    const auto keys = selector ? std::vector<juce::String> { "opale-instrument", "jade-instrument", "ambre-instrument" }
-                               : std::vector<juce::String> { "jade-instrument", "nebuleuse-instrument" };
+    const auto keys = selector ? std::vector<cydaw::base::Text> { "opale-instrument", "jade-instrument", "ambre-instrument" }
+                               : std::vector<cydaw::base::Text> { "jade-instrument", "nebuleuse-instrument" };
     for (const auto& key : keys) {
-        juce::String error;
+        cydaw::base::Text error;
         if (const auto layer = addLayer(track, key, error); layer && !selector && key == "nebuleuse-instrument") {
             // The pad under the piano.
             if (const auto* state = rackPad(track, *layer)) {
@@ -7988,7 +7990,7 @@ void Studio::fillDefaultLayers(const TrackRef& track)
     }
 }
 
-juce::String Studio::padsKindName(const TrackRef& track) const
+cydaw::base::Text Studio::padsKindName(const TrackRef& track) const
 {
     const auto found = track.midi ? midiTracks_.find(track.midiId) : midiTracks_.end();
     if (found == midiTracks_.end())
@@ -8024,7 +8026,7 @@ cydaw::base::Value Studio::rackPadsState(const TrackRef& track) const
     return pads;
 }
 
-void Studio::restoreRackPads(const TrackRef& track, const cydaw::base::Value& state, const juce::String& kind)
+void Studio::restoreRackPads(const TrackRef& track, const cydaw::base::Value& state, const cydaw::base::Text& kind)
 {
     const auto found = track.midi ? midiTracks_.find(track.midiId) : midiTracks_.end();
     const auto* items = state.getArray();

@@ -31,9 +31,9 @@ double levelOfY(const Box& box, const float y)
     return kColumnFloorDb * (1.0 - static_cast<double>(t));
 }
 
-juce::String hertz(const double hz)
+cydaw::base::Text hertz(const double hz)
 {
-    return hz >= 1'000.0 ? juce::String(hz / 1'000.0, hz >= 10'000.0 ? 0 : 1) + " kHz" : juce::String(juce::roundToInt(hz)) + " Hz";
+    return hz >= 1'000.0 ? cydaw::base::Text(hz / 1'000.0, hz >= 10'000.0 ? 0 : 1) + " kHz" : cydaw::base::Text(juce::roundToInt(hz)) + " Hz";
 }
 
 // The bands' levels in a tapped frame, as the processor splits them.
@@ -203,15 +203,15 @@ bool pressionLarge(const Pane& pane, std::vector<Param>& parameters, const ImVec
 
 constexpr ImU32 kHeat = IM_COL32(255, 110, 40, 255);
 
-juce::String fournaiseName(const int index)
+cydaw::base::Text fournaiseName(const int index)
 {
     const auto& style = mixd::fournaiseCharacter(index);
-    return juce::String::fromUTF8(ui::french() ? style.french : style.english);
+    return cydaw::base::Text::fromUTF8(ui::french() ? style.french : style.english);
 }
-juce::String fournaiseHint(const int index)
+cydaw::base::Text fournaiseHint(const int index)
 {
     const auto& style = mixd::fournaiseCharacter(index);
-    return juce::String::fromUTF8(ui::french() ? style.frenchHint : style.englishHint);
+    return cydaw::base::Text::fromUTF8(ui::french() ? style.frenchHint : style.englishHint);
 }
 
 // Its filters' curve over the spectrum, the saturation's curve beside it,
@@ -342,7 +342,7 @@ bool fournaiseLarge(const Pane& pane, std::vector<Param>& parameters, const ImVe
 constexpr ImU32 kTape = IM_COL32(150, 112, 70, 255);
 constexpr ImU32 kSpring = IM_COL32(150, 220, 200, 255);
 
-juce::String echoModeName(const int index)
+cydaw::base::Text echoModeName(const int index)
 {
     static const std::array<const char*, mixd::echoModeCount> french {
         "1 : tête 1", "2 : tête 2", "3 : tête 3", "4 : têtes 2 et 3", "5 : tête 1 + ressort", "6 : tête 2 + ressort",
@@ -355,9 +355,9 @@ juce::String echoModeName(const int index)
         "12: spring alone"
     };
     const auto at = static_cast<std::size_t>(std::clamp(index, 0, mixd::echoModeCount - 1));
-    return juce::String::fromUTF8(ui::french() ? french[at] : english[at]);
+    return cydaw::base::Text::fromUTF8(ui::french() ? french[at] : english[at]);
 }
-juce::String echoModeHint(const int index)
+cydaw::base::Text echoModeHint(const int index)
 {
     juce::ignoreUnused(index);
     return ui::Ls("Les têtes de lecture qui jouent (la 2 et la 3 deux et trois fois plus tard que la 1), et le ressort.",
@@ -507,9 +507,9 @@ bool echoLarge(const Pane& pane, std::vector<Param>& parameters, const ImVec2 po
         }
         ImGui::PopID();
         // The sync beside it.
-        std::vector<juce::String> syncs { ui::Ls("Temps libre", "Free time") };
+        std::vector<cydaw::base::Text> syncs { ui::Ls("Temps libre", "Free time") };
         for (const auto& note : engine::noteDivisions)
-            syncs.push_back(juce::String(std::string(note.name)));
+            syncs.push_back(cydaw::base::Text(std::string(note.name)));
         const auto syncX = position.x + dp(16.0f) + cellWidth * 6.0f;
         if (syncX + dp(110.0f) < position.x + size.x) {
             section(list, ImVec2(syncX, y + dp(2.0f)), L("SYNCHRO", "SYNC"));
@@ -1018,21 +1018,21 @@ constexpr ImU32 kOnTarget = IM_COL32(110, 220, 140, 255);
 constexpr ImU32 kOverTarget = IM_COL32(255, 160, 70, 255);
 constexpr ImU32 kUnderTarget = IM_COL32(110, 170, 255, 255);
 
-juce::String targetName(const int index)
+cydaw::base::Text targetName(const int index)
 {
     const auto& target = mixd::loudnessTargets[static_cast<std::size_t>(std::clamp(index, 0, mixd::loudnessTargetCount - 1))];
     char text[96];
     std::snprintf(text, sizeof(text), "%s  %.0f LUFS", ui::french() ? target.french : target.english, target.lufs);
-    return juce::String::fromUTF8(text);
+    return cydaw::base::Text::fromUTF8(text);
 }
-juce::String targetHint(const int index)
+cydaw::base::Text targetHint(const int index)
 {
     const auto& target = mixd::loudnessTargets[static_cast<std::size_t>(std::clamp(index, 0, mixd::loudnessTargetCount - 1))];
     char text[96];
     std::snprintf(text, sizeof(text), ui::french() ? "Sonie intégrée visée %.0f LUFS, crête vraie %.1f dB au plus"
                                                    : "Integrated loudness aimed at %.0f LUFS, true peak %.1f dB at most",
                   target.lufs, target.truePeakDb);
-    return juce::String::fromUTF8(text);
+    return cydaw::base::Text::fromUTF8(text);
 }
 
 ImU32 againstTarget(const double value, const double target)
@@ -1184,7 +1184,7 @@ bool sonometreLarge(const Pane& pane, std::vector<Param>& parameters, const ImVe
     for (std::size_t index = 0; index < knobs.size(); ++index)
         changed |= knobCell(ImVec2(position.x + dp(4.0f) + dp(110.0f) * static_cast<float>(index), y), dp(110.0f),
                             at(parameters, pane, knobs[index].index), knobs[index].label, colour, live, set, 34.0f);
-    std::vector<juce::String> targets;
+    std::vector<cydaw::base::Text> targets;
     for (int index = 0; index < mixd::loudnessTargetCount; ++index)
         targets.push_back(targetName(index));
     section(list, ImVec2(position.x + dp(240.0f), y + dp(4.0f)), L("CIBLE", "TARGET"));

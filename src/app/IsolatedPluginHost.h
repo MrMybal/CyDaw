@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #pragma once
 
@@ -22,14 +23,14 @@ public:
     static void setSessionMetre(int numerator, int denominator) noexcept;
     struct ParameterSnapshot {
         std::uint32_t index {};
-        juce::String name;
-        juce::String label;
+        cydaw::base::Text name;
+        cydaw::base::Text label;
         float value {};
         bool automatable {};
         bool discrete {};
         bool boolean {};
         // The value as the plug-in shows it ("-6.0 dB", "Hall").
-        juce::String text;
+        cydaw::base::Text text;
     };
 
     struct RealtimeParameterValue {
@@ -40,16 +41,16 @@ public:
     IsolatedPluginHost() = default;
     ~IsolatedPluginHost();
 
-    [[nodiscard]] cydaw::base::Result startPlugin(const juce::File& pluginFile,
+    [[nodiscard]] cydaw::base::Result startPlugin(const cydaw::base::File& pluginFile,
                                            double sampleRate,
                                            int maximumBlockSize,
                                            int channelCount);
-    [[nodiscard]] cydaw::base::Result startPassthroughForTest(const juce::File& workerExecutable,
+    [[nodiscard]] cydaw::base::Result startPassthroughForTest(const cydaw::base::File& workerExecutable,
                                                        double sampleRate,
                                                        int maximumBlockSize,
                                                        int channelCount);
-    [[nodiscard]] cydaw::base::Result startPluginForTest(const juce::File& workerExecutable,
-                                                  const juce::File& pluginFile,
+    [[nodiscard]] cydaw::base::Result startPluginForTest(const cydaw::base::File& workerExecutable,
+                                                  const cydaw::base::File& pluginFile,
                                                   double sampleRate,
                                                   int maximumBlockSize,
                                                   int channelCount);
@@ -64,7 +65,7 @@ public:
     [[nodiscard]] cydaw::base::Result setParameter(std::uint32_t index, float normalisedValue);
     // The plug-in's own programs (its factory presets, as a host lists them)
     // and the current one; choosing one, then the state is read again.
-    [[nodiscard]] cydaw::base::Result getPrograms(juce::StringArray& names, int& current);
+    [[nodiscard]] cydaw::base::Result getPrograms(cydaw::base::TextList& names, int& current);
     [[nodiscard]] cydaw::base::Result setProgram(int index);
     void publishRealtimeParameters(const RealtimeParameterValue* values,
                                    std::size_t valueCount) noexcept;
@@ -79,9 +80,9 @@ public:
                                     int numSamples, double timelineSeconds = 0.0, double tempo = 120.0, bool playing = false) noexcept;
 
     [[nodiscard]] bool isRunning() const noexcept;
-    [[nodiscard]] juce::File pluginFile() const;
-    [[nodiscard]] juce::String pluginName() const;
-    [[nodiscard]] juce::String statusMessage() const;
+    [[nodiscard]] cydaw::base::File pluginFile() const;
+    [[nodiscard]] cydaw::base::Text pluginName() const;
+    [[nodiscard]] cydaw::base::Text statusMessage() const;
     [[nodiscard]] std::uint64_t missedBlockCount() const noexcept;
     [[nodiscard]] int latencySamples() const noexcept;
     // The sample rate and block size its worker was started with (0: none).
@@ -90,7 +91,7 @@ public:
 
 private:
     [[nodiscard]] cydaw::base::Result startWorker(PluginWorkerLaunch launch,
-                                           const juce::File& pluginFile,
+                                           const cydaw::base::File& pluginFile,
                                            bool passthrough,
                                            double sampleRate,
                                            int maximumBlockSize,
@@ -103,10 +104,10 @@ private:
 
     cydaw::plugins::WorkerWake wake_;
     juce::ChildProcess process_;
-    juce::File sharedFile_;
-    juce::File pluginFile_;
-    juce::String pluginName_;
-    juce::String lastStatus_;
+    cydaw::base::File sharedFile_;
+    cydaw::base::File pluginFile_;
+    cydaw::base::Text pluginName_;
+    cydaw::base::Text lastStatus_;
     std::unique_ptr<juce::MemoryMappedFile> mapping_;
     std::atomic<cydaw::plugins::SharedPluginAudio*> active_ {};
     std::atomic<int> callbacksInFlight_ {};

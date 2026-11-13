@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #include "CurveEditor.h"
 #include <cyui/modules/Plots.h>
 
@@ -589,7 +590,7 @@ bool Editor::draw(const char* id, const ImVec2 min, const ImVec2 max, std::vecto
             selected_.clear();
     }
     const auto valueText = [&lane](const double value) {
-        return lane.formatValue ? lane.formatValue(value) : juce::String(value, 3);
+        return lane.formatValue ? lane.formatValue(value) : cydaw::base::Text(value, 3);
     };
     if (laneHovered && !ImGui::IsPopupOpen("##curveMenu")) {
         if (hoveredHandle) {
@@ -598,7 +599,7 @@ bool Editor::draw(const char* id, const ImVec2 min, const ImVec2 max, std::vecto
         } else if (hovered) {
             for (const auto& point : shown)
                 if (point.id == *hovered) {
-                    const auto text = valueText(point.value) + "   " + (lane.formatTime ? lane.formatTime(point.time) : juce::String(point.time, 3))
+                    const auto text = valueText(point.value) + "   " + (lane.formatTime ? lane.formatTime(point.time) : cydaw::base::Text(point.time, 3))
                                       + "   " + shapeName(point.shape);
                     ui::tooltip(text.toRawUTF8());
                 }
@@ -691,7 +692,7 @@ bool Editor::drawBar(std::vector<Point>& points, const Lane& lane, const double 
     const auto minimum = std::min(lane.minimum, lane.maximum);
     const auto maximum = std::max(lane.minimum, lane.maximum);
     const auto valueText = [&lane](const double value) {
-        return lane.formatValue ? lane.formatValue(value) : juce::String(value, 3);
+        return lane.formatValue ? lane.formatValue(value) : cydaw::base::Text(value, 3);
     };
     if (selected_.size() == 1) {
         // One point: its shape, its time and its value, typed or dragged.
@@ -702,7 +703,7 @@ bool Editor::drawBar(std::vector<Point>& points, const Lane& lane, const double 
         ImGui::AlignTextToFramePadding();
         ImGui::TextColored(theme::vec(p.textDim), "%s", L("Point", "Point"));
         ImGui::SameLine();
-        ImGui::TextDisabled("%s", (lane.formatTime ? lane.formatTime(found->time) : juce::String(found->time, 3)).toRawUTF8());
+        ImGui::TextDisabled("%s", (lane.formatTime ? lane.formatTime(found->time) : cydaw::base::Text(found->time, 3)).toRawUTF8());
         ImGui::SameLine();
         if (const auto time = numberField("##pointTime", 0, pointId, found->time, 0.005f, nullptr, nullptr, "%.3f", dp(84.0f))) {
             found->time = *time;

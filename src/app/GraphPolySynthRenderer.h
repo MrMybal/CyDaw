@@ -57,6 +57,6 @@ void attachReplacerInstruments(cydaw::engine::NativeDspGraph& graph, const cydaw
 [[nodiscard]] cydaw::base::Value serialisePolySynthGraphPlan(
     const cydaw::engine::PolySynthGraphPlan& plan);
 [[nodiscard]] std::optional<cydaw::engine::PolySynthGraphPlan>
-restorePolySynthGraphPlan(const cydaw::base::Value& state, juce::String& error);
+restorePolySynthGraphPlan(const cydaw::base::Value& state, cydaw::base::Text& error);
 
 } // namespace cydaw::app

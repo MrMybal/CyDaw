@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #include "ClipEditorView.h"
 
 #include "AudioEditorView.h"
@@ -310,7 +311,7 @@ void ClipEditorView::drawMidiToolbar(const TrackRef& track, const MidiClip& clip
     std::snprintf(name, sizeof(name), "%s", clip.name.toRawUTF8());
     ImGui::SetNextItemWidth(dp(150.0f));
     if (ImGui::InputText("##clipName", name, sizeof(name), ImGuiInputTextFlags_EnterReturnsTrue))
-        (void) engine.setMidiClipPresentation(track.midiId, clip.id, juce::String::fromUTF8(name), 0);
+        (void) engine.setMidiClipPresentation(track.midiId, clip.id, cydaw::base::Text::fromUTF8(name), 0);
     ImGui::SameLine();
     ImGui::TextDisabled("%s", studio_.trackName(track).toRawUTF8());
 
@@ -1829,7 +1830,7 @@ void ClipEditorView::drawClipBar(const TrackRef& track, const MidiClip& clip, co
 
 // ---- The velocity lane ----------------------------------------------------------------------
 
-void ClipEditorView::report(const juce::String& text)
+void ClipEditorView::report(const cydaw::base::Text& text)
 {
     state_.status = text;
     state_.statusIsError = false;
@@ -2115,7 +2116,7 @@ void ClipEditorView::copyVelocities(const MidiClip& clip)
     const auto chance = laneKind_ == LaneKind::chance;
     for (const auto& note : picked)
         values.push_back(chance ? note.chance : note.velocity);
-    report(juce::String(static_cast<int>(values.size())) + (chance ? ui::Ls(" chances copiées", " chances copied")
+    report(cydaw::base::Text(static_cast<int>(values.size())) + (chance ? ui::Ls(" chances copiées", " chances copied")
                                                                    : ui::Ls(" vélocités copiées", " velocities copied")));
 }
 
@@ -2141,7 +2142,7 @@ void ClipEditorView::pasteVelocities(const TrackRef& track, const MidiClip& clip
     }
     (void) engine.endMidiEdit();
     studio_.markDirty();
-    report(juce::String(static_cast<int>(picked.size())) + ui::Ls(" vélocités collées", " velocities pasted"));
+    report(cydaw::base::Text(static_cast<int>(picked.size())) + ui::Ls(" vélocités collées", " velocities pasted"));
 }
 
 void ClipEditorView::nudgeVelocities(const TrackRef& track, const MidiClip& clip, const float amount)
@@ -2179,7 +2180,7 @@ void ClipEditorView::copyNotes(const MidiClip& clip)
     copied.notes = std::move(picked);
     copied.span = std::max(grid, std::ceil((last - first) / grid - 1.0e-9) * grid);
     pasteNext_ = first + copied.span;
-    report(juce::String(static_cast<int>(copied.notes.size())) + ui::Ls(" notes copiées", " notes copied"));
+    report(cydaw::base::Text(static_cast<int>(copied.notes.size())) + ui::Ls(" notes copiées", " notes copied"));
 }
 
 void ClipEditorView::pasteNotes(const TrackRef& track, const MidiClip& clip)
@@ -2203,7 +2204,7 @@ void ClipEditorView::pasteNotes(const TrackRef& track, const MidiClip& clip)
     selection_ = pasted;
     pasteNext_ = at + copied.span;
     studio_.markDirty();
-    report(juce::String(static_cast<int>(pasted.size())) + ui::Ls(" notes collées", " notes pasted"));
+    report(cydaw::base::Text(static_cast<int>(pasted.size())) + ui::Ls(" notes collées", " notes pasted"));
 }
 
 void ClipEditorView::drawMidiPopups(const TrackRef& track, const MidiClip& clip)

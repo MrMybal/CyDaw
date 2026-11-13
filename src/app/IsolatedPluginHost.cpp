@@ -18,12 +18,12 @@ std::atomic<int> sessionNumerator { 4 };
 std::atomic<int> sessionDenominator { 4 };
 
 // This process: its workers end when it is gone (a crash leaves none behind).
-juce::String processId()
+cydaw::base::Text processId()
 {
 #if JUCE_WINDOWS
-    return juce::String(static_cast<juce::int64>(GetCurrentProcessId()));
+    return cydaw::base::Text(static_cast<juce::int64>(GetCurrentProcessId()));
 #else
-    return juce::String(static_cast<juce::int64>(getpid()));
+    return cydaw::base::Text(static_cast<juce::int64>(getpid()));
 #endif
 }
 } // namespace
@@ -39,7 +39,7 @@ IsolatedPluginHost::~IsolatedPluginHost()
     stop();
 }
 
-cydaw::base::Result IsolatedPluginHost::startPlugin(const juce::File& pluginFile,
+cydaw::base::Result IsolatedPluginHost::startPlugin(const cydaw::base::File& pluginFile,
                                               const double sampleRate,
                                               const int maximumBlockSize,
                                               const int channelCount)
@@ -48,7 +48,7 @@ cydaw::base::Result IsolatedPluginHost::startPlugin(const juce::File& pluginFile
                        pluginFile, false, sampleRate, maximumBlockSize, channelCount);
 }
 
-cydaw::base::Result IsolatedPluginHost::startPassthroughForTest(const juce::File& workerExecutable,
+cydaw::base::Result IsolatedPluginHost::startPassthroughForTest(const cydaw::base::File& workerExecutable,
                                                           const double sampleRate,
                                                           const int maximumBlockSize,
                                                           const int channelCount)
@@ -58,8 +58,8 @@ cydaw::base::Result IsolatedPluginHost::startPassthroughForTest(const juce::File
                        {}, true, sampleRate, maximumBlockSize, channelCount);
 }
 
-cydaw::base::Result IsolatedPluginHost::startPluginForTest(const juce::File& workerExecutable,
-                                                     const juce::File& pluginFile,
+cydaw::base::Result IsolatedPluginHost::startPluginForTest(const cydaw::base::File& workerExecutable,
+                                                     const cydaw::base::File& pluginFile,
                                                      const double sampleRate,
                                                      const int maximumBlockSize,
                                                      const int channelCount)
@@ -71,7 +71,7 @@ cydaw::base::Result IsolatedPluginHost::startPluginForTest(const juce::File& wor
 }
 
 cydaw::base::Result IsolatedPluginHost::startWorker(PluginWorkerLaunch launch,
-                                              const juce::File& pluginFile,
+                                              const cydaw::base::File& pluginFile,
                                               const bool passthrough,
                                               const double sampleRate,
                                               const int maximumBlockSize,
@@ -90,7 +90,7 @@ cydaw::base::Result IsolatedPluginHost::startWorker(PluginWorkerLaunch launch,
         || channelCount > static_cast<int>(cydaw::plugins::maximumSharedAudioChannels))
         return cydaw::base::Result::fail("The current audio block or channel configuration exceeds the worker limit");
 
-    sharedFile_ = juce::File::getSpecialLocation(juce::File::tempDirectory)
+    sharedFile_ = cydaw::base::File::getSpecialLocation(cydaw::base::File::tempDirectory)
                       .getNonexistentChildFile("cydaw-plugin-instance", ".ipc", true);
     {
         auto output = sharedFile_.createOutputStream();
@@ -136,9 +136,9 @@ cydaw::base::Result IsolatedPluginHost::startWorker(PluginWorkerLaunch launch,
                          launch.usesWindowsGuestPaths()
                              ? WindowsPluginBridge::pathForWindowsGuest(sharedFile_)
                              : sharedFile_.getFullPathName(),
-                         "--sample-rate", juce::String(sampleRate, 3),
-                         "--block-size", juce::String(maximumBlockSize),
-                         "--channels", juce::String(channelCount) });
+                         "--sample-rate", cydaw::base::Text(sampleRate, 3),
+                         "--block-size", cydaw::base::Text(maximumBlockSize),
+                         "--channels", cydaw::base::Text(channelCount) });
     // A worker under Wine sees other process numbers: it is not told.
     if (!launch.usesWindowsGuestPaths())
         arguments.addArray({ "--parent-pid", processId() });
@@ -160,7 +160,7 @@ cydaw::base::Result IsolatedPluginHost::startWorker(PluginWorkerLaunch launch,
         juce::Thread::sleep(10);
     }
     if (state != cydaw::plugins::SharedPluginState::ready) {
-        const auto error = juce::String::fromUTF8(shared->statusMessage);
+        const auto error = cydaw::base::Text::fromUTF8(shared->statusMessage);
         const auto failure = error.isNotEmpty() ? error : "Plugin worker failed to initialise or timed out";
         stop();
         lastStatus_ = failure;
@@ -183,7 +183,7 @@ cydaw::base::Result IsolatedPluginHost::startWorker(PluginWorkerLaunch launch,
     blockSize_ = maximumBlockSize;
     startedChannels_ = channelCount;
     lastHeartbeat_ = 0;
-    heartbeatSince_ = juce::Time::getMillisecondCounterHiRes() * 0.001;
+    heartbeatSince_ = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
     active_.store(shared, std::memory_order_release);
     juce::MemoryBlock initialState;
     (void) getState(initialState);
@@ -209,10 +209,10 @@ void IsolatedPluginHost::stop()
         process_.kill();
     wake_.close();
     mapping_.reset();
-    if (sharedFile_ != juce::File {})
+    if (sharedFile_ != cydaw::base::File {})
         sharedFile_.deleteFile();
-    sharedFile_ = juce::File {};
-    pluginFile_ = juce::File {};
+    sharedFile_ = cydaw::base::File {};
+    pluginFile_ = cydaw::base::File {};
     pluginName_.clear();
     lastStatus_ = "Stopped";
     nextSequence_ = 1;
@@ -239,7 +239,7 @@ void IsolatedPluginHost::pollWorkerHealth()
     // It is ended, and the track goes on dry as after a crash.
     auto hung = false;
     {
-        const auto now = juce::Time::getMillisecondCounterHiRes() * 0.001;
+        const auto now = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
         const auto beat = cydaw::plugins::sharedAtomic(shared->heartbeat).load(std::memory_order_acquire);
         const auto waiting = cydaw::plugins::sharedAtomic(shared->requestSequence).load(std::memory_order_acquire)
                              != cydaw::plugins::sharedAtomic(shared->responseSequence).load(std::memory_order_acquire);
@@ -257,7 +257,7 @@ void IsolatedPluginHost::pollWorkerHealth()
     if (process_.isRunning() && state != cydaw::plugins::SharedPluginState::error) {
         // Parameters set and at rest for a moment: the state kept (what a
         // restarted worker gets back, what an autosave writes) follows.
-        if (stateStaleSince_ > 0.0 && juce::Time::getMillisecondCounterHiRes() * 0.001 - stateStaleSince_ > 0.4) {
+        if (stateStaleSince_ > 0.0 && cydaw::base::Time::getMillisecondCounterHiRes() * 0.001 - stateStaleSince_ > 0.4) {
             stateStaleSince_ = 0.0;
             juce::MemoryBlock fresh;
             (void) getState(fresh);
@@ -269,9 +269,9 @@ void IsolatedPluginHost::pollWorkerHealth()
     const auto retainedName = pluginName_;
     const auto retainedState = cachedState_;
     auto failure = state == cydaw::plugins::SharedPluginState::error
-                       ? juce::String::fromUTF8(shared->statusMessage)
-                   : hung ? juce::String("Plugin stopped answering")
-                          : juce::String("Plugin worker crashed");
+                       ? cydaw::base::Text::fromUTF8(shared->statusMessage)
+                   : hung ? cydaw::base::Text("Plugin stopped answering")
+                          : cydaw::base::Text("Plugin worker crashed");
     if (failure.isEmpty())
         failure = "Plugin worker unavailable";
     stop();
@@ -308,7 +308,7 @@ cydaw::base::Result IsolatedPluginHost::sendCommand(const cydaw::plugins::Shared
         if (response.load(std::memory_order_acquire) == sequence) {
             if (shared->commandResult == 0)
                 return cydaw::base::Result::ok();
-            const auto message = juce::String::fromUTF8(shared->commandStatus);
+            const auto message = cydaw::base::Text::fromUTF8(shared->commandStatus);
             return cydaw::base::Result::fail(message.isNotEmpty() ? message : "Plugin command failed");
         }
         if (!process_.isRunning())
@@ -381,18 +381,18 @@ cydaw::base::Result IsolatedPluginHost::refreshParameters(std::vector<ParameterS
     for (std::uint32_t index = 0; index < count; ++index) {
         const auto& parameter = shared->parameters[index];
         destination.push_back({ parameter.index,
-                                juce::String::fromUTF8(parameter.name),
-                                juce::String::fromUTF8(parameter.label),
+                                cydaw::base::Text::fromUTF8(parameter.name),
+                                cydaw::base::Text::fromUTF8(parameter.label),
                                 parameter.value,
                                 (parameter.flags & cydaw::plugins::parameterAutomatable) != 0,
                                 (parameter.flags & cydaw::plugins::parameterDiscrete) != 0,
                                 (parameter.flags & cydaw::plugins::parameterBoolean) != 0,
-                                juce::String::fromUTF8(parameter.text) });
+                                cydaw::base::Text::fromUTF8(parameter.text) });
     }
     return cydaw::base::Result::ok();
 }
 
-cydaw::base::Result IsolatedPluginHost::getPrograms(juce::StringArray& names, int& current)
+cydaw::base::Result IsolatedPluginHost::getPrograms(cydaw::base::TextList& names, int& current)
 {
     names.clear();
     current = -1;
@@ -402,7 +402,7 @@ cydaw::base::Result IsolatedPluginHost::getPrograms(juce::StringArray& names, in
         return result;
     const auto count = static_cast<int>(shared->commandParameterValue);
     const auto bytes = std::min(shared->stateBytes, static_cast<std::uint32_t>(cydaw::plugins::maximumSharedPluginStateBytes));
-    const auto text = juce::String::fromUTF8(reinterpret_cast<const char*>(shared->stateData), static_cast<int>(bytes));
+    const auto text = cydaw::base::Text::fromUTF8(reinterpret_cast<const char*>(shared->stateData), static_cast<int>(bytes));
     auto start = 0;
     for (int index = 0; index < count; ++index) {
         const auto end = text.indexOfChar(start, '\n');
@@ -445,7 +445,7 @@ cydaw::base::Result IsolatedPluginHost::setParameter(const std::uint32_t index,
     // The state is read again once the knob rests: a drag sends dozens of
     // values, and a big plug-in's state takes a while to write.
     if (result.wasOk())
-        stateStaleSince_ = juce::Time::getMillisecondCounterHiRes() * 0.001;
+        stateStaleSince_ = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
     return result;
 }
 
@@ -565,9 +565,9 @@ bool IsolatedPluginHost::isRunning() const noexcept
     return active_.load(std::memory_order_acquire) != nullptr;
 }
 
-juce::File IsolatedPluginHost::pluginFile() const { return pluginFile_; }
-juce::String IsolatedPluginHost::pluginName() const { return pluginName_; }
-juce::String IsolatedPluginHost::statusMessage() const { return lastStatus_; }
+cydaw::base::File IsolatedPluginHost::pluginFile() const { return pluginFile_; }
+cydaw::base::Text IsolatedPluginHost::pluginName() const { return pluginName_; }
+cydaw::base::Text IsolatedPluginHost::statusMessage() const { return lastStatus_; }
 
 std::uint64_t IsolatedPluginHost::missedBlockCount() const noexcept
 {

@@ -1,3 +1,5 @@
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include <juce_core/juce_core.h>
@@ -13,8 +15,8 @@ enum class PluginWorkerRuntime {
 
 struct PluginWorkerLaunch {
     PluginWorkerRuntime runtime { PluginWorkerRuntime::unavailable };
-    juce::StringArray command;
-    juce::String error;
+    cydaw::base::TextList command;
+    cydaw::base::Text error;
 
     [[nodiscard]] bool isValid() const noexcept
     {
@@ -29,22 +31,22 @@ struct PluginWorkerLaunch {
 };
 
 struct PluginWorkerToolchain {
-    juce::File nativeWorker;
-    juce::File windowsWorker;
-    juce::File configuredRunner;
-    juce::File wineRunner;
-    juce::File umuRunner;
+    cydaw::base::File nativeWorker;
+    cydaw::base::File windowsWorker;
+    cydaw::base::File configuredRunner;
+    cydaw::base::File wineRunner;
+    cydaw::base::File umuRunner;
     bool preferUmu {};
 };
 
 struct WindowsPluginBridgeStatus {
     bool linuxHost {};
-    juce::File nativeWorker;
-    juce::File windowsWorker;
-    juce::File yabridgeControl;
-    juce::File wineRunner;
-    juce::File umuRunner;
-    juce::File selectedDirectRunner;
+    cydaw::base::File nativeWorker;
+    cydaw::base::File windowsWorker;
+    cydaw::base::File yabridgeControl;
+    cydaw::base::File wineRunner;
+    cydaw::base::File umuRunner;
+    cydaw::base::File selectedDirectRunner;
     PluginWorkerRuntime directRuntime { PluginWorkerRuntime::unavailable };
 
     [[nodiscard]] bool yabridgeReady() const noexcept
@@ -63,23 +65,23 @@ struct WindowsPluginBridgeStatus {
 
 class WindowsPluginBridge final {
 public:
-    [[nodiscard]] static bool isWindowsVst3Bundle(const juce::File& pluginFile);
-    [[nodiscard]] static bool isLinuxVst3Bundle(const juce::File& pluginFile);
-    [[nodiscard]] static bool isWindowsVst2Binary(const juce::File& pluginFile);
-    [[nodiscard]] static bool isLinuxVst2Binary(const juce::File& pluginFile);
-    [[nodiscard]] static juce::String pathForWindowsGuest(const juce::File& file);
-    [[nodiscard]] static juce::String pathForWindowsGuest(juce::String hostPath);
+    [[nodiscard]] static bool isWindowsVst3Bundle(const cydaw::base::File& pluginFile);
+    [[nodiscard]] static bool isLinuxVst3Bundle(const cydaw::base::File& pluginFile);
+    [[nodiscard]] static bool isWindowsVst2Binary(const cydaw::base::File& pluginFile);
+    [[nodiscard]] static bool isLinuxVst2Binary(const cydaw::base::File& pluginFile);
+    [[nodiscard]] static cydaw::base::Text pathForWindowsGuest(const cydaw::base::File& file);
+    [[nodiscard]] static cydaw::base::Text pathForWindowsGuest(cydaw::base::Text hostPath);
     [[nodiscard]] static PluginWorkerLaunch planWorkerLaunch(
         bool windowsPlugin,
         const PluginWorkerToolchain& toolchain);
-    [[nodiscard]] static PluginWorkerLaunch workerLaunchFor(const juce::File& pluginFile);
+    [[nodiscard]] static PluginWorkerLaunch workerLaunchFor(const cydaw::base::File& pluginFile);
     [[nodiscard]] static WindowsPluginBridgeStatus inspect();
 
 private:
     [[nodiscard]] static PluginWorkerToolchain discoverToolchain();
-    [[nodiscard]] static juce::File findExecutable(const juce::String& nameOrPath);
-    [[nodiscard]] static juce::File nativeWorkerFile();
-    [[nodiscard]] static juce::File windowsWorkerFile();
+    [[nodiscard]] static cydaw::base::File findExecutable(const cydaw::base::Text& nameOrPath);
+    [[nodiscard]] static cydaw::base::File nativeWorkerFile();
+    [[nodiscard]] static cydaw::base::File windowsWorkerFile();
 };
 
 } // namespace cydaw::app

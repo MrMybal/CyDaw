@@ -1,3 +1,5 @@
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "SampleCatalog.h"
@@ -33,10 +35,10 @@ public:
     ~BrowserView() override;
     void draw();
     // The samples tab in front with this file selected (control port).
-    void selectSample(const juce::File& file);
+    void selectSample(const cydaw::base::File& file);
     // The samples tab in front showing a search and a filter (control port).
-    void browse(const juce::String& query, bool semantic, const juce::String& family, const juce::String& category,
-                const juce::String& source);
+    void browse(const cydaw::base::Text& query, bool semantic, const cydaw::base::Text& family, const cydaw::base::Text& category,
+                const cydaw::base::Text& source);
 
 private:
     void sampleLibraryChanged(bool structure) override;
@@ -47,7 +49,7 @@ private:
     void drawSampleMenu(const app::SampleRecord& record);
     void drawInstruments();
     void drawDevices();
-    void report(const juce::String& message, bool error = false);
+    void report(const cydaw::base::Text& message, bool error = false);
     void openLarge(int tab);
     // The factory catalogue, read again now and then while shown.
     std::vector<Studio::FactoryInstrument> instruments_;
@@ -68,7 +70,7 @@ private:
     std::string lastSearch_;
     bool favouritesOnly_ {};
     bool dirty_ { true };
-    juce::String selectedPath_;
+    cydaw::base::Text selectedPath_;
     bool autoPreview_ { true };
     bool showSamplesTab_ {};
     int currentTab_ {};
@@ -78,10 +80,10 @@ private:
     std::shared_ptr<const SampleCatalog::Data> data_;
     SampleCatalog::Result result_;
     // The tree, and what of it filters the table.
-    juce::String filterFamily_;
-    juce::String filterCategory_;
-    juce::String filterGroup_;
-    juce::String filterSource_;
+    cydaw::base::Text filterFamily_;
+    cydaw::base::Text filterCategory_;
+    cydaw::base::Text filterGroup_;
+    cydaw::base::Text filterSource_;
     bool showTree_ { true };
     float treeHeight_ { 190.0f };
 
@@ -89,11 +91,11 @@ private:
     bool semanticMode_ {};
     bool semanticPending_ {};
     double editedAt_ {};
-    juce::String semanticAsked_;
-    juce::String semanticEnglish_;
-    juce::String semanticSimilarTo_;
-    juce::String semanticError_;
-    std::vector<std::pair<juce::String, float>> semanticHits_;
+    cydaw::base::Text semanticAsked_;
+    cydaw::base::Text semanticEnglish_;
+    cydaw::base::Text semanticSimilarTo_;
+    cydaw::base::Text semanticError_;
+    std::vector<std::pair<cydaw::base::Text, float>> semanticHits_;
 
     // The devices' list, made again when the track changes, not each frame.
     std::vector<app::NodeGraphComponent::DeviceCatalogueEntry> devices_;

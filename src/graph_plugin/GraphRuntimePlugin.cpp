@@ -129,8 +129,8 @@ enum class InstrumentParameterField : std::uint16_t {
 };
 
 struct HostParameterMetadata {
-    juce::String name;
-    juce::String unit;
+    cydaw::base::Text name;
+    cydaw::base::Text unit;
     float minimum {};
     float maximum { 1.0f };
     float defaultNormalised {};
@@ -180,26 +180,26 @@ public:
     GraphHostParameter(const std::size_t slot,
                        const cydaw::generated_graph::ParameterConfig* config)
         : AudioProcessorParameterWithID(
-              juce::ParameterID(
+              juce::ParameterID(juce::String::fromUTF8((
                   config != nullptr
                       ? "graph."
-                            + juce::String::toHexString(
+                            + cydaw::base::Text::toHexString(
                                   static_cast<int>(config->stableId))
                                   .paddedLeft('0', 8)
                       : "graph.slot."
-                            + juce::String(static_cast<int>(slot + 1))
-                                  .paddedLeft('0', 2),
+                            + cydaw::base::Text(static_cast<int>(slot + 1))
+                                  .paddedLeft('0', 2)).toRawUTF8()),
                   1),
               config != nullptr
-                  ? juce::String(config->name)
+                  ? cydaw::base::Text(config->name)
                   : "Graph Parameter "
-                        + juce::String(static_cast<int>(slot + 1)))
+                        + cydaw::base::Text(static_cast<int>(slot + 1)))
     {
         auto initial = std::make_shared<HostParameterMetadata>();
         initial->name = config != nullptr
-            ? juce::String(config->name)
+            ? cydaw::base::Text(config->name)
             : "Unassigned Graph Parameter "
-                  + juce::String(static_cast<int>(slot + 1));
+                  + cydaw::base::Text(static_cast<int>(slot + 1));
         if (config != nullptr) {
             initial->unit = config->unit;
             initial->minimum = config->minimum;
@@ -262,7 +262,7 @@ public:
         const auto actual = current->minimum
             + juce::jlimit(0.0f, 1.0f, normalisedValue)
                   * (current->maximum - current->minimum);
-        return (juce::String(actual, std::abs(actual) >= 100.0f ? 1 : 3)
+        return (cydaw::base::Text(actual, std::abs(actual) >= 100.0f ? 1 : 3)
                 + (current->unit.isNotEmpty() ? " " + current->unit : ""))
             .substring(0, maximumLength);
     }
@@ -844,10 +844,10 @@ public:
         }
         hostParameterMap_.store(std::make_shared<HostParameterMap>());
         if constexpr (cydaw::generated_graph::exactWrapper) {
-            juce::String state;
+            cydaw::base::Text state;
             for (const auto* chunk :
                  cydaw::generated_graph::embeddedStateJsonChunks)
-                state += juce::String::fromUTF8(chunk);
+                state += cydaw::base::Text::fromUTF8(chunk);
             if (state.isNotEmpty())
                 setStateInformation(state.toRawUTF8(),
                                     static_cast<int>(
@@ -1033,7 +1033,7 @@ public:
         const juce::ScopedLock lock(stateLock_);
         return index >= 0 && index < static_cast<int>(programs_.size())
                    ? programs_[static_cast<std::size_t>(index)].name
-                   : juce::String("Graph");
+                   : cydaw::base::Text("Graph");
     }
     void changeProgramName(const int index, const juce::String& name) override
     {
@@ -1077,10 +1077,10 @@ public:
         return editorState_;
     }
 
-    std::vector<std::pair<juce::String, double>>
+    std::vector<std::pair<cydaw::base::Text, double>>
         currentPublishedParameterValues() const
     {
-        std::vector<std::pair<juce::String, double>> values;
+        std::vector<std::pair<cydaw::base::Text, double>> values;
         const juce::ScopedLock lock(stateLock_);
         values.reserve(publishedParameters_.size());
         auto slot = std::size_t {};
@@ -1090,7 +1090,7 @@ public:
             const auto normalised = hostParameters_[slot] != nullptr
                 ? hostParameters_[slot]->getValue() : 0.0f;
             values.emplace_back(
-                juce::String(parameter.key),
+                cydaw::base::Text(parameter.key),
                 parameter.minimum
                     + static_cast<double>(normalised)
                         * (parameter.maximum - parameter.minimum));
@@ -1148,10 +1148,10 @@ public:
             const auto extent = static_cast<float>(
                 parameter.maximum - parameter.minimum);
             HostParameterMetadata metadata;
-            metadata.name = juce::String(parameter.displayName.empty()
+            metadata.name = cydaw::base::Text(parameter.displayName.empty()
                                              ? parameter.key
                                              : parameter.displayName);
-            metadata.unit = juce::String(parameter.unit);
+            metadata.unit = cydaw::base::Text(parameter.unit);
             metadata.minimum = static_cast<float>(parameter.minimum);
             metadata.maximum = static_cast<float>(parameter.maximum);
             metadata.defaultNormalised = extent > 0.0f
@@ -1242,7 +1242,7 @@ public:
         for (; slot < parameterCapacity_; ++slot) {
             HostParameterMetadata metadata;
             metadata.name = "Unassigned Graph Parameter "
-                            + juce::String(static_cast<int>(slot + 1));
+                            + cydaw::base::Text(static_cast<int>(slot + 1));
             const auto previousMetadata = hostParameters_[slot]->metadata();
             const auto changed = previousMetadata->active
                                  || previousMetadata->name != metadata.name
@@ -1289,16 +1289,16 @@ public:
         for (const auto& parameter : published) {
             auto value = cydaw::base::Object::Ptr(new cydaw::base::Object());
             value->setProperty("id", static_cast<juce::int64>(parameter.id));
-            value->setProperty("key", juce::String(parameter.key));
-            value->setProperty("name", juce::String(parameter.displayName));
-            value->setProperty("unit", juce::String(parameter.unit));
+            value->setProperty("key", cydaw::base::Text(parameter.key));
+            value->setProperty("name", cydaw::base::Text(parameter.displayName));
+            value->setProperty("unit", cydaw::base::Text(parameter.unit));
             value->setProperty("minimum", parameter.minimum);
             value->setProperty("maximum", parameter.maximum);
             value->setProperty("default", parameter.defaultValue);
             value->setProperty("targetNodeId",
                                static_cast<juce::int64>(parameter.targetNodeId));
             value->setProperty(
-                "targetParameter", juce::String(parameter.targetParameterKey));
+                "targetParameter", cydaw::base::Text(parameter.targetParameterKey));
             value->setProperty("automatable", parameter.automatable);
             value->setProperty("modulatable", parameter.modulatable);
             value->setProperty("visibleInDevice", parameter.visibleInDevice);
@@ -1337,13 +1337,13 @@ public:
         if (data == nullptr || size <= 0)
             return;
         const auto parsed = cydaw::base::JSON::parse(
-            juce::String::fromUTF8(static_cast<const char*>(data), size));
+            cydaw::base::Text::fromUTF8(static_cast<const char*>(data), size));
         const auto* root = parsed.getDynamicObject();
         const auto schema = root != nullptr
             ? static_cast<int>(root->getProperty("schema")) : 0;
         if (root == nullptr || schema < 1 || schema > 2)
             return;
-        juce::String error;
+        cydaw::base::Text error;
         auto native = cydaw::app::restoreNativeDspGraphState(
             root->getProperty("native"), error);
         if (!native.has_value())
@@ -1353,18 +1353,18 @@ public:
         cydaw::app::attachImpulses(*native, root->getProperty("editor"));
         // Each Replacer's instrument, its samples decoded.
         if (const auto factory = root->getProperty("factoryFolder").toString(); factory.isNotEmpty())
-            cydaw::app::setFactoryContentFolder(juce::File(factory));
+            cydaw::app::setFactoryContentFolder(cydaw::base::File(factory));
         if (const auto banks = root->getProperty("banksFolder").toString(); banks.isNotEmpty())
-            cydaw::app::setBanksFolder(juce::File(banks));
+            cydaw::app::setBanksFolder(cydaw::base::File(banks));
         cydaw::app::attachReplacerInstruments(*native, parsed, true);
         if (runtime_.setGraph(*native).failed())
             return;
         reportLatency();
         cydaw::engine::PolySynthGraphPlan instrumentPlan;
         if (const auto factory = root->getProperty("factoryFolder").toString(); factory.isNotEmpty())
-            cydaw::app::setFactoryContentFolder(juce::File(factory));
+            cydaw::app::setFactoryContentFolder(cydaw::base::File(factory));
         if (const auto banks = root->getProperty("banksFolder").toString(); banks.isNotEmpty())
-            cydaw::app::setBanksFolder(juce::File(banks));
+            cydaw::app::setBanksFolder(cydaw::base::File(banks));
         if (root->hasProperty("polySynth")) {
             const auto restoredPlan = cydaw::app::restorePolySynthGraphPlan(
                 root->getProperty("polySynth"), error);
@@ -1522,7 +1522,7 @@ private:
     }
 
     struct RuntimeProgram {
-        juce::String name;
+        cydaw::base::Text name;
         std::vector<float> hostValues;
     };
 
@@ -1638,7 +1638,7 @@ GraphRuntimeEditor::GraphRuntimeEditor(GraphRuntimeProcessor& processor)
     deviceSurface_.setLayoutMode(
         cydaw::app::ModuleInterfaceLayoutMode::graph);
     deviceSurface_.setParameterChangedHandler(
-        [this](const juce::String& key, const double value) {
+        [this](const cydaw::base::Text& key, const double value) {
             if (graph_.setGraphInterfaceParameter(key, value))
                 publish(false);
         });

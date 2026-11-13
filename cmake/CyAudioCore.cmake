@@ -47,16 +47,19 @@ if(NOT TARGET CyDSP::Stretch)
 endif()
 
 function(cydaw_copy_audio_notices target destination)
+    set(cydaw_notice_root "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/..")
     add_custom_command(TARGET ${target} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${destination}/pugixml"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${cydaw_notice_root}/third_party/pugixml/LICENSE.md" "${destination}/pugixml/LICENSE.md"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${destination}/nlohmann-json"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${PROJECT_SOURCE_DIR}/third_party/nlohmann/LICENSE.MIT" "${destination}/nlohmann-json/LICENSE.MIT"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${cydaw_notice_root}/third_party/nlohmann/LICENSE.MIT" "${destination}/nlohmann-json/LICENSE.MIT"
         VERBATIM)
     if(WIN32 AND CYDAW_ENABLE_ASIO)
         add_custom_command(TARGET ${target} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E make_directory "${destination}/ASIO"
-            COMMAND ${CMAKE_COMMAND} -E copy_directory "${PROJECT_SOURCE_DIR}/third_party/asio-sdk" "${destination}/ASIO/SDK"
-            COMMAND ${CMAKE_COMMAND} -E copy_directory "${PROJECT_SOURCE_DIR}/third_party/portaudio-asio" "${destination}/ASIO/PortAudio"
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${PROJECT_SOURCE_DIR}/third_party/asio-provenance.json" "${destination}/ASIO/asio-provenance.json"
+            COMMAND ${CMAKE_COMMAND} -E copy_directory "${cydaw_notice_root}/third_party/asio-sdk" "${destination}/ASIO/SDK"
+            COMMAND ${CMAKE_COMMAND} -E copy_directory "${cydaw_notice_root}/third_party/portaudio-asio" "${destination}/ASIO/PortAudio"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${cydaw_notice_root}/third_party/asio-provenance.json" "${destination}/ASIO/asio-provenance.json"
             VERBATIM)
     endif()
     foreach(dependency IN ITEMS CyAudioCore CyDSP)
@@ -91,3 +94,5 @@ foreach(dependency IN ITEMS CyAudioCore CyDSP)
 endforeach()
 
 install(FILES "${PROJECT_SOURCE_DIR}/third_party/nlohmann/LICENSE.MIT" DESTINATION Licenses/nlohmann-json COMPONENT CyDAWRuntime)
+
+install(FILES "${PROJECT_SOURCE_DIR}/third_party/pugixml/LICENSE.md" DESTINATION Licenses/pugixml COMPONENT CyDAWRuntime)

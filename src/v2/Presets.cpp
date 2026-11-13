@@ -12,16 +12,16 @@ namespace {
 
 constexpr auto format = "cydaw-preset";
 
-juce::String fileNameOf(const juce::String& name)
+cydaw::base::Text fileNameOf(const cydaw::base::Text& name)
 {
-    return juce::File::createLegalFileName(name.trim()).substring(0, 120);
+    return cydaw::base::File::createLegalFileName(name.trim()).substring(0, 120);
 }
 
-void addFrom(const juce::File& folder, const bool factory, std::vector<Entry>& out)
+void addFrom(const cydaw::base::File& folder, const bool factory, std::vector<Entry>& out)
 {
     if (!folder.isDirectory())
         return;
-    auto files = folder.findChildFiles(juce::File::findFiles, false, juce::String("*") + fileExtension);
+    auto files = folder.findChildFiles(cydaw::base::File::findFiles, false, cydaw::base::Text("*") + fileExtension);
     files.sort();
     for (const auto& file : files)
         out.push_back({ file.getFileNameWithoutExtension(), file, factory });
@@ -29,23 +29,23 @@ void addFrom(const juce::File& folder, const bool factory, std::vector<Entry>& o
 
 } // namespace
 
-juce::String folderName(const juce::String& target)
+cydaw::base::Text folderName(const cydaw::base::Text& target)
 {
-    const auto name = juce::File::createLegalFileName(target.trim()).substring(0, 96);
-    return name.isNotEmpty() ? name : juce::String("other");
+    const cydaw::base::Text name = cydaw::base::File::createLegalFileName(target.trim()).substring(0, 96);
+    return name.isNotEmpty() ? name : cydaw::base::Text("other");
 }
 
-juce::File userFolder(const juce::String& kind, const juce::String& target)
+cydaw::base::File userFolder(const cydaw::base::Text& kind, const cydaw::base::Text& target)
 {
     return locations::folder(Location::presets).getChildFile(kind).getChildFile(folderName(target));
 }
 
-juce::File factoryFolder(const juce::String& kind, const juce::String& target)
+cydaw::base::File factoryFolder(const cydaw::base::Text& kind, const cydaw::base::Text& target)
 {
     return app::factoryContentFolder().getChildFile("Presets").getChildFile(kind).getChildFile(folderName(target));
 }
 
-std::vector<Entry> list(const juce::String& kind, const juce::String& target)
+std::vector<Entry> list(const cydaw::base::Text& kind, const cydaw::base::Text& target)
 {
     std::vector<Entry> entries;
     addFrom(factoryFolder(kind, target), true, entries);
@@ -53,7 +53,7 @@ std::vector<Entry> list(const juce::String& kind, const juce::String& target)
     return entries;
 }
 
-const Entry* find(const std::vector<Entry>& entries, const juce::String& name)
+const Entry* find(const std::vector<Entry>& entries, const cydaw::base::Text& name)
 {
     // The person's before CyDAW's of the same name.
     const Entry* found = nullptr;
@@ -63,8 +63,8 @@ const Entry* find(const std::vector<Entry>& entries, const juce::String& name)
     return found;
 }
 
-bool save(const juce::String& kind, const juce::String& target, const juce::String& name, const cydaw::base::Value& state,
-          juce::String& error)
+bool save(const cydaw::base::Text& kind, const cydaw::base::Text& target, const cydaw::base::Text& name, const cydaw::base::Value& state,
+          cydaw::base::Text& error)
 {
     const auto fileName = fileNameOf(name);
     if (fileName.isEmpty()) {
@@ -86,7 +86,7 @@ bool save(const juce::String& kind, const juce::String& target, const juce::Stri
     document->setProperty("kind", kind);
     document->setProperty("target", target);
     document->setProperty("name", name.trim());
-    document->setProperty("created", juce::Time::getCurrentTime().toISO8601(true));
+    document->setProperty("created", cydaw::base::Time::getCurrentTime().toISO8601(true));
     document->setProperty("state", state);
     const auto file = folder.getChildFile(fileName + fileExtension);
     if (!file.replaceWithText(cydaw::base::JSON::toString(cydaw::base::Value(document), true))) {
@@ -96,7 +96,7 @@ bool save(const juce::String& kind, const juce::String& target, const juce::Stri
     return true;
 }
 
-cydaw::base::Value read(const Entry& entry, const juce::String& kind, juce::String& error)
+cydaw::base::Value read(const Entry& entry, const cydaw::base::Text& kind, cydaw::base::Text& error)
 {
     if (entry.file.getSize() > 256 * 1024 * 1024) {
         error = "the preset is too large";
@@ -119,7 +119,7 @@ cydaw::base::Value read(const Entry& entry, const juce::String& kind, juce::Stri
     return state;
 }
 
-bool remove(const Entry& entry, juce::String& error)
+bool remove(const Entry& entry, cydaw::base::Text& error)
 {
     if (entry.factory) {
         error = "CyDAW's presets stay";
@@ -132,7 +132,7 @@ bool remove(const Entry& entry, juce::String& error)
     return true;
 }
 
-bool rename(const Entry& entry, const juce::String& name, juce::String& error)
+bool rename(const Entry& entry, const cydaw::base::Text& name, cydaw::base::Text& error)
 {
     if (entry.factory) {
         error = "CyDAW's presets stay";

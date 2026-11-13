@@ -22,13 +22,13 @@ namespace cydaw::v2 {
 class PresetMenu final {
 public:
     using Capture = std::function<cydaw::base::Value()>;
-    using Apply = std::function<bool(const cydaw::base::Value&, juce::String&)>;
+    using Apply = std::function<bool(const cydaw::base::Value&, cydaw::base::Text&)>;
     // A hosted plug-in's own programs: listed (with the current one) when
     // the list opens, one chosen. Any list of that kind (a track's factory
     // chains) under its own heading.
     struct Programs {
-        std::function<bool(juce::StringArray&, int&)> list;
-        std::function<bool(int, juce::String&)> select;
+        std::function<bool(cydaw::base::TextList&, int&)> list;
+        std::function<bool(int, cydaw::base::Text&)> select;
         const char* heading {};
     };
 
@@ -47,15 +47,15 @@ private:
     void open(const char* id, const PresetHolder& holder, const Programs* programs);
     bool load(const presets::Entry& entry, const PresetHolder& holder, const Apply& apply);
     void step(int direction, const PresetHolder& holder, const Apply& apply);
-    void report(const juce::String& text, bool error);
+    void report(const cydaw::base::Text& text, bool error);
 
     DeviceHost& studio_;
     UiState& state_;
     char name_[128] {};
     char newName_[128] {};
-    juce::String renaming_;
-    juce::String removing_;
-    juce::StringArray programNames_; // the open list's plug-in programs
+    cydaw::base::Text renaming_;
+    cydaw::base::Text removing_;
+    cydaw::base::TextList programNames_; // the open list's plug-in programs
     int programCurrent_ { -1 };
 };
 

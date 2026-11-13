@@ -1,3 +1,5 @@
+#include <cydaw/integration/AudioFiles.h>
+#include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "ProjectImport.h"
@@ -21,7 +23,7 @@ using namespace shared;
 
 class MidiStemsReader {
 public:
-    MidiStemsReader(const juce::File& file, ImportedProject& out) : file_(file), out_(out) {}
+    MidiStemsReader(const cydaw::base::File& file, ImportedProject& out) : file_(file), out_(out) {}
 
     cydaw::base::Result read()
     {
@@ -56,11 +58,11 @@ public:
                 }
             }
         if (tempoChanges > 1)
-            out_.warnings.add("The tempo changes along the MIDI file: CyDAW keeps " + juce::String(out_.tempo, 2) + " BPM.");
+            out_.warnings.add("The tempo changes along the MIDI file: CyDAW keeps " + cydaw::base::Text(out_.tempo, 2) + " BPM.");
         for (int index = 0; index < midi.getNumTracks(); ++index) {
             juce::MidiMessageSequence sequence(*midi.getTrack(index));
             sequence.updateMatchedPairs();
-            juce::String name;
+            cydaw::base::Text name;
             // By channel: a part of its own each.
             std::map<int, std::vector<ImportedNote>> byChannel;
             auto last = 0.0;
@@ -79,9 +81,9 @@ public:
             for (auto& [channel, notes] : byChannel) {
                 ImportedTrack track;
                 track.midi = true;
-                track.name = name.isNotEmpty() ? name : "MIDI " + juce::String(index + 1);
+                track.name = name.isNotEmpty() ? name : "MIDI " + cydaw::base::Text(index + 1);
                 if (byChannel.size() > 1)
-                    track.name << " (" << juce::String(channel) << ")";
+                    track.name << " (" << cydaw::base::Text(channel) << ")";
                 ImportedDevice device;
                 device.instrument = true;
                 device.type = channel == 10 ? "Drums" : "Instrument";
@@ -97,11 +99,11 @@ public:
             }
         }
         // The audio files beside it: each a track, from the start.
-        juce::Array<juce::File> stems;
-        file_.getParentDirectory().findChildFiles(stems, juce::File::findFiles, false, "*.wav;*.aif;*.aiff;*.flac;*.mp3;*.ogg");
+        cydaw::base::Array<cydaw::base::File> stems;
+        file_.getParentDirectory().findChildFiles(stems, cydaw::base::File::findFiles, false, "*.wav;*.aif;*.aiff;*.flac;*.mp3;*.ogg");
         stems.sort();
         if (stems.size() > 64) {
-            out_.warnings.add(juce::String(stems.size()) + " audio files beside the MIDI file: none was taken as a stem (too many).");
+            out_.warnings.add(cydaw::base::Text(stems.size()) + " audio files beside the MIDI file: none was taken as a stem (too many).");
             stems.clear();
         }
         for (const auto& stem : stems) {
@@ -111,9 +113,9 @@ public:
             clip.name = track.name;
             clip.file = stem;
             clip.originalPath = stem.getFullPathName();
-            juce::AudioFormatManager formats;
+            cydaw::audio::AudioFormatManager formats;
             cydaw::integration::registerCyAudioCoreReaders(formats);
-            if (std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(stem)); reader != nullptr && reader->sampleRate > 0.0)
+            if (std::unique_ptr<cydaw::audio::AudioFormatReader> reader(formats.createReaderFor(stem)); reader != nullptr && reader->sampleRate > 0.0)
                 clip.durationSeconds = static_cast<double>(reader->lengthInSamples) / reader->sampleRate;
             if (clip.durationSeconds <= 0.0)
                 continue;
@@ -121,18 +123,18 @@ public:
             out_.tracks.push_back(std::move(track));
         }
         if (!stems.isEmpty())
-            out_.warnings.add(juce::String(stems.size()) + " audio file(s) beside the MIDI file came in as stems, from the start.");
+            out_.warnings.add(cydaw::base::Text(stems.size()) + " audio file(s) beside the MIDI file came in as stems, from the start.");
         return cydaw::base::Result::ok();
     }
 
 private:
-    juce::File file_;
+    cydaw::base::File file_;
     ImportedProject& out_;
 };
 
 } // namespace
 
-cydaw::base::Result importMidiAndStems(const juce::File& file, ImportedProject& out)
+cydaw::base::Result importMidiAndStems(const cydaw::base::File& file, ImportedProject& out)
 {
     out.source = file;
     MidiStemsReader reader(file, out);

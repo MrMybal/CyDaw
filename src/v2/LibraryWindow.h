@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "SampleCatalog.h"
@@ -44,11 +45,11 @@ public:
         double buildMs {};
         double extractMs {};
         double frameMs {};
-        std::vector<std::pair<juce::String, std::vector<std::pair<juce::String, int>>>> facets;
-        juce::StringArray names; // the first rows
+        std::vector<std::pair<cydaw::base::Text, std::vector<std::pair<cydaw::base::Text, int>>>> facets;
+        cydaw::base::TextList names; // the first rows
     };
     // A search shown: text, semantic, a facet's values chosen by key.
-    void setSampleQuery(const juce::String& text, bool semantic, const std::vector<std::pair<int, juce::StringArray>>& chosen,
+    void setSampleQuery(const cydaw::base::Text& text, bool semantic, const std::vector<std::pair<int, cydaw::base::TextList>>& chosen,
                         int sortColumn, bool ascending);
     [[nodiscard]] Probe probe();
 
@@ -61,12 +62,12 @@ private:
     // A column of the multi-column filter, as drawn.
     struct FacetEntry {
         int value {};
-        juce::String label;
+        cydaw::base::Text label;
         int count {};
         int family { -1 }; // a family's heading when the value is -1
     };
     struct FacetColumn {
-        juce::String title;
+        cydaw::base::Text title;
         std::vector<FacetEntry> entries;
         std::vector<char>* selected {};
         float weight { 1.0f };
@@ -77,13 +78,13 @@ private:
     void drawSamples();
     void drawSamplePreview(const SampleCatalog::Item* item, float width);
     // The "at tempo" switch, and the tempos of the loop heard.
-    void tempoSwitch(const juce::String& path);
+    void tempoSwitch(const cydaw::base::Text& path);
     void drawInstruments();
     void drawEffects();
     void requery();
-    void addSampleToTrack(const juce::String& path);
+    void addSampleToTrack(const cydaw::base::Text& path);
     void takeSemanticAnswer();
-    void report(const juce::String& message, bool error = false);
+    void report(const cydaw::base::Text& message, bool error = false);
     [[nodiscard]] std::optional<TrackRef> target() const;
     void picked();
 
@@ -109,12 +110,12 @@ private:
     bool semanticMode_ {};
     bool semanticPending_ {};
     double editedAt_ {};
-    juce::String semanticAsked_;
-    juce::String semanticEnglish_;
-    juce::String semanticSimilarTo_;
-    juce::String semanticError_;
-    std::vector<std::pair<juce::String, float>> semanticHits_;
-    juce::String selectedPath_;
+    cydaw::base::Text semanticAsked_;
+    cydaw::base::Text semanticEnglish_;
+    cydaw::base::Text semanticSimilarTo_;
+    cydaw::base::Text semanticError_;
+    std::vector<std::pair<cydaw::base::Text, float>> semanticHits_;
+    cydaw::base::Text selectedPath_;
     int selectedRow_ { -1 };
     bool scrollToSelected_ {};
     bool autoPreview_ { true };

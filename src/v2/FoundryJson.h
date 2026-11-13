@@ -11,7 +11,7 @@ inline cydaw::base::Value automation(const std::vector<engine::foundry::Automati
     for (const auto &lane : lanes)
     {
         auto *item = new cydaw::base::Object();
-        item->setProperty("binding", juce::String::fromUTF8(lane.binding.c_str()));
+        item->setProperty("binding", cydaw::base::Text::fromUTF8(lane.binding.c_str()));
         cydaw::base::Array<cydaw::base::Value> points;
         for (const auto &point : lane.points)
         {

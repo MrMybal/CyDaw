@@ -1,3 +1,5 @@
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #include "BrowserView.h"
 
 #include "Icons.h"
@@ -19,9 +21,9 @@ using ui::L;
 namespace {
 
 // Small letters without accents (the device list's search).
-juce::String fold(const juce::String& text)
+cydaw::base::Text fold(const cydaw::base::Text& text)
 {
-    return juce::String::fromUTF8(SampleCatalog::fold(text).c_str());
+    return cydaw::base::Text::fromUTF8(SampleCatalog::fold(text).c_str());
 }
 
 } // namespace
@@ -73,16 +75,16 @@ void BrowserView::openLarge(const int tab)
 
 namespace {
 
-juce::String categoryLabel(const juce::String& key)
+cydaw::base::Text categoryLabel(const cydaw::base::Text& key)
 {
     if (key == "-" || key.isEmpty())
         return ui::Ls("Sans catégorie", "Uncategorised");
     if (const auto* info = app::SampleLibrary::categoryInfo(key))
-        return juce::String::fromUTF8(ui::french() ? info->french : info->english);
+        return cydaw::base::Text::fromUTF8(ui::french() ? info->french : info->english);
     return key;
 }
 
-int familyIndexOf(const juce::String& family)
+int familyIndexOf(const cydaw::base::Text& family)
 {
     const auto& families = app::SampleLibrary::categoryFamilies();
     for (std::size_t index = 0; index < families.size(); ++index)
@@ -100,7 +102,7 @@ void BrowserView::refilter()
         return;
     using Catalog = SampleCatalog;
     Catalog::Query query;
-    query.text = semanticMode_ ? juce::String() : juce::String::fromUTF8(search_);
+    query.text = semanticMode_ ? cydaw::base::Text() : cydaw::base::Text::fromUTF8(search_);
     query.favouritesOnly = favouritesOnly_;
     // The tree's branch as the catalog's columns.
     const auto choose = [&](const Catalog::Facet facet, const std::function<bool(const Catalog::Value&)>& keep) {
@@ -143,7 +145,7 @@ void BrowserView::takeSemanticAnswer()
         return;
     SemanticSearch::rerank(*answer, studio_.samples(), 400);
     semanticHits_.clear();
-    semanticError_ = answer->failed ? answer->error : juce::String();
+    semanticError_ = answer->failed ? answer->error : cydaw::base::Text();
     semanticEnglish_ = answer->english;
     for (const auto& hit : answer->hits)
         semanticHits_.emplace_back(hit.path, hit.score);
@@ -212,11 +214,11 @@ void BrowserView::drawSampleTree(const float height)
         ImGui::TextColored(theme::vec(p.textFaint), "%d", node.count);
         return std::pair { expanded && !leaf, clicked };
     };
-    const auto choose = [this](const juce::String& family, const juce::String& category, const juce::String& group) {
+    const auto choose = [this](const cydaw::base::Text& family, const cydaw::base::Text& category, const cydaw::base::Text& group) {
         const auto same = filterFamily_ == family && filterCategory_ == category && filterGroup_ == group;
-        filterFamily_ = same ? juce::String() : family;
-        filterCategory_ = same ? juce::String() : category;
-        filterGroup_ = same ? juce::String() : group;
+        filterFamily_ = same ? cydaw::base::Text() : family;
+        filterCategory_ = same ? cydaw::base::Text() : category;
+        filterGroup_ = same ? cydaw::base::Text() : group;
         dirty_ = true;
     };
     // Everything.
@@ -267,7 +269,7 @@ void BrowserView::drawSampleTree(const float height)
                 ImGui::PushID(kind.key.toRawUTF8());
                 const auto [open, clicked] = line(kind, filterSource_ == kind.key, false);
                 if (clicked) {
-                    filterSource_ = filterSource_ == kind.key ? juce::String() : kind.key;
+                    filterSource_ = filterSource_ == kind.key ? cydaw::base::Text() : kind.key;
                     dirty_ = true;
                 }
                 if (open) {
@@ -275,7 +277,7 @@ void BrowserView::drawSampleTree(const float height)
                         const auto [ignored, sourceClicked] = line(source, filterSource_ == source.key, true);
                         juce::ignoreUnused(ignored);
                         if (sourceClicked) {
-                            filterSource_ = filterSource_ == source.key ? juce::String() : source.key;
+                            filterSource_ = filterSource_ == source.key ? cydaw::base::Text() : source.key;
                             dirty_ = true;
                         }
                     }
@@ -293,10 +295,10 @@ void BrowserView::drawSemanticLine()
     const auto& p = theme::palette();
     auto& semantic = studio_.semantic();
     const auto status = semantic.status();
-    juce::String text;
+    cydaw::base::Text text;
     auto colour = p.textDim;
     if (semanticSimilarTo_.isNotEmpty())
-        text = ui::Ls("Sons proches de « ", "Sounds like \"") + juce::File(semanticSimilarTo_).getFileNameWithoutExtension()
+        text = ui::Ls("Sons proches de « ", "Sounds like \"") + cydaw::base::File(semanticSimilarTo_).getFileNameWithoutExtension()
                + ui::Ls(" »", "\"");
     else if (semanticEnglish_.isNotEmpty() && fold(semanticEnglish_) != fold(semanticAsked_))
         text = ui::Ls("Cherché : « ", "Searched: \"") + semanticEnglish_ + ui::Ls(" »", "\"");
@@ -343,8 +345,8 @@ void BrowserView::drawSampleMenu(const app::SampleRecord& record)
         for (const auto& family : app::SampleLibrary::categoryFamilies()) {
             ImGui::TextDisabled("%s", ui::french() ? family.french : family.english);
             for (const auto& category : app::SampleLibrary::categoryTaxonomy())
-                if (juce::String(category.family) == family.key
-                    && ImGui::MenuItem((juce::String("  ") + juce::String::fromUTF8(ui::french() ? category.french : category.english)).toRawUTF8(),
+                if (cydaw::base::Text(category.family) == family.key
+                    && ImGui::MenuItem((cydaw::base::Text("  ") + cydaw::base::Text::fromUTF8(ui::french() ? category.french : category.english)).toRawUTF8(),
                                        nullptr, record.category == category.key))
                     library.setCategory(record.path, category.key);
         }
@@ -428,7 +430,7 @@ void BrowserView::drawSamples()
         openLarge(0);
     if (ImGui::BeginPopup("##folders")) {
         ImGui::TextDisabled("%s", L("Dossiers analysés", "Scanned folders"));
-        std::optional<juce::File> remove;
+        std::optional<cydaw::base::File> remove;
         for (const auto& folder : library.folders()) {
             ImGui::PushID(folder.getFullPathName().toRawUTF8());
             if (ui::iconButton(icon::close, L("Retirer ce dossier", "Remove this folder"), false, 0, ImVec2(dp(20.0f), dp(20.0f))))
@@ -442,7 +444,7 @@ void BrowserView::drawSamples()
         if (library.folders().empty())
             ImGui::TextDisabled("%s", L("Aucun dossier à vous pour l'instant.", "No folder of yours yet."));
         if (ImGui::Selectable(L("Ajouter un dossier…", "Add a folder…"))) {
-            chooser_ = std::make_unique<juce::FileChooser>(L("Dossier de samples", "Sample folder"), juce::File {});
+            chooser_ = std::make_unique<juce::FileChooser>(L("Dossier de samples", "Sample folder"), cydaw::base::File {});
             chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
                                   [this](const juce::FileChooser& chooser) {
                                       const auto folder = chooser.getResult();
@@ -455,7 +457,7 @@ void BrowserView::drawSamples()
         ImGui::Separator();
         auto banks = library.includeBanks();
         const auto bankLabel = ui::Ls("Inclure les banques de CyDAW (", "Include CyDAW's banks (")
-                               + juce::String(static_cast<int>(library.banks().size())) + ")";
+                               + cydaw::base::Text(static_cast<int>(library.banks().size())) + ")";
         if (ImGui::Checkbox(bankLabel.toRawUTF8(), &banks))
             library.setIncludeBanks(banks);
         ui::tooltip(L("Les sons des banques téléchargées ou générées (Options › Banques de sons), rangés par catégorie et "
@@ -479,7 +481,7 @@ void BrowserView::drawSamples()
     // The semantic search asked once the typing pauses, or on Enter.
     if (semanticMode_ && (semanticPending_ || entered) && (entered || ImGui::GetTime() - editedAt_ > 0.6)) {
         semanticPending_ = false;
-        const auto text = juce::String::fromUTF8(search_).trim();
+        const auto text = cydaw::base::Text::fromUTF8(search_).trim();
         semanticSimilarTo_.clear();
         semanticHits_.clear();
         semanticError_.clear();
@@ -563,7 +565,7 @@ void BrowserView::drawSamples()
     } else if (ImGui::BeginTable("##samples", 5, flags, ImVec2(0.0f, -detailsHeight))) {
         ImGui::TableSetupScrollFreeze(0, 1);
         ImGui::TableSetupColumn("##fav", ImGuiTableColumnFlags_WidthFixed, dp(18.0f));
-        ImGui::TableSetupColumn((ui::Ls("Nom", "Name") + " (" + juce::String(static_cast<int>(rows.size())) + ")##name").toRawUTF8(),
+        ImGui::TableSetupColumn((ui::Ls("Nom", "Name") + " (" + cydaw::base::Text(static_cast<int>(rows.size())) + ")##name").toRawUTF8(),
                                 ImGuiTableColumnFlags_WidthStretch, 3.0f);
         ImGui::TableSetupColumn(L("Cat.", "Cat."), ImGuiTableColumnFlags_WidthStretch, 1.2f);
         ImGui::TableSetupColumn(scored ? "%" : "BPM", ImGuiTableColumnFlags_WidthFixed, dp(36.0f));
@@ -595,7 +597,7 @@ void BrowserView::drawSamples()
                         (void) studio_.auditionSample(item.path, 0.0, state_.auditionAtTempo);
                     if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
                         // Into the selected audio track at the playhead, or a new one.
-                        const juce::File file(item.path);
+                        const cydaw::base::File file(item.path);
                         auto placed = false;
                         if (state_.selectedTrack && !state_.selectedTrack->midi && !state_.selectedTrack->master) {
                             std::uint64_t clipId {};
@@ -708,7 +710,7 @@ void BrowserView::drawSamples()
     }
 }
 
-void BrowserView::report(const juce::String& message, const bool error)
+void BrowserView::report(const cydaw::base::Text& message, const bool error)
 {
     state_.status = message;
     state_.statusIsError = error;
@@ -719,14 +721,14 @@ void BrowserView::drawInstruments()
 {
     const auto& p = theme::palette();
     if (ImGui::Button(L("Nouveau sampler…", "New sampler…"))) {
-        chooser_ = std::make_unique<juce::FileChooser>(L("Les échantillons du sampler", "The sampler's samples"), juce::File {},
+        chooser_ = std::make_unique<juce::FileChooser>(L("Les échantillons du sampler", "The sampler's samples"), cydaw::base::File {},
                                                        "*.wav;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
         chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
                                   | juce::FileBrowserComponent::canSelectMultipleItems,
                               [this](const juce::FileChooser& chooser) {
                                   if (chooser.getResults().isEmpty())
                                       return;
-                                  juce::String error;
+                                  cydaw::base::Text error;
                                   if (const auto track = studio_.newSamplerTrack(chooser.getResults(), error)) {
                                       state_.selectTrack(*track);
                                       report(studio_.trackName(*track));
@@ -740,12 +742,12 @@ void BrowserView::drawInstruments()
     ImGui::SameLine();
     if (ImGui::Button(L("Ouvrir un SFZ…", "Open an SFZ…"))) {
         chooser_ = std::make_unique<juce::FileChooser>(L("Un instrument SFZ ou une carte .cysampler", "An SFZ instrument or a .cysampler map"),
-                                                       juce::File {}, "*.sfz;*.cysampler");
+                                                       cydaw::base::File {}, "*.sfz;*.cysampler");
         chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
                               [this](const juce::FileChooser& chooser) {
-                                  if (chooser.getResult() == juce::File())
+                                  if (chooser.getResult() == cydaw::base::File())
                                       return;
-                                  juce::String error;
+                                  cydaw::base::Text error;
                                   if (const auto track = studio_.loadSamplerFile(chooser.getResult(), std::nullopt, error)) {
                                       state_.selectTrack(*track);
                                       report(studio_.trackName(*track));
@@ -792,7 +794,7 @@ void BrowserView::drawInstruments()
                                    "Double click: a new track (its samples downloaded if need be). Right click: the sound model."));
     ImGui::PopStyleColor();
     ImGui::BeginChild("##instrumentList");
-    juce::StringArray categories;
+    cydaw::base::TextList categories;
     for (const auto& instrument : instruments_)
         categories.addIfNotAlreadyThere(instrument.category);
     for (const auto& category : categories) {
@@ -809,7 +811,7 @@ void BrowserView::drawInstruments()
             const auto missing = instrument.missingFiles > 0;
             const auto fetching = download.running && download.label == instrument.name;
             const auto startDownload = [&] {
-                juce::String error;
+                cydaw::base::Text error;
                 if (studio_.downloadFactoryInstrument(instrument.key, error))
                     report((studio_.banks().generatedOnly(instrument.banks)
                                 ? ui::Ls("Génération des sons de ", "Generating the sounds of ")
@@ -822,7 +824,7 @@ void BrowserView::drawInstruments()
                 ImGui::PushStyleColor(ImGuiCol_Text, theme::vec(p.textDim));
             if (ImGui::Selectable(instrument.name.toRawUTF8(), false, ImGuiSelectableFlags_AllowDoubleClick)
                 && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
-                juce::String error;
+                cydaw::base::Text error;
                 if (missing && !fetching)
                     startDownload();
                 if (const auto track = studio_.addFactoryInstrument(instrument.key, error, false, onto)) {
@@ -837,7 +839,7 @@ void BrowserView::drawInstruments()
                 ImGui::PopStyleColor();
             if (ImGui::IsItemHovered()) {
                 auto text = instrument.range + "  "
-                            + (instrument.model != juce::File() ? ui::Ls("(échantillons ; clic droit : modèle de son)",
+                            + (instrument.model != cydaw::base::File() ? ui::Ls("(échantillons ; clic droit : modèle de son)",
                                                                          "(samples; right click: sound model)")
                                                                 : ui::Ls("(échantillons)", "(samples)"));
                 if (missing && studio_.banks().generatedOnly(instrument.banks))
@@ -857,7 +859,7 @@ void BrowserView::drawInstruments()
             }
             if (ImGui::BeginPopupContextItem("##instrumentMenu")) {
                 const auto add = [&](const bool model, const std::optional<TrackRef> on) {
-                    juce::String error;
+                    cydaw::base::Text error;
                     if (const auto track = studio_.addFactoryInstrument(instrument.key, error, model, on)) {
                         state_.selectTrack(*track);
                         report(studio_.trackName(*track));
@@ -871,14 +873,14 @@ void BrowserView::drawInstruments()
                     if (ImGui::MenuItem(label.toRawUTF8()))
                         add(false, onto);
                     if (ImGui::MenuItem(L("Le remplacer par son modèle de son", "Replace it with its sound model"), nullptr, false,
-                                        instrument.model != juce::File()))
+                                        instrument.model != cydaw::base::File()))
                         add(true, onto);
                     ImGui::Separator();
                 }
                 if (ImGui::MenuItem(L("Nouvelle piste : échantillons (sampler)", "New track: samples (sampler)")))
                     add(false, std::nullopt);
                 if (ImGui::MenuItem(L("Nouvelle piste : modèle de son", "New track: sound model"), nullptr, false,
-                                    instrument.model != juce::File()))
+                                    instrument.model != cydaw::base::File()))
                     add(true, std::nullopt);
                 if (missing) {
                     ImGui::Separator();
@@ -900,7 +902,7 @@ void BrowserView::drawInstruments()
                 ImGui::SameLine(ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - dp(90.0f));
                 ImGui::ProgressBar(fraction, ImVec2(dp(90.0f), ImGui::GetTextLineHeight()), "");
             } else {
-                const auto right = missing ? juce::String::fromUTF8(icon::download) + " " + ui::sizeText(instrument.missingBytes) : instrument.range;
+                const auto right = missing ? cydaw::base::Text::fromUTF8(icon::download) + " " + ui::sizeText(instrument.missingBytes) : instrument.range;
                 ImGui::SameLine(ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - ImGui::CalcTextSize(right.toRawUTF8()).x);
                 ImGui::TextColored(theme::vec(missing ? p.accent : p.textFaint), "%s", right.toRawUTF8());
             }
@@ -926,7 +928,7 @@ void BrowserView::drawDevices()
     if (slot == nullptr)
         return;
     ImGui::TextDisabled("%s %s", L("Double-clic : ajouter à", "Double click: add to"), studio_.trackName(track).toRawUTF8());
-    const auto query = fold(juce::String::fromUTF8(deviceSearch_).trim());
+    const auto query = fold(cydaw::base::Text::fromUTF8(deviceSearch_).trim());
     if (devicesFor_ != track || ImGui::GetTime() - devicesTime_ > 10.0) {
         devicesFor_ = track;
         devicesTime_ = ImGui::GetTime();
@@ -934,7 +936,7 @@ void BrowserView::drawDevices()
     }
     const auto& entries = devices_;
     ImGui::BeginChild("##deviceList");
-    juce::String lastCategory;
+    cydaw::base::Text lastCategory;
     for (std::size_t index = 0; index < entries.size(); ++index) {
         const auto& entry = entries[index];
         if (!track.midi && entry.soundSource)
@@ -969,15 +971,15 @@ void BrowserView::drawDevices()
     ImGui::EndChild();
 }
 
-void BrowserView::browse(const juce::String& query, const bool semantic, const juce::String& family, const juce::String& category,
-                         const juce::String& source)
+void BrowserView::browse(const cydaw::base::Text& query, const bool semantic, const cydaw::base::Text& family, const cydaw::base::Text& category,
+                         const cydaw::base::Text& source)
 {
     query.copyToUTF8(search_, sizeof(search_));
     lastSearch_.clear();
     filterFamily_ = family;
     filterCategory_ = category;
     filterGroup_.clear();
-    filterSource_ = source.isEmpty() ? juce::String() : source.startsWith("bank:") || source == "banks" || source == "folders"
+    filterSource_ = source.isEmpty() ? cydaw::base::Text() : source.startsWith("bank:") || source == "banks" || source == "folders"
                                                                 ? source
                                                                 : "bank:" + source;
     semanticMode_ = semantic;
@@ -994,7 +996,7 @@ void BrowserView::browse(const juce::String& query, const bool semantic, const j
     host_.wake();
 }
 
-void BrowserView::selectSample(const juce::File& file)
+void BrowserView::selectSample(const cydaw::base::File& file)
 {
     search_[0] = 0;
     lastSearch_.clear();

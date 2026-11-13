@@ -1,3 +1,5 @@
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #include "ControllersImpl.h"
 
 #include "Icons.h"
@@ -29,12 +31,12 @@ using RawKind = Controllers::Impl::RawKind;
 
 double secondsNow()
 {
-    return juce::Time::getMillisecondCounterHiRes() * 0.001;
+    return cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
 }
 
-juce::String middleDot()
+cydaw::base::Text middleDot()
 {
-    return juce::String::fromUTF8(" \xc2\xb7 ");
+    return cydaw::base::Text::fromUTF8(" \xc2\xb7 ");
 }
 
 const char* kindLabel(const control::ControlKind kind)
@@ -357,7 +359,7 @@ void Controllers::Impl::drawDeviceList()
         auto detail = device.input.empty() ? ui::Ls("sans matériel", "no hardware") : nameOf(device.input);
         if (input != nullptr && !input->present)
             detail << (input->kind == RawKind::osc ? ui::Ls(" (fermé)", " (closed)") : ui::Ls(" (débranché)", " (unplugged)"));
-        detail << middleDot() << juce::String(static_cast<int>(device.controls.size())) << ui::Ls(" règle(s)", " rule(s)");
+        detail << middleDot() << cydaw::base::Text(static_cast<int>(device.controls.size())) << ui::Ls(" règle(s)", " rule(s)");
         ui::clippedText(list, ImVec2(at.x + dp(18.0f), at.y + dp(5.0f) + line), width - dp(22.0f), p.textDim, detail.toRawUTF8());
         ImGui::PopID();
     }
@@ -467,7 +469,7 @@ bool Controllers::Impl::rawCombo(const char* id, std::string& value, const bool 
             if (outputs ? isOutput(owned->kind) : isInput(owned->kind))
                 shown.push_back(owned.get());
         std::stable_sort(shown.begin(), shown.end(), [](const auto* a, const auto* b) { return familyRank(a->kind) < familyRank(b->kind); });
-        juce::String family;
+        cydaw::base::Text family;
         auto gamepads = false;
         for (const auto* device : shown) {
             const auto its = familyOf(*device);
@@ -479,7 +481,7 @@ bool Controllers::Impl::rawCombo(const char* id, std::string& value, const bool 
             auto label = nameOf(device->id);
             if (!device->present)
                 label << (device->kind == RawKind::osc ? ui::Ls(" (fermé)", " (closed)") : ui::Ls(" (débranché)", " (unplugged)"));
-            if (ImGui::Selectable((label + "##" + juce::String(device->id)).toRawUTF8(), device->id == value))
+            if (ImGui::Selectable((label + "##" + cydaw::base::Text(device->id)).toRawUTF8(), device->id == value))
                 value = device->id, picked = true;
         }
         if (!gamepads) {
@@ -518,7 +520,7 @@ void Controllers::Impl::drawOscSettings(RawDevice& device)
     ImGui::SameLine(0.0f, dp(14.0f));
     std::string hostName = device.sendHost.toStdString();
     if (inputText("##sendHost", hostName, dp(120.0f)))
-        device.sendHost = juce::String(hostName), edited = true;
+        device.sendHost = cydaw::base::Text(hostName), edited = true;
     ImGui::SameLine(0.0f, dp(4.0f));
     auto sendPort = device.sendPort;
     ImGui::SetNextItemWidth(dp(80.0f));
@@ -706,9 +708,9 @@ void Controllers::Impl::drawControls(control::VirtualDevice& device)
                 ImGui::TextDisabled("%s", L("rien", "nothing"));
             } else {
                 const auto info = targets.describe(found->second.front());
-                auto what = info ? info->label : juce::String(found->second.front());
+                auto what = info ? info->label : cydaw::base::Text(found->second.front());
                 if (found->second.size() > 1)
-                    what << " +" << juce::String(static_cast<int>(found->second.size()) - 1);
+                    what << " +" << cydaw::base::Text(static_cast<int>(found->second.size()) - 1);
                 ImGui::TextUnformatted(what.toRawUTF8());
             }
             ImGui::PopID();
@@ -726,7 +728,7 @@ void Controllers::Impl::drawControl(control::VirtualDevice& device, control::Vir
 {
     const auto& p = theme::palette();
     ImGui::PushID(control.id.c_str());
-    ui::sectionTitle((ui::Ls("Règle « ", "Rule « ") + juce::String(control.name) + ui::Ls(" »", " »")).toRawUTF8());
+    ui::sectionTitle((ui::Ls("Règle « ", "Rule « ") + cydaw::base::Text(control.name) + ui::Ls(" »", " »")).toRawUTF8());
     const auto label = dp(84.0f);
     // Its name and kind.
     formLabel(L("Nom", "Name"), label);
@@ -936,7 +938,7 @@ void Controllers::Impl::drawControlTargets(control::VirtualDevice& device, contr
             ImGui::TextUnformatted(info->label.toRawUTF8());
         else
             ImGui::TextColored(theme::vec(p.record), "%s", assignment.target.c_str());
-        ui::tooltip((juce::String(assignment.target) + (assignment.project ? ui::Ls("  ·  gardée avec le projet", "  ·  kept with the project")
+        ui::tooltip((cydaw::base::Text(assignment.target) + (assignment.project ? ui::Ls("  ·  gardée avec le projet", "  ·  kept with the project")
                                                                           : ui::Ls("  ·  pour tous les projets", "  ·  for every project")))
                         .toRawUTF8());
         // Its range and pickup, on the right.
@@ -1002,15 +1004,15 @@ void Controllers::Impl::drawControlTargets(control::VirtualDevice& device, contr
     if (targetFilter[0] == 0)
         return;
     if (ImGui::BeginChild("##targetList", ImVec2(0.0f, dp(170.0f)), ImGuiChildFlags_Borders)) {
-        const auto filter = juce::String::fromUTF8(targetFilter);
+        const auto filter = cydaw::base::Text::fromUTF8(targetFilter);
         auto shown = 0;
         for (const auto& key : targets.list()) {
             const auto info = targets.describe(key);
-            if (!info || (!info->label.containsIgnoreCase(filter) && !juce::String(key).containsIgnoreCase(filter)))
+            if (!info || (!info->label.containsIgnoreCase(filter) && !cydaw::base::Text(key).containsIgnoreCase(filter)))
                 continue;
             if (++shown > 200)
                 break;
-            if (ImGui::Selectable((info->label + "##" + juce::String(key)).toRawUTF8()))
+            if (ImGui::Selectable((info->label + "##" + cydaw::base::Text(key)).toRawUTF8()))
                 assign(device.id, control.id, key, false);
         }
         if (shown == 0)
@@ -1029,13 +1031,13 @@ void Controllers::Impl::drawRaw()
                                 "What CyDAW sees as it is: the MIDI ports, the computer's keyboard, the application plug-ins' devices (gamepads), the OSC endpoints. A device takes an input and a feedback output from them."));
     ImGui::PopTextWrapPos();
     // Which devices use each one.
-    std::map<std::string, juce::String> users;
+    std::map<std::string, cydaw::base::Text> users;
     for (const auto& device : router.devices)
         for (const auto* id : { &device.input, &device.output })
             if (!id->empty()) {
                 auto& names = users[*id];
-                if (!names.contains(juce::String(device.name)))
-                    names << (names.isEmpty() ? "" : ", ") << juce::String(device.name);
+                if (!names.contains(cydaw::base::Text(device.name)))
+                    names << (names.isEmpty() ? "" : ", ") << cydaw::base::Text(device.name);
             }
     for (const auto kind : { RawKind::midiIn, RawKind::midiOut, RawKind::keyboard, RawKind::plugin, RawKind::osc }) {
         ImGui::Spacing();
@@ -1077,7 +1079,7 @@ void Controllers::Impl::drawRaw()
             if (const auto found = users.find(device.id); found != users.end()) {
                 ImGui::SameLine();
                 ImGui::AlignTextToFramePadding();
-                ImGui::TextColored(theme::vec(p.textDim), "%s", (juce::String::fromUTF8("\xe2\x86\x92 ") + found->second).toRawUTF8());
+                ImGui::TextColored(theme::vec(p.textDim), "%s", (cydaw::base::Text::fromUTF8("\xe2\x86\x92 ") + found->second).toRawUTF8());
             }
             if (isInput(kind) && device.present) {
                 ImGui::SameLine();
@@ -1114,7 +1116,7 @@ void Controllers::Impl::drawRaw()
             ImGui::PushID("newOsc");
             std::string name = newOscName.toStdString();
             if (inputText("##name", name, dp(110.0f)))
-                newOscName = juce::String(name);
+                newOscName = cydaw::base::Text(name);
             ImGui::SameLine();
             ImGui::SetNextItemWidth(dp(80.0f));
             ImGui::InputInt("##port", &newOscPort, 0);
@@ -1170,8 +1172,8 @@ void Controllers::Impl::drawAssignments()
             ImGui::TableNextColumn();
             const auto* device = router.findDevice(assignment.device);
             const auto* control = router.findControl(assignment.device, assignment.control);
-            const auto name = (device != nullptr ? juce::String(device->name) : juce::String("?")) + middleDot()
-                              + (control != nullptr ? juce::String(control->name) : juce::String("?"));
+            const auto name = (device != nullptr ? cydaw::base::Text(device->name) : cydaw::base::Text("?")) + middleDot()
+                              + (control != nullptr ? cydaw::base::Text(control->name) : cydaw::base::Text("?"));
             if (ImGui::Selectable(name.toRawUTF8(), false) && control != nullptr) {
                 selectedDevice = assignment.device;
                 selectedControl = assignment.control;
@@ -1184,7 +1186,7 @@ void Controllers::Impl::drawAssignments()
                 ImGui::TextUnformatted(info->label.toRawUTF8());
             else
                 ImGui::TextColored(theme::vec(p.record), "%s", assignment.target.c_str());
-            ui::tooltip((juce::String(assignment.target) + (assignment.project ? ui::Ls("  ·  gardée avec le projet", "  ·  kept with the project")
+            ui::tooltip((cydaw::base::Text(assignment.target) + (assignment.project ? ui::Ls("  ·  gardée avec le projet", "  ·  kept with the project")
                                                                               : ui::Ls("  ·  pour tous les projets", "  ·  for every project")))
                             .toRawUTF8());
             ImGui::TableNextColumn();
@@ -1265,7 +1267,7 @@ void Controllers::Impl::drawMonitor(const control::VirtualDevice* only)
                 // The address, and how it reads when that says more.
                 const auto readable = readableAddress(seen.message.address);
                 ImGui::TextUnformatted(seen.message.address.c_str());
-                if (readable != juce::String(seen.message.address)) {
+                if (readable != cydaw::base::Text(seen.message.address)) {
                     ImGui::SameLine();
                     ImGui::TextDisabled("%s", readable.toRawUTF8());
                 }
@@ -1397,10 +1399,10 @@ void Controllers::Impl::drawOverlay()
     if (pickTarget && picking == nullptr)
         pickTarget.reset();
     // What each target is moved by now.
-    std::map<std::string, juce::String> assigned;
+    std::map<std::string, cydaw::base::Text> assigned;
     for (const auto& assignment : router.assignments)
         if (const auto* control = router.findControl(assignment.device, assignment.control))
-            assigned[assignment.target] = juce::String(control->name);
+            assigned[assignment.target] = cydaw::base::Text(control->name);
     std::map<ImGuiID, std::vector<const ui::LearnSpot*>> byViewport;
     byViewport[ImGui::GetMainViewport()->ID];
     for (const auto& spot : spots)
@@ -1462,11 +1464,11 @@ void Controllers::Impl::drawOverlay()
             ImGui::EndTooltip();
             if (clickedLeft) {
                 const auto info = targets.describe(hovered->key);
-                const auto label = info ? info->label : juce::String(hovered->label);
+                const auto label = info ? info->label : cydaw::base::Text(hovered->label);
                 if (picking != nullptr) {
                     // The rule picked in the window moves it.
                     const auto [deviceId, controlId] = *pickTarget;
-                    learnStatus = label + juce::String::fromUTF8(" \xe2\x86\x90 ") + juce::String(picking->name);
+                    learnStatus = label + cydaw::base::Text::fromUTF8(" \xe2\x86\x90 ") + cydaw::base::Text(picking->name);
                     assign(deviceId, controlId, hovered->key, false);
                     pickTarget.reset();
                     learnMode = false;
@@ -1485,7 +1487,7 @@ void Controllers::Impl::drawOverlay()
         // The banner, on the main window.
         if (id == ImGui::GetMainViewport()->ID && learnMode) {
             const auto message = pickTarget && picking != nullptr
-                                     ? ui::Ls("« ", "« ") + juce::String(picking->name)
+                                     ? ui::Ls("« ", "« ") + cydaw::base::Text(picking->name)
                                            + ui::Ls(" » : cliquez ce que la règle doit piloter. Échap : annuler.", " »: click what the rule should move. Escape: cancel.")
                                  : !learnTarget.empty()
                                      ? ui::Ls("« ", "« ") + learnTargetLabel + ui::Ls(" » : bougez un contrôle de votre appareil…", " »: move a control on your device…")

@@ -15,11 +15,11 @@ inline cydaw::base::Value portableGraph(const cydaw::base::Value& source)
     auto* root = graph.getDynamicObject();
     if (root == nullptr)
         return graph;
-    std::map<juce::String, cydaw::base::Value> available;
+    std::map<cydaw::base::Text, cydaw::base::Value> available;
     if (const auto* modules = root->getProperty("modules").getArray())
         for (const auto& module : *modules)
             available[module.getProperty("key", {}).toString()] = module;
-    std::set<juce::String> needed;
+    std::set<cydaw::base::Text> needed;
     cydaw::base::Array<cydaw::base::Value> kept;
     const auto visit = [&](const auto& self, const cydaw::base::Value& state) -> void {
         if (const auto* nodes = state.getProperty("nodes", {}).getArray())
@@ -49,7 +49,7 @@ inline cydaw::base::Value portableGraph(const cydaw::base::Value& source)
 // Binary banks / recordings are not silently claimed to be part of a graph.
 // Tables, impulse data, interface code and models already stored in the JSON
 // remain embedded. Ignore descriptive source text and C++ source code.
-inline void externalFiles(const cydaw::base::Value& state, juce::StringArray& files)
+inline void externalFiles(const cydaw::base::Value& state, cydaw::base::TextList& files)
 {
     if (const auto* object = state.getDynamicObject()) {
         for (const auto& property : object->getProperties()) {

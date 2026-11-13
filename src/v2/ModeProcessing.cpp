@@ -127,7 +127,7 @@ std::optional<TrackRef> ModeProcessing::inputTrack(std::uint64_t id) const
     const auto it = trackKeys_.find(id);
     return it == trackKeys_.end() ? std::nullopt : studio_.trackForKey(it->second);
 }
-void ModeProcessing::ensureInput(std::uint64_t id, const juce::String &name, const bool midi, const bool bus)
+void ModeProcessing::ensureInput(std::uint64_t id, const cydaw::base::Text &name, const bool midi, const bool bus)
 {
     if (auto track = inputTrack(id))
     {
@@ -169,7 +169,7 @@ void ModeProcessing::syncFoundry(const engine::foundry::Session &session)
     for (const auto &t : session.tracks)
     {
         present.insert(t.id);
-        ensureInput(t.id, juce::String::fromUTF8(t.name.c_str()), t.midi, t.bus);
+        ensureInput(t.id, cydaw::base::Text::fromUTF8(t.name.c_str()), t.midi, t.bus);
         if (auto track = inputTrack(t.id))
         {
             auto mix = studio_.trackMix(*track);
@@ -212,7 +212,7 @@ void ModeProcessing::syncFoundry(const engine::foundry::Session &session)
                 const auto beatsPerFrame = engine.tempo() / 60.0 / session.rate;
                 for (const auto &c : t.clips)
                 {
-                    const auto id = engine.addMidiClip(track->midiId, juce::String::fromUTF8(c.name.c_str()), c.start * beatsPerFrame,
+                    const auto id = engine.addMidiClip(track->midiId, cydaw::base::Text::fromUTF8(c.name.c_str()), c.start * beatsPerFrame,
                                                        c.length * beatsPerFrame, false);
                     std::vector<app::AudioTrackController::MidiNote> notes;
                     for (const auto &note : c.notes)
@@ -241,7 +241,7 @@ void ModeProcessing::syncFoundry(const engine::foundry::Session &session)
                     std::vector<Studio::AutomationPoint> points;
                     for (const auto &point : lane.points)
                         points.push_back({0, point.frame / session.rate, point.value});
-                    studio_.setLanePoints(*track, juce::String::fromUTF8(lane.binding.c_str()), points);
+                    studio_.setLanePoints(*track, cydaw::base::Text::fromUTF8(lane.binding.c_str()), points);
                 }
             }
             studio_.engine().setModeGainAutomation(track->midi, track->midi ? track->midiId : track->audioIndex, std::move(gain));
@@ -255,7 +255,7 @@ void ModeProcessing::syncFoundry(const engine::foundry::Session &session)
     masterGainAutomation_.store(std::move(masterGain));
     std::vector<app::NativeDspRuntime::AutomationLane> master;
     for (const auto &lane : session.masterAutomation)
-        if (const auto target = modulation::nativeTargetFor(juce::String::fromUTF8(lane.binding.c_str())))
+        if (const auto target = modulation::nativeTargetFor(cydaw::base::Text::fromUTF8(lane.binding.c_str())))
         {
             app::NativeDspRuntime::AutomationLane out;
             out.nodeId = target->nodeId;
@@ -349,14 +349,14 @@ void ModeProcessing::chooseInstrument(std::uint64_t id)
     openLibrary();
     state_.libraryTab = 1;
 }
-cydaw::base::Result ModeProcessing::loadSample(std::uint64_t id, const juce::File &file)
+cydaw::base::Result ModeProcessing::loadSample(std::uint64_t id, const cydaw::base::File &file)
 {
     const auto track = inputTrack(id);
     if (!track || !track->midi)
         return cydaw::base::Result::fail("No MIDI track");
     if (const auto result = studio_.replaceInstrument(*track, "simple-sampler-instrument"); result.failed())
         return result;
-    juce::String error;
+    cydaw::base::Text error;
     if (!studio_.loadSamplerFile(file, track, error))
         return cydaw::base::Result::fail(error);
     return cydaw::base::Result::ok();
@@ -678,7 +678,7 @@ cydaw::base::Value withMissingClasses(const cydaw::base::Value &graphState, cons
     const auto *shared = library.getArray();
     if (graph == nullptr || shared == nullptr)
         return graphState;
-    std::set<juce::String> present;
+    std::set<cydaw::base::Text> present;
     cydaw::base::Array<cydaw::base::Value> modules;
     if (const auto *local = graph->getProperty("modules").getArray())
         for (const auto &module : *local)
@@ -802,7 +802,7 @@ std::uint64_t ModeProcessing::revision() const
 cydaw::base::Value ModeProcessing::command(const cydaw::base::Value &request)
 {
     const auto action = request.getProperty("op", "status").toString();
-    juce::String error;
+    cydaw::base::Text error;
     auto track = Studio::masterTrack();
     const auto id = static_cast<std::uint64_t>(num(request, "inputId"));
     const auto key = static_cast<std::uint64_t>(num(request, "trackKey"));

@@ -1,3 +1,5 @@
+#include <cydaw/base/TextMap.h>
+#include <cydaw/base/Text.h>
 #include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include <cyaudio/io/AudioFile.h>
 #include <cyaudio/io/AudioMetadata.h>
@@ -20,7 +22,7 @@ constexpr std::size_t chunkFrames = 4096;
 // Borrowed seekable stream. Reader's base owns it and destroys it last.
 class InputBuffer final : public std::streambuf {
 public:
-    explicit InputBuffer(juce::InputStream& stream) : stream_(stream) {}
+    explicit InputBuffer(cydaw::base::InputStream& stream) : stream_(stream) {}
 private:
     std::streamsize xsgetn(char* dest, std::streamsize count) override {
         std::streamsize done = 0;
@@ -43,9 +45,9 @@ private:
         return stream_.read(&c, 1) == 1 ? traits_type::to_int_type(c) : traits_type::eof();
     }
     pos_type seekoff(off_type offset, std::ios_base::seekdir way, std::ios_base::openmode) override {
-        const auto base = way == std::ios_base::beg ? juce::int64(0)
+        const auto base = way == std::ios_base::beg ? cydaw::base::int64(0)
                         : way == std::ios_base::cur ? stream_.getPosition() : stream_.getTotalLength();
-        if (base < 0 || (offset > 0 && base > std::numeric_limits<juce::int64>::max() - offset)
+        if (base < 0 || (offset > 0 && base > std::numeric_limits<cydaw::base::int64>::max() - offset)
             || offset < -base) return pos_type(off_type(-1));
         const auto at = base + offset;
         return stream_.setPosition(at) ? pos_type(at) : pos_type(off_type(-1));
@@ -53,29 +55,30 @@ private:
     pos_type seekpos(pos_type at, std::ios_base::openmode mode) override {
         return seekoff(off_type(at), std::ios_base::beg, mode);
     }
-    juce::InputStream& stream_;
+    cydaw::base::InputStream& stream_;
 };
 
 // The persisted application vocabulary remains stable while the implementation
 // uses CyAudioCore's public versioned contract. Unknown legacy keys must take the
 // explicit compatibility path; never silently discard metadata during export.
-bool writeMetadata(const std::unordered_map<juce::String, juce::String>& values,
+template<class Map>
+bool writeMetadata(const Map& values,
                    cyaudio::AudioFileInfo& info) {
     if (values.empty()) return true;
-    juce::StringPairArray v;
+    cydaw::base::TextMap v;
     for (const auto& [key, value] : values) v.set(key, value);
     cyaudio::AudioMetadata m;
     if (const auto opaque = v["cydsp.metadata"]; opaque.isNotEmpty()) {
         if (cyaudio::parseAudioMetadata(opaque.toStdString(), m) != cyaudio::Status::ok) return false;
     }
     std::set<std::string> used {"cydsp.metadata", "cydsp.format", "MetaDataSource"};
-    const auto text = [&](const juce::String& key, const juce::String& fallback = {}) {
+    const auto text = [&](const cydaw::base::Text& key, const cydaw::base::Text& fallback = {}) {
         used.insert(key.toStdString());
         return v.getValue(key, fallback);
     };
-    const auto number = [&](const juce::String& key, juce::int64 fallback = 0) -> std::uint64_t {
-        const auto value = text(key, juce::String(fallback)).getLargeIntValue();
-        if (value < 0 || value > juce::int64(UINT32_MAX)) throw std::invalid_argument("metadata integer");
+    const auto number = [&](const cydaw::base::Text& key, cydaw::base::int64 fallback = 0) -> std::uint64_t {
+        const auto value = text(key, cydaw::base::Text(fallback)).getLargeIntValue();
+        if (value < 0 || value > cydaw::base::int64(UINT32_MAX)) throw std::invalid_argument("metadata integer");
         return static_cast<std::uint64_t>(value);
     };
     const auto count = [&](const char* key) {
@@ -87,7 +90,7 @@ bool writeMetadata(const std::unordered_map<juce::String, juce::String>& values,
         if (v.containsKey("NumCuePoints")) {
             m.markers.clear();
             for (unsigned i = 0, n = count("NumCuePoints"); i < n; ++i) {
-                const auto k = "Cue" + juce::String(i);
+                const auto k = "Cue" + cydaw::base::Text(i);
                 cyaudio::AudioMarker marker;
                 marker.id = static_cast<std::uint32_t>(number(k + "Identifier"));
                 marker.frame = number(k + "Offset");
@@ -96,33 +99,33 @@ bool writeMetadata(const std::unordered_map<juce::String, juce::String>& values,
             }
         }
         for (const auto* kind : {"Label", "Note"}) {
-            const auto key = "NumCue" + juce::String(kind) + "s";
+            const auto key = "NumCue" + cydaw::base::Text(kind) + "s";
             if (!v.containsKey(key)) continue;
             for (auto& marker : m.markers)
-                (juce::String(kind) == "Label" ? marker.name : marker.note).clear();
+                (cydaw::base::Text(kind) == "Label" ? marker.name : marker.note).clear();
             for (unsigned i = 0, n = count(key.toRawUTF8()); i < n; ++i) {
-                const auto k = "Cue" + juce::String(kind) + juce::String(i);
+                const auto k = "Cue" + cydaw::base::Text(kind) + cydaw::base::Text(i);
                 const auto id = number(k + "Identifier");
                 const auto value = text(k + "Text").toStdString();
                 const auto at = std::find_if(m.markers.begin(), m.markers.end(), [id](const auto& x) { return x.id == id; });
                 if (at == m.markers.end()) return false; // Orphan data needs the legacy path.
-                (juce::String(kind) == "Label" ? at->name : at->note) = value;
+                (cydaw::base::Text(kind) == "Label" ? at->name : at->note) = value;
             }
         }
         if (v.containsKey("NumCueRegions")) {
             m.regions.clear();
             for (unsigned i = 0, n = count("NumCueRegions"); i < n; ++i) {
-                const auto k = "CueRegion" + juce::String(i);
+                const auto k = "CueRegion" + cydaw::base::Text(i);
                 cyaudio::AudioRegion region;
                 region.markerId = static_cast<std::uint32_t>(number(k + "Identifier"));
                 region.lengthFrames = number(k + "SampleLength");
                 region.purpose = static_cast<std::uint32_t>(number(k + "Purpose"));
                 for (const auto* field : {"Country", "Language", "Dialect", "CodePage"}) {
-                    const auto value = number(k + field, juce::String(field) == "CodePage" ? 65001 : 0);
+                    const auto value = number(k + field, cydaw::base::Text(field) == "CodePage" ? 65001 : 0);
                     if (value > UINT16_MAX) return false;
-                    if (juce::String(field) == "Country") region.country = static_cast<std::uint16_t>(value);
-                    else if (juce::String(field) == "Language") region.language = static_cast<std::uint16_t>(value);
-                    else if (juce::String(field) == "Dialect") region.dialect = static_cast<std::uint16_t>(value);
+                    if (cydaw::base::Text(field) == "Country") region.country = static_cast<std::uint16_t>(value);
+                    else if (cydaw::base::Text(field) == "Language") region.language = static_cast<std::uint16_t>(value);
+                    else if (cydaw::base::Text(field) == "Dialect") region.dialect = static_cast<std::uint16_t>(value);
                     else region.codePage = static_cast<std::uint16_t>(value);
                 }
                 region.text = text(k + "Text").toStdString();
@@ -132,7 +135,7 @@ bool writeMetadata(const std::unordered_map<juce::String, juce::String>& values,
         if (v.containsKey("NumSampleLoops")) {
             m.loops.clear();
             for (unsigned i = 0, n = count("NumSampleLoops"); i < n; ++i) {
-                const auto k = "Loop" + juce::String(i);
+                const auto k = "Loop" + cydaw::base::Text(i);
                 cyaudio::AudioSamplerLoop loop;
                 loop.id = static_cast<std::uint32_t>(number(k + "Identifier"));
                 const auto mode = number(k + "Type");
@@ -157,34 +160,34 @@ bool writeMetadata(const std::unordered_map<juce::String, juce::String>& values,
     } catch (const std::invalid_argument&) { return false; }
 }
 
-void readTypedMetadata(const cyaudio::AudioFileInfo& info, juce::StringPairArray& values) {
+void readTypedMetadata(const cyaudio::AudioFileInfo& info, cydaw::base::TextMap& values) {
     cyaudio::AudioMetadata m;
     if (cyaudio::getAudioMetadata(info, m) != cyaudio::Status::ok || m.container != "WAV") return;
     std::string serialized;
     if (cyaudio::serializeAudioMetadata(m, serialized) == cyaudio::Status::ok)
-        values.set("cydsp.metadata", juce::String::fromUTF8(serialized.c_str()));
-    const auto set = [&](const juce::String& key, std::uint64_t n) { values.set(key, juce::String(n)); };
+        values.set("cydsp.metadata", cydaw::base::Text::fromUTF8(serialized.c_str()));
+    const auto set = [&](const cydaw::base::Text& key, std::uint64_t n) { values.set(key, cydaw::base::Text(n)); };
     set("NumCuePoints", m.markers.size());
     unsigned labels = 0, notes = 0;
     for (std::size_t i = 0; i < m.markers.size(); ++i) {
         const auto& marker = m.markers[i];
-        const auto k = "Cue" + juce::String(i);
+        const auto k = "Cue" + cydaw::base::Text(i);
         set(k + "Identifier", marker.id); set(k + "Offset", marker.frame); set(k + "Order", marker.position);
         if (!marker.name.empty()) {
-            const auto label = "CueLabel" + juce::String(labels++);
-            set(label + "Identifier", marker.id); values.set(label + "Text", juce::String::fromUTF8(marker.name.c_str()));
+            const auto label = "CueLabel" + cydaw::base::Text(labels++);
+            set(label + "Identifier", marker.id); values.set(label + "Text", cydaw::base::Text::fromUTF8(marker.name.c_str()));
         }
         if (!marker.note.empty()) {
-            const auto note = "CueNote" + juce::String(notes++);
-            set(note + "Identifier", marker.id); values.set(note + "Text", juce::String::fromUTF8(marker.note.c_str()));
+            const auto note = "CueNote" + cydaw::base::Text(notes++);
+            set(note + "Identifier", marker.id); values.set(note + "Text", cydaw::base::Text::fromUTF8(marker.note.c_str()));
         }
     }
     set("NumCueLabels", labels); set("NumCueNotes", notes); set("NumCueRegions", m.regions.size());
     for (std::size_t i = 0; i < m.regions.size(); ++i) {
-        const auto& r = m.regions[i]; const auto k = "CueRegion" + juce::String(i);
+        const auto& r = m.regions[i]; const auto k = "CueRegion" + cydaw::base::Text(i);
         set(k + "Identifier", r.markerId); set(k + "SampleLength", r.lengthFrames); set(k + "Purpose", r.purpose);
         set(k + "Country", r.country); set(k + "Language", r.language); set(k + "Dialect", r.dialect); set(k + "CodePage", r.codePage);
-        values.set(k + "Text", juce::String::fromUTF8(r.text.c_str()));
+        values.set(k + "Text", cydaw::base::Text::fromUTF8(r.text.c_str()));
     }
     // An instrument-only WAV may have an inst base note outside the typed smpl
     // contract. Preserve the supplemental parser's value in that case.
@@ -193,12 +196,12 @@ void readTypedMetadata(const cyaudio::AudioFileInfo& info, juce::StringPairArray
     }
     set("NumSampleLoops", m.loops.size());
     for (std::size_t i = 0; i < m.loops.size(); ++i) {
-        const auto& loop = m.loops[i]; const auto k = "Loop" + juce::String(i);
+        const auto& loop = m.loops[i]; const auto k = "Loop" + cydaw::base::Text(i);
         set(k + "Identifier", loop.id); set(k + "Type", static_cast<unsigned>(loop.mode));
         set(k + "Start", loop.startFrame); set(k + "End", loop.endFrame - 1);
         set(k + "Fraction", loop.fractionalOffset); set(k + "PlayCount", loop.playCount);
     }
-    for (const auto& tag : m.tags) values.set(juce::String::fromUTF8(tag.key.c_str()), juce::String::fromUTF8(tag.value.c_str()));
+    for (const auto& tag : m.tags) values.set(cydaw::base::Text::fromUTF8(tag.key.c_str()), cydaw::base::Text::fromUTF8(tag.value.c_str()));
 }
 
 unsigned bits(cyaudio::AudioEncoding encoding) {
@@ -213,51 +216,34 @@ unsigned bits(cyaudio::AudioEncoding encoding) {
     return 0;
 }
 
-class Reader final : public juce::AudioFormatReader {
+class Reader final : public cydaw::audio::AudioFormatReader {
 public:
-    explicit Reader(juce::InputStream* stream)
-        : juce::AudioFormatReader(stream, "CyAudioCore"), bridge_(*stream),
+    explicit Reader(cydaw::base::InputStream* stream)
+        : cydaw::audio::AudioFormatReader(stream, "CyAudioCore"), bridge_(*stream),
           stream_(std::make_shared<std::istream>(&bridge_)) {}
 
     bool open() {
-        // Preserve the established application's metadata vocabulary. This is
-        // intentionally NOT a decoder fallback: only CyAudioCore reads sample data.
-        juce::AudioFormatManager metadataFormats;
-        metadataFormats.registerBasicFormats();
-        input->setPosition(0);
-        if (std::unique_ptr<juce::AudioFormatReader> metadata(metadataFormats.createReaderFor(
-                std::unique_ptr<juce::InputStream>(new BorrowedInput(*input)))); metadata) {
-            metadataValues = metadata->metadataValues;
-        }
         input->setPosition(0);
         cyaudio::Status status;
-        if (auto* file = dynamic_cast<juce::FileInputStream*>(input)) {
-#if JUCE_WINDOWS
-            status = reader_.open(std::filesystem::path(file->getFile().getFullPathName().toWideCharPointer()), chunkFrames);
-#else
-            status = reader_.open(std::filesystem::path(file->getFile().getFullPathName().toStdString()), chunkFrames);
-#endif
-        } else {
-            status = reader_.open(stream_, chunkFrames);
-        }
+        status = reader_.open(stream_, chunkFrames);
         if (status != cyaudio::Status::ok) return false;
         const auto& info = *reader_.info();
-        if (info.frames > static_cast<std::uint64_t>(std::numeric_limits<juce::int64>::max())) return false;
+        if (info.frames > static_cast<std::uint64_t>(std::numeric_limits<cydaw::base::int64>::max())) return false;
         sampleRate = info.sampleRate;
         numChannels = static_cast<unsigned>(info.channels);
-        lengthInSamples = static_cast<juce::int64>(info.frames);
+        lengthInSamples = static_cast<cydaw::base::int64>(info.frames);
         bitsPerSample = bits(info.encoding);
         readTypedMetadata(info, metadataValues);
-        metadataValues.set("cydsp.format", juce::String::fromUTF8(info.formatName.c_str()));
+        metadataValues.set("cydsp.format", cydaw::base::Text::fromUTF8(info.formatName.c_str()));
         usesFloatingPointData = true; // All sample reads cross the bridge as normalized float.
         return scratch_.resize(info.channels, chunkFrames) == cyaudio::Status::ok;
     }
 
-    bool readSamples(int* const* dest, int destChannels, int offset, juce::int64 first, int count) override {
+    bool readSamples(int* const* dest, int destChannels, int offset, cydaw::base::int64 first, int count) override {
         if (!dest || count < 0 || offset < 0) return false;
         int done = 0;
         if (first < 0) {
-            const auto silence = first <= -static_cast<juce::int64>(count) ? count : static_cast<int>(-first);
+            const auto silence = first <= -static_cast<cydaw::base::int64>(count) ? count : static_cast<int>(-first);
             for (int ch = 0; ch < destChannels; ++ch)
                 if (dest[ch]) std::fill_n(reinterpret_cast<float*>(dest[ch]) + offset, silence, 0.0f);
             done += silence;
@@ -265,6 +251,7 @@ public:
         while (done < count) {
             const auto n = std::min(chunkFrames, static_cast<std::size_t>(count - done));
             auto block = scratch_.block(n);
+            for(std::size_t ch=0;ch<block.channels();++ch)std::fill_n(block.channel(ch).data(),n,0.f);
             std::size_t read = 0;
             const auto status = reader_.read(static_cast<std::uint64_t>(first) + (done ? done : 0), block, read);
             if (status != cyaudio::Status::ok && status != cyaudio::Status::end_of_stream) return false;
@@ -279,15 +266,15 @@ public:
         return true;
     }
 private:
-    class BorrowedInput final : public juce::InputStream {
+    class BorrowedInput final : public cydaw::base::InputStream {
     public:
-        explicit BorrowedInput(juce::InputStream& s) : stream(s) {}
-        juce::int64 getTotalLength() override { return stream.getTotalLength(); }
+        explicit BorrowedInput(cydaw::base::InputStream& s) : stream(s) {}
+        cydaw::base::int64 getTotalLength() override { return stream.getTotalLength(); }
         int read(void* d, int n) override { return stream.read(d, n); }
         bool isExhausted() override { return stream.isExhausted(); }
-        juce::int64 getPosition() override { return stream.getPosition(); }
-        bool setPosition(juce::int64 p) override { return stream.setPosition(p); }
-    private: juce::InputStream& stream;
+        cydaw::base::int64 getPosition() override { return stream.getPosition(); }
+        bool setPosition(cydaw::base::int64 p) override { return stream.setPosition(p); }
+    private: cydaw::base::InputStream& stream;
     };
     InputBuffer bridge_;
     std::shared_ptr<std::istream> stream_;
@@ -297,7 +284,7 @@ private:
 
 class OutputBuffer final : public std::streambuf {
 public:
-    explicit OutputBuffer(juce::OutputStream& stream) : stream_(stream), length_(stream.getPosition()) {}
+    explicit OutputBuffer(cydaw::base::OutputStream& stream) : stream_(stream), length_(stream.getPosition()) {}
     bool failed() const noexcept { return failed_; }
 private:
     std::streamsize xsputn(const char* data, std::streamsize n) override {
@@ -312,13 +299,13 @@ private:
     }
     int sync() override {
         stream_.flush();
-        if (auto* file = dynamic_cast<juce::FileOutputStream*>(&stream_); file && file->getStatus().failed()) failed_ = true;
+        if (auto* file = dynamic_cast<cydaw::base::FileOutputStream*>(&stream_); file && file->getStatus().failed()) failed_ = true;
         return failed_ ? -1 : 0;
     }
     pos_type seekoff(off_type offset, std::ios_base::seekdir way, std::ios_base::openmode) override {
-        const auto base = way == std::ios_base::beg ? juce::int64(0)
+        const auto base = way == std::ios_base::beg ? cydaw::base::int64(0)
                         : way == std::ios_base::cur ? stream_.getPosition() : length_;
-        if (base < 0 || (offset > 0 && base > std::numeric_limits<juce::int64>::max() - offset)
+        if (base < 0 || (offset > 0 && base > std::numeric_limits<cydaw::base::int64>::max() - offset)
             || offset < -base) { failed_ = true; return pos_type(off_type(-1)); }
         const auto at = base + offset;
         if (!stream_.setPosition(at)) { failed_ = true; return pos_type(off_type(-1)); }
@@ -327,8 +314,8 @@ private:
     pos_type seekpos(pos_type at, std::ios_base::openmode mode) override {
         return seekoff(off_type(at), std::ios_base::beg, mode);
     }
-    juce::OutputStream& stream_;
-    juce::int64 length_ = 0;
+    cydaw::base::OutputStream& stream_;
+    cydaw::base::int64 length_ = 0;
     bool failed_ = false;
 };
 
@@ -340,24 +327,24 @@ const char* writerName(cyaudio::AudioFileFormat format) {
         default: return "CyAudioCore WAV";
     }
 }
-class Writer final : public juce::AudioFormatWriter {
+class Writer final : public cydaw::audio::AudioFormatWriter {
 public:
-    Writer(juce::OutputStream& stream, const juce::AudioFormatWriterOptions& options,
+    Writer(cydaw::base::OutputStream& stream, const cydaw::audio::AudioFormatWriterOptions& options,
            cyaudio::AudioFileFormat format = cyaudio::AudioFileFormat::wav, std::string quality = {})
-        : juce::AudioFormatWriter(nullptr, writerName(format), options.getSampleRate(),
+        : cydaw::audio::AudioFormatWriter(nullptr, writerName(format), options.getSampleRate(),
               static_cast<unsigned>(options.getNumChannels()), static_cast<unsigned>(options.getBitsPerSample())),
           bridge_(stream), stream_(std::make_shared<std::ostream>(&bridge_)), pointers_(numChannels), zero_(chunkFrames, 0.0f), format_(format), quality_(std::move(quality)) {
         usesFloatingPointData = true; // JUCE source adapter passes normalized floats.
     }
-    bool open(const juce::AudioFormatWriterOptions& options) {
+    bool open(const cydaw::audio::AudioFormatWriterOptions& options) {
         if (options.getNumChannels() <= 0 || options.getNumChannels() > 256) return false;
         auto encoding = cyaudio::AudioEncoding::pcm16;
         switch (options.getBitsPerSample()) {
             case 8: encoding = cyaudio::AudioEncoding::pcm8; break;
             case 16: break;
             case 24: encoding = cyaudio::AudioEncoding::pcm24; break;
-            case 32: encoding = options.getSampleFormat() == juce::AudioFormatWriterOptions::SampleFormat::integral
-                                   || (format_ != cyaudio::AudioFileFormat::wav && options.getSampleFormat() != juce::AudioFormatWriterOptions::SampleFormat::floatingPoint)
+            case 32: encoding = options.getSampleFormat() == cydaw::audio::AudioFormatWriterOptions::SampleFormat::integral
+                                   || (format_ != cyaudio::AudioFileFormat::wav && options.getSampleFormat() != cydaw::audio::AudioFormatWriterOptions::SampleFormat::floatingPoint)
                                    ? cyaudio::AudioEncoding::pcm32 : cyaudio::AudioEncoding::float32; break;
             default: return false;
         }
@@ -370,7 +357,7 @@ public:
         } else if (!options.getMetadataValues().empty()) return false;
         return writer_.open(stream_, format_, info, quality_, chunkFrames) == cyaudio::Status::ok;
     }
-    void takeStream(juce::OutputStream* stream) { output = stream; }
+    void takeStream(cydaw::base::OutputStream* stream) { output = stream; }
     ~Writer() override { (void) writer_.close(); }
     bool write(const int** samples, int frames) override {
         if (!samples || frames < 0) return false;
@@ -400,36 +387,34 @@ private:
     std::string quality_;
 };
 
-class ReadFormat final : public juce::AudioFormat {
+class ReadFormat final : public cydaw::audio::AudioFormat {
 public:
-    ReadFormat() : juce::AudioFormat("CyAudioCore", ".wav .bwf .aif .aiff .aifc .caf .flac .ogg .mp3 .m4a .aac .wma") {}
-    juce::Array<int> getPossibleSampleRates() override { return {}; }
-    juce::Array<int> getPossibleBitDepths() override { return {8, 16, 24, 32, 64}; }
+    ReadFormat() : cydaw::audio::AudioFormat("CyAudioCore", ".wav .bwf .aif .aiff .aifc .caf .flac .ogg .mp3 .m4a .aac .wma") {}
+    cydaw::base::Array<int> getPossibleSampleRates() override { return {}; }
+    cydaw::base::Array<int> getPossibleBitDepths() override { return {8, 16, 24, 32, 64}; }
     bool canDoStereo() override { return true; }
     bool canDoMono() override { return true; }
-    juce::AudioFormatReader* createReaderFor(juce::InputStream* source, bool deleteOnFail) override {
+    cydaw::audio::AudioFormatReader* createReaderFor(cydaw::base::InputStream* source, bool deleteOnFail) override {
         if (!source) return nullptr;
         auto next = std::make_unique<Reader>(source);
         if (next->open()) return next.release();
         if (!deleteOnFail) next->input = nullptr;
         return nullptr;
     }
-    std::unique_ptr<juce::AudioFormatWriter> createWriterFor(std::unique_ptr<juce::OutputStream>&,
-            const juce::AudioFormatWriterOptions&) override { return {}; }
+    std::unique_ptr<cydaw::audio::AudioFormatWriter> createWriterFor(std::unique_ptr<cydaw::base::OutputStream>&,
+            const cydaw::audio::AudioFormatWriterOptions&) override { return {}; }
 };
 } // namespace
-void registerCyAudioCoreReaders(juce::AudioFormatManager& manager) {
+void registerCyAudioCoreReaders(cydaw::audio::AudioFormatManager& manager) {
     manager.clearFormats();
     manager.registerFormat(new ReadFormat, true);
 }
-std::unique_ptr<juce::AudioFormatWriter> WaveFormat::createWriterFor(
-        std::unique_ptr<juce::OutputStream>& stream, const juce::AudioFormatWriterOptions& options) {
+std::unique_ptr<cydaw::audio::AudioFormatWriter> WaveFormat::createWriterFor(
+        std::unique_ptr<cydaw::base::OutputStream>& stream, const cydaw::audio::AudioFormatWriterOptions& options) {
     cyaudio::AudioFileInfo metadataCheck;
     metadataCheck.formatName = "WAV";
     if (!writeMetadata(options.getMetadataValues(), metadataCheck)) {
-        // A legacy writer cannot interpret the opaque preservation payload.
-        if (options.getMetadataValues().contains("cydsp.metadata")) return {};
-        return juce::WavAudioFormat::createWriterFor(stream, options);
+        return {}; // Unsupported metadata must fail visibly, never be discarded.
     }
     if (!stream || options.getNumChannels() <= 0 || options.getNumChannels() > 256
         || !std::isfinite(options.getSampleRate()) || options.getSampleRate() <= 0)
@@ -440,29 +425,29 @@ std::unique_ptr<juce::AudioFormatWriter> WaveFormat::createWriterFor(
     return next;
 }
 FileFormat::FileFormat(cyaudio::AudioFileFormat format)
-    : juce::AudioFormat(writerName(format), format == cyaudio::AudioFileFormat::aiff ? ".aif .aiff" : format == cyaudio::AudioFileFormat::flac ? ".flac" : ".ogg"), format_(format) {}
-juce::Array<int> FileFormat::getPossibleSampleRates() { return {}; }
-juce::Array<int> FileFormat::getPossibleBitDepths() {
-    juce::Array<int> result;
+    : cydaw::audio::AudioFormat(writerName(format), format == cyaudio::AudioFileFormat::aiff ? ".aif .aiff" : format == cyaudio::AudioFileFormat::flac ? ".flac" : ".ogg"), format_(format) {}
+cydaw::base::Array<int> FileFormat::getPossibleSampleRates() { return {}; }
+cydaw::base::Array<int> FileFormat::getPossibleBitDepths() {
+    cydaw::base::Array<int> result;
     for (const auto& capabilities : cyaudio::audioFileFormats()) if (capabilities.format == format_)
         for (const auto encoding : capabilities.writableEncodings) result.addIfNotAlreadyThere(static_cast<int>(bits(encoding)));
     return result;
 }
-juce::StringArray FileFormat::getQualityOptions() {
-    juce::StringArray result;
+cydaw::base::TextList FileFormat::getQualityOptions() {
+    cydaw::base::TextList result;
     for (const auto& capabilities : cyaudio::audioFileFormats()) if (capabilities.format == format_)
-        for (const auto& quality : capabilities.qualityLevels) result.add(juce::String::fromUTF8(quality.c_str()));
+        for (const auto& quality : capabilities.qualityLevels) result.add(cydaw::base::Text::fromUTF8(quality.c_str()));
     return result;
 }
-juce::AudioFormatReader* FileFormat::createReaderFor(juce::InputStream* stream, bool deleteOnFail) {
+cydaw::audio::AudioFormatReader* FileFormat::createReaderFor(cydaw::base::InputStream* stream, bool deleteOnFail) {
     if (!stream) return nullptr;
     auto next = std::make_unique<Reader>(stream);
     if (next->open()) return next.release();
     if (!deleteOnFail) next->input = nullptr;
     return nullptr;
 }
-std::unique_ptr<juce::AudioFormatWriter> FileFormat::createWriterFor(std::unique_ptr<juce::OutputStream>& stream,
-        const juce::AudioFormatWriterOptions& options) {
+std::unique_ptr<cydaw::audio::AudioFormatWriter> FileFormat::createWriterFor(std::unique_ptr<cydaw::base::OutputStream>& stream,
+        const cydaw::audio::AudioFormatWriterOptions& options) {
     if (!stream || options.getNumChannels() <= 0 || options.getNumChannels() > 256
         || !std::isfinite(options.getSampleRate()) || options.getSampleRate() <= 0) return {};
     const auto qualities = getQualityOptions();
@@ -475,3 +460,7 @@ std::unique_ptr<juce::AudioFormatWriter> FileFormat::createWriterFor(std::unique
     return next;
 }
 } // namespace cydaw::integration
+
+namespace cydaw::audio {void AudioFormatManager::registerBasicFormats(){cydaw::integration::registerCyAudioCoreReaders(*this);}
+base::Text AudioFormatManager::getWildcardForAllFormats()const{base::TextList extensions;for(auto& f:formats_)for(auto& e:f->getFileExtensions())if(e.isNotEmpty())extensions.addIfNotAlreadyThere("*."+e);return extensions.joinIntoString(";");}}
+namespace cydaw::integration {audio::AudioFormatReader* WaveFormat::createReaderFor(base::InputStream* input,bool deleteOnFail){FileFormat reader(cyaudio::AudioFileFormat::wav);return reader.createReaderFor(input,deleteOnFail);}}

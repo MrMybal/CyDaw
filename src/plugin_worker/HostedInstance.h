@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #pragma once
 #include <atomic>
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -5,13 +6,13 @@ namespace cydaw::plugins
 {
 struct HostedControl : juce::HostedAudioProcessorParameter
 {
-    juce::String id, name, unit;
+    cydaw::base::Text id, name, unit;
     double minimum{}, maximum{1}, initial{};
     int steps{};
     bool automate{true};
     std::atomic<double> value{};
-    std::function<juce::String(double)> display;
-    HostedControl(juce::String key, juce::String label, double lo, double hi, double def)
+    std::function<cydaw::base::Text(double)> display;
+    HostedControl(cydaw::base::Text key, cydaw::base::Text label, double lo, double hi, double def)
         : id(std::move(key)), name(std::move(label)), minimum(lo), maximum(hi), initial(def), value(def)
     {
     }
@@ -59,7 +60,7 @@ struct HostedControl : juce::HostedAudioProcessorParameter
     juce::String getText(float n, int length) const override
     {
         auto v = minimum + n * (maximum - minimum);
-        return (display ? display(v) : juce::String(v, 3)).substring(0, length);
+        return (display ? display(v) : cydaw::base::Text(v, 3)).substring(0, length);
     }
     float getValueForText(const juce::String &s) const override
     {

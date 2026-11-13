@@ -1,3 +1,5 @@
+#include <cydaw/base/File.h>
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include <juce_gui_extra/juce_gui_extra.h>
@@ -27,7 +29,7 @@ public:
     std::function<void()> beforeNewFrame;
     // Files dropped from the system file manager, at a point in interface
     // coordinates (physical pixels of the host).
-    std::function<void(const juce::StringArray&, float x, float y)> onFilesDropped;
+    std::function<void(const cydaw::base::TextList&, float x, float y)> onFilesDropped;
     // Called once the ImGui context and fonts exist, before the first frame.
     std::function<void()> onInitialised;
     // Panels may leave the window as windows of their own (the studio);
@@ -44,17 +46,17 @@ public:
 
     [[nodiscard]] bool isReady() const noexcept;
     [[nodiscard]] float dpiScale() const noexcept;
-    [[nodiscard]] juce::String rendererDescription() const;
+    [[nodiscard]] cydaw::base::Text rendererDescription() const;
     // The next rendered frame, written as PNG (probes and snapshots).
-    void captureNextFrame(const juce::File& target, std::function<void(bool)> done = {});
+    void captureNextFrame(const cydaw::base::File& target, std::function<void(bool)> done = {});
     // Renders one frame now, outside the vertical blank pacing.
     void renderNow();
     // An image the interface can draw (ImGui::Image), made once per key and
     // kept; 0 until the graphics device exists.
-    [[nodiscard]] unsigned long long texture(const juce::String& key, const juce::Image& image);
+    [[nodiscard]] unsigned long long texture(const cydaw::base::Text& key, const juce::Image& image);
 
-    [[nodiscard]] unsigned long long updateTexture(const juce::String& key,const juce::Image& image);
-    void releaseTexture(const juce::String& key);
+    [[nodiscard]] unsigned long long updateTexture(const cydaw::base::Text& key,const juce::Image& image);
+    void releaseTexture(const cydaw::base::Text& key);
 
     void resized() override;
     void parentHierarchyChanged() override;
@@ -83,7 +85,7 @@ private:
     int wakeFrames_ { 30 };
     bool animating_ {};
     double lastFrameSeconds_ {};
-    juce::File captureTarget_;
+    cydaw::base::File captureTarget_;
     std::function<void(bool)> captureDone_;
 
     friend struct NativeAccess;

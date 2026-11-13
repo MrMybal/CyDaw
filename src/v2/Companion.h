@@ -22,11 +22,11 @@ public:
         bool finished {};   // a job ended (done or failed) and was not yet taken
         bool failed {};
         double progress {};
-        juce::String message;
-        juce::String error;
+        cydaw::base::Text message;
+        cydaw::base::Text error;
         cydaw::base::Value result;    // the {"done": true, ...} object
-        juce::String command; // what runs ("analyse", "setup", "info")
-        juce::StringArray log; // its last messages (pip's lines while it installs)
+        cydaw::base::Text command; // what runs ("analyse", "setup", "info")
+        cydaw::base::TextList log; // its last messages (pip's lines while it installs)
     };
 
     Companion();
@@ -35,46 +35,46 @@ public:
     // The Python that runs it: CYDAW_COMPANION_PYTHON (a test's, never
     // saved), the setting, else the companion's own environment when it was
     // made, else "python" from the PATH.
-    [[nodiscard]] juce::String pythonCommand() const;
-    void setPythonCommand(const juce::String& command);
+    [[nodiscard]] cydaw::base::Text pythonCommand() const;
+    void setPythonCommand(const cydaw::base::Text& command);
     // Where `import cydaw_companion` is found: beside the executable when
     // shipped (tools/companion), in the source tree otherwise.
-    [[nodiscard]] static juce::File packageFolder();
+    [[nodiscard]] static cydaw::base::File packageFolder();
     // The companion's own environment (a venv), made from the Options.
-    [[nodiscard]] static juce::File environmentFolder();
+    [[nodiscard]] static cydaw::base::File environmentFolder();
 
     // What it can install into its environment (components.json beside its
     // package): each component's id, title, description, size, sources, the
     // setup arguments, whether its licences ask to be accepted, and its
     // packages with their licences, shown before anything is downloaded.
     [[nodiscard]] static cydaw::base::Value componentCatalogue();
-    [[nodiscard]] static cydaw::base::Value component(const juce::String& id);
+    [[nodiscard]] static cydaw::base::Value component(const cydaw::base::Text& id);
     // Whether `info`'s answer says a component is there.
-    [[nodiscard]] static bool componentInstalled(const juce::String& id, const cydaw::base::Value& info);
+    [[nodiscard]] static bool componentInstalled(const cydaw::base::Text& id, const cydaw::base::Value& info);
     // Installs a component into its environment (setup), refused when its
     // licences ask to be accepted and were not, or when one job runs. What
     // was accepted, and when, is kept in <environment>/receipts/<id>.json.
     // `extra`: arguments of the setup added to the component's own (--clap).
-    bool install(const juce::String& id, bool licencesAccepted, juce::String& error,
-                 const juce::StringArray& extra = {});
+    bool install(const cydaw::base::Text& id, bool licencesAccepted, cydaw::base::Text& error,
+                 const cydaw::base::TextList& extra = {});
 
     // Starts `python -m cydaw_companion <arguments>`; false when one runs.
-    bool start(const juce::StringArray& arguments);
+    bool start(const cydaw::base::TextList& arguments);
     void cancel();
     [[nodiscard]] Status status() const;
     // The finished job's status, once: the caller applies it.
     [[nodiscard]] std::optional<Status> takeFinished();
 
     // A short command run to its end (info): its last JSON line, or why not.
-    [[nodiscard]] cydaw::base::Value runNow(const juce::StringArray& arguments, juce::String& error, int timeoutMs = 60'000) const;
+    [[nodiscard]] cydaw::base::Value runNow(const cydaw::base::TextList& arguments, cydaw::base::Text& error, int timeoutMs = 60'000) const;
     // The command line that runs `python -m cydaw_companion <arguments>`.
-    [[nodiscard]] juce::StringArray commandLine(const juce::StringArray& arguments) const;
+    [[nodiscard]] cydaw::base::TextList commandLine(const cydaw::base::TextList& arguments) const;
 
 private:
     class Job;
     void loadSettings();
 
-    juce::String python_;
+    cydaw::base::Text python_;
     std::unique_ptr<Job> job_;
     mutable std::mutex mutex_;
     Status status_;

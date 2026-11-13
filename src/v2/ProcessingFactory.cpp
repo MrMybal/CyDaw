@@ -23,7 +23,7 @@ Step code(const char* source)
     step.type = StepType::code;
     step.code = source;
     for (const auto& slider : inspectJsfx(step.code).sliders)
-        step.settings["slider" + juce::String(slider.index + 1)] = slider.defaultValue;
+        step.settings["slider" + cydaw::base::Text(slider.index + 1)] = slider.defaultValue;
     return step;
 }
 
@@ -262,12 +262,12 @@ Processing roomReverb()
     (void) mixer.command(cydaw::base::Value(request));
     step.chain = mixer.serialise();
     for (const auto& knob : mixer.parameters(1)) {
-        const auto label = juce::String(knob.label).toLowerCase();
+        const auto label = cydaw::base::Text(knob.label).toLowerCase();
         if (knob.binding.empty())
             continue;
         if (label.contains("decay") || label.contains("mix") || label.contains("size") || label.contains("dry/wet")) {
-            step.published.push_back({ juce::String(knob.binding), juce::String(knob.label), knob.minimum, knob.maximum });
-            step.settings[juce::String(knob.binding)] = knob.value;
+            step.published.push_back({ cydaw::base::Text(knob.binding), cydaw::base::Text(knob.label), knob.minimum, knob.maximum });
+            step.settings[cydaw::base::Text(knob.binding)] = knob.value;
         }
     }
     return audio("Room Reverb", "CyDAW's studio reverb on the sound, its tail let ring.", { step }, true, 12.0f);
@@ -275,7 +275,7 @@ Processing roomReverb()
 
 } // namespace
 
-cydaw::base::Result writeFactory(const juce::File& folder)
+cydaw::base::Result writeFactory(const cydaw::base::File& folder)
 {
     std::vector<Processing> all {
         audio("Remove Noise", "Background noise (hiss, hum of fans) measured in the quietest moments and taken out.",
@@ -312,7 +312,7 @@ cydaw::base::Result writeFactory(const juce::File& folder)
     };
     (void) folder.createDirectory();
     for (const auto& processing : all)
-        if (const auto saved = save(processing, folder.getChildFile(juce::File::createLegalFileName(processing.name) + fileExtension));
+        if (const auto saved = save(processing, folder.getChildFile(cydaw::base::File::createLegalFileName(processing.name) + fileExtension));
             saved.failed())
             return saved;
     return cydaw::base::Result::ok();

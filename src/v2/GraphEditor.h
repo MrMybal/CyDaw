@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "Studio.h"
@@ -38,7 +39,7 @@ public:
     void drawPrograms();
     // A card of that type: in the middle of the view (the palette's click),
     // a little aside from the last one so they do not pile up.
-    void addNode(const juce::String& typeKey);
+    void addNode(const cydaw::base::Text& typeKey);
     // What a palette drags onto the canvas: the node type's key.
     static constexpr const char* nodeTypePayload = "CYDAW_NODE_TYPE";
 
@@ -97,7 +98,7 @@ private:
     // MIDI, control values. Each is a card at the edge of the graph and a
     // socket on the device's card outside.
     void ioMenu(GraphSlot& slot);
-    void addBoundary(GraphSlot& slot, const juce::String& typeKey, bool input);
+    void addBoundary(GraphSlot& slot, const cydaw::base::Text& typeKey, bool input);
     // A cable's menu (right click on it): a control cable onto a knob sets
     // it or modulates it around its value, by a depth; any cable goes.
     void cableMenu(GraphSlot& slot);
@@ -113,7 +114,7 @@ private:
     void valueActions(app::NodeGraphComponent& graph, const EditorNode& node,
                       const app::NodeGraphComponent::EditorParameter& parameter);
     void promoteValue(app::NodeGraphComponent& graph, std::uint64_t node, std::uint64_t port,
-                      const juce::String& binding, bool input);
+                      const cydaw::base::Text& binding, bool input);
     void handleKeys(GraphSlot& slot);
     // Returns the zoom that fits.
     float frameAll(const std::vector<EditorNode>& nodes, bool selectionOnly);
@@ -185,11 +186,11 @@ private:
     void splice(app::NodeGraphComponent& graph, const std::vector<NodeLayout>& layouts);
     bool knobHovered_ {};
     const void* programGraph_ {};
-    juce::String program_;
+    cydaw::base::Text program_;
     int renamingProgram_ { -1 };
     std::vector<char> programName_ = std::vector<char>(128, 0);
     std::vector<char> programRename_ = std::vector<char>(128, 0);
-    juce::String lastError_;
+    cydaw::base::Text lastError_;
     double lastErrorTime_ {};
     Mode mode_;
     int addedInPlace_ {};

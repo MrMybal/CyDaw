@@ -44,7 +44,7 @@ public:
     }
     // Files onto a card: added to its zones (mapped by their names, their
     // pitch); an SFZ or a .cysampler replaces them.
-    void addFiles(const TrackRef& track, std::uint64_t nodeId, const juce::StringArray& paths);
+    void addFiles(const TrackRef& track, std::uint64_t nodeId, const cydaw::base::TextList& paths);
 
 private:
     struct Target {
@@ -53,7 +53,7 @@ private:
     };
     [[nodiscard]] cydaw::base::Value currentMap(const Target& target) const;
     void commit(const Target& target, const cydaw::base::Value& json, bool applySettings = false);
-    void report(const juce::String& message, bool error = false);
+    void report(const cydaw::base::Text& message, bool error = false);
     void chooseFiles(const Target& target);
     void chooseSfz(const Target& target);
     void exportSfz(const Target& target);

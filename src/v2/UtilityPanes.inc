@@ -9,25 +9,25 @@ namespace utilityd = engine::utility;
 constexpr ImU32 kUtilityInPhase = IM_COL32(96, 214, 128, 255);
 constexpr ImU32 kUtilityOutOfPhase = IM_COL32(255, 92, 92, 255);
 
-juce::String utilitaireModeName(const int index)
+cydaw::base::Text utilitaireModeName(const int index)
 {
     const auto& mode = utilityd::utilitaireChannelModes[static_cast<std::size_t>(std::clamp(index, 0, utilityd::utilitaireChannelModeCount - 1))];
-    return juce::String::fromUTF8(ui::french() ? mode.french : mode.english);
+    return cydaw::base::Text::fromUTF8(ui::french() ? mode.french : mode.english);
 }
-juce::String utilitaireModeHint(const int index)
+cydaw::base::Text utilitaireModeHint(const int index)
 {
     const auto& mode = utilityd::utilitaireChannelModes[static_cast<std::size_t>(std::clamp(index, 0, utilityd::utilitaireChannelModeCount - 1))];
-    return juce::String::fromUTF8(ui::french() ? mode.frenchHint : mode.englishHint);
+    return cydaw::base::Text::fromUTF8(ui::french() ? mode.frenchHint : mode.englishHint);
 }
-juce::String stereoscopeModeName(const int index)
+cydaw::base::Text stereoscopeModeName(const int index)
 {
     const auto& mode = utilityd::stereoscopeDisplayModes[static_cast<std::size_t>(std::clamp(index, 0, utilityd::stereoscopeDisplayModeCount - 1))];
-    return juce::String::fromUTF8(ui::french() ? mode.french : mode.english);
+    return cydaw::base::Text::fromUTF8(ui::french() ? mode.french : mode.english);
 }
-juce::String stereoscopeModeHint(const int index)
+cydaw::base::Text stereoscopeModeHint(const int index)
 {
     const auto& mode = utilityd::stereoscopeDisplayModes[static_cast<std::size_t>(std::clamp(index, 0, utilityd::stereoscopeDisplayModeCount - 1))];
-    return juce::String::fromUTF8(ui::french() ? mode.frenchHint : mode.englishHint);
+    return cydaw::base::Text::fromUTF8(ui::french() ? mode.frenchHint : mode.englishHint);
 }
 
 // The processor's readings when they are there and fresh.
@@ -300,9 +300,9 @@ struct StereoscopeMemory {
 };
 StereoscopeMemory& stereoscopeMemoryOf(std::vector<Param>& parameters, const Pane& pane)
 {
-    static std::map<juce::String, StereoscopeMemory> memories;
+    static std::map<cydaw::base::Text, StereoscopeMemory> memories;
     const auto* first = at(parameters, pane, 0);
-    return memories[first != nullptr ? first->binding : juce::String("?")];
+    return memories[first != nullptr ? first->binding : cydaw::base::Text("?")];
 }
 
 // The newest readings into the memory: a new set of pairs (at most ~70 a
@@ -675,7 +675,7 @@ std::vector<int> utilityCardFields(const PaneKind kind, std::vector<Param>& para
 }
 
 // A value as these effects show it; empty for none of theirs.
-juce::String utilityFormat(const juce::String& binding, const double value)
+cydaw::base::Text utilityFormat(const cydaw::base::Text& binding, const double value)
 {
     if (binding.contains("utilitaire.")) {
         const auto suffix = binding.fromLastOccurrenceOf("utilitaire.", false, false);
@@ -688,17 +688,17 @@ juce::String utilityFormat(const juce::String& binding, const double value)
         if (suffix == "mute")
             return value >= 0.5 ? ui::Ls("Muet", "Muted") : ui::Ls("Joue", "Playing");
         if (suffix == "monoBass")
-            return utilityd::utilitaireMonoBassOn(static_cast<float>(value)) ? juce::String(juce::roundToInt(value)) + " Hz"
+            return utilityd::utilitaireMonoBassOn(static_cast<float>(value)) ? cydaw::base::Text(juce::roundToInt(value)) + " Hz"
                                                                               : ui::Ls("Coupé", "Off");
         if (suffix == "pan") {
             if (std::abs(value) < 0.005)
                 return "C";
-            return juce::String(juce::roundToInt(std::abs(value) * 100.0)) + (value < 0.0 ? ui::Ls(" G", " L") : ui::Ls(" D", " R"));
+            return cydaw::base::Text(juce::roundToInt(std::abs(value) * 100.0)) + (value < 0.0 ? ui::Ls(" G", " L") : ui::Ls(" D", " R"));
         }
         if (suffix == "width")
-            return value < 0.005 ? juce::String("Mono") : percent(value);
+            return value < 0.005 ? cydaw::base::Text("Mono") : percent(value);
         if (suffix == "delay")
-            return value <= 0.0 ? ui::Ls("Aucun", "None") : juce::String(value, 2) + " ms";
+            return value <= 0.0 ? ui::Ls("Aucun", "None") : cydaw::base::Text(value, 2) + " ms";
         return {};
     }
     if (binding.contains("stereoscope.")) {
@@ -706,7 +706,7 @@ juce::String utilityFormat(const juce::String& binding, const double value)
         if (suffix == "displayMode")
             return stereoscopeModeName(whole(static_cast<float>(value), utilityd::stereoscopeDisplayModeCount));
         if (suffix == "zoom")
-            return juce::String::fromUTF8("\xc3\x97") + juce::String(value, 2);
+            return cydaw::base::Text::fromUTF8("\xc3\x97") + cydaw::base::Text(value, 2);
         if (suffix == "persistence")
             return percent(value);
         return {};
@@ -715,7 +715,7 @@ juce::String utilityFormat(const juce::String& binding, const double value)
 }
 
 // A parameter of theirs that takes whole steps (a choice, a switch).
-bool utilityStepped(const juce::String& binding)
+bool utilityStepped(const cydaw::base::Text& binding)
 {
     for (const auto* suffix : { "utilitaire.channelMode", "utilitaire.invertLeft", "utilitaire.invertRight", "utilitaire.dcFilter",
                                 "utilitaire.mute", "stereoscope.displayMode" })

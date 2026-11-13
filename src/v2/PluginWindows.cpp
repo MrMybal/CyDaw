@@ -23,12 +23,12 @@ PluginWindows::~PluginWindows() = default;
 
 std::string PluginWindows::windowId(const PluginWindow& window)
 {
-    const auto id = juce::String(window.track.isBus() ? "b" + juce::String(static_cast<juce::int64>(window.track.bus))
+    const auto id = cydaw::base::Text(window.track.isBus() ? "b" + cydaw::base::Text(static_cast<juce::int64>(window.track.bus))
                                  : window.track.master ? "m"
                                  : window.track.midi   ? "i"
                                                        : "a")
-                    + juce::String(static_cast<juce::int64>(window.track.midi ? window.track.midiId : window.track.audioIndex)) + "-"
-                    + juce::String(static_cast<juce::int64>(window.nodeId));
+                    + cydaw::base::Text(static_cast<juce::int64>(window.track.midi ? window.track.midiId : window.track.audioIndex)) + "-"
+                    + cydaw::base::Text(static_cast<juce::int64>(window.nodeId));
     return ("###plugin" + id).toStdString();
 }
 
@@ -46,7 +46,7 @@ void PluginWindows::draw()
         auto& graph = slot->graph();
         // A card made of a graph shows its own; the track's whole graph (an
         // instrument) its root's.
-        juce::String name;
+        cydaw::base::Text name;
         auto interface = graph.editorInterface();
         if (window.nodeId != 0) {
             const auto nodes = graph.editorNodes();
@@ -64,14 +64,14 @@ void PluginWindows::draw()
             name = studio_.trackName(window.track);
         const auto width = interface.windowWidth != 0 ? static_cast<float>(interface.windowWidth) : 720.0f;
         const auto height = interface.windowHeight != 0 ? static_cast<float>(interface.windowHeight) : 420.0f;
-        const auto id = juce::String(window.track.isBus() ? "b" + juce::String(static_cast<juce::int64>(window.track.bus))
+        const auto id = cydaw::base::Text(window.track.isBus() ? "b" + cydaw::base::Text(static_cast<juce::int64>(window.track.bus))
                                      : window.track.master ? "m"
                                      : window.track.midi   ? "i"
                                                            : "a")
-                        + juce::String(static_cast<juce::int64>(window.track.midi ? window.track.midiId : window.track.audioIndex)) + "-"
-                        + juce::String(static_cast<juce::int64>(window.nodeId));
+                        + cydaw::base::Text(static_cast<juce::int64>(window.track.midi ? window.track.midiId : window.track.audioIndex)) + "-"
+                        + cydaw::base::Text(static_cast<juce::int64>(window.nodeId));
         const auto windowKey = windowId(window) + state_.deviceWindowNamespace;
-        const auto title = name + "  —  " + studio_.trackName(window.track) + juce::String(windowKey);
+        const auto title = name + "  —  " + studio_.trackName(window.track) + cydaw::base::Text(windowKey);
         ui::beforeDetachable(windowKey.c_str());
         const auto dimensions=std::make_pair(width,height);
         const auto previous=authoredSizes_.find(windowKey);
@@ -100,7 +100,7 @@ void PluginWindows::draw()
                              [this, track, nodeId] {
                                  return nodeId != 0 ? studio_.devicePresetState(track, nodeId) : studio_.chainPresetState(track);
                              },
-                             [this, track, nodeId](const cydaw::base::Value& preset, juce::String& error) {
+                             [this, track, nodeId](const cydaw::base::Value& preset, cydaw::base::Text& error) {
                                  return nodeId != 0 ? studio_.applyDevicePreset(track, nodeId, preset, error)
                                                     : studio_.applyChainPreset(track, preset, error);
                              },
@@ -116,7 +116,7 @@ void PluginWindows::draw()
                                L("Dessinez-la dans l'atelier (onglet Interface) : elle s'affiche ici comme la fenêtre d'un plugin.",
                                  "Design it in the workshop (Interface tab): it shows here as a plugin's window."));
             } else {
-                renderer_->drawPlayed(id.toRawUTF8(), interface, room, [&graph](const juce::String& key, const double value) {
+                renderer_->drawPlayed(id.toRawUTF8(), interface, room, [&graph](const cydaw::base::Text& key, const double value) {
                     (void) graph.editorSetParameter(key, value);
                 }, &graph.editorAnalysis());
             }
