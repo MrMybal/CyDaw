@@ -115,3 +115,7 @@ Linux/macOS desktop UI, physical latency, microphone recording, MIDI hardware
 hotplug and installed third-party plugin interoperability require separate
 platform/device acceptance. A compiled Windows desktop is not a claim that those
 hardware combinations have all been exercised.
+
+## Paired JUCE comparison
+
+The [controlled Windows comparison](CyAudioCoreComparison.fr.md) measures the actual old JUCE desktop against the native product. It identifies higher live CPU use, delayed sample-library readiness and shared pre-existing CUE/Cinema-export issues. Dependency retirement is complete; performance equivalence is not established. No audio implementation was changed during that comparison.

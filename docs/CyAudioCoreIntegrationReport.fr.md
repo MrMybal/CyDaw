@@ -154,3 +154,7 @@ les cas historiques pris en charge.
 Voir [les commandes de build](CyAudioCoreIntegration.md). La voie de production
 ne doit pas activer `CYDAW_BUILD_LEGACY_JUCE_TESTS`. Aucune publication ni push
 n'est déclenché par cette intégration locale.
+
+## Comparaison de performances après migration
+
+Le [rapport de comparaison contrôlée](CyAudioCoreComparison.fr.md) complète cette acceptation. Il constate un CPU plus élevé en lecture, un chargement initial de bibliothèque plus lent et deux problèmes communs à l’ancienne version : CUE au quantum ASIO de 1 024 et composante continue après Cinéma. La suppression de la dépendance JUCE est terminée ; elle ne constitue pas une preuve d’équivalence des performances. Aucun code audio n’a été modifié pendant cette comparaison.

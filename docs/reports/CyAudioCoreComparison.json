@@ -1,0 +1,4220 @@
+{
+  "schema": 1,
+  "baseline": "cf4228d5ed18897b786bb10f4844673593c21c5a",
+  "native": "de660211561b0de604d665ee201dc0b6cc6bffe4",
+  "environment": {
+    "platform": "Windows-10-10.0.19044-SP0",
+    "python": "3.12.0 (tags/v3.12.0:0fb18b0, Oct  2 2023, 13:03:39) [MSC v.1935 64 bit (AMD64)]",
+    "logicalCpus": 24,
+    "processor": "AMD64 Family 25 Model 97 Stepping 2, AuthenticAMD",
+    "executables": {
+      "juce": {
+        "path": "D:\\_Project\\CyDAW_Project\\build\\juce-comparison\\CyDAW2_artefacts\\Release\\CyDAW 2.exe",
+        "sha256": "326a8fa59838a79417204eaebf5265a37a28983482243b9f8da53e8ffae39e70",
+        "bytes": 22080512
+      },
+      "cyaudiocore": {
+        "path": "D:\\_Project\\CyDAW_Project\\build\\cyaudio-native-desktop\\CyDAW2_artefacts\\Release\\CyDAW 2.exe",
+        "sha256": "5e27ee131af975f0bec6b440ad9fe74e3bd21b2dcb6003148cee90679569eab7",
+        "bytes": 20224000
+      }
+    },
+    "cpuConvention": "100% = one logical CPU fully busy; host + descendant workers; peak sampled private committed bytes",
+    "methodology": "Alternating paired sequential runs, Release x64 LTO off, same ASIO Fireface 48kHz/1024, warmup excluded, silent hidden UI at 1500x900; OS filesystem cache not flushed. API latency is not visible-window FPS. Functional wall times include Python/assertions/sleeps and are not DSP speed.",
+    "baselineProfilePatch": "tests/fixtures/juce-benchmark-profile.patch; only absolute preferences paths, no audio or DSP edits"
+  },
+  "roundsPerProduct": 3,
+  "metrics": {
+    "idle": {
+      "cpuCorePercent": {
+        "JUCE": {
+          "samples": [
+            0.5207964088678227,
+            0.7594850446738423,
+            1.2591694329845975
+          ],
+          "median": 0.7594850446738423,
+          "minimum": 0.5207964088678227,
+          "maximum": 1.2591694329845975
+        },
+        "CyAudioCore": {
+          "samples": [
+            1.0349915576151703,
+            1.0414730568256587,
+            0.7585946835641807
+          ],
+          "median": 1.0349915576151703,
+          "minimum": 0.7585946835641807,
+          "maximum": 1.0414730568256587
+        },
+        "changePercent": 36.275436214763545
+      },
+      "peakPrivateMiB": {
+        "JUCE": {
+          "samples": [
+            294.96484375,
+            296.5546875,
+            299.21875
+          ],
+          "median": 296.5546875,
+          "minimum": 294.96484375,
+          "maximum": 299.21875
+        },
+        "CyAudioCore": {
+          "samples": [
+            243.89453125,
+            252.73046875,
+            249.83984375
+          ],
+          "median": 249.83984375,
+          "minimum": 243.89453125,
+          "maximum": 252.73046875
+        },
+        "changePercent": -15.752522458442009
+      },
+      "requestP95Ms": {
+        "JUCE": {
+          "samples": [
+            20.00134499976411,
+            1.0862200004339682,
+            9.657400000287424
+          ],
+          "median": 9.657400000287424,
+          "minimum": 1.0862200004339682,
+          "maximum": 20.00134499976411
+        },
+        "CyAudioCore": {
+          "samples": [
+            20.04141999932471,
+            15.773460001400956,
+            2.484679998451611
+          ],
+          "median": 15.773460001400956,
+          "minimum": 2.484679998451611,
+          "maximum": 20.04141999932471
+        },
+        "changePercent": 63.33029594851103
+      }
+    },
+    "audio32": {
+      "cpuCorePercent": {
+        "JUCE": {
+          "samples": [
+            9.107150507149475,
+            8.836746640732231,
+            10.32678593625036
+          ],
+          "median": 9.107150507149475,
+          "minimum": 8.836746640732231,
+          "maximum": 10.32678593625036
+        },
+        "CyAudioCore": {
+          "samples": [
+            16.33548752674756,
+            20.066435997460196,
+            17.00276804239335
+          ],
+          "median": 17.00276804239335,
+          "minimum": 16.33548752674756,
+          "maximum": 20.066435997460196
+        },
+        "changePercent": 86.6969040321174
+      },
+      "peakPrivateMiB": {
+        "JUCE": {
+          "samples": [
+            730.10546875,
+            730.02734375,
+            732.66015625
+          ],
+          "median": 730.10546875,
+          "minimum": 730.02734375,
+          "maximum": 732.66015625
+        },
+        "CyAudioCore": {
+          "samples": [
+            691.91015625,
+            691.62109375,
+            697.31640625
+          ],
+          "median": 691.91015625,
+          "minimum": 691.62109375,
+          "maximum": 697.31640625
+        },
+        "changePercent": -5.231478756814889
+      },
+      "requestP95Ms": {
+        "JUCE": {
+          "samples": [
+            2.43590000027325,
+            15.934995000316093,
+            17.233739998300734
+          ],
+          "median": 15.934995000316093,
+          "minimum": 2.43590000027325,
+          "maximum": 17.233739998300734
+        },
+        "CyAudioCore": {
+          "samples": [
+            26.567134999459086,
+            21.141880000686793,
+            22.023950000948386
+          ],
+          "median": 22.023950000948386,
+          "minimum": 21.141880000686793,
+          "maximum": 26.567134999459086
+        },
+        "changePercent": 38.21121375006085
+      }
+    },
+    "effects16": {
+      "cpuCorePercent": {
+        "JUCE": {
+          "samples": [
+            65.94434792691524,
+            67.14088498392718,
+            69.99113394610897
+          ],
+          "median": 67.14088498392718,
+          "minimum": 65.94434792691524,
+          "maximum": 69.99113394610897
+        },
+        "CyAudioCore": {
+          "samples": [
+            145.00870760155837,
+            144.17237845143697,
+            147.11660910155342
+          ],
+          "median": 145.00870760155837,
+          "minimum": 144.17237845143697,
+          "maximum": 147.11660910155342
+        },
+        "changePercent": 115.97675937139039
+      },
+      "peakPrivateMiB": {
+        "JUCE": {
+          "samples": [
+            610.71484375,
+            596.99609375,
+            597.6953125
+          ],
+          "median": 597.6953125,
+          "minimum": 596.99609375,
+          "maximum": 610.71484375
+        },
+        "CyAudioCore": {
+          "samples": [
+            648.9765625,
+            636.515625,
+            645.390625
+          ],
+          "median": 645.390625,
+          "minimum": 636.515625,
+          "maximum": 648.9765625
+        },
+        "changePercent": 7.979870596693028
+      },
+      "requestP95Ms": {
+        "JUCE": {
+          "samples": [
+            23.338029999104037,
+            22.18621999982133,
+            3.8044200009608105
+          ],
+          "median": 22.18621999982133,
+          "minimum": 3.8044200009608105,
+          "maximum": 23.338029999104037
+        },
+        "CyAudioCore": {
+          "samples": [
+            10.48155500102439,
+            27.580745000523166,
+            22.073490000730086
+          ],
+          "median": 22.073490000730086,
+          "minimum": 10.48155500102439,
+          "maximum": 27.580745000523166
+        },
+        "changePercent": -0.5081081819803046
+      }
+    },
+    "voices64": {
+      "cpuCorePercent": {
+        "JUCE": {
+          "samples": [
+            20.308874865828287,
+            22.478370533974402,
+            20.14735648414829
+          ],
+          "median": 20.308874865828287,
+          "minimum": 20.14735648414829,
+          "maximum": 22.478370533974402
+        },
+        "CyAudioCore": {
+          "samples": [
+            31.116227992805285,
+            30.886206304264448,
+            31.411800888362595
+          ],
+          "median": 31.116227992805285,
+          "minimum": 30.886206304264448,
+          "maximum": 31.411800888362595
+        },
+        "changePercent": 53.21492794837912
+      },
+      "peakPrivateMiB": {
+        "JUCE": {
+          "samples": [
+            485.38671875,
+            485.6015625,
+            487.3359375
+          ],
+          "median": 485.6015625,
+          "minimum": 485.38671875,
+          "maximum": 487.3359375
+        },
+        "CyAudioCore": {
+          "samples": [
+            455.5625,
+            470.23828125,
+            461.2421875
+          ],
+          "median": 461.2421875,
+          "minimum": 455.5625,
+          "maximum": 470.23828125
+        },
+        "changePercent": -5.016329616937753
+      },
+      "requestP95Ms": {
+        "JUCE": {
+          "samples": [
+            15.58132000027398,
+            1.8791199996485375,
+            20.061739999982816
+          ],
+          "median": 15.58132000027398,
+          "minimum": 1.8791199996485375,
+          "maximum": 20.061739999982816
+        },
+        "CyAudioCore": {
+          "samples": [
+            22.892609998416443,
+            23.736264998296974,
+            16.792424997947812
+          ],
+          "median": 22.892609998416443,
+          "minimum": 16.792424997947812,
+          "maximum": 23.736264998296974
+        },
+        "changePercent": 46.923431378175295
+      }
+    },
+    "plugins8": {
+      "cpuCorePercent": {
+        "JUCE": {
+          "samples": [
+            3.5465250175132077,
+            3.0344281361252836,
+            2.5297751294621964
+          ],
+          "median": 3.0344281361252836,
+          "minimum": 2.5297751294621964,
+          "maximum": 3.5465250175132077
+        },
+        "CyAudioCore": {
+          "samples": [
+            14.595321460650098,
+            15.063731594064677,
+            18.4734513919102
+          ],
+          "median": 15.063731594064677,
+          "minimum": 14.595321460650098,
+          "maximum": 18.4734513919102
+        },
+        "changePercent": 396.4273635196327
+      },
+      "peakPrivateMiB": {
+        "JUCE": {
+          "samples": [
+            500.84375,
+            509.984375,
+            511.8515625
+          ],
+          "median": 509.984375,
+          "minimum": 500.84375,
+          "maximum": 511.8515625
+        },
+        "CyAudioCore": {
+          "samples": [
+            559.69140625,
+            550.06640625,
+            552.140625
+          ],
+          "median": 552.140625,
+          "minimum": 550.06640625,
+          "maximum": 559.69140625
+        },
+        "changePercent": 8.266184625754459
+      },
+      "requestP95Ms": {
+        "JUCE": {
+          "samples": [
+            1.36596000083955,
+            1.4827200000581797,
+            1.415500001166947
+          ],
+          "median": 1.415500001166947,
+          "minimum": 1.36596000083955,
+          "maximum": 1.4827200000581797
+        },
+        "CyAudioCore": {
+          "samples": [
+            2.758660000108648,
+            13.3370299992748,
+            2.800319997186307
+          ],
+          "median": 2.800319997186307,
+          "minimum": 2.758660000108648,
+          "maximum": 13.3370299992748
+        },
+        "changePercent": 97.83256763530241
+      }
+    },
+    "dj4": {
+      "cpuCorePercent": {
+        "JUCE": {
+          "samples": [
+            7.088342293540162,
+            6.547633035092561,
+            5.817586674188259
+          ],
+          "median": 6.547633035092561,
+          "minimum": 5.817586674188259,
+          "maximum": 7.088342293540162
+        },
+        "CyAudioCore": {
+          "samples": [
+            17.852983435297055,
+            18.730076193620146,
+            18.621141399555537
+          ],
+          "median": 18.621141399555537,
+          "minimum": 17.852983435297055,
+          "maximum": 18.730076193620146
+        },
+        "changePercent": 184.3950065581569
+      },
+      "peakPrivateMiB": {
+        "JUCE": {
+          "samples": [
+            611.5390625,
+            609.80859375,
+            611.22265625
+          ],
+          "median": 611.22265625,
+          "minimum": 609.80859375,
+          "maximum": 611.5390625
+        },
+        "CyAudioCore": {
+          "samples": [
+            674.75390625,
+            670.765625,
+            684.7265625
+          ],
+          "median": 674.75390625,
+          "minimum": 670.765625,
+          "maximum": 684.7265625
+        },
+        "changePercent": 10.394125504080588
+      },
+      "requestP95Ms": {
+        "JUCE": {
+          "samples": [
+            1.4939800013962667,
+            8.962320000136947,
+            1.3392599998041987
+          ],
+          "median": 1.4939800013962667,
+          "minimum": 1.3392599998041987,
+          "maximum": 8.962320000136947
+        },
+        "CyAudioCore": {
+          "samples": [
+            9.713820000615646,
+            3.5086050012978363,
+            3.159080001205438
+          ],
+          "median": 3.5086050012978363,
+          "minimum": 3.159080001205438,
+          "maximum": 9.713820000615646
+        },
+        "changePercent": 134.8495293122204
+      }
+    },
+    "foundry": {
+      "cpuCorePercent": {
+        "JUCE": {
+          "samples": [
+            9.108122448726874,
+            10.88614332771045,
+            9.365844730678448
+          ],
+          "median": 9.365844730678448,
+          "minimum": 9.108122448726874,
+          "maximum": 10.88614332771045
+        },
+        "CyAudioCore": {
+          "samples": [
+            18.972852947546198,
+            21.14769711770857,
+            18.392376415801355
+          ],
+          "median": 18.972852947546198,
+          "minimum": 18.392376415801355,
+          "maximum": 21.14769711770857
+        },
+        "changePercent": 102.57492509350867
+      },
+      "peakPrivateMiB": {
+        "JUCE": {
+          "samples": [
+            668.0078125,
+            668.98046875,
+            670.65625
+          ],
+          "median": 668.98046875,
+          "minimum": 668.0078125,
+          "maximum": 670.65625
+        },
+        "CyAudioCore": {
+          "samples": [
+            741.2421875,
+            739.51171875,
+            751.7890625
+          ],
+          "median": 741.2421875,
+          "minimum": 739.51171875,
+          "maximum": 751.7890625
+        },
+        "changePercent": 10.801768082261365
+      },
+      "requestP95Ms": {
+        "JUCE": {
+          "samples": [
+            2.5050600001122802,
+            2.2401399997761446,
+            11.163834998478686
+          ],
+          "median": 2.5050600001122802,
+          "minimum": 2.2401399997761446,
+          "maximum": 11.163834998478686
+        },
+        "CyAudioCore": {
+          "samples": [
+            11.815099999330394,
+            19.03443999908631,
+            2.767199998925207
+          ],
+          "median": 11.815099999330394,
+          "minimum": 2.767199998925207,
+          "maximum": 19.03443999908631
+        },
+        "changePercent": 371.64938160366717
+      }
+    },
+    "cinema": {
+      "cpuCorePercent": {
+        "JUCE": {
+          "samples": [
+            17.207642557829196,
+            18.8998976587168,
+            18.703163336177592
+          ],
+          "median": 18.703163336177592,
+          "minimum": 17.207642557829196,
+          "maximum": 18.8998976587168
+        },
+        "CyAudioCore": {
+          "samples": [
+            27.809186506828325,
+            34.90992845399835,
+            25.80369126385223
+          ],
+          "median": 27.809186506828325,
+          "minimum": 25.80369126385223,
+          "maximum": 34.90992845399835
+        },
+        "changePercent": 48.687075052362516
+      },
+      "peakPrivateMiB": {
+        "JUCE": {
+          "samples": [
+            784.33984375,
+            783.33984375,
+            782.390625
+          ],
+          "median": 783.33984375,
+          "minimum": 782.390625,
+          "maximum": 784.33984375
+        },
+        "CyAudioCore": {
+          "samples": [
+            866.58984375,
+            866.83984375,
+            873.33203125
+          ],
+          "median": 866.83984375,
+          "minimum": 866.58984375,
+          "maximum": 873.33203125
+        },
+        "changePercent": 10.659485875283625
+      },
+      "requestP95Ms": {
+        "JUCE": {
+          "samples": [
+            2.4454999991576156,
+            9.389839999494123,
+            1.622660000430187
+          ],
+          "median": 2.4454999991576156,
+          "minimum": 1.622660000430187,
+          "maximum": 9.389839999494123
+        },
+        "CyAudioCore": {
+          "samples": [
+            2.8347850015052245,
+            17.783299999427975,
+            21.120305001932138
+          ],
+          "median": 17.783299999427975,
+          "minimum": 2.8347850015052245,
+          "maximum": 21.120305001932138
+        },
+        "changePercent": 627.1846250481973
+      }
+    }
+  },
+  "timings": {
+    "startupReadyMs": {
+      "JUCE": {
+        "samples": [
+          2133.611100001872,
+          2061.077300000761,
+          2069.1631000008783
+        ],
+        "median": 2069.1631000008783,
+        "minimum": 2061.077300000761,
+        "maximum": 2133.611100001872
+      },
+      "CyAudioCore": {
+        "samples": [
+          2019.253700000263,
+          2039.8289999975532,
+          2019.7688000007474
+        ],
+        "median": 2019.7688000007474,
+        "minimum": 2019.253700000263,
+        "maximum": 2039.8289999975532
+      },
+      "changePercent": -2.3871631965653117
+    },
+    "projectOpenMs": {
+      "JUCE": {
+        "samples": [
+          1638.1710000023304,
+          1632.114799998817,
+          1656.7395000020042
+        ],
+        "median": 1638.1710000023304,
+        "minimum": 1632.114799998817,
+        "maximum": 1656.7395000020042
+      },
+      "CyAudioCore": {
+        "samples": [
+          753.0617999982496,
+          744.8770000009972,
+          766.3293000005069
+        ],
+        "median": 753.0617999982496,
+        "minimum": 744.8770000009972,
+        "maximum": 766.3293000005069
+      },
+      "changePercent": -54.03033016716946
+    },
+    "pluginLoad8Ms": {
+      "JUCE": {
+        "samples": [
+          840.1215999983833,
+          834.2456999998831,
+          785.1023000002897
+        ],
+        "median": 834.2456999998831,
+        "minimum": 785.1023000002897,
+        "maximum": 840.1215999983833
+      },
+      "CyAudioCore": {
+        "samples": [
+          804.365100000723,
+          770.6041000019468,
+          1020.6421000002592
+        ],
+        "median": 804.365100000723,
+        "minimum": 770.6041000019468,
+        "maximum": 1020.6421000002592
+      },
+      "changePercent": -3.581750556120844
+    },
+    "studioExportMs": {
+      "JUCE": {
+        "samples": [
+          6041.738299998542,
+          6024.138799999491,
+          6048.770699999295
+        ],
+        "median": 6041.738299998542,
+        "minimum": 6024.138799999491,
+        "maximum": 6048.770699999295
+      },
+      "CyAudioCore": {
+        "samples": [
+          5048.255699999572,
+          5035.6457000016235,
+          5107.032199997775
+        ],
+        "median": 5048.255699999572,
+        "minimum": 5035.6457000016235,
+        "maximum": 5107.032199997775
+      },
+      "changePercent": -16.443654965975764
+    },
+    "offlineSynth": {
+      "JUCE": {
+        "samples": [
+          37.459400002262555,
+          43.56109999935143,
+          37.61599999779719
+        ],
+        "median": 37.61599999779719,
+        "minimum": 37.459400002262555,
+        "maximum": 43.56109999935143
+      },
+      "CyAudioCore": {
+        "samples": [
+          38.441700002294965,
+          37.897399997746106,
+          38.22749999744701
+        ],
+        "median": 38.22749999744701,
+        "minimum": 37.897399997746106,
+        "maximum": 38.441700002294965
+      },
+      "changePercent": 1.6256380255360359
+    },
+    "offlineEffect": {
+      "JUCE": {
+        "samples": [
+          89.1842999990331,
+          88.9050000005227,
+          88.81839999958174
+        ],
+        "median": 88.9050000005227,
+        "minimum": 88.81839999958174,
+        "maximum": 89.1842999990331
+      },
+      "CyAudioCore": {
+        "samples": [
+          90.67689999938011,
+          90.35909999875003,
+          90.45730000070762
+        ],
+        "median": 90.45730000070762,
+        "minimum": 90.35909999875003,
+        "maximum": 90.67689999938011
+      },
+      "changePercent": 1.7460210338853699
+    },
+    "projectSave": {
+      "JUCE": {
+        "samples": [
+          181.38719999842579,
+          182.20859999928507,
+          184.4470000032743
+        ],
+        "median": 182.20859999928507,
+        "minimum": 181.38719999842579,
+        "maximum": 184.4470000032743
+      },
+      "CyAudioCore": {
+        "samples": [
+          131.35840000177268,
+          133.8906000019051,
+          135.67709999915678
+        ],
+        "median": 133.8906000019051,
+        "minimum": 131.35840000177268,
+        "maximum": 135.67709999915678
+      },
+      "changePercent": -26.517957987476738
+    },
+    "shutdown": {
+      "JUCE": {
+        "samples": [
+          576.4746000022569,
+          590.4949000032502,
+          578.1840999989072
+        ],
+        "median": 578.1840999989072,
+        "minimum": 576.4746000022569,
+        "maximum": 590.4949000032502
+      },
+      "CyAudioCore": {
+        "samples": [
+          491.36859999998705,
+          483.75559999840334,
+          484.84370000005583
+        ],
+        "median": 484.84370000005583,
+        "minimum": 483.75559999840334,
+        "maximum": 491.36859999998705
+      },
+      "changePercent": -16.143716162209888
+    },
+    "cinemaSeek": {
+      "JUCE": {
+        "samples": [
+          0.9842500003287569,
+          0.8280000001832377,
+          0.9867999997368315
+        ],
+        "median": 0.9842500003287569,
+        "minimum": 0.8280000001832377,
+        "maximum": 0.9867999997368315
+      },
+      "CyAudioCore": {
+        "samples": [
+          2.0403000016813166,
+          2.5597000003472203,
+          2.622900001369999
+        ],
+        "median": 2.5597000003472203,
+        "minimum": 2.0403000016813166,
+        "maximum": 2.622900001369999
+      },
+      "changePercent": 160.0660400804913
+    },
+    "Remove Hum": {
+      "JUCE": {
+        "samples": [
+          14.330700003483798,
+          15.574099998048041,
+          15.788100001373095
+        ],
+        "median": 15.574099998048041,
+        "minimum": 14.330700003483798,
+        "maximum": 15.788100001373095
+      },
+      "CyAudioCore": {
+        "samples": [
+          17.690799999400042,
+          17.387100000632927,
+          17.97390000137966
+        ],
+        "median": 17.690799999400042,
+        "minimum": 17.387100000632927,
+        "maximum": 17.97390000137966
+      },
+      "changePercent": 13.591154555430451
+    },
+    "Tape Echo": {
+      "JUCE": {
+        "samples": [
+          90.3440000001865,
+          83.76420000058715,
+          82.0581999978458
+        ],
+        "median": 83.76420000058715,
+        "minimum": 82.0581999978458,
+        "maximum": 90.3440000001865
+      },
+      "CyAudioCore": {
+        "samples": [
+          89.31020000090939,
+          88.65489999880083,
+          88.46939999784809
+        ],
+        "median": 88.65489999880083,
+        "minimum": 88.46939999784809,
+        "maximum": 89.31020000090939
+      },
+      "changePercent": 5.838651832381125
+    },
+    "Room Reverb": {
+      "JUCE": {
+        "samples": [
+          514.1374000013457,
+          513.3538000009139,
+          518.4389000023657
+        ],
+        "median": 514.1374000013457,
+        "minimum": 513.3538000009139,
+        "maximum": 518.4389000023657
+      },
+      "CyAudioCore": {
+        "samples": [
+          451.00920000186306,
+          444.940499997756,
+          440.1795999983733
+        ],
+        "median": 444.940499997756,
+        "minimum": 440.1795999983733,
+        "maximum": 451.00920000186306
+      },
+      "changePercent": -13.458834156668741
+    }
+  },
+  "functional": {
+    "cydaw_help_entrypoints": {
+      "JUCE": {
+        "exitCode": 0,
+        "seconds": 3.638562299998739,
+        "failedLines": [],
+        "passedAssertions": 0,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw_help_entrypoints\\test.log"
+      },
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 3.220139199998812,
+        "failedLines": [],
+        "passedAssertions": 0,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw_help_entrypoints\\test.log"
+      }
+    },
+    "cydaw2_cinema_layout_check": {
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 7.849489700001868,
+        "failedLines": [],
+        "passedAssertions": 0,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_cinema_layout_check\\test.log"
+      },
+      "JUCE": {
+        "exitCode": 1,
+        "seconds": 7.536474599997746,
+        "failedLines": [
+          "Traceback (most recent call last):",
+          "AssertionError"
+        ],
+        "passedAssertions": 0,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_cinema_layout_check\\test.log"
+      }
+    },
+    "cydaw2_cinema_codecs_check": {
+      "JUCE": {
+        "exitCode": 0,
+        "seconds": 12.142446400001063,
+        "failedLines": [],
+        "passedAssertions": 0,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_cinema_codecs_check\\test.log"
+      },
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 8.886038100001315,
+        "failedLines": [],
+        "passedAssertions": 0,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_cinema_codecs_check\\test.log"
+      }
+    },
+    "cydaw2_mcp_check": {
+      "JUCE": {
+        "exitCode": 0,
+        "seconds": 17.844017299998086,
+        "failedLines": [],
+        "passedAssertions": 0,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_mcp_check\\test.log"
+      },
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 17.81587839999702,
+        "failedLines": [],
+        "passedAssertions": 0,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_mcp_check\\test.log"
+      }
+    },
+    "cydaw2_sound_model_check": {
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 10.129059700000653,
+        "failedLines": [],
+        "passedAssertions": 18,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_sound_model_check\\test.log"
+      },
+      "JUCE": {
+        "exitCode": 0,
+        "seconds": 10.682303099998535,
+        "failedLines": [],
+        "passedAssertions": 18,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_sound_model_check\\test.log"
+      }
+    },
+    "cydaw2_sampler_check": {
+      "JUCE": {
+        "exitCode": 0,
+        "seconds": 9.41281969999909,
+        "failedLines": [],
+        "passedAssertions": 36,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_sampler_check\\test.log"
+      },
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 8.14030609999827,
+        "failedLines": [],
+        "passedAssertions": 36,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_sampler_check\\test.log"
+      }
+    },
+    "cydaw2_launcher_check": {
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 16.349697699999524,
+        "failedLines": [],
+        "passedAssertions": 23,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_launcher_check\\test.log"
+      },
+      "JUCE": {
+        "exitCode": 0,
+        "seconds": 16.928502300001128,
+        "failedLines": [],
+        "passedAssertions": 23,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_launcher_check\\test.log"
+      }
+    },
+    "cydaw2_routing_check": {
+      "JUCE": {
+        "exitCode": 0,
+        "seconds": 13.27286439999807,
+        "failedLines": [],
+        "passedAssertions": 25,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_routing_check\\test.log"
+      },
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 11.971065599998838,
+        "failedLines": [],
+        "passedAssertions": 25,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_routing_check\\test.log"
+      }
+    },
+    "cydaw2_banks_check": {
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 3.7662326999998186,
+        "failedLines": [],
+        "passedAssertions": 26,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_banks_check\\test.log"
+      },
+      "JUCE": {
+        "exitCode": 0,
+        "seconds": 3.326154799997312,
+        "failedLines": [],
+        "passedAssertions": 26,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_banks_check\\test.log"
+      }
+    },
+    "cydaw2_electro_check": {
+      "JUCE": {
+        "exitCode": 0,
+        "seconds": 4.712299800001347,
+        "failedLines": [],
+        "passedAssertions": 27,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_electro_check\\test.log"
+      },
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 4.058279000000766,
+        "failedLines": [],
+        "passedAssertions": 27,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_electro_check\\test.log"
+      }
+    },
+    "cydaw2_sample_search_check": {
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 32.75680260000081,
+        "failedLines": [],
+        "passedAssertions": 36,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_sample_search_check\\test.log"
+      },
+      "JUCE": {
+        "exitCode": 0,
+        "seconds": 18.74472169999717,
+        "failedLines": [],
+        "passedAssertions": 36,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_sample_search_check\\test.log"
+      }
+    },
+    "cydaw2_amps_check": {
+      "JUCE": {
+        "exitCode": 0,
+        "seconds": 3.9128173000026436,
+        "failedLines": [],
+        "passedAssertions": 18,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_amps_check\\test.log"
+      },
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 3.4697056999975757,
+        "failedLines": [],
+        "passedAssertions": 18,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_amps_check\\test.log"
+      }
+    },
+    "cydaw2_editing_check": {
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 18.1066716000023,
+        "failedLines": [],
+        "passedAssertions": 38,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_editing_check\\test.log"
+      },
+      "JUCE": {
+        "exitCode": 0,
+        "seconds": 20.074945000000298,
+        "failedLines": [],
+        "passedAssertions": 38,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_editing_check\\test.log"
+      }
+    },
+    "cydaw2_mixing_check": {
+      "JUCE": {
+        "exitCode": 0,
+        "seconds": 46.21643810000023,
+        "failedLines": [],
+        "passedAssertions": 23,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_mixing_check\\test.log"
+      },
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 42.96510750000016,
+        "failedLines": [],
+        "passedAssertions": 23,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_mixing_check\\test.log"
+      }
+    },
+    "cydaw2_mix_effects_check": {
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 3.1818138000016916,
+        "failedLines": [],
+        "passedAssertions": 25,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_mix_effects_check\\test.log"
+      },
+      "JUCE": {
+        "exitCode": 0,
+        "seconds": 3.4408546999984537,
+        "failedLines": [],
+        "passedAssertions": 25,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_mix_effects_check\\test.log"
+      }
+    },
+    "cydaw2_synths_check": {
+      "JUCE": {
+        "exitCode": 0,
+        "seconds": 15.472522899999603,
+        "failedLines": [],
+        "passedAssertions": 79,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_synths_check\\test.log"
+      },
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 13.775892400000885,
+        "failedLines": [],
+        "passedAssertions": 79,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_synths_check\\test.log"
+      }
+    },
+    "cydaw2_creative_check": {
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 28.1151953999979,
+        "failedLines": [],
+        "passedAssertions": 56,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_creative_check\\test.log"
+      },
+      "JUCE": {
+        "exitCode": 0,
+        "seconds": 28.729341700000077,
+        "failedLines": [],
+        "passedAssertions": 56,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_creative_check\\test.log"
+      }
+    },
+    "cydaw2_dj_check": {
+      "JUCE": {
+        "exitCode": 1,
+        "seconds": 27.535090199999104,
+        "failedLines": [
+          "FAIL the cue button: held it plays, let go it is back on the cue point (8.22, cue 8.21)"
+        ],
+        "passedAssertions": 30,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_dj_check\\test.log"
+      },
+      "CyAudioCore": {
+        "exitCode": 1,
+        "seconds": 27.443250000000262,
+        "failedLines": [
+          "FAIL the cue button: held it plays, let go it is back on the cue point (8.22, cue 8.21)"
+        ],
+        "passedAssertions": 30,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_dj_check\\test.log"
+      }
+    },
+    "cydaw2_foundry_check": {
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 4.496320400001423,
+        "failedLines": [],
+        "passedAssertions": 27,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_foundry_check\\test.log"
+      },
+      "JUCE": {
+        "exitCode": 0,
+        "seconds": 5.185685899999953,
+        "failedLines": [],
+        "passedAssertions": 27,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_foundry_check\\test.log"
+      }
+    },
+    "cydaw2_processing_check": {
+      "JUCE": {
+        "exitCode": 0,
+        "seconds": 4.364962800002104,
+        "failedLines": [],
+        "passedAssertions": 32,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_processing_check\\test.log"
+      },
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 4.1546491000008245,
+        "failedLines": [],
+        "passedAssertions": 32,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_processing_check\\test.log"
+      }
+    },
+    "cydaw2_controllers_check": {
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 4.6141827999999805,
+        "failedLines": [],
+        "passedAssertions": 35,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_controllers_check\\test.log"
+      },
+      "JUCE": {
+        "exitCode": 0,
+        "seconds": 4.783861500000057,
+        "failedLines": [],
+        "passedAssertions": 35,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_controllers_check\\test.log"
+      }
+    },
+    "cydaw2_value_list_check": {
+      "JUCE": {
+        "exitCode": 0,
+        "seconds": 3.337016500001482,
+        "failedLines": [],
+        "passedAssertions": 5,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_value_list_check\\test.log"
+      },
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 2.841466499998205,
+        "failedLines": [],
+        "passedAssertions": 5,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_value_list_check\\test.log"
+      }
+    },
+    "cydaw2_modulators_check": {
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 4.587689099997078,
+        "failedLines": [],
+        "passedAssertions": 16,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_modulators_check\\test.log"
+      },
+      "JUCE": {
+        "exitCode": 0,
+        "seconds": 4.835424300003069,
+        "failedLines": [],
+        "passedAssertions": 16,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_modulators_check\\test.log"
+      }
+    },
+    "cydaw2_containers_check": {
+      "JUCE": {
+        "exitCode": 0,
+        "seconds": 6.006129199999123,
+        "failedLines": [],
+        "passedAssertions": 32,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_containers_check\\test.log"
+      },
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 5.490660799998295,
+        "failedLines": [],
+        "passedAssertions": 32,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_containers_check\\test.log"
+      }
+    },
+    "cydaw2_instrument_containers_check": {
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 41.03655499999877,
+        "failedLines": [],
+        "passedAssertions": 35,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_instrument_containers_check\\test.log"
+      },
+      "JUCE": {
+        "exitCode": 0,
+        "seconds": 46.816974699999264,
+        "failedLines": [],
+        "passedAssertions": 35,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_instrument_containers_check\\test.log"
+      }
+    },
+    "cydaw2_project_import_check": {
+      "JUCE": {
+        "exitCode": 0,
+        "seconds": 7.066043700000591,
+        "failedLines": [],
+        "passedAssertions": 27,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_project_import_check\\test.log"
+      },
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 5.2735081000028,
+        "failedLines": [],
+        "passedAssertions": 27,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_project_import_check\\test.log"
+      }
+    },
+    "cydaw2_batterie_check": {
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 12.176136199999746,
+        "failedLines": [],
+        "passedAssertions": 14,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_batterie_check\\test.log"
+      },
+      "JUCE": {
+        "exitCode": 0,
+        "seconds": 13.318684699999721,
+        "failedLines": [],
+        "passedAssertions": 14,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_batterie_check\\test.log"
+      }
+    },
+    "cydaw2_sfz_live_check": {
+      "JUCE": {
+        "exitCode": 0,
+        "seconds": 5.022567300002265,
+        "failedLines": [],
+        "passedAssertions": 17,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_sfz_live_check\\test.log"
+      },
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 4.585976699996536,
+        "failedLines": [],
+        "passedAssertions": 17,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_sfz_live_check\\test.log"
+      }
+    },
+    "cydaw2_tempo_audition_check": {
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 25.83734909999839,
+        "failedLines": [],
+        "passedAssertions": 9,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_tempo_audition_check\\test.log"
+      },
+      "JUCE": {
+        "exitCode": 0,
+        "seconds": 12.066557100002683,
+        "failedLines": [],
+        "passedAssertions": 9,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_tempo_audition_check\\test.log"
+      }
+    },
+    "cydaw2_bypass_check": {
+      "JUCE": {
+        "exitCode": 0,
+        "seconds": 15.720734700000321,
+        "failedLines": [],
+        "passedAssertions": 12,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_bypass_check\\test.log"
+      },
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 15.414415199997165,
+        "failedLines": [],
+        "passedAssertions": 12,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_bypass_check\\test.log"
+      }
+    },
+    "cydaw2_knob_glide_check": {
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 18.962956100000156,
+        "failedLines": [],
+        "passedAssertions": 3,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_knob_glide_check\\test.log"
+      },
+      "JUCE": {
+        "exitCode": 0,
+        "seconds": 19.20140629999878,
+        "failedLines": [],
+        "passedAssertions": 3,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_knob_glide_check\\test.log"
+      }
+    },
+    "cydaw2_voice_live_check": {
+      "JUCE": {
+        "exitCode": 0,
+        "seconds": 5.6192058000015095,
+        "failedLines": [],
+        "passedAssertions": 7,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_voice_live_check\\test.log"
+      },
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 5.512008600002446,
+        "failedLines": [],
+        "passedAssertions": 7,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_voice_live_check\\test.log"
+      }
+    },
+    "cydaw2_presets_check": {
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 4.1693214000006265,
+        "failedLines": [],
+        "passedAssertions": 14,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_presets_check\\test.log"
+      },
+      "JUCE": {
+        "exitCode": 0,
+        "seconds": 4.323051600000326,
+        "failedLines": [],
+        "passedAssertions": 14,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_presets_check\\test.log"
+      }
+    },
+    "cydaw2_transport_sync_check": {
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 7.185601100001804,
+        "failedLines": [],
+        "passedAssertions": 0,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_transport_sync_check\\test.log"
+      },
+      "JUCE": {
+        "exitCode": 0,
+        "seconds": 8.826937600002566,
+        "failedLines": [],
+        "passedAssertions": 0,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_transport_sync_check\\test.log"
+      }
+    },
+    "cydaw2_transport_jack_check": {
+      "JUCE": {
+        "exitCode": 1,
+        "seconds": 7.71588790000169,
+        "failedLines": [
+          "Traceback (most recent call last):",
+          "AssertionError: timed out"
+        ],
+        "passedAssertions": 0,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_transport_jack_check\\test.log"
+      },
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 3.094390599999315,
+        "failedLines": [],
+        "passedAssertions": 0,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_transport_jack_check\\test.log"
+      }
+    },
+    "cydaw2_cinema_check": {
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 12.68176769999991,
+        "failedLines": [],
+        "passedAssertions": 0,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_cinema_check\\test.log"
+      },
+      "JUCE": {
+        "exitCode": 0,
+        "seconds": 17.174867900001118,
+        "failedLines": [],
+        "passedAssertions": 0,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_cinema_check\\test.log"
+      }
+    },
+    "cydaw2_plugin_formats_check": {
+      "JUCE": {
+        "exitCode": 1,
+        "seconds": 10.23545279999962,
+        "failedLines": [
+          "Traceback (most recent call last):",
+          "AssertionError: (-12.2, -12.2, -12.2)"
+        ],
+        "passedAssertions": 0,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\JUCE\\cydaw2_plugin_formats_check\\test.log"
+      },
+      "CyAudioCore": {
+        "exitCode": 0,
+        "seconds": 9.183306900002208,
+        "failedLines": [],
+        "passedAssertions": 0,
+        "skipped": false,
+        "log": "output\\juce-core-comparison\\functional\\CyAudioCore\\cydaw2_plugin_formats_check\\test.log"
+      }
+    }
+  },
+  "audio": [
+    {
+      "round": 1,
+      "file": "studio.wav",
+      "rates": [
+        48000,
+        48000
+      ],
+      "shapes": [
+        [
+          240000,
+          2
+        ],
+        [
+          240000,
+          2
+        ]
+      ],
+      "dcMeanJUCE": [
+        -0.03528704316963752,
+        -0.006652457410593828
+      ],
+      "dcMeanCore": [
+        0.02524568324883779,
+        0.013269358995060127
+      ],
+      "meanCenteredMaxAbs": 2.016454935110934e-07,
+      "meanCenteredErrorRmsDb": -143.0974326907916,
+      "maxAbs": 0.06053292751312256,
+      "errorRmsDb": -26.923874096055748,
+      "signalRmsDb": [
+        -25.77933750457957,
+        -26.18920383374624
+      ],
+      "correlation": 0.9034086449692538,
+      "equalPcm": false
+    },
+    {
+      "round": 1,
+      "file": "Remove-Hum.wav",
+      "rates": [
+        48000,
+        48000
+      ],
+      "shapes": [
+        [
+          144000,
+          2
+        ],
+        [
+          144000,
+          2
+        ]
+      ],
+      "dcMeanJUCE": [
+        -1.6077856222788492e-06,
+        -2.8043323092990453e-07
+      ],
+      "dcMeanCore": [
+        -1.5522862474123637e-06,
+        -2.2477822171317205e-07
+      ],
+      "meanCenteredMaxAbs": 1.8291920424184926e-07,
+      "meanCenteredErrorRmsDb": -144.41495625994543,
+      "maxAbs": 2.384185791015625e-07,
+      "errorRmsDb": -141.7346336142304,
+      "signalRmsDb": [
+        -19.076810830762994,
+        -19.076814438452725
+      ],
+      "correlation": 0.9999999999999389,
+      "equalPcm": false
+    },
+    {
+      "round": 1,
+      "file": "Tape-Echo.wav",
+      "rates": [
+        48000,
+        48000
+      ],
+      "shapes": [
+        [
+          261120,
+          2
+        ],
+        [
+          261120,
+          2
+        ]
+      ],
+      "dcMeanJUCE": [
+        1.1018943041563035e-06,
+        6.891061168383149e-07
+      ],
+      "dcMeanCore": [
+        1.1575832853422445e-06,
+        7.460642532975066e-07
+      ],
+      "meanCenteredMaxAbs": 1.827295979164173e-07,
+      "meanCenteredErrorRmsDb": -144.44953857974335,
+      "maxAbs": 2.384185791015625e-07,
+      "errorRmsDb": -141.6990256875095,
+      "signalRmsDb": [
+        -21.371653757301452,
+        -21.37165733355578
+      ],
+      "correlation": 0.9999999999998395,
+      "equalPcm": false
+    },
+    {
+      "round": 1,
+      "file": "Room-Reverb.wav",
+      "rates": [
+        48000,
+        48000
+      ],
+      "shapes": [
+        [
+          218880,
+          2
+        ],
+        [
+          218880,
+          2
+        ]
+      ],
+      "dcMeanJUCE": [
+        6.352671100730784e-07,
+        3.275810060096763e-07
+      ],
+      "dcMeanCore": [
+        6.921420538286019e-07,
+        3.842843903435601e-07
+      ],
+      "meanCenteredMaxAbs": 1.817151947802742e-07,
+      "meanCenteredErrorRmsDb": -144.42223787325662,
+      "maxAbs": 2.384185791015625e-07,
+      "errorRmsDb": -141.6511832980149,
+      "signalRmsDb": [
+        -21.902058850557957,
+        -21.90206314871803
+      ],
+      "correlation": 0.9999999999998426,
+      "equalPcm": false
+    },
+    {
+      "round": 2,
+      "file": "studio.wav",
+      "rates": [
+        48000,
+        48000
+      ],
+      "shapes": [
+        [
+          240000,
+          2
+        ],
+        [
+          240000,
+          2
+        ]
+      ],
+      "dcMeanJUCE": [
+        -0.03039976471165816,
+        0.03958348624457916
+      ],
+      "dcMeanCore": [
+        0.021468811314801377,
+        -0.10075327686717113
+      ],
+      "meanCenteredMaxAbs": 2.5651504596824193e-07,
+      "meanCenteredErrorRmsDb": -140.7729569993864,
+      "maxAbs": 0.1403369903564453,
+      "errorRmsDb": -19.510776258092942,
+      "signalRmsDb": [
+        -24.889732905431075,
+        -21.364296485378578
+      ],
+      "correlation": -0.032637555992074255,
+      "equalPcm": false
+    },
+    {
+      "round": 2,
+      "file": "Remove-Hum.wav",
+      "rates": [
+        48000,
+        48000
+      ],
+      "shapes": [
+        [
+          144000,
+          2
+        ],
+        [
+          144000,
+          2
+        ]
+      ],
+      "dcMeanJUCE": [
+        -1.6077856222788492e-06,
+        -2.8043323092990453e-07
+      ],
+      "dcMeanCore": [
+        -1.5522862474123637e-06,
+        -2.2477822171317205e-07
+      ],
+      "meanCenteredMaxAbs": 1.8291920424184926e-07,
+      "meanCenteredErrorRmsDb": -144.41495625994543,
+      "maxAbs": 2.384185791015625e-07,
+      "errorRmsDb": -141.7346336142304,
+      "signalRmsDb": [
+        -19.076810830762994,
+        -19.076814438452725
+      ],
+      "correlation": 0.9999999999999389,
+      "equalPcm": false
+    },
+    {
+      "round": 2,
+      "file": "Tape-Echo.wav",
+      "rates": [
+        48000,
+        48000
+      ],
+      "shapes": [
+        [
+          261120,
+          2
+        ],
+        [
+          261120,
+          2
+        ]
+      ],
+      "dcMeanJUCE": [
+        1.1018943041563035e-06,
+        6.891061168383149e-07
+      ],
+      "dcMeanCore": [
+        1.1575832853422445e-06,
+        7.460642532975066e-07
+      ],
+      "meanCenteredMaxAbs": 1.827295979164173e-07,
+      "meanCenteredErrorRmsDb": -144.44953857974335,
+      "maxAbs": 2.384185791015625e-07,
+      "errorRmsDb": -141.6990256875095,
+      "signalRmsDb": [
+        -21.371653757301452,
+        -21.37165733355578
+      ],
+      "correlation": 0.9999999999998395,
+      "equalPcm": false
+    },
+    {
+      "round": 2,
+      "file": "Room-Reverb.wav",
+      "rates": [
+        48000,
+        48000
+      ],
+      "shapes": [
+        [
+          218880,
+          2
+        ],
+        [
+          218880,
+          2
+        ]
+      ],
+      "dcMeanJUCE": [
+        6.352671100730784e-07,
+        3.275810060096763e-07
+      ],
+      "dcMeanCore": [
+        6.921420538286019e-07,
+        3.842843903435601e-07
+      ],
+      "meanCenteredMaxAbs": 1.817151947802742e-07,
+      "meanCenteredErrorRmsDb": -144.42223787325662,
+      "maxAbs": 2.384185791015625e-07,
+      "errorRmsDb": -141.6511832980149,
+      "signalRmsDb": [
+        -21.902058850557957,
+        -21.90206314871803
+      ],
+      "correlation": 0.9999999999998426,
+      "equalPcm": false
+    },
+    {
+      "round": 3,
+      "file": "studio.wav",
+      "rates": [
+        48000,
+        48000
+      ],
+      "shapes": [
+        [
+          240000,
+          2
+        ],
+        [
+          240000,
+          2
+        ]
+      ],
+      "dcMeanJUCE": [
+        -0.03073332164088885,
+        -0.024988093177974225
+      ],
+      "dcMeanCore": [
+        0.02524568324883779,
+        0.013269358995060127
+      ],
+      "meanCenteredMaxAbs": 2.469718456271641e-07,
+      "meanCenteredErrorRmsDb": -142.01897094886593,
+      "maxAbs": 0.055979251861572266,
+      "errorRmsDb": -26.385288856750144,
+      "signalRmsDb": [
+        -25.555542910191576,
+        -26.18920383374624
+      ],
+      "correlation": 0.9805903283805576,
+      "equalPcm": false
+    },
+    {
+      "round": 3,
+      "file": "Remove-Hum.wav",
+      "rates": [
+        48000,
+        48000
+      ],
+      "shapes": [
+        [
+          144000,
+          2
+        ],
+        [
+          144000,
+          2
+        ]
+      ],
+      "dcMeanJUCE": [
+        -1.6077856222788492e-06,
+        -2.8043323092990453e-07
+      ],
+      "dcMeanCore": [
+        -1.5522862474123637e-06,
+        -2.2477822171317205e-07
+      ],
+      "meanCenteredMaxAbs": 1.8291920424184926e-07,
+      "meanCenteredErrorRmsDb": -144.41495625994543,
+      "maxAbs": 2.384185791015625e-07,
+      "errorRmsDb": -141.7346336142304,
+      "signalRmsDb": [
+        -19.076810830762994,
+        -19.076814438452725
+      ],
+      "correlation": 0.9999999999999389,
+      "equalPcm": false
+    },
+    {
+      "round": 3,
+      "file": "Tape-Echo.wav",
+      "rates": [
+        48000,
+        48000
+      ],
+      "shapes": [
+        [
+          261120,
+          2
+        ],
+        [
+          261120,
+          2
+        ]
+      ],
+      "dcMeanJUCE": [
+        1.1018943041563035e-06,
+        6.891061168383149e-07
+      ],
+      "dcMeanCore": [
+        1.1575832853422445e-06,
+        7.460642532975066e-07
+      ],
+      "meanCenteredMaxAbs": 1.827295979164173e-07,
+      "meanCenteredErrorRmsDb": -144.44953857974335,
+      "maxAbs": 2.384185791015625e-07,
+      "errorRmsDb": -141.6990256875095,
+      "signalRmsDb": [
+        -21.371653757301452,
+        -21.37165733355578
+      ],
+      "correlation": 0.9999999999998395,
+      "equalPcm": false
+    },
+    {
+      "round": 3,
+      "file": "Room-Reverb.wav",
+      "rates": [
+        48000,
+        48000
+      ],
+      "shapes": [
+        [
+          218880,
+          2
+        ],
+        [
+          218880,
+          2
+        ]
+      ],
+      "dcMeanJUCE": [
+        6.352671100730784e-07,
+        3.275810060096763e-07
+      ],
+      "dcMeanCore": [
+        6.921420538286019e-07,
+        3.842843903435601e-07
+      ],
+      "meanCenteredMaxAbs": 1.817151947802742e-07,
+      "meanCenteredErrorRmsDb": -144.42223787325662,
+      "maxAbs": 2.384185791015625e-07,
+      "errorRmsDb": -141.6511832980149,
+      "signalRmsDb": [
+        -21.902058850557957,
+        -21.90206314871803
+      ],
+      "correlation": 0.9999999999998426,
+      "equalPcm": false
+    }
+  ],
+  "testSourceHashConvention": "UTF-8 without BOM, normalized LF; executable hashes remain raw binary SHA-256",
+  "testFixtureHashes": {
+    "juce-benchmark-optimization.cmake": "510611bd6beb2a9e95dbf916056e618cd20d53474b5e2dc31e8b5ded254db11e",
+    "juce-benchmark-profile.patch": "c657caaafdb14435898ad8e1e88623a4d46f7e8e5ea70e29253bba4b353b9694"
+  },
+  "testSourceHashes": {
+    "tests\\cyaudio_comparison.py": "4c93e6f7beab66b5d6db149d98e1676cd02189cfb22de39746a369e918f9270c",
+    "tests\\cyaudio_comparison_diagnostics.py": "63fbc36c13bd4d0da51fa86d764a33e5f413e688bc3ef8f6a4efac4951cfe3ec",
+    "tests\\cyaudio_comparison_report.py": "85081639db79a815ea5b713397f404bc6e99f9122452eb827d959c03305b922b",
+    "tests\\cyaudio_prepare_comparison.py": "3f338af83de3c1a3ca5a22ba7f03b33000efc3c61106e8cb1dccaca365fa2491",
+    "tests\\run_silent_session.py": "fd10217524106b7ea213caf2a407816b9b25951eecd0684c45f78bc24dbcf7fd",
+    "tests\\v2_amps_check.py": "7abdb89de4e8d39696fa934504cc66b1415c7752ef86b223fd2474b4b74e4638",
+    "tests\\v2_banks_check.py": "3752201f59b8789435fc69daf425f5c040d1d7441a6ac5c297aece81e4ce787a",
+    "tests\\v2_batterie_check.py": "7aaf15b6f1730ba2f5e9d9c39dfd59f096c262224b586713114ef8798a17318d",
+    "tests\\v2_bypass_check.py": "812c38b63b2826ae97ae8427b56e7b1e8e46dabb1101a7dfb7933dc7653b1ca5",
+    "tests\\v2_cinema_check.py": "53f2998296ad9c037fa2a0d8850bb783fcb50cb8cbb316335ac6d222dfa3b0a7",
+    "tests\\v2_cinema_codecs_check.py": "57315fad260d725871a19730c228def370c844f88cd613713d6975c391bdcd3a",
+    "tests\\v2_cinema_layout_check.py": "06e51952f95b62fce91dad295a56ed3047b5f020703bb93b9a46fe06b5eecc5a",
+    "tests\\v2_containers_check.py": "1b1f5af3d40092f7d9f58c501b2aa66a994056c03acc99a04f9b21a5cb90bce6",
+    "tests\\v2_controllers_check.py": "57c4fe46b8a0f76e8552c3c9b3d4d411cb246bc0bfeaa1d7ea4675266fcf9837",
+    "tests\\v2_creative_check.py": "6c8c87e35c26b2135c77c2eca3120c084c4e72bc7a8b02d2a56883f4b978e9c2",
+    "tests\\v2_device_transfer_check.py": "cf55823b03229710f0b356e66f6f4596f553022d98058f8a91db65e6663f76f9",
+    "tests\\v2_dj_check.py": "ddd1311b1a02427a23509a6c404dc45bf9e2295c7baddbc49ba41ff9e46e1bf5",
+    "tests\\v2_editing_check.py": "7b71659b8ddbe112ac2a24540bfd41f6514403f039e676c1637c924be08ac2b4",
+    "tests\\v2_electro_check.py": "491d525fd4de96adedd0a720c33c7cb0e291c1b63268051d5a5608660f1733d2",
+    "tests\\v2_foundry_check.py": "7a4d074026da9a1c0abad7f75296cbdd987a9e6c8a0caab9bb3acf5b7a465c23",
+    "tests\\v2_foundry_launcher_ui_check.py": "c75e8f375f1851c11a4f4578e0701cf77a7979af2f2e8842df55ed70c42dda1b",
+    "tests\\v2_foundry_midi_automation_check.py": "9b462e97d151add4dbd1c6775c0493d7977153371048c6ea9c5c5e4f7fea5b27",
+    "tests\\v2_graph_presets_check.py": "aafc11a664fea4c12bd5d2400a275e999c0a85393765efd39eddd5b0967130bd",
+    "tests\\v2_help_check.py": "b83bbe829d35def42f599a8d721950a5f8b7e72cadc2299be7bcda30dce06417",
+    "tests\\v2_instrument_containers_check.py": "2dce1e2d7909d3dbff92ad06c2dba8b3d9641da4dbd75e7ab5c2bbae2240f2a9",
+    "tests\\v2_instrument_interface_check.py": "79968c3d46171b52756518439ba33282521ee099e33668fbac6289aa32130f22",
+    "tests\\v2_knob_glide_check.py": "25ff85caf2c13663a78ff9b447dbdb071d78c30ee61ecd68659663e99888afeb",
+    "tests\\v2_launcher_check.py": "c4fe656cb6b35d9e156fcb344d2aa938358d895faad3dc2fc60c46bae2f707a0",
+    "tests\\v2_master_inspector_check.py": "4bc30200910974ce6870ca9b580d5d2b348e3a30450adcf5dd66f9d8449eb284",
+    "tests\\v2_mixing_check.py": "3c85ef78e8196fa2e134e5201180b260ff56ce0fbbb6d22539b8525e0f8f54c2",
+    "tests\\v2_mix_effects_check.py": "125d1abdbe1e5cb58665c9cdef91f3fe9cb4566cbf63036c8c05d1563411614c",
+    "tests\\v2_mode_processing_check.py": "d9312bdea77951778d65373eee2db159d22415868a47e84c5727ea6c80b8eb2e",
+    "tests\\v2_modulators_check.py": "17c6ce65c93a823e1b606fa5a37550dae37f2310f258132ef477804e0b4b1915",
+    "tests\\v2_package_check.py": "fcbd3e4896f213375e6d5627edbcbb857978cee992d45636d2287cba3846670d",
+    "tests\\v2_plugin_cross_export_check.py": "c80d352c873361a18dd3c4a968613a64592ac33769ed04f364b841fee1eb4c0c",
+    "tests\\v2_plugin_formats_check.py": "978827cf4fa31643ee9a21d13a94fa6c787b0efec5c97ab9a72866627929e9a5",
+    "tests\\v2_plugin_window_check.py": "ffdfae0e27a60812aa42dd9ef23162240cf377db312f84ac2defdc3bf0f7542d",
+    "tests\\v2_presets_check.py": "1bde7fca57b51def94d59dabc33163a77f5ccf9be5101812ada7cc4edf98bc13",
+    "tests\\v2_processing_check.py": "59f9c2ade8f29b08eec4b531efb49f8547e20c1fccccca8d88ead1c9a11ff9b6",
+    "tests\\v2_project_import_check.py": "3d01d474f9ff18e84129a07231ac427c8d8801617d218ba79b272d370cbee958",
+    "tests\\v2_routing_check.py": "05ba166e96da9bb8b27d22761e27750aa7fe54bb120f35626e51f3ad1b1cdb51",
+    "tests\\v2_sampler_check.py": "5da0a4be3c16f6e332316812f8e35baada414cf87375809310521b670574df52",
+    "tests\\v2_sample_search_check.py": "4fc3763691dee36e5bff0567e20e4b0a477b8f88525edb4f9e245d1f5453ccd9",
+    "tests\\v2_sfz_live_check.py": "26f196560168d4a8f1c477fb6c93317105adb86aea8b97ddf691cc6946a0e3b2",
+    "tests\\v2_sound_model_check.py": "40e38f3bc347c46f8c9948941bc45f1ae6cb60eba28273c8f30029cb42d666be",
+    "tests\\v2_synths_check.py": "f4ed43a452fa65e5ef50c0b2d0ee4834c7d78e9bcf65ff0d418026fd85857f99",
+    "tests\\v2_tempo_audition_check.py": "3c20bc5f39aacbd2d87ca55855f099bcb0979a4313d152d200394fb2e500b98c",
+    "tests\\v2_transport_jack_check.py": "ccd7811b2052de49440af2b8aff10e1f40d494ac2093ead5ada06b7bf36b0967",
+    "tests\\v2_transport_sync_check.py": "f7904739e014769f6d3977982ebc244d399176fce0be3554ecf221d288bb212f",
+    "tests\\v2_value_list_check.py": "fe1573aa72156eff0675f5e2f81cdc129e35dfded98cc47cd5f78da5c6fd86e7",
+    "tests\\v2_voice_live_check.py": "4204e9bab082db414b1be24502f7a25e6cbc2aa26394782aacf61d67d7635b16",
+    "tests\\v2_workshop_blueprint_check.py": "4459b909dd575af6099554ce7684a590ed9b99a61ed76abd97111a559b74b75d",
+    "tests\\v2_workshop_designer_check.py": "3eebca3fdea4992423a29a86b5f716b344180c5f9ad02e7184000db09615c7b2"
+  },
+  "rawEvidenceDirectory": "output\\juce-core-comparison",
+  "normalizedPerformanceDirectory": "output\\juce-core-comparison\\normalized-o2",
+  "diagnostics": {
+    "JUCE": {
+      "freshStudio": {
+        "file": "output\\juce-core-comparison\\diagnostics\\JUCE\\workers\\fresh-studio.wav",
+        "rate": 48000,
+        "frames": 240000,
+        "mean": [
+          4.1904995838801064e-07,
+          2.1640012661616007e-07
+        ],
+        "tailPeak": 0.0,
+        "maxErrorFromInput": 1.2133023837013202e-07
+      },
+      "idle0": {
+        "seconds": 4.020523399998638,
+        "cpuCorePercent": 0.3886309926713844,
+        "cpuMachinePercent": 0.01619295802797435,
+        "peakPrivateMiB": 307.4375,
+        "requestMedianMs": 0.8138999983202666,
+        "requestP95Ms": 0.9506900001724716,
+        "requestMaxMs": 0.954200000705896,
+        "positionDelta": 0.0,
+        "lastMeters": [
+          {
+            "name": "Instrument 1",
+            "peakDb": -120.0,
+            "rmsDb": -120.0
+          }
+        ],
+        "processes": 1,
+        "rootPid": 103496,
+        "cpuSecondsByPid": {
+          "103496": 0.015625
+        },
+        "cpuCorePercentByImage": {
+          "CyDAW 2.exe": 0.3886309926713844
+        }
+      },
+      "idle8": {
+        "seconds": 4.046601700003521,
+        "cpuCorePercent": 1.544505850426189,
+        "cpuMachinePercent": 0.06435441043442454,
+        "peakPrivateMiB": 482.6875,
+        "requestMedianMs": 1.1751000020012725,
+        "requestP95Ms": 1.3166300006560043,
+        "requestMaxMs": 1.5598999998474028,
+        "positionDelta": 0.0,
+        "lastMeters": [
+          {
+            "name": "Instrument 1",
+            "peakDb": -120.0,
+            "rmsDb": -120.0
+          },
+          {
+            "name": "long",
+            "peakDb": -120.0,
+            "rmsDb": -120.0
+          },
+          {
+            "name": "long",
+            "peakDb": -120.0,
+            "rmsDb": -120.0
+          },
+          {
+            "name": "long",
+            "peakDb": -120.0,
+            "rmsDb": -120.0
+          },
+          {
+            "name": "long",
+            "peakDb": -120.0,
+            "rmsDb": -120.0
+          },
+          {
+            "name": "long",
+            "peakDb": -120.0,
+            "rmsDb": -120.0
+          },
+          {
+            "name": "long",
+            "peakDb": -120.0,
+            "rmsDb": -120.0
+          },
+          {
+            "name": "long",
+            "peakDb": -120.0,
+            "rmsDb": -120.0
+          },
+          {
+            "name": "long",
+            "peakDb": -120.0,
+            "rmsDb": -120.0
+          }
+        ],
+        "processes": 17,
+        "rootPid": 103496,
+        "cpuSecondsByPid": {
+          "103496": 0.0625,
+          "50512": 0,
+          "72656": 0,
+          "54288": 0,
+          "70812": 0,
+          "101340": 0,
+          "107100": 0,
+          "104412": 0,
+          "106912": 0,
+          "90276": 0,
+          "106084": 0,
+          "25576": 0,
+          "106984": 0,
+          "96560": 0,
+          "79920": 0,
+          "54196": 0,
+          "54068": 0
+        },
+        "cpuCorePercentByImage": {
+          "CyDAW 2.exe": 1.544505850426189,
+          "CyDAWPluginWorker.exe": 0.0,
+          "conhost.exe": 0.0
+        }
+      },
+      "playing8": {
+        "seconds": 4.0681406000003335,
+        "cpuCorePercent": 1.920410518751333,
+        "cpuMachinePercent": 0.0800171049479722,
+        "peakPrivateMiB": 482.2109375,
+        "requestMedianMs": 1.157399998191977,
+        "requestP95Ms": 14.288490000035363,
+        "requestMaxMs": 21.58380000037141,
+        "positionDelta": 3.84,
+        "lastMeters": [
+          {
+            "name": "Instrument 1",
+            "peakDb": -120.0,
+            "rmsDb": -120.0
+          },
+          {
+            "name": "long",
+            "peakDb": -60.9,
+            "rmsDb": -66.6
+          },
+          {
+            "name": "long",
+            "peakDb": -12.8,
+            "rmsDb": -18.4
+          },
+          {
+            "name": "long",
+            "peakDb": -12.8,
+            "rmsDb": -18.4
+          },
+          {
+            "name": "long",
+            "peakDb": -12.8,
+            "rmsDb": -18.4
+          },
+          {
+            "name": "long",
+            "peakDb": -12.8,
+            "rmsDb": -18.4
+          },
+          {
+            "name": "long",
+            "peakDb": -12.8,
+            "rmsDb": -18.4
+          },
+          {
+            "name": "long",
+            "peakDb": -12.8,
+            "rmsDb": -18.4
+          },
+          {
+            "name": "long",
+            "peakDb": -12.8,
+            "rmsDb": -18.4
+          }
+        ],
+        "processes": 17,
+        "rootPid": 103496,
+        "cpuSecondsByPid": {
+          "103496": 0.078125,
+          "50512": 0,
+          "72656": 0,
+          "54288": 0,
+          "70812": 0,
+          "101340": 0,
+          "107100": 0,
+          "104412": 0,
+          "106912": 0,
+          "90276": 0,
+          "106084": 0,
+          "25576": 0,
+          "106984": 0,
+          "96560": 0,
+          "79920": 0,
+          "54196": 0,
+          "54068": 0
+        },
+        "cpuCorePercentByImage": {
+          "CyDAW 2.exe": 1.920410518751333,
+          "CyDAWPluginWorker.exe": 0.0,
+          "conhost.exe": 0.0
+        }
+      },
+      "djWithoutWorkers": {
+        "seconds": 4.060117000000901,
+        "cpuCorePercent": 6.927140276990482,
+        "cpuMachinePercent": 0.2886308448746034,
+        "peakPrivateMiB": 413.95703125,
+        "requestMedianMs": 0.8821999981591944,
+        "requestP95Ms": 3.9480500003264254,
+        "requestMaxMs": 24.864499999239342,
+        "positionDelta": 0.0,
+        "lastMeters": [
+          {
+            "name": "Instrument 1",
+            "peakDb": -120.0,
+            "rmsDb": -120.0
+          }
+        ],
+        "processes": 1,
+        "rootPid": 103496,
+        "cpuSecondsByPid": {
+          "103496": 0.28125
+        },
+        "cpuCorePercentByImage": {
+          "CyDAW 2.exe": 6.927140276990482
+        }
+      },
+      "djState": {
+        "decks": [
+          {
+            "deck": "A",
+            "state": "ready",
+            "file": "D:\\_Project\\CyDAW_Project\\output\\juce-core-comparison\\assets\\long.wav",
+            "title": "long",
+            "artist": "",
+            "analysed": true,
+            "seconds": 12.0,
+            "position": 5.301322916666667,
+            "playing": true,
+            "tempo": 1.0,
+            "speed": 1.0,
+            "bpm": 84.78,
+            "playedBpm": 84.78,
+            "firstBeat": 0.651644983171487,
+            "key": "A",
+            "camelot": "11B",
+            "loudness": -16.43977554810157,
+            "keylock": true,
+            "sync": false,
+            "master": true,
+            "phase": 0.0,
+            "looping": false,
+            "loopStart": 0.0,
+            "loopEnd": 0.0,
+            "cuePoint": 0.0,
+            "hotCues": [
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0
+            ],
+            "peakDb": -21.978042125701904,
+            "trimDb": 0.0,
+            "fader": 0.699999988079071,
+            "effect": "echo",
+            "effectOn": false
+          },
+          {
+            "deck": "B",
+            "state": "ready",
+            "file": "D:\\_Project\\CyDAW_Project\\output\\juce-core-comparison\\assets\\long.wav",
+            "title": "long",
+            "artist": "",
+            "analysed": true,
+            "seconds": 12.0,
+            "position": 5.301322916666667,
+            "playing": true,
+            "tempo": 1.0,
+            "speed": 1.0,
+            "bpm": 84.78,
+            "playedBpm": 84.78,
+            "firstBeat": 0.651644983171487,
+            "key": "A",
+            "camelot": "11B",
+            "loudness": -16.43977554810157,
+            "keylock": true,
+            "sync": false,
+            "master": false,
+            "phase": 0.0,
+            "looping": false,
+            "loopStart": 0.0,
+            "loopEnd": 0.0,
+            "cuePoint": 0.0,
+            "hotCues": [
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0
+            ],
+            "peakDb": -21.978042125701904,
+            "trimDb": 0.0,
+            "fader": 0.699999988079071,
+            "effect": "echo",
+            "effectOn": false
+          },
+          {
+            "deck": "C",
+            "state": "ready",
+            "file": "D:\\_Project\\CyDAW_Project\\output\\juce-core-comparison\\assets\\long.wav",
+            "title": "long",
+            "artist": "",
+            "analysed": true,
+            "seconds": 12.0,
+            "position": 5.301322916666667,
+            "playing": true,
+            "tempo": 1.0,
+            "speed": 1.0,
+            "bpm": 84.78,
+            "playedBpm": 84.78,
+            "firstBeat": 0.651644983171487,
+            "key": "A",
+            "camelot": "11B",
+            "loudness": -16.43977554810157,
+            "keylock": true,
+            "sync": false,
+            "master": false,
+            "phase": 0.0,
+            "looping": false,
+            "loopStart": 0.0,
+            "loopEnd": 0.0,
+            "cuePoint": 0.0,
+            "hotCues": [
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0
+            ],
+            "peakDb": -21.978042125701904,
+            "trimDb": 0.0,
+            "fader": 0.699999988079071,
+            "effect": "echo",
+            "effectOn": false
+          },
+          {
+            "deck": "D",
+            "state": "ready",
+            "file": "D:\\_Project\\CyDAW_Project\\output\\juce-core-comparison\\assets\\long.wav",
+            "title": "long",
+            "artist": "",
+            "analysed": true,
+            "seconds": 12.0,
+            "position": 5.301322916666667,
+            "playing": true,
+            "tempo": 1.0,
+            "speed": 1.0,
+            "bpm": 84.78,
+            "playedBpm": 84.78,
+            "firstBeat": 0.651644983171487,
+            "key": "A",
+            "camelot": "11B",
+            "loudness": -16.43977554810157,
+            "keylock": true,
+            "sync": false,
+            "master": false,
+            "phase": 0.0,
+            "looping": false,
+            "loopStart": 0.0,
+            "loopEnd": 0.0,
+            "cuePoint": 0.0,
+            "hotCues": [
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0
+            ],
+            "peakDb": -21.978042125701904,
+            "trimDb": 0.0,
+            "fader": 0.699999988079071,
+            "effect": "echo",
+            "effectOn": false
+          }
+        ],
+        "deckCount": 4,
+        "masterBpm": 84.78,
+        "masterDeck": -1,
+        "crossfader": 0.5,
+        "masterPeakDb": -9.936842322349548,
+        "split": false,
+        "quantize": true,
+        "limiter": true,
+        "limiterReductionDb": 0.0,
+        "recording": false,
+        "scanning": false,
+        "analysing": 0,
+        "folders": [],
+        "trackCount": 1
+      },
+      "cinemaPlaying": {
+        "tabs": [
+          {
+            "name": "DC follow-up",
+            "file": "",
+            "sessionFile": "",
+            "plainFile": false,
+            "frames": 576000,
+            "rate": 48000.0,
+            "tempo": 120.0,
+            "cinema": true,
+            "picture": {
+              "file": "D:\\_Project\\CyDAW_Project\\output\\juce-core-comparison\\assets\\video.mp4",
+              "start": 0.0,
+              "sourceIn": 0.0,
+              "duration": 12.0,
+              "fps": 24.0
+            },
+            "activeGroup": 2,
+            "panes": [
+              {
+                "track": 1,
+                "x": 219.0,
+                "y": 279.0,
+                "width": 664.4000244140625,
+                "height": 76.0,
+                "timelineX": 216.0,
+                "timelineWidth": 838.0
+              }
+            ],
+            "viewStart": 0.0,
+            "viewSeconds": 15.0,
+            "contentsVisible": true,
+            "windows": [
+              {
+                "id": "###cinemaTimeline",
+                "x": 8.0,
+                "y": 84.0,
+                "width": 1070.0,
+                "height": 532.0,
+                "dock": 9
+              },
+              {
+                "id": "###cinemaPreview",
+                "x": 1080.0,
+                "y": 84.0,
+                "width": 412.0,
+                "height": 550.0,
+                "dock": 11
+              },
+              {
+                "id": "###cinemaTools",
+                "x": 8.0,
+                "y": 618.0,
+                "width": 1070.0,
+                "height": 254.0,
+                "dock": 10
+              },
+              {
+                "id": "###cinemaDetails",
+                "x": 1080.0,
+                "y": 636.0,
+                "width": 412.0,
+                "height": 236.0,
+                "dock": 12
+              }
+            ],
+            "imguiErrorCount": 0,
+            "imguiErrorLog": "",
+            "thumbnailFrames": [
+              0,
+              45,
+              90,
+              135,
+              180,
+              225,
+              270
+            ],
+            "navigatorBounds": {
+              "x": 216.0,
+              "y": 134.0,
+              "width": 838.0,
+              "height": 14.0
+            },
+            "followPaused": false,
+            "filmstrip": true,
+            "thumbnailCount": 7,
+            "filmstripBounds": {
+              "x": 216.0,
+              "y": 170.0,
+              "width": 838.0,
+              "height": 76.0
+            },
+            "toolsPanel": 0,
+            "buses": [
+              {
+                "id": 2,
+                "x": 216.0,
+                "y": 250.0,
+                "width": 838.0,
+                "height": 120.0
+              }
+            ],
+            "subtrackFocusButtons": [],
+            "decoder": {
+              "backend": "FFmpeg",
+              "codec": "h264",
+              "error": "",
+              "loading": false,
+              "width": 1280,
+              "height": 720,
+              "duration": 12.0,
+              "fps": 24.0,
+              "time": 1.541666666666667,
+              "revision": 37
+            },
+            "masterAutomation": [],
+            "seconds": 12.0,
+            "bits": 24,
+            "dirty": true,
+            "selectionStart": 4800,
+            "selectionEnd": 4800,
+            "cursor": 4800,
+            "mask": 3,
+            "clip": 0,
+            "undo": "Import long.wav",
+            "redo": "",
+            "pickedTracks": [
+              1
+            ],
+            "tracks": [
+              {
+                "id": 2,
+                "midi": false,
+                "bus": true,
+                "virtualGroup": true,
+                "parentId": 0,
+                "containerStart": 0,
+                "containerLength": 0,
+                "automation": [],
+                "name": "Bus 1",
+                "gainDb": 0.0,
+                "pan": 0.0,
+                "mute": false,
+                "solo": false,
+                "clips": []
+              },
+              {
+                "id": 1,
+                "midi": false,
+                "bus": false,
+                "virtualGroup": false,
+                "parentId": 2,
+                "containerStart": 0,
+                "containerLength": 576000,
+                "automation": [],
+                "name": "Track 1",
+                "gainDb": 0.0,
+                "pan": 0.0,
+                "mute": false,
+                "solo": false,
+                "clips": [
+                  {
+                    "id": 3,
+                    "notes": [],
+                    "name": "long",
+                    "start": 0,
+                    "offset": 0,
+                    "length": 576000,
+                    "fadeIn": 0,
+                    "fadeOut": 0,
+                    "gainDb": 0.0,
+                    "channels": 2,
+                    "edited": false
+                  }
+                ]
+              }
+            ],
+            "markers": []
+          }
+        ],
+        "current": 0,
+        "playing": true,
+        "position": 77504.0,
+        "outputPeakDb": -12.766181230545044,
+        "loop": false,
+        "clipboardFrames": 0
+      },
+      "afterCinemaStudio": {
+        "file": "output\\juce-core-comparison\\diagnostics\\JUCE\\workers\\after-cinema.wav",
+        "rate": 48000,
+        "frames": 240000,
+        "mean": [
+          -0.006936445330580076,
+          0.018472336061795554
+        ],
+        "tailPeak": 0.01847207546234131,
+        "maxErrorFromInput": 0.018484189437457735
+      },
+      "shutdown": {
+        "ms": 531.3188000000082,
+        "forced": false
+      },
+      "cueWASAPI480": {
+        "exitCode": 0,
+        "audioSettings": {
+          "inputChannels": [],
+          "outputChannels": [
+            "Output channel 1",
+            "Output channel 2"
+          ],
+          "availableInputs": 0,
+          "availableOutputs": 2,
+          "type": "Windows Audio",
+          "output": "Haut-parleurs (RME Fireface UCX)",
+          "input": "",
+          "sampleRate": 48000.0,
+          "bufferSize": 480,
+          "availableSampleRates": [
+            48000.0
+          ],
+          "availableBufferSizes": [
+            480
+          ],
+          "latencyMs": 10.0,
+          "types": [
+            {
+              "type": "Windows Audio",
+              "outputs": [
+                "Haut-parleurs (RME Fireface UCX)",
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Microphone)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "Casque (Oculus Virtual Audio Device)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Speakers)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "Line 1 (Virtual Audio Cable)"
+              ],
+              "inputs": [
+                "Analog (1+2) (RME Fireface UCX)",
+                "Headset Microphone (Oculus Virtual Audio Device)",
+                "Line 1 (Virtual Audio Cable)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Microphone (Steam Streaming Microphone)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)"
+              ]
+            },
+            {
+              "type": "Windows Audio (Exclusive Mode)",
+              "outputs": [
+                "Haut-parleurs (RME Fireface UCX)",
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Microphone)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "Casque (Oculus Virtual Audio Device)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Speakers)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "Line 1 (Virtual Audio Cable)"
+              ],
+              "inputs": [
+                "Analog (1+2) (RME Fireface UCX)",
+                "Headset Microphone (Oculus Virtual Audio Device)",
+                "Line 1 (Virtual Audio Cable)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Microphone (Steam Streaming Microphone)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)"
+              ]
+            },
+            {
+              "type": "Windows Audio (Low Latency Mode)",
+              "outputs": [
+                "Haut-parleurs (RME Fireface UCX)",
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Microphone)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "Casque (Oculus Virtual Audio Device)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Speakers)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "Line 1 (Virtual Audio Cable)"
+              ],
+              "inputs": [
+                "Analog (1+2) (RME Fireface UCX)",
+                "Headset Microphone (Oculus Virtual Audio Device)",
+                "Line 1 (Virtual Audio Cable)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Microphone (Steam Streaming Microphone)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)"
+              ]
+            },
+            {
+              "type": "DirectSound",
+              "outputs": [
+                "Périphérique audio principal",
+                "Haut-parleurs (RME Fireface UCX)",
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Microphone)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "Casque (Oculus Virtual Audio Device)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Speakers)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "Line 1 (Virtual Audio Cable)"
+              ],
+              "inputs": [
+                "Pilote de capture audio principal",
+                "Analog (1+2) (RME Fireface UCX)",
+                "Headset Microphone (Oculus Virtual Audio Device)",
+                "Line 1 (Virtual Audio Cable)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Microphone (Steam Streaming Microphone)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)"
+              ]
+            },
+            {
+              "type": "ASIO",
+              "outputs": [
+                "ASIO Fireface USB"
+              ],
+              "inputs": [
+                "ASIO Fireface USB"
+              ]
+            }
+          ]
+        },
+        "log": "output\\juce-core-comparison\\diagnostics\\JUCE\\cue-wasapi\\test.log"
+      },
+      "repeats": {
+        "cydaw2_sample_search_check": [
+          {
+            "iteration": 1,
+            "seconds": 19.140080499997566,
+            "exitCode": 0,
+            "profiled": true,
+            "log": "output\\juce-core-comparison\\diagnostics\\JUCE\\cydaw2_sample_search_check-1\\test.log",
+            "timingBreakdown": [
+              {
+                "file": "v2_sample_search_check.py",
+                "line": 51,
+                "function": "request",
+                "calls": 93,
+                "cumulativeSeconds": 0.749885,
+                "ownSeconds": 0.0013723000000000001
+              },
+              {
+                "file": "shutil.py",
+                "line": 704,
+                "function": "rmtree",
+                "calls": 1,
+                "cumulativeSeconds": 0.0065875000000000005,
+                "ownSeconds": 1.3000000000000001e-05
+              },
+              {
+                "file": "subprocess.py",
+                "line": 1580,
+                "function": "_wait",
+                "calls": 1,
+                "cumulativeSeconds": 0.11478050000000001,
+                "ownSeconds": 1.52e-05
+              },
+              {
+                "file": "subprocess.py",
+                "line": 1259,
+                "function": "wait",
+                "calls": 1,
+                "cumulativeSeconds": 0.114789,
+                "ownSeconds": 6.200000000000001e-06
+              }
+            ],
+            "readinessPolls": [
+              {
+                "file": "v2_sample_search_check.py",
+                "line": 155,
+                "calls": 4
+              },
+              {
+                "file": "v2_sample_search_check.py",
+                "line": 329,
+                "calls": 2
+              },
+              {
+                "file": "v2_sample_search_check.py",
+                "line": 369,
+                "calls": 2
+              },
+              {
+                "file": "v2_sample_search_check.py",
+                "line": 378,
+                "calls": 31
+              },
+              {
+                "file": "v2_sample_search_check.py",
+                "line": 388,
+                "calls": 1
+              },
+              {
+                "file": "v2_sample_search_check.py",
+                "line": 296,
+                "calls": 2
+              },
+              {
+                "file": "v2_sample_search_check.py",
+                "line": 324,
+                "calls": 2
+              },
+              {
+                "file": "v2_sample_search_check.py",
+                "line": 322,
+                "calls": 1
+              },
+              {
+                "file": "v2_sample_search_check.py",
+                "line": 294,
+                "calls": 18
+              }
+            ]
+          },
+          {
+            "iteration": 2,
+            "seconds": 18.754147000003286,
+            "exitCode": 0,
+            "profiled": false,
+            "log": "output\\juce-core-comparison\\diagnostics\\JUCE\\cydaw2_sample_search_check-2\\test.log"
+          }
+        ],
+        "cydaw2_tempo_audition_check": [
+          {
+            "iteration": 1,
+            "seconds": 12.324771999999939,
+            "exitCode": 0,
+            "profiled": true,
+            "log": "output\\juce-core-comparison\\diagnostics\\JUCE\\cydaw2_tempo_audition_check-1\\test.log",
+            "timingBreakdown": [
+              {
+                "file": "v2_tempo_audition_check.py",
+                "line": 36,
+                "function": "request",
+                "calls": 82,
+                "cumulativeSeconds": 2.4831126,
+                "ownSeconds": 0.0013930000000000001
+              },
+              {
+                "file": "shutil.py",
+                "line": 704,
+                "function": "rmtree",
+                "calls": 1,
+                "cumulativeSeconds": 0.0020789000000000003,
+                "ownSeconds": 1.4900000000000001e-05
+              },
+              {
+                "file": "subprocess.py",
+                "line": 1580,
+                "function": "_wait",
+                "calls": 1,
+                "cumulativeSeconds": 0.49389710000000003,
+                "ownSeconds": 2.2000000000000003e-05
+              },
+              {
+                "file": "subprocess.py",
+                "line": 1259,
+                "function": "wait",
+                "calls": 1,
+                "cumulativeSeconds": 0.493906,
+                "ownSeconds": 8.200000000000001e-06
+              }
+            ],
+            "readinessPolls": [
+              {
+                "file": "v2_tempo_audition_check.py",
+                "line": 112,
+                "calls": 28
+              }
+            ]
+          },
+          {
+            "iteration": 2,
+            "seconds": 12.153241099997103,
+            "exitCode": 0,
+            "profiled": false,
+            "log": "output\\juce-core-comparison\\diagnostics\\JUCE\\cydaw2_tempo_audition_check-2\\test.log"
+          }
+        ]
+      }
+    },
+    "CyAudioCore": {
+      "freshStudio": {
+        "file": "output\\juce-core-comparison\\diagnostics\\CyAudioCore\\workers\\fresh-studio.wav",
+        "rate": 48000,
+        "frames": 240000,
+        "mean": [
+          4.532421628634135e-07,
+          2.50646968682607e-07
+        ],
+        "tailPeak": 0.0,
+        "maxErrorFromInput": 1.2667995930026876e-07
+      },
+      "idle0": {
+        "seconds": 4.0318870000010065,
+        "cpuCorePercent": 0.7750713251634334,
+        "cpuMachinePercent": 0.03229463854847639,
+        "peakPrivateMiB": 256.55078125,
+        "requestMedianMs": 1.3940000026195776,
+        "requestP95Ms": 2.355670002361876,
+        "requestMaxMs": 2.3976999982551206,
+        "positionDelta": 0.0,
+        "lastMeters": [
+          {
+            "name": "Instrument 1",
+            "peakDb": -120.0,
+            "rmsDb": -120.0
+          }
+        ],
+        "processes": 1,
+        "rootPid": 66604,
+        "cpuSecondsByPid": {
+          "66604": 0.03125
+        },
+        "cpuCorePercentByImage": {
+          "CyDAW 2.exe": 0.7750713251634334
+        }
+      },
+      "idle8": {
+        "seconds": 4.071625700002187,
+        "cpuCorePercent": 14.198873928899935,
+        "cpuMachinePercent": 0.5916197470374973,
+        "peakPrivateMiB": 510.5546875,
+        "requestMedianMs": 1.7413999994460028,
+        "requestP95Ms": 4.969549998713726,
+        "requestMaxMs": 24.985099997138605,
+        "positionDelta": 0.0,
+        "lastMeters": [
+          {
+            "name": "Instrument 1",
+            "peakDb": -120.0,
+            "rmsDb": -120.0
+          },
+          {
+            "name": "long",
+            "peakDb": -120.0,
+            "rmsDb": -120.0
+          },
+          {
+            "name": "long",
+            "peakDb": -120.0,
+            "rmsDb": -120.0
+          },
+          {
+            "name": "long",
+            "peakDb": -120.0,
+            "rmsDb": -120.0
+          },
+          {
+            "name": "long",
+            "peakDb": -120.0,
+            "rmsDb": -120.0
+          },
+          {
+            "name": "long",
+            "peakDb": -120.0,
+            "rmsDb": -120.0
+          },
+          {
+            "name": "long",
+            "peakDb": -120.0,
+            "rmsDb": -120.0
+          },
+          {
+            "name": "long",
+            "peakDb": -120.0,
+            "rmsDb": -120.0
+          },
+          {
+            "name": "long",
+            "peakDb": -120.0,
+            "rmsDb": -120.0
+          }
+        ],
+        "processes": 17,
+        "rootPid": 66604,
+        "cpuSecondsByPid": {
+          "65228": 0.015625,
+          "75988": 0,
+          "36628": 0,
+          "29084": 0,
+          "71072": 0,
+          "56484": 0,
+          "96228": 0,
+          "23464": 0,
+          "59816": 0,
+          "66604": 0.546875,
+          "64748": 0,
+          "13552": 0,
+          "27188": 0,
+          "47668": 0.015625,
+          "91444": 0,
+          "43572": 0,
+          "94264": 0
+        },
+        "cpuCorePercentByImage": {
+          "CyDAWPluginWorker.exe": 0.767506698859456,
+          "conhost.exe": 0.0,
+          "CyDAW 2.exe": 13.431367230040477
+        }
+      },
+      "playing8": {
+        "seconds": 4.058468299997912,
+        "cpuCorePercent": 17.70988330746281,
+        "cpuMachinePercent": 0.7379118044776171,
+        "peakPrivateMiB": 508.92578125,
+        "requestMedianMs": 1.8076000014843885,
+        "requestP95Ms": 2.7302199971018126,
+        "requestMaxMs": 2.7789999985543545,
+        "positionDelta": 3.8399999999986623,
+        "lastMeters": [
+          {
+            "name": "Instrument 1",
+            "peakDb": -120.0,
+            "rmsDb": -120.0
+          },
+          {
+            "name": "long",
+            "peakDb": -60.9,
+            "rmsDb": -66.6
+          },
+          {
+            "name": "long",
+            "peakDb": -12.8,
+            "rmsDb": -18.4
+          },
+          {
+            "name": "long",
+            "peakDb": -12.8,
+            "rmsDb": -18.4
+          },
+          {
+            "name": "long",
+            "peakDb": -12.8,
+            "rmsDb": -18.4
+          },
+          {
+            "name": "long",
+            "peakDb": -12.8,
+            "rmsDb": -18.4
+          },
+          {
+            "name": "long",
+            "peakDb": -12.8,
+            "rmsDb": -18.4
+          },
+          {
+            "name": "long",
+            "peakDb": -12.8,
+            "rmsDb": -18.4
+          },
+          {
+            "name": "long",
+            "peakDb": -12.8,
+            "rmsDb": -18.4
+          }
+        ],
+        "processes": 17,
+        "rootPid": 66604,
+        "cpuSecondsByPid": {
+          "65228": 0,
+          "75988": 0.015625,
+          "36628": 0,
+          "29084": 0,
+          "71072": 0,
+          "56484": 0.015625,
+          "96228": 0,
+          "23464": 0,
+          "59816": 0,
+          "66604": 0.6875,
+          "64748": 0,
+          "13552": 0,
+          "27188": 0,
+          "47668": 0,
+          "91444": 0,
+          "43572": 0,
+          "94264": 0
+        },
+        "cpuCorePercentByImage": {
+          "CyDAWPluginWorker.exe": 0.7699949264114266,
+          "conhost.exe": 0.0,
+          "CyDAW 2.exe": 16.939888381051386
+        }
+      },
+      "djWithoutWorkers": {
+        "seconds": 4.084661799999594,
+        "cpuCorePercent": 16.831258832740286,
+        "cpuMachinePercent": 0.7013024513641786,
+        "peakPrivateMiB": 387.90234375,
+        "requestMedianMs": 1.438600000255974,
+        "requestP95Ms": 16.96946999945793,
+        "requestMaxMs": 21.364799998991657,
+        "positionDelta": 0.0,
+        "lastMeters": [
+          {
+            "name": "Instrument 1",
+            "peakDb": -120.0,
+            "rmsDb": -120.0
+          }
+        ],
+        "processes": 1,
+        "rootPid": 66604,
+        "cpuSecondsByPid": {
+          "66604": 0.6875
+        },
+        "cpuCorePercentByImage": {
+          "CyDAW 2.exe": 16.831258832740286
+        }
+      },
+      "djState": {
+        "decks": [
+          {
+            "deck": "A",
+            "state": "ready",
+            "file": "D:\\_Project\\CyDAW_Project\\output\\juce-core-comparison\\assets\\long.wav",
+            "title": "long",
+            "artist": "",
+            "analysed": true,
+            "seconds": 12.0,
+            "position": 5.365322916666667,
+            "playing": true,
+            "tempo": 1.0,
+            "speed": 1.0,
+            "bpm": 84.78,
+            "playedBpm": 84.78,
+            "firstBeat": 0.6516449834715564,
+            "key": "A",
+            "camelot": "11B",
+            "loudness": -16.43977557756497,
+            "keylock": true,
+            "sync": false,
+            "master": true,
+            "phase": 0.0,
+            "looping": false,
+            "loopStart": 0.0,
+            "loopEnd": 0.0,
+            "cuePoint": 0.0,
+            "hotCues": [
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0
+            ],
+            "peakDb": -22.00643539428711,
+            "trimDb": 0.0,
+            "fader": 0.699999988079071,
+            "effect": "echo",
+            "effectOn": false
+          },
+          {
+            "deck": "B",
+            "state": "ready",
+            "file": "D:\\_Project\\CyDAW_Project\\output\\juce-core-comparison\\assets\\long.wav",
+            "title": "long",
+            "artist": "",
+            "analysed": true,
+            "seconds": 12.0,
+            "position": 5.365322916666667,
+            "playing": true,
+            "tempo": 1.0,
+            "speed": 1.0,
+            "bpm": 84.78,
+            "playedBpm": 84.78,
+            "firstBeat": 0.6516449834715564,
+            "key": "A",
+            "camelot": "11B",
+            "loudness": -16.43977557756497,
+            "keylock": true,
+            "sync": false,
+            "master": false,
+            "phase": 0.0,
+            "looping": false,
+            "loopStart": 0.0,
+            "loopEnd": 0.0,
+            "cuePoint": 0.0,
+            "hotCues": [
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0
+            ],
+            "peakDb": -22.00643539428711,
+            "trimDb": 0.0,
+            "fader": 0.699999988079071,
+            "effect": "echo",
+            "effectOn": false
+          },
+          {
+            "deck": "C",
+            "state": "ready",
+            "file": "D:\\_Project\\CyDAW_Project\\output\\juce-core-comparison\\assets\\long.wav",
+            "title": "long",
+            "artist": "",
+            "analysed": true,
+            "seconds": 12.0,
+            "position": 5.343989583333333,
+            "playing": true,
+            "tempo": 1.0,
+            "speed": 1.0,
+            "bpm": 84.78,
+            "playedBpm": 84.78,
+            "firstBeat": 0.6516449834715564,
+            "key": "A",
+            "camelot": "11B",
+            "loudness": -16.43977557756497,
+            "keylock": true,
+            "sync": false,
+            "master": false,
+            "phase": 0.030144000000000837,
+            "looping": false,
+            "loopStart": 0.0,
+            "loopEnd": 0.0,
+            "cuePoint": 0.0,
+            "hotCues": [
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0
+            ],
+            "peakDb": -21.985774040222168,
+            "trimDb": 0.0,
+            "fader": 0.699999988079071,
+            "effect": "echo",
+            "effectOn": false
+          },
+          {
+            "deck": "D",
+            "state": "ready",
+            "file": "D:\\_Project\\CyDAW_Project\\output\\juce-core-comparison\\assets\\long.wav",
+            "title": "long",
+            "artist": "",
+            "analysed": true,
+            "seconds": 12.0,
+            "position": 5.343989583333333,
+            "playing": true,
+            "tempo": 1.0,
+            "speed": 1.0,
+            "bpm": 84.78,
+            "playedBpm": 84.78,
+            "firstBeat": 0.6516449834715564,
+            "key": "A",
+            "camelot": "11B",
+            "loudness": -16.43977557756497,
+            "keylock": true,
+            "sync": false,
+            "master": false,
+            "phase": 0.030144000000000837,
+            "looping": false,
+            "loopStart": 0.0,
+            "loopEnd": 0.0,
+            "cuePoint": 0.0,
+            "hotCues": [
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0,
+              -1.0
+            ],
+            "peakDb": -21.985774040222168,
+            "trimDb": 0.0,
+            "fader": 0.699999988079071,
+            "effect": "echo",
+            "effectOn": false
+          }
+        ],
+        "deckCount": 4,
+        "masterBpm": 84.78,
+        "masterDeck": -1,
+        "crossfader": 0.5,
+        "masterPeakDb": -11.8352210521698,
+        "split": false,
+        "quantize": true,
+        "limiter": true,
+        "limiterReductionDb": 0.0,
+        "recording": false,
+        "scanning": false,
+        "analysing": 0,
+        "folders": [],
+        "trackCount": 1
+      },
+      "cinemaPlaying": {
+        "tabs": [
+          {
+            "name": "DC follow-up",
+            "file": "",
+            "sessionFile": "",
+            "plainFile": false,
+            "frames": 576000,
+            "rate": 48000.0,
+            "tempo": 120.0,
+            "cinema": true,
+            "picture": {
+              "file": "D:\\_Project\\CyDAW_Project\\output\\juce-core-comparison\\assets\\video.mp4",
+              "start": 0.0,
+              "sourceIn": 0.0,
+              "duration": 12.0,
+              "fps": 24.0
+            },
+            "activeGroup": 2,
+            "panes": [
+              {
+                "track": 1,
+                "x": 219.0,
+                "y": 279.0,
+                "width": 685.2000122070312,
+                "height": 76.0,
+                "timelineX": 216.0,
+                "timelineWidth": 864.0
+              }
+            ],
+            "viewStart": 0.0,
+            "viewSeconds": 15.0,
+            "contentsVisible": true,
+            "windows": [
+              {
+                "id": "###cinemaTimeline",
+                "x": 8.0,
+                "y": 84.0,
+                "width": 1096.0,
+                "height": 550.0,
+                "dock": 9
+              },
+              {
+                "id": "###cinemaPreview",
+                "x": 1106.0,
+                "y": 84.0,
+                "width": 386.0,
+                "height": 550.0,
+                "dock": 11
+              },
+              {
+                "id": "###cinemaTools",
+                "x": 8.0,
+                "y": 636.0,
+                "width": 1096.0,
+                "height": 236.0,
+                "dock": 10
+              },
+              {
+                "id": "###cinemaDetails",
+                "x": 1106.0,
+                "y": 636.0,
+                "width": 386.0,
+                "height": 236.0,
+                "dock": 12
+              }
+            ],
+            "imguiErrorCount": 0,
+            "imguiErrorLog": "",
+            "thumbnailFrames": [
+              0,
+              44,
+              88,
+              132,
+              176,
+              220,
+              264
+            ],
+            "navigatorBounds": {
+              "x": 216.0,
+              "y": 134.0,
+              "width": 864.0,
+              "height": 14.0
+            },
+            "followPaused": false,
+            "filmstrip": true,
+            "thumbnailCount": 7,
+            "filmstripBounds": {
+              "x": 216.0,
+              "y": 170.0,
+              "width": 864.0,
+              "height": 76.0
+            },
+            "toolsPanel": 0,
+            "buses": [
+              {
+                "id": 2,
+                "x": 216.0,
+                "y": 250.0,
+                "width": 864.0,
+                "height": 120.0
+              }
+            ],
+            "subtrackFocusButtons": [],
+            "decoder": {
+              "backend": "FFmpeg",
+              "codec": "h264",
+              "error": "",
+              "loading": false,
+              "width": 1280,
+              "height": 720,
+              "duration": 12.0,
+              "fps": 24.0,
+              "time": 1.5833333333333333,
+              "revision": 38
+            },
+            "masterAutomation": [],
+            "seconds": 12.0,
+            "bits": 24,
+            "dirty": true,
+            "selectionStart": 4800,
+            "selectionEnd": 4800,
+            "cursor": 4800,
+            "mask": 3,
+            "clip": 0,
+            "undo": "Import long.wav",
+            "redo": "",
+            "pickedTracks": [
+              1
+            ],
+            "tracks": [
+              {
+                "id": 2,
+                "midi": false,
+                "bus": true,
+                "virtualGroup": true,
+                "parentId": 0,
+                "containerStart": 0,
+                "containerLength": 0,
+                "automation": [],
+                "name": "Bus 1",
+                "gainDb": 0.0,
+                "pan": 0.0,
+                "mute": false,
+                "solo": false,
+                "clips": []
+              },
+              {
+                "id": 1,
+                "midi": false,
+                "bus": false,
+                "virtualGroup": false,
+                "parentId": 2,
+                "containerStart": 0,
+                "containerLength": 576000,
+                "automation": [],
+                "name": "Track 1",
+                "gainDb": 0.0,
+                "pan": 0.0,
+                "mute": false,
+                "solo": false,
+                "clips": [
+                  {
+                    "id": 3,
+                    "notes": [],
+                    "name": "long",
+                    "start": 0,
+                    "offset": 0,
+                    "length": 576000,
+                    "fadeIn": 0,
+                    "fadeOut": 0,
+                    "gainDb": 0.0,
+                    "channels": 2,
+                    "edited": false
+                  }
+                ]
+              }
+            ],
+            "markers": []
+          }
+        ],
+        "current": 0,
+        "playing": true,
+        "position": 77504.0,
+        "outputPeakDb": -12.766181230545044,
+        "loop": false,
+        "clipboardFrames": 0
+      },
+      "afterCinemaStudio": {
+        "file": "output\\juce-core-comparison\\diagnostics\\CyAudioCore\\workers\\after-cinema.wav",
+        "rate": 48000,
+        "frames": 240000,
+        "mean": [
+          -0.09132912741204102,
+          0.007609179649750391
+        ],
+        "tailPeak": 0.09132957458496094,
+        "maxErrorFromInput": 0.09134297729843517
+      },
+      "shutdown": {
+        "ms": 469.5924000006926,
+        "forced": false
+      },
+      "cueWASAPI480": {
+        "exitCode": 0,
+        "audioSettings": {
+          "inputChannels": [],
+          "outputChannels": [
+            "Output 1",
+            "Output 2"
+          ],
+          "availableInputs": 0,
+          "availableOutputs": 2,
+          "type": "Windows Audio",
+          "output": "Haut-parleurs (RME Fireface UCX)",
+          "input": "",
+          "sampleRate": 48000.0,
+          "bufferSize": 480,
+          "availableSampleRates": [
+            48000.0
+          ],
+          "availableBufferSizes": [
+            32,
+            64,
+            128,
+            256,
+            480,
+            512,
+            1024,
+            2048,
+            4096
+          ],
+          "latencyMs": 0.0,
+          "types": [
+            {
+              "type": "Windows Audio",
+              "outputs": [
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Microphone)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "Casque (Oculus Virtual Audio Device)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Speakers)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "Line 1 (Virtual Audio Cable)",
+                "Haut-parleurs (RME Fireface UCX)"
+              ],
+              "inputs": [
+                "Analog (1+2) (RME Fireface UCX)",
+                "Headset Microphone (Oculus Virtual Audio Device)",
+                "Line 1 (Virtual Audio Cable)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Microphone (Steam Streaming Microphone)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)"
+              ]
+            },
+            {
+              "type": "Windows Audio (Exclusive Mode)",
+              "outputs": [
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Microphone)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "Casque (Oculus Virtual Audio Device)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Speakers)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "Line 1 (Virtual Audio Cable)",
+                "Haut-parleurs (RME Fireface UCX)"
+              ],
+              "inputs": [
+                "Analog (1+2) (RME Fireface UCX)",
+                "Headset Microphone (Oculus Virtual Audio Device)",
+                "Line 1 (Virtual Audio Cable)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Microphone (Steam Streaming Microphone)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)"
+              ]
+            },
+            {
+              "type": "Windows Audio (Low Latency Mode)",
+              "outputs": [
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Microphone)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "Casque (Oculus Virtual Audio Device)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Speakers)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "Line 1 (Virtual Audio Cable)",
+                "Haut-parleurs (RME Fireface UCX)"
+              ],
+              "inputs": [
+                "Analog (1+2) (RME Fireface UCX)",
+                "Headset Microphone (Oculus Virtual Audio Device)",
+                "Line 1 (Virtual Audio Cable)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Microphone (Steam Streaming Microphone)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)"
+              ]
+            },
+            {
+              "type": "DirectSound",
+              "outputs": [
+                "Périphérique audio principal",
+                "Haut-parleurs (RME Fireface UCX)",
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Microphone)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "Casque (Oculus Virtual Audio Device)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Speakers)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "Line 1 (Virtual Audio Cable)"
+              ],
+              "inputs": [
+                "Pilote de capture audio principal",
+                "Analog (1+2) (RME Fireface UCX)",
+                "Headset Microphone (Oculus Virtual Audio Device)",
+                "Line 1 (Virtual Audio Cable)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Microphone (Steam Streaming Microphone)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)"
+              ]
+            },
+            {
+              "type": "ASIO",
+              "outputs": [
+                "ASIO Fireface USB"
+              ],
+              "inputs": [
+                "ASIO Fireface USB"
+              ]
+            }
+          ]
+        },
+        "log": "output\\juce-core-comparison\\diagnostics\\CyAudioCore\\cue-wasapi\\test.log"
+      },
+      "repeats": {
+        "cydaw2_sample_search_check": [
+          {
+            "iteration": 1,
+            "seconds": 32.881361700001435,
+            "exitCode": 0,
+            "profiled": true,
+            "log": "output\\juce-core-comparison\\diagnostics\\CyAudioCore\\cydaw2_sample_search_check-1\\test.log",
+            "timingBreakdown": [
+              {
+                "file": "subprocess.py",
+                "line": 1580,
+                "function": "_wait",
+                "calls": 1,
+                "cumulativeSeconds": 0.11219680000000001,
+                "ownSeconds": 1.76e-05
+              },
+              {
+                "file": "v2_sample_search_check.py",
+                "line": 51,
+                "function": "request",
+                "calls": 136,
+                "cumulativeSeconds": 0.6432950000000001,
+                "ownSeconds": 0.0022459000000000003
+              },
+              {
+                "file": "shutil.py",
+                "line": 704,
+                "function": "rmtree",
+                "calls": 1,
+                "cumulativeSeconds": 0.0080491,
+                "ownSeconds": 1.6800000000000002e-05
+              },
+              {
+                "file": "subprocess.py",
+                "line": 1259,
+                "function": "wait",
+                "calls": 1,
+                "cumulativeSeconds": 0.1122046,
+                "ownSeconds": 4.7e-06
+              }
+            ],
+            "readinessPolls": [
+              {
+                "file": "v2_sample_search_check.py",
+                "line": 155,
+                "calls": 4
+              },
+              {
+                "file": "v2_sample_search_check.py",
+                "line": 329,
+                "calls": 1
+              },
+              {
+                "file": "v2_sample_search_check.py",
+                "line": 369,
+                "calls": 2
+              },
+              {
+                "file": "v2_sample_search_check.py",
+                "line": 378,
+                "calls": 31
+              },
+              {
+                "file": "v2_sample_search_check.py",
+                "line": 388,
+                "calls": 1
+              },
+              {
+                "file": "v2_sample_search_check.py",
+                "line": 296,
+                "calls": 2
+              },
+              {
+                "file": "v2_sample_search_check.py",
+                "line": 324,
+                "calls": 2
+              },
+              {
+                "file": "v2_sample_search_check.py",
+                "line": 322,
+                "calls": 1
+              },
+              {
+                "file": "v2_sample_search_check.py",
+                "line": 294,
+                "calls": 62
+              }
+            ]
+          },
+          {
+            "iteration": 2,
+            "seconds": 32.84069909999744,
+            "exitCode": 0,
+            "profiled": false,
+            "log": "output\\juce-core-comparison\\diagnostics\\CyAudioCore\\cydaw2_sample_search_check-2\\test.log"
+          }
+        ],
+        "cydaw2_tempo_audition_check": [
+          {
+            "iteration": 1,
+            "seconds": 25.867358900002728,
+            "exitCode": 0,
+            "profiled": true,
+            "log": "output\\juce-core-comparison\\diagnostics\\CyAudioCore\\cydaw2_tempo_audition_check-1\\test.log",
+            "timingBreakdown": [
+              {
+                "file": "v2_tempo_audition_check.py",
+                "line": 36,
+                "function": "request",
+                "calls": 214,
+                "cumulativeSeconds": 2.8504769000000003,
+                "ownSeconds": 0.0032240000000000003
+              },
+              {
+                "file": "shutil.py",
+                "line": 704,
+                "function": "rmtree",
+                "calls": 1,
+                "cumulativeSeconds": 0.0019158,
+                "ownSeconds": 1.36e-05
+              },
+              {
+                "file": "subprocess.py",
+                "line": 1580,
+                "function": "_wait",
+                "calls": 1,
+                "cumulativeSeconds": 0.43637980000000004,
+                "ownSeconds": 2.0600000000000003e-05
+              },
+              {
+                "file": "subprocess.py",
+                "line": 1259,
+                "function": "wait",
+                "calls": 1,
+                "cumulativeSeconds": 0.4363883,
+                "ownSeconds": 7.9e-06
+              }
+            ],
+            "readinessPolls": [
+              {
+                "file": "v2_tempo_audition_check.py",
+                "line": 112,
+                "calls": 94
+              }
+            ]
+          },
+          {
+            "iteration": 2,
+            "seconds": 25.692658699997992,
+            "exitCode": 0,
+            "profiled": false,
+            "log": "output\\juce-core-comparison\\diagnostics\\CyAudioCore\\cydaw2_tempo_audition_check-2\\test.log"
+          }
+        ]
+      }
+    }
+  },
+  "normalizedCompilerSettings": {
+    "JUCE": {
+      "CyDAW2": {
+        "Optimization": "MaxSpeed",
+        "RuntimeLibrary": "MultiThreadedDLL",
+        "InlineFunctionExpansion": "AnySuitable",
+        "FloatingPointModel": null
+      },
+      "CyDAWPluginWorker": {
+        "Optimization": "MaxSpeed",
+        "RuntimeLibrary": "MultiThreadedDLL",
+        "InlineFunctionExpansion": "AnySuitable",
+        "FloatingPointModel": null
+      }
+    },
+    "CyAudioCore": {
+      "CyDAW2": {
+        "Optimization": "MaxSpeed",
+        "RuntimeLibrary": "MultiThreadedDLL",
+        "InlineFunctionExpansion": "AnySuitable",
+        "FloatingPointModel": null
+      },
+      "CyDAWPluginWorker": {
+        "Optimization": "MaxSpeed",
+        "RuntimeLibrary": "MultiThreadedDLL",
+        "InlineFunctionExpansion": "AnySuitable",
+        "FloatingPointModel": null
+      }
+    }
+  },
+  "dependencies": {
+    "JUCE": {
+      "tag": "8.0.15",
+      "commit": "91ad83ae34a81e0833b1a2b0866f54846370ae53"
+    },
+    "CyUI": "0ba1ba663b4b2bf46d066a32829bc91ea2743cba",
+    "CyAudioCore": "bb26e93604d43de2069694b0791bc0bcf5a53ea6",
+    "CyDSP": "fda6bd30c5b622795cc08e8bd2750188a6c5a0c0"
+  },
+  "buildProvenance": {
+    "JUCE": {
+      "projects": 31,
+      "projectsWithJuceIncludesOrLibraries": [
+        "CyDAW2.vcxproj",
+        "CyDAWControlGamepad.vcxproj",
+        "CyDAWPluginWorker.vcxproj",
+        "_deps\\cyui-build\\cyui_audio.vcxproj",
+        "_deps\\cyui-build\\cyui_audioviews.vcxproj",
+        "_deps\\cyui-build\\cyui_canvas.vcxproj",
+        "_deps\\cyui-build\\cyui_code.vcxproj",
+        "_deps\\cyui-build\\cyui_codeeditor.vcxproj",
+        "_deps\\cyui-build\\cyui_core.vcxproj",
+        "_deps\\cyui-build\\cyui_images.vcxproj",
+        "_deps\\cyui-build\\cyui_inspector.vcxproj",
+        "_deps\\cyui-build\\cyui_nodes.vcxproj",
+        "_deps\\cyui-build\\cyui_plots.vcxproj",
+        "_deps\\cyui-build\\cyui_texteditor.vcxproj",
+        "cydaw_core.vcxproj",
+        "cydaw_imgui.vcxproj",
+        "cydaw_zstd.vcxproj",
+        "third_party\\ysfx\\eel2.vcxproj",
+        "third_party\\ysfx\\lice.vcxproj",
+        "third_party\\ysfx\\wdl-base.vcxproj",
+        "third_party\\ysfx\\ysfx-private.vcxproj",
+        "third_party\\ysfx\\ysfx.vcxproj"
+      ],
+      "settings": [
+        "CMAKE_CXX_FLAGS_RELEASE:STRING=/O2 /Ob2 /DNDEBUG",
+        "CYDAW_ENABLE_ASIO:BOOL=ON",
+        "CYDAW_ENABLE_LTO:BOOL=OFF",
+        "CYDAW_FFMPEG_ROOT:PATH=D:/_Project/CyDAW_Project/third_party/ffmpeg",
+        "FETCHCONTENT_SOURCE_DIR_CYUI:PATH=D:/_Project/CyImgui_Interface"
+      ]
+    },
+    "CyAudioCore": {
+      "projects": 41,
+      "projectsWithJuceIncludesOrLibraries": [],
+      "settings": [
+        "CMAKE_CXX_FLAGS_RELEASE:STRING=/O2 /Ob2 /DNDEBUG",
+        "CYDAW_ENABLE_ASIO:BOOL=ON",
+        "CYDAW_ENABLE_LTO:BOOL=OFF",
+        "CYDAW_FFMPEG_ROOT:PATH=D:/_Project/CyDAW_Project/third_party/ffmpeg",
+        "FETCHCONTENT_SOURCE_DIR_CYUI:PATH=D:/_Project/CyImgui_Interface"
+      ]
+    },
+    "sharedFfmpegDllSha256": {
+      "avcodec-62.dll": "9023155e12aa1513da3db7ef7ccb93f4b22c3b1df91af4d9a9b0ee940a464f7f",
+      "avformat-62.dll": "07e1d9bdf240f9d91f608f9c0d8ec450ebb55c39d1ea0e58eafae99619724d54",
+      "avutil-60.dll": "7d43d70b89c4c3f819f168e572800d83ed359341359b5c52d708339fe25846f6",
+      "swresample-6.dll": "33ca7f7bb42e5bb721d6418b27a10d8c31b590ae7febaade1d363cad816440f4",
+      "swscale-9.dll": "7f0643d5e6741709b2e76b6b5533ce30ab7491aa613246b3531ceda24221e10f"
+    }
+  },
+  "normalizedCriticalChecks": [
+    {
+      "name": "cydaw2_transport_jack_check",
+      "label": "JUCE",
+      "exitCode": 1,
+      "seconds": 8.360073300002114,
+      "passedAssertions": 0,
+      "failedLines": [
+        "Traceback (most recent call last):",
+        "AssertionError: timed out"
+      ],
+      "skipped": false,
+      "command": [
+        "D:\\_Project\\CyDAW_Project\\output\\cyaudio-qa-python\\Scripts\\python.exe",
+        "D:/_Project/CyDAW_Project/tests/run_silent_session.py",
+        "--exe",
+        "D:\\_Project\\CyDAW_Project\\build\\juce-comparison\\CyDAW2_artefacts\\Release\\CyDAW 2.exe",
+        "--port",
+        "48086",
+        "D:/_Project/CyDAW_Project/tests/v2_transport_jack_check.py",
+        "--port",
+        "48086",
+        "--library",
+        "D:/_Project/CyDAW_Project/build/cyaudio-native-desktop/Release/cydaw_transport_jack_fixture.dll"
+      ],
+      "log": "output\\juce-core-comparison\\normalized-critical\\functional\\JUCE\\cydaw2_transport_jack_check\\test.log"
+    },
+    {
+      "name": "cydaw2_transport_jack_check",
+      "label": "CyAudioCore",
+      "exitCode": 0,
+      "seconds": 3.169084000001021,
+      "passedAssertions": 0,
+      "failedLines": [],
+      "skipped": false,
+      "command": [
+        "D:\\_Project\\CyDAW_Project\\output\\cyaudio-qa-python\\Scripts\\python.exe",
+        "D:/_Project/CyDAW_Project/tests/run_silent_session.py",
+        "--exe",
+        "D:\\_Project\\CyDAW_Project\\build\\cyaudio-native-desktop\\CyDAW2_artefacts\\Release\\CyDAW 2.exe",
+        "--port",
+        "48086",
+        "D:/_Project/CyDAW_Project/tests/v2_transport_jack_check.py",
+        "--port",
+        "48086",
+        "--library",
+        "D:/_Project/CyDAW_Project/build/cyaudio-native-desktop/Release/cydaw_transport_jack_fixture.dll"
+      ],
+      "log": "output\\juce-core-comparison\\normalized-critical\\functional\\CyAudioCore\\cydaw2_transport_jack_check\\test.log"
+    },
+    {
+      "name": "cydaw2_cinema_layout_check",
+      "label": "CyAudioCore",
+      "exitCode": 0,
+      "seconds": 8.013976099999127,
+      "passedAssertions": 0,
+      "failedLines": [],
+      "skipped": false,
+      "command": [
+        "D:\\_Project\\CyDAW_Project\\output\\cyaudio-qa-python\\Scripts\\python.exe",
+        "D:/_Project/CyDAW_Project/tests/v2_cinema_layout_check.py",
+        "--exe",
+        "D:\\_Project\\CyDAW_Project\\build\\cyaudio-native-desktop\\CyDAW2_artefacts\\Release\\CyDAW 2.exe",
+        "--output",
+        "D:\\_Project\\CyDAW_Project\\output\\juce-core-comparison\\normalized-critical\\functional\\CyAudioCore\\cydaw2_cinema_layout_check\\artifacts"
+      ],
+      "log": "output\\juce-core-comparison\\normalized-critical\\functional\\CyAudioCore\\cydaw2_cinema_layout_check\\test.log"
+    },
+    {
+      "name": "cydaw2_cinema_layout_check",
+      "label": "JUCE",
+      "exitCode": 1,
+      "seconds": 7.590614900000219,
+      "passedAssertions": 0,
+      "failedLines": [
+        "Traceback (most recent call last):",
+        "AssertionError"
+      ],
+      "skipped": false,
+      "command": [
+        "D:\\_Project\\CyDAW_Project\\output\\cyaudio-qa-python\\Scripts\\python.exe",
+        "D:/_Project/CyDAW_Project/tests/v2_cinema_layout_check.py",
+        "--exe",
+        "D:\\_Project\\CyDAW_Project\\build\\juce-comparison\\CyDAW2_artefacts\\Release\\CyDAW 2.exe",
+        "--output",
+        "D:\\_Project\\CyDAW_Project\\output\\juce-core-comparison\\normalized-critical\\functional\\JUCE\\cydaw2_cinema_layout_check\\artifacts"
+      ],
+      "log": "output\\juce-core-comparison\\normalized-critical\\functional\\JUCE\\cydaw2_cinema_layout_check\\test.log"
+    },
+    {
+      "name": "cydaw2_dj_check",
+      "label": "JUCE",
+      "exitCode": 1,
+      "seconds": 27.998373799997353,
+      "passedAssertions": 30,
+      "failedLines": [
+        "FAIL the cue button: held it plays, let go it is back on the cue point (8.22, cue 8.21)"
+      ],
+      "skipped": false,
+      "command": [
+        "D:\\_Project\\CyDAW_Project\\output\\cyaudio-qa-python\\Scripts\\python.exe",
+        "D:/_Project/CyDAW_Project/tests/v2_dj_check.py",
+        "--port",
+        "47854",
+        "--exe",
+        "D:\\_Project\\CyDAW_Project\\build\\juce-comparison\\CyDAW2_artefacts\\Release\\CyDAW 2.exe"
+      ],
+      "log": "output\\juce-core-comparison\\normalized-critical\\functional\\JUCE\\cydaw2_dj_check\\test.log"
+    },
+    {
+      "name": "cydaw2_dj_check",
+      "label": "CyAudioCore",
+      "exitCode": 1,
+      "seconds": 27.355698300001677,
+      "passedAssertions": 30,
+      "failedLines": [
+        "FAIL the cue button: held it plays, let go it is back on the cue point (8.22, cue 8.21)"
+      ],
+      "skipped": false,
+      "command": [
+        "D:\\_Project\\CyDAW_Project\\output\\cyaudio-qa-python\\Scripts\\python.exe",
+        "D:/_Project/CyDAW_Project/tests/v2_dj_check.py",
+        "--port",
+        "47854",
+        "--exe",
+        "D:\\_Project\\CyDAW_Project\\build\\cyaudio-native-desktop\\CyDAW2_artefacts\\Release\\CyDAW 2.exe"
+      ],
+      "log": "output\\juce-core-comparison\\normalized-critical\\functional\\CyAudioCore\\cydaw2_dj_check\\test.log"
+    },
+    {
+      "name": "cydaw2_plugin_formats_check",
+      "label": "CyAudioCore",
+      "exitCode": 0,
+      "seconds": 9.570041400002083,
+      "passedAssertions": 0,
+      "failedLines": [],
+      "skipped": false,
+      "command": [
+        "D:\\_Project\\CyDAW_Project\\output\\cyaudio-qa-python\\Scripts\\python.exe",
+        "D:\\_Project\\CyDAW_Project\\tests\\v2_plugin_formats_check.py",
+        "--exe",
+        "D:\\_Project\\CyDAW_Project\\build\\cyaudio-native-desktop\\CyDAW2_artefacts\\Release\\CyDAW 2.exe",
+        "--output",
+        "D:\\_Project\\CyDAW_Project\\output\\juce-core-comparison\\normalized-critical\\functional\\CyAudioCore\\cydaw2_plugin_formats_check\\artifacts",
+        "--port",
+        "48194",
+        "--clap",
+        "D:\\_Project\\CyDAW_Project\\build\\cyaudio-native-clap\\CLAP\\Release\\CyGraphPresets.clap",
+        "--lv2",
+        "D:\\_Project\\CyDAW_Project\\build\\cyaudio-native\\LV2\\Release\\CyGraphPresets.lv2",
+        "--vst3",
+        "D:\\_Project\\CyDAW_Project\\build\\cyaudio-native-vst3\\VST3\\Release\\CyGraphPresets.vst3"
+      ],
+      "log": "output\\juce-core-comparison\\normalized-critical\\functional\\CyAudioCore\\cydaw2_plugin_formats_check\\test.log"
+    },
+    {
+      "name": "cydaw2_plugin_formats_check",
+      "label": "JUCE",
+      "exitCode": 1,
+      "seconds": 10.216022399999929,
+      "passedAssertions": 0,
+      "failedLines": [
+        "Traceback (most recent call last):",
+        "AssertionError: (-12.2, -12.2, -12.2)"
+      ],
+      "skipped": false,
+      "command": [
+        "D:\\_Project\\CyDAW_Project\\output\\cyaudio-qa-python\\Scripts\\python.exe",
+        "D:\\_Project\\CyDAW_Project\\tests\\v2_plugin_formats_check.py",
+        "--exe",
+        "D:\\_Project\\CyDAW_Project\\build\\juce-comparison\\CyDAW2_artefacts\\Release\\CyDAW 2.exe",
+        "--output",
+        "D:\\_Project\\CyDAW_Project\\output\\juce-core-comparison\\normalized-critical\\functional\\JUCE\\cydaw2_plugin_formats_check\\artifacts",
+        "--port",
+        "48194",
+        "--clap",
+        "D:\\_Project\\CyDAW_Project\\build\\cyaudio-native-clap\\CLAP\\Release\\CyGraphPresets.clap",
+        "--lv2",
+        "D:\\_Project\\CyDAW_Project\\build\\cyaudio-native\\LV2\\Release\\CyGraphPresets.lv2",
+        "--vst3",
+        "D:\\_Project\\CyDAW_Project\\build\\cyaudio-native-vst3\\VST3\\Release\\CyGraphPresets.vst3"
+      ],
+      "log": "output\\juce-core-comparison\\normalized-critical\\functional\\JUCE\\cydaw2_plugin_formats_check\\test.log"
+    }
+  ]
+}
