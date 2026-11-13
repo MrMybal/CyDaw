@@ -119,3 +119,7 @@ hardware combinations have all been exercised.
 ## Paired JUCE comparison
 
 The [controlled Windows comparison](CyAudioCoreComparison.fr.md) measures the actual old JUCE desktop against the native product. It identifies higher live CPU use, delayed sample-library readiness and shared pre-existing CUE/Cinema-export issues. Dependency retirement is complete; performance equivalence is not established. No audio implementation was changed during that comparison.
+
+## CPU attribution after the comparison
+
+The [application CPU diagnostic](CyAudioCoreCpuDiagnostic.fr.md) separates the UI thread, live audio, worker IPC and vector backends. It includes controlled null-driver UI experiments and repeated ASIO measurements. The global CPU regression must not be attributed to SDK DSP kernels without this thread/function breakdown. Production audio code and sibling dependencies are unchanged by this campaign.
