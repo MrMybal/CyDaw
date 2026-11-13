@@ -3751,7 +3751,7 @@ bool ClipAudioSource::moveArrangementRegion(const std::uint64_t regionId,
     return moved;
 }
 
-class GraphSynthSound final : public juce::SynthesiserSound {
+class GraphSynthSound final : public cydaw::audio::VoiceSound {
 public:
     bool appliesToNote(int) override { return true; }
     bool appliesToChannel(int) override { return true; }
@@ -4028,7 +4028,7 @@ private:
 
 } // namespace
 
-class GraphSynthVoice final : public juce::SynthesiserVoice, public PlanVoice {
+class GraphSynthVoice final : public cydaw::audio::AllocatedVoice, public PlanVoice {
 public:
     GraphSynthVoice(const cydaw::realtime::RtPublisher<cydaw::engine::PolySynthGraphPlan>& graph,
                     const VoiceModulationState& modulation, const cydaw::engine::prism::Context* context = nullptr)
@@ -4051,14 +4051,14 @@ public:
         return graph != nullptr ? voice_.chokedBy(*graph) : 0;
     }
 
-    bool canPlaySound(juce::SynthesiserSound* sound) override
+    bool canPlaySound(cydaw::audio::VoiceSound* sound) override
     {
         return dynamic_cast<GraphSynthSound*>(sound) != nullptr;
     }
 
     void startNote(const int midiNoteNumber,
                    const float velocity,
-                   juce::SynthesiserSound*,
+                   cydaw::audio::VoiceSound*,
                    const int pitchWheel) override
     {
         // A note starts from the automated values too (what an envelope or
@@ -4088,7 +4088,7 @@ public:
 
     void setCurrentPlaybackSampleRate(const double rate) override
     {
-        juce::SynthesiserVoice::setCurrentPlaybackSampleRate(rate);
+        cydaw::audio::AllocatedVoice::setCurrentPlaybackSampleRate(rate);
         // Off the audio thread: sizes the string's delay line and builds the
         // wavetable bank before any note can ask for either; and the room a
         // panned note is rendered in.
@@ -4099,7 +4099,7 @@ public:
 
     void stopNote(float, const bool allowTailOff) override
     {
-        // Legato: JUCE stops a voice before starting it again; this one goes on.
+        // Legato preserves the sounding voice across a new start.
         if (legato)
             return;
         // Choked, or one note at a time: this one gives way, quickly.
@@ -4142,7 +4142,7 @@ public:
         }
     }
 
-    void renderNextBlock(juce::AudioBuffer<float>& output,
+    void renderNextBlock(cydaw::audio::SampleBuffer<float>& output,
                          int startSample,
                          const int numSamples) override
     {

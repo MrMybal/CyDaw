@@ -1,3 +1,4 @@
+#include <cydaw/audio/SampleBuffer.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/Properties.h>
@@ -9719,7 +9720,7 @@ cydaw::base::Result NodeGraphComponent::importWavetableFile(const NodeId nodeId,
         return cydaw::base::Result::fail(tr("module.ui.wavetableUnreadable"));
     const auto count = static_cast<int>(std::min<juce::int64>(
         reader->lengthInSamples, 1 << 20));
-    juce::AudioBuffer<float> samples(1, count);
+    cydaw::audio::SampleBuffer<float> samples(1, count);
     samples.clear();
     // One channel: a wavetable is a shape, and the two sides of a stereo file
     // hold the same shape or the file was never a table.

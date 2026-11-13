@@ -39,7 +39,7 @@ struct PlanProvider {
     }
 };
 
-class GraphSynthSound final : public juce::SynthesiserSound {
+class GraphSynthSound final : public cydaw::audio::VoiceSound {
 public:
     bool appliesToNote(int) override { return true; }
     bool appliesToChannel(int) override { return true; }
@@ -47,7 +47,7 @@ public:
 
 // A thin host: JUCE's voice bookkeeping around the engine's PolyVoice,
 // which is the same one a MIDI track plays.
-class GraphSynthVoice final : public juce::SynthesiserVoice, public PlanVoice {
+class GraphSynthVoice final : public cydaw::audio::AllocatedVoice, public PlanVoice {
 public:
     GraphSynthVoice(PlanProvider& plan, const cydaw::engine::prism::Context* context) : plan_(plan)
     {
@@ -62,12 +62,12 @@ public:
         return current != nullptr ? voice_.chokedBy(*current) : 0;
     }
 
-    bool canPlaySound(juce::SynthesiserSound* sound) override
+    bool canPlaySound(cydaw::audio::VoiceSound* sound) override
     {
         return dynamic_cast<GraphSynthSound*>(sound) != nullptr;
     }
 
-    void startNote(int note, float velocity, juce::SynthesiserSound*, const int pitchWheel) override
+    void startNote(int note, float velocity, cydaw::audio::VoiceSound*, const int pitchWheel) override
     {
         const auto retained = plan_.borrowPlan();
         const auto* current = plan_.realtimeOverride != nullptr
@@ -89,7 +89,7 @@ public:
 
     void stopNote(float, bool allowTailOff) override
     {
-        // Legato: JUCE stops a voice before starting it again; this one goes on.
+        // Legato preserves the sounding voice across a new start.
         if (legato)
             return;
         // Choked, or one note at a time: this one gives way, quickly.
@@ -108,7 +108,7 @@ public:
 
     void setCurrentPlaybackSampleRate(const double rate) override
     {
-        juce::SynthesiserVoice::setCurrentPlaybackSampleRate(rate);
+        cydaw::audio::AllocatedVoice::setCurrentPlaybackSampleRate(rate);
         // Off the audio thread: the string's delay line is sized here for the
         // lowest note it will ever play, and the wavetable bank is built here
         // rather than under the first note.
@@ -136,7 +136,7 @@ public:
         }
     }
 
-    void renderNextBlock(juce::AudioBuffer<float>& output, int start,
+    void renderNextBlock(cydaw::audio::SampleBuffer<float>& output, int start,
                          int count) override
     {
         if (!voice_.isActive())
@@ -194,10 +194,10 @@ struct GraphPolySynthRenderer::Impl {
     PlanSynthesiser synthesiser;
     // The plan's MIDI effects, free-running at the session's tempo.
     MidiEffectsHost midiEffects;
-    juce::MidiBuffer notes;
+    cydaw::midi::EventBuffer notes;
 
     // The block's notes through the plan's MIDI effects.
-    const juce::MidiBuffer& throughEffects(const juce::MidiBuffer& midi, const int startSample, const int numSamples,
+    const cydaw::midi::EventBuffer& throughEffects(const cydaw::midi::EventBuffer& midi, const int startSample, const int numSamples,
                                            const cydaw::engine::PolySynthGraphPlan* current) noexcept
     {
         notes.clear();
@@ -247,7 +247,7 @@ bool GraphPolySynthRenderer::enabled() const noexcept
 }
 
 void GraphPolySynthRenderer::render(cydaw::audio::SampleBuffer<float>& output,
-                                    const juce::MidiBuffer& midi,
+                                    const cydaw::midi::EventBuffer& midi,
                                     const int startSample,
                                     const int numSamples) noexcept
 {
@@ -258,7 +258,7 @@ void GraphPolySynthRenderer::render(cydaw::audio::SampleBuffer<float>& output,
                                        numSamples);
 }
 
-void GraphPolySynthRenderer::renderChanged(cydaw::audio::SampleBuffer<float>& output, const juce::MidiBuffer& midi,
+void GraphPolySynthRenderer::renderChanged(cydaw::audio::SampleBuffer<float>& output, const cydaw::midi::EventBuffer& midi,
                                            const int startSample, const int numSamples, const PlanChange change,
                                            const void* context) noexcept
 {
@@ -279,7 +279,7 @@ void GraphPolySynthRenderer::renderChanged(cydaw::audio::SampleBuffer<float>& ou
 }
 
 void GraphPolySynthRenderer::renderWithPlan(
-    cydaw::audio::SampleBuffer<float>& output, const juce::MidiBuffer& midi,
+    cydaw::audio::SampleBuffer<float>& output, const cydaw::midi::EventBuffer& midi,
     const int startSample, const int numSamples,
     const cydaw::engine::PolySynthGraphPlan& plan) noexcept
 {
