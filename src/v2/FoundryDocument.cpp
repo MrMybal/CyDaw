@@ -1,3 +1,4 @@
+#include <cydaw/audio/SampleBuffer.h>
 #include <cydaw/base/TextMap.h>
 #include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/File.h>
@@ -79,7 +80,7 @@ std::shared_ptr<const engine::foundry::Sound> FoundryDocument::readSound(const c
         return nullptr;
     }
     constexpr int chunk = 1 << 16;
-    juce::AudioBuffer<float> buffer(static_cast<int>(std::max(1u, reader->numChannels)), chunk);
+    cydaw::audio::SampleBuffer<float> buffer(static_cast<int>(std::max(1u, reader->numChannels)), chunk);
     for (juce::int64 at = 0; at < frames; at += chunk) {
         const auto n = static_cast<int>(std::min<juce::int64>(chunk, frames - at));
         buffer.clear();

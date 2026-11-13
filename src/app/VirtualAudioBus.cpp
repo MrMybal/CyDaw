@@ -1,3 +1,4 @@
+#include <cydaw/audio/Sources.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/Text.h>
 #include "VirtualAudioBus.h"
@@ -37,7 +38,7 @@ std::shared_ptr<NativeDspRuntime> makeBusRuntime(
 constexpr auto maximumChannels = static_cast<std::size_t>(VirtualAudioBus::maximumChannels);
 }
 
-VirtualBusRouter::VirtualBusRouter(juce::AudioSource& source)
+VirtualBusRouter::VirtualBusRouter(cydaw::audio::AudioSource& source)
     : source_(source)
 {
     resetToDefaults();
@@ -398,7 +399,7 @@ void VirtualBusRouter::publishMeter(const std::size_t slot,
 }
 
 void VirtualBusRouter::getNextAudioBlock(
-    const juce::AudioSourceChannelInfo& bufferToFill)
+    const cydaw::audio::AudioSourceChannelInfo& bufferToFill)
 {
     // The whole session renders under this call: denormals flushed to zero for
     // all of it (a reverb's or a resonator's tail decaying in silence would
@@ -411,7 +412,7 @@ void VirtualBusRouter::getNextAudioBlock(
         return;
     }
     sourceBuffer_.clear();
-    juce::AudioSourceChannelInfo sourceInfo(
+    cydaw::audio::AudioSourceChannelInfo sourceInfo(
         &sourceBuffer_, 0, bufferToFill.numSamples);
     source_.getNextAudioBlock(sourceInfo);
     bufferToFill.clearActiveBufferRegion();
@@ -452,7 +453,7 @@ void VirtualBusRouter::getNextAudioBlock(
         // then the tracks sent after them; then its level.
         addDirect(true);
         if (entry.graph != nullptr) {
-            juce::AudioBuffer<float> view(lanes.data(), channels, count);
+            cydaw::audio::SampleBuffer<float> view(lanes.data(), channels, count);
             (void) entry.graph->process(view, 0, count);
         }
         addDirect(false);
@@ -544,7 +545,7 @@ void VirtualBusRouter::audioDeviceIOCallbackWithContext(
             juce::FloatVectorOperations::copy(before.getWritePointer(channel), lanes[static_cast<std::size_t>(channel)],
                                               numSamples);
         if (entry.graph != nullptr) {
-            juce::AudioBuffer<float> view(lanes.data(), channels, numSamples);
+            cydaw::audio::SampleBuffer<float> view(lanes.data(), channels, numSamples);
             (void) entry.graph->process(view, 0, numSamples);
         }
         inputIds_[slot] = bus.id;

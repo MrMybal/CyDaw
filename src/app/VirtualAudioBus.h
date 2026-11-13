@@ -1,3 +1,4 @@
+#include <cydaw/audio/Sources.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/Text.h>
 #pragma once
@@ -83,18 +84,18 @@ public:
     virtual ~DirectOutputSource() = default;
     // This block's sound for that bus (in its channels), or null: what goes
     // through its effects, or what joins after them.
-    [[nodiscard]] virtual const juce::AudioBuffer<float>* directOutput(std::uint64_t busId, int numSamples,
+    [[nodiscard]] virtual const cydaw::audio::SampleBuffer<float>* directOutput(std::uint64_t busId, int numSamples,
                                                                        bool beforeEffects) noexcept = 0;
     // The block read: nothing of it is left for the next.
     virtual void finishDirectOutputs() noexcept = 0;
 };
 
-class VirtualBusRouter final : public juce::AudioSource,
+class VirtualBusRouter final : public cydaw::audio::AudioSource,
                                public juce::AudioIODeviceCallback {
 public:
     static constexpr std::size_t maximumBusCount = 16;
 
-    explicit VirtualBusRouter(juce::AudioSource& source);
+    explicit VirtualBusRouter(cydaw::audio::AudioSource& source);
 
     // Where the tracks sent to an output bus are found (the tracks' mixer).
     void setDirectOutputs(DirectOutputSource* source) noexcept { directOutputs_ = source; }
@@ -134,7 +135,7 @@ public:
                        double sampleRate) override;
     void releaseResources() override;
     void getNextAudioBlock(
-        const juce::AudioSourceChannelInfo& bufferToFill) override;
+        const cydaw::audio::AudioSourceChannelInfo& bufferToFill) override;
 
     void audioDeviceIOCallbackWithContext(
         const float* const* inputChannelData, int numInputChannels,
@@ -171,7 +172,7 @@ private:
     void publishMeter(std::size_t slot, const float* const* channels,
                       int channelCount, int numSamples) noexcept;
 
-    juce::AudioSource& source_;
+    cydaw::audio::AudioSource& source_;
     DirectOutputSource* directOutputs_ {};
     mutable cydaw::base::CriticalSection busesLock_;
     std::vector<VirtualAudioBus> buses_;
@@ -182,11 +183,11 @@ private:
     cydaw::realtime::RtPublisher<Snapshot> snapshot_;
     std::uint64_t nextBusId_ { 1 };
     std::uint64_t defaultInputBusId_ {};
-    juce::AudioBuffer<float> sourceBuffer_;
-    juce::AudioBuffer<float> inputBusBuffer_;
+    cydaw::audio::SampleBuffer<float> sourceBuffer_;
+    cydaw::audio::SampleBuffer<float> inputBusBuffer_;
     // Every input bus each block, before and after its effects, by slot.
-    std::array<juce::AudioBuffer<float>, maximumBusCount> inputsBefore_;
-    std::array<juce::AudioBuffer<float>, maximumBusCount> inputsAfter_;
+    std::array<cydaw::audio::SampleBuffer<float>, maximumBusCount> inputsBefore_;
+    std::array<cydaw::audio::SampleBuffer<float>, maximumBusCount> inputsAfter_;
     std::array<std::uint64_t, maximumBusCount> inputIds_ {};
     std::array<int, maximumBusCount> inputChannels_ {};
     int inputSamples_ {};

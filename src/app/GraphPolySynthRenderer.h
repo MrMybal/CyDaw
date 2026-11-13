@@ -1,3 +1,4 @@
+#include <cydaw/audio/SampleBuffer.h>
 #include <cydaw/document/PolySynthState.h>
 #include <cydaw/base/File.h>
 #pragma once
@@ -24,10 +25,10 @@ public:
     void setPlan(cydaw::engine::PolySynthGraphPlan plan);
     [[nodiscard]] cydaw::engine::PolySynthGraphPlan plan() const;
     [[nodiscard]] bool enabled() const noexcept;
-    void render(juce::AudioBuffer<float>& output,
+    void render(cydaw::audio::SampleBuffer<float>& output,
                 const juce::MidiBuffer& midi,
                 int startSample, int numSamples) noexcept;
-    void renderWithPlan(juce::AudioBuffer<float>& output,
+    void renderWithPlan(cydaw::audio::SampleBuffer<float>& output,
                         const juce::MidiBuffer& midi,
                         int startSample, int numSamples,
                         const cydaw::engine::PolySynthGraphPlan& plan) noexcept;
@@ -35,10 +36,26 @@ public:
     // and played while the published one is still borrowed: what the copy
     // shares (a sampler's map, a model) is never freed by the audio thread.
     using PlanChange = void (*)(cydaw::engine::PolySynthGraphPlan& plan, const void* context);
-    void renderChanged(juce::AudioBuffer<float>& output,
+    void renderChanged(cydaw::audio::SampleBuffer<float>& output,
                        const juce::MidiBuffer& midi,
                        int startSample, int numSamples,
                        PlanChange change, const void* context) noexcept;
+
+    template<class Buffer,class... Args> requires(!std::is_same_v<Buffer,cydaw::audio::SampleBuffer<float>>)
+    void render(Buffer& output,Args&&... args) noexcept {
+        cydaw::audio::SampleBuffer<float> view(output.getArrayOfWritePointers(),output.getNumChannels(),output.getNumSamples());
+        render(view,std::forward<Args>(args)...);
+    }
+    template<class Buffer,class... Args> requires(!std::is_same_v<Buffer,cydaw::audio::SampleBuffer<float>>)
+    void renderWithPlan(Buffer& output,Args&&... args) noexcept {
+        cydaw::audio::SampleBuffer<float> view(output.getArrayOfWritePointers(),output.getNumChannels(),output.getNumSamples());
+        renderWithPlan(view,std::forward<Args>(args)...);
+    }
+    template<class Buffer,class... Args> requires(!std::is_same_v<Buffer,cydaw::audio::SampleBuffer<float>>)
+    void renderChanged(Buffer& output,Args&&... args) noexcept {
+        cydaw::audio::SampleBuffer<float> view(output.getArrayOfWritePointers(),output.getNumChannels(),output.getNumSamples());
+        renderChanged(view,std::forward<Args>(args)...);
+    }
 
 private:
     struct Impl;

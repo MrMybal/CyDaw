@@ -1,3 +1,4 @@
+#include <cydaw/audio/SampleBuffer.h>
 #include <cydaw/base/EventLoop.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/integration/AudioFiles.h>
@@ -3733,7 +3734,7 @@ cydaw::base::Result Studio::matchSynth(const cydaw::base::File& file, const cyda
     if (reader == nullptr || reader->sampleRate <= 0.0 || reader->lengthInSamples <= 0)
         return cydaw::base::Result::fail(ui::Ls("Fichier audio illisible : ", "Unreadable audio file: ") + file.getFileName());
     const auto length = static_cast<int>(std::min<juce::int64>(reader->lengthInSamples, static_cast<juce::int64>(reader->sampleRate * 6.0)));
-    juce::AudioBuffer<float> buffer(static_cast<int>(std::max(1u, reader->numChannels)), length);
+    cydaw::audio::SampleBuffer<float> buffer(static_cast<int>(std::max(1u, reader->numChannels)), length);
     reader->read(&buffer, 0, length, 0, true, true);
     std::vector<float> mono(static_cast<std::size_t>(length), 0.0f);
     for (int channel = 0; channel < buffer.getNumChannels(); ++channel)
@@ -7396,7 +7397,7 @@ cydaw::base::Result Studio::readAudioClipSound(const TrackRef& track, const std:
         return cydaw::base::Result::fail(ui::Ls("Son trop long (30 minutes au plus)", "Sound too long (30 minutes at most)"));
     const auto frames = static_cast<int>(reader->lengthInSamples);
     const auto count = static_cast<int>(std::clamp(reader->numChannels, 1u, 2u));
-    juce::AudioBuffer<float> buffer(count, frames);
+    cydaw::audio::SampleBuffer<float> buffer(count, frames);
     reader->read(&buffer, 0, frames, 0, true, count > 1);
     channels.assign(static_cast<std::size_t>(count), std::vector<float>(static_cast<std::size_t>(frames)));
     for (int c = 0; c < count; ++c)
@@ -7421,7 +7422,7 @@ cydaw::base::Result Studio::applyAudioProcessing(const TrackRef& track, const st
     const auto destination = folder.getNonexistentChildFile(base + " ~" + cydaw::base::Time::getCurrentTime().formatted("%H%M%S"), ".wav", false);
     {
         const auto frames = static_cast<int>(result.channels.front().size());
-        juce::AudioBuffer<float> buffer(static_cast<int>(result.channels.size()), frames);
+        cydaw::audio::SampleBuffer<float> buffer(static_cast<int>(result.channels.size()), frames);
         for (int c = 0; c < buffer.getNumChannels(); ++c)
             std::copy_n(result.channels[static_cast<std::size_t>(c)].data(), frames, buffer.getWritePointer(c));
         cydaw::integration::WaveFormat wav;

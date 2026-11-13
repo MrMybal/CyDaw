@@ -1,3 +1,4 @@
+#include <cydaw/audio/SampleBuffer.h>
 #include <cydaw/base/Thread.h>
 #pragma once
 
@@ -37,6 +38,12 @@ public:
 
 class PlanSynthesiser final : public juce::Synthesiser {
 public:
+    using juce::Synthesiser::renderNextBlock;
+    void renderNextBlock(cydaw::audio::SampleBuffer<float>& output,const juce::MidiBuffer& midi,int first,int count) {
+        juce::AudioBuffer<float> borrowed(output.getArrayOfWritePointers(),output.getNumChannels(),output.getNumSamples());
+        juce::Synthesiser::renderNextBlock(borrowed,midi,first,count);
+    }
+
     struct Voicing {
         bool prism {};
         int mode {};   // prism::VoiceMode

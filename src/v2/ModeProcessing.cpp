@@ -1,3 +1,4 @@
+#include <cydaw/audio/Sources.h>
 #include <cydaw/base/File.h>
 #include "JsfxView.h"
 #include "ModeProcessing.h"
@@ -38,7 +39,7 @@ double num(const cydaw::base::Value &v, const char *k, double fallback = 0)
     return static_cast<double>(v.getProperty(k, fallback));
 }
 } // namespace
-struct ModeProcessing::Input final : juce::AudioSource
+struct ModeProcessing::Input final : cydaw::audio::AudioSource
 {
     std::uint64_t id{};
     const float *left{};
@@ -53,7 +54,7 @@ struct ModeProcessing::Input final : juce::AudioSource
     void releaseResources() override
     {
     }
-    void getNextAudioBlock(const juce::AudioSourceChannelInfo &out) override
+    void getNextAudioBlock(const cydaw::audio::AudioSourceChannelInfo &out) override
     {
         out.clearActiveBufferRegion();
         if (!left || !out.buffer)

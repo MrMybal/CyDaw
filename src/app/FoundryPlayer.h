@@ -1,3 +1,4 @@
+#include <cydaw/audio/Sources.h>
 #pragma once
 #include "ModeProcessor.h"
 #include <cydaw/realtime/RtPublisher.h>
@@ -19,14 +20,14 @@
 
 namespace cydaw::app {
 
-class FoundryPlayer final : public juce::AudioSource {
+class FoundryPlayer final : public cydaw::audio::AudioSource {
 public:
     FoundryPlayer();
     ~FoundryPlayer() override;
 
     void prepareToPlay(int samplesPerBlockExpected, double sampleRate) override;
     void releaseResources() override;
-    void getNextAudioBlock(const juce::AudioSourceChannelInfo& output) override;
+    void getNextAudioBlock(const cydaw::audio::AudioSourceChannelInfo& output) override;
 
     // The session played from now on (an edit gives a new one; the place is
     // kept). Null: nothing.

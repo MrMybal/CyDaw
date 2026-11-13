@@ -1,3 +1,4 @@
+#include <cydaw/audio/SampleBuffer.h>
 #include <cydaw/base/FileDialog.h>
 #include <cydaw/base/File.h>
 #include "FoundryView.h"
@@ -810,7 +811,7 @@ cydaw::base::Result FoundryView::applyTrackEffects(Tab& tab, const TrackRef& tra
         const auto room = std::min<std::int64_t>(tail, std::max<std::int64_t>(0, sound.frames() - to));
         const auto total = length + room + latency;
         std::vector<std::vector<float>> rendered(2, std::vector<float>(static_cast<std::size_t>(length + room)));
-        juce::AudioBuffer<float> buffer(2, block);
+        cydaw::audio::SampleBuffer<float> buffer(2, block);
         for (std::int64_t at = 0; at < total; at += block) {
             const auto n = static_cast<int>(std::min<std::int64_t>(block, total - at));
             for (int c = 0; c < 2; ++c) {

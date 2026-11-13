@@ -10,9 +10,11 @@ struct Ramp final : PositionableAudioSource {
   std::int64_t position{};
   bool loop = false;
   int prepared = 0;
+  int lastChannels = 0;
   void prepareToPlay(int, double) override { ++prepared; }
   void releaseResources() override { --prepared; }
   void getNextAudioBlock(const AudioSourceChannelInfo &block) override {
+    lastChannels = block.buffer->getNumChannels();
     block.clearActiveBufferRegion();
     for (int i = 0; i < block.numSamples; ++i) {
       if (position >= 16) {
@@ -87,6 +89,21 @@ int main() {
       buffered.releaseResources();
       require(bufferedInput.prepared == 0,
               "background worker releases source before owner destruction");
+    }
+    {
+      Ramp first, second;
+      MixerAudioSource mixer;
+      mixer.addInputSource(&first, false);
+      mixer.addInputSource(&second, false);
+      mixer.prepareToPlay(8, 48000);
+      mixer.getNextAudioBlock({&samples, 0, 8});
+      require(samples.getSample(0, 0) == 2 && samples.getSample(1, 7) == 16,
+              "native audition mixer sums its inputs");
+      require(first.lastChannels == 2 && second.lastChannels == 2,
+              "audition mixer preserves requested channel width");
+      mixer.removeAllInputs();
+      require(first.prepared == 0 && second.prepared == 0,
+              "mixer releases detached inputs");
     }
     std::cout << "Native source lifecycle, Core transport, bounded render, "
                  "seek, pause and loop passed without JUCE\n";

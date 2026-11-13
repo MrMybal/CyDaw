@@ -24,6 +24,20 @@ public:
   virtual void releaseResources() = 0;
   virtual void getNextAudioBlock(const AudioSourceChannelInfo &) = 0;
 };
+class MixerAudioSource final : public AudioSource {
+  struct Native;
+  std::unique_ptr<Native> native_;
+
+public:
+  MixerAudioSource();
+  ~MixerAudioSource();
+  void addInputSource(AudioSource *, bool deleteWhenRemoved);
+  void removeInputSource(AudioSource *);
+  void removeAllInputs();
+  void prepareToPlay(int, double) override;
+  void releaseResources() override;
+  void getNextAudioBlock(const AudioSourceChannelInfo &) override;
+};
 class PositionableAudioSource : public AudioSource {
 public:
   virtual void setNextReadPosition(std::int64_t) = 0;

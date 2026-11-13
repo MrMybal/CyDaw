@@ -1,3 +1,4 @@
+#include <cydaw/audio/SampleBuffer.h>
 #include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/File.h>
 #include <cydaw/integration/CyAudioCoreAudioFormats.h>
@@ -519,7 +520,7 @@ cydaw::base::Result renderChain(const cydaw::base::Value& state, engine::repair:
     const auto latency = std::max(0, chain.latencySamples());
     const auto length = static_cast<std::int64_t>(channels.front().size());
     engine::repair::Channels rendered(2, std::vector<float>(static_cast<std::size_t>(frames), 0.0f));
-    juce::AudioBuffer<float> buffer(2, block);
+    cydaw::audio::SampleBuffer<float> buffer(2, block);
     const auto total = frames + latency;
     for (std::int64_t at = 0; at < total; at += block) {
         if (cancel != nullptr && cancel->load())
@@ -693,7 +694,7 @@ cydaw::base::Result readAudioFile(const cydaw::base::File& file, engine::repair:
         channels.assign(static_cast<std::size_t>(count), std::vector<float>(static_cast<std::size_t>(frames)));
         // Read in pieces: the whole sound is held once, not twice.
         constexpr int piece = 65'536;
-        juce::AudioBuffer<float> buffer(count, piece);
+        cydaw::audio::SampleBuffer<float> buffer(count, piece);
         for (juce::int64 at = 0; at < frames; at += piece) {
             const auto n = static_cast<int>(std::min<juce::int64>(piece, frames - at));
             reader->read(&buffer, 0, n, at, true, count > 1);
@@ -711,7 +712,7 @@ cydaw::base::Result readAudioFile(const cydaw::base::File& file, engine::repair:
 cydaw::base::Result writeAudioFile(const cydaw::base::File& file, const engine::repair::Channels& channels, const double rate)
 {
     const auto frames = channels.empty() ? 0 : static_cast<int>(channels.front().size());
-    juce::AudioBuffer<float> buffer(std::max(1, static_cast<int>(channels.size())), frames);
+    cydaw::audio::SampleBuffer<float> buffer(std::max(1, static_cast<int>(channels.size())), frames);
     for (int c = 0; c < static_cast<int>(channels.size()); ++c)
         std::copy_n(channels[static_cast<std::size_t>(c)].data(), frames, buffer.getWritePointer(c));
     (void) file.getParentDirectory().createDirectory();

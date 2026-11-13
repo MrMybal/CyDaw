@@ -1,3 +1,4 @@
+#include <cydaw/audio/Sources.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/TextMap.h>
 #include <cydaw/integration/AudioFiles.h>
@@ -37,7 +38,7 @@ namespace cydaw::app {
 // file's name.
 void djTrackTags(const cydaw::base::File& file, const cydaw::base::TextMap& tags, cydaw::base::Text& title, cydaw::base::Text& artist);
 
-class DjEngine final : public juce::AudioSource {
+class DjEngine final : public cydaw::audio::AudioSource {
 public:
     static constexpr int deckCount = 4;
     static constexpr int hotCueCount = 8;
@@ -47,7 +48,7 @@ public:
 
     void prepareToPlay(int samplesPerBlockExpected, double sampleRate) override;
     void releaseResources() override;
-    void getNextAudioBlock(const juce::AudioSourceChannelInfo& output) override;
+    void getNextAudioBlock(const cydaw::audio::AudioSourceChannelInfo& output) override;
 
     // ---- Tracks ------------------------------------------------------------------------------
     // What is already known of a track (its grid and cues kept from before):
@@ -204,7 +205,7 @@ public:
 
 private:
     realtime::RtPublisher<std::shared_ptr<ModeProcessor>> processor_;
-    std::array<juce::AudioBuffer<float>,4> modeInputs_;
+    std::array<cydaw::audio::SampleBuffer<float>,4> modeInputs_;
     struct Command {
         enum class Type : int { play, cueDown, cueUp, seek, hotCueJump, hotCueSet, hotCueRemove, loopBeats, loopMove,
                                 loopResize, beatJump, syncOn };
@@ -238,9 +239,9 @@ private:
 
     double rate_ { 48'000.0 };
     int blockSize_ { 512 };
-    juce::AudioBuffer<float> work_;
-    juce::AudioBuffer<float> mix_;
-    juce::AudioBuffer<float> cueBus_;
+    cydaw::audio::SampleBuffer<float> work_;
+    cydaw::audio::SampleBuffer<float> mix_;
+    cydaw::audio::SampleBuffer<float> cueBus_;
     std::atomic<std::uint64_t> blocks_ {};
 
     std::atomic<float> crossfader_ { 0.5f };

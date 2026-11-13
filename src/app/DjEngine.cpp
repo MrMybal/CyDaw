@@ -1,3 +1,4 @@
+#include <cydaw/audio/Sources.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/TextMap.h>
 #include <cydaw/integration/AudioFiles.h>
@@ -98,7 +99,7 @@ std::shared_ptr<TrackAudio> DjEngine::decode(cydaw::audio::AudioFormatManager& f
     const auto channels = static_cast<int>(std::clamp<unsigned>(reader->numChannels, 1u, 2u));
     audio->channels.assign(static_cast<std::size_t>(channels), std::vector<float>(static_cast<std::size_t>(frames)));
     constexpr int chunk = 1 << 16;
-    juce::AudioBuffer<float> buffer(static_cast<int>(std::max(2u, reader->numChannels)), chunk);
+    cydaw::audio::SampleBuffer<float> buffer(static_cast<int>(std::max(2u, reader->numChannels)), chunk);
     for (juce::int64 at = 0; at < frames; at += chunk) {
         if (cancelled && cancelled())
             return nullptr;
@@ -849,7 +850,7 @@ void DjEngine::runCommand(Deck& deck, const Command& command)
     }
 }
 
-void DjEngine::getNextAudioBlock(const juce::AudioSourceChannelInfo& output)
+void DjEngine::getNextAudioBlock(const cydaw::audio::AudioSourceChannelInfo& output)
 {
     output.clearActiveBufferRegion();
     if (output.buffer == nullptr || output.numSamples <= 0)

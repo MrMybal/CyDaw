@@ -1,3 +1,4 @@
+#include <cydaw/audio/SampleBuffer.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/File.h>
@@ -1280,9 +1281,9 @@ cydaw::base::Value Commands::run()
         app::GraphPolySynthRenderer renderer;
         renderer.prepare(rate);
         renderer.setPlan(*plan);
-        juce::AudioBuffer<float> audio(2, samples);
+        cydaw::audio::SampleBuffer<float> audio(2, samples);
         audio.clear();
-        juce::AudioBuffer<float> scratch(2, block);
+        cydaw::audio::SampleBuffer<float> scratch(2, block);
         // "notes": [[note, velocity, seconds, length], ...] played at their
         // times (let go after `length` seconds when given); else the one note
         // at the start. "controllers": [[number, value, seconds], ...].
@@ -1551,7 +1552,7 @@ cydaw::base::Value Commands::run()
         const auto samples = static_cast<int>(juce::jlimit(0.1, 10.0, number("seconds", 1.0)) * rate);
         std::vector<float> out;
         out.reserve(static_cast<std::size_t>(samples));
-        juce::AudioBuffer<float> buffer(2, block);
+        cydaw::audio::SampleBuffer<float> buffer(2, block);
         for (auto start = 0; start < samples; start += block) {
             const auto count = std::min(block, samples - start);
             for (auto i = 0; i < count; ++i) {
@@ -1623,7 +1624,7 @@ cydaw::base::Value Commands::run()
         voice->prepare(rate);
         voice->start(*model, values, note, velocity, rate);
         // In stereo (a model analysed from a stereo recording keeps its image).
-        juce::AudioBuffer<float> audio(2, samples);
+        cydaw::audio::SampleBuffer<float> audio(2, samples);
         auto ended = -1;
         for (int index = 0; index < samples; ++index) {
             if (index == held)

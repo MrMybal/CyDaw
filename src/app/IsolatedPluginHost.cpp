@@ -1,3 +1,4 @@
+#include <cydaw/audio/Sources.h>
 #include <cydaw/base/Process.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
@@ -477,7 +478,7 @@ cydaw::base::Result IsolatedPluginHost::hideEditor()
     return sendCommand(cydaw::plugins::SharedPluginCommand::hideEditor);
 }
 
-bool IsolatedPluginHost::processBlock(juce::AudioBuffer<float>& buffer,
+bool IsolatedPluginHost::processBlock(cydaw::audio::SampleBuffer<float>& buffer,
                                       const int startSample,
                                       const int numSamples, double timelineSeconds, double tempo, bool playing) noexcept
 {

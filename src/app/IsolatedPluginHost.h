@@ -1,3 +1,4 @@
+#include <cydaw/audio/Sources.h>
 #include <cydaw/base/Process.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
@@ -76,7 +77,7 @@ public:
     // Called by the audio thread. Returns true only when a fresh processed
     // block was available. An active worker missing its deadline emits silence;
     // a stopped/crashed worker leaves input untouched for safety bypass.
-    [[nodiscard]] bool processBlock(juce::AudioBuffer<float>& buffer,
+    [[nodiscard]] bool processBlock(cydaw::audio::SampleBuffer<float>& buffer,
                                     int startSample,
                                     int numSamples, double timelineSeconds = 0.0, double tempo = 120.0, bool playing = false) noexcept;
 

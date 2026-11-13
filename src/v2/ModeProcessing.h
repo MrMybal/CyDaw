@@ -1,3 +1,4 @@
+#include <cydaw/audio/SampleBuffer.h>
 #include <cydaw/base/File.h>
 #pragma once
 #include "ModeProcessor.h"
@@ -94,7 +95,7 @@ class ModeProcessing final : public app::ModeProcessor
     std::unique_ptr<RoutingView> routing_;
     std::unique_ptr<DeviceEditorView> editors_;
     std::unique_ptr<PluginWindows> windows_;
-    juce::AudioBuffer<float> output_;
+    cydaw::audio::SampleBuffer<float> output_;
     double timeline_{};
     bool timelineActive_{};
     bool insideFoundry_{};

@@ -1,3 +1,5 @@
+#include <cydaw/audio/Sources.h>
+#include <cydaw/integration/SourcePlayer.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/File.h>
@@ -63,12 +65,12 @@ struct PluginParameterAutomationLane {
     std::vector<PluginParameterAutomationPoint> points;
 };
 
-class LatencyCompensatingAudioSource final : public juce::AudioSource {
+class LatencyCompensatingAudioSource final : public cydaw::audio::AudioSource {
 public:
     static constexpr int maximumDelaySamples = 131'072;
     static constexpr int maximumChannelCount = 8;
 
-    explicit LatencyCompensatingAudioSource(juce::AudioSource& input) noexcept;
+    explicit LatencyCompensatingAudioSource(cydaw::audio::AudioSource& input) noexcept;
 
     // The channels its delay keeps (its track's format), taken at the next
     // prepare: set while it is out of the mixer.
@@ -78,11 +80,11 @@ public:
     [[nodiscard]] int delaySamples() const noexcept;
     void prepareToPlay(int samplesPerBlockExpected, double sampleRate) override;
     void releaseResources() override;
-    void getNextAudioBlock(const juce::AudioSourceChannelInfo& bufferToFill) override;
+    void getNextAudioBlock(const cydaw::audio::AudioSourceChannelInfo& bufferToFill) override;
 
 private:
-    juce::AudioSource& input_;
-    juce::AudioBuffer<float> delayBuffer_;
+    cydaw::audio::AudioSource& input_;
+    cydaw::audio::SampleBuffer<float> delayBuffer_;
     int channelCount_ { 2 };
     std::atomic<int> delaySamples_ {};
     std::atomic<bool> resetRequested_ { true };
@@ -100,10 +102,10 @@ public:
     [[nodiscard]] int delaySamples() const noexcept { return delay_.load(std::memory_order_acquire); }
     [[nodiscard]] int channelCount() const noexcept { return ring_.getNumChannels(); }
     void requestReset() noexcept { reset_.store(true, std::memory_order_release); }
-    void process(juce::AudioBuffer<float>& buffer, int startSample, int numSamples) noexcept;
+    void process(cydaw::audio::SampleBuffer<float>& buffer, int startSample, int numSamples) noexcept;
 
 private:
-    juce::AudioBuffer<float> ring_;
+    cydaw::audio::SampleBuffer<float> ring_;
     std::atomic<int> delay_ {};
     std::atomic<bool> reset_ { true };
     int write_ {};
@@ -120,7 +122,7 @@ public:
     // `buses[k]`: what reaches input k this block (`numSamples` from 0), or
     // null. The main input's joins the track's own sound; the others are
     // the graph's extra audio inputs.
-    virtual void setRoutedInputs(const juce::AudioBuffer<float>* const* buses, int numSamples) noexcept = 0;
+    virtual void setRoutedInputs(const cydaw::audio::SampleBuffer<float>* const* buses, int numSamples) noexcept = 0;
     // What reaches each input lately: its peak, falling by half every
     // 0.2 s (at 48 kHz) when nothing comes, for the meters.
     [[nodiscard]] float inputLevel(const std::size_t bus) const noexcept
@@ -129,7 +131,7 @@ public:
     }
 
 protected:
-    void measureRoutedInputs(const juce::AudioBuffer<float>* const* buses, const int numSamples) noexcept
+    void measureRoutedInputs(const cydaw::audio::SampleBuffer<float>* const* buses, const int numSamples) noexcept
     {
         if (buses == nullptr || numSamples <= 0)
             return;
@@ -146,18 +148,18 @@ private:
     std::array<std::atomic<float>, maximumBuses> inputLevels_ {};
 };
 
-class GainPanAudioSource final : public juce::AudioSource, public RoutedInputReceiver {
+class GainPanAudioSource final : public cydaw::audio::AudioSource, public RoutedInputReceiver {
 public:
     static constexpr std::size_t maximumPluginCount = 8;
 
-    explicit GainPanAudioSource(juce::AudioSource& input) noexcept;
-    GainPanAudioSource(juce::AudioSource& input,
+    explicit GainPanAudioSource(cydaw::audio::AudioSource& input) noexcept;
+    GainPanAudioSource(cydaw::audio::AudioSource& input,
                        const std::atomic<double>& timelinePosition) noexcept;
-    explicit GainPanAudioSource(juce::AudioTransportSource& input) noexcept;
+    explicit GainPanAudioSource(cydaw::audio::AudioTransportSource& input) noexcept;
     ~GainPanAudioSource() override;
 
     void setExternalTimeline(const std::atomic<double>* clock) noexcept { modeTimeline_ = clock; }
-    void setExternalInput(juce::AudioSource* source) noexcept { externalInput_.store(source); }
+    void setExternalInput(cydaw::audio::AudioSource* source) noexcept { externalInput_.store(source); }
     void setGain(float linearGain) noexcept;
     void setPan(float pan) noexcept;
     // What enters it lately (its clips, what it monitors, what is routed
@@ -275,8 +277,8 @@ public:
     [[nodiscard]] int totalLatencySamples() const noexcept;
     void prepareToPlay(int samplesPerBlockExpected, double sampleRate) override;
     void releaseResources() override;
-    void getNextAudioBlock(const juce::AudioSourceChannelInfo& bufferToFill) override;
-    void setRoutedInputs(const juce::AudioBuffer<float>* const* buses, int numSamples) noexcept override
+    void getNextAudioBlock(const cydaw::audio::AudioSourceChannelInfo& bufferToFill) override;
+    void setRoutedInputs(const cydaw::audio::SampleBuffer<float>* const* buses, int numSamples) noexcept override
     {
         measureRoutedInputs(buses, numSamples);
         for (std::size_t bus = 0; bus < maximumBuses; ++bus)
@@ -294,24 +296,24 @@ public:
     void resetInputDelay() noexcept { inputDelay_.requestReset(); }
     // The last block's sound before the fader, on the audio thread right
     // after rendering it; null when not kept.
-    [[nodiscard]] const juce::AudioBuffer<float>* preFader() const noexcept { return preFaderValid_ ? &preFader_ : nullptr; }
+    [[nodiscard]] const cydaw::audio::SampleBuffer<float>* preFader() const noexcept { return preFaderValid_ ? &preFader_ : nullptr; }
 
 private:
-    std::array<const juce::AudioBuffer<float>*, maximumBuses> routedInputs_ {};
+    std::array<const cydaw::audio::SampleBuffer<float>*, maximumBuses> routedInputs_ {};
     int routedSamples_ {};
     std::atomic<bool> keepPreFader_ {};
     std::atomic<bool> sendsAudible_ { true };
-    juce::AudioBuffer<float> preFader_;
+    cydaw::audio::SampleBuffer<float> preFader_;
     bool preFaderValid_ {};
     AudioDelayLine inputDelay_;
     [[nodiscard]] bool processNativeDspGraph(
-        const juce::AudioSourceChannelInfo& bufferToFill) noexcept;
+        const cydaw::audio::AudioSourceChannelInfo& bufferToFill) noexcept;
     void publishAnalysisFrame(
-        const juce::AudioSourceChannelInfo& bufferToFill) noexcept;
+        const cydaw::audio::AudioSourceChannelInfo& bufferToFill) noexcept;
 
-    std::atomic<juce::AudioSource*> externalInput_ {};
-    juce::AudioSource& input_;
-    juce::AudioTransportSource* transport_ {};
+    std::atomic<cydaw::audio::AudioSource*> externalInput_ {};
+    cydaw::audio::AudioSource& input_;
+    cydaw::audio::AudioTransportSource* transport_ {};
     const std::atomic<double>* timelinePosition_ {};
     const std::atomic<double>* modeTimeline_ {};
     std::atomic<float> gain_ { 1.0f };
@@ -361,13 +363,13 @@ private:
 // track renders in its own format (mono to 7.1) and converts into what it
 // goes to (the master is stereo). Inputs are added and removed as with
 // juce::MixerAudioSource; the routing is published by the controller.
-class TrackMixer final : public juce::AudioSource, public DirectOutputSource {
+class TrackMixer final : public cydaw::audio::AudioSource, public DirectOutputSource {
 public:
     static constexpr std::size_t buses = RoutedInputReceiver::maximumBuses;
     static constexpr int maximumChannels = LatencyCompensatingAudioSource::maximumChannelCount;
     static constexpr std::size_t maximumDirectOutputs = VirtualBusRouter::maximumBusCount;
     struct Output {
-        juce::AudioSource* destination {}; // null: the master (or a hardware output)
+        cydaw::audio::AudioSource* destination {}; // null: the master (or a hardware output)
         float gain { 1.0f };
         std::uint32_t bus {};              // which of the destination's inputs
         bool preFader {};
@@ -378,7 +380,7 @@ public:
         int hardware { -1 };               // a slot of the plan's hardware outputs
     };
     struct Entry {
-        juce::AudioSource* source {};
+        cydaw::audio::AudioSource* source {};
         RoutedInputReceiver* receiver {};
         GainPanAudioSource* fader {};      // where its sound before the fader is kept
         std::vector<Output> outputs;       // empty: the master
@@ -397,33 +399,33 @@ public:
     };
 
     TrackMixer();
-    void addInputSource(juce::AudioSource* source, bool deleteWhenRemoved);
-    void removeInputSource(juce::AudioSource* source);
+    void addInputSource(cydaw::audio::AudioSource* source, bool deleteWhenRemoved);
+    void removeInputSource(cydaw::audio::AudioSource* source);
     void setPlan(std::shared_ptr<const Plan> plan);
 
     void prepareToPlay(int samplesPerBlockExpected, double sampleRate) override;
     void releaseResources() override;
-    void getNextAudioBlock(const juce::AudioSourceChannelInfo& bufferToFill) override;
-    [[nodiscard]] const juce::AudioBuffer<float>* directOutput(std::uint64_t busId, int numSamples,
+    void getNextAudioBlock(const cydaw::audio::AudioSourceChannelInfo& bufferToFill) override;
+    [[nodiscard]] const cydaw::audio::SampleBuffer<float>* directOutput(std::uint64_t busId, int numSamples,
                                                                bool beforeEffects) noexcept override;
     void finishDirectOutputs() noexcept override { directSamples_ = 0; }
 
 private:
-    [[nodiscard]] int indexOf(const juce::AudioSource* source) const noexcept;
+    [[nodiscard]] int indexOf(const cydaw::audio::AudioSource* source) const noexcept;
 
     cydaw::base::CriticalSection lock_;
-    std::vector<juce::AudioSource*> inputs_;
+    std::vector<cydaw::audio::AudioSource*> inputs_;
     // Each track's sound and what reaches each of its inputs, in buffers of
     // the widest format; the block reads them through views of its own.
-    std::vector<juce::AudioBuffer<float>> rendered_;
-    std::vector<juce::AudioBuffer<float>> routed_;
-    std::vector<juce::AudioBuffer<float>> routedViews_;
+    std::vector<cydaw::audio::SampleBuffer<float>> rendered_;
+    std::vector<cydaw::audio::SampleBuffer<float>> routed_;
+    std::vector<cydaw::audio::SampleBuffer<float>> routedViews_;
     std::vector<char> routedUsed_;
     std::vector<char> done_;
-    juce::AudioBuffer<float> delayed_;
+    cydaw::audio::SampleBuffer<float> delayed_;
     // What the tracks routed to the sound card's outputs left this block.
-    std::array<juce::AudioBuffer<float>, maximumDirectOutputs> direct_;
-    std::array<juce::AudioBuffer<float>, maximumDirectOutputs> directViews_;
+    std::array<cydaw::audio::SampleBuffer<float>, maximumDirectOutputs> direct_;
+    std::array<cydaw::audio::SampleBuffer<float>, maximumDirectOutputs> directViews_;
     std::array<std::uint64_t, maximumDirectOutputs> directBus_ {};
     std::array<char, maximumDirectOutputs> directBefore_ {};
     std::array<char, maximumDirectOutputs> directUsed_ {};
@@ -484,7 +486,7 @@ private:
     cydaw::realtime::RtPublisher<VirtualAudioBus> inputBus_;
     const VirtualBusRouter* router_ {};
     std::atomic<bool> afterEffects_ { true };
-    juce::AudioBuffer<float> routedInputBuffer_;
+    cydaw::audio::SampleBuffer<float> routedInputBuffer_;
     NativeDspRuntime inputBusGraph_;
 };
 
@@ -493,7 +495,7 @@ private:
 // the transport while it plays. The mix is wrapped in a clock (ClockStart
 // before it, this source after it) so the message thread can read the
 // transport's position together with the block it belongs to.
-class LoopAuditionSource final : public juce::AudioSource {
+class LoopAuditionSource final : public cydaw::audio::AudioSource {
 public:
     struct Loop {
         std::uint64_t generation {};
@@ -514,12 +516,12 @@ public:
         std::int64_t startFrame {};
     };
     // Before the mix: a block begins.
-    class ClockStart final : public juce::AudioSource {
+    class ClockStart final : public cydaw::audio::AudioSource {
     public:
         explicit ClockStart(LoopAuditionSource& owner) noexcept : owner_(owner) {}
         void prepareToPlay(int, double) override {}
         void releaseResources() override {}
-        void getNextAudioBlock(const juce::AudioSourceChannelInfo& info) override
+        void getNextAudioBlock(const cydaw::audio::AudioSourceChannelInfo& info) override
         {
             owner_.sequence_.fetch_add(1, std::memory_order_acq_rel);
             info.clearActiveBufferRegion();
@@ -543,7 +545,7 @@ public:
 
     void prepareToPlay(int, double sampleRate) override { rate_.store(std::max(1.0, sampleRate), std::memory_order_release); }
     void releaseResources() override {}
-    void getNextAudioBlock(const juce::AudioSourceChannelInfo& info) override;
+    void getNextAudioBlock(const cydaw::audio::AudioSourceChannelInfo& info) override;
 
 private:
     const std::atomic<float>& gainDb_;
@@ -559,9 +561,9 @@ private:
     std::int64_t phase_ {};
 };
 
-class MasterOutputAudioSource final : public juce::AudioSource {
+class MasterOutputAudioSource final : public cydaw::audio::AudioSource {
 public:
-    explicit MasterOutputAudioSource(juce::AudioSource& input);
+    explicit MasterOutputAudioSource(cydaw::audio::AudioSource& input);
     ~MasterOutputAudioSource() override;
 
     // What the mix is late by (its tracks' compensation, the master's own
@@ -597,13 +599,13 @@ public:
 
     void prepareToPlay(int samplesPerBlockExpected, double sampleRate) override;
     void releaseResources() override;
-    void getNextAudioBlock(const juce::AudioSourceChannelInfo& bufferToFill) override;
+    void getNextAudioBlock(const cydaw::audio::AudioSourceChannelInfo& bufferToFill) override;
 
 private:
     void publishAnalysisFrame(
-        const juce::AudioSourceChannelInfo& bufferToFill) noexcept;
+        const cydaw::audio::AudioSourceChannelInfo& bufferToFill) noexcept;
 
-    juce::AudioSource& input_;
+    cydaw::audio::AudioSource& input_;
     std::unique_ptr<cydaw::audio::AudioFormatWriter::ThreadedWriter> threadedWriter_;
     std::atomic<cydaw::audio::AudioFormatWriter::ThreadedWriter*> activeWriter_ {};
     std::atomic<int> callbacksInFlight_ {};
@@ -1047,8 +1049,8 @@ public:
     // A secondary mixing session, driven by the Foundry/DJ audio callback.
     // No sound card is opened. External sources outlive the track.
     void prepareModeMix(double rate, int block) { modeRate_ = rate; masterOutput_.prepareToPlay(block, rate); }
-    void renderModeMix(const juce::AudioSourceChannelInfo& output) { masterOutput_.getNextAudioBlock(output); }
-    void setModeTrackSource(std::size_t index, juce::AudioSource* source);
+    void renderModeMix(const cydaw::audio::AudioSourceChannelInfo& output) { masterOutput_.getNextAudioBlock(output); }
+    void setModeTrackSource(std::size_t index, cydaw::audio::AudioSource* source);
     void setModeGainAutomation(bool midi, std::uint64_t id, std::vector<GainAutomationPoint> points);
     void setModeTimeline(double seconds, int samples, bool midiPlaying = true) noexcept {
         modeMidiPlaying_.store(midiPlaying,std::memory_order_relaxed);
@@ -2335,12 +2337,12 @@ private:
 
     cydaw::integration::DeviceManager deviceManager_;
     cydaw::audio::AudioFormatManager formatManager_;
-    juce::TimeSliceThread readAheadThread_ { "CyDAW audio read-ahead" };
+    cydaw::audio::ReadAheadScheduler readAheadThread_ { "CyDAW audio read-ahead" };
     TrackMixer mixerSource_;
     MasterOutputAudioSource masterOutput_ { mixerSource_ };
     // Where each track's outputs go, for the solo: a bus a soloed track is
     // routed into is heard with it.
-    std::vector<std::pair<const juce::AudioSource*, std::vector<const juce::AudioSource*>>> routingEdges_;
+    std::vector<std::pair<const cydaw::audio::AudioSource*, std::vector<const cydaw::audio::AudioSource*>>> routingEdges_;
     // The routing as last published, by track identity rather than position:
     // a track moved keeps it, one removed leaves it, and the plan can be made
     // again when a plugin's latency changes.
@@ -2368,8 +2370,8 @@ private:
     // A cable's delay, kept while its length holds: a change of level must
     // not start it again.
     struct EdgeDelay {
-        const juce::AudioSource* from {};
-        const juce::AudioSource* to {};
+        const cydaw::audio::AudioSource* from {};
+        const cydaw::audio::AudioSource* to {};
         std::uint32_t bus {};
         bool preFader {};
         std::shared_ptr<AudioDelayLine> line;
@@ -2381,8 +2383,8 @@ private:
     std::atomic<bool> modeMidiPlaying_{true};
     std::atomic<float> masterGainDb_ {};
     std::atomic<bool> masterMuted_ {};
-    juce::AudioTransportSource samplePreviewTransport_;
-    std::unique_ptr<juce::PositionableAudioSource> samplePreviewReader_;
+    cydaw::audio::AudioTransportSource samplePreviewTransport_;
+    std::unique_ptr<cydaw::audio::PositionableAudioSource> samplePreviewReader_;
     std::atomic<float> samplePreviewGainDb_ { -3.0f };
     LoopAuditionSource loopAudition_ { samplePreviewGainDb_ };
     // The loop auditioned at the tempo, made again when the tempo moves.
@@ -2397,7 +2399,7 @@ private:
     } tempoPreview_;
     [[nodiscard]] cydaw::base::Result startTempoPreview(const cydaw::base::File& file, double startSeconds, const SamplePreviewTempo& tempo);
     std::unique_ptr<PlaybackTrack> clipPreviewTrack_;
-    juce::MixerAudioSource auditionMixer_;
+    cydaw::audio::MixerAudioSource auditionMixer_;
     VirtualBusRouter virtualBusRouter_ { auditionMixer_ };
     juce::MidiMessageCollector midiCollector_;
     // The inputs' messages through the gate, then into the collector.
@@ -2416,7 +2418,7 @@ private:
     std::atomic<std::uint32_t> keyboardCount_ {};
     std::unique_ptr<MidiOutputHub> midiOutputs_;
     juce::MidiKeyboardState midiKeyboardState_;
-    juce::AudioSourcePlayer sourcePlayer_;
+    cydaw::integration::SourcePlayer sourcePlayer_;
     InputRecorder recorder_;
     std::vector<std::unique_ptr<PlaybackTrack>> tracks_;
     std::vector<ArrangementSessionState> arrangementSessionUndoStates_;

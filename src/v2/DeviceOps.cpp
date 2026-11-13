@@ -1,3 +1,4 @@
+#include <cydaw/audio/SampleBuffer.h>
 #include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/File.h>
 #include <cydaw/integration/CyAudioCoreAudioFormats.h>
@@ -271,7 +272,7 @@ bool importPrismTable(app::GraphDocument& graph, const std::uint64_t nodeId, con
     // Four million samples at most: a minute and a half, far more than a table.
     const auto length = static_cast<int>(std::min<juce::int64>(reader->lengthInSamples, 1 << 22));
     const auto channels = std::clamp(static_cast<int>(reader->numChannels), 1, 8);
-    juce::AudioBuffer<float> buffer(channels, length);
+    cydaw::audio::SampleBuffer<float> buffer(channels, length);
     (void) reader->read(&buffer, 0, length, 0, true, channels > 1);
     std::vector<float> mono(static_cast<std::size_t>(length), 0.0f);
     for (int channel = 0; channel < channels; ++channel) {
@@ -359,7 +360,7 @@ bool loadImpulse(app::GraphDocument& graph, const std::uint64_t nodeId, const cy
                                static_cast<juce::int64>(engine::maximumImpulseSamples) * 4);
     const auto length = static_cast<int>(std::min(reader->lengthInSamples, most));
     const auto channels = std::min(2, static_cast<int>(reader->numChannels));
-    juce::AudioBuffer<float> buffer(static_cast<int>(reader->numChannels), length);
+    cydaw::audio::SampleBuffer<float> buffer(static_cast<int>(reader->numChannels), length);
     (void) reader->read(&buffer, 0, length, 0, true, true);
     // Its silences trimmed: before its first sound (a few samples kept) and
     // after its tail falls 80 dB under its peak.

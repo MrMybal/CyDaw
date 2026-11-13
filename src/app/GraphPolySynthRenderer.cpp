@@ -246,7 +246,7 @@ bool GraphPolySynthRenderer::enabled() const noexcept
     return current != nullptr && current->enabled;
 }
 
-void GraphPolySynthRenderer::render(juce::AudioBuffer<float>& output,
+void GraphPolySynthRenderer::render(cydaw::audio::SampleBuffer<float>& output,
                                     const juce::MidiBuffer& midi,
                                     const int startSample,
                                     const int numSamples) noexcept
@@ -258,7 +258,7 @@ void GraphPolySynthRenderer::render(juce::AudioBuffer<float>& output,
                                        numSamples);
 }
 
-void GraphPolySynthRenderer::renderChanged(juce::AudioBuffer<float>& output, const juce::MidiBuffer& midi,
+void GraphPolySynthRenderer::renderChanged(cydaw::audio::SampleBuffer<float>& output, const juce::MidiBuffer& midi,
                                            const int startSample, const int numSamples, const PlanChange change,
                                            const void* context) noexcept
 {
@@ -279,7 +279,7 @@ void GraphPolySynthRenderer::renderChanged(juce::AudioBuffer<float>& output, con
 }
 
 void GraphPolySynthRenderer::renderWithPlan(
-    juce::AudioBuffer<float>& output, const juce::MidiBuffer& midi,
+    cydaw::audio::SampleBuffer<float>& output, const juce::MidiBuffer& midi,
     const int startSample, const int numSamples,
     const cydaw::engine::PolySynthGraphPlan& plan) noexcept
 {

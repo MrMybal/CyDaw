@@ -275,7 +275,7 @@ else()
     target_compile_options(cydaw_core PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
-add_library(cydaw_audio_sources STATIC src/integration/AudioSources.cpp src/integration/BufferedAudioSource.cpp)
+add_library(cydaw_audio_sources STATIC src/integration/AudioSources.cpp src/integration/BufferedAudioSource.cpp src/integration/MixerAudioSource.cpp)
 target_link_libraries(cydaw_audio_sources PUBLIC CyDAW::Core CyAudioCore::Sources)
 target_compile_features(cydaw_audio_sources PUBLIC cxx_std_20)
 set_target_properties(cydaw_audio_sources PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -1158,6 +1158,7 @@ if(CYDAW_BUILD_DESKTOP)
             cydaw_copy_cyui_notices(CyDAW2)
             cydaw_use_precompiled_header(CyDAW2)
             target_link_libraries(CyDAW2 PRIVATE
+                cydaw_audio_sources
                 CyDAW::Core
                 cydaw_localization
                 cydaw_assets

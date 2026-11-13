@@ -1,3 +1,4 @@
+#include <cydaw/audio/SampleBuffer.h>
 #include <cydaw/base/Socket.h>
 #include <cydaw/base/Process.h>
 #include <cydaw/base/EventLoop.h>
@@ -156,7 +157,7 @@ bool decodeWindows(const cydaw::base::File& file, const double rate, const doubl
         const auto count = static_cast<int>(std::min<juce::int64>(window, length - start));
         if (count <= 0)
             continue;
-        juce::AudioBuffer<float> buffer(std::max(1, channels), count);
+        cydaw::audio::SampleBuffer<float> buffer(std::max(1, channels), count);
         if (!reader->read(&buffer, 0, count, start, true, channels > 1))
             return false;
         std::vector<float> mono(static_cast<std::size_t>(count));

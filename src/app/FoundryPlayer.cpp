@@ -1,3 +1,4 @@
+#include <cydaw/audio/Sources.h>
 #include "FoundryPlayer.h"
 
 #include <algorithm>
@@ -92,7 +93,7 @@ float FoundryPlayer::sampleAt(const int channel, const double frame) noexcept
     return ((c3 * t + c2) * t + c1) * t + x0;
 }
 
-void FoundryPlayer::getNextAudioBlock(const juce::AudioSourceChannelInfo& output)
+void FoundryPlayer::getNextAudioBlock(const cydaw::audio::AudioSourceChannelInfo& output)
 {
     output.clearActiveBufferRegion();
     if (hasPending_.exchange(false, std::memory_order_acq_rel)) {

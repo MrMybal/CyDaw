@@ -1,3 +1,4 @@
+#include <cydaw/audio/SampleBuffer.h>
 #include <cydaw/base/EventLoop.h>
 #include "SamplerMapFile.h"
 #include <cydaw/base/File.h>
@@ -384,7 +385,7 @@ cydaw::base::Text displayTest(const cydaw::base::File& project)
                 taps.push_back({ exit, false });
         }
         runtime.setTaps(taps);
-        juce::AudioBuffer<float> buffer(2, 512);
+        cydaw::audio::SampleBuffer<float> buffer(2, 512);
         for (auto block = 0; block < 8; ++block) {
             for (auto channel = 0; channel < 2; ++channel)
                 for (auto sample = 0; sample < 512; ++sample)
@@ -587,7 +588,7 @@ cydaw::base::Text effectsTest()
         runtime.prepare(48'000.0, 512, 2);
         if (const auto result = runtime.setGraph(native); result.failed())
             return typeKey + ": " + result.getErrorMessage();
-        juce::AudioBuffer<float> buffer(2, 512);
+        cydaw::audio::SampleBuffer<float> buffer(2, 512);
         auto inputEnergy = 0.0;
         auto outputEnergy = 0.0;
         auto peak = 0.0f;
@@ -654,7 +655,7 @@ cydaw::base::Text effectsTest()
         runtime.prepare(48'000.0, 512, 2);
         if (const auto result = runtime.setGraph(graph); result.failed())
             return "ping-pong graph: " + result.getErrorMessage();
-        juce::AudioBuffer<float> buffer(2, 512);
+        cydaw::audio::SampleBuffer<float> buffer(2, 512);
         auto first = -1;
         for (auto block = 0; block < 60 && first < 0; ++block) {
             buffer.clear();
@@ -697,7 +698,7 @@ cydaw::base::Text effectsTest()
             runtime.prepare(48'000.0, 512, 2);
             if (runtime.setGraph(graph).failed())
                 return 999.0;
-            juce::AudioBuffer<float> buffer(2, 512);
+            cydaw::audio::SampleBuffer<float> buffer(2, 512);
             auto peak = 0.0f;
             for (auto block = 0; block < 60; ++block) {
                 for (auto sample = 0; sample < 512; ++sample) {
@@ -747,7 +748,7 @@ cydaw::base::Text effectsTest()
         lane.field = &engine::NativeDspNodeParameters::effect1;
         lane.points = { { 0.0, -24.0f, 0, 0.0f }, { 1.0, 0.0f, 0, 0.0f } };
         runtime.setAutomation({ lane });
-        juce::AudioBuffer<float> buffer(2, 512);
+        cydaw::audio::SampleBuffer<float> buffer(2, 512);
         auto sampleClock = 0;
         // The peak in dB of a few blocks of sine played at a timeline place.
         const auto peakAt = [&](const double seconds, const int blocks) {
@@ -859,7 +860,7 @@ cydaw::base::Text effectsTest()
                 runtime.prepare(48'000.0, 512, 2);
                 if (const auto result = runtime.setGraph(graph); result.failed())
                     return "parametric EQ graph: " + result.getErrorMessage();
-                juce::AudioBuffer<float> buffer(2, 512);
+                cydaw::audio::SampleBuffer<float> buffer(2, 512);
                 auto inputEnergy = 0.0;
                 auto outputEnergy = 0.0;
                 for (auto block = 0; block < 48; ++block) {
