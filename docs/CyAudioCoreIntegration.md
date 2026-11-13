@@ -6,7 +6,10 @@ uses `cyaudio` service APIs and `cydsp` processors, including internal/exported
 instruments and effects. Neither sibling repository is modified by this port.
 
 Validated dependency revisions: CyAudioCore `bb26e93604d43de2069694b0791bc0bcf5a53ea6`,
-CyDSP `cc18dca043925b75adea481c1c8545a125607e1f`. The earlier source snapshot remains
+CyDSP `fda6bd30c5b622795cc08e8bd2750188a6c5a0c0`. This CyDSP revision changes only docs/report tooling
+from the previous pin; the compiled-source hash is identical. The
+[final source snapshot](reports/JuceRetirementSourceSnapshot.json) records clean
+sibling trees and their hashes. The earlier source snapshot remains
 at [CyAudioCoreSnapshot.json](reports/CyAudioCoreSnapshot.json). See the
 [current French integration/issue report](CyAudioCoreIntegrationReport.fr.md).
 Historical checkpoint reports in this repository describe their dated state;
@@ -43,7 +46,9 @@ they are not the current production dependency boundary.
 
 ## Windows builds
 
-Requirements are in the README. Default sibling locations are `../CyAudioCore`
+Requirements are in the README. Native acceptance tests require Python 3.12+
+for extensible PCM WAV support; install `tests/requirements-native.txt` for
+Cinema image/codec and numerical companion checks. Default sibling locations are `../CyAudioCore`
 and `../CyDSP`; override `CYDAW_CYAUDIOCORE_SOURCE_DIR` and
 `CYDAW_CYDSP_SOURCE_DIR`. Corresponding environment variables supply clean-build
 CI defaults. No implicit fetch of another audio-library revision occurs.
@@ -69,6 +74,27 @@ Windows build's generated dependency graph is checked by
 `tests/no_juce_build_check.py` for actual includes and libraries.
 
 ## Validation and distribution
+
+Final Windows acceptance passed: the 119-case native suite has no failures;
+its optional Batterie skip was separately exercised with the installed bank.
+The strict sampler/Batterie checks, actual Fireface ASIO four-format application
+session, native CLAP/LV2/VST3 exports, 47 official VST3 validator tests, five plugin
+windows and eight packaging tests passed. See
+[the acceptance manifest](reports/JuceRetirementAcceptance.json) for evidence
+paths and limits. No JUCE includes or libraries occur in the generated 41-project
+production dependency graph.
+
+```powershell
+python -m pip install -r tests/requirements-native.txt
+python tests/no_juce_build_check.py build/cyaudio-native-desktop
+# Native Audio Probe is in Release, not in a JUCE artefacts directory:
+& 'build/cyaudio-native-desktop/Release/CyDAWAudioProbe.exe' --open-type ASIO --open-device Fireface --sample-rate 48000 --block-size 1024 --output-only --run-silent-ms 300
+python tools/package_v2_test.py --build-dir build/cyaudio-native-desktop/CyDAW2_artefacts/Release --output output/cyaudio-native-package --alpha
+```
+
+Choose a block size actually advertised by the ASIO driver/control panel;
+1,024 is the currently installed Fireface setting, not a universal requirement.
+
 
 Run automated desktop scenarios with isolated `APPDATA`/`LOCALAPPDATA`, recovery
 disabled, and silent output. Some optional factory-instrument tests need installed

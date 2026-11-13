@@ -16551,6 +16551,7 @@ bool AudioTrackController::hasAudioFile() const noexcept { return !tracks_.empty
 
 bool AudioTrackController::isPlaying() const noexcept
 {
+    if(tracks_.empty()&&midiTracks_.empty())return masterOutput_.clockRunning();
     return std::any_of(midiTracks_.begin(), midiTracks_.end(), [](const auto& track) {
                return track->synth.isPlaying();
            })
@@ -16561,6 +16562,8 @@ bool AudioTrackController::isPlaying() const noexcept
 
 double AudioTrackController::position() const noexcept
 {
+    // Transport-only sessions still have the master audio clock.
+    if(tracks_.empty()&&midiTracks_.empty())return masterOutput_.clock();
     double current = 0.0;
     for (const auto& track : tracks_)
         current = std::max(current, track->transportSource.getCurrentPosition());

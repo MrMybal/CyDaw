@@ -100,7 +100,7 @@ The published application package is **Windows 10/11 x64 · Alpha 1**. Source bu
 <details>
 <summary><strong>Windows source build</strong></summary>
 
-Requirements: **Visual Studio 2022** with C++ tools/Windows SDK, **CMake 3.24+**, **Git/Git LFS**, **Python 3.11+** and **Node.js 22+/npm** for documentation. CMake fetches pinned CyUI sources; CyAudioCore manages the CyDSP dependency. CyUI checkout requires access if its repository is restricted. Prepare the shared FFmpeg SDK separately. NASM enables native EEL2 code generation; without it ysfx uses its portable interpreter.
+Requirements: **Visual Studio 2022** with C++ tools/Windows SDK, **CMake 3.24+**, **Git/Git LFS**, **Python 3.12+** and **Node.js 22+/npm** for documentation. CMake fetches pinned CyUI sources; CyAudioCore manages the CyDSP dependency. CyUI checkout requires access if its repository is restricted. Prepare the shared FFmpeg SDK separately. NASM enables native EEL2 code generation; without it ysfx uses its portable interpreter.
 
 ```powershell
 git lfs install

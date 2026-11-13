@@ -1,15 +1,17 @@
-# Active JUCE retirement work
+# JUCE retirement — completed production migration
 
-The user explicitly requires the COMPLETE migration. Do not stop after another
-partial integration report. Target: the production desktop and plugin worker
-configure/build/run without JUCE includes or libraries, preserving the actual
-application, editing, modes, MIDI, plugin formats and document functionality.
+Final status, 13 November 2026: the Windows production desktop and plugin worker
+build and run without JUCE. CyAudioCore owns the CyDSP numerical dependency.
+The [current report](CyAudioCoreIntegrationReport.fr.md) and
+[acceptance manifest](reports/JuceRetirementAcceptance.json) are authoritative.
+Historical, explicitly opt-in comparison fixtures remain outside production.
+Both sibling repositories were kept read-only; no push/publication was performed.
 
-Branch: CyDSP-CORE. Starting checkpoint: 58f8c87. CyAudioCore and CyDSP sibling
-repositories are read-only and unchanged. Use their public APIs. Commit meaningful
-validated checkpoints locally; do not push without a new request.
+The chronological notes below preserve intermediate discoveries and temporary
+boundaries. Statements about unfinished work describe their checkpoint only;
+they are not the current status or instructions to repeat completed work.
 
-## Active implementation
+## Historical implementation notes
 
 - Added original application foundation in include/cydaw/base and src/base:
   UTF-8 Text, containers, Result, Identifier, document Value/Object/JSON,
@@ -25,7 +27,7 @@ validated checkpoints locally; do not push without a new request.
   constitute completion. The same applies to src/app/ProjectRecovery.h and
   NativeDspGraphState.h adapters retaining file/text types.
 
-## Continue work
+## Historical continuation notes
 
 1. Finish the current document-port desktop build; inspect only unique errors
    from output/cyaudio-document-port-build.log. Last iteration had two errors:
@@ -243,3 +245,25 @@ factory banks are reported as absent in isolated profiles, rather than silently
 weakening synthetic sampler assertions; a separate strict installed-bank run
 is required. Windows worker/probe argv parsing now preserves Unicode with the
 native UTF-16 command line. Final runtime/export acceptance is the next step.
+
+
+## Final acceptance
+
+The fresh native Release build succeeds with JUCE fetch and fixtures disabled.
+All 41 generated production dependencies pass the no-JUCE check. The complete
+119-case suite has zero failures; the isolated optional Batterie skip and strict
+sampler bank were then exercised successfully against installed read-only media.
+Native CLAP/LV2 exports pass audio/state/editor checks, native VST3 passes editor
+lifecycle checks and all 47 official validator tests. Actual four-format desktop
+sessions pass both with Unicode paths and on Fireface ASIO. IPC crash/state/editor,
+VST3 pinned controls and five real plugin windows also pass. Eight package checks
+pass and a final local Alpha ZIP is generated without requiring a JUCE checkout.
+
+Final fixes preserve Windows UTF-16 environment paths and argv, cross-volume
+references, asynchronous binary sample caches, empty-session transport clocks,
+lazy cancellable scans, plugin parameter refresh and driver-advertised ASIO
+quanta. COM initialization is required before ASIO discovery. The real factory
+runs pass in both ASIO and WASAPI. Windows production retirement is complete;
+other desktop ports, measured analog latency, recording/hotplug and broad
+third-party plugin compatibility remain separate acceptance work, not a hidden
+JUCE dependency. See the current report for precise upstream Core API gaps.

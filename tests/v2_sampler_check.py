@@ -323,12 +323,25 @@ def scenario(scratch: Path) -> None:
         print("skip the factory instruments: none in", listed.get("folder"), flush=True)
         return
     check(len(instruments) >= 17, f"the factory instruments are listed ({len(instruments)})")
+    # Bank registries can be absent in a clean profile. Inspect the actual map
+    # paths before optional factory checks; synthetic decoding above never skips.
+    bank_root = Path(need({"cmd": "banks", "action": "list"}, "bank paths")["folder"])
+    def missing_samples(key):
+        mapping = json.loads(Path(instruments[key]["map"]).read_text(encoding="utf-8-sig"))
+        missing = 0
+        for zone in mapping.get("zones", []):
+            name = zone.get("file", "")
+            path = (bank_root / name[5:] if name.startswith("bank:") else
+                    Path(listed["folder"]) / name[8:] if name.startswith("factory:") else Path(name))
+            missing += not path.is_file()
+        return missing
+
     for key, note, seconds in (("harpsichord-italian", 60, 0.8), ("violin-arco", 67, 20.0)):
         if key not in instruments:
             check(False, f"{key} is a factory instrument")
             continue
-        if instruments[key].get("missingFiles", 0) > 0 and os.environ.get("CYDAW_REQUIRE_FACTORY_SAMPLES") != "1":
-            print(f"skip optional factory bank {key}: {instruments[key]['missingFiles']} samples are not installed", flush=True)
+        if (missing := missing_samples(key)) > 0 and os.environ.get("CYDAW_REQUIRE_FACTORY_SAMPLES") != "1":
+            print(f"skip optional factory bank {key}: {missing} samples are not installed", flush=True)
             continue
         added = need({"cmd": "add_factory_instrument", "key": key}, key)
         status = need({"cmd": "sampler_status", "track": added["track"], "wait": 60}, key + " status")
@@ -345,8 +358,8 @@ def scenario(scratch: Path) -> None:
         if key not in instruments:
             check(False, f"{key} is a factory instrument")
             continue
-        if instruments[key].get("missingFiles", 0) > 0 and os.environ.get("CYDAW_REQUIRE_FACTORY_SAMPLES") != "1":
-            print(f"skip optional factory bank {key}: {instruments[key]['missingFiles']} samples are not installed", flush=True)
+        if (missing := missing_samples(key)) > 0 and os.environ.get("CYDAW_REQUIRE_FACTORY_SAMPLES") != "1":
+            print(f"skip optional factory bank {key}: {missing} samples are not installed", flush=True)
             continue
         added = need({"cmd": "add_factory_instrument", "key": key}, key)
         status = need({"cmd": "sampler_status", "track": added["track"], "wait": 60}, key + " status")

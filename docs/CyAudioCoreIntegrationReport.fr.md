@@ -3,10 +3,14 @@
 Date : 13 novembre 2026. Branche `CyDSP-CORE`.
 Architecture : **CyDaw → CyAudioCore → CyDSP numérique**, interface CyUI/ImGui.
 Révisions : CyAudioCore `bb26e93604d43de2069694b0791bc0bcf5a53ea6`,
-CyDSP `cc18dca043925b75adea481c1c8545a125607e1f`.
-Les deux dépôts de bibliothèque restent inchangés.
+CyDSP `fda6bd30c5b622795cc08e8bd2750188a6c5a0c0`.
+Les deux dépôts de bibliothèque restent inchangés par cette intégration.
+La révision CyDSP précédente `cc18dca043925b75adea481c1c8545a125607e1f` diffère seulement
+par sa documentation et ses outils de rapport : les sources compilées ont le même
+SHA-256. Le [snapshot final](reports/JuceRetirementSourceSnapshot.json) conserve
+les révisions, les périmètres de hachage et les empreintes vérifiées.
 
-## Résultat de compilation
+## Résultat final
 
 Le desktop Windows complet et le worker de plugins compilent désormais sans
 checkout, includes ni bibliothèques JUCE. Le répertoire neuf
@@ -46,6 +50,19 @@ L'exécutable garde son nom interne `CyDAW 2.exe` pour les scripts existants.
 - **Arguments Unicode sous Windows** : les arguments étroits du CRT arrivent
   dans la page de codes locale. Le worker et les probes lisent désormais la
   véritable ligne de commande UTF-16 ; l'archive ZIP au nom accentué est testée.
+- **Environnement Unicode** : `getenv` du CRT dégradait aussi les variables de
+  chemin Windows accentuées. Leur lecture utilise maintenant UTF-16. Le scénario
+  complet des quatre formats passe depuis un dossier accentué.
+- **Transport vide** : une session sans pistes doit suivre l’horloge master ;
+  le suivi JACK start/stop/locate fonctionne aussi dans ce cas.
+- **ASIO** : initialisation COM avant la découverte et rejet d’un quantum non
+  annoncé par le pilote. La Fireface annonce actuellement 1 024 échantillons ;
+  accepter artificiellement 64 provoquait un découpage PortAudio en rafale.
+  Le test positif à 1 024 et le rejet explicite à 64 sont vérifiés.
+- **Répertoire de samples** : parcours paresseux au lieu de matérialiser toute
+  l’arborescence avant le premier résultat, permettant l’annulation rapide.
+- **Éditeur de plugin** : les changements d’état, métadonnées et demandes de
+  reconfiguration rafraîchissent aussi les paramètres des contrôles génériques.
 - **Période WASAPI** : augmenter uniquement la capacité du callback ne suffisait
   pas. La FIFO nominale Core devait aussi être alignée sur la période négociée,
   sinon le worker recevait des blocs courts en rafale. Les deux sont alignées.
@@ -74,21 +91,48 @@ Aucun changement des bibliothèques privées n'a été fait pour contourner ces 
 | P2 | Planifier des voix stéréo personnalisées | Ordonnanceur applicatif conservé ; le callback générique de synthèse Core est mono |
 | P2 | Mettre en cache une source rendue arbitraire | Cache applicatif de pages ; la source de lecture anticipée Core attend un chemin de fichier |
 | P2 | API de programmes générique entre formats | Adaptation LV2 et paramètre CLAP Preset ; documenter les capacités par format |
+| P2 | Classification explicite des plugins | `PluginDescriptor` ne donne pas de type instrument/effet/MIDI ni de catégories ; l’heuristique ports audio/notes est insuffisante pour les hybrides. Ajouter ces champs publics |
 
 Ces adaptations n'utilisent pas JUCE. Elles ne justifient plus de conserver
 l'ancien framework dans le produit.
 
-## Validation
+## Validation terminée
 
-Build complet natif réussi : `output/cyaudio-strict-verified-build.log`.
-Les tests autonomes couvrent les services réellement employés, le moteur,
-les fichiers audio, les voix/MIDI, les périphériques, le transport et l'IPC.
-La campagne finale des scénarios applicatifs et des exports est en cours ;
-les résultats définitifs seront ajoutés après leur exécution.
+Les résultats structurés et chemins des preuves sont conservés dans
+[JuceRetirementAcceptance.json](reports/JuceRetirementAcceptance.json).
 
-Les profils de test sont isolés ; les tests ne doivent pas enregistrer des
-réglages dans le profil de travail de l'utilisateur. Les tests de samples
-installés accèdent à la banque existante en lecture uniquement.
+| Vérification | Résultat |
+| --- | --- |
+| Production Windows Release, téléchargement et fixtures JUCE désactivés | Application, worker et Audio Probe compilés dans un répertoire neuf |
+| Dépendances MSBuild de l’application et du worker | 41 projets inspectés ; aucun include ni lien JUCE |
+| Suite CTest native complète | 119 cas enregistrés, 0 échec ; Batterie ignoré dans le profil isolé sans banque, puis exécuté séparément avec succès |
+| Banque réelle en mode strict et Batterie | 2/2 réussis avec `D:/CyDAW/Banks` en lecture |
+| Contrats finaux ASIO, manager, ports, plateforme et absence JUCE | 5/5 réussis après les derniers correctifs |
+| Application réelle : JSFX/CLAP/LV2/VST3 | Scripts/rechargement/erreurs/tempo, presets, état, sauvegarde/relecture et génération des trois projets d’export réussis, y compris dossier accentué |
+| Même scénario sur Fireface ASIO, 48 kHz / 1 024 échantillons | Réussi, entrées désactivées et sortie silencieuse |
+| Exports neufs LV2 et CLAP | Audio, état, paramètres et interface native réussis |
+| Export neuf VST3 | Audio, paramètres, ouverture/fermeture/réouverture de l’éditeur réussis |
+| Validateur officiel VST3 | 47 réussis, 0 échec |
+| Worker IPC natif face à un VST3 externe | Audio, crash/bypass, état, paramètres, boîte aux lettres et éditeur réussis |
+| Paramètres épinglés et modulation VST3 | Sauvegarde/relecture réussie |
+| Cinq fenêtres d’instruments/effets | Captures, tailles et fermeture réussies |
+| Packaging sans checkout JUCE | 8 tests réussis ; archive Alpha locale produite et inspectée |
+| Sécurité du commit | Scan Gitleaks du diff indexé effectué avant commit |
+
+Les tests IPC et des cinq fenêtres utilisent aussi un plugin de comparaison
+historique construit avec JUCE : cela vérifie qu’un plugin tiers peut employer
+ce framework sans l’imposer à l’hôte. Les exports neufs VST3/CLAP/LV2 ont été
+compilés et contrôlés séparément sans JUCE.
+
+Les profils de test isolent `APPDATA`, `LOCALAPPDATA` et `Locations.json` ; les
+réglages de travail ne sont pas remplacés. Les images du mode Cinéma, sa bande
+de vignettes, ses clips audio et sa fenêtre de prévisualisation ont aussi été
+inspectés. Les vérifications audio automatiques mesurent les buffers/mètres et
+rendent les sorties silencieuses : ce n’est pas une validation d’écoute humaine.
+
+La validation exige Python 3.12+ pour lire les WAV PCM extensibles émis par Core.
+La configuration et l’Action Alpha utilisent cette version avec les dépendances
+épinglées dans `tests/requirements-native.txt`.
 
 ## Limites d'acceptation matérielle et de plateforme
 
@@ -96,8 +140,9 @@ La cible validée est Windows x64. Cela ne constitue pas une validation du
 desktop Linux/macOS, dont la fenêtre/dialogues/éditeurs natifs demandent un
 portage spécifique. Les exports de plugins et le moteur portable sont distincts.
 
-Un démarrage/arrêt silencieux réel Fireface ASIO et des callbacks WASAPI ont été
-vérifiés. Cela ne mesure pas la latence analogique et ne remplace pas des essais
+La fabrique de périphériques a été exercée réellement en Fireface ASIO et en
+WASAPI. Le probe ASIO a reçu 15 callbacks / 15 360 frames sur 300 ms au quantum
+annoncé de 1 024 ; sa latence backend rapportée est de 1 069 échantillons. Cela ne mesure pas la latence analogique et ne remplace pas des essais
 microphone, MIDI physique, hotplug/reconnexion ou l'écoute des sorties. Les
 plugins tiers installés demandent encore leur propre matrice d'interopérabilité.
 VST2 n'est pas annoncé : Core ne fournit pas ce provider. La compatibilité avec

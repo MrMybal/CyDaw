@@ -98,8 +98,8 @@ for second,upper,lower in [(0,'red','green'),(.96,'red','green'),(1,'blue','yell
     assert all(len(v)>300 for v in points.values()),(second,{k:len(v) for k,v in points.items()})
     assert sum(y for x,y in points[upper])/len(points[upper])<sum(y for x,y in points[lower])/len(points[lower]),'Video orientation'
 report['videoFrameBoundaryAndOrientation']=True
-wait(lambda:any(t['name']=='Guide vid\u00e9o' and t['clips'] for t in tab()['tracks']))
-guide=next(t for t in tab()['tracks'] if t['name']=='Guide vid\u00e9o');video_bus=next(t for t in tab()['tracks'] if t['id']==guide['parentId'])
+wait(lambda:any(t['name'] in ('Guide vid\u00e9o','Video guide') and t['clips'] for t in tab()['tracks']))
+guide=next(t for t in tab()['tracks'] if t['name'] in ('Guide vid\u00e9o','Video guide'));video_bus=next(t for t in tab()['tracks'] if t['id']==guide['parentId'])
 assert video_bus['bus'] and video_bus['virtualGroup'] and 96000<=guide['clips'][0]['length']<100000
 state=c(action='processing');native_bus=next(t for t in state['tracks'] if t['inputId']==video_bus['id']);native_guide=next(t for t in state['tracks'] if t['inputId']==guide['id'])
 assert native_guide['outputs'][0]['destination']==native_bus['key'] and native_bus['outputs'][0]['destination']==0

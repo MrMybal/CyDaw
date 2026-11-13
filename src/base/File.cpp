@@ -235,8 +235,13 @@ File::createOutputStream(std::size_t b) const {
 int File::findChildFiles(Array<File> &out, int what, bool recursive,
                          const Text &mask) const {
   int before = out.size();
-  auto patterns=TextList::fromTokens(mask,";,",{});
-  auto matches=[&](const Text& name){return std::any_of(patterns.begin(),patterns.end(),[&](const Text& pattern){return wildcard(pattern.trim().toStdString(),name.toStdString());});};
+  auto patterns = TextList::fromTokens(mask, ";,", {});
+  auto matches = [&](const Text &name) {
+    return std::any_of(
+        patterns.begin(), patterns.end(), [&](const Text &pattern) {
+          return wildcard(pattern.trim().toStdString(), name.toStdString());
+        });
+  };
   auto add = [&](const auto &entry) {
     File f(entry.path());
     if ((what & ignoreHiddenFiles) && f.isHidden())
@@ -275,10 +280,102 @@ File File::getNonexistentChildFile(const Text &prefix, const Text &suffix,
                      (brackets ? ")" : "") + suffix);
   return f;
 }
+struct RangedDirectoryIterator::Cursor {
+  std::filesystem::directory_iterator flat;
+  std::filesystem::recursive_directory_iterator tree;
+  TextList patterns;
+  Entry current;
+  bool recursive{}, ended{};
+  int flags{};
+  Cursor(const File &root, bool recurse, const Text &mask, int what)
+      : patterns(TextList::fromTokens(mask, ";,", {})), recursive(recurse),
+        flags(what) {
+    std::error_code error;
+    auto options = std::filesystem::directory_options::skip_permission_denied;
+    if (recursive)
+      tree = std::filesystem::recursive_directory_iterator(root.path(), options,
+                                                           error);
+    else
+      flat = std::filesystem::directory_iterator(root.path(), options, error);
+    ended = bool(error);
+    seek(false);
+  }
+  void seek(bool advance) {
+    if (ended)
+      return;
+    std::error_code error;
+    auto increment = [&] {
+      if (recursive)
+        tree.increment(error);
+      else
+        flat.increment(error);
+    };
+    if (advance)
+      increment();
+    for (;;) {
+      if (error ||
+          (recursive ? tree == std::filesystem::recursive_directory_iterator{}
+                     : flat == std::filesystem::directory_iterator{})) {
+        ended = true;
+        return;
+      }
+      current.file = File(recursive ? tree->path() : flat->path());
+      const auto &file = current.file;
+      if (!((flags & File::ignoreHiddenFiles) && file.isHidden()) &&
+          (file.isDirectory() ? (flags & File::findDirectories)
+                              : (flags & File::findFiles)) &&
+          std::any_of(patterns.begin(), patterns.end(), [&](const Text &mask) {
+            return wildcard(mask.trim().toStdString(),
+                            file.getFileName().toStdString());
+          }))
+        return;
+      increment();
+    }
+  }
+};
+RangedDirectoryIterator::Iterator::Iterator(std::shared_ptr<Cursor> cursor)
+    : cursor_(std::move(cursor)) {}
+const RangedDirectoryIterator::Entry &
+RangedDirectoryIterator::Iterator::operator*() const {
+  return cursor_->current;
+}
+RangedDirectoryIterator::Iterator &
+RangedDirectoryIterator::Iterator::operator++() {
+  cursor_->seek(true);
+  return *this;
+}
+bool RangedDirectoryIterator::Iterator::operator!=(End) const {
+  return cursor_ && !cursor_->ended;
+}
+RangedDirectoryIterator::Iterator RangedDirectoryIterator::begin() const {
+  return Iterator(
+      std::make_shared<Cursor>(root_, recursive_, wildcard_, flags_));
+}
+
 Text SystemStats::getEnvironmentVariable(const Text &key,
                                          const Text &fallback) {
+#if defined(_WIN32)
+  const auto name = key.toWideString();
+  SetLastError(ERROR_SUCCESS);
+  auto required = GetEnvironmentVariableW(name.c_str(), nullptr, 0);
+  if (!required)
+    return GetLastError() == ERROR_ENVVAR_NOT_FOUND ? fallback : Text{};
+  for (int attempt = 0; attempt < 3; ++attempt) {
+    std::wstring value(required, L'\0');
+    auto count = GetEnvironmentVariableW(name.c_str(), value.data(), required);
+    if (!count)
+      return GetLastError() == ERROR_ENVVAR_NOT_FOUND ? fallback : Text{};
+    if (count < required) {
+      value.resize(count);
+      return Text(value.c_str());
+    }
+    required = count;
+  }
+  return fallback;
+#else
   auto *value = std::getenv(key.toRawUTF8());
   return value ? Text::fromUTF8(value) : fallback;
+#endif
 }
 Text SystemStats::getOperatingSystemName() {
 #if defined(_WIN32)

@@ -1,4 +1,3 @@
-#include <cydaw/base/Platform.h>
 #include <cydaw/base/Listeners.h>
 #include <cydaw/base/Platform.h>
 #include <cydaw/base/Url.h>
@@ -14,7 +13,7 @@ static void need(bool b, const char *why) {
 }
 int main(int argc, char **argv) {
   try {
-    auto arguments=cydaw::base::commandLineArguments(argc,argv);
+    auto arguments = cydaw::base::commandLineArguments(argc, argv);
     need(arguments.size() == 3, "HTTP and archive fixture paths required");
     need(Text::isValidUTF8("a\xc3\xa9\xf0\x9f\x8e\xac", 7), "valid UTF8");
     for (auto s :
@@ -25,7 +24,12 @@ int main(int argc, char **argv) {
     need(Text::fromUTF16(utf16, 4) ==
              Text::fromUTF8("A\xf0\x9f\x8e\xac\xc3\xa9"),
          "UTF16 surrogate pairs");
-    auto original = Text::fromUTF8("fran\xc3\xa7" "ais # + %/");
+    need(SystemStats::getEnvironmentVariable("CYDAW_NATIVE_UTF8_TEST") ==
+             Text::fromUTF8("fran\xc3\xa7"
+                            "ais \xf0\x9f\x8e\xac"),
+         "Windows UTF16 environment preserves Unicode paths");
+    auto original = Text::fromUTF8("fran\xc3\xa7"
+                                   "ais # + %/");
     need(Url::removeEscapeChars(Url::addEscapeChars(original, true)) ==
              original,
          "URL encoding lossless");
@@ -65,6 +69,23 @@ int main(int argc, char **argv) {
     });
     need(a.calls == 1 && b.calls == 0,
          "callback removal does not call dangling listeners");
+    auto scanRoot = File(arguments[2]).getSiblingFile("lazy-scan");
+    need(scanRoot.createDirectory().wasOk(), "create scan fixture");
+    RangedDirectoryIterator lazy(scanRoot, true, "*.wav", File::findFiles);
+    need(scanRoot.getChildFile("nested").createDirectory().wasOk(),
+         "nested scan fixture");
+    need(scanRoot.getChildFile("nested/later.wav").replaceWithText("fixture"),
+         "write lazy entry");
+    need(scanRoot.getChildFile("ignored.txt").replaceWithText("fixture"),
+         "write excluded entry");
+    int found = 0;
+    for (const auto &entry : lazy) {
+      need(entry.getFile().getFileName() == "later.wav",
+           "recursive wildcard filter");
+      ++found;
+    }
+    need(found == 1,
+         "scan opens lazily and reads entries added after range construction");
     ZipFile zip{File(arguments[2])};
     need(zip.getNumEntries() == 3, "ZIP central directory");
     auto index = zip.getIndexOfFileName("media/large.bin");

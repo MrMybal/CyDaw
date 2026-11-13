@@ -1,3 +1,12 @@
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+// clang-format off
+#include <windows.h>
+#include <objbase.h>
+// clang-format on
+#endif
 #include <cydaw/audio/Devices.h>
 #include <iostream>
 #include <stdexcept>
@@ -31,6 +40,15 @@ struct Silence final : audio::DeviceCallback {
   }
 };
 int main(int argc, char **argv) {
+#ifdef _WIN32
+  struct ComScope {
+    HRESULT status = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    ~ComScope() {
+      if (SUCCEEDED(status))
+        CoUninitialize();
+    }
+  } com;
+#endif
   try {
     audio::ChannelSet channels;
     channels.setBit(0);
@@ -64,8 +82,11 @@ int main(int argc, char **argv) {
     require(bool(device), "native device factory");
     audio::ChannelSet out;
     out.setRange(0, 2, true);
-    require(device->open({}, out, 48000, 128).isEmpty(),
-            "native Core output opens");
+    require(
+        device
+            ->open({}, out, 48000, asio ? device->getDefaultBufferSize() : 128)
+            .isEmpty(),
+        "native Core output opens");
     auto stream = device->streamDescription();
     require(stream && stream->sampleRate == 48000 &&
                 stream->output.channels == 2,

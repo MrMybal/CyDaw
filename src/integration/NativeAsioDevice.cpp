@@ -62,6 +62,13 @@ public:
     if (!std::isfinite(rate) || rate <= 0 || rate > 768000 || frames <= 0 ||
         frames > 1048576)
       return lastError = error(Status::invalid_argument);
+    // ASIO drivers may expose only their current control-panel quantum. Do
+    // not let PortAudio silently split that quantum into an unsupported small
+    // client period: per-instance plugin IPC requires regular block deadlines.
+    if (std::find(details.bufferSizes.begin(), details.bufferSizes.end(),
+                  frames) == details.bufferSizes.end())
+      return lastError = "ASIO buffer size is not advertised by the driver; "
+                         "use its control panel.";
     config = {};
     inputMask = inputs;
     outputMask = outputs;

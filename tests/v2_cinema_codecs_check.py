@@ -58,7 +58,7 @@ try:
         c(action='cursor',at=1.2,seconds=True);wait(lambda:abs(tab()['decoder']['time']-1.2)<.022)
         c(action='cursor',at=.2,seconds=True);wait(lambda:abs(tab()['decoder']['time']-.2)<.022)
         wait(lambda:tab()['thumbnailCount']>=8)
-        guide=wait(lambda:next((t for t in tab()['tracks'] if t['name']=='Guide vid\u00e9o' and t['clips']),None))
+        guide=wait(lambda:next((t for t in tab()['tracks'] if t['name'] in ('Guide vid\u00e9o','Video guide') and t['clips']),None))
         clip=guide['clips'][0];assert 95000<=clip['length']<=101000,(name,clip['length'])
         output=folder/(name+'.wav');c(action='export',path=str(output),bits=16)
         with wave.open(str(output),'rb') as f:

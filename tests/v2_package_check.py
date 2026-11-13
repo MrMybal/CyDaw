@@ -30,6 +30,10 @@ class PackageTests(unittest.TestCase):
                      'build/fonts/Roboto-Medium.ttf', 'build/fonts/Cousine-Regular.ttf',
                      'build/i18n/en.json', 'build/Licenses/FFmpeg/LICENSE-LGPL-3.0.txt',
                      'build/Licenses/FFmpeg/sources/ffmpeg.tar.gz', 'build/ControlPlugins/Gamepads.cyctl',
+                     'build/Licenses/nlohmann-json/LICENSE.MIT', 'build/Licenses/pugixml/LICENSE.md',
+                     'build/Licenses/miniz/LICENSE', 'build/Licenses/stb/LICENSE',
+                     'build/Licenses/CyAudioCore/LICENSE', 'build/Licenses/CyAudioCore/manifest.json',
+                     'build/Licenses/CyDSP/LICENSE', 'build/Licenses/CyDSP/manifest.json',
                      'build/Licenses/CyUI/LICENSE', 'build/Licenses/CyUI/THIRD_PARTY_NOTICES.md',
                      'build/Licenses/CyUI/third_party/texteditor/LICENSE',
                      'build/Licenses/CyUI/third_party/lexilla/License.txt',
@@ -68,6 +72,12 @@ class PackageTests(unittest.TestCase):
         archive.write_bytes(b'corrupt')
         with self.assertRaises(ValueError):
             publish.verified_assets(self.root / 'out')
+
+    def test_native_package_has_no_juce_requirement(self):
+        archive = pack.package(self.root / 'build', self.root / 'out', True)
+        with zipfile.ZipFile(archive) as bundle:
+            self.assertFalse(any(n.endswith('/JUCE_LICENSE.md') for n in bundle.namelist()))
+            self.assertTrue(any(n.endswith('/Licenses/CyAudioCore/LICENSE') for n in bundle.namelist()))
 
     def test_missing_reader_data_fails(self):
         (self.root / 'build/Documentation/DocData/data.js').unlink()

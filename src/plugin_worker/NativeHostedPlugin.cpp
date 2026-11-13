@@ -290,7 +290,9 @@ void NativeHostedPlugin::setStateInformation(const void *data, int size) {
   const auto status = plugin_.loadState(state);
   if (status == Status::ok) {
     (void)plugin_.refresh();
-    syncValues();
+    refreshDescription();
+    if (editor_)
+      editor_->refreshParameters();
   }
   if (resume)
     prepareToPlay(options_.sampleRate, int(options_.maximumFrames));

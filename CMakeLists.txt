@@ -30,7 +30,7 @@ if(WIN32 AND CYDAW_BUILD_DESKTOP)
     set(cydaw_asio_default ON)
 endif()
 option(CYDAW_ENABLE_ASIO "Build CyDaw's GPL ASIO backend using PortAudio" ${cydaw_asio_default})
-option(CYDAW_ENABLE_JACK "Enable JACK where JUCE supports it" ON)
+option(CYDAW_ENABLE_JACK "Discover optional JACK development headers (transport uses the bundled dynamic API)" ON)
 option(CYDAW_ENABLE_VST2 "Enable legacy VST2 hosting with a legally obtained SDK" OFF)
 set(CYDAW_JUCE_SOURCE_DIR "" CACHE PATH "Path to a local JUCE checkout")
 # The instruments CyDAW ships (tools/factory_content builds them): a package
@@ -44,7 +44,7 @@ add_compile_definitions(CYDAW_FACTORY_CONTENT_DIR="${CYDAW_FACTORY_CONTENT_DIR}"
 # 33 s was the LTO link and only a fraction the compile. Keep it on for the
 # builds that ship and let day-to-day work turn it off.
 option(CYDAW_ENABLE_LTO "Link the desktop targets with link-time optimisation" ON)
-option(CYDAW_ENABLE_PCH "Precompile the JUCE surface shared by the desktop sources" ON)
+option(CYDAW_ENABLE_PCH "Precompile the standard/native surface shared by the desktop sources" ON)
 set(CYDAW_VST2_SDK_PATH "" CACHE PATH
     "Root containing pluginterfaces/vst2.x/aeffect.h from a licensed historical VST2 SDK")
 # The GPL ASIO SDK is selected by CyDaw, outside the MIT source repositories.
@@ -91,13 +91,16 @@ if(CYDAW_ENABLE_JACK AND (WIN32 OR APPLE OR UNIX))
     else()
         message(WARNING
             "CYDAW_ENABLE_JACK is ON, but jack/jack.h was not found. "
-            "CyDAW will be built without JACK; install the JACK development headers "
-            "or set JACK_ROOT/JACK_SDK_DIR to enable it.")
+            "Optional JACK development integration is disabled. Dynamic JACK transport "
+            "remains available when its runtime is installed; set JACK_ROOT/JACK_SDK_DIR for headers.")
     endif()
 endif()
 
 set(CYDAW_VST2_AVAILABLE OFF)
 if(CYDAW_BUILD_DESKTOP AND CYDAW_ENABLE_VST2)
+    if(NOT CYDAW_BUILD_LEGACY_JUCE_TESTS)
+        message(FATAL_ERROR "CyAudioCore has no VST2 provider. CYDAW_ENABLE_VST2 is limited to opt-in historical JUCE fixtures.")
+    endif()
     if(NOT CYDAW_VST2_SDK_PATH)
         message(FATAL_ERROR
             "CYDAW_ENABLE_VST2=ON requires CYDAW_VST2_SDK_PATH. "
@@ -904,8 +907,8 @@ if(CYDAW_BUILD_DESKTOP AND CYDAW_BUILD_LEGACY_JUCE_TESTS)
         endif()
     else()
         message(STATUS
-            "JUCE was not provided: building the CyDAW core only. "
-            "Set CYDAW_JUCE_SOURCE_DIR or CYDAW_FETCH_JUCE=ON for the desktop shell.")
+            "JUCE was not provided: historical comparison fixtures are skipped. "
+            "The native CyAudioCore/CyUI desktop does not require JUCE.")
     endif()
 endif()
 
@@ -929,6 +932,9 @@ if(CYDAW_BUILD_DESKTOP AND WIN32)
         # src/v2 holds it.
         option(CYDAW_BUILD_V2 "Build CyDAW 2, the Dear ImGui interface" ON)
         if(WIN32 AND CYDAW_BUILD_V2)
+            if(CYDAW_BUILD_TESTS)
+                find_package(Python3 3.12 REQUIRED COMPONENTS Interpreter)
+            endif()
             add_executable(CyDAW2 WIN32)
             set_target_properties(CyDAW2 PROPERTIES OUTPUT_NAME "CyDAW 2"
                 RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/CyDAW2_artefacts/$<CONFIG>")

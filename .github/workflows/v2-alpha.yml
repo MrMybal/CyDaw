@@ -33,10 +33,12 @@ jobs:
           token: ${{ secrets.CYDAW_DEPENDENCIES_TOKEN || github.token }}
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Install native acceptance test dependencies
+        run: python -m pip install -r tests/requirements-native.txt
       - name: Check Alpha tag
         run: python tools/publish_v2_alpha.py --check-tag "$env:RELEASE_TAG"
       - uses: actions/cache@v4

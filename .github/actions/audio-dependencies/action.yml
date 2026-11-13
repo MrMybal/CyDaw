@@ -17,7 +17,7 @@ runs:
     - uses: actions/checkout@v4
       with:
         repository: MrMybal/CyDSP
-        ref: cc18dca043925b75adea481c1c8545a125607e1f
+        ref: fda6bd30c5b622795cc08e8bd2750188a6c5a0c0
         path: .dependencies/CyDSP
         token: ${{ inputs.token }}
         persist-credentials: false

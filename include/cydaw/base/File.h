@@ -544,12 +544,41 @@ struct SystemStats {
   static Text getOperatingSystemName();
   static int getNumCpus() { return int(std::thread::hardware_concurrency()); }
 };
+// Input range: opening/advancing a scan never materializes the entire tree.
+// Destruction closes the directory handles immediately when a worker cancels.
 class RangedDirectoryIterator {
+  struct Cursor;
+  File root_;
+  bool recursive_;
+  Text wildcard_;
+  int flags_;
+
 public:
- struct Entry {File file;File getFile()const{return file;}bool isDirectory()const{return file.isDirectory();}bool isHidden()const{return file.isHidden();}int64 getFileSize()const{return file.getSize();}Time getModificationTime()const{return file.getLastModificationTime();}};
-private:std::vector<Entry> entries_;
-public:
- RangedDirectoryIterator(const File& root,bool recursive,const Text& wildcard="*",int flags=File::findFilesAndDirectories){for(const auto& file:root.findChildFiles(flags,recursive,wildcard))entries_.push_back({file});}
- auto begin()const{return entries_.begin();}auto end()const{return entries_.end();}
+  struct Entry {
+    File file;
+    File getFile() const { return file; }
+    bool isDirectory() const { return file.isDirectory(); }
+    bool isHidden() const { return file.isHidden(); }
+    int64 getFileSize() const { return file.getSize(); }
+    Time getModificationTime() const { return file.getLastModificationTime(); }
+  };
+  struct End {};
+  class Iterator {
+    std::shared_ptr<Cursor> cursor_;
+
+  public:
+    explicit Iterator(std::shared_ptr<Cursor>);
+    const Entry &operator*() const;
+    Iterator &operator++();
+    bool operator!=(End) const;
+  };
+  RangedDirectoryIterator(const File &root, bool recursive,
+                          const Text &wildcard = "*",
+                          int flags = File::findFilesAndDirectories)
+      : root_(root), recursive_(recursive), wildcard_(wildcard), flags_(flags) {
+  }
+  Iterator begin() const;
+  End end() const { return {}; }
 };
+
 } // namespace cydaw::base

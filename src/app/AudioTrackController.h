@@ -596,6 +596,7 @@ public:
     void setClockRunning(bool running) noexcept { clockRunning_.store(running, std::memory_order_release); }
     void setTempo(double bpm) noexcept { tempo_.store(bpm, std::memory_order_relaxed); }
     [[nodiscard]] double clock() const noexcept { return clock_.load(std::memory_order_relaxed); }
+    [[nodiscard]] bool clockRunning() const noexcept { return clockRunning_.load(std::memory_order_acquire); }
     // How late the master's devices make the mix (look-aheads).
     [[nodiscard]] int chainLatencySamples() const noexcept
     {

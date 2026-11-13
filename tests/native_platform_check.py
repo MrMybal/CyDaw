@@ -1,3 +1,4 @@
+import os
 import http.server
 import pathlib
 import subprocess
@@ -35,7 +36,7 @@ with tempfile.TemporaryDirectory(prefix="cydaw-native-platform-") as folder:
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
-        result = subprocess.run([sys.argv[1], f"http://127.0.0.1:{server.server_port}", str(archive)], timeout=30)
+        result = subprocess.run([sys.argv[1], f"http://127.0.0.1:{server.server_port}", str(archive)], timeout=30, env=dict(os.environ, CYDAW_NATIVE_UTF8_TEST="français 🎬"))
     finally:
         server.shutdown()
         server.server_close()

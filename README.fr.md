@@ -100,7 +100,7 @@ L’archive publiée de l’application est **Windows 10/11 x64 · Alpha 1**. Le
 <details>
 <summary><strong>Compilation Windows depuis les sources</strong></summary>
 
-Prérequis : **Visual Studio 2022** avec outils C++/SDK Windows, **CMake 3.24+**, **Git/Git LFS**, **Python 3.11+** et **Node.js 22+/npm** pour la documentation. CMake récupère la révision fixée de CyUI ; CyAudioCore gère sa dépendance CyDSP. l’accès au dépôt CyUI est requis s’il est restreint. Préparer le SDK partagé FFmpeg séparément. NASM active la génération native de code EEL2 ; sans lui, ysfx utilise son interpréteur portable.
+Prérequis : **Visual Studio 2022** avec outils C++/SDK Windows, **CMake 3.24+**, **Git/Git LFS**, **Python 3.12+** et **Node.js 22+/npm** pour la documentation. CMake récupère la révision fixée de CyUI ; CyAudioCore gère sa dépendance CyDSP. l’accès au dépôt CyUI est requis s’il est restreint. Préparer le SDK partagé FFmpeg séparément. NASM active la génération native de code EEL2 ; sans lui, ysfx utilise son interpréteur portable.
 
 ```powershell
 git lfs install
