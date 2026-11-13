@@ -9,11 +9,11 @@
 #include <memory>
 
 // A native child window showing Dear ImGui with Direct3D 11. Everything — input, the
-// interface code, the rendering — runs on the message thread, paced by the
-// display's vertical blank, so the interface can call the engine directly.
+// interface code, the rendering — runs on the message thread, so the
+// interface can call the engine directly.
 //
-// Frames run at the display rate while something moves (input, playback,
-// animation) and drop to a low idle rate otherwise.
+// Frames use the selected 30/60/120 FPS ceiling (60 by default) while
+// something moves, and drop to 12 FPS at rest, independently of the monitor.
 
 namespace cydaw::v2 {
 
@@ -39,17 +39,20 @@ public:
     // its own, which would make its window the active one.
     bool background {};
 
-    // Keeps the display rate for a while (input, a change on screen).
+    // Keeps the selected frame rate for a while (input, a change on screen).
     void wake(int frames = 12);
-    // Full rate for as long as it is set (playback, meters moving).
+    // Selected rate for as long as it is set (playback, meters moving).
     void setAnimating(bool animating);
+    // A maximum, not a requirement to redraw an idle interface at full rate.
+    void setFrameRateLimit(int framesPerSecond) noexcept;
+    [[nodiscard]] int frameRateLimit() const noexcept { return static_cast<int>(frameRateHz_); }
 
     [[nodiscard]] bool isReady() const noexcept;
     [[nodiscard]] float dpiScale() const noexcept;
     [[nodiscard]] cydaw::base::Text rendererDescription() const;
     // The next rendered frame, written as PNG (probes and snapshots).
     void captureNextFrame(const cydaw::base::File& target, std::function<void(bool)> done = {});
-    // Renders one frame now, outside the vertical blank pacing.
+    // Renders one frame now, outside normal pacing (captures/scripted input).
     void renderNow();
     // An image the interface can draw (ImGui::Image), made once per key and
     // kept; 0 until the graphics device exists.
@@ -74,10 +77,10 @@ private:
     std::unique_ptr<Native> native_;
     void* parent_{};
     cydaw::base::Rectangle<int> bounds_{0, 0, 1600, 960};
-    double refreshHz_{60};
+    double frameRateHz_{60};
     int wakeFrames_ { 30 };
     bool animating_ {};
-    double lastFrameSeconds_ {};
+    double nextFrameSeconds_ {};
     cydaw::base::File captureTarget_;
     std::function<void(bool)> captureDone_;
 

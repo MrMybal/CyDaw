@@ -139,6 +139,7 @@ AppUi::AppUi(Studio& studio, ImGuiHost& host)
     computerKeyboard_ = std::make_unique<ComputerKeyboard>(studio_);
     themes_ = std::make_unique<ThemesView>(studio_, state_);
     themes_->applySaved();
+    host_.setFrameRateLimit(studio_.settings().getIntValue("uiFrameRate", 60));
     state_.manyInstrumentWindows = studio_.settings().getBoolValue("manyInstrumentWindows", true);
     inspectorVisible_ = studio_.settings().getBoolValue("inspectorPanelVisible", true);
     browserVisible_ = studio_.settings().getBoolValue("browserPanelVisible", true);
@@ -3184,7 +3185,26 @@ void AppUi::drawMenuBar()
         ImGui::MenuItem(L("Démo Dear ImGui", "Dear ImGui demo"), nullptr, &showDemo_);
         ImGui::EndMenu();
     }
-    if (ImGui::BeginMenu(ui::labelId(L("Options", "Options"), "menuOptions").c_str())) {
+    const auto optionsMenuOpen = ImGui::BeginMenu(ui::labelId(L("Options", "Options"), "menuOptions").c_str());
+    ui::recordSpot("menu:options");
+    if (optionsMenuOpen) {
+        const auto frameRateMenuOpen = ImGui::BeginMenu(L("Fréquence d'affichage", "Frame rate"));
+        ui::recordSpot("menu:frame-rate");
+        if (frameRateMenuOpen) {
+            for (const auto fps : { 30, 60, 120 }) {
+                const auto label = std::to_string(fps) + " FPS";
+                if (ImGui::MenuItem(label.c_str(), nullptr, host_.frameRateLimit() == fps)) {
+                    host_.setFrameRateLimit(fps);
+                    if (studio_.keepsSettings()) {
+                        studio_.settings().setValue("uiFrameRate", fps);
+                        (void) studio_.settings().saveIfNeeded();
+                    }
+                }
+                ui::recordSpot("display-fps:" + std::to_string(fps));
+            }
+            ImGui::EndMenu();
+        }
+
         if (ImGui::MenuItem(L("Réglages audio…", "Audio settings…")))
             showAudioSettings_ = true;
         if (ImGui::MenuItem(L("Entrées et sorties de la carte son…", "Sound card inputs and outputs…")))

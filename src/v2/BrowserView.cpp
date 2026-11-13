@@ -522,7 +522,8 @@ void BrowserView::drawSamples()
     if (!library.loaded() || data_ == nullptr || (data_->items.empty() && catalog_.building())) {
         ImGui::Spacing();
         ImGui::TextColored(theme::vec(p.textDim), "%s", L("Lecture de la bibliothèque…", "Reading the library…"));
-        host_.wake(6);
+        // A static loading message can follow the normal idle refresh. Waking
+        // on every draw would prevent idling when the library is not started.
         return;
     }
     if (library.samples().empty()) {

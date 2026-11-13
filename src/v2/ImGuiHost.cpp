@@ -3,6 +3,7 @@
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #include "ImGuiHost.h"
+#include "FramePacing.h"
 
 #include "Theme.h"
 #include "Widgets.h"
@@ -366,12 +367,6 @@ void ImGuiHost::createNativeWindow()
         return;
     SetWindowLongPtrW(native_->hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
     DragAcceptFiles(native_->hwnd, TRUE);
-    MONITORINFOEXW monitor{};monitor.cbSize=sizeof(monitor);
-    if(GetMonitorInfoW(MonitorFromWindow(native_->hwnd,MONITOR_DEFAULTTONEAREST),&monitor)){
-      DEVMODEW mode{};mode.dmSize=sizeof(mode);
-      if(EnumDisplaySettingsW(monitor.szDevice,ENUM_CURRENT_SETTINGS,&mode)&&mode.dmDisplayFrequency>=30)
-        refreshHz_=mode.dmDisplayFrequency;
-    }
     // Legacy exported test fixtures can embed this child without owning the
     // application's polling loop. Native desktop polling supplies full pacing.
     SetTimer(native_->hwnd,1,16,nullptr);
@@ -438,12 +433,25 @@ cydaw::base::Text ImGuiHost::rendererDescription() const
 
 void ImGuiHost::wake(const int frames)
 {
+    if (wakeFrames_ <= 0 && !animating_ && frames > 0)
+        nextFrameSeconds_ = std::min(nextFrameSeconds_,
+            cydaw::base::Time::getMillisecondCounterHiRes() * 0.001 + 1.0 / frameRateHz_);
     wakeFrames_ = std::max(wakeFrames_, frames);
 }
 
 void ImGuiHost::setAnimating(const bool animating)
 {
+    if (animating && !animating_)
+        nextFrameSeconds_ = std::min(nextFrameSeconds_,
+            cydaw::base::Time::getMillisecondCounterHiRes() * 0.001 + 1.0 / frameRateHz_);
     animating_ = animating;
+}
+
+void ImGuiHost::setFrameRateLimit(const int framesPerSecond) noexcept
+{
+    frameRateHz_ = framesPerSecond == 30 || framesPerSecond == 120 ? framesPerSecond : 60;
+    nextFrameSeconds_ = 0.0;
+    wake();
 }
 
 void ImGuiHost::captureNextFrame(const cydaw::base::File& target, std::function<void(bool)> done)
@@ -458,9 +466,8 @@ void ImGuiHost::vblank(const double timestampSeconds)
     if (!native_->backendsReady) return;
     // Idle: a dozen frames a second keeps tooltips and slow changes alive.
     const auto idle = wakeFrames_ <= 0 && !animating_;
-    if (timestampSeconds - lastFrameSeconds_ < 1.0 / (idle ? 12.0 : refreshHz_))
+    if (!detail::frameDue(timestampSeconds, idle ? 12.0 : frameRateHz_, nextFrameSeconds_))
         return;
-    lastFrameSeconds_ = timestampSeconds;
     if (wakeFrames_ > 0)
         --wakeFrames_;
     frame();
@@ -620,7 +627,7 @@ void ImGuiHost::frame()
         ImGui::UpdatePlatformWindows();
         ImGui::RenderPlatformWindowsDefault();
         // Their input does not reach this window's messages: while there are
-        // any, the interface runs at the display's rate.
+        // any, the interface keeps its selected active frame rate.
         if (ImGui::GetPlatformIO().Viewports.Size > 1)
             wake(2);
     }
@@ -641,7 +648,8 @@ bool ImGuiHost::isReady() const noexcept { return false; }
 float ImGuiHost::dpiScale() const noexcept { return 1.0f; }
 cydaw::base::Text ImGuiHost::rendererDescription() const { return "unavailable on this platform"; }
 void ImGuiHost::wake(int) {}
-void ImGuiHost::setAnimating(bool) {}
+void ImGuiHost::setAnimating(bool animating) { animating_ = animating; }
+void ImGuiHost::setFrameRateLimit(int fps) noexcept { frameRateHz_ = fps == 30 || fps == 120 ? fps : 60; }
 void ImGuiHost::captureNextFrame(const cydaw::base::File&, std::function<void(bool)> done)
 {
     if (done)

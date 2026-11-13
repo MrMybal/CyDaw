@@ -5,7 +5,7 @@ description: Choisir les sorties audio, le tampon et les entrées MIDI.
 section: Manuel / Bien démarrer
 parent: welcome
 order: 1
-sourceRevision: b70548790723c3c5
+sourceRevision: 901fa6e13622fc77
 ---
 
 ## Vue d’ensemble {#overview}
@@ -32,3 +32,7 @@ Activer l'entrée MIDI voulue, sélectionner une piste instrument et jouer. Une 
 Options > Emplacements liste caches, périphériques, presets, banques, exports et sessions des modes. Utiliser ce panneau pour changer les dossiers gérés. Les grandes banques peuvent être sur un disque de données ; caches et échantillons sources ont des rôles différents. Conserver projet et sons référencés pour déplacer le travail.
 
 Si tout semble correct mais que rien ne sort, suivre le [dépannage](doc:troubleshooting#silence). Continuer avec [l'espace de travail](doc:workspace) et [l'enregistrement](doc:studio#recording).
+
+## Fréquence d’affichage {#display-frame-rate}
+
+Dans **Options > Fréquence d'affichage**, choisir **30, 60 ou 120 FPS**. La valeur par défaut est **60 FPS**. Le choix prend effet immédiatement et reste enregistré pour le prochain lancement. Il limite le rafraîchissement animé dans tous les modes, y compris les panneaux détachés ; il ne change ni la fréquence audio ni le tampon. L’interface descend à 12 FPS au repos. Les projets complexes peuvent s’afficher sous le maximum choisi.

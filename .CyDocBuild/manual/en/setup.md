@@ -5,7 +5,7 @@ description: Choose audio outputs, buffer size and MIDI inputs.
 section: Manual / Start here
 parent: welcome
 order: 1
-revision: b70548790723c3c5
+revision: 901fa6e13622fc77
 ---
 
 ## Overview {#overview}
@@ -32,3 +32,7 @@ Enable the intended MIDI input, select an instrument track and play. An audio tr
 Options > Locations lists caches, devices, presets, banks, exports and mode-specific sessions. Use this panel to change managed folders. Large banks can live on a data drive; build caches and source samples serve different purposes. Keep a saved project and all audio it references when moving work.
 
 If setup looks correct but nothing is audible, follow [troubleshooting](doc:troubleshooting#silence). Continue with [the workspace](doc:workspace) and [recording](doc:studio#recording).
+
+## Display frame rate {#display-frame-rate}
+
+In **Options > Frame rate**, choose **30, 60 or 120 FPS**. The default is **60 FPS**. The choice takes effect immediately and is saved for the next launch. It limits animated interface updates in every mode, including detached panels; it does not change the audio sample rate or buffer. The interface drops to 12 FPS at rest. Complex projects may render below the selected maximum.

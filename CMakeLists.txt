@@ -336,6 +336,10 @@ endif()
 target_compile_definitions(CyDAWAudioProbe PRIVATE CYDAW_WITH_JACK=$<BOOL:${CYDAW_JACK_AVAILABLE}>)
 if(CYDAW_BUILD_TESTS)
     enable_testing()
+    add_executable(cydaw_frame_pacing_tests tests/FramePacingTests.cpp)
+    target_include_directories(cydaw_frame_pacing_tests PRIVATE src/v2)
+    target_compile_features(cydaw_frame_pacing_tests PRIVATE cxx_std_20)
+    add_test(NAME cydaw_frame_pacing_tests COMMAND cydaw_frame_pacing_tests)
     add_executable(cydaw_core_tests tests/CoreTests.cpp)
     target_link_libraries(cydaw_core_tests PRIVATE CyDAW::Core)
     if(MSVC)
@@ -979,6 +983,7 @@ if(CYDAW_BUILD_DESKTOP AND WIN32)
                 src/v2/AppUi.h
                 src/v2/ImGuiHost.cpp
                 src/v2/ImGuiHost.h
+                src/v2/FramePacing.h
                 src/v2/Icons.h
                 src/v2/Studio.cpp
                 src/v2/GraphSlot.cpp

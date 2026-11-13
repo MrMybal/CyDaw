@@ -870,7 +870,8 @@ void LibraryWindow::drawSamples()
                                                                     : L("Aucun son : ajoutez un dossier, ou téléchargez des banques "
                                                                         "(Options › Banques de sons).",
                                                                         "No sound: add a folder, or download banks (Options › Sound banks)."));
-        host_.wake(6);
+        // No animation here: an empty/loading library must not wake itself
+        // every frame. Idle refresh still observes background completion.
         return;
     }
 
