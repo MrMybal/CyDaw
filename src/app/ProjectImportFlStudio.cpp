@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #include "ProjectImport.h"
 #include "ProjectImportShared.h"
 
@@ -152,22 +153,22 @@ class FlStudioReader {
 public:
     FlStudioReader(const juce::File& file, ImportedProject& out) : file_(file), out_(out), folder_(file.getParentDirectory()) {}
 
-    juce::Result read()
+    cydaw::base::Result read()
     {
         juce::MemoryBlock bytes;
         if (!file_.loadFileAsData(bytes))
-            return juce::Result::fail("The file could not be opened: " + file_.getFullPathName());
+            return cydaw::base::Result::fail("The file could not be opened: " + file_.getFullPathName());
         const auto* data = static_cast<const juce::uint8*>(bytes.getData());
         const auto size = bytes.getSize();
         if (size < 22 || std::memcmp(data, "FLhd", 4) != 0)
-            return juce::Result::fail("Not an FL Studio project: " + file_.getFileName());
+            return cydaw::base::Result::fail("Not an FL Studio project: " + file_.getFileName());
         const auto headerLength = readU32(data + 4);
         if (headerLength < 6 || static_cast<std::uint64_t>(headerLength) + 16u > static_cast<std::uint64_t>(size))
-            return juce::Result::fail("The FL Studio project's header is damaged");
+            return cydaw::base::Result::fail("The FL Studio project's header is damaged");
         ppq_ = std::max(1, readU16(data + 12));
         auto at = static_cast<std::size_t>(8 + headerLength);
         if (std::memcmp(data + at, "FLdt", 4) != 0)
-            return juce::Result::fail("The FL Studio project holds no data chunk");
+            return cydaw::base::Result::fail("The FL Studio project holds no data chunk");
         const auto dataLength = readU32(data + at + 4);
         at += 8;
         const auto end = std::min<std::size_t>(size, at + dataLength);
@@ -207,7 +208,7 @@ public:
             }
         }
         build();
-        return juce::Result::ok();
+        return cydaw::base::Result::ok();
     }
 
 private:
@@ -515,7 +516,7 @@ private:
 
 } // namespace
 
-juce::Result importFlStudioProject(const juce::File& file, ImportedProject& out)
+cydaw::base::Result importFlStudioProject(const juce::File& file, ImportedProject& out)
 {
     out.source = file;
     FlStudioReader reader(file, out);

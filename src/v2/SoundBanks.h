@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #pragma once
 
 #include <juce_core/juce_core.h>
@@ -67,7 +68,7 @@ public:
         juce::int64 size {};
         bool lfs {};
         // A generated bank's: how the file is made.
-        juce::var recipe;
+        cydaw::base::Value recipe;
         // Its SHA-256 (lower-case hex) when the list gives it: a download of
         // the right size but other bytes (corrupted, tampered) is refused.
         juce::String sha256;
@@ -116,7 +117,7 @@ public:
     // a whole bank's. Without `exact`, from the banks' counts (nothing asked
     // of the disk; a bank not counted yet is counted, and said `pending`);
     // with it, the disk asked now (before a download).
-    [[nodiscard]] Missing missingFor(const juce::var& mapJson, bool exact = false);
+    [[nodiscard]] Missing missingFor(const cydaw::base::Value& mapJson, bool exact = false);
     [[nodiscard]] Missing missingForFile(const juce::File& mapFile, bool exact = false);
     // Maps read ahead on a thread of their own (the factory's are 26 MB of
     // zones): until one is, missingForFile says it `pending` rather than
@@ -184,7 +185,7 @@ private:
     void work(juce::Thread& thread);
     void finishFrontJob();
     void writeBankRecord(const Bank& bank) const;
-    [[nodiscard]] std::vector<juce::String> bankPathsOf(const juce::var& mapJson) const;
+    [[nodiscard]] std::vector<juce::String> bankPathsOf(const cydaw::base::Value& mapJson) const;
 
     std::vector<Bank> banks_;
     std::map<juce::String, std::vector<BankFile>> lists_;
@@ -221,7 +222,7 @@ private:
     [[nodiscard]] static PreloadedList readList(const juce::File& list);
     std::thread preloader_;
     std::atomic<bool> stopPreload_ {};
-    [[nodiscard]] static std::vector<juce::String> pathsOfMap(const juce::var& mapJson);
+    [[nodiscard]] static std::vector<juce::String> pathsOfMap(const cydaw::base::Value& mapJson);
     int diskGeneration_ {};
 
     mutable std::mutex mutex_;

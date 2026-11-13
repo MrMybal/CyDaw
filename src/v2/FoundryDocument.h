@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #pragma once
 
 #include <cydaw/engine/FoundrySession.h>
@@ -53,8 +54,8 @@ public:
 
     float renderTail() const noexcept { return renderTail_; }
     void setRenderTail(float seconds) { renderTail_=std::clamp(seconds,0.0f,30.0f);changed(); }
-    const juce::var& processing() const noexcept { return processing_; }
-    void setProcessing(juce::var state) { processing_=std::move(state);changed(); }
+    const cydaw::base::Value& processing() const noexcept { return processing_; }
+    void setProcessing(cydaw::base::Value state) { processing_=std::move(state);changed(); }
     void apply(Session next, const juce::String& label);
     // A change that is no step to undo (a track's gain, its mute, as on a
     // mixer), the file only marked changed.
@@ -76,13 +77,13 @@ public:
 
     // The plain file written as `file` (wav, flac, aiff, ogg by its
     // extension), its markers in a WAV.
-    juce::Result save(const juce::File& file, int bits);
+    cydaw::base::Result save(const juce::File& file, int bits);
     // The session as a .cyfoundry file (the sounds edited in a folder beside).
-    juce::Result saveSession(const juce::File& file);
+    cydaw::base::Result saveSession(const juce::File& file);
     // The mix of [start, end) (end <= start: all of it) as a sound file.
-    juce::Result exportMix(const juce::File& file, int bits, std::int64_t start, std::int64_t end) const;
+    cydaw::base::Result exportMix(const juce::File& file, int bits, std::int64_t start, std::int64_t end) const;
     // A sound written as a file (any thread).
-    [[nodiscard]] static juce::Result writeSound(const Sound& sound, const juce::File& file, int bits,
+    [[nodiscard]] static cydaw::base::Result writeSound(const Sound& sound, const juce::File& file, int bits,
                                                  const std::vector<FoundryMarker>& markers = {});
 
 private:
@@ -99,7 +100,7 @@ private:
     std::vector<Step> undo_;
     std::vector<Step> redo_;
     float renderTail_{};
-    juce::var processing_;
+    cydaw::base::Value processing_;
     juce::File file_;
     juce::File sessionFile_;
     juce::String name_;

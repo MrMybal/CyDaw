@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "SampleLibrary.h"
 
@@ -790,10 +791,10 @@ SampleRecord SampleLibrary::analyseFile(const juce::File& file, const juce::File
     return record;
 }
 
-juce::var SampleLibrary::serialise(const SampleRecord& record)
+cydaw::base::Value SampleLibrary::serialise(const SampleRecord& record)
 {
-    auto* object = new juce::DynamicObject();
-    juce::var value(object);
+    auto* object = new cydaw::base::Object();
+    cydaw::base::Value value(object);
     object->setProperty("path", record.path);
     object->setProperty("root", record.root);
     object->setProperty("size", record.size);
@@ -827,7 +828,7 @@ juce::var SampleLibrary::serialise(const SampleRecord& record)
     return value;
 }
 
-std::optional<SampleRecord> SampleLibrary::restore(const juce::var& value)
+std::optional<SampleRecord> SampleLibrary::restore(const cydaw::base::Value& value)
 {
     const auto* object = value.getDynamicObject();
     if (object == nullptr)
@@ -1163,21 +1164,21 @@ public:
         juce::String message;
         for (auto start = 0; start < paths_.size() && !threadShouldExit();
              start += classifyBatch) {
-            juce::Array<juce::var> files;
+            cydaw::base::Array<cydaw::base::Value> files;
             for (auto index = start; index < std::min(paths_.size(), start + classifyBatch); ++index)
                 files.add(paths_[index]);
-            auto* request = new juce::DynamicObject();
+            auto* request = new cydaw::base::Object();
             request->setProperty("files", files);
-            juce::Array<juce::var> categoryList;
+            cydaw::base::Array<cydaw::base::Value> categoryList;
             for (const auto& category : categoryVocabulary())
                 categoryList.add(category);
-            juce::Array<juce::var> tagList;
+            cydaw::base::Array<cydaw::base::Value> tagList;
             for (const auto& tag : tagVocabulary())
                 tagList.add(tag);
             request->setProperty("categories", categoryList);
             request->setProperty("tags", tagList);
             const auto requestFile = workFolder_.getChildFile("clap-request.json");
-            requestFile.replaceWithText(juce::JSON::toString(juce::var(request)));
+            requestFile.replaceWithText(cydaw::base::JSON::toString(cydaw::base::Value(request)));
             juce::ChildProcess process;
             juce::StringArray command { python_, script_.getFullPathName(),
                                         requestFile.getFullPathName() };
@@ -1188,7 +1189,7 @@ public:
             juce::StringArray lines;
             lines.addLines(output);
             for (const auto& line : lines) {
-                const auto value = juce::JSON::parse(line);
+                const auto value = cydaw::base::JSON::parse(line);
                 const auto* object = value.getDynamicObject();
                 if (object == nullptr)
                     continue;
@@ -1896,7 +1897,7 @@ void SampleLibrary::saveNow()
     saveSettings();
 }
 
-juce::var SampleLibrary::setting(const juce::String& key, const juce::var& fallback)
+cydaw::base::Value SampleLibrary::setting(const juce::String& key, const cydaw::base::Value& fallback)
 {
     auto& settings = settingsFile();
     if (!settings.containsKey(key))
@@ -1909,10 +1910,10 @@ juce::var SampleLibrary::setting(const juce::String& key, const juce::var& fallb
     return text;
 }
 
-void SampleLibrary::setSetting(const juce::String& key, const juce::var& value)
+void SampleLibrary::setSetting(const juce::String& key, const cydaw::base::Value& value)
 {
     auto& settings = settingsFile();
-    settings.setValue(key, value.isBool() ? juce::var(static_cast<bool>(value) ? 1 : 0) : value);
+    settings.setValue(key, value.isBool() ? cydaw::base::Value(static_cast<bool>(value) ? 1 : 0) : value);
     settings.saveIfNeeded();
 }
 
@@ -2012,8 +2013,8 @@ std::vector<SampleRecord> SampleLibrary::readCacheFile(const juce::File& folder)
         }
     }
     // The first library, written as JSON.
-    const auto document = juce::JSON::parse(folder.getChildFile(indexFileName));
-    if (const auto* list = document.getProperty("samples", juce::var()).getArray())
+    const auto document = cydaw::base::JSON::parse(folder.getChildFile(indexFileName));
+    if (const auto* list = document.getProperty("samples", cydaw::base::Value()).getArray())
         for (const auto& value : *list)
             if (auto record = restore(value))
                 records.push_back(std::move(*record));

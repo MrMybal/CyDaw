@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #pragma once
 
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -21,7 +22,7 @@ struct LauncherClipDragSource {
     int sceneIndex {};
 };
 
-[[nodiscard]] inline juce::var makeSampleDragPayload(
+[[nodiscard]] inline cydaw::base::Value makeSampleDragPayload(
     const juce::File& file)
 {
     if (file == juce::File {})
@@ -31,7 +32,7 @@ struct LauncherClipDragSource {
 }
 
 [[nodiscard]] inline std::optional<juce::File> sampleFileFromDragPayload(
-    const juce::var& payload)
+    const cydaw::base::Value& payload)
 {
     const auto description = payload.toString();
     if (!description.startsWith(sampleDragPayloadPrefix))
@@ -43,7 +44,7 @@ struct LauncherClipDragSource {
     return juce::File(path);
 }
 
-[[nodiscard]] inline juce::var makeLauncherClipDragPayload(
+[[nodiscard]] inline cydaw::base::Value makeLauncherClipDragPayload(
     const std::size_t trackIndex, const int sceneIndex)
 {
     if (sceneIndex < 0)
@@ -54,7 +55,7 @@ struct LauncherClipDragSource {
 }
 
 [[nodiscard]] inline std::optional<LauncherClipDragSource>
-launcherClipFromDragPayload(const juce::var& payload)
+launcherClipFromDragPayload(const cydaw::base::Value& payload)
 {
     const auto description = payload.toString();
     if (!description.startsWith(launcherClipDragPayloadPrefix))
@@ -84,7 +85,7 @@ launcherClipFromDragPayload(const juce::var& payload)
     };
 }
 
-[[nodiscard]] inline juce::var makeFactoryDeviceDragPayload(
+[[nodiscard]] inline cydaw::base::Value makeFactoryDeviceDragPayload(
     const juce::String& deviceKey)
 {
     if (deviceKey.isEmpty())
@@ -93,7 +94,7 @@ launcherClipFromDragPayload(const juce::var& payload)
 }
 
 [[nodiscard]] inline std::optional<juce::String>
-factoryDeviceFromDragPayload(const juce::var& payload)
+factoryDeviceFromDragPayload(const cydaw::base::Value& payload)
 {
     const auto description = payload.toString();
     if (!description.startsWith(factoryDeviceDragPayloadPrefix))
@@ -102,10 +103,10 @@ factoryDeviceFromDragPayload(const juce::var& payload)
         juce::String(factoryDeviceDragPayloadPrefix).length()));
     if (key.isEmpty())
         return std::nullopt;
-    return key;
+    return juce::String::fromUTF8(key.toRawUTF8());
 }
 
-[[nodiscard]] inline juce::var makeGraphPresetDragPayload(
+[[nodiscard]] inline cydaw::base::Value makeGraphPresetDragPayload(
     const juce::String& presetKey)
 {
     if (presetKey.isEmpty())
@@ -114,7 +115,7 @@ factoryDeviceFromDragPayload(const juce::var& payload)
 }
 
 [[nodiscard]] inline std::optional<juce::String>
-graphPresetFromDragPayload(const juce::var& payload)
+graphPresetFromDragPayload(const cydaw::base::Value& payload)
 {
     const auto description = payload.toString();
     if (!description.startsWith(graphPresetDragPayloadPrefix))
@@ -123,10 +124,10 @@ graphPresetFromDragPayload(const juce::var& payload)
         juce::String(graphPresetDragPayloadPrefix).length()));
     if (key.isEmpty())
         return std::nullopt;
-    return key;
+    return juce::String::fromUTF8(key.toRawUTF8());
 }
 
-[[nodiscard]] inline juce::var makeGraphPresetFileDragPayload(
+[[nodiscard]] inline cydaw::base::Value makeGraphPresetFileDragPayload(
     const juce::File& file)
 {
     if (file == juce::File {})
@@ -136,7 +137,7 @@ graphPresetFromDragPayload(const juce::var& payload)
 }
 
 [[nodiscard]] inline std::optional<juce::File>
-graphPresetFileFromDragPayload(const juce::var& payload)
+graphPresetFileFromDragPayload(const cydaw::base::Value& payload)
 {
     const auto description = payload.toString();
     if (!description.startsWith(graphPresetFileDragPayloadPrefix))
@@ -148,7 +149,7 @@ graphPresetFileFromDragPayload(const juce::var& payload)
     return juce::File(path);
 }
 
-[[nodiscard]] inline juce::var makePluginDragPayload(
+[[nodiscard]] inline cydaw::base::Value makePluginDragPayload(
     const juce::File& file)
 {
     if (file == juce::File {})
@@ -158,7 +159,7 @@ graphPresetFileFromDragPayload(const juce::var& payload)
 }
 
 [[nodiscard]] inline std::optional<juce::File> pluginFileFromDragPayload(
-    const juce::var& payload)
+    const cydaw::base::Value& payload)
 {
     const auto description = payload.toString();
     if (!description.startsWith(pluginDragPayloadPrefix))

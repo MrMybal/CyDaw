@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "Locations.h"
 
 #include <algorithm>
@@ -45,16 +46,16 @@ void save(const std::map<Location, juce::File>& folders)
 {
     if (!saving().load())
         return;
-    auto* list = new juce::DynamicObject();
+    auto* list = new cydaw::base::Object();
     for (const auto& [location, folder] : folders)
         list->setProperty(key(location), folder.getFullPathName());
-    auto* root = new juce::DynamicObject();
+    auto* root = new cydaw::base::Object();
     root->setProperty("format", "CyDAW Locations");
     root->setProperty("version", 1);
-    root->setProperty("folders", juce::var(list));
+    root->setProperty("folders", cydaw::base::Value(list));
     const auto file = settingsFile();
     (void) file.getParentDirectory().createDirectory();
-    (void) file.replaceWithText(juce::JSON::toString(juce::var(root)));
+    (void) file.replaceWithText(cydaw::base::JSON::toString(cydaw::base::Value(root)));
 }
 
 } // namespace
@@ -137,7 +138,7 @@ juce::File settingsFile()
 
 void load()
 {
-    const auto json = juce::JSON::parse(settingsFile().loadFileAsString());
+    const auto json = cydaw::base::JSON::parse(settingsFile().loadFileAsString());
     const std::scoped_lock lock(settingsLock());
     chosen().clear();
     if (const auto* folders = json.getProperty("folders", {}).getDynamicObject())

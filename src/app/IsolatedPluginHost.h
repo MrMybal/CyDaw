@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "WindowsPluginBridge.h"
@@ -39,15 +40,15 @@ public:
     IsolatedPluginHost() = default;
     ~IsolatedPluginHost();
 
-    [[nodiscard]] juce::Result startPlugin(const juce::File& pluginFile,
+    [[nodiscard]] cydaw::base::Result startPlugin(const juce::File& pluginFile,
                                            double sampleRate,
                                            int maximumBlockSize,
                                            int channelCount);
-    [[nodiscard]] juce::Result startPassthroughForTest(const juce::File& workerExecutable,
+    [[nodiscard]] cydaw::base::Result startPassthroughForTest(const juce::File& workerExecutable,
                                                        double sampleRate,
                                                        int maximumBlockSize,
                                                        int channelCount);
-    [[nodiscard]] juce::Result startPluginForTest(const juce::File& workerExecutable,
+    [[nodiscard]] cydaw::base::Result startPluginForTest(const juce::File& workerExecutable,
                                                   const juce::File& pluginFile,
                                                   double sampleRate,
                                                   int maximumBlockSize,
@@ -55,20 +56,20 @@ public:
     void stop();
     void pollWorkerHealth();
     void terminateWorkerForTest();
-    [[nodiscard]] juce::Result getState(juce::MemoryBlock& destination);
-    [[nodiscard]] juce::Result getCachedState(
+    [[nodiscard]] cydaw::base::Result getState(juce::MemoryBlock& destination);
+    [[nodiscard]] cydaw::base::Result getCachedState(
         juce::MemoryBlock& destination) const;
-    [[nodiscard]] juce::Result setState(const juce::MemoryBlock& state);
-    [[nodiscard]] juce::Result refreshParameters(std::vector<ParameterSnapshot>& destination);
-    [[nodiscard]] juce::Result setParameter(std::uint32_t index, float normalisedValue);
+    [[nodiscard]] cydaw::base::Result setState(const juce::MemoryBlock& state);
+    [[nodiscard]] cydaw::base::Result refreshParameters(std::vector<ParameterSnapshot>& destination);
+    [[nodiscard]] cydaw::base::Result setParameter(std::uint32_t index, float normalisedValue);
     // The plug-in's own programs (its factory presets, as a host lists them)
     // and the current one; choosing one, then the state is read again.
-    [[nodiscard]] juce::Result getPrograms(juce::StringArray& names, int& current);
-    [[nodiscard]] juce::Result setProgram(int index);
+    [[nodiscard]] cydaw::base::Result getPrograms(juce::StringArray& names, int& current);
+    [[nodiscard]] cydaw::base::Result setProgram(int index);
     void publishRealtimeParameters(const RealtimeParameterValue* values,
                                    std::size_t valueCount) noexcept;
-    [[nodiscard]] juce::Result showEditor();
-    [[nodiscard]] juce::Result hideEditor();
+    [[nodiscard]] cydaw::base::Result showEditor();
+    [[nodiscard]] cydaw::base::Result hideEditor();
 
     // Called by the audio thread. Returns true only when a fresh processed
     // block was available. An active worker missing its deadline emits silence;
@@ -88,13 +89,13 @@ public:
     [[nodiscard]] int preparedBlockSize() const noexcept { return blockSize_; }
 
 private:
-    [[nodiscard]] juce::Result startWorker(PluginWorkerLaunch launch,
+    [[nodiscard]] cydaw::base::Result startWorker(PluginWorkerLaunch launch,
                                            const juce::File& pluginFile,
                                            bool passthrough,
                                            double sampleRate,
                                            int maximumBlockSize,
                                            int channelCount);
-    [[nodiscard]] juce::Result sendCommand(cydaw::plugins::SharedPluginCommand command,
+    [[nodiscard]] cydaw::base::Result sendCommand(cydaw::plugins::SharedPluginCommand command,
                                            int timeoutMilliseconds = 2'000);
     // A command still running in the worker (one that timed out): its data in
     // the shared block is not written over while it reads it.

@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #pragma once
 
 #include <juce_core/juce_core.h>
@@ -12,7 +13,7 @@ namespace cydaw::app {
 // message thread. Listens on the loopback address only.
 class RemoteControlServer final : private juce::Thread {
 public:
-    using Handler = std::function<juce::var(const juce::var&)>;
+    using Handler = std::function<cydaw::base::Value(const cydaw::base::Value&)>;
 
     // With a token, a request must carry {"token": …} to be answered.
     RemoteControlServer(int port, Handler handler, juce::String token = {});

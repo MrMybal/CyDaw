@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #pragma once
 
 #include <juce_core/juce_core.h>
@@ -41,7 +42,7 @@ public:
     void setLearning(bool on);
     [[nodiscard]] bool learning() const;
     // The control port's "controllers" command.
-    juce::var command(const juce::var& request);
+    cydaw::base::Value command(const cydaw::base::Value& request);
 
     class Impl;
 

@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #include "VirtualAudioBus.h"
 
 #include <cydaw/engine/ChannelLayout.h>
@@ -269,7 +270,7 @@ void VirtualBusRouter::publishSnapshot()
     snapshot_.store(std::move(snapshot));
 }
 
-juce::Result VirtualBusRouter::setGraph(
+cydaw::base::Result VirtualBusRouter::setGraph(
     const std::uint64_t busId,
     const cydaw::engine::NativeDspGraph& graph)
 {
@@ -279,7 +280,7 @@ juce::Result VirtualBusRouter::setGraph(
             return candidate.id == busId;
         });
     if (bus == buses_.end())
-        return juce::Result::fail("Unknown virtual bus");
+        return cydaw::base::Result::fail("Unknown virtual bus");
     auto& runtime = graphs_[busId];
     if (runtime == nullptr)
         runtime = makeBusRuntime(sampleRate_, maximumBlockSize_, bus->channels);
@@ -289,7 +290,7 @@ juce::Result VirtualBusRouter::setGraph(
     return result;
 }
 
-juce::Result VirtualBusRouter::updateGraphParameters(
+cydaw::base::Result VirtualBusRouter::updateGraphParameters(
     const std::uint64_t busId,
     const cydaw::engine::NativeDspGraph& graph)
 {
@@ -301,7 +302,7 @@ juce::Result VirtualBusRouter::updateGraphParameters(
     const auto runtime = graphs_.find(busId);
     if (bus == buses_.end() || runtime == graphs_.end()
         || runtime->second == nullptr)
-        return juce::Result::fail("Unknown virtual bus");
+        return cydaw::base::Result::fail("Unknown virtual bus");
     return runtime->second->updateParameters(graph);
 }
 

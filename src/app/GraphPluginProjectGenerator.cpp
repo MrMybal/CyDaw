@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "GraphPluginProjectGenerator.h"
 #include "SamplerMapFile.h"
 #include "SoundModelFile.h"
@@ -54,7 +55,7 @@ constexpr auto voiceAssetsName = "Voice.cyvoice";
 // the sampler's zones with every sample whole (one held only in part, or
 // not decoded yet, is decoded again from its file), the sound model.
 // Nothing to write: ok, `written` false.
-juce::Result writeVoiceAssetsFile(const juce::File &file, const juce::var &editor,
+cydaw::base::Result writeVoiceAssetsFile(const juce::File &file, const cydaw::base::Value &editor,
                                   const cydaw::engine::PolyOscillatorWaveform waveform, bool &written)
 {
     using cydaw::engine::PolyOscillatorWaveform;
@@ -63,12 +64,12 @@ juce::Result writeVoiceAssetsFile(const juce::File &file, const juce::var &edito
     const auto sampler = waveform == PolyOscillatorWaveform::sampler;
     const auto model = waveform == PolyOscillatorWaveform::soundModel;
     if (!sampler && !model)
-        return juce::Result::ok();
+        return cydaw::base::Result::ok();
     const auto assets = voiceAssetsFromGraphState(editor);
     if (sampler && (assets.sampler == nullptr || assets.sampler->zones.empty()))
-        return juce::Result::fail("The sampler has no zone to export");
+        return cydaw::base::Result::fail("The sampler has no zone to export");
     if (model && assets.soundModel == nullptr)
-        return juce::Result::fail("The sound model card has no model to export");
+        return cydaw::base::Result::fail("The sound model card has no model to export");
     const auto whole = [](const cydaw::engine::SampleDataRef &sample) -> cydaw::engine::SampleDataRef {
         if (sample->playable() && !sample->streamed &&
             sample->pcm.size() == static_cast<std::size_t>(sample->frames) * static_cast<std::size_t>(sample->channels))
@@ -87,32 +88,32 @@ juce::Result writeVoiceAssetsFile(const juce::File &file, const juce::var &edito
         {
             out.close();
             (void)file.deleteFile();
-            return juce::Result::fail("The instrument's voice data cannot be exported: " + juce::String(error));
+            return cydaw::base::Result::fail("The instrument's voice data cannot be exported: " + juce::String(error));
         }
     }
     written = true;
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 } // namespace
 
-juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw::graph::PluginExportPlan &plan,
-                                      const juce::var &manifest, const juce::var &runtimeState, const juce::String& format)
+cydaw::base::Result generateGraphVst3Project(const juce::File &destination, const cydaw::graph::PluginExportPlan &plan,
+                                      const cydaw::base::Value &manifest, const cydaw::base::Value &runtimeState, const juce::String& format)
 {
-    if (format != "VST3" && format != "CLAP" && format != "LV2") return juce::Result::fail("Unknown export format");
+    if (format != "VST3" && format != "CLAP" && format != "LV2") return cydaw::base::Result::fail("Unknown export format");
     if (destination == juce::File{} || !runtimeState.isObject())
-        return juce::Result::fail("The native export state or destination is missing");
+        return cydaw::base::Result::fail("The native export state or destination is missing");
     const auto native = runtimeState.getProperty("native", {}), poly = runtimeState.getProperty("polySynth", {});
     const auto editor = runtimeState.getProperty("editor", {}), presentation = editor.getProperty("presentation", {});
     const auto *nodes = native.getProperty("nodes", {}).getArray();
     if (!nodes)
-        return juce::Result::fail("The native audio plan is missing");
+        return cydaw::base::Result::fail("The native audio plan is missing");
     const auto waveform =
         static_cast<cydaw::engine::PolyOscillatorWaveform>(static_cast<int>(poly.getProperty("waveform", 0)));
     const auto instrument = static_cast<bool>(poly.getProperty("enabled", false));
     // A rack's pads are instruments of the track, outside the device.
     if (instrument && waveform == cydaw::engine::PolyOscillatorWaveform::rack)
-        return juce::Result::fail("Pad racks are excluded from native export: their pads are instruments of the track");
+        return cydaw::base::Result::fail("Pad racks are excluded from native export: their pads are instruments of the track");
     int outputs = 0, inputs = 0;
     for (const auto &b : plan.buses)
         if (b.mediaType == cydaw::graph::PluginBusMediaType::audio)
@@ -123,7 +124,7 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
                 ++outputs;
         }
     if (outputs != 1 || inputs > 4)
-        return juce::Result::fail("Native export requires one audio output and up to four audio inputs");
+        return cydaw::base::Result::fail("Native export requires one audio output and up to four audio inputs");
     // Samples and recorded models travel in the bundle's voice data; a
     // rack's pads cannot.
     if (const auto *list = editor.getProperty("nodes", {}).getArray())
@@ -131,17 +132,17 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
         {
             const auto type = n.getProperty("type", {}).toString();
             if (type == "drum-rack" || type == "instrument-layer" || type == "instrument-selector")
-                return juce::Result::fail("Instrument containers (Drum Machine, Instrument Layer, Instrument Selector) are "
+                return cydaw::base::Result::fail("Instrument containers (Drum Machine, Instrument Layer, Instrument Selector) are "
                                           "excluded from native export: their pads and layers are instruments of the track");
             if (n.hasProperty("prismTables") || n.hasProperty("wavetableShape") || n.hasProperty("impulse"))
-                return juce::Result::fail(
+                return cydaw::base::Result::fail(
                     "Imported wavetable/impulse assets must be embedded before this device can use native export");
         }
     if (destination.createDirectory().failed())
-        return juce::Result::fail("Cannot create the project directory");
+        return cydaw::base::Result::fail("Cannot create the project directory");
     const auto generated = destination.getChildFile("generated");
     if (generated.createDirectory().failed())
-        return juce::Result::fail("Cannot create the generated source directory");
+        return cydaw::base::Result::fail("Cannot create the generated source directory");
     auto voiceAssets = false;
     if (const auto voice = writeVoiceAssetsFile(generated.getChildFile(voiceAssetsName), editor,
                                             instrument ? waveform : cydaw::engine::PolyOscillatorWaveform::sine,
@@ -152,7 +153,7 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
     // in a file of its own ("Voice1.cyvoice"...), beside the instrument's.
     struct ReplacerExport {
         juce::int64 node {};
-        juce::var poly;
+        cydaw::base::Value poly;
         juce::String assets;
     };
     std::vector<ReplacerExport> replacers;
@@ -165,21 +166,21 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
             const auto replacerWaveform =
                 static_cast<cydaw::engine::PolyOscillatorWaveform>(static_cast<int>(made.poly.getProperty("waveform", 0)));
             if (replacerWaveform == cydaw::engine::PolyOscillatorWaveform::rack)
-                return juce::Result::fail("A Replacer playing a pad rack cannot be exported");
+                return cydaw::base::Result::fail("A Replacer playing a pad rack cannot be exported");
             const auto name = "Voice" + juce::String(static_cast<int>(replacers.size()) + 1) + ".cyvoice";
             auto written = false;
             if (const auto voice = writeVoiceAssetsFile(generated.getChildFile(name), entry.getProperty("editor", {}),
                                                         replacerWaveform, written);
                 voice.failed())
-                return juce::Result::fail("A Replacer's instrument: " + voice.getErrorMessage());
+                return cydaw::base::Result::fail("A Replacer's instrument: " + voice.getErrorMessage());
             if (written)
                 made.assets = name;
             replacers.push_back(std::move(made));
         }
-    const auto prop = [](const juce::var &v, const char *key) { return v.getProperty(key, {}); };
-    const auto number = [](const juce::var &value) { return juce::String(static_cast<double>(value), 12); };
-    const auto integer = [](const juce::var &value) { return juce::String(static_cast<juce::int64>(value)); };
-    const auto quote = [&](const juce::var &v, const char *key) { return cppString(prop(v, key).toString()); };
+    const auto prop = [](const cydaw::base::Value &v, const char *key) { return v.getProperty(key, {}); };
+    const auto number = [](const cydaw::base::Value &value) { return juce::String(static_cast<double>(value), 12); };
+    const auto integer = [](const cydaw::base::Value &value) { return juce::String(static_cast<juce::int64>(value)); };
+    const auto quote = [&](const cydaw::base::Value &v, const char *key) { return cppString(prop(v, key).toString()); };
     juce::String cpp = "#include \"PluginDefinition.h\"\n#include <cydaw/engine/MidiEffects.h>\n";
     juce::String customDeclarations, customSources;
     if (const auto *controls = prop(presentation, "controls").getArray())
@@ -188,12 +189,12 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
             {
                 const auto source = prop(prop(c, "design"), "customSource").toString();
                 if (source.trim().isEmpty())
-                    return juce::Result::fail("A custom C++ control has no source");
+                    return cydaw::base::Result::fail("A custom C++ control has no source");
                 const auto suffix = integer(prop(c, "id")), symbol = "cydawCustom_" + suffix,
                            filename = "Custom_" + suffix + ".cpp";
                 if (!writeText(generated.getChildFile(filename),
                                "#define cydawDrawInterfaceV1 " + symbol + "\n" + source))
-                    return juce::Result::fail("Cannot write custom component source");
+                    return cydaw::base::Result::fail("Cannot write custom component source");
                 customDeclarations += "extern \"C\" void " + symbol + "(const CyInterfaceContext*);\n";
                 customSources += "  \"${CMAKE_CURRENT_SOURCE_DIR}/generated/" + filename + "\"\n";
             }
@@ -218,21 +219,21 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
         if (b.mediaType == cydaw::graph::PluginBusMediaType::audio)
             cpp += "d.buses.push_back({" + cppString(b.displayName) + "," + juce::String(b.channels) + "," +
                    (b.direction == cydaw::graph::PortDirection::input ? "true" : "false") + "});\n";
-    auto metadata = juce::DynamicObject::Ptr(new juce::DynamicObject());
+    auto metadata = cydaw::base::Object::Ptr(new cydaw::base::Object());
     metadata->setProperty("name", juce::String(plan.identity.productName));
     metadata->setProperty("vendor", juce::String(plan.identity.companyName));
     metadata->setProperty("synth", plan.isSynth);
     metadata->setProperty("acceptsMidi", plan.acceptsMidi);
     metadata->setProperty("producesMidi", plan.producesMidi);
     metadata->setProperty("programs", prop(runtimeState, "programs"));
-    juce::Array<juce::var> metadataBuses, metadataParameters;
+    cydaw::base::Array<cydaw::base::Value> metadataBuses, metadataParameters;
     for (const auto& b : plan.buses)
         if (b.mediaType == cydaw::graph::PluginBusMediaType::audio) {
-            auto bus = juce::DynamicObject::Ptr(new juce::DynamicObject());
+            auto bus = cydaw::base::Object::Ptr(new cydaw::base::Object());
             bus->setProperty("name", juce::String(b.displayName));
             bus->setProperty("channels", static_cast<int>(b.channels));
             bus->setProperty("input", b.direction == cydaw::graph::PortDirection::input);
-            metadataBuses.add(juce::var(bus.get()));
+            metadataBuses.add(cydaw::base::Value(bus.get()));
         }
     metadata->setProperty("buses", metadataBuses);
     const auto parameters =
@@ -319,11 +320,11 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
             cpp += "d.voiceModulations.push_back({" + integer(prop(route, "source")) +
                    "ull,static_cast<engine::PolyVoiceTarget>(" + integer(prop(route, "target")) + ")," +
                    number(prop(route, "depth")) + "f," + integer(prop(route, "index")) + "," +
-                   number(prop(route, "minimum")) + "f," + number(prop(route, "maximum").isVoid() ? juce::var(1.0) : prop(route, "maximum")) + "f," +
+                   number(prop(route, "minimum")) + "f," + number(prop(route, "maximum").isVoid() ? cydaw::base::Value(1.0) : prop(route, "maximum")) + "f," +
                    (static_cast<bool>(prop(route, "logarithmic")) ? "true" : "false") + "});\n";
     // An instrument's plan as a function of the source: the track's, each
     // Replacer's.
-    const auto emitPlan = [&](const juce::var &poly, const juce::String &function) {
+    const auto emitPlan = [&](const cydaw::base::Value &poly, const juce::String &function) {
         juce::String out = "engine::PolySynthGraphPlan " + function + "(){engine::PolySynthGraphPlan p;\n";
         for (const auto *key :
              {"graphNodeCount", "voiceCount", "voiceMode", "transposeSemitones", "minimumMidiNote", "maximumMidiNote"})
@@ -509,13 +510,13 @@ juce::Result generateGraphVst3Project(const juce::File &destination, const cydaw
                         "build --config Release --target CyDAWGeneratedGraphPlugin_" + format + "\n\nFormat dependency: " + sdkLicense + ". Dear ImGui is MIT. The license of the embedded CyDAW engine and custom "
                         "code must also be respected. This generation does not relicense those sources.\n";
     metadata->setProperty("parameters", metadataParameters);
-    if (!writeText(generated.getChildFile("Metadata.json"), juce::JSON::toString(juce::var(metadata.get()), true)) ||
+    if (!writeText(generated.getChildFile("Metadata.json"), cydaw::base::JSON::toString(cydaw::base::Value(metadata.get()), true)) ||
         !writeText(generated.getChildFile("Definition.cpp"), cpp) ||
         !writeText(destination.getChildFile("CMakeLists.txt"), cmake) ||
         !writeText(destination.getChildFile("README.md"), readme) ||
-        !writeText(destination.getChildFile("GraphManifest.cydawvst3.json"), juce::JSON::toString(manifest, true)))
-        return juce::Result::fail("Cannot write native VST3 project files");
-    return juce::Result::ok();
+        !writeText(destination.getChildFile("GraphManifest.cydawvst3.json"), cydaw::base::JSON::toString(manifest, true)))
+        return cydaw::base::Result::fail("Cannot write native VST3 project files");
+    return cydaw::base::Result::ok();
 }
 
 } // namespace cydaw::app

@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #pragma once
 
 #include "NativeDspRuntime.h"
@@ -45,7 +46,7 @@ public:
 
     [[nodiscard]] app::NodeGraphComponent& graph();
     // The graph the plug-in's state holds; nothing is published.
-    void restore(const juce::var& editorState);
+    void restore(const cydaw::base::Value& editorState);
     // The size its window opens at (logical pixels), and the least.
     [[nodiscard]] juce::Point<int> preferredSize() const;
     [[nodiscard]] static juce::Point<int> smallestSize() { return { 560, 380 }; }

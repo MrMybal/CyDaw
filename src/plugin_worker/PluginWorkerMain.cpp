@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "ExtraPluginFormats.h"
 #include "CyAudioCorePluginFormat.h"
 #include <cydaw/plugins/PluginIsolation.h>
@@ -75,9 +76,9 @@ private:
 // What runRealtimeWorker returns when CyDAW went away.
 constexpr int parentGone = 18;
 
-juce::var pluginDescriptionToJson(const juce::PluginDescription& description)
+cydaw::base::Value pluginDescriptionToJson(const juce::PluginDescription& description)
 {
-    auto value = juce::DynamicObject::Ptr(new juce::DynamicObject());
+    auto value = cydaw::base::Object::Ptr(new cydaw::base::Object());
     value->setProperty("name", description.name);
     value->setProperty("manufacturer", description.manufacturerName);
     value->setProperty("version", description.version);
@@ -89,7 +90,7 @@ juce::var pluginDescriptionToJson(const juce::PluginDescription& description)
     value->setProperty("inputs", description.numInputChannels);
     value->setProperty("outputs", description.numOutputChannels);
     value->setProperty("instrument", description.isInstrument);
-    return juce::var(value.get());
+    return cydaw::base::Value(value.get());
 }
 
 int runSelfTest()
@@ -132,7 +133,7 @@ bool isVst2Candidate(const juce::File& pluginFile)
 PluginFormatSelection formatForPlugin(const juce::File& pluginFile)
 {
     if (pluginFile.hasFileExtension("cyplugin")) {
-        const auto data = juce::JSON::parse(pluginFile);
+        const auto data = cydaw::base::JSON::parse(pluginFile);
         const auto path = data.getProperty("file", {}).toString();
         if (!juce::File::isAbsolutePath(path)) return {{}, {}, "Invalid plugin descriptor"};
         const juce::File target(path);
@@ -162,12 +163,12 @@ PluginFormatSelection formatForPlugin(const juce::File& pluginFile)
 
 void findPluginTypes(PluginFormatSelection& selection, const juce::File& requested, juce::OwnedArray<juce::PluginDescription>& result) {
     auto file=requested;juce::String id;
-    if(file.hasFileExtension("cyplugin")) {const auto data=juce::JSON::parse(file);id=data.getProperty("id",{}).toString();file=juce::File(data.getProperty("file",{}).toString());}
+    if(file.hasFileExtension("cyplugin")) {const auto data=cydaw::base::JSON::parse(file);id=data.getProperty("id",{}).toString();file=juce::File(data.getProperty("file",{}).toString());}
     selection.format->findAllTypesForFile(result,file.getFullPathName());
     if(id.isNotEmpty())for(int i=result.size();--i>=0;)if(result[i]->descriptiveName!=id && result[i]->fileOrIdentifier!=id)result.remove(i);
 }
 
-juce::var graphStateFromPlugin(juce::AudioProcessor& processor)
+cydaw::base::Value graphStateFromPlugin(juce::AudioProcessor& processor)
 {
     juce::MemoryBlock state;
     processor.getStateInformation(state);
@@ -176,7 +177,7 @@ juce::var graphStateFromPlugin(juce::AudioProcessor& processor)
     if (state.getSize() >= 24 && std::memcmp(state.getData(), "CyDSP.VST3State1", 16) == 0) {
         const auto* p=static_cast<const unsigned char*>(state.getData());
         const auto size=std::uint32_t(p[16])|(std::uint32_t(p[17])<<8)|(std::uint32_t(p[18])<<16)|(std::uint32_t(p[19])<<24);
-        if(size<=state.getSize()-24) return juce::JSON::parse(juce::String::fromUTF8(reinterpret_cast<const char*>(p+24),int(size)));
+        if(size<=state.getSize()-24) return cydaw::base::JSON::parse(juce::String::fromUTF8(reinterpret_cast<const char*>(p+24),int(size)));
         return {};
     }
     if (auto xml = juce::AudioProcessor::getXmlFromBinary(
@@ -187,11 +188,11 @@ juce::var graphStateFromPlugin(juce::AudioProcessor& processor)
         juce::MemoryBlock decoded;
         if (!decoded.fromBase64Encoding(component->getAllSubText()))
             return {};
-        return juce::JSON::parse(juce::String::fromUTF8(
+        return cydaw::base::JSON::parse(juce::String::fromUTF8(
             static_cast<const char*>(decoded.getData()),
             static_cast<int>(decoded.getSize())));
     }
-    return juce::JSON::parse(juce::String::fromUTF8(
+    return cydaw::base::JSON::parse(juce::String::fromUTF8(
         static_cast<const char*>(state.getData()),
         static_cast<int>(state.getSize())));
 }
@@ -200,15 +201,15 @@ int probePlugin(const juce::File& pluginFile,
                 const juce::File& outputFile,
                 const bool validateProcessing)
 {
-    juce::Array<juce::var> results;
+    cydaw::base::Array<cydaw::base::Value> results;
     auto selection = formatForPlugin(pluginFile);
     if (selection.format == nullptr) {
-        auto failure = juce::DynamicObject::Ptr(new juce::DynamicObject());
+        auto failure = cydaw::base::Object::Ptr(new cydaw::base::Object());
         failure->setProperty("format", selection.name);
         failure->setProperty("file", pluginFile.getFullPathName());
         failure->setProperty("error", selection.error);
         failure->setProperty("processingOk", false);
-        results.add(juce::var(failure.get()));
+        results.add(cydaw::base::Value(failure.get()));
     }
     juce::OwnedArray<juce::PluginDescription> descriptions;
     if (selection.format != nullptr) {
@@ -219,12 +220,12 @@ int probePlugin(const juce::File& pluginFile,
         } else findPluginTypes(selection, pluginFile, descriptions);
     }
     if (selection.format != nullptr && descriptions.isEmpty()) {
-        auto failure = juce::DynamicObject::Ptr(new juce::DynamicObject());
+        auto failure = cydaw::base::Object::Ptr(new cydaw::base::Object());
         failure->setProperty("format", selection.name);
         failure->setProperty("file", pluginFile.getFullPathName());
         failure->setProperty("error", selection.error.isNotEmpty() ? selection.error : "No " + selection.name + " type was found in the selected file");
         failure->setProperty("processingOk", false);
-        results.add(juce::var(failure.get()));
+        results.add(cydaw::base::Value(failure.get()));
     }
     for (const auto* description : descriptions) {
         auto result = pluginDescriptionToJson(*description);
@@ -251,42 +252,42 @@ int probePlugin(const juce::File& pluginFile,
                         && initialGraphRoot->getProperty("native")
                                .getDynamicObject() != nullptr;
                     if (editableGraphRuntime) {
-                        auto native = juce::DynamicObject::Ptr(
-                            new juce::DynamicObject());
+                        auto native = cydaw::base::Object::Ptr(
+                            new cydaw::base::Object());
                         native->setProperty("schema", 1);
                         native->setProperty("outputNodeId", 3);
-                        juce::Array<juce::var> nodes;
+                        cydaw::base::Array<cydaw::base::Value> nodes;
                         const auto addNode = [&nodes](const int id,
                                                      const int kind,
                                                      const double gainDb) {
-                            auto node = juce::DynamicObject::Ptr(
-                                new juce::DynamicObject());
+                            auto node = cydaw::base::Object::Ptr(
+                                new cydaw::base::Object());
                             node->setProperty("id", id);
                             node->setProperty("kind", kind);
-                            auto parameters = juce::DynamicObject::Ptr(
-                                new juce::DynamicObject());
+                            auto parameters = cydaw::base::Object::Ptr(
+                                new cydaw::base::Object());
                             parameters->setProperty("gainDb", gainDb);
                             node->setProperty("parameters",
-                                              juce::var(parameters.get()));
-                            nodes.add(juce::var(node.get()));
+                                              cydaw::base::Value(parameters.get()));
+                            nodes.add(cydaw::base::Value(node.get()));
                         };
                         addNode(1, 1, 0.0); // input
                         addNode(2, 4, 0.0); // gain
                         addNode(3, 2, 0.0); // output
                         native->setProperty("nodes", nodes);
-                        juce::Array<juce::var> connections;
+                        cydaw::base::Array<cydaw::base::Value> connections;
                         for (const auto [source, destination]
                              : { std::pair { 1, 2 }, std::pair { 2, 3 } }) {
-                            auto connection = juce::DynamicObject::Ptr(
-                                new juce::DynamicObject());
+                            auto connection = cydaw::base::Object::Ptr(
+                                new cydaw::base::Object());
                             connection->setProperty("source", source);
                             connection->setProperty("destination", destination);
-                            connections.add(juce::var(connection.get()));
+                            connections.add(cydaw::base::Value(connection.get()));
                         }
                         native->setProperty("connections", connections);
 
-                        auto published = juce::DynamicObject::Ptr(
-                            new juce::DynamicObject());
+                        auto published = cydaw::base::Object::Ptr(
+                            new cydaw::base::Object());
                         published->setProperty("id", 0x1020304);
                         published->setProperty("key", "node.2.gain.db");
                         published->setProperty("name", "Host Gain");
@@ -301,20 +302,20 @@ int probePlugin(const juce::File& pluginFile,
                         published->setProperty("modulatable", true);
                         published->setProperty("visibleInDevice", true);
                         published->setProperty("exportedToHost", true);
-                        juce::Array<juce::var> publishedParameters;
-                        publishedParameters.add(juce::var(published.get()));
-                        juce::Array<juce::var> hostValues;
+                        cydaw::base::Array<cydaw::base::Value> publishedParameters;
+                        publishedParameters.add(cydaw::base::Value(published.get()));
+                        cydaw::base::Array<cydaw::base::Value> hostValues;
                         hostValues.add(0.25); // -12 dB
 
-                        auto state = juce::DynamicObject::Ptr(
-                            new juce::DynamicObject());
+                        auto state = cydaw::base::Object::Ptr(
+                            new cydaw::base::Object());
                         state->setProperty("schema", 2);
-                        state->setProperty("native", juce::var(native.get()));
+                        state->setProperty("native", cydaw::base::Value(native.get()));
                         state->setProperty("publishedParameters",
                                            publishedParameters);
                         state->setProperty("hostValues", hostValues);
-                        const auto stateJson = juce::JSON::toString(
-                            juce::var(state.get()), false);
+                        const auto stateJson = cydaw::base::JSON::toString(
+                            cydaw::base::Value(state.get()), false);
                         juce::XmlElement vstState("VST3PluginState");
                         juce::MemoryBlock componentState(
                             stateJson.toRawUTF8(),
@@ -415,7 +416,7 @@ int probePlugin(const juce::File& pluginFile,
                                         "automatable"));
                             }
                         }
-                        juce::Array<juce::var> parameterNames;
+                        cydaw::base::Array<cydaw::base::Value> parameterNames;
                         for (auto* parameter : parameters) {
                             if (parameter == nullptr)
                                 continue;
@@ -604,7 +605,7 @@ int probePlugin(const juce::File& pluginFile,
         results.add(std::move(result));
     }
 
-    const auto json = juce::JSON::toString(results, true);
+    const auto json = cydaw::base::JSON::toString(results, true);
     if (outputFile != juce::File {}) {
         if (!outputFile.replaceWithText(json))
             return 3;

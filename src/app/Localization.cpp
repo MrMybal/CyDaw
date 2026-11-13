@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "Localization.h"
 
 #include <CyDAWTranslations.h>
@@ -95,8 +96,8 @@ std::vector<Localization::Language> Localization::availableLanguages()
         const auto code = file.getFileNameWithoutExtension();
         if (code == "en" || code == "fr" || code.isEmpty() || file.getSize() > 8 * 1024 * 1024)
             continue;
-        const auto parsed = juce::JSON::parse(file);
-        auto name = parsed.getProperty("language.name", juce::var()).toString();
+        const auto parsed = cydaw::base::JSON::parse(file);
+        auto name = parsed.getProperty("language.name", cydaw::base::Value()).toString();
         languages.push_back({ code, name.isNotEmpty() ? name : code });
     }
     return languages;
@@ -144,7 +145,7 @@ Localization::Mappings Localization::loadLanguage(const juce::String& languageCo
 Localization::Mappings Localization::parseJson(const juce::String& json)
 {
     Mappings result;
-    const auto parsed = juce::JSON::parse(json);
+    const auto parsed = cydaw::base::JSON::parse(json);
     if (const auto* object = parsed.getDynamicObject()) {
         const auto& properties = object->getProperties();
         result.reserve(static_cast<std::size_t>(properties.size()));

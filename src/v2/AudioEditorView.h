@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "CurveEditor.h"
@@ -140,7 +141,7 @@ private:
                             StretchMode mode);
     std::uint64_t splitEvent(const TrackRef& track, const AudioClip& clip, std::uint64_t event, double at);
     bool removeEvent(const TrackRef& track, const AudioClip& clip, std::uint64_t event);
-    juce::Result replaceEvents(const TrackRef& track, const AudioClip& clip, std::vector<AudioEvent> events);
+    cydaw::base::Result replaceEvents(const TrackRef& track, const AudioClip& clip, std::vector<AudioEvent> events);
     std::uint64_t addMarker(const TrackRef& track, const AudioClip& clip, std::uint64_t event, double sourceSeconds, double eventSeconds);
     bool moveMarker(const TrackRef& track, const AudioClip& clip, std::uint64_t event, std::uint64_t marker, double eventSeconds);
     bool removeMarker(const TrackRef& track, const AudioClip& clip, std::uint64_t event, std::uint64_t marker);

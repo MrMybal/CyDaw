@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include <cydaw/integration/CyAudioCoreDeviceManager.h>
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -8,9 +9,9 @@
 
 namespace {
 
-juce::var stringArrayToVar(const juce::StringArray& values)
+cydaw::base::Value stringArrayToVar(const juce::StringArray& values)
 {
-    juce::Array<juce::var> result;
+    cydaw::base::Array<cydaw::base::Value> result;
     for (const auto& value : values)
         result.add(value);
     return result;
@@ -65,7 +66,7 @@ int main(const int argc, char* argv[])
         arguments.add(juce::String::fromUTF8(argv[index]));
 
     cydaw::integration::DeviceManager manager;
-    juce::Array<juce::var> deviceTypes;
+    cydaw::base::Array<cydaw::base::Value> deviceTypes;
     juce::StringArray availableTypeNames;
     juce::StringArray allDeviceNames;
     for (auto* type : manager.getAvailableDeviceTypes()) {
@@ -76,35 +77,35 @@ int main(const int argc, char* argv[])
         allDeviceNames.addArray(inputs);
         allDeviceNames.addArray(outputs);
 
-        auto description = juce::DynamicObject::Ptr(new juce::DynamicObject());
+        auto description = cydaw::base::Object::Ptr(new cydaw::base::Object());
         description->setProperty("name", type->getTypeName());
         description->setProperty("inputs", stringArrayToVar(inputs));
         description->setProperty("outputs", stringArrayToVar(outputs));
-        deviceTypes.add(juce::var(description.get()));
+        deviceTypes.add(cydaw::base::Value(description.get()));
     }
 
-    juce::Array<juce::var> midiInputs;
+    cydaw::base::Array<cydaw::base::Value> midiInputs;
     for (const auto& device : juce::MidiInput::getAvailableDevices()) {
-        auto value = juce::DynamicObject::Ptr(new juce::DynamicObject());
+        auto value = cydaw::base::Object::Ptr(new cydaw::base::Object());
         value->setProperty("name", device.name);
         value->setProperty("identifier", device.identifier);
-        midiInputs.add(juce::var(value.get()));
+        midiInputs.add(cydaw::base::Value(value.get()));
     }
-    juce::Array<juce::var> midiOutputs;
+    cydaw::base::Array<cydaw::base::Value> midiOutputs;
     for (const auto& device : juce::MidiOutput::getAvailableDevices()) {
-        auto value = juce::DynamicObject::Ptr(new juce::DynamicObject());
+        auto value = cydaw::base::Object::Ptr(new cydaw::base::Object());
         value->setProperty("name", device.name);
         value->setProperty("identifier", device.identifier);
-        midiOutputs.add(juce::var(value.get()));
+        midiOutputs.add(cydaw::base::Value(value.get()));
     }
 
-    auto report = juce::DynamicObject::Ptr(new juce::DynamicObject());
+    auto report = cydaw::base::Object::Ptr(new cydaw::base::Object());
     report->setProperty("application", "CyDAW Audio Probe");
     report->setProperty("asioCompiled", CYDAW_WITH_ASIO != 0);
     report->setProperty("jackCompiled", JUCE_JACK != 0);
-    report->setProperty("audioDeviceTypes", juce::var(deviceTypes));
-    report->setProperty("midiInputs", juce::var(midiInputs));
-    report->setProperty("midiOutputs", juce::var(midiOutputs));
+    report->setProperty("audioDeviceTypes", cydaw::base::Value(deviceTypes));
+    report->setProperty("midiInputs", cydaw::base::Value(midiInputs));
+    report->setProperty("midiOutputs", cydaw::base::Value(midiOutputs));
     auto exitCode = 0;
     if (arguments.contains("--self-test")) {
 #if JUCE_WINDOWS
@@ -136,7 +137,7 @@ int main(const int argc, char* argv[])
     const auto openType = argumentValue(arguments, "--open-type");
     if (openType.isNotEmpty()) {
         const auto requestedDevice = argumentValue(arguments, "--open-device");
-        auto openResult = juce::DynamicObject::Ptr(new juce::DynamicObject());
+        auto openResult = cydaw::base::Object::Ptr(new cydaw::base::Object());
         openResult->setProperty("requestedType", openType);
         openResult->setProperty("requestedDevice", requestedDevice);
         openResult->setProperty("requestedSampleRate",
@@ -206,11 +207,11 @@ int main(const int argc, char* argv[])
                     exitCode = 32;
             }
         }
-        report->setProperty("openTest", juce::var(openResult.get()));
+        report->setProperty("openTest", cydaw::base::Value(openResult.get()));
     }
 
     report->setProperty("exitCode", exitCode);
-    std::cout << juce::JSON::toString(juce::var(report.get()), true).toStdString() << '\n';
+    std::cout << cydaw::base::JSON::toString(cydaw::base::Value(report.get()), true).toStdString() << '\n';
 
     return exitCode;
 }

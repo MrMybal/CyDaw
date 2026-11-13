@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "TransportSync.h"
 #include "Localization.h"
 #include "Theme.h"
@@ -17,8 +18,8 @@
 namespace cydaw::v2 {
 namespace {
     double nowSeconds() { return juce::Time::getMillisecondCounterHiRes() * 0.001; }
-    juce::var obj() { return juce::var(new juce::DynamicObject()); }
-    void put(juce::var& v, const char* k, const juce::var& x) { v.getDynamicObject()->setProperty(k, x); }
+    cydaw::base::Value obj() { return cydaw::base::Value(new cydaw::base::Object()); }
+    void put(cydaw::base::Value& v, const char* k, const cydaw::base::Value& x) { v.getDynamicObject()->setProperty(k, x); }
     const char* protocols[] = { "MIDI Clock", "MTC + MMC", "JACK Transport", "Ableton Link" };
     const char* protocolKeys[] = { "midi-clock", "mtc-mmc", "jack", "link" };
     const char* targetKeys[] = { "studio", "foundry", "deck-a", "deck-b", "deck-c", "deck-d", "cinema" };
@@ -32,7 +33,7 @@ namespace {
         double offsetMs {}, quantum { 4.0 };
         juce::String input, output, jackLibrary, server;
     };
-    juce::var json(const Config& c)
+    cydaw::base::Value json(const Config& c)
     {
         auto v = obj();
         put(v, "enabled", c.enabled);
@@ -53,7 +54,7 @@ namespace {
         put(v, "server", c.server);
         return v;
     }
-    juce::String parse(const juce::var& v, Config& c)
+    juce::String parse(const cydaw::base::Value& v, Config& c)
     {
         if (!v.isObject())
             return "configuration must be an object";
@@ -110,7 +111,7 @@ public:
         , read_(std::move(read))
         , apply_(std::move(apply))
     {
-        auto saved = juce::JSON::parse(settings.getValue("transportSync"));
+        auto saved = cydaw::base::JSON::parse(settings.getValue("transportSync"));
         if (saved.isObject()) {
             auto candidate = config;
             if (parse(saved, candidate).isEmpty())
@@ -204,7 +205,7 @@ public:
         if (saving) {
             auto saved = json(config);
             put(saved, "enabled", false);
-            settings.setValue("transportSync", juce::JSON::toString(saved, false));
+            settings.setValue("transportSync", juce::String::fromUTF8(cydaw::base::JSON::toString(saved, false).toRawUTF8()));
         }
         return error;
     }
@@ -213,7 +214,7 @@ public:
         inputs = juce::MidiInput::getAvailableDevices();
         outputs = juce::MidiOutput::getAvailableDevices();
     }
-    juce::var status()
+    cydaw::base::Value status()
     {
         auto v = json(config);
         put(v, "connected", connected);
@@ -226,14 +227,14 @@ public:
         put(v, "timing",
             "message-thread transport; dedicated 1 ms MIDI output scheduler; not sample-locked across audio devices");
         auto ports = [](const auto& devices) {
-            juce::Array<juce::var> a;
+            cydaw::base::Array<cydaw::base::Value> a;
             for (const auto& d : devices) {
                 auto p = obj();
                 put(p, "id", d.identifier);
                 put(p, "name", d.name);
                 a.add(p);
             }
-            return juce::var(a);
+            return cydaw::base::Value(a);
         };
         put(v, "inputs", ports(inputs));
         put(v, "outputs", ports(outputs));
@@ -246,7 +247,7 @@ public:
         put(v, "transport", state);
         return v;
     }
-    juce::var command(const juce::var& request)
+    cydaw::base::Value command(const cydaw::base::Value& request)
     {
         auto action = request.getProperty("action", "status").toString();
         if (action == "configure") {
@@ -300,19 +301,19 @@ public:
             applyIncoming(false);
             draft = config;
         } else if (action == "capture") {
-            juce::Array<juce::var> messages;
+            cydaw::base::Array<cydaw::base::Value> messages;
             {
                 std::lock_guard guard(ioMutex);
                 for (const auto& bytes : sent) {
-                    juce::Array<juce::var> a;
+                    cydaw::base::Array<cydaw::base::Value> a;
                     for (auto b : bytes)
                         a.add(static_cast<int>(b));
-                    messages.add(juce::var(a));
+                    messages.add(cydaw::base::Value(a));
                 }
                 sent.clear();
             }
             auto v = status();
-            put(v, "messages", juce::var(messages));
+            put(v, "messages", cydaw::base::Value(messages));
             return v;
         } else if (action != "status")
             return "action: status, configure, disable, refresh, capture";
@@ -961,7 +962,7 @@ juce::String TransportSync::statusText() const
         text << (impl_->config.send ? ui::Ls(" : CyDAW l'envoie", ": CyDAW sends it") : ui::Ls(" : CyDAW le suit", ": CyDAW follows it"));
     return text;
 }
-juce::var TransportSync::command(const juce::var& request) { return impl_->command(request); }
+cydaw::base::Value TransportSync::command(const cydaw::base::Value& request) { return impl_->command(request); }
 void TransportSync::drawButton(bool& visible)
 {
     using ui::L;

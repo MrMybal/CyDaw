@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #pragma once
 
 #include <juce_audio_utils/juce_audio_utils.h>
@@ -218,8 +219,8 @@ public:
     void saveNow();
     // A value of the library's settings file (others keep theirs there: the
     // semantic search).
-    [[nodiscard]] juce::var setting(const juce::String& key, const juce::var& fallback);
-    void setSetting(const juce::String& key, const juce::var& value);
+    [[nodiscard]] cydaw::base::Value setting(const juce::String& key, const cydaw::base::Value& fallback);
+    void setSetting(const juce::String& key, const cydaw::base::Value& value);
 
     // --- pure helpers, shared with the suite
     [[nodiscard]] static juce::String categoryFromName(const juce::String& name,
@@ -248,8 +249,8 @@ public:
                                                   const SampleHint* hint = nullptr);
     // What the catalogue says, on a record the person did not edit.
     static void applyHint(SampleRecord& record, const SampleHint& hint);
-    [[nodiscard]] static juce::var serialise(const SampleRecord& record);
-    [[nodiscard]] static std::optional<SampleRecord> restore(const juce::var& value);
+    [[nodiscard]] static cydaw::base::Value serialise(const SampleRecord& record);
+    [[nodiscard]] static std::optional<SampleRecord> restore(const cydaw::base::Value& value);
     // The cache's binary form (sample-library.bin).
     static void write(juce::OutputStream& out, const SampleRecord& record);
     [[nodiscard]] static std::optional<SampleRecord> read(juce::InputStream& in);

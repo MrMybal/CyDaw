@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #pragma once
 
 #include "Studio.h"
@@ -59,7 +60,7 @@ public:
     // library_window: the library's big window shown, set, and asked what it
     // shows; library_perf: the sample catalog's speed measured on as many
     // sounds as asked. Null when there is no interface.
-    virtual juce::var library(const juce::String& command, const juce::var& request)
+    virtual cydaw::base::Value library(const juce::String& command, const cydaw::base::Value& request)
     {
         juce::ignoreUnused(command, request);
         return {};
@@ -70,7 +71,7 @@ public:
     // theme: the colour themes, and the one on; {name or key} puts one on,
     // {create, from} makes one of the person's from another, {key, colours}
     // changes its colours ("#RRGGBB" by palette name).
-    virtual juce::var themes(const juce::var& request)
+    virtual cydaw::base::Value themes(const cydaw::base::Value& request)
     {
         juce::ignoreUnused(request);
         return {};
@@ -78,21 +79,21 @@ public:
     // dj: the Mix DJ mode's decks, mixer and collection; foundry: the
     // Foundry's sound files. Their answer, or a string saying what failed;
     // null when there is no interface.
-    virtual juce::var jsfx(const juce::var&) { return {}; }
-    virtual juce::var manual(const juce::var&) { return {}; }
-    virtual juce::var cinema(const juce::var&) { return {}; }
+    virtual cydaw::base::Value jsfx(const cydaw::base::Value&) { return {}; }
+    virtual cydaw::base::Value manual(const cydaw::base::Value&) { return {}; }
+    virtual cydaw::base::Value cinema(const cydaw::base::Value&) { return {}; }
     // processing: the Traitements mode's window ({show, select, testFile,
     // reload}: what it shows); openProcessing: the apply window on a clip.
-    virtual juce::var processing(const juce::var&) { return {}; }
+    virtual cydaw::base::Value processing(const cydaw::base::Value&) { return {}; }
     virtual bool openProcessing(const TrackRef&, std::uint64_t) { return false; }
-    virtual juce::var transportSync(const juce::var&) { return {}; }
-    virtual juce::var controllers(const juce::var&) { return {}; }
-    virtual juce::var dj(const juce::var& request)
+    virtual cydaw::base::Value transportSync(const cydaw::base::Value&) { return {}; }
+    virtual cydaw::base::Value controllers(const cydaw::base::Value&) { return {}; }
+    virtual cydaw::base::Value dj(const cydaw::base::Value& request)
     {
         juce::ignoreUnused(request);
         return {};
     }
-    virtual juce::var foundry(const juce::var& request)
+    virtual cydaw::base::Value foundry(const cydaw::base::Value& request)
     {
         juce::ignoreUnused(request);
         return {};
@@ -104,7 +105,7 @@ public:
         juce::ignoreUnused(mode);
         return {};
     }
-    virtual juce::var midiInputs(const juce::String& command, const juce::var& request)
+    virtual cydaw::base::Value midiInputs(const juce::String& command, const cydaw::base::Value& request)
     {
         juce::ignoreUnused(command, request);
         return {};
@@ -116,7 +117,7 @@ public:
     // scripted pointer stays in place of the real one until "release".
     // file_drop: {files:[absolute paths],x,y}, through the desktop drop handler.
     // Empty on success, otherwise why not.
-    virtual juce::String injectInput(const juce::var& events)
+    virtual juce::String injectInput(const cydaw::base::Value& events)
     {
         (void) events;
         return "this interface takes no scripted input";
@@ -220,15 +221,15 @@ public:
     // detached onto other screens): their names, one saved as the window
     // is now, one loaded (at the next frame), one deleted.
     [[nodiscard]] virtual juce::StringArray layoutNames() const { return {}; }
-    virtual juce::Result saveLayoutAs(const juce::String& name)
+    virtual cydaw::base::Result saveLayoutAs(const juce::String& name)
     {
         (void) name;
-        return juce::Result::fail("this interface has no layouts");
+        return cydaw::base::Result::fail("this interface has no layouts");
     }
-    virtual juce::Result loadLayout(const juce::String& name)
+    virtual cydaw::base::Result loadLayout(const juce::String& name)
     {
         (void) name;
-        return juce::Result::fail("this interface has no layouts");
+        return cydaw::base::Result::fail("this interface has no layouts");
     }
     virtual bool deleteLayout(const juce::String& name)
     {
@@ -253,6 +254,6 @@ public:
 };
 
 // One request ({"cmd": "...", ...}) answered.
-[[nodiscard]] juce::var handleRemoteCommand(Studio& studio, RemoteUi& ui, const juce::var& request);
+[[nodiscard]] cydaw::base::Value handleRemoteCommand(Studio& studio, RemoteUi& ui, const cydaw::base::Value& request);
 
 } // namespace cydaw::v2

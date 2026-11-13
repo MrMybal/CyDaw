@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "Theme.h"
 #include <cyui/Core.h>
 namespace cydaw::v2::theme {
@@ -50,9 +51,9 @@ const std::vector<PaletteField>& paletteFields()
     return fields;
 }
 
-juce::var paletteToJson(const Palette& palette)
+cydaw::base::Value paletteToJson(const Palette& palette)
 {
-    auto* colours = new juce::DynamicObject();
+    auto* colours = new cydaw::base::Object();
     for (const auto& field : paletteFields()) {
         const auto colour = palette.*field.member;
         const auto r = colour & 0xffu;
@@ -64,14 +65,14 @@ juce::var paletteToJson(const Palette& palette)
             text << juce::String::toHexString(static_cast<int>(a)).paddedLeft('0', 2).toUpperCase();
         colours->setProperty(field.key, text);
     }
-    return juce::var(colours);
+    return cydaw::base::Value(colours);
 }
 
-Palette paletteFromJson(const juce::var& colours, const Palette& base)
+Palette paletteFromJson(const cydaw::base::Value& colours, const Palette& base)
 {
     auto palette = base;
     for (const auto& field : paletteFields()) {
-        auto text = colours.getProperty(field.key, juce::var()).toString().trim();
+        auto text = colours.getProperty(field.key, cydaw::base::Value()).toString().trim();
         if (!text.startsWithChar('#') || (text.length() != 7 && text.length() != 9))
             continue;
         const auto value = static_cast<unsigned int>(text.substring(1, 7).getHexValue32());

@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "SynthView.h"
 #include "InstrumentPanels.h"
 
@@ -1409,7 +1410,7 @@ bool SynthView::drawEditorWindow(const bool focus)
             const auto track = target.track;
             const auto nodeId = target.nodeId;
             presets_.bar("synthPresets", *holder, [this, track, nodeId] { return studio_.devicePresetState(track, nodeId); },
-                         [this, track, nodeId](const juce::var& preset, juce::String& error) {
+                         [this, track, nodeId](const cydaw::base::Value& preset, juce::String& error) {
                              return studio_.applyDevicePreset(track, nodeId, preset, error);
                          },
                          dp(330.0f));

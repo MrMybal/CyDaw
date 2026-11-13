@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #pragma once
 
 #include "ProcessingCode.h"
@@ -59,7 +60,7 @@ struct Step {
     bool enabled { true };
     std::map<juce::String, double> settings;
     juce::String code;
-    juce::var chain;
+    cydaw::base::Value chain;
     std::vector<Published> published;
 };
 
@@ -75,10 +76,10 @@ struct Processing {
     bool factory {};
 };
 
-[[nodiscard]] juce::var toJson(const Processing& processing);
-[[nodiscard]] std::optional<Processing> fromJson(const juce::var& json, juce::String& error);
+[[nodiscard]] cydaw::base::Value toJson(const Processing& processing);
+[[nodiscard]] std::optional<Processing> fromJson(const cydaw::base::Value& json, juce::String& error);
 [[nodiscard]] std::optional<Processing> load(const juce::File& file, juce::String& error);
-juce::Result save(const Processing& processing, const juce::File& file);
+cydaw::base::Result save(const Processing& processing, const juce::File& file);
 
 // The library: the factory's, then the person's, of a kind (or both).
 [[nodiscard]] juce::File userFolder();
@@ -110,7 +111,7 @@ using Values = std::map<juce::String, double>;
 struct Prepared {
     Processing processing;
     Values values;
-    std::vector<juce::var> chains; // per step: the graph's runtime state, else void
+    std::vector<cydaw::base::Value> chains; // per step: the graph's runtime state, else void
 };
 [[nodiscard]] Prepared prepare(const Processing& processing, const Values& values);
 
@@ -132,10 +133,10 @@ struct AudioResult {
                                            double tempo, double clipLength, std::uint32_t seed);
 
 // A sound file read whole (30 minutes at most), one or two channels; written as 24-bit WAV.
-juce::Result readAudioFile(const juce::File& file, engine::repair::Channels& channels, double& rate);
-juce::Result writeAudioFile(const juce::File& file, const engine::repair::Channels& channels, double rate);
+cydaw::base::Result readAudioFile(const juce::File& file, engine::repair::Channels& channels, double& rate);
+cydaw::base::Result writeAudioFile(const juce::File& file, const engine::repair::Channels& channels, double rate);
 
 // The factory's processings written into a folder (the build's content).
-juce::Result writeFactory(const juce::File& folder);
+cydaw::base::Result writeFactory(const juce::File& folder);
 
 } // namespace cydaw::v2::processing

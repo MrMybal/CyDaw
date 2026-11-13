@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #pragma once
 
 #include <cydaw/engine/WavetableShape.h>
@@ -67,7 +68,7 @@ struct ModulePublishedParameter {
     // that went into it. Rebuilding three hundred of these per serialise was
     // most of what a knob notch cost on a large patch. Validated, not
     // invalidated: no mutation site has to know.
-    mutable juce::var serialised;
+    mutable cydaw::base::Value serialised;
     mutable std::uint64_t serialisedSignature {};
 };
 
@@ -97,9 +98,9 @@ struct ModuleInterfaceControl {
     // reads them as consecutive frequency / gain / Q triples, one per band.
     std::vector<juce::String> extraParameterBindings;
     // Portable appearance, page/group membership and custom ImGui component source.
-    juce::var design;
+    cydaw::base::Value design;
     // Same arrangement as ModulePublishedParameter, for the same reason.
-    mutable juce::var serialised;
+    mutable cydaw::base::Value serialised;
     mutable std::uint64_t serialisedSignature {};
 };
 
@@ -121,8 +122,8 @@ struct ModuleInterfaceState {
     bool designed {};
     bool deviceDesigned {};
     // Per-surface appearance, independent of control-level overrides.
-    juce::var windowDesign;
-    juce::var deviceDesign;
+    cydaw::base::Value windowDesign;
+    cydaw::base::Value deviceDesign;
     std::uint16_t deviceWidth { 480 };
     std::uint16_t deviceHeight { 240 };
     std::vector<ModulePublishedParameter> parameters;
@@ -151,10 +152,10 @@ void dropSerialisedPresentation(ModuleInterfaceState& state);
 [[nodiscard]] const std::vector<ModuleInterfaceControl>& moduleInterfaceControls(
     const ModuleInterfaceState& state, ModuleInterfaceLayoutMode mode) noexcept;
 void rebuildAutomaticDeviceControls(ModuleInterfaceState& state);
-[[nodiscard]] juce::var serialiseModuleInterface(const ModuleInterfaceState& state);
-[[nodiscard]] ModuleInterfaceState restoreModuleInterface(const juce::var& value);
-[[nodiscard]] juce::Result validateModuleInterfaceDocument(const juce::var& document, const ModuleInterfaceState& parameters);
-[[nodiscard]] juce::Result validateModuleInterface(const ModuleInterfaceState& state);
+[[nodiscard]] cydaw::base::Value serialiseModuleInterface(const ModuleInterfaceState& state);
+[[nodiscard]] ModuleInterfaceState restoreModuleInterface(const cydaw::base::Value& value);
+[[nodiscard]] cydaw::base::Result validateModuleInterfaceDocument(const cydaw::base::Value& document, const ModuleInterfaceState& parameters);
+[[nodiscard]] cydaw::base::Result validateModuleInterface(const ModuleInterfaceState& state);
 
 class ModuleXyPadComponent final : public juce::Component,
                                    public juce::SettableTooltipClient {
@@ -680,8 +681,8 @@ private:
     bool restoringHistory_ {};
     // Trees, not text. Rebuilding these as JSON strings on every setState
     // put the cost of the whole interface on every graph edit.
-    juce::var committedState_;
-    juce::var historyGestureStart_;
+    cydaw::base::Value committedState_;
+    cydaw::base::Value historyGestureStart_;
     std::vector<ModuleInterfaceState> undoStates_;
     std::vector<ModuleInterfaceState> redoStates_;
     bool compactMode_ {};

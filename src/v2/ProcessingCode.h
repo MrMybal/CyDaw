@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include <cydaw/engine/AudioRepair.h>
@@ -80,7 +81,7 @@ struct JsfxInfo {
 [[nodiscard]] JsfxInfo inspectJsfx(const juce::String& source);
 // The sound through the script (stereo in and out), `frames` long (past the
 // input: silence fed in, a tail let ring); its delay taken off.
-[[nodiscard]] juce::Result renderJsfx(const juce::String& source, const std::map<int, double>& values,
+[[nodiscard]] cydaw::base::Result renderJsfx(const juce::String& source, const std::map<int, double>& values,
                                       engine::repair::Channels& channels, double rate, std::int64_t frames,
                                       const std::atomic<bool>* cancel = nullptr);
 

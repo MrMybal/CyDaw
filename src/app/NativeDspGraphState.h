@@ -1,24 +1,10 @@
 #pragma once
-
-#include <cydaw/engine/NativeDspGraph.h>
-
-#include <juce_data_structures/juce_data_structures.h>
-
-#include <optional>
-
+#include <cydaw/document/NativeGraphState.h>
+#include <juce_core/juce_core.h>
 namespace cydaw::app {
-
-// Stable JUCE-state adapter shared by CyDAW, the standalone editor and the
-// VST3 runtime wrapper. The audio callback never parses this representation.
-[[nodiscard]] juce::var serialiseNativeDspGraphState(
-    const cydaw::engine::NativeDspGraph& graph);
-
-[[nodiscard]] std::optional<cydaw::engine::NativeDspGraph>
-restoreNativeDspGraphState(const juce::var& state, juce::String& error);
-
-// The equaliser's band array, written only when a band holds something so
-// every other node stays as small as before.
-void writeEqBands(juce::DynamicObject& object, const cydaw::engine::NativeDspNodeParameters& parameters);
-void readEqBands(const juce::DynamicObject& object, cydaw::engine::NativeDspNodeParameters& parameters);
-
-} // namespace cydaw::app
+using document::serialiseNativeDspGraphState;
+using document::writeEqBands;
+using document::readEqBands;
+using document::restoreNativeDspGraphState;
+inline std::optional<engine::NativeDspGraph> restoreNativeDspGraphState(const base::Value& state,juce::String& error){base::Text message;auto graph=document::restoreNativeDspGraphState(state,message);error=juce::String::fromUTF8(message.toRawUTF8());return graph;}
+}

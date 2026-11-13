@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "DjEngine.h"
 
@@ -1041,21 +1042,21 @@ void DjEngine::getNextAudioBlock(const juce::AudioSourceChannelInfo& output)
 
 // ---- Recording ---------------------------------------------------------------------------------
 
-juce::Result DjEngine::startRecording(const juce::File& file)
+cydaw::base::Result DjEngine::startRecording(const juce::File& file)
 {
     stopRecording();
     if (!file.getParentDirectory().createDirectory())
-        return juce::Result::fail(juce::String::fromUTF8("Dossier impossible à créer : ") + file.getParentDirectory().getFullPathName());
+        return cydaw::base::Result::fail(juce::String::fromUTF8("Dossier impossible à créer : ") + file.getParentDirectory().getFullPathName());
     file.deleteFile();
     auto stream = file.createOutputStream();
     if (stream == nullptr)
-        return juce::Result::fail(juce::String::fromUTF8("Fichier impossible à écrire : ") + file.getFullPathName());
+        return cydaw::base::Result::fail(juce::String::fromUTF8("Fichier impossible à écrire : ") + file.getFullPathName());
     std::unique_ptr<juce::OutputStream> output { std::move(stream) };
     cydaw::integration::WaveFormat wav;
     const auto options = juce::AudioFormatWriterOptions().withSampleRate(rate_).withNumChannels(2).withBitsPerSample(24);
     auto writer = wav.createWriterFor(output, options);
     if (writer == nullptr)
-        return juce::Result::fail(juce::String::fromUTF8("Format impossible à écrire"));
+        return cydaw::base::Result::fail(juce::String::fromUTF8("Format impossible à écrire"));
     if (!writerThread_.isThreadRunning())
         writerThread_.startThread();
     {
@@ -1066,7 +1067,7 @@ juce::Result DjEngine::startRecording(const juce::File& file)
         recordedFrames_.store(0, std::memory_order_relaxed);
     }
     recording_.store(true, std::memory_order_release);
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 void DjEngine::stopRecording()

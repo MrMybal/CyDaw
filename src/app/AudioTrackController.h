@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #pragma once
 #include <cydaw/integration/CyAudioCoreDeviceManager.h>
 
@@ -183,9 +184,9 @@ public:
     // Every card of a kind changed in the playing graph (control threads).
     void updateGraphNodes(cydaw::engine::NativeDspNodeKind kind,
                           const std::function<void(cydaw::engine::NativeDspNodeParameters&)>& change) noexcept;
-    [[nodiscard]] juce::Result setNativeDspGraph(
+    [[nodiscard]] cydaw::base::Result setNativeDspGraph(
         const cydaw::engine::NativeDspGraph& graph);
-    [[nodiscard]] juce::Result updateNativeDspParameters(
+    [[nodiscard]] cydaw::base::Result updateNativeDspParameters(
         const cydaw::engine::NativeDspGraph& graph);
     [[nodiscard]] std::size_t nativeDspNodeCount() const noexcept;
     [[nodiscard]] bool tryPopAnalysisFrame(
@@ -233,12 +234,12 @@ public:
     {
         return nativeGraph_.readTap(nodeId, input, frame);
     }
-    [[nodiscard]] juce::Result addPlugin(const juce::File& pluginFile,
+    [[nodiscard]] cydaw::base::Result addPlugin(const juce::File& pluginFile,
                                          double sampleRate,
                                          int maximumBlockSize,
                                          int channelCount,
                                          std::size_t* pluginIndex = nullptr);
-    juce::Result reloadPlugin(std::size_t pluginIndex, double sampleRate, int blockSize, int channels);
+    cydaw::base::Result reloadPlugin(std::size_t pluginIndex, double sampleRate, int blockSize, int channels);
     // whileHeld: run while no block plays the plug-ins (their automation
     // lanes renumbered with them).
     void removePlugin(std::size_t pluginIndex, const std::function<void()>& whileHeld = {});
@@ -248,18 +249,18 @@ public:
     // The device's rate or block size changed: the workers started with
     // others start again (their state kept). Whether one did.
     bool followDevice(double sampleRate, int blockSize, int channels);
-    [[nodiscard]] juce::Result getPluginState(std::size_t pluginIndex,
+    [[nodiscard]] cydaw::base::Result getPluginState(std::size_t pluginIndex,
                                               juce::MemoryBlock& destination);
-    [[nodiscard]] juce::Result getCachedPluginState(
+    [[nodiscard]] cydaw::base::Result getCachedPluginState(
         std::size_t pluginIndex,
         juce::MemoryBlock& destination) const;
-    [[nodiscard]] juce::Result setPluginState(std::size_t pluginIndex,
+    [[nodiscard]] cydaw::base::Result setPluginState(std::size_t pluginIndex,
                                               const juce::MemoryBlock& state);
-    [[nodiscard]] juce::Result showPluginEditor(std::size_t pluginIndex);
-    [[nodiscard]] juce::Result refreshPluginParameters(
+    [[nodiscard]] cydaw::base::Result showPluginEditor(std::size_t pluginIndex);
+    [[nodiscard]] cydaw::base::Result refreshPluginParameters(
         std::size_t pluginIndex,
         std::vector<IsolatedPluginHost::ParameterSnapshot>& destination);
-    [[nodiscard]] juce::Result setPluginParameter(std::size_t pluginIndex,
+    [[nodiscard]] cydaw::base::Result setPluginParameter(std::size_t pluginIndex,
                                                   std::uint32_t parameterIndex,
                                                   float normalisedValue);
     [[nodiscard]] std::size_t pluginCount() const noexcept;
@@ -435,7 +436,7 @@ public:
     InputRecorder();
     ~InputRecorder() override;
 
-    [[nodiscard]] juce::Result start(const juce::File& destination,
+    [[nodiscard]] cydaw::base::Result start(const juce::File& destination,
                                      double startDelaySeconds = 0.0);
     void scheduleStop(double delaySeconds);
     void stop();
@@ -452,7 +453,7 @@ public:
     // them in the callback before this one), and which side of their effects.
     void setRouter(const VirtualBusRouter* router) noexcept { router_ = router; }
     void setAfterEffects(bool afterEffects) noexcept { afterEffects_.store(afterEffects, std::memory_order_release); }
-    [[nodiscard]] static juce::Result selfTestScheduledRecording(
+    [[nodiscard]] static cydaw::base::Result selfTestScheduledRecording(
         const juce::File& destination);
 
     void audioDeviceIOCallbackWithContext(const float* const* inputChannelData,
@@ -563,7 +564,7 @@ public:
 
     // What the mix is late by (its tracks' compensation, the master's own
     // devices) is skipped, so the file starts with the song's first sample.
-    [[nodiscard]] juce::Result startCapture(const juce::File& destination,
+    [[nodiscard]] cydaw::base::Result startCapture(const juce::File& destination,
                                              double durationSeconds, int skipSamples = 0);
     void stopCapture();
     [[nodiscard]] bool isCapturing() const noexcept;
@@ -575,8 +576,8 @@ public:
     void setGain(float linearGain) noexcept;
     // The master track's devices, before its fader: what its graph does to
     // the tracks mixed. Passes the sound as it is while it has none.
-    juce::Result setChainGraph(const cydaw::engine::NativeDspGraph& graph);
-    juce::Result updateChainParameters(const cydaw::engine::NativeDspGraph& graph);
+    cydaw::base::Result setChainGraph(const cydaw::engine::NativeDspGraph& graph);
+    cydaw::base::Result updateChainParameters(const cydaw::engine::NativeDspGraph& graph);
     [[nodiscard]] NativeDspRuntime& chain() noexcept { return chain_; }
     [[nodiscard]] const NativeDspRuntime& chain() const noexcept { return chain_; }
     // The master's own clock (seconds, as the timeline counts them), which
@@ -1038,7 +1039,7 @@ public:
 
     [[nodiscard]] juce::String initialiseAudio(
         const juce::XmlElement* savedState = nullptr);
-    [[nodiscard]] juce::Result addAudioTrack(
+    [[nodiscard]] cydaw::base::Result addAudioTrack(
         const juce::File& file,
         std::size_t* newTrackIndex = nullptr,
         double initialClipStartSeconds = 0.0);
@@ -1056,7 +1057,7 @@ public:
         masterOutput_.setClock(seconds);
         masterOutput_.setClockRunning(true);
     }
-    [[nodiscard]] juce::Result addEmptyAudioTrack(
+    [[nodiscard]] cydaw::base::Result addEmptyAudioTrack(
         std::size_t* newTrackIndex = nullptr);
     // A sample auditioned at the project's tempo: its own tempo (0: as it
     // is) and how it is stretched.
@@ -1067,7 +1068,7 @@ public:
     // At its tempo (a loop of whole beats, 32 s at most): stretched to the
     // project's, played over and over, in step with the transport when it
     // plays; another sound, or no tempo, as it is.
-    [[nodiscard]] juce::Result startSamplePreview(
+    [[nodiscard]] cydaw::base::Result startSamplePreview(
         const juce::File& file, double startSeconds = 0.0, const SamplePreviewTempo& tempo = {});
     // The loop being auditioned at the project's tempo: its beats, else 0.
     [[nodiscard]] int samplePreviewLoopBeats() const noexcept;
@@ -1082,10 +1083,10 @@ public:
     [[nodiscard]] double samplePreviewPositionSeconds() const noexcept;
     void setSamplePreviewGainDb(float gainDb) noexcept;
     [[nodiscard]] float samplePreviewGainDb() const noexcept;
-    [[nodiscard]] juce::Result startAudioClipPreview(
+    [[nodiscard]] cydaw::base::Result startAudioClipPreview(
         std::size_t trackIndex, std::uint64_t clipId,
         double localStartSeconds = 0.0);
-    [[nodiscard]] juce::Result refreshAudioClipPreview(
+    [[nodiscard]] cydaw::base::Result refreshAudioClipPreview(
         std::size_t trackIndex, std::uint64_t clipId);
     void stopAudioClipPreview();
     [[nodiscard]] bool isAudioClipPreviewing() const noexcept;
@@ -1141,10 +1142,10 @@ public:
     [[nodiscard]] std::uint64_t defaultInputBusId() const noexcept;
     [[nodiscard]] std::array<float, 2> virtualBusMeterLevels(
         std::uint64_t busId) const noexcept;
-    [[nodiscard]] juce::Result setVirtualBusGraph(
+    [[nodiscard]] cydaw::base::Result setVirtualBusGraph(
         std::uint64_t busId,
         const cydaw::engine::NativeDspGraph& graph);
-    [[nodiscard]] juce::Result updateVirtualBusGraphParameters(
+    [[nodiscard]] cydaw::base::Result updateVirtualBusGraphParameters(
         std::uint64_t busId,
         const cydaw::engine::NativeDspGraph& graph);
     [[nodiscard]] cydaw::engine::NativeDspGraph virtualBusGraph(
@@ -1167,7 +1168,7 @@ public:
         int availableOutputs {};
     };
     [[nodiscard]] DeviceChannels deviceChannels() const;
-    juce::Result setDeviceChannelCounts(int inputs, int outputs);
+    cydaw::base::Result setDeviceChannelCounts(int inputs, int outputs);
 
     // ---- Track formats ------------------------------------------------------
     // An audio track's channels: 1 mono, 2 stereo, up to 8 (7.1), laid out
@@ -1175,7 +1176,7 @@ public:
     // another format converts), its devices process every channel, and its
     // sound converts into what it is routed to.
     [[nodiscard]] int trackChannelCount(std::size_t index) const noexcept;
-    juce::Result setTrackChannelCount(std::size_t index, int channels);
+    cydaw::base::Result setTrackChannelCount(std::size_t index, int channels);
     [[nodiscard]] bool setTrackInputBus(std::size_t trackIndex,
                                         std::uint64_t busId);
     // What it records of its input bus: after the bus's effects (the sound
@@ -1191,8 +1192,8 @@ public:
     void setMasterMuted(bool muted) noexcept;
     // The master track's devices (a graph from the tracks mixed to the
     // fader), its control values and its displays' taps, as a track's.
-    juce::Result setMasterNativeDspGraph(const cydaw::engine::NativeDspGraph& graph);
-    juce::Result updateMasterNativeDspParameters(const cydaw::engine::NativeDspGraph& graph);
+    cydaw::base::Result setMasterNativeDspGraph(const cydaw::engine::NativeDspGraph& graph);
+    cydaw::base::Result updateMasterNativeDspParameters(const cydaw::engine::NativeDspGraph& graph);
     [[nodiscard]] std::vector<std::pair<std::uint64_t, float>> masterControlValues() const;
     // The master's devices' knobs that follow its launcher clip, on the
     // master's clock (which runs while the transport plays).
@@ -1244,18 +1245,18 @@ public:
         juce::File sourceFile = {},
         double fadeInSeconds = 0.0,
         double fadeOutSeconds = 0.0);
-    [[nodiscard]] juce::Result addAudioClipFromFile(
+    [[nodiscard]] cydaw::base::Result addAudioClipFromFile(
         std::size_t index,
         const juce::File& sourceFile,
         double startSeconds,
         std::uint64_t* newClipId = nullptr);
-    [[nodiscard]] juce::Result addAudioTake(
+    [[nodiscard]] cydaw::base::Result addAudioTake(
         std::size_t index,
         std::uint64_t clipId,
         const juce::File& sourceFile,
         bool activate = true,
         bool fitClipToTake = false);
-    [[nodiscard]] juce::Result replaceAudioTakes(
+    [[nodiscard]] cydaw::base::Result replaceAudioTakes(
         std::size_t index,
         std::uint64_t clipId,
         std::vector<AudioTake> takes,
@@ -1291,11 +1292,11 @@ public:
         double timelineSeconds);
     [[nodiscard]] bool removeAudioClipStretchMarker(
         std::size_t index, std::uint64_t clipId, std::uint64_t markerId);
-    [[nodiscard]] juce::Result addAudioClipEventFromFile(
+    [[nodiscard]] cydaw::base::Result addAudioClipEventFromFile(
         std::size_t index, std::uint64_t clipId,
         const juce::File& sourceFile, double localStartSeconds,
         std::uint64_t* newEventId = nullptr);
-    [[nodiscard]] juce::Result replaceAudioClipEvents(
+    [[nodiscard]] cydaw::base::Result replaceAudioClipEvents(
         std::size_t index, std::uint64_t clipId,
         std::vector<AudioEvent> events);
     [[nodiscard]] bool updateAudioClipEvent(
@@ -1348,7 +1349,7 @@ public:
     [[nodiscard]] bool removeAudioClipEventStretchMarker(
         std::size_t index, std::uint64_t clipId, std::uint64_t eventId,
         std::uint64_t markerId);
-    [[nodiscard]] juce::Result commitAudioClipEventEdit(
+    [[nodiscard]] cydaw::base::Result commitAudioClipEventEdit(
         std::size_t index, std::uint64_t clipId, std::uint64_t eventId,
         const juce::File& renderedFile);
     [[nodiscard]] bool moveAudioClip(
@@ -1401,13 +1402,13 @@ public:
     void clearArrangementEditHistory(std::size_t index) noexcept;
     void clearArrangementEditHistory() noexcept;
     void setTrackEffects(std::size_t index, float driveDb, float filterCutoffHz);
-    [[nodiscard]] juce::Result setTrackNativeDspGraph(
+    [[nodiscard]] cydaw::base::Result setTrackNativeDspGraph(
         std::size_t index,
         const cydaw::engine::NativeDspGraph& graph);
-    [[nodiscard]] juce::Result updateTrackNativeDspParameters(
+    [[nodiscard]] cydaw::base::Result updateTrackNativeDspParameters(
         std::size_t index,
         const cydaw::engine::NativeDspGraph& graph);
-    [[nodiscard]] juce::Result setNativeDspGraph(
+    [[nodiscard]] cydaw::base::Result setNativeDspGraph(
         const cydaw::engine::NativeDspGraph& graph);
     [[nodiscard]] cydaw::engine::NativeDspGraph nativeDspGraph(
         std::size_t trackIndex) const;
@@ -1432,16 +1433,16 @@ public:
         cydaw::engine::AudioAnalysisFrame& frame) noexcept;
     [[nodiscard]] bool popMasterAnalysisFrame(
         cydaw::engine::AudioAnalysisFrame& frame) noexcept;
-    [[nodiscard]] juce::Result normaliseTrackRange(std::size_t index,
+    [[nodiscard]] cydaw::base::Result normaliseTrackRange(std::size_t index,
                                                    double sourceStartSeconds,
                                                    double durationSeconds,
                                                    float targetPeakDb = -1.0f,
                                                    float* appliedGainDb = nullptr);
-    [[nodiscard]] juce::Result exportTrackRange(std::size_t index,
+    [[nodiscard]] cydaw::base::Result exportTrackRange(std::size_t index,
                                                 double sourceStartSeconds,
                                                 double durationSeconds,
                                                 const juce::File& destination);
-    [[nodiscard]] static juce::Result analyseAudioRangeGain(
+    [[nodiscard]] static cydaw::base::Result analyseAudioRangeGain(
         const juce::File& source,
         double sourceStartSeconds,
         double durationSeconds,
@@ -1451,35 +1452,35 @@ public:
     [[nodiscard]] static std::optional<TempoDetectionResult> detectAudioTempo(
         const juce::File& source,
         const std::atomic<bool>* cancellation = nullptr);
-    [[nodiscard]] static juce::Result exportAudioRange(
+    [[nodiscard]] static cydaw::base::Result exportAudioRange(
         const juce::File& source,
         double sourceStartSeconds,
         double durationSeconds,
         const juce::File& destination,
         const std::atomic<bool>* cancellation = nullptr);
-    [[nodiscard]] static juce::Result renderAudioEdit(
+    [[nodiscard]] static cydaw::base::Result renderAudioEdit(
         const juce::File& source,
         double sourceStartSeconds,
         double durationSeconds,
         AudioEditOperation operation,
         const juce::File& destination,
         const std::atomic<bool>* cancellation = nullptr);
-    [[nodiscard]] static juce::Result renderAudioEdit(
+    [[nodiscard]] static cydaw::base::Result renderAudioEdit(
         const juce::File& source,
         double sourceStartSeconds,
         double durationSeconds,
         AudioEditRequest request,
         const juce::File& destination,
         const std::atomic<bool>* cancellation = nullptr);
-    [[nodiscard]] juce::Result commitTrackAudioEdit(std::size_t index,
+    [[nodiscard]] cydaw::base::Result commitTrackAudioEdit(std::size_t index,
                                                      const juce::File& renderedFile);
-    [[nodiscard]] juce::Result commitAudioClipEdit(
+    [[nodiscard]] cydaw::base::Result commitAudioClipEdit(
         std::size_t index,
         std::uint64_t clipId,
         const juce::File& renderedFile);
     // Cut, crop, insert silence, paste: the file written again without, or
     // with, the selection (renderAudioEdit hands them here).
-    [[nodiscard]] static juce::Result renderAudioSplice(
+    [[nodiscard]] static cydaw::base::Result renderAudioSplice(
         const juce::File& source, double sourceStartSeconds, double durationSeconds,
         const AudioEditRequest& request, const juce::File& destination,
         const std::atomic<bool>* cancellation = nullptr);
@@ -1492,11 +1493,11 @@ public:
     // take, 10 ms crossfades where they meet, over the whole length of the
     // clip's source (outside the clip, the nearest passage's take), on the
     // source's time (no stretch, no transposition: the clip keeps those).
-    [[nodiscard]] static juce::Result renderAudioClipComp(const AudioClip& clip, const juce::File& destination,
+    [[nodiscard]] static cydaw::base::Result renderAudioClipComp(const AudioClip& clip, const juce::File& destination,
                                                           const std::atomic<bool>* cancellation = nullptr);
     // The clip then plays that file alone: one take, no comp; its history
     // gets it, named `label`. One arrangement undo step.
-    [[nodiscard]] juce::Result commitAudioClipCompFlatten(std::size_t index, std::uint64_t clipId,
+    [[nodiscard]] cydaw::base::Result commitAudioClipCompFlatten(std::size_t index, std::uint64_t clipId,
                                                           const juce::File& renderedFile, const juce::String& label);
     // Why an edit of that kind cannot apply to a clip (made of events, warp
     // markers or several takes playing for a cut), or empty.
@@ -1506,7 +1507,7 @@ public:
     // edit's result: it keeps playing what it played around the edit (a cut
     // shortens it, an insert lengthens it); its history (versions) gets the
     // new one, named `label`. One arrangement undo step.
-    [[nodiscard]] juce::Result commitAudioClipSourceEdit(
+    [[nodiscard]] cydaw::base::Result commitAudioClipSourceEdit(
         std::size_t index, std::uint64_t clipId, const juce::File& renderedFile, const juce::String& label,
         AudioEditOperation operation, double selectionStartSeconds, double selectionSeconds);
     // A clip back to one of its versions (one undo step).
@@ -1520,46 +1521,46 @@ public:
     [[nodiscard]] bool setAudioClipComp(std::size_t index, std::uint64_t clipId, std::vector<CompSegment> comp);
     // Takes added at once, each with its own shift (a loop's passes), the
     // last one made active when asked.
-    [[nodiscard]] juce::Result addAudioTakes(std::size_t index, std::uint64_t clipId, std::vector<AudioTake> takes,
+    [[nodiscard]] cydaw::base::Result addAudioTakes(std::size_t index, std::uint64_t clipId, std::vector<AudioTake> takes,
                                              bool activateLast);
     [[nodiscard]] bool undoTrackAudioEdit(std::size_t index);
     [[nodiscard]] bool redoTrackAudioEdit(std::size_t index);
     [[nodiscard]] bool canUndoTrackAudioEdit(std::size_t index) const noexcept;
     [[nodiscard]] bool canRedoTrackAudioEdit(std::size_t index) const noexcept;
-    [[nodiscard]] juce::Result setTrackPlugin(std::size_t index,
+    [[nodiscard]] cydaw::base::Result setTrackPlugin(std::size_t index,
                                               const juce::File& pluginFile,
                                               std::size_t* pluginIndex = nullptr);
-    juce::Result reloadTrackPlugin(std::size_t track, std::size_t plugin);
+    cydaw::base::Result reloadTrackPlugin(std::size_t track, std::size_t plugin);
     void clearTrackPlugin(std::size_t index, std::size_t pluginIndex);
     void clearTrackPlugins(std::size_t index);
     [[nodiscard]] bool moveTrackPlugin(std::size_t index,
                                        std::size_t pluginIndex,
                                        int direction);
     void pollPluginWorkers();
-    [[nodiscard]] juce::Result getTrackPluginState(std::size_t index,
+    [[nodiscard]] cydaw::base::Result getTrackPluginState(std::size_t index,
                                                    std::size_t pluginIndex,
                                                    juce::MemoryBlock& destination);
-    [[nodiscard]] juce::Result getCachedTrackPluginState(
+    [[nodiscard]] cydaw::base::Result getCachedTrackPluginState(
         std::size_t index,
         std::size_t pluginIndex,
         juce::MemoryBlock& destination) const;
-    [[nodiscard]] juce::Result setTrackPluginState(std::size_t index,
+    [[nodiscard]] cydaw::base::Result setTrackPluginState(std::size_t index,
                                                    std::size_t pluginIndex,
                                                    const juce::MemoryBlock& state);
-    [[nodiscard]] juce::Result showTrackPluginEditor(std::size_t index,
+    [[nodiscard]] cydaw::base::Result showTrackPluginEditor(std::size_t index,
                                                      std::size_t pluginIndex);
-    [[nodiscard]] juce::Result refreshTrackPluginParameters(
+    [[nodiscard]] cydaw::base::Result refreshTrackPluginParameters(
         std::size_t index,
         std::size_t pluginIndex,
         std::vector<IsolatedPluginHost::ParameterSnapshot>& destination);
-    [[nodiscard]] juce::Result setTrackPluginParameter(std::size_t index,
+    [[nodiscard]] cydaw::base::Result setTrackPluginParameter(std::size_t index,
                                                        std::size_t pluginIndex,
                                                        std::uint32_t parameterIndex,
                                                        float normalisedValue);
     // A hosted plug-in's own programs, and choosing one.
-    [[nodiscard]] juce::Result getTrackPluginPrograms(std::size_t index, std::size_t pluginIndex,
+    [[nodiscard]] cydaw::base::Result getTrackPluginPrograms(std::size_t index, std::size_t pluginIndex,
                                                       juce::StringArray& names, int& current);
-    [[nodiscard]] juce::Result setTrackPluginProgram(std::size_t index, std::size_t pluginIndex, int program);
+    [[nodiscard]] cydaw::base::Result setTrackPluginProgram(std::size_t index, std::size_t pluginIndex, int program);
 
     [[nodiscard]] std::uint64_t addMidiNote(int noteNumber,
                                             double startBeats,
@@ -1640,11 +1641,11 @@ public:
         std::uint64_t trackId,
         std::uint64_t clipId,
         std::vector<MidiNote> notes);
-    [[nodiscard]] juce::Result importMidiFile(
+    [[nodiscard]] cydaw::base::Result importMidiFile(
         const juce::File& file,
         MidiFileImportSummary& summary,
         bool adoptFileTempo = true);
-    [[nodiscard]] juce::Result exportMidiClipToFile(
+    [[nodiscard]] cydaw::base::Result exportMidiClipToFile(
         std::uint64_t trackId,
         std::uint64_t clipId,
         const juce::File& file) const;
@@ -1659,7 +1660,7 @@ public:
     [[nodiscard]] bool canUndoMidiEdit() const noexcept;
     [[nodiscard]] bool canRedoMidiEdit() const noexcept;
     void clearMidiEditHistory() noexcept;
-    [[nodiscard]] juce::Result startMidiRecording(
+    [[nodiscard]] cydaw::base::Result startMidiRecording(
         std::uint64_t trackId,
         std::uint64_t clipId,
         bool overdub,
@@ -1710,20 +1711,20 @@ public:
     // The name the launcher, the mixer and the project show for the track.
     [[nodiscard]] bool setMidiTrackName(std::uint64_t trackId,
                                         juce::String name);
-    [[nodiscard]] juce::Result setMidiTrackInstrumentGraph(
+    [[nodiscard]] cydaw::base::Result setMidiTrackInstrumentGraph(
         std::uint64_t trackId,
         const cydaw::engine::PolySynthGraphPlan& graph);
     [[nodiscard]] cydaw::engine::PolySynthGraphPlan midiTrackInstrumentGraph(
         std::uint64_t trackId) const;
     // What the graph places after the instrument on a MIDI track: the chain
     // an Ableton or Bitwig user drops behind their synth.
-    [[nodiscard]] juce::Result setMidiTrackEffectGraph(
+    [[nodiscard]] cydaw::base::Result setMidiTrackEffectGraph(
         std::uint64_t trackId, const cydaw::engine::NativeDspGraph& graph);
     [[nodiscard]] cydaw::engine::NativeDspGraph midiTrackEffectGraph(
         std::uint64_t trackId) const;
     // Values only, the way a knob changes them: no recompilation when the
     // chain's shape is unchanged. Fails when it is, and the caller recompiles.
-    [[nodiscard]] juce::Result updateMidiTrackEffectParameters(
+    [[nodiscard]] cydaw::base::Result updateMidiTrackEffectParameters(
         std::uint64_t trackId, const cydaw::engine::NativeDspGraph& graph);
     // The chain's control nodes and what each put out last block — an LFO's
     // position, a range node's mapped value. Read on the message thread.
@@ -1757,7 +1758,7 @@ public:
     // Pad `pad`: its instrument's plan and the effects after it (values only
     // when its chain keeps its shape; else compiled again).
     static constexpr std::size_t maximumRackPads = 128;
-    [[nodiscard]] juce::Result setMidiTrackRackPad(std::uint64_t trackId, std::size_t pad,
+    [[nodiscard]] cydaw::base::Result setMidiTrackRackPad(std::uint64_t trackId, std::size_t pad,
                                                    const cydaw::engine::PolySynthGraphPlan& plan,
                                                    const cydaw::engine::NativeDspGraph& effects);
     struct PadMix {
@@ -1934,11 +1935,11 @@ public:
         std::size_t trackIndex, int sceneIndex, double durationSeconds,
         double playStartSeconds, double playEndSeconds,
         double loopStartSeconds, double loopEndSeconds, bool looping);
-    [[nodiscard]] juce::Result addLauncherClipEventFromFile(
+    [[nodiscard]] cydaw::base::Result addLauncherClipEventFromFile(
         std::size_t trackIndex, int sceneIndex,
         const juce::File& sourceFile, double localStartSeconds,
         std::uint64_t* newEventId = nullptr);
-    [[nodiscard]] juce::Result replaceLauncherClipEvents(
+    [[nodiscard]] cydaw::base::Result replaceLauncherClipEvents(
         std::size_t trackIndex, int sceneIndex,
         std::vector<AudioEvent> events);
     [[nodiscard]] bool updateLauncherClipEvent(
@@ -2017,26 +2018,26 @@ public:
         std::size_t trackIndex) const noexcept;
     [[nodiscard]] bool launcherUsesDoubleDeckReadAhead(
         std::size_t trackIndex) const noexcept;
-    [[nodiscard]] static juce::Result selfTestDoubleDeckLauncher(
+    [[nodiscard]] static cydaw::base::Result selfTestDoubleDeckLauncher(
         const juce::File& sourceFile,
         const juce::File& alternateSourceFile = {});
-    [[nodiscard]] static juce::Result selfTestLauncherTimeline(
+    [[nodiscard]] static cydaw::base::Result selfTestLauncherTimeline(
         const juce::File& eventSourceFile);
-    [[nodiscard]] static juce::Result selfTestMidiLauncherClip();
-    [[nodiscard]] static juce::Result selfTestMulticlipArrangement(
+    [[nodiscard]] static cydaw::base::Result selfTestMidiLauncherClip();
+    [[nodiscard]] static cydaw::base::Result selfTestMulticlipArrangement(
         const juce::File& sourceFile,
         const juce::File& alternateSourceFile = {});
-    [[nodiscard]] static juce::Result selfTestAudioTakeRendering(
+    [[nodiscard]] static cydaw::base::Result selfTestAudioTakeRendering(
         const juce::File& firstTake,
         const juce::File& secondTake);
-    [[nodiscard]] static juce::Result selfTestStretchRendering(
+    [[nodiscard]] static cydaw::base::Result selfTestStretchRendering(
         const juce::File& sourceFile);
-    [[nodiscard]] static juce::Result selfTestPolySynthGraph();
+    [[nodiscard]] static cydaw::base::Result selfTestPolySynthGraph();
     // Per-note expressions: a pitch curve moves its note alone, a gain
     // curve its level, copies keep them.
-    [[nodiscard]] static juce::Result selfTestNoteExpression();
+    [[nodiscard]] static cydaw::base::Result selfTestNoteExpression();
     // Mono and legato: one note at a time, sliding from the last.
-    [[nodiscard]] static juce::Result selfTestLegatoVoicing();
+    [[nodiscard]] static cydaw::base::Result selfTestLegatoVoicing();
     void setLaunchQuantization(LaunchQuantization quantization) noexcept;
     [[nodiscard]] LaunchQuantization launchQuantization() const noexcept;
     [[nodiscard]] double launcherBoundaryDelaySeconds() const noexcept;
@@ -2053,7 +2054,7 @@ public:
     // rebuilds are only noted, and done once per track at the end, which
     // returns the first failure among them.
     void beginArrangementBatch() noexcept;
-    [[nodiscard]] juce::Result endArrangementBatch();
+    [[nodiscard]] cydaw::base::Result endArrangementBatch();
     void setPosition(double seconds);
     void setArrangementPlaybackEnabled(bool enabled) noexcept;
     [[nodiscard]] bool arrangementPlaybackEnabled() const noexcept;
@@ -2064,7 +2065,7 @@ public:
     [[nodiscard]] double loopEnd() const noexcept;
     [[nodiscard]] bool hasExplicitLoopRange() const noexcept;
 
-    [[nodiscard]] juce::Result startRecording(
+    [[nodiscard]] cydaw::base::Result startRecording(
         const juce::File& destination,
         double startDelaySeconds = 0.0);
     void scheduleRecordingStop(double delaySeconds);
@@ -2074,15 +2075,15 @@ public:
     [[nodiscard]] bool recordingStarted() const noexcept;
     [[nodiscard]] bool recordingStopPending() const noexcept;
     [[nodiscard]] bool recordingComplete() const noexcept;
-    [[nodiscard]] juce::Result commitRecordedTake(
+    [[nodiscard]] cydaw::base::Result commitRecordedTake(
         const juce::File& recordedFile,
         std::optional<std::size_t> targetTrack,
         double startSeconds,
         RecordedTakeResult& result,
         std::optional<std::uint64_t> targetClipId = std::nullopt);
 
-    [[nodiscard]] juce::Result startMasterExport(const juce::File& destination);
-    [[nodiscard]] juce::Result finishMasterExport();
+    [[nodiscard]] cydaw::base::Result startMasterExport(const juce::File& destination);
+    [[nodiscard]] cydaw::base::Result finishMasterExport();
     void cancelMasterExport();
     [[nodiscard]] bool isMasterExporting() const noexcept;
     // Nothing to the sound card (an automated session): the mix, its meters
@@ -2137,7 +2138,7 @@ public:
     // Every track's outputs at once: into the master, or into other tracks
     // (their sound joins the destination's own, before its devices). Fails,
     // changing nothing, on a loop.
-    juce::Result setTrackRouting(const std::vector<TrackRouting>& routing);
+    cydaw::base::Result setTrackRouting(const std::vector<TrackRouting>& routing);
 
     // ---- The DJ mode and the Foundry -----------------------------------------
     // Their sound joins the master's mixer with the tracks (the master's
@@ -2169,19 +2170,19 @@ public:
     [[nodiscard]] double simulationSeconds() const noexcept;
     // The device: an effect's graph (its input fed by the source), or an
     // instrument's voices and what its graph puts after them.
-    juce::Result setSimulationEffect(const cydaw::engine::NativeDspGraph& graph, bool monoOutput);
-    juce::Result setSimulationInstrument(const cydaw::engine::PolySynthGraphPlan& plan,
+    cydaw::base::Result setSimulationEffect(const cydaw::engine::NativeDspGraph& graph, bool monoOutput);
+    cydaw::base::Result setSimulationInstrument(const cydaw::engine::PolySynthGraphPlan& plan,
                                          const cydaw::engine::NativeDspGraph& chain,
                                          std::vector<cydaw::engine::PolyVoiceModulation> modulations);
     // Values only, the shape unchanged; fails when the shape changed.
-    juce::Result updateSimulationParameters(const cydaw::engine::NativeDspGraph& graph);
+    cydaw::base::Result updateSimulationParameters(const cydaw::engine::NativeDspGraph& graph);
     void setSimulationSource(SimulationSource source, float levelDb, float toneHz) noexcept;
     // What the device's other audio inputs (a sidechain) hear: the source
     // again, nothing, or a kick on every beat.
     enum class SimulationSideSource : int { same, silence, kick };
     void setSimulationSideSource(SimulationSideSource source) noexcept;
     // An audio file looped as the source (read whole, up to five minutes).
-    juce::Result setSimulationSample(const juce::File& file);
+    cydaw::base::Result setSimulationSample(const juce::File& file);
     // Notes looped over lengthBeats at the session tempo; empty for none.
     void setSimulationPattern(std::vector<SimulationNote> notes, double lengthBeats);
     void simulationNoteOn(int noteNumber, float velocity);
@@ -2288,7 +2289,7 @@ private:
     void refreshLatencyCompensation() noexcept;
     void resetLatencyCompensation() noexcept;
     // The mixer's plan from routing_ and the tracks' latencies as they are.
-    juce::Result rebuildRouting();
+    cydaw::base::Result rebuildRouting();
     void publishMidiSequence(MidiPlaybackTrack& track);
     void publishMidiTrackAutomation(MidiPlaybackTrack& track);
     void publishMidiClipAutomation(MidiPlaybackTrack& track,
@@ -2311,8 +2312,8 @@ private:
         double noteStartSeconds) const noexcept;
     void publishTrackAutomation(PlaybackTrack& track);
     void publishTrackPluginAutomation(PlaybackTrack& track);
-    [[nodiscard]] juce::Result rebuildArrangementPlan(PlaybackTrack& track);
-    [[nodiscard]] juce::Result rebuildLauncherPlans(PlaybackTrack& track);
+    [[nodiscard]] cydaw::base::Result rebuildArrangementPlan(PlaybackTrack& track);
+    [[nodiscard]] cydaw::base::Result rebuildLauncherPlans(PlaybackTrack& track);
     void refreshTransportRanges() noexcept;
     [[nodiscard]] double contentLength() const noexcept;
     [[nodiscard]] double transportLength() const noexcept;
@@ -2393,7 +2394,7 @@ private:
         std::shared_ptr<const LoopAuditionSource::Loop> loop;
         juce::uint32 checked {};
     } tempoPreview_;
-    [[nodiscard]] juce::Result startTempoPreview(const juce::File& file, double startSeconds, const SamplePreviewTempo& tempo);
+    [[nodiscard]] cydaw::base::Result startTempoPreview(const juce::File& file, double startSeconds, const SamplePreviewTempo& tempo);
     std::unique_ptr<PlaybackTrack> clipPreviewTrack_;
     juce::MixerAudioSource auditionMixer_;
     VirtualBusRouter virtualBusRouter_ { auditionMixer_ };

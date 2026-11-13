@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #pragma once
 
 #include <cydaw/engine/PolySynthGraph.h>
@@ -45,17 +46,17 @@ private:
 
 // What a plan carries as numbers cannot hold a sound model or a table: they
 // come back from the graph's own JSON (an exported plug-in's "editor" state).
-void attachVoiceAssets(cydaw::engine::PolySynthGraphPlan& plan, const juce::var& graphState);
+void attachVoiceAssets(cydaw::engine::PolySynthGraphPlan& plan, const cydaw::base::Value& graphState);
 
 // Each Replacer's instrument (Containers.h) an exported state carries
 // ("replacers": its node, its plan, its graph): the plan restored, its
 // samples and model attached, onto its node of `graph`. `waitForSamples`: a
 // sampler's samples decoded before it returns (a host rendering offline).
-void attachReplacerInstruments(cydaw::engine::NativeDspGraph& graph, const juce::var& runtimeState, bool waitForSamples);
+void attachReplacerInstruments(cydaw::engine::NativeDspGraph& graph, const cydaw::base::Value& runtimeState, bool waitForSamples);
 
-[[nodiscard]] juce::var serialisePolySynthGraphPlan(
+[[nodiscard]] cydaw::base::Value serialisePolySynthGraphPlan(
     const cydaw::engine::PolySynthGraphPlan& plan);
 [[nodiscard]] std::optional<cydaw::engine::PolySynthGraphPlan>
-restorePolySynthGraphPlan(const juce::var& state, juce::String& error);
+restorePolySynthGraphPlan(const cydaw::base::Value& state, juce::String& error);
 
 } // namespace cydaw::app

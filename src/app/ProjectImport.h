@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include <juce_core/juce_core.h>
@@ -112,24 +113,24 @@ struct ImportedProject {
 // Studio One and others), .zpj (Zrythm), .mid (a MIDI file and the audio
 // files beside it, as any application exports them). The result is what could be read;
 // the warnings say what could not.
-[[nodiscard]] juce::Result importProjectFile(const juce::File& file, ImportedProject& out);
-[[nodiscard]] juce::Result importReaperProject(const juce::File& file, ImportedProject& out);
-[[nodiscard]] juce::Result importFlStudioProject(const juce::File& file, ImportedProject& out);
-[[nodiscard]] juce::Result importArdourSession(const juce::File& file, ImportedProject& out);
-[[nodiscard]] juce::Result importLmmsProject(const juce::File& file, ImportedProject& out);
-[[nodiscard]] juce::Result importAafComposition(const juce::File& file, ImportedProject& out);
-[[nodiscard]] juce::Result importZrythmProject(const juce::File& file, ImportedProject& out);
+[[nodiscard]] cydaw::base::Result importProjectFile(const juce::File& file, ImportedProject& out);
+[[nodiscard]] cydaw::base::Result importReaperProject(const juce::File& file, ImportedProject& out);
+[[nodiscard]] cydaw::base::Result importFlStudioProject(const juce::File& file, ImportedProject& out);
+[[nodiscard]] cydaw::base::Result importArdourSession(const juce::File& file, ImportedProject& out);
+[[nodiscard]] cydaw::base::Result importLmmsProject(const juce::File& file, ImportedProject& out);
+[[nodiscard]] cydaw::base::Result importAafComposition(const juce::File& file, ImportedProject& out);
+[[nodiscard]] cydaw::base::Result importZrythmProject(const juce::File& file, ImportedProject& out);
 // A standard MIDI file and the audio files beside it (stems): what any other
 // application exports (Reason…).
-[[nodiscard]] juce::Result importMidiAndStems(const juce::File& file, ImportedProject& out);
+[[nodiscard]] cydaw::base::Result importMidiAndStems(const juce::File& file, ImportedProject& out);
 // Where audio made by an import goes (two mono files made one stereo file):
 // the application's own folder for it; the system's temporary one until set.
 void setImportedAudioFolder(const juce::File& folder);
 [[nodiscard]] juce::File importedAudioFolder();
-[[nodiscard]] juce::Result importDawProject(const juce::File& file, ImportedProject& out);
-[[nodiscard]] juce::Result importAbletonLiveSet(const juce::File& file, ImportedProject& out);
-[[nodiscard]] juce::Result importStudioOneSong(const juce::File& file, ImportedProject& out);
-[[nodiscard]] juce::Result importBitwigProject(const juce::File& file, ImportedProject& out);
+[[nodiscard]] cydaw::base::Result importDawProject(const juce::File& file, ImportedProject& out);
+[[nodiscard]] cydaw::base::Result importAbletonLiveSet(const juce::File& file, ImportedProject& out);
+[[nodiscard]] cydaw::base::Result importStudioOneSong(const juce::File& file, ImportedProject& out);
+[[nodiscard]] cydaw::base::Result importBitwigProject(const juce::File& file, ImportedProject& out);
 [[nodiscard]] juce::StringArray supportedProjectExtensions();
 [[nodiscard]] juce::String supportedProjectWildcard();
 

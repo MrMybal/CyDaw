@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #include "ProjectImport.h"
 #include "ProjectImportShared.h"
 
@@ -23,13 +24,13 @@ class LmmsReader {
 public:
     LmmsReader(const juce::File& file, ImportedProject& out) : file_(file), out_(out), folder_(file.getParentDirectory()) {}
 
-    juce::Result read()
+    cydaw::base::Result read()
     {
         std::unique_ptr<juce::XmlElement> document;
         if (file_.hasFileExtension("mmpz")) {
             juce::MemoryBlock bytes;
             if (!file_.loadFileAsData(bytes) || bytes.getSize() < 6)
-                return juce::Result::fail("The file could not be opened: " + file_.getFullPathName());
+                return cydaw::base::Result::fail("The file could not be opened: " + file_.getFullPathName());
             juce::MemoryInputStream compressed(static_cast<const char*>(bytes.getData()) + 4, bytes.getSize() - 4, false);
             juce::GZIPDecompressorInputStream unzipped(&compressed, false, juce::GZIPDecompressorInputStream::zlibFormat);
             document = juce::XmlDocument::parse(readBounded(unzipped));
@@ -37,7 +38,7 @@ public:
             document = juce::XmlDocument::parse(file_);
         }
         if (document == nullptr || !document->hasTagName("lmms-project"))
-            return juce::Result::fail("Not an LMMS project: " + file_.getFileName());
+            return cydaw::base::Result::fail("Not an LMMS project: " + file_.getFileName());
         out_.format = "lmms";
         out_.application = "LMMS " + document->getStringAttribute("creatorversion");
         if (const auto* head = document->getChildByName("head")) {
@@ -49,7 +50,7 @@ public:
         const auto* song = document->getChildByName("song");
         const auto* container = song != nullptr ? song->getChildByName("trackcontainer") : nullptr;
         if (container == nullptr)
-            return juce::Result::fail("The LMMS project holds no song");
+            return cydaw::base::Result::fail("The LMMS project holds no song");
         // The beat/bassline tracks in their order: the n-th plays the
         // patterns at place n of the instruments of the one container they
         // share (written in the first of them).
@@ -67,7 +68,7 @@ public:
         readBeats(beatTracks);
         if (automation_)
             out_.warnings.add("Automation tracks were left out.");
-        return juce::Result::ok();
+        return cydaw::base::Result::ok();
     }
 
 private:
@@ -296,7 +297,7 @@ private:
 
 } // namespace
 
-juce::Result importLmmsProject(const juce::File& file, ImportedProject& out)
+cydaw::base::Result importLmmsProject(const juce::File& file, ImportedProject& out)
 {
     out.source = file;
     LmmsReader reader(file, out);

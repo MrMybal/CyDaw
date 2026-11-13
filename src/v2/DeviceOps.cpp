@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "DeviceOps.h"
 
@@ -22,17 +23,17 @@ juce::String parameterKeyOf(const juce::String& binding, const std::uint64_t nod
     return binding.startsWith(prefix) ? binding.substring(prefix.length()) : binding;
 }
 
-juce::var presetState(const app::NodeGraphComponent& graph, const std::uint64_t nodeId)
+cydaw::base::Value presetState(const app::NodeGraphComponent& graph, const std::uint64_t nodeId)
 {
     for (const auto& node : graph.editorNodes()) {
         if (node.id != nodeId)
             continue;
-        auto* knobs = new juce::DynamicObject();
+        auto* knobs = new cydaw::base::Object();
         for (const auto& parameter : node.parameters)
             knobs->setProperty(parameterKeyOf(parameter.binding, nodeId), parameter.value);
-        auto* state = new juce::DynamicObject();
+        auto* state = new cydaw::base::Object();
         state->setProperty("type", node.typeKey);
-        state->setProperty("parameters", juce::var(knobs));
+        state->setProperty("parameters", cydaw::base::Value(knobs));
         if (node.typeKey == "sampler")
             if (const auto map = graph.nodeSamplerJson(nodeId); map.isObject())
                 state->setProperty("sampler", map);
@@ -46,7 +47,7 @@ juce::var presetState(const app::NodeGraphComponent& graph, const std::uint64_t 
             if (const auto model = graph.nodeSoundModelJson(nodeId); model.isObject())
                 state->setProperty("soundModel", model);
         if (node.typeKey == "wavetable") {
-            juce::Array<juce::var> harmonics;
+            cydaw::base::Array<cydaw::base::Value> harmonics;
             for (const auto& frame : graph.editorNodeWavetable(nodeId).harmonics)
                 for (const auto amplitude : frame)
                     harmonics.add(amplitude);
@@ -65,12 +66,12 @@ juce::var presetState(const app::NodeGraphComponent& graph, const std::uint64_t 
         if (node.typeKey == "cab-sim" || node.typeKey == "empreinte")
             if (const auto response = graph.nodeImpulseJson(nodeId); response.isObject())
                 state->setProperty("impulse", response);
-        return juce::var(state);
+        return cydaw::base::Value(state);
     }
     return {};
 }
 
-bool applyPreset(app::NodeGraphComponent& graph, const std::uint64_t nodeId, const juce::var& state, juce::String& error,
+bool applyPreset(app::NodeGraphComponent& graph, const std::uint64_t nodeId, const cydaw::base::Value& state, juce::String& error,
                  const std::function<bool(int kit, juce::String& error)>& setBatterieKit)
 {
     const auto nodes = graph.editorNodes();
@@ -103,21 +104,21 @@ bool applyPreset(app::NodeGraphComponent& graph, const std::uint64_t nodeId, con
     if (node->typeKey == "cab-sim" || node->typeKey == "empreinte") {
         const auto response = state.getProperty("impulse", {});
         if ((response.isObject() || graph.nodeImpulseJson(nodeId).isObject())
-            && !graph.setNodeImpulse(nodeId, response.isObject() ? response : juce::var(), error))
+            && !graph.setNodeImpulse(nodeId, response.isObject() ? response : cydaw::base::Value(), error))
             return false;
     }
     // A Prisme preset brings its own tables, or none (the factory's then).
     if (node->typeKey == "prism-synth") {
         const auto tables = state.getProperty("prismTables", {});
         if ((tables.isObject() || graph.nodePrismTablesJson(nodeId).isObject())
-            && !graph.setNodePrismTables(nodeId, tables.isObject() ? tables : juce::var(), error))
+            && !graph.setNodePrismTables(nodeId, tables.isObject() ? tables : cydaw::base::Value(), error))
             return false;
     }
     if (node->typeKey == "batterie")
         if (const auto* knobs = state.getProperty("parameters", {}).getDynamicObject())
             for (const auto& parameter : node->parameters)
                 if (parameter.binding.endsWith(".batterie.kit.kit")) {
-                    const auto key = juce::Identifier(parameterKeyOf(parameter.binding, nodeId));
+                    const auto key = cydaw::base::Identifier(parameterKeyOf(parameter.binding, nodeId));
                     const auto kit = knobs->hasProperty(key) ? static_cast<int>(std::lround(static_cast<double>(knobs->getProperty(key)))) : 0;
                     const auto loaded = graph.nodeSamplerJson(nodeId).getProperty("batterieKit", -1);
                     if (static_cast<int>(loaded) != kit && (!setBatterieKit || !setBatterieKit(kit, error)))
@@ -130,7 +131,7 @@ bool applyPreset(app::NodeGraphComponent& graph, const std::uint64_t nodeId, con
         if (const auto* knobs = state.getProperty("parameters", {}).getDynamicObject()) {
             const auto prefix = "node." + juce::String(static_cast<juce::int64>(nodeId)) + ".sampler.cc";
             for (int number = 0; number < 128; ++number) {
-                const auto key = juce::Identifier("sampler.cc" + juce::String(number));
+                const auto key = cydaw::base::Identifier("sampler.cc" + juce::String(number));
                 (void) graph.editorSetParameter(prefix + juce::String(number),
                                                 knobs->hasProperty(key) ? static_cast<double>(knobs->getProperty(key)) : -1.0);
             }
@@ -143,7 +144,7 @@ bool applyPreset(app::NodeGraphComponent& graph, const std::uint64_t nodeId, con
             const auto prefix = "node." + juce::String(static_cast<juce::int64>(nodeId)) + ".prism.";
             for (int index = 0; index < engine::prism::parameterCount; ++index) {
                 const auto& setting = engine::prism::parameter(index);
-                const auto key = juce::Identifier("prism." + juce::String(setting.key));
+                const auto key = cydaw::base::Identifier("prism." + juce::String(setting.key));
                 const auto value = knobs->hasProperty(key) ? static_cast<double>(knobs->getProperty(key))
                                                            : static_cast<double>(setting.defaultValue);
                 (void) graph.editorSetParameter(prefix + juce::String(setting.key),
@@ -152,7 +153,7 @@ bool applyPreset(app::NodeGraphComponent& graph, const std::uint64_t nodeId, con
         }
     if (const auto* knobs = state.getProperty("parameters", {}).getDynamicObject())
         for (const auto& parameter : node->parameters) {
-            const auto key = juce::Identifier(parameterKeyOf(parameter.binding, nodeId));
+            const auto key = cydaw::base::Identifier(parameterKeyOf(parameter.binding, nodeId));
             if (knobs->hasProperty(key))
                 (void) graph.editorSetParameter(parameter.binding,
                                                 std::clamp(static_cast<double>(knobs->getProperty(key)), parameter.minimum,

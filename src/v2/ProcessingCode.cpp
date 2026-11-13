@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 // The EEL2 headers include windows.h: its min/max macros kept out.
 #ifndef NOMINMAX
  #define NOMINMAX
@@ -450,13 +451,13 @@ JsfxInfo inspectJsfx(const juce::String& source)
     return info;
 }
 
-juce::Result renderJsfx(const juce::String& source, const std::map<int, double>& values, engine::repair::Channels& channels,
+cydaw::base::Result renderJsfx(const juce::String& source, const std::map<int, double>& values, engine::repair::Channels& channels,
                         const double rate, const std::int64_t frames, const std::atomic<bool>* cancel)
 {
     Loaded loaded;
     juce::String error;
     if (!loaded.load(source, error))
-        return juce::Result::fail(error);
+        return cydaw::base::Result::fail(error);
     auto* fx = loaded.fx.get();
     constexpr uint32_t block = 512;
     ysfx_set_sample_rate(fx, rate);
@@ -477,7 +478,7 @@ juce::Result renderJsfx(const juce::String& source, const std::map<int, double>&
     std::int64_t latency = -1;
     for (std::int64_t at = 0;; at += block) {
         if (cancel != nullptr && cancel->load())
-            return juce::Result::fail("cancelled");
+            return cydaw::base::Result::fail("cancelled");
         if (latency < 0)
             latency = std::max<std::int64_t>(0, static_cast<std::int64_t>(std::lround(ysfx_get_pdc_delay(fx))));
         if (at >= frames + latency)
@@ -497,7 +498,7 @@ juce::Result renderJsfx(const juce::String& source, const std::map<int, double>&
             }
     }
     channels = std::move(rendered);
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 } // namespace cydaw::v2::processing

@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #pragma once
 
 #include <juce_audio_formats/juce_audio_formats.h>
@@ -87,8 +88,8 @@ private:
     void scan();
     void analyseNow(juce::AudioFormatManager& formats, const juce::File& file);
     void changed();
-    [[nodiscard]] juce::var toJson() const;
-    void fromJson(const juce::var& document);
+    [[nodiscard]] cydaw::base::Value toJson() const;
+    void fromJson(const cydaw::base::Value& document);
     [[nodiscard]] std::size_t indexOf(const juce::File& file) const;
 
     mutable std::mutex lock_;

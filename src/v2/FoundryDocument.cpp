@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "FoundryDocument.h"
 #include "FoundryJson.h"
@@ -24,9 +25,9 @@ int intOf(const juce::StringPairArray& values, const juce::String& key, const in
     return values.containsKey(key) ? values[key].getIntValue() : fallback;
 }
 
-double number(const juce::var& object, const char* key, const double fallback = 0.0)
+double number(const cydaw::base::Value& object, const char* key, const double fallback = 0.0)
 {
-    const auto value = object.getProperty(key, juce::var());
+    const auto value = object.getProperty(key, cydaw::base::Value());
     return value.isVoid() ? fallback : static_cast<double>(value);
 }
 
@@ -284,7 +285,7 @@ std::vector<FoundryMarker> FoundryDocument::shiftedMarkers(const std::int64_t at
     return result;
 }
 
-juce::Result FoundryDocument::writeSound(const Sound& sound, const juce::File& file, int bits, const std::vector<FoundryMarker>& markers)
+cydaw::base::Result FoundryDocument::writeSound(const Sound& sound, const juce::File& file, int bits, const std::vector<FoundryMarker>& markers)
 {
     std::unique_ptr<juce::AudioFormat> format;
     if (file.hasFileExtension("flac"))
@@ -335,12 +336,12 @@ juce::Result FoundryDocument::writeSound(const Sound& sound, const juce::File& f
         temporary.deleteFile();
         auto stream = temporary.createOutputStream();
         if (stream == nullptr)
-            return juce::Result::fail(ui::Ls("Fichier impossible à écrire : ", "Cannot write the file: ") + file.getFullPathName());
+            return cydaw::base::Result::fail(ui::Ls("Fichier impossible à écrire : ", "Cannot write the file: ") + file.getFullPathName());
         std::unique_ptr<juce::OutputStream> output { std::move(stream) };
         auto writer = format->createWriterFor(output, options);
         if (writer == nullptr) {
             temporary.deleteFile();
-            return juce::Result::fail(ui::Ls("Ce format n'accepte pas ce son (canaux, fréquence ou bits)",
+            return cydaw::base::Result::fail(ui::Ls("Ce format n'accepte pas ce son (canaux, fréquence ou bits)",
                                              "This format does not take this sound (channels, rate or bits)"));
         }
         constexpr std::int64_t chunk = 1 << 16;
@@ -355,22 +356,22 @@ juce::Result FoundryDocument::writeSound(const Sound& sound, const juce::File& f
             if (!writer->writeFromFloatArrays(pointers.data(), sound.channels(), static_cast<int>(n))) {
                 writer.reset();
                 temporary.deleteFile();
-                return juce::Result::fail(ui::Ls("Écriture interrompue", "Writing stopped"));
+                return cydaw::base::Result::fail(ui::Ls("Écriture interrompue", "Writing stopped"));
             }
         }
     }
     if (!temporary.moveFileTo(file)) {
         temporary.deleteFile();
-        return juce::Result::fail(ui::Ls("Le fichier est utilisé (par le projet ?) : enregistrez sous un autre nom",
+        return cydaw::base::Result::fail(ui::Ls("Le fichier est utilisé (par le projet ?) : enregistrez sous un autre nom",
                                          "The file is in use (by the project?): save it under another name"));
     }
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
-juce::Result FoundryDocument::save(const juce::File& file, const int bits)
+cydaw::base::Result FoundryDocument::save(const juce::File& file, const int bits)
 {
     if (!plainFile())
-        return juce::Result::fail(ui::Ls("Plusieurs clips : enregistrez la session, ou exportez le mixage",
+        return cydaw::base::Result::fail(ui::Ls("Plusieurs clips : enregistrez la session, ou exportez le mixage",
                                          "Several clips: save the session, or export the mix"));
     const auto& clip = session_->tracks[0].clips[0];
     if (const auto result = writeSound(*clip.sound, file, bits, markers_); result.failed())
@@ -384,10 +385,10 @@ juce::Result FoundryDocument::save(const juce::File& file, const int bits)
     bits_ = bits;
     dirty_ = false;
     ++revision_;
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
-juce::Result FoundryDocument::exportMix(const juce::File& file, const int bits, std::int64_t start, std::int64_t end) const
+cydaw::base::Result FoundryDocument::exportMix(const juce::File& file, const int bits, std::int64_t start, std::int64_t end) const
 {
     const auto& session = *session_;
     if (end <= start) {
@@ -395,7 +396,7 @@ juce::Result FoundryDocument::exportMix(const juce::File& file, const int bits, 
         end = session.frames();
     }
     if (end <= start)
-        return juce::Result::fail(ui::Ls("Rien à exporter", "Nothing to export"));
+        return cydaw::base::Result::fail(ui::Ls("Rien à exporter", "Nothing to export"));
     std::vector<FoundryMarker> inside;
     for (auto marker : markers_)
         if (marker.start >= start && marker.start < end) {
@@ -406,19 +407,19 @@ juce::Result FoundryDocument::exportMix(const juce::File& file, const int bits, 
     return writeSound((processing_.getDynamicObject() || !session.masterAutomation.empty() || std::any_of(session.tracks.begin(),session.tracks.end(),[](const auto& t){return t.midi || !t.automation.empty();})) ? ModeProcessing::render(session,processing_,start,end,renderTail_) : engine::foundry::render(session, start, end), file, bits, inside);
 }
 
-juce::Result FoundryDocument::saveSession(const juce::File& file)
+cydaw::base::Result FoundryDocument::saveSession(const juce::File& file)
 {
     const auto& session = *session_;
     const auto folder = file.getSiblingFile(file.getFileNameWithoutExtension() + " files");
     // The sounds edited (each once), the others where they are.
     std::map<const Sound*, juce::String> written;
-    auto* root = new juce::DynamicObject();
+    auto* root = new cydaw::base::Object();
     root->setProperty("format", session.cinema ? "CyDAW Cinema session" : "CyDAW Foundry session");
-    auto* picture = new juce::DynamicObject();
+    auto* picture = new cydaw::base::Object();
     picture->setProperty("file",fromUtf8(session.picture.file));
     picture->setProperty("start",session.picture.start);picture->setProperty("sourceIn",session.picture.sourceIn);
     picture->setProperty("duration",session.picture.duration);picture->setProperty("fps",session.picture.fps);
-    root->setProperty("picture",juce::var(picture));
+    root->setProperty("picture",cydaw::base::Value(picture));
     root->setProperty("version", session.cinema ? 5 : 3);
     root->setProperty("processing",processing_);
     root->setProperty("renderTail",renderTail_);
@@ -426,9 +427,9 @@ juce::Result FoundryDocument::saveSession(const juce::File& file)
     root->setProperty("tempo",session.tempo);
     root->setProperty("span",session.span);
     root->setProperty("masterAutomation",foundry_json::automation(session.masterAutomation));
-    juce::Array<juce::var> tracks;
+    cydaw::base::Array<cydaw::base::Value> tracks;
     for (const auto& track : session.tracks) {
-        auto* entry = new juce::DynamicObject();
+        auto* entry = new cydaw::base::Object();
         entry->setProperty("id",static_cast<juce::int64>(track.id));
         entry->setProperty("name", fromUtf8(track.name));
         entry->setProperty("gainDb", track.gainDb);
@@ -441,9 +442,9 @@ juce::Result FoundryDocument::saveSession(const juce::File& file)
         entry->setProperty("parentId",static_cast<juce::int64>(track.parentId));
         entry->setProperty("containerStart",track.containerStart);entry->setProperty("containerLength",track.containerLength);
         entry->setProperty("automation",foundry_json::automation(track.automation));
-        juce::Array<juce::var> clips;
+        cydaw::base::Array<cydaw::base::Value> clips;
         for (const auto& clip : track.clips) {
-            auto* item = new juce::DynamicObject();
+            auto* item = new cydaw::base::Object();
             item->setProperty("id",static_cast<juce::int64>(clip.id));
             item->setProperty("notes",foundry_json::notes(clip.notes));
             item->setProperty("name", fromUtf8(clip.name));
@@ -462,41 +463,41 @@ juce::Result FoundryDocument::saveSession(const juce::File& file)
                 auto& name = written[clip.sound.get()];
                 if (name.isEmpty()) {
                     if (!folder.createDirectory())
-                        return juce::Result::fail(ui::Ls("Dossier impossible à créer : ", "Cannot make the folder: ") + folder.getFullPathName());
+                        return cydaw::base::Result::fail(ui::Ls("Dossier impossible à créer : ", "Cannot make the folder: ") + folder.getFullPathName());
                     name = folder.getFileName() + "/clip-" + juce::String(static_cast<juce::int64>(clip.id)) + ".wav";
                     if (const auto result = writeSound(*clip.sound, file.getSiblingFile(name), 32); result.failed())
                         return result;
                 }
                 item->setProperty("sound", name);
             }
-            clips.add(juce::var(item));
+            clips.add(cydaw::base::Value(item));
         }
         entry->setProperty("clips", clips);
-        tracks.add(juce::var(entry));
+        tracks.add(cydaw::base::Value(entry));
     }
     root->setProperty("tracks", tracks);
-    juce::Array<juce::var> markers;
+    cydaw::base::Array<cydaw::base::Value> markers;
     for (const auto& marker : markers_) {
-        auto* item = new juce::DynamicObject();
+        auto* item = new cydaw::base::Object();
         item->setProperty("start", marker.start);
         item->setProperty("end", marker.end);
         item->setProperty("name", marker.name);
-        markers.add(juce::var(item));
+        markers.add(cydaw::base::Value(item));
     }
     root->setProperty("markers", markers);
-    if (!file.replaceWithText(juce::JSON::toString(juce::var(root))))
-        return juce::Result::fail(ui::Ls("Fichier impossible à écrire : ", "Cannot write the file: ") + file.getFullPathName());
+    if (!file.replaceWithText(cydaw::base::JSON::toString(cydaw::base::Value(root))))
+        return cydaw::base::Result::fail(ui::Ls("Fichier impossible à écrire : ", "Cannot write the file: ") + file.getFullPathName());
     sessionFile_ = file;
     file_ = {};
     dirty_ = false;
     ++revision_;
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 std::unique_ptr<FoundryDocument> FoundryDocument::openSession(const juce::File& file, juce::String& error)
 {
-    const auto document = juce::JSON::parse(file);
-    const auto format=document.getProperty("format",juce::var()).toString();
+    const auto document = cydaw::base::JSON::parse(file);
+    const auto format=document.getProperty("format",cydaw::base::Value()).toString();
     if (format != "CyDAW Foundry session" && format != "CyDAW Cinema session") {
         error = ui::Ls("Ce n'est pas une session de la Fonderie : ", "Not a Foundry session: ") + file.getFileName();
         return nullptr;
@@ -514,13 +515,13 @@ std::unique_ptr<FoundryDocument> FoundryDocument::openSession(const juce::File& 
     session.span=static_cast<juce::int64>(document.getProperty("span",0));
     session.masterAutomation=foundry_json::automation(document.getProperty("masterAutomation",{}));
     std::map<juce::String, std::shared_ptr<const Sound>> read;
-    if (const auto* tracks = document.getProperty("tracks", juce::var()).getArray())
+    if (const auto* tracks = document.getProperty("tracks", cydaw::base::Value()).getArray())
         for (const auto& entry : *tracks) {
             Track track;
             track.id = static_cast<std::uint64_t>(number(entry,"id",0));
             if(!track.id)track.id=session.newId();
             session.nextId=std::max(session.nextId,track.id+1);
-            track.name = utf8(entry.getProperty("name", juce::var()).toString());
+            track.name = utf8(entry.getProperty("name", cydaw::base::Value()).toString());
             track.gainDb = static_cast<float>(number(entry, "gainDb"));
             track.pan = static_cast<float>(number(entry, "pan"));
             track.mute = static_cast<bool>(entry.getProperty("mute", false));
@@ -532,23 +533,23 @@ std::unique_ptr<FoundryDocument> FoundryDocument::openSession(const juce::File& 
             track.containerStart=static_cast<std::int64_t>(std::max(0.0,number(entry,"containerStart",0)));
             track.containerLength=static_cast<std::int64_t>(std::max(0.0,number(entry,"containerLength",0)));
             track.automation=foundry_json::automation(entry.getProperty("automation",{}));
-            if (const auto* clips = entry.getProperty("clips", juce::var()).getArray())
+            if (const auto* clips = entry.getProperty("clips", cydaw::base::Value()).getArray())
                 for (const auto& item : *clips) {
                     Clip clip;
                     clip.id = static_cast<std::uint64_t>(number(item,"id"));
                     if(!clip.id)clip.id=session.newId();
                     session.nextId=std::max(session.nextId,clip.id+1);
                     clip.notes=foundry_json::notes(item.getProperty("notes",{}),session);
-                    clip.name = utf8(item.getProperty("name", juce::var()).toString());
+                    clip.name = utf8(item.getProperty("name", cydaw::base::Value()).toString());
                     clip.start = static_cast<std::int64_t>(number(item, "start"));
                     clip.offset = static_cast<std::int64_t>(number(item, "offset"));
                     clip.length = static_cast<std::int64_t>(number(item, "length"));
                     clip.fadeIn = static_cast<std::int64_t>(number(item, "fadeIn"));
                     clip.fadeOut = static_cast<std::int64_t>(number(item, "fadeOut"));
                     clip.gainDb = static_cast<float>(number(item, "gainDb"));
-                    clip.file = utf8(item.getProperty("file", juce::var()).toString());
+                    clip.file = utf8(item.getProperty("file", cydaw::base::Value()).toString());
                     if(track.midi) {track.clips.push_back(std::move(clip));continue;}
-                    const auto own = item.getProperty("sound", juce::var()).toString();
+                    const auto own = item.getProperty("sound", cydaw::base::Value()).toString();
                     clip.edited = own.isNotEmpty();
                     const auto source = own.isNotEmpty() ? file.getSiblingFile(own) : juce::File(fromUtf8(clip.file));
                     auto& sound = read[source.getFullPathName()];
@@ -574,10 +575,10 @@ std::unique_ptr<FoundryDocument> FoundryDocument::openSession(const juce::File& 
     opened->renderTail_=static_cast<float>(std::clamp(number(document,"renderTail",0),0.0,30.0));
     opened->sessionFile_ = file;
     opened->name_ = file.getFileName();
-    if (const auto* markers = document.getProperty("markers", juce::var()).getArray())
+    if (const auto* markers = document.getProperty("markers", cydaw::base::Value()).getArray())
         for (const auto& item : *markers)
             opened->markers_.push_back({ static_cast<std::int64_t>(number(item, "start")), static_cast<std::int64_t>(number(item, "end")),
-                                         item.getProperty("name", juce::var()).toString() });
+                                         item.getProperty("name", cydaw::base::Value()).toString() });
     return opened;
 }
 

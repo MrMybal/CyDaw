@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "SoundModelFile.h"
 
 #include "SamplerMapFile.h"
@@ -22,7 +23,7 @@ constexpr int noiseFloorDb10 = -2'000;
 // little-endian int16 rows (a compact zone's), or "z:" + base64 of the zlib
 // stream of those rows each written as its difference from the one before
 // (modulo 2^16).
-bool readRows(const juce::var& rows, const int count, const int columns, std::vector<float>& db10)
+bool readRows(const cydaw::base::Value& rows, const int count, const int columns, std::vector<float>& db10)
 {
     // No larger than a model can be (a length field is not trusted further).
     if (count < 0 || columns < 0 || static_cast<std::uint64_t>(count) * static_cast<std::uint64_t>(columns) > (1ull << 26))
@@ -77,7 +78,7 @@ bool readRows(const juce::var& rows, const int count, const int columns, std::ve
 // A rows x columns table of dB x 10 integers, to linear values: amplitudes
 // (dB / 20) or powers (dB / 10). The rows stay as they are (a compact zone's
 // at its key frames): the voice reads between them.
-bool readTable(const juce::var& rows, const int count, const int columns, const bool power, std::vector<float>& out)
+bool readTable(const cydaw::base::Value& rows, const int count, const int columns, const bool power, std::vector<float>& out)
 {
     if (!readRows(rows, count, columns, out))
         return false;
@@ -90,7 +91,7 @@ bool readTable(const juce::var& rows, const int count, const int columns, const 
     return true;
 }
 
-std::vector<float> readFloats(const juce::var& value)
+std::vector<float> readFloats(const cydaw::base::Value& value)
 {
     std::vector<float> out;
     if (const auto* list = value.getArray()) {
@@ -114,7 +115,7 @@ std::vector<int> stereoFramesOf(const int frames, const int step)
 
 // The two channels of a zone, from its "stereo" object; false when it does
 // not match the zone.
-bool readStereo(const juce::var& stereo, cydaw::engine::SoundModelZone& zone)
+bool readStereo(const cydaw::base::Value& stereo, cydaw::engine::SoundModelZone& zone)
 {
     const auto step = static_cast<int>(stereo.getProperty("step", 0));
     if (step <= 0)
@@ -163,7 +164,7 @@ bool readStereo(const juce::var& stereo, cydaw::engine::SoundModelZone& zone)
 }
 
 // The recording's first moments, from a zone's "head" object.
-bool readHead(const juce::var& head, cydaw::engine::SoundModelZone& zone)
+bool readHead(const cydaw::base::Value& head, cydaw::engine::SoundModelZone& zone)
 {
     const auto channels = juce::jlimit(1, 2, static_cast<int>(head.getProperty("channels", 1)));
     const auto length = static_cast<int>(head.getProperty("length", 0));
@@ -191,7 +192,7 @@ bool readHead(const juce::var& head, cydaw::engine::SoundModelZone& zone)
 
 } // namespace
 
-cydaw::engine::SoundModelRef soundModelFromVar(const juce::var& value, juce::String& error)
+cydaw::engine::SoundModelRef soundModelFromVar(const cydaw::base::Value& value, juce::String& error)
 {
     if (value.getProperty("format", {}).toString() != "cydaw-sound-model") {
         error = "not a cydaw-sound-model";
@@ -315,7 +316,7 @@ namespace {
 // The factory models read, by their stored name ("factory:…"), while
 // something holds them (a card, a document being read).
 struct FactoryModel {
-    juce::var json;
+    cydaw::base::Value json;
     juce::Time modified;
     juce::int64 size {};
 };
@@ -329,22 +330,22 @@ std::map<juce::String, FactoryModel>& factoryModels()
     static std::map<juce::String, FactoryModel> models;
     return models;
 }
-const juce::Identifier soundModelKey("soundModel");
-const juce::Identifier soundModelFileKey("soundModelFile");
+const cydaw::base::Identifier soundModelKey("soundModel");
+const cydaw::base::Identifier soundModelFileKey("soundModelFile");
 
-juce::var shallowCopy(const juce::DynamicObject& object)
+cydaw::base::Value shallowCopy(const cydaw::base::Object& object)
 {
-    auto copy = juce::DynamicObject::Ptr(new juce::DynamicObject());
+    auto copy = cydaw::base::Object::Ptr(new cydaw::base::Object());
     for (const auto& property : object.getProperties())
         copy->setProperty(property.name, property.value);
-    return juce::var(copy.get());
+    return cydaw::base::Value(copy.get());
 }
 
 // The value with its factory models named; `changed` when anything was.
-juce::var referenced(const juce::var& value, bool& changed)
+cydaw::base::Value referenced(const cydaw::base::Value& value, bool& changed)
 {
     if (const auto* array = value.getArray()) {
-        std::optional<juce::Array<juce::var>> copy;
+        std::optional<cydaw::base::Array<cydaw::base::Value>> copy;
         for (int i = 0; i < array->size(); ++i) {
             const auto& item = array->getReference(i);
             if (!item.isObject() && !item.isArray())
@@ -360,12 +361,12 @@ juce::var referenced(const juce::var& value, bool& changed)
         if (!copy)
             return value;
         changed = true;
-        return juce::var(*copy);
+        return cydaw::base::Value(*copy);
     }
     const auto* object = value.getDynamicObject();
     if (object == nullptr)
         return value;
-    juce::var copy;
+    cydaw::base::Value copy;
     for (const auto& property : object->getProperties()) {
         if (property.name == soundModelKey) {
             // A model holds no other: not looked into. A factory model, or the
@@ -397,7 +398,7 @@ juce::var referenced(const juce::var& value, bool& changed)
     return copy;
 }
 
-void expanded(const juce::var& value, juce::StringArray& missing)
+void expanded(const cydaw::base::Value& value, juce::StringArray& missing)
 {
     if (const auto* array = value.getArray()) {
         for (const auto& item : *array)
@@ -410,7 +411,7 @@ void expanded(const juce::var& value, juce::StringArray& missing)
         return;
     if (const auto stored = object->getProperty(soundModelFileKey).toString();
         stored.startsWith("factory:") && !object->getProperty(soundModelKey).isObject()) {
-        juce::var json;
+        cydaw::base::Value json;
         juce::String error;
         if (loadSoundModelFile(resolveSamplePath(stored), json, error) != nullptr) {
             object->setProperty(soundModelKey, json);
@@ -418,9 +419,9 @@ void expanded(const juce::var& value, juce::StringArray& missing)
         } else {
             // Not here (another computer, a model not installed): its name kept
             // on the card, so the next save still names it.
-            auto standIn = juce::DynamicObject::Ptr(new juce::DynamicObject());
+            auto standIn = cydaw::base::Object::Ptr(new cydaw::base::Object());
             standIn->setProperty(soundModelFileKey, stored);
-            object->setProperty(soundModelKey, juce::var(standIn.get()));
+            object->setProperty(soundModelKey, cydaw::base::Value(standIn.get()));
             object->removeProperty(soundModelFileKey);
             missing.addIfNotAlreadyThere(stored);
         }
@@ -432,7 +433,7 @@ void expanded(const juce::var& value, juce::StringArray& missing)
 
 } // namespace
 
-cydaw::engine::SoundModelRef loadSoundModelFile(const juce::File& file, juce::var& json, juce::String& error)
+cydaw::engine::SoundModelRef loadSoundModelFile(const juce::File& file, cydaw::base::Value& json, juce::String& error)
 {
     if (!file.existsAsFile()) {
         error = "no file " + file.getFullPathName();
@@ -462,7 +463,7 @@ cydaw::engine::SoundModelRef loadSoundModelFile(const juce::File& file, juce::va
         if (cached)
             return soundModelFromVar(json, error);
     }
-    json = juce::JSON::parse(file.loadFileAsString());
+    json = cydaw::base::JSON::parse(file.loadFileAsString());
     if (!json.isObject()) {
         error = "not JSON: " + file.getFileName();
         return {};
@@ -481,7 +482,7 @@ cydaw::engine::SoundModelRef loadSoundModelFile(const juce::File& file, juce::va
     return model;
 }
 
-juce::String factoryModelReference(const juce::var& json)
+juce::String factoryModelReference(const cydaw::base::Value& json)
 {
     const auto* object = json.getDynamicObject();
     if (object == nullptr)
@@ -493,29 +494,29 @@ juce::String factoryModelReference(const juce::var& json)
     return {};
 }
 
-juce::var withFactoryModelReferences(const juce::var& document)
+cydaw::base::Value withFactoryModelReferences(const cydaw::base::Value& document)
 {
     auto changed = false;
     return referenced(document, changed);
 }
 
-void expandFactoryModelReferences(juce::var& document, juce::StringArray& missing)
+void expandFactoryModelReferences(cydaw::base::Value& document, juce::StringArray& missing)
 {
     expanded(document, missing);
 }
 
-bool isMissingFactoryModel(const juce::var& model)
+bool isMissingFactoryModel(const cydaw::base::Value& model)
 {
     const auto* object = model.getDynamicObject();
     return object != nullptr && object->getProperties().size() == 1
            && object->getProperty(soundModelFileKey).toString().startsWith("factory:");
 }
 
-VoiceAssets voiceAssetsFromGraphState(const juce::var& state)
+VoiceAssets voiceAssetsFromGraphState(const cydaw::base::Value& state)
 {
     VoiceAssets assets;
     // The devices' classes, by key: a card of that type is one of them.
-    std::map<juce::String, const juce::Array<juce::var>*> classes;
+    std::map<juce::String, const cydaw::base::Array<cydaw::base::Value>*> classes;
     if (const auto* modules = state.getProperty("modules", {}).getArray())
         for (const auto& module : *modules)
             if (const auto* nodes = module.getProperty("nodes", {}).getArray())
@@ -525,7 +526,7 @@ VoiceAssets voiceAssetsFromGraphState(const juce::var& state)
     auto tableFound = false;
     auto prismFound = false;
     std::set<juce::String> visiting;
-    std::function<void(const juce::Array<juce::var>&)> walk = [&](const juce::Array<juce::var>& nodes) {
+    std::function<void(const cydaw::base::Array<cydaw::base::Value>&)> walk = [&](const cydaw::base::Array<cydaw::base::Value>& nodes) {
         for (const auto& node : nodes) {
             if (modelFound && samplerFound && tableFound && prismFound)
                 return;
@@ -580,7 +581,7 @@ const char* prismOscillatorKey(const int oscillator)
 }
 } // namespace
 
-juce::var prismTableVar(const juce::String& name, const juce::String& source, const int frameLength,
+cydaw::base::Value prismTableVar(const juce::String& name, const juce::String& source, const int frameLength,
                         const std::vector<std::vector<float>>& frames)
 {
     juce::MemoryOutputStream pcm;
@@ -592,16 +593,16 @@ juce::var prismTableVar(const juce::String& name, const juce::String& source, co
             pcm.writeShort(static_cast<short>(std::lround(std::clamp(sample, -1.0f, 1.0f) * 32'767.0f)));
         ++count;
     }
-    auto table = std::make_unique<juce::DynamicObject>();
+    auto table = std::make_unique<cydaw::base::Object>();
     table->setProperty("name", name);
     table->setProperty("source", source);
     table->setProperty("frameLength", frameLength);
     table->setProperty("frames", count);
     table->setProperty("pcm", juce::Base64::toBase64(pcm.getData(), pcm.getDataSize()));
-    return juce::var(table.release());
+    return cydaw::base::Value(table.release());
 }
 
-cydaw::engine::prism::TablesRef prismTablesFromVar(const juce::var& value)
+cydaw::engine::prism::TablesRef prismTablesFromVar(const cydaw::base::Value& value)
 {
     if (!value.isObject())
         return {};
@@ -632,9 +633,9 @@ cydaw::engine::prism::TablesRef prismTablesFromVar(const juce::var& value)
     return any ? cydaw::engine::prism::TablesRef(std::move(tables)) : cydaw::engine::prism::TablesRef {};
 }
 
-juce::var withPrismTable(const juce::var& tables, const int oscillator, const juce::var& table)
+cydaw::base::Value withPrismTable(const cydaw::base::Value& tables, const int oscillator, const cydaw::base::Value& table)
 {
-    auto copy = std::make_unique<juce::DynamicObject>();
+    auto copy = std::make_unique<cydaw::base::Object>();
     for (int other = 0; other < cydaw::engine::prism::oscillatorCount; ++other) {
         const auto* key = prismOscillatorKey(other);
         const auto kept = other == oscillator ? table : tables.getProperty(key, {});
@@ -643,31 +644,31 @@ juce::var withPrismTable(const juce::var& tables, const int oscillator, const ju
     }
     if (copy->getProperties().isEmpty())
         return {};
-    return juce::var(copy.release());
+    return cydaw::base::Value(copy.release());
 }
 
-juce::String prismTableName(const juce::var& tables, const int oscillator)
+juce::String prismTableName(const cydaw::base::Value& tables, const int oscillator)
 {
     return tables.getProperty(prismOscillatorKey(oscillator), {}).getProperty("name", {}).toString();
 }
 
-juce::var impulseVar(const cydaw::engine::ImpulseResponse& response, const juce::String& source)
+cydaw::base::Value impulseVar(const cydaw::engine::ImpulseResponse& response, const juce::String& source)
 {
     juce::MemoryOutputStream pcm;
     for (const auto& channel : response.channels)
         for (const auto sample : channel)
             pcm.writeFloat(sample);
-    auto value = std::make_unique<juce::DynamicObject>();
+    auto value = std::make_unique<cydaw::base::Object>();
     value->setProperty("name", juce::String(response.name));
     value->setProperty("source", source);
     value->setProperty("sampleRate", response.sampleRate);
     value->setProperty("channels", static_cast<int>(response.channels.size()));
     value->setProperty("frames", static_cast<juce::int64>(response.length()));
     value->setProperty("pcm", juce::Base64::toBase64(pcm.getData(), pcm.getDataSize()));
-    return juce::var(value.release());
+    return cydaw::base::Value(value.release());
 }
 
-cydaw::engine::ImpulseResponseRef impulseFromVar(const juce::var& value)
+cydaw::engine::ImpulseResponseRef impulseFromVar(const cydaw::base::Value& value)
 {
     if (!value.isObject())
         return {};
@@ -695,7 +696,7 @@ cydaw::engine::ImpulseResponseRef impulseFromVar(const juce::var& value)
     return response;
 }
 
-std::map<std::uint64_t, cydaw::engine::ImpulseResponseRef> impulsesFromGraphState(const juce::var& state)
+std::map<std::uint64_t, cydaw::engine::ImpulseResponseRef> impulsesFromGraphState(const cydaw::base::Value& state)
 {
     std::map<std::uint64_t, cydaw::engine::ImpulseResponseRef> found;
     if (const auto* nodes = state.getProperty("nodes", {}).getArray())
@@ -705,7 +706,7 @@ std::map<std::uint64_t, cydaw::engine::ImpulseResponseRef> impulsesFromGraphStat
     return found;
 }
 
-void attachImpulses(cydaw::engine::NativeDspGraph& graph, const juce::var& editorState)
+void attachImpulses(cydaw::engine::NativeDspGraph& graph, const cydaw::base::Value& editorState)
 {
     const auto responses = impulsesFromGraphState(editorState);
     for (auto& node : graph.nodes)

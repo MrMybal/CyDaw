@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #pragma once
 
 #include "FoundryDocument.h"
@@ -44,7 +45,7 @@ public:
     void draw();
     // The transport bar's middle in this mode: play, stop, loop, where.
     void drawTransport();
-    [[nodiscard]] juce::var command(const juce::var& request);
+    [[nodiscard]] cydaw::base::Value command(const cydaw::base::Value& request);
     // A sound file or a session in a tab of its own.
     bool open(const juce::File& file);
     // Files into the session shown: on the track under (x, y), else new
@@ -196,14 +197,14 @@ private:
     void addMarker(Tab& tab, bool region);
     bool importFile(Tab& tab, const juce::File& file, int track, std::int64_t at);
     void applyProcess(Tab& tab);
-    juce::Result applyTrackEffects(Tab& tab, const TrackRef& track, double tailSeconds);
+    cydaw::base::Result applyTrackEffects(Tab& tab, const TrackRef& track, double tailSeconds);
     void sendToStudio(Tab& tab, bool eachTrack);
     void playFrom(Tab& tab);
     void stop();
     void measure(Tab& tab, bool force);
     void closeTab(int index);
     void report(const juce::String& message, bool error);
-    [[nodiscard]] juce::var tabJson(const Tab& tab) const;
+    [[nodiscard]] cydaw::base::Value tabJson(const Tab& tab) const;
 
     app::FoundryPlayer& player() const;
     void ensureCinema(Tab& tab);
@@ -230,7 +231,7 @@ private:
     std::uint64_t addCinemaGroup(Tab&,const juce::String& name);
     std::uint64_t addCinemaTrack(Tab&,std::uint64_t group,bool midi,const juce::String& name = {});
     bool assignCinemaTrack(Tab&,std::uint64_t id,std::uint64_t group);
-    juce::var cinemaCommand(const juce::var&);
+    cydaw::base::Value cinemaCommand(const cydaw::base::Value&);
     struct CinemaAudioTask {
         juce::File source,target;
         juce::Uuid documentIdentity;
@@ -254,7 +255,7 @@ private:
     std::vector<CinemaBusTarget> cinemaBusTargets_;
     std::vector<CinemaBusTarget> cinemaListTargets_;
     std::vector<CinemaDropTarget> cinemaDropTargets_;
-    juce::var cinemaPending_;
+    cydaw::base::Value cinemaPending_;
     std::optional<Session> cinemaGestureBefore_;
     Clip cinemaGestureClip_;
     int cinemaGestureTrack_{-1};

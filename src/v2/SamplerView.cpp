@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "SamplerView.h"
 
@@ -21,17 +22,17 @@ using ui::L;
 
 namespace {
 
-juce::var copyOf(const juce::var& json)
+cydaw::base::Value copyOf(const cydaw::base::Value& json)
 {
-    return juce::JSON::parse(juce::JSON::toString(json, true));
+    return cydaw::base::JSON::parse(cydaw::base::JSON::toString(json, true));
 }
 
-juce::Array<juce::var>* zonesOf(juce::var& json)
+cydaw::base::Array<cydaw::base::Value>* zonesOf(cydaw::base::Value& json)
 {
     return json.getProperty("zones", {}).getArray();
 }
 
-const juce::Array<juce::var>* zonesOf(const juce::var& json)
+const cydaw::base::Array<cydaw::base::Value>* zonesOf(const cydaw::base::Value& json)
 {
     return json.getProperty("zones", {}).getArray();
 }
@@ -42,23 +43,23 @@ juce::String noteName(const int note)
     return juce::String(names[((note % 12) + 12) % 12]) + juce::String(note / 12 - 1);
 }
 
-std::pair<int, int> pairOf(const juce::var& zone, const char* key, const std::pair<int, int> fallback)
+std::pair<int, int> pairOf(const cydaw::base::Value& zone, const char* key, const std::pair<int, int> fallback)
 {
     if (const auto* list = zone.getProperty(key, {}).getArray(); list != nullptr && list->size() == 2)
         return { static_cast<int>((*list)[0]), static_cast<int>((*list)[1]) };
     return fallback;
 }
 
-void setPair(juce::var& zone, const char* key, const juce::int64 first, const juce::int64 second)
+void setPair(cydaw::base::Value& zone, const char* key, const juce::int64 first, const juce::int64 second)
 {
-    juce::Array<juce::var> list;
+    cydaw::base::Array<cydaw::base::Value> list;
     list.add(first);
     list.add(second);
     if (auto* object = zone.getDynamicObject())
         object->setProperty(key, list);
 }
 
-void setValue(juce::var& zone, const char* key, const juce::var& value)
+void setValue(cydaw::base::Value& zone, const char* key, const cydaw::base::Value& value)
 {
     if (auto* object = zone.getDynamicObject())
         object->setProperty(key, value);
@@ -74,7 +75,7 @@ bool isAudioFile(const juce::File& file)
 SamplerView::SamplerView(Studio& studio, UiState& state) : studio_(studio), state_(state) {}
 SamplerView::~SamplerView() = default;
 
-juce::var SamplerView::currentMap(const Target& target) const
+cydaw::base::Value SamplerView::currentMap(const Target& target) const
 {
     if (const auto* slot = studio_.graphFor(target.track))
         return slot->graph().nodeSamplerJson(target.nodeId);
@@ -88,7 +89,7 @@ void SamplerView::report(const juce::String& message, const bool error)
     state_.statusTime = ImGui::GetTime();
 }
 
-void SamplerView::commit(const Target& target, const juce::var& json, const bool applySettings)
+void SamplerView::commit(const Target& target, const cydaw::base::Value& json, const bool applySettings)
 {
     juce::String error;
     if (!studio_.setSamplerMap(target.track, target.nodeId, json, applySettings, error))
@@ -192,7 +193,7 @@ void SamplerView::exportSfz(const Target& target)
                           });
 }
 
-int SamplerView::drawMap(const juce::var& json, const ImVec2 at, const ImVec2 size, const int selected, const ImU32 colour,
+int SamplerView::drawMap(const cydaw::base::Value& json, const ImVec2 at, const ImVec2 size, const int selected, const ImU32 colour,
                          const bool interactive)
 {
     const auto& p = theme::palette();
@@ -520,11 +521,11 @@ void SamplerView::drawSimplePane(const TrackRef& track, app::NodeGraphComponent&
         && !ImGui::IsAnyItemActive()) {
         pane_.editing = false;
         commit(target, pane_.working);
-        pane_.working = juce::var();
+        pane_.working = cydaw::base::Value();
     }
 }
 
-void SamplerView::drawZoneFields(const Target& target, juce::var& json, const int zone)
+void SamplerView::drawZoneFields(const Target& target, cydaw::base::Value& json, const int zone)
 {
     auto* zones = zonesOf(json);
     if (zones == nullptr || zone < 0 || zone >= zones->size())
@@ -610,8 +611,8 @@ void SamplerView::drawZoneFields(const Target& target, juce::var& json, const in
                   "The root and tuning from the pitch heard in the sample."));
 }
 
-void SamplerView::drawWaveform(const Target& target, juce::var& json, const int zone, const ImVec2 size, Peaks& peaks,
-                               juce::var& working, bool& editing, const bool compact)
+void SamplerView::drawWaveform(const Target& target, cydaw::base::Value& json, const int zone, const ImVec2 size, Peaks& peaks,
+                               cydaw::base::Value& working, bool& editing, const bool compact)
 {
     const auto& p = theme::palette();
     auto* list = ImGui::GetWindowDrawList();
@@ -935,7 +936,7 @@ bool SamplerView::drawEditorWindow(const bool focus)
     if (editing_ && !ImGui::IsAnyItemActive()) {
         editing_ = false;
         commit(target, working_);
-        working_ = juce::var();
+        working_ = cydaw::base::Value();
     }
     return open;
 }

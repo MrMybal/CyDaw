@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #pragma once
 
 #include <juce_core/juce_core.h>
@@ -41,10 +42,10 @@ struct Entry {
 [[nodiscard]] std::vector<Entry> list(const juce::String& kind, const juce::String& target);
 [[nodiscard]] const Entry* find(const std::vector<Entry>& entries, const juce::String& name);
 // Kept as the person's (one of that name replaced). False with `error`.
-bool save(const juce::String& kind, const juce::String& target, const juce::String& name, const juce::var& state,
+bool save(const juce::String& kind, const juce::String& target, const juce::String& name, const cydaw::base::Value& state,
           juce::String& error);
 // The preset's state; void with `error` when the file is not one of that kind.
-[[nodiscard]] juce::var read(const Entry& entry, const juce::String& kind, juce::String& error);
+[[nodiscard]] cydaw::base::Value read(const Entry& entry, const juce::String& kind, juce::String& error);
 // The person's only: to the recycle bin; under another name.
 bool remove(const Entry& entry, juce::String& error);
 bool rename(const Entry& entry, const juce::String& name, juce::String& error);

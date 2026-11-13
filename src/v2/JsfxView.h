@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #pragma once
 #include "SourceEditor.h"
 #include "Studio.h"
@@ -10,7 +11,7 @@ class JsfxView final
     JsfxView(Studio &, UiState &);
     ~JsfxView();
     void draw();
-    juce::var command(const juce::var &);
+    cydaw::base::Value command(const cydaw::base::Value &);
     static bool askBeforeQuit(const std::function<void()> &next);
     static void drawQuitPrompts();
 

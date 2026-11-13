@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "SamplerMapFile.h"
 
@@ -140,28 +141,28 @@ namespace {
 // Factory/Instruments/legacy.json, read once per factory folder:
 //   { "factory:Instruments/Kawai Grand/C4_2.flac":
 //       { "file": "bank:vcsl/…/C4_v2.wav", "offset": 1234, "frames": 98765, "endFade": 2880 }, … }
-juce::var legacyFactoryFiles()
+cydaw::base::Value legacyFactoryFiles()
 {
     static std::mutex lock;
     static juce::File read;
-    static juce::var table;
+    static cydaw::base::Value table;
     const auto file = factoryContentFolder().getChildFile("Instruments").getChildFile("legacy.json");
     const std::scoped_lock hold(lock);
     if (file != read) {
         read = file;
-        table = juce::JSON::parse(file.loadFileAsString());
+        table = cydaw::base::JSON::parse(file.loadFileAsString());
     }
     return table;
 }
 
 } // namespace
 
-juce::var upgradedSamplerMap(const juce::var& json)
+cydaw::base::Value upgradedSamplerMap(const cydaw::base::Value& json)
 {
     const auto* zones = json.getProperty("zones", {}).getArray();
     if (zones == nullptr)
         return json;
-    const auto stale = [](const juce::var& zone) {
+    const auto stale = [](const cydaw::base::Value& zone) {
         const auto file = zone.getProperty("file", {}).toString();
         return file.startsWith(factoryPrefix) && !resolveSamplePath(file).existsAsFile();
     };
@@ -170,13 +171,13 @@ juce::var upgradedSamplerMap(const juce::var& json)
     const auto table = legacyFactoryFiles();
     if (!table.isObject())
         return json;
-    auto copy = juce::JSON::parse(juce::JSON::toString(json, true));
+    auto copy = cydaw::base::JSON::parse(cydaw::base::JSON::toString(json, true));
     if (auto* list = copy.getProperty("zones", {}).getArray())
         for (auto& zone : *list) {
             auto* object = zone.getDynamicObject();
             if (object == nullptr || !stale(zone))
                 continue;
-            const auto entry = table.getProperty(juce::Identifier(zone.getProperty("file", {}).toString()), {});
+            const auto entry = table.getProperty(cydaw::base::Identifier(zone.getProperty("file", {}).toString()), {});
             if (!entry.isObject())
                 continue;
             // Frames of the cut file are frames of the recording, `offset` later.
@@ -190,7 +191,7 @@ juce::var upgradedSamplerMap(const juce::var& json)
             if (!object->hasProperty("endFade"))
                 object->setProperty("endFade", entry.getProperty("endFade", 0));
             if (const auto* loop = zone.getProperty("loop", {}).getArray(); loop != nullptr && loop->size() == 2) {
-                juce::Array<juce::var> moved;
+                cydaw::base::Array<cydaw::base::Value> moved;
                 moved.add(offset + static_cast<juce::int64>((*loop)[0]));
                 moved.add(offset + static_cast<juce::int64>((*loop)[1]));
                 object->setProperty("loop", moved);
@@ -800,17 +801,17 @@ double detectSamplePitch(const SampleData& data)
 
 namespace {
 
-int intOf(const juce::var& value, const int fallback)
+int intOf(const cydaw::base::Value& value, const int fallback)
 {
     return value.isVoid() || value.isUndefined() ? fallback : static_cast<int>(value);
 }
 
-juce::int64 int64Of(const juce::var& value, const juce::int64 fallback)
+juce::int64 int64Of(const cydaw::base::Value& value, const juce::int64 fallback)
 {
     return value.isVoid() || value.isUndefined() ? fallback : static_cast<juce::int64>(value);
 }
 
-float floatOf(const juce::var& value, const float fallback)
+float floatOf(const cydaw::base::Value& value, const float fallback)
 {
     if (value.isVoid() || value.isUndefined())
         return fallback;
@@ -818,23 +819,23 @@ float floatOf(const juce::var& value, const float fallback)
     return std::isfinite(number) ? number : fallback;
 }
 
-std::pair<int, int> pairOf(const juce::var& value, const std::pair<int, int> fallback)
+std::pair<int, int> pairOf(const cydaw::base::Value& value, const std::pair<int, int> fallback)
 {
     if (const auto* list = value.getArray(); list != nullptr && list->size() == 2)
         return { static_cast<int>((*list)[0]), static_cast<int>((*list)[1]) };
     return fallback;
 }
 
-std::pair<juce::int64, juce::int64> pair64Of(const juce::var& value, const std::pair<juce::int64, juce::int64> fallback)
+std::pair<juce::int64, juce::int64> pair64Of(const cydaw::base::Value& value, const std::pair<juce::int64, juce::int64> fallback)
 {
     if (const auto* list = value.getArray(); list != nullptr && list->size() == 2)
         return { static_cast<juce::int64>((*list)[0]), static_cast<juce::int64>((*list)[1]) };
     return fallback;
 }
 
-juce::var pairVar(const juce::int64 first, const juce::int64 second)
+cydaw::base::Value pairVar(const juce::int64 first, const juce::int64 second)
 {
-    juce::Array<juce::var> list;
+    cydaw::base::Array<cydaw::base::Value> list;
     list.add(first);
     list.add(second);
     return list;
@@ -901,7 +902,7 @@ struct ZoneSpec {
     std::vector<RuleSpec> rules;
 };
 
-ZoneSpec zoneFromVar(const juce::var& value)
+ZoneSpec zoneFromVar(const cydaw::base::Value& value)
 {
     ZoneSpec zone;
     zone.file = value.getProperty("file", {}).toString();
@@ -959,9 +960,9 @@ ZoneSpec zoneFromVar(const juce::var& value)
     return zone;
 }
 
-juce::var zoneToVar(const ZoneSpec& zone)
+cydaw::base::Value zoneToVar(const ZoneSpec& zone)
 {
-    auto* value = new juce::DynamicObject();
+    auto* value = new cydaw::base::Object();
     value->setProperty("file", zone.file);
     value->setProperty("root", zone.root);
     value->setProperty("keys", pairVar(zone.lowKey, zone.highKey));
@@ -996,28 +997,28 @@ juce::var zoneToVar(const ZoneSpec& zone)
     if (zone.keyswitch >= 0)
         value->setProperty("keyswitch", zone.keyswitch);
     if (!zone.rules.empty()) {
-        juce::Array<juce::var> rules;
+        cydaw::base::Array<cydaw::base::Value> rules;
         for (const auto& rule : zone.rules) {
-            auto* item = new juce::DynamicObject();
+            auto* item = new cydaw::base::Object();
             item->setProperty("cc", rule.controller);
             if (twoAmounts(rule.kind)) {
-                juce::Array<juce::var> amounts;
+                cydaw::base::Array<cydaw::base::Value> amounts;
                 amounts.add(rule.a);
                 amounts.add(rule.b);
-                item->setProperty(juce::Identifier(rule.kind), amounts);
+                item->setProperty(cydaw::base::Identifier(rule.kind), amounts);
             } else {
-                item->setProperty(juce::Identifier(rule.kind), rule.a);
+                item->setProperty(cydaw::base::Identifier(rule.kind), rule.a);
             }
             if (rule.curve >= 0)
                 item->setProperty("curve", rule.curve);
-            rules.add(juce::var(item));
+            rules.add(cydaw::base::Value(item));
         }
         value->setProperty("rules", rules);
     }
-    return juce::var(value);
+    return cydaw::base::Value(value);
 }
 
-std::vector<ZoneSpec> zonesOf(const juce::var& json)
+std::vector<ZoneSpec> zonesOf(const cydaw::base::Value& json)
 {
     std::vector<ZoneSpec> zones;
     if (const auto* list = json.getProperty("zones", {}).getArray())
@@ -1034,14 +1035,14 @@ std::vector<ZoneSpec> zonesOf(const juce::var& json)
 constexpr std::array<const char*, 5> mapExtras { "controllers", "controls", "curves", "keyswitches", "whole" };
 
 // `from`: the map whose extras it keeps (an SFZ read: its own).
-juce::var mapVar(const juce::String& name, const std::vector<ZoneSpec>& zones, const juce::var& settings,
-                 const juce::var& from = {})
+cydaw::base::Value mapVar(const juce::String& name, const std::vector<ZoneSpec>& zones, const cydaw::base::Value& settings,
+                 const cydaw::base::Value& from = {})
 {
-    auto* root = new juce::DynamicObject();
+    auto* root = new cydaw::base::Object();
     root->setProperty("format", "cydaw-sampler");
     root->setProperty("version", 1);
     root->setProperty("name", name);
-    juce::Array<juce::var> list;
+    cydaw::base::Array<cydaw::base::Value> list;
     for (const auto& zone : zones)
         list.add(zoneToVar(zone));
     root->setProperty("zones", list);
@@ -1050,7 +1051,7 @@ juce::var mapVar(const juce::String& name, const std::vector<ZoneSpec>& zones, c
     for (const auto* extra : mapExtras)
         if (const auto value = from.getProperty(extra, {}); !value.isVoid())
             root->setProperty(extra, value);
-    return juce::var(root);
+    return cydaw::base::Value(root);
 }
 
 // Each root's keys: from just above the midpoint with the root below to the
@@ -1247,7 +1248,7 @@ std::vector<ZoneSpec> zonesForFiles(const juce::Array<juce::File>& files, std::v
 
 } // namespace
 
-SamplerMapRef samplerMapFromVar(const juce::var& json, juce::String& error)
+SamplerMapRef samplerMapFromVar(const cydaw::base::Value& json, juce::String& error)
 {
     if (json.getProperty("format", {}).toString() != "cydaw-sampler") {
         error = "not a cydaw-sampler map";
@@ -1360,11 +1361,11 @@ SamplerMapRef samplerMapFromVar(const juce::var& json, juce::String& error)
     return map;
 }
 
-juce::var loadSamplerMapFile(const juce::File& file, juce::String& error)
+cydaw::base::Value loadSamplerMapFile(const juce::File& file, juce::String& error)
 {
     if (file.hasFileExtension("sfz"))
         return samplerMapFromSfz(file, error);
-    const auto json = juce::JSON::parse(file.loadFileAsString());
+    const auto json = cydaw::base::JSON::parse(file.loadFileAsString());
     if (json.getProperty("format", {}).toString() != "cydaw-sampler") {
         error = "not a cydaw-sampler map: " + file.getFullPathName();
         return {};
@@ -1379,7 +1380,7 @@ juce::var loadSamplerMapFile(const juce::File& file, juce::String& error)
                   json.getProperty("settings", {}), json);
 }
 
-juce::String describeSamplerMap(const juce::var& json)
+juce::String describeSamplerMap(const cydaw::base::Value& json)
 {
     const auto zones = zonesOf(json);
     if (zones.empty())
@@ -1404,30 +1405,30 @@ juce::String describeSamplerMap(const juce::var& json)
            + (layerCount > 1 ? " layers" : " layer");
 }
 
-juce::var samplerMapFromFiles(const juce::Array<juce::File>& files, const juce::String& name)
+cydaw::base::Value samplerMapFromFiles(const juce::Array<juce::File>& files, const juce::String& name)
 {
     auto unpitched = false;
     const auto zones = zonesForFiles(files, {}, unpitched);
-    juce::var settings;
+    cydaw::base::Value settings;
     if (unpitched) {
         // Drums: each plays to its end at its own pitch.
-        auto* values = new juce::DynamicObject();
+        auto* values = new cydaw::base::Object();
         values->setProperty("one-shot", 1);
         values->setProperty("key-track", 0);
-        settings = juce::var(values);
+        settings = cydaw::base::Value(values);
     }
     return mapVar(name, zones, settings);
 }
 
-juce::var simpleSamplerMap(const juce::File& file)
+cydaw::base::Value simpleSamplerMap(const juce::File& file)
 {
     auto json = samplerMapFromFiles(juce::Array<juce::File> { file }, file.getFileNameWithoutExtension());
     const auto unpitched = static_cast<int>(json.getProperty("settings", {}).getProperty("key-track", 1)) == 0;
     if (auto* zones = json.getProperty("zones", {}).getArray(); zones != nullptr && !zones->isEmpty()) {
         zones->removeRange(1, zones->size() - 1);
         if (auto* zone = zones->getReference(0).getDynamicObject()) {
-            zone->setProperty("keys", juce::Array<juce::var> { 0, 127 });
-            zone->setProperty("velocities", juce::Array<juce::var> { 1, 127 });
+            zone->setProperty("keys", cydaw::base::Array<cydaw::base::Value> { 0, 127 });
+            zone->setProperty("velocities", cydaw::base::Array<cydaw::base::Value> { 1, 127 });
             if (unpitched)
                 zone->setProperty("root", 60);
         }
@@ -1440,14 +1441,14 @@ juce::var simpleSamplerMap(const juce::File& file)
     return json;
 }
 
-juce::var withFilesAdded(const juce::var& json, const juce::Array<juce::File>& files)
+cydaw::base::Value withFilesAdded(const cydaw::base::Value& json, const juce::Array<juce::File>& files)
 {
     auto unpitched = false;
     auto zones = zonesForFiles(files, zonesOf(json), unpitched);
     return mapVar(json.getProperty("name", {}).toString(), zones, json.getProperty("settings", {}), json);
 }
 
-juce::var withKeysSpread(const juce::var& json)
+cydaw::base::Value withKeysSpread(const cydaw::base::Value& json)
 {
     auto zones = zonesOf(json);
     std::vector<ZoneSpec> spread;
@@ -1569,7 +1570,7 @@ int sfzNote(const juce::String& value, const int fallback)
 
 } // namespace
 
-juce::var samplerMapFromSfz(const juce::File& file, juce::String& error, const std::map<int, double>& given)
+cydaw::base::Value samplerMapFromSfz(const juce::File& file, juce::String& error, const std::map<int, double>& given)
 {
     if (!file.existsAsFile()) {
         error = "no file " + file.getFullPathName();
@@ -1906,37 +1907,37 @@ juce::var samplerMapFromSfz(const juce::File& file, juce::String& error, const s
         error = "no playable region in " + file.getFullPathName();
         return {};
     }
-    juce::var settings;
+    cydaw::base::Value settings;
     if (regions > 0 && oneShots == regions) {
-        auto* values = new juce::DynamicObject();
+        auto* values = new cydaw::base::Object();
         values->setProperty("one-shot", 1);
-        settings = juce::var(values);
+        settings = cydaw::base::Value(values);
     }
     // What the map carries beyond its zones.
-    auto* extras = new juce::DynamicObject();
-    const juce::var extrasVar(extras);
+    auto* extras = new cydaw::base::Object();
+    const cydaw::base::Value extrasVar(extras);
     if (!controllers.empty()) {
-        auto* starts = new juce::DynamicObject();
+        auto* starts = new cydaw::base::Object();
         for (const auto& [number, value] : controllers)
             if (number >= 0 && number < 128)
-                starts->setProperty(juce::Identifier(juce::String(number)), std::clamp(value, 0.0, 127.0));
-        extras->setProperty("controllers", juce::var(starts));
+                starts->setProperty(cydaw::base::Identifier(juce::String(number)), std::clamp(value, 0.0, 127.0));
+        extras->setProperty("controllers", cydaw::base::Value(starts));
     }
     // The controls a card shows: those the zones read, by their numbers
     // (an SFZ numbers a piece's together), named as the SFZ names them.
-    juce::Array<juce::var> controls;
+    cydaw::base::Array<cydaw::base::Value> controls;
     for (const auto number : readControllers) {
-        auto* item = new juce::DynamicObject();
+        auto* item = new cydaw::base::Object();
         item->setProperty("cc", number);
         item->setProperty("label", labels.contains(number) ? labels[number] : "CC " + juce::String(number));
-        controls.add(juce::var(item));
+        controls.add(cydaw::base::Value(item));
     }
     if (!controls.isEmpty())
         extras->setProperty("controls", controls);
     if (!usedCurves.empty()) {
-        juce::Array<juce::var> list;
+        cydaw::base::Array<cydaw::base::Value> list;
         for (const auto index : usedCurves) {
-            juce::Array<juce::var> values;
+            cydaw::base::Array<cydaw::base::Value> values;
             for (const auto value : curves[index])
                 values.add(value);
             list.add(values);
@@ -1944,26 +1945,26 @@ juce::var samplerMapFromSfz(const juce::File& file, juce::String& error, const s
         extras->setProperty("curves", list);
     }
     if (!switchKeys.empty()) {
-        auto* keyswitches = new juce::DynamicObject();
-        juce::Array<juce::var> keys;
+        auto* keyswitches = new cydaw::base::Object();
+        cydaw::base::Array<cydaw::base::Value> keys;
         for (const auto key : switchKeys)
             keys.add(key);
         keyswitches->setProperty("keys", keys);
         const auto start = defaultSwitch.isNotEmpty() ? sfzNote(defaultSwitch, -1) : -1;
         keyswitches->setProperty("start", switchKeys.contains(start) ? start : *switchKeys.begin());
         if (!switchLabels.empty()) {
-            auto* names = new juce::DynamicObject();
+            auto* names = new cydaw::base::Object();
             for (const auto& [key, label] : switchLabels)
-                names->setProperty(juce::Identifier(juce::String(key)), label);
-            keyswitches->setProperty("labels", juce::var(names));
+                names->setProperty(cydaw::base::Identifier(juce::String(key)), label);
+            keyswitches->setProperty("labels", cydaw::base::Value(names));
         }
-        extras->setProperty("keyswitches", juce::var(keyswitches));
+        extras->setProperty("keyswitches", cydaw::base::Value(keyswitches));
     }
     error.clear();
     return mapVar(file.getFileNameWithoutExtension(), zones, settings, extrasVar);
 }
 
-juce::String samplerMapToSfz(const juce::var& json, const juce::File& sfzFile)
+juce::String samplerMapToSfz(const cydaw::base::Value& json, const juce::File& sfzFile)
 {
     juce::String out;
     out << "// " << json.getProperty("name", {}).toString() << " - written by CyDAW\n";

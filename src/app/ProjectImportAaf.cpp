@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #include "ProjectImport.h"
 #include "ProjectImportShared.h"
 
@@ -45,26 +46,26 @@ public:
     };
     static constexpr juce::uint32 kNone = 0xffffffffu;
 
-    juce::Result open(const juce::File& file)
+    cydaw::base::Result open(const juce::File& file)
     {
         map_ = std::make_unique<juce::MemoryMappedFile>(file, juce::MemoryMappedFile::readOnly);
         if (map_->getData() == nullptr || map_->getSize() < 512)
-            return juce::Result::fail("The file could not be read: " + file.getFullPathName());
+            return cydaw::base::Result::fail("The file could not be read: " + file.getFullPathName());
         data_ = static_cast<const juce::uint8*>(map_->getData());
         size_ = map_->getSize();
         static constexpr juce::uint8 signature[] { 0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1 };
         if (std::memcmp(data_, signature, 8) != 0)
-            return juce::Result::fail("Not an AAF file (no compound file signature): " + file.getFileName());
+            return cydaw::base::Result::fail("Not an AAF file (no compound file signature): " + file.getFileName());
         sectorShift_ = u16(0x1e);
         miniShift_ = u16(0x20);
         if (sectorShift_ < 7 || sectorShift_ > 16)
-            return juce::Result::fail("The AAF file's sectors are of an unknown size");
+            return cydaw::base::Result::fail("The AAF file's sectors are of an unknown size");
         if (miniShift_ < 4 || miniShift_ > sectorShift_)
-            return juce::Result::fail("The AAF file's small sectors are of an unknown size");
+            return cydaw::base::Result::fail("The AAF file's small sectors are of an unknown size");
         const auto fatSectors = u32(0x2c);
         // No more FAT sectors than the file holds sectors.
         if (fatSectors > size_ / sectorSize() + 1)
-            return juce::Result::fail("The AAF file's FAT is larger than the file");
+            return cydaw::base::Result::fail("The AAF file's FAT is larger than the file");
         const auto firstDirectory = u32(0x30);
         miniCutoff_ = u32(0x38);
         const auto firstMiniFat = u32(0x3c);
@@ -88,7 +89,7 @@ public:
         for (const auto sector : fatList) {
             const auto base = offsetOf(sector);
             if (base + sectorSize() > size_)
-                return juce::Result::fail("The AAF file's FAT is cut short");
+                return cydaw::base::Result::fail("The AAF file's FAT is cut short");
             for (std::size_t index = 0; index < perSector; ++index)
                 fat_.push_back(u32(base + index * 4));
         }
@@ -118,13 +119,13 @@ public:
             entries_.push_back(std::move(entry));
         }
         if (entries_.empty() || entries_[0].type != 5)
-            return juce::Result::fail("The AAF file holds no root storage");
+            return cydaw::base::Result::fail("The AAF file holds no root storage");
         // The mini stream (the root's stream) and its FAT.
         const auto miniFat = readChain(firstMiniFat, false, 0);
         for (std::size_t at = 0; at + 4 <= miniFat.getSize(); at += 4)
             miniFat_.push_back(read32(static_cast<const juce::uint8*>(miniFat.getData()) + at));
         miniStream_ = readChain(entries_[0].start, false, entries_[0].size);
-        return juce::Result::ok();
+        return cydaw::base::Result::ok();
     }
 
     [[nodiscard]] const Entry& entry(const int index) const { return entries_[static_cast<std::size_t>(index)]; }
@@ -330,7 +331,7 @@ class AafReader {
 public:
     AafReader(const juce::File& file, ImportedProject& out) : file_(file), out_(out), folder_(file.getParentDirectory()) {}
 
-    juce::Result read()
+    cydaw::base::Result read()
     {
         if (const auto opened = cfb_.open(file_); opened.failed())
             return opened;
@@ -343,11 +344,11 @@ public:
             if (name == "header" || name.startsWith("header-"))
                 header = index;
         if (header < 0)
-            return juce::Result::fail("The AAF file holds no header");
+            return cydaw::base::Result::fail("The AAF file holds no header");
         const auto headerObject = load(header);
         const auto content = strongChild(headerObject, pid::headerContent);
         if (!content)
-            return juce::Result::fail("The AAF file's header holds no content");
+            return cydaw::base::Result::fail("The AAF file's header holds no content");
         application(header);
         for (const auto& mob : strongChildren(*content, pid::mobs)) {
             const auto* id = mob.value(pid::mobId);
@@ -374,7 +375,7 @@ public:
                 break;
         }
         if (composition == nullptr)
-            return juce::Result::fail("The AAF file holds no composition");
+            return cydaw::base::Result::fail("The AAF file holds no composition");
         out_.name = composition->text(pid::mobName);
         auto number = 0;
         for (const auto& slot : strongChildren(*composition, pid::slots)) {
@@ -405,7 +406,7 @@ public:
         }
         if (gains_)
             out_.warnings.add("Clip and track gain and pan changes were left out.");
-        return juce::Result::ok();
+        return cydaw::base::Result::ok();
     }
 
 private:
@@ -849,7 +850,7 @@ private:
 
 } // namespace
 
-juce::Result importAafComposition(const juce::File& file, ImportedProject& out)
+cydaw::base::Result importAafComposition(const juce::File& file, ImportedProject& out)
 {
     out.source = file;
     AafReader reader(file, out);

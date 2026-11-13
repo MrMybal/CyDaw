@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "Processing.h"
 
@@ -180,20 +181,20 @@ namespace {
 
 // A graph with the classes its cards use (and those they use), and its own
 // inline ones: the rest is CyDAW's library, put back when it is restored.
-juce::var withUsedModules(const juce::var& graphState)
+cydaw::base::Value withUsedModules(const cydaw::base::Value& graphState)
 {
     const auto* graph = graphState.getDynamicObject();
     const auto* modules = graph != nullptr ? graph->getProperty("modules").getArray() : nullptr;
     if (modules == nullptr)
         return graphState;
     std::set<juce::String> used;
-    const auto addTypes = [&used](const juce::var& nodes) {
+    const auto addTypes = [&used](const cydaw::base::Value& nodes) {
         if (const auto* list = nodes.getArray())
             for (const auto& node : *list)
                 used.insert(node.getProperty("type", {}).toString());
     };
     addTypes(graph->getProperty("nodes"));
-    juce::Array<juce::var> kept;
+    cydaw::base::Array<cydaw::base::Value> kept;
     std::set<juce::String> keptKeys;
     for (auto grew = true; grew;) {
         grew = false;
@@ -210,48 +211,48 @@ juce::var withUsedModules(const juce::var& graphState)
             }
         }
     }
-    auto shallow = juce::DynamicObject::Ptr(new juce::DynamicObject());
+    auto shallow = cydaw::base::Object::Ptr(new cydaw::base::Object());
     for (const auto& property : graph->getProperties())
         shallow->setProperty(property.name, property.value);
-    shallow->setProperty("modules", juce::var(kept));
-    return juce::var(shallow.get());
+    shallow->setProperty("modules", cydaw::base::Value(kept));
+    return cydaw::base::Value(shallow.get());
 }
 
 // A chain step's mixer, its graphs with the classes they use only.
-juce::var compactChain(const juce::var& chain)
+cydaw::base::Value compactChain(const cydaw::base::Value& chain)
 {
     const auto* object = chain.getDynamicObject();
     if (object == nullptr)
         return chain;
-    auto copy = juce::DynamicObject::Ptr(new juce::DynamicObject());
+    auto copy = cydaw::base::Object::Ptr(new cydaw::base::Object());
     for (const auto& property : object->getProperties())
         copy->setProperty(property.name, property.value);
     if (const auto* tracks = object->getProperty("tracks").getArray()) {
-        juce::Array<juce::var> compact;
+        cydaw::base::Array<cydaw::base::Value> compact;
         for (const auto& track : *tracks) {
             const auto* trackObject = track.getDynamicObject();
             if (trackObject == nullptr) {
                 compact.add(track);
                 continue;
             }
-            auto trackCopy = juce::DynamicObject::Ptr(new juce::DynamicObject());
+            auto trackCopy = cydaw::base::Object::Ptr(new cydaw::base::Object());
             for (const auto& property : trackObject->getProperties())
                 trackCopy->setProperty(property.name, property.value);
             trackCopy->setProperty("graph", withUsedModules(trackObject->getProperty("graph")));
-            compact.add(juce::var(trackCopy.get()));
+            compact.add(cydaw::base::Value(trackCopy.get()));
         }
         copy->setProperty("tracks", compact);
     }
     if (object->hasProperty("master"))
         copy->setProperty("master", withUsedModules(object->getProperty("master")));
-    return juce::var(copy.get());
+    return cydaw::base::Value(copy.get());
 }
 
 } // namespace
 
-juce::var toJson(const Processing& processing)
+cydaw::base::Value toJson(const Processing& processing)
 {
-    auto* root = new juce::DynamicObject();
+    auto* root = new cydaw::base::Object();
     root->setProperty("format", format);
     root->setProperty("version", 1);
     root->setProperty("kind", processing.kind == Kind::midi ? "midi" : "audio");
@@ -260,45 +261,45 @@ juce::var toJson(const Processing& processing)
     if (processing.kind == Kind::midi) {
         root->setProperty("script", processing.script);
     } else {
-        juce::Array<juce::var> steps;
+        cydaw::base::Array<cydaw::base::Value> steps;
         for (const auto& step : processing.steps) {
-            auto* item = new juce::DynamicObject();
+            auto* item = new cydaw::base::Object();
             item->setProperty("type", keyOf(step.type));
             item->setProperty("enabled", step.enabled);
-            auto* settings = new juce::DynamicObject();
+            auto* settings = new cydaw::base::Object();
             for (const auto& [key, value] : step.settings)
                 settings->setProperty(key, value);
-            item->setProperty("settings", juce::var(settings));
+            item->setProperty("settings", cydaw::base::Value(settings));
             if (step.type == StepType::code)
                 item->setProperty("code", step.code);
             if (step.type == StepType::chain) {
                 item->setProperty("chain", compactChain(step.chain));
-                juce::Array<juce::var> published;
+                cydaw::base::Array<cydaw::base::Value> published;
                 for (const auto& knob : step.published) {
-                    auto* entry = new juce::DynamicObject();
+                    auto* entry = new cydaw::base::Object();
                     entry->setProperty("binding", knob.binding);
                     entry->setProperty("label", knob.label);
                     entry->setProperty("min", knob.minimum);
                     entry->setProperty("max", knob.maximum);
-                    published.add(juce::var(entry));
+                    published.add(cydaw::base::Value(entry));
                 }
                 item->setProperty("published", published);
             }
-            steps.add(juce::var(item));
+            steps.add(cydaw::base::Value(item));
         }
         root->setProperty("steps", steps);
-        auto* tail = new juce::DynamicObject();
+        auto* tail = new cydaw::base::Object();
         tail->setProperty("allow", processing.tail.allow);
         tail->setProperty("thresholdDb", processing.tail.thresholdDb);
         tail->setProperty("holdSeconds", processing.tail.holdSeconds);
         tail->setProperty("maxSeconds", processing.tail.maxSeconds);
         tail->setProperty("fadeMs", processing.tail.fadeMs);
-        root->setProperty("tail", juce::var(tail));
+        root->setProperty("tail", cydaw::base::Value(tail));
     }
-    return juce::var(root);
+    return cydaw::base::Value(root);
 }
 
-std::optional<Processing> fromJson(const juce::var& json, juce::String& error)
+std::optional<Processing> fromJson(const cydaw::base::Value& json, juce::String& error)
 {
     if (json.getProperty("format", {}).toString() != format) {
         error = "not a CyDAW processing";
@@ -343,18 +344,18 @@ std::optional<Processing> fromJson(const juce::var& json, juce::String& error)
 
 std::optional<Processing> load(const juce::File& file, juce::String& error)
 {
-    auto processing = fromJson(juce::JSON::parse(file), error);
+    auto processing = fromJson(cydaw::base::JSON::parse(file), error);
     if (processing)
         processing->file = file;
     return processing;
 }
 
-juce::Result save(const Processing& processing, const juce::File& file)
+cydaw::base::Result save(const Processing& processing, const juce::File& file)
 {
     (void) file.getParentDirectory().createDirectory();
-    if (!file.replaceWithText(juce::JSON::toString(toJson(processing))))
-        return juce::Result::fail(ui::Ls("Impossible d'écrire ", "Cannot write ") + file.getFullPathName());
-    return juce::Result::ok();
+    if (!file.replaceWithText(cydaw::base::JSON::toString(toJson(processing))))
+        return cydaw::base::Result::fail(ui::Ls("Impossible d'écrire ", "Cannot write ") + file.getFullPathName());
+    return cydaw::base::Result::ok();
 }
 
 juce::File userFolder() { return locations::folder(Location::processings); }
@@ -485,12 +486,12 @@ Prepared prepare(const Processing& processing, const Values& values)
         mixer.restore(step.chain);
         mixer.ensureInput(chainInput, ui::Ls("Son", "Sound"));
         for (const auto& knob : step.published) {
-            auto* request = new juce::DynamicObject();
+            auto* request = new cydaw::base::Object();
             request->setProperty("op", "parameter");
             request->setProperty("inputId", static_cast<juce::int64>(chainInput));
             request->setProperty("binding", knob.binding);
             request->setProperty("value", valueOf(values, static_cast<int>(i), step, knob.binding, 0.5 * (knob.minimum + knob.maximum)));
-            (void) mixer.command(juce::var(request));
+            (void) mixer.command(cydaw::base::Value(request));
         }
         prepared.chains[i] = mixer.inputRuntimeState(chainInput);
     }
@@ -499,21 +500,21 @@ Prepared prepare(const Processing& processing, const Values& values)
 
 namespace {
 
-juce::Result renderChain(const juce::var& state, engine::repair::Channels& channels, const double rate, const std::int64_t frames,
+cydaw::base::Result renderChain(const cydaw::base::Value& state, engine::repair::Channels& channels, const double rate, const std::int64_t frames,
                          const std::atomic<bool>* cancel)
 {
     if (!state.isObject())
-        return juce::Result::ok(); // an empty chain: the sound as it is
+        return cydaw::base::Result::ok(); // an empty chain: the sound as it is
     juce::String error;
     auto native = app::restoreNativeDspGraphState(state.getProperty("native", {}), error);
     if (!native)
-        return juce::Result::fail(ui::Ls("La chaîne ne se relit pas : ", "The chain does not restore: ") + error);
+        return cydaw::base::Result::fail(ui::Ls("La chaîne ne se relit pas : ", "The chain does not restore: ") + error);
     app::attachImpulses(*native, state.getProperty("editor", {}));
     constexpr int block = 1'024;
     app::NativeDspRuntime chain;
     chain.prepare(rate, block, 2);
     if (const auto compiled = chain.setGraph(*native); compiled.failed())
-        return juce::Result::fail(ui::Ls("La chaîne ne se compile pas : ", "The chain does not compile: ") + compiled.getErrorMessage());
+        return cydaw::base::Result::fail(ui::Ls("La chaîne ne se compile pas : ", "The chain does not compile: ") + compiled.getErrorMessage());
     const auto latency = std::max(0, chain.latencySamples());
     const auto length = static_cast<std::int64_t>(channels.front().size());
     engine::repair::Channels rendered(2, std::vector<float>(static_cast<std::size_t>(frames), 0.0f));
@@ -521,7 +522,7 @@ juce::Result renderChain(const juce::var& state, engine::repair::Channels& chann
     const auto total = frames + latency;
     for (std::int64_t at = 0; at < total; at += block) {
         if (cancel != nullptr && cancel->load())
-            return juce::Result::fail("cancelled");
+            return cydaw::base::Result::fail("cancelled");
         const auto n = static_cast<int>(std::min<std::int64_t>(block, total - at));
         for (int c = 0; c < 2; ++c) {
             auto* data = buffer.getWritePointer(c);
@@ -540,7 +541,7 @@ juce::Result renderChain(const juce::var& state, engine::repair::Channels& chann
         }
     }
     channels = std::move(rendered);
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 } // namespace
@@ -674,17 +675,17 @@ AudioResult renderAudio(const Prepared& prepared, engine::repair::Channels chann
     }
 }
 
-juce::Result readAudioFile(const juce::File& file, engine::repair::Channels& channels, double& rate)
+cydaw::base::Result readAudioFile(const juce::File& file, engine::repair::Channels& channels, double& rate)
 {
     juce::AudioFormatManager formats;
     cydaw::integration::registerCyAudioCoreReaders(formats);
     std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
     if (reader == nullptr || reader->lengthInSamples <= 0 || !std::isfinite(reader->sampleRate) || reader->sampleRate < 1'000.0
         || reader->sampleRate > 384'000.0)
-        return juce::Result::fail(ui::Ls("Fichier son illisible : ", "Unreadable sound file: ") + file.getFileName());
+        return cydaw::base::Result::fail(ui::Ls("Fichier son illisible : ", "Unreadable sound file: ") + file.getFileName());
     // The header's word for its length is not trusted further than 30 minutes.
     if (reader->lengthInSamples > static_cast<juce::int64>(reader->sampleRate * 60.0 * 30.0))
-        return juce::Result::fail(ui::Ls("Son trop long (30 minutes au plus)", "Sound too long (30 minutes at most)"));
+        return cydaw::base::Result::fail(ui::Ls("Son trop long (30 minutes au plus)", "Sound too long (30 minutes at most)"));
     const auto frames = static_cast<juce::int64>(reader->lengthInSamples);
     const auto count = static_cast<int>(std::clamp(reader->numChannels, 1u, 2u));
     try {
@@ -700,13 +701,13 @@ juce::Result readAudioFile(const juce::File& file, engine::repair::Channels& cha
         }
     } catch (const std::bad_alloc&) {
         channels.clear();
-        return juce::Result::fail(ui::Ls("Pas assez de mémoire pour ce son", "Not enough memory for this sound"));
+        return cydaw::base::Result::fail(ui::Ls("Pas assez de mémoire pour ce son", "Not enough memory for this sound"));
     }
     rate = reader->sampleRate;
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
-juce::Result writeAudioFile(const juce::File& file, const engine::repair::Channels& channels, const double rate)
+cydaw::base::Result writeAudioFile(const juce::File& file, const engine::repair::Channels& channels, const double rate)
 {
     const auto frames = channels.empty() ? 0 : static_cast<int>(channels.front().size());
     juce::AudioBuffer<float> buffer(std::max(1, static_cast<int>(channels.size())), frames);
@@ -719,11 +720,11 @@ juce::Result writeAudioFile(const juce::File& file, const engine::repair::Channe
     std::unique_ptr<juce::AudioFormatWriter> writer(
         stream != nullptr ? wav.createWriterFor(stream.get(), rate, static_cast<unsigned>(buffer.getNumChannels()), 24, {}, 0) : nullptr);
     if (writer == nullptr)
-        return juce::Result::fail(ui::Ls("Impossible d'écrire ", "Cannot write ") + file.getFullPathName());
+        return cydaw::base::Result::fail(ui::Ls("Impossible d'écrire ", "Cannot write ") + file.getFullPathName());
     (void) stream.release();
     return writer->writeFromAudioSampleBuffer(buffer, 0, frames)
-               ? juce::Result::ok()
-               : juce::Result::fail(ui::Ls("Impossible d'écrire ", "Cannot write ") + file.getFullPathName());
+               ? cydaw::base::Result::ok()
+               : cydaw::base::Result::fail(ui::Ls("Impossible d'écrire ", "Cannot write ") + file.getFullPathName());
 }
 
 NoteScriptResult renderNotes(const Processing& processing, const Values& values, std::vector<ScriptNote> notes, const double tempo,

@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "PluginFiles.h"
 #include "WindowsPluginBridge.h"
 #include "LibraryWindow.h"
@@ -296,7 +297,7 @@ private:
                     if (file.isDirectory()) for (const auto& child : juce::RangedDirectoryIterator(file, true, "*", juce::File::findFiles)) stamp = std::max(stamp, child.getFile().getLastModificationTime().toMilliseconds());
                     const auto key = juce::String::toHexString(file.getFullPathName().hashCode64());
                     const auto report = cache.getChildFile(key + ".json");
-                    auto data = juce::JSON::parse(report);
+                    auto data = cydaw::base::JSON::parse(report);
                     if (static_cast<juce::int64>(data.getProperty("stamp", 0)) != stamp) {
                         const auto launch = app::WindowsPluginBridge::workerLaunchFor(file);
                         auto command = launch.command; const auto resultFile = cache.getChildFile(key + "-" + juce::Uuid().toString() + ".probe.json");
@@ -307,12 +308,12 @@ private:
                             const auto deadline=juce::Time::getMillisecondCounterHiRes()+15000;
                             while(process.isRunning() && !threadShouldExit() && juce::Time::getMillisecondCounterHiRes()<deadline) wait(30);
                             if(process.isRunning())process.kill();
-                            data=juce::JSON::parse(resultFile);
+                            data=cydaw::base::JSON::parse(resultFile);
                             // Read once: what stays is the catalogue's own report.
                             (void) resultFile.deleteFile();
                             if (auto* entries=data.getArray()) {
-                                auto root=juce::DynamicObject::Ptr(new juce::DynamicObject());root->setProperty("stamp", stamp);root->setProperty("plugins", *entries);data=juce::var(root.get());
-                                (void) report.replaceWithText(juce::JSON::toString(data));
+                                auto root=cydaw::base::Object::Ptr(new cydaw::base::Object());root->setProperty("stamp", stamp);root->setProperty("plugins", *entries);data=cydaw::base::Value(root.get());
+                                (void) report.replaceWithText(cydaw::base::JSON::toString(data));
                             }
                         }
                     }
@@ -324,12 +325,12 @@ private:
                             foundPlugin.kind=static_cast<bool>(item.getProperty("instrument", false))?"Instrument":"Fx";
                             foundPlugin.subcategory=item.getProperty("category", {}).toString();foundPlugin.format=item.getProperty("format", plugin.format).toString();
                             if(entries->size()>1) {
-                                auto descriptor=juce::DynamicObject::Ptr(new juce::DynamicObject());descriptor->setProperty("file", file.getFullPathName());descriptor->setProperty("id", item.getProperty("pluginId", {}));
+                                auto descriptor=cydaw::base::Object::Ptr(new cydaw::base::Object());descriptor->setProperty("file", file.getFullPathName());descriptor->setProperty("id", item.getProperty("pluginId", {}));
                                 const auto descriptors=cache.getSiblingFile("PluginDescriptors");(void)descriptors.createDirectory();
                                 descriptor->setProperty("name",foundPlugin.name);descriptor->setProperty("format",foundPlugin.format);
                                 const auto entryId=juce::String::toHexString(item.getProperty("pluginId",{}).toString().hashCode64());
                                 const auto path=descriptors.getChildFile(key+"-"+entryId+".cyplugin");
-                                (void) path.replaceWithText(juce::JSON::toString(juce::var(descriptor.get())));foundPlugin.file=path;
+                                (void) path.replaceWithText(cydaw::base::JSON::toString(cydaw::base::Value(descriptor.get())));foundPlugin.file=path;
                             }
                             found.push_back(std::move(foundPlugin));added=true;
                         }
@@ -337,7 +338,7 @@ private:
                     }
                 }
                 // What the bundle says of itself (VST 3.7 and later).
-                const auto info = juce::JSON::parse(file.getChildFile("Contents").getChildFile("Resources").getChildFile("moduleinfo.json"));
+                const auto info = cydaw::base::JSON::parse(file.getChildFile("Contents").getChildFile("Resources").getChildFile("moduleinfo.json"));
                 plugin.vendor = info.getProperty("Factory Info", {}).getProperty("Vendor", {}).toString();
                 if (const auto* classes = info.getProperty("Classes", {}).getArray())
                     for (const auto& item : *classes)
@@ -1664,13 +1665,13 @@ void LibraryWindow::drawEffects()
             report(ui::Ls("Choisissez d'abord une piste", "Choose a track first"), true);
             return;
         }
-        juce::Result result = juce::Result::ok();
+        cydaw::base::Result result = cydaw::base::Result::ok();
         // Before the card whose "+" opened the window, else where it goes.
         const auto before = state_.deviceInsertBefore && state_.deviceInsertBefore->first == *track ? state_.deviceInsertBefore->second
                                                                                                       : std::uint64_t {};
         if (row.kind == EffectRow::vst3) {
             if (track->midi || track->master)
-                result = juce::Result::fail(ui::Ls("Les plug-ins externes vont sur les pistes audio", "External plug-ins go on audio tracks"));
+                result = cydaw::base::Result::fail(ui::Ls("Les plug-ins externes vont sur les pistes audio", "External plug-ins go on audio tracks"));
             else
                 result = studio_.engine().setTrackPlugin(track->audioIndex, row.file);
         } else if (row.kind == EffectRow::mine) {

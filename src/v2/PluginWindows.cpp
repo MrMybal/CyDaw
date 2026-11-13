@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "PluginWindows.h"
 
 #include "InterfaceEditor.h"
@@ -99,7 +100,7 @@ void PluginWindows::draw()
                              [this, track, nodeId] {
                                  return nodeId != 0 ? studio_.devicePresetState(track, nodeId) : studio_.chainPresetState(track);
                              },
-                             [this, track, nodeId](const juce::var& preset, juce::String& error) {
+                             [this, track, nodeId](const cydaw::base::Value& preset, juce::String& error) {
                                  return nodeId != 0 ? studio_.applyDevicePreset(track, nodeId, preset, error)
                                                     : studio_.applyChainPreset(track, preset, error);
                              },

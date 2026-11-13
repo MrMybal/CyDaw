@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "StudioTypes.h"
 
 namespace cydaw::v2 {
@@ -28,14 +29,14 @@ GraphSlot::~GraphSlot()
     graph_->setParametersChangedHandler({});
 }
 
-void GraphSlot::restore(const juce::var& stateWithLibrary)
+void GraphSlot::restore(const cydaw::base::Value& stateWithLibrary)
 {
     const juce::ScopedValueSetter<bool> guard(restoring_, true);
     graph_->restore(stateWithLibrary);
     ++revision_;
 }
 
-juce::var GraphSlot::serialise() const
+cydaw::base::Value GraphSlot::serialise() const
 {
     return graph_->serialise();
 }

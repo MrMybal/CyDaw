@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #pragma once
 
 #include "NodeGraphComponent.h"
@@ -18,11 +19,11 @@ namespace cydaw::v2::device_ops {
 // A card's settings as a preset holds them (its knobs by key, a sampler's
 // map, a model card's model, a wavetable's table, Prisme's tables, a
 // response); none for a card it does not have.
-[[nodiscard]] juce::var presetState(const app::NodeGraphComponent& graph, std::uint64_t nodeId);
+[[nodiscard]] cydaw::base::Value presetState(const app::NodeGraphComponent& graph, std::uint64_t nodeId);
 
 // A preset put back on a card: its assets, then its knobs. A Batterie's kit
 // changes through `setBatterieKit` (none: a preset of another kit fails).
-bool applyPreset(app::NodeGraphComponent& graph, std::uint64_t nodeId, const juce::var& state, juce::String& error,
+bool applyPreset(app::NodeGraphComponent& graph, std::uint64_t nodeId, const cydaw::base::Value& state, juce::String& error,
                  const std::function<bool(int kit, juce::String& error)>& setBatterieKit);
 
 // A sound file made the table of a Prisme card's oscillator (0 A, 1 B);

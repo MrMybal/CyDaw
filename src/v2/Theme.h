@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #pragma once
 
 #include <cyui/Theme.h>
@@ -58,8 +59,8 @@ struct PaletteField {
 [[nodiscard]] const std::vector<PaletteField>& paletteFields();
 // A theme file's colours ("#RRGGBB" or "#RRGGBBAA"), and back; what a file
 // lacks keeps `base`'s.
-[[nodiscard]] juce::var paletteToJson(const Palette& palette);
-[[nodiscard]] Palette paletteFromJson(const juce::var& colours, const Palette& base);
+[[nodiscard]] cydaw::base::Value paletteToJson(const Palette& palette);
+[[nodiscard]] Palette paletteFromJson(const cydaw::base::Value& colours, const Palette& base);
 
 // Applies colours and sizes, scaled for the display.
 void apply(float dpiScale);

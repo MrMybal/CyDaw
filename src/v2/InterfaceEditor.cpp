@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "InterfaceEditor.h"
 #include "InstrumentPanels.h"
 #include "CustomInterface.h"
@@ -286,9 +287,9 @@ std::uint64_t InterfaceEditor::add(GraphSlot& slot, const Kind kind, const ImVec
     if (kind == Kind::text)
         control.label = slot.graph().editorGraphName().isNotEmpty() ? slot.graph().editorGraphName() : ui::Ls("Texte", "Text");
     if (kind == Kind::group) control.label = {};
-    if (page_.isNotEmpty()) { control.design=new juce::DynamicObject;control.design.getDynamicObject()->setProperty("page",page_); }
+    if (page_.isNotEmpty()) { control.design=new cydaw::base::Object;control.design.getDynamicObject()->setProperty("page",page_); }
     if (kind == Kind::custom) {
-        control.design = control.design.isObject()?control.design:juce::var(new juce::DynamicObject);
+        control.design = control.design.isObject()?control.design:cydaw::base::Value(new cydaw::base::Object);
         control.design.getDynamicObject()->setProperty("customSource",CustomInterface::example());
     }
 
@@ -976,13 +977,13 @@ void InterfaceEditor::drawCanvas(GraphSlot& slot)
         }
         if(selected_ && io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_C,false)) {
             auto copy=interface_;std::erase_if(copy.controls,[this](const auto& c){return c.id!=selected_ && !selection_.contains(c.id);});
-            copy.deviceControls.clear();const auto json=juce::JSON::toString(app::serialiseModuleInterface(copy),false);
+            copy.deviceControls.clear();const auto json=cydaw::base::JSON::toString(app::serialiseModuleInterface(copy),false);
             ImGui::SetClipboardText((juce::String("CyDAW-Interface\n")+json).toRawUTF8());
         }
         if(io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_V,false)) {
             const auto text=juce::String::fromUTF8(ImGui::GetClipboardText());
             if(text.startsWith("CyDAW-Interface\n")) {
-                const auto copied=app::restoreModuleInterface(juce::JSON::parse(text.substring(16)));
+                const auto copied=app::restoreModuleInterface(cydaw::base::JSON::parse(text.substring(16)));
                 std::vector<Control> additions;bool valid=true;
                 for(auto c:copied.controls) {
                     for(const auto* key:{&c.parameterBinding,&c.secondaryParameterBinding,&c.tertiaryParameterBinding,&c.quaternaryParameterBinding})if(key->isNotEmpty() && !parameter(*key))valid=false;

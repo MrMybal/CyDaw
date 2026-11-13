@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "ProjectImport.h"
 #include "ProjectImportShared.h"
 
@@ -26,11 +27,11 @@ class ZrythmReader {
 public:
     ZrythmReader(const juce::File& file, ImportedProject& out) : file_(file), out_(out), folder_(file.getParentDirectory()) {}
 
-    juce::Result read()
+    cydaw::base::Result read()
     {
         juce::MemoryBlock bytes;
         if (!file_.loadFileAsData(bytes))
-            return juce::Result::fail("The file could not be opened: " + file_.getFullPathName());
+            return cydaw::base::Result::fail("The file could not be opened: " + file_.getFullPathName());
         juce::String text;
         const auto* data = static_cast<const juce::uint8*>(bytes.getData());
         if (bytes.getSize() >= 4 && data[0] == 0x28 && data[1] == 0xb5 && data[2] == 0x2f && data[3] == 0xfd) {
@@ -38,7 +39,7 @@ public:
             juce::MemoryOutputStream plain;
             auto* stream = ZSTD_createDStream();
             if (stream == nullptr)
-                return juce::Result::fail("No zstd decoder");
+                return cydaw::base::Result::fail("No zstd decoder");
             (void) ZSTD_initDStream(stream);
             std::vector<char> chunk(ZSTD_DStreamOutSize());
             ZSTD_inBuffer input { bytes.getData(), bytes.getSize(), 0 };
@@ -58,16 +59,16 @@ public:
             }
             ZSTD_freeDStream(stream);
             if (failed)
-                return juce::Result::fail("The Zrythm project could not be decompressed: " + file_.getFileName());
+                return cydaw::base::Result::fail("The Zrythm project could not be decompressed: " + file_.getFileName());
             text = plain.toUTF8();
         } else {
             text = bytes.toString();
         }
         if (text.trimStart().startsWith("---"))
-            return juce::Result::fail("An older Zrythm project (YAML): open it in Zrythm 1.0 or later and save it, then import it.");
-        const auto root = juce::JSON::parse(text);
+            return cydaw::base::Result::fail("An older Zrythm project (YAML): open it in Zrythm 1.0 or later and save it, then import it.");
+        const auto root = cydaw::base::JSON::parse(text);
         if (root.getProperty("type", {}).toString() != "ZrythmProject")
-            return juce::Result::fail("Not a Zrythm project: " + file_.getFileName());
+            return cydaw::base::Result::fail("Not a Zrythm project: " + file_.getFileName());
         out_.format = "zrythm";
         out_.application = "Zrythm " + root.getProperty("version", {}).toString();
         out_.name = root.getProperty("title", {}).toString();
@@ -78,7 +79,7 @@ public:
                     pool_[static_cast<int>(clip.getProperty("poolId", -1))] = clip;
         const auto* tracks = root.getProperty("tracklist", {}).getProperty("tracks", {}).getArray();
         if (tracks == nullptr)
-            return juce::Result::fail("The Zrythm project holds no tracks");
+            return cydaw::base::Result::fail("The Zrythm project holds no tracks");
         // The tempo first: every position depends on it.
         for (const auto& track : *tracks)
             if (static_cast<int>(track.getProperty("type", -1)) == tempo) {
@@ -89,18 +90,18 @@ public:
             }
         for (const auto& track : *tracks)
             readTrack(track);
-        return juce::Result::ok();
+        return cydaw::base::Result::ok();
     }
 
 private:
-    static double control(const juce::var& port, const double fallback)
+    static double control(const cydaw::base::Value& port, const double fallback)
     {
         return port.isObject() && port.hasProperty("control") ? static_cast<double>(port.getProperty("control", fallback)) : fallback;
     }
 
-    static double ticks(const juce::var& position) { return static_cast<double>(position.getProperty("ticks", 0.0)); }
+    static double ticks(const cydaw::base::Value& position) { return static_cast<double>(position.getProperty("ticks", 0.0)); }
 
-    static juce::uint32 colourOf(const juce::var& colour)
+    static juce::uint32 colourOf(const cydaw::base::Value& colour)
     {
         if (!colour.isObject())
             return 0;
@@ -110,7 +111,7 @@ private:
         return opaque(channel("red"), channel("green"), channel("blue"));
     }
 
-    static ImportedDevice deviceOf(const juce::var& plugin, const bool isInstrument)
+    static ImportedDevice deviceOf(const cydaw::base::Value& plugin, const bool isInstrument)
     {
         ImportedDevice device;
         const auto descriptor = plugin.getProperty("setting", {}).getProperty("descriptor", {});
@@ -124,7 +125,7 @@ private:
         return device;
     }
 
-    void readTrack(const juce::var& element)
+    void readTrack(const cydaw::base::Value& element)
     {
         const auto type = static_cast<int>(element.getProperty("type", -1));
         if (type == master) {
@@ -166,7 +167,7 @@ private:
         out_.tracks.push_back(std::move(track));
     }
 
-    void readRegion(const juce::var& region, const bool laneMuted, ImportedTrack& track)
+    void readRegion(const cydaw::base::Value& region, const bool laneMuted, ImportedTrack& track)
     {
         const auto base = region.getProperty("base", {});
         const auto start = ticks(base.getProperty("pos", {}));
@@ -242,12 +243,12 @@ private:
     juce::File file_;
     ImportedProject& out_;
     juce::File folder_;
-    std::map<int, juce::var> pool_;
+    std::map<int, cydaw::base::Value> pool_;
 };
 
 } // namespace
 
-juce::Result importZrythmProject(const juce::File& file, ImportedProject& out)
+cydaw::base::Result importZrythmProject(const juce::File& file, ImportedProject& out)
 {
     out.source = file;
     ZrythmReader reader(file, out);

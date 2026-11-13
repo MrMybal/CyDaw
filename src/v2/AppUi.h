@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #pragma once
 
 #include "RemoteCommands.h"
@@ -190,19 +191,19 @@ public:
     void selectSample(const juce::File& file) override;
     void browseSamples(const juce::String& query, bool semantic, const juce::String& family, const juce::String& category,
                        const juce::String& source) override;
-    juce::var library(const juce::String& command, const juce::var& request) override;
-    juce::var midiInputs(const juce::String& command, const juce::var& request) override;
-    juce::var themes(const juce::var& request) override;
-    juce::var jsfx(const juce::var&) override;
-    juce::var manual(const juce::var&) override;
+    cydaw::base::Value library(const juce::String& command, const cydaw::base::Value& request) override;
+    cydaw::base::Value midiInputs(const juce::String& command, const cydaw::base::Value& request) override;
+    cydaw::base::Value themes(const cydaw::base::Value& request) override;
+    cydaw::base::Value jsfx(const cydaw::base::Value&) override;
+    cydaw::base::Value manual(const cydaw::base::Value&) override;
     void openManual(const juce::String& topic = {}, const juce::String& section = {});
-    juce::var transportSync(const juce::var& request) override;
-    juce::var controllers(const juce::var& request) override;
-    juce::var dj(const juce::var& request) override;
-    juce::var foundry(const juce::var& request) override;
-    juce::var processing(const juce::var& request) override;
+    cydaw::base::Value transportSync(const cydaw::base::Value& request) override;
+    cydaw::base::Value controllers(const cydaw::base::Value& request) override;
+    cydaw::base::Value dj(const cydaw::base::Value& request) override;
+    cydaw::base::Value foundry(const cydaw::base::Value& request) override;
+    cydaw::base::Value processing(const cydaw::base::Value& request) override;
     bool openProcessing(const TrackRef& track, std::uint64_t clipId) override;
-    juce::var cinema(const juce::var& request) override;
+    cydaw::base::Value cinema(const cydaw::base::Value& request) override;
     juce::String appMode(const juce::String& mode) override;
     bool showDeviceEditor(std::uint64_t nodeId, int pane, bool detached = false) override;
     void showWorkshop() override { state_.bringToFront = Panel::workshop; }
@@ -290,15 +291,15 @@ public:
         return true;
     }
     Vst3Build* vst3Build() override { return vst3Build_.get(); }
-    juce::String injectInput(const juce::var& events) override;
+    juce::String injectInput(const cydaw::base::Value& events) override;
     // The scripted mouse, between the system's input and the frame.
     void applyScriptedInput();
     // A scripted key pressed, let go on the next event.
     int pendingKeyUp_ {};
     // Named layouts, in CyDAW/Layouts beside the current one.
     [[nodiscard]] juce::StringArray layoutNames() const override;
-    juce::Result saveLayoutAs(const juce::String& name) override;
-    juce::Result loadLayout(const juce::String& name) override;
+    cydaw::base::Result saveLayoutAs(const juce::String& name) override;
+    cydaw::base::Result loadLayout(const juce::String& name) override;
     bool deleteLayout(const juce::String& name) override;
     // Between frames: a layout asked for is put in place (Dear ImGui reads
     // a layout only outside a frame), then the scripted mouse.
@@ -417,7 +418,7 @@ private:
     juce::File opening_;
     void continueOpening();
     void drawOpening();
-    void projectOpened(const juce::File& file, const juce::Result& result);
+    void projectOpened(const juce::File& file, const cydaw::base::Result& result);
     // The logo, at about `pixels` wide (0 until the graphics device exists).
     [[nodiscard]] unsigned long long logo(float pixels);
     bool showWarnings_ {};
@@ -465,7 +466,7 @@ private:
     bool scriptedMouse_ {};
     float scriptedX_ {};
     float scriptedY_ {};
-    juce::var scriptedEvent_;
+    cydaw::base::Value scriptedEvent_;
     bool scriptedShift_ {};
 };
 

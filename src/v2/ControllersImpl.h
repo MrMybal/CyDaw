@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #pragma once
 
 // The controllers tool's inside, shared by Controllers.cpp (devices, routing,
@@ -193,10 +194,10 @@ public:
     void see(bool out, const std::string& device, const control::RawMessage& message);
 
     // ---- Files ----------------------------------------------------------------------------
-    [[nodiscard]] juce::var globalState() const;
-    void restoreGlobal(const juce::var& state);
-    [[nodiscard]] juce::var projectAssignments() const;
-    void restoreProject(const juce::var& assignments);
+    [[nodiscard]] cydaw::base::Value globalState() const;
+    void restoreGlobal(const cydaw::base::Value& state);
+    [[nodiscard]] cydaw::base::Value projectAssignments() const;
+    void restoreProject(const cydaw::base::Value& assignments);
     void changed(bool global, bool project);
     void saveNow();
     bool globalDirty {};
@@ -236,8 +237,8 @@ public:
     int newOscPort { 9000 };
     char targetFilter[96] {};
 
-    juce::var command(const juce::var& request);
-    [[nodiscard]] juce::var describe() const;
+    cydaw::base::Value command(const cydaw::base::Value& request);
+    [[nodiscard]] cydaw::base::Value describe() const;
 
     Studio& studio;
     UiState& uiState;

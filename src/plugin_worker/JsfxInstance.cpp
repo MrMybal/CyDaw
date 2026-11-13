@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "ExtraPluginFormats.h"
 #include "HostedInstance.h"
 #include <array>
@@ -313,12 +314,12 @@ std::unique_ptr<juce::AudioPluginInstance> createJsfx(const juce::File &file, ju
         return {};
     return p;
 }
-juce::var validateJsfxGraphics(juce::AudioPluginInstance &instance)
+cydaw::base::Value validateJsfxGraphics(juce::AudioPluginInstance &instance)
 {
     auto *script = dynamic_cast<JsfxInstance *>(&instance);
     if (!script)
         return {};
-    auto result = juce::DynamicObject::Ptr(new juce::DynamicObject());
+    auto result = cydaw::base::Object::Ptr(new cydaw::base::Object());
     const auto present = ysfx_has_section(script->fx.get(), ysfx_section_gfx);
     result->setProperty("gfxPresent", present);
     if (present)
@@ -341,6 +342,6 @@ juce::var validateJsfxGraphics(juce::AudioPluginInstance &instance)
         result->setProperty("gfxWidth", int(width));
         result->setProperty("gfxHeight", int(height));
     }
-    return juce::var(result.get());
+    return cydaw::base::Value(result.get());
 }
 } // namespace cydaw::plugins

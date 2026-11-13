@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #pragma once
 
 #include "StudioTypes.h"
@@ -31,8 +32,8 @@ public:
     // A card's presets: what holds them, its settings as a preset keeps
     // them, a preset put back; the name of the last one each holder took.
     [[nodiscard]] virtual std::optional<PresetHolder> devicePresetHolder(const TrackRef& track, std::uint64_t nodeId) const = 0;
-    [[nodiscard]] virtual juce::var devicePresetState(const TrackRef& track, std::uint64_t nodeId) const = 0;
-    virtual bool applyDevicePreset(const TrackRef& track, std::uint64_t nodeId, const juce::var& state, juce::String& error) = 0;
+    [[nodiscard]] virtual cydaw::base::Value devicePresetState(const TrackRef& track, std::uint64_t nodeId) const = 0;
+    virtual bool applyDevicePreset(const TrackRef& track, std::uint64_t nodeId, const cydaw::base::Value& state, juce::String& error) = 0;
     [[nodiscard]] virtual juce::String presetName(const juce::String& holderKey) const = 0;
     virtual void setPresetName(const juce::String& holderKey, const juce::String& name) = 0;
 
@@ -63,7 +64,7 @@ public:
     virtual bool clearCabImpulse(const TrackRef& track, std::uint64_t nodeId) = 0;
 
     // A device of the catalogue added to a track's chain.
-    virtual juce::Result insertDevice(const TrackRef& track, const juce::String& key) = 0;
+    virtual cydaw::base::Result insertDevice(const TrackRef& track, const juce::String& key) = 0;
 };
 
 } // namespace cydaw::v2

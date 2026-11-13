@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #include "ProjectImport.h"
 #include "ProjectImportShared.h"
 
@@ -243,20 +244,20 @@ public:
     {
     }
 
-    juce::Result read()
+    cydaw::base::Result read()
     {
         if (zip_.getNumEntries() == 0)
-            return juce::Result::fail("Not a DAWproject file (no zip entries): "
+            return cydaw::base::Result::fail("Not a DAWproject file (no zip entries): "
                                       + file_.getFullPathName());
         const auto index = zip_.getIndexOfFileName("project.xml", true);
         if (index < 0)
-            return juce::Result::fail("No project.xml inside " + file_.getFileName());
+            return cydaw::base::Result::fail("No project.xml inside " + file_.getFileName());
         std::unique_ptr<juce::InputStream> stream(zip_.createStreamForEntry(index));
         if (stream == nullptr)
-            return juce::Result::fail("project.xml could not be read");
+            return cydaw::base::Result::fail("project.xml could not be read");
         const auto document = juce::XmlDocument::parse(shared::readBounded(*stream));
         if (document == nullptr || !document->hasTagName("Project"))
-            return juce::Result::fail("project.xml is not a DAWproject document");
+            return cydaw::base::Result::fail("project.xml is not a DAWproject document");
 
         out_.format = "dawproject";
         if (const auto* application = document->getChildByName("Application"))
@@ -284,7 +285,7 @@ public:
                     readScene(scene, sceneIndex++);
         }
         settleKinds();
-        return juce::Result::ok();
+        return cydaw::base::Result::ok();
     }
 
 private:
@@ -656,13 +657,13 @@ public:
     {
     }
 
-    juce::Result read()
+    cydaw::base::Result read()
     {
         std::unique_ptr<juce::XmlElement> document;
         {
             juce::FileInputStream input(file_);
             if (!input.openedOk())
-                return juce::Result::fail("The file could not be opened: " + file_.getFullPathName());
+                return cydaw::base::Result::fail("The file could not be opened: " + file_.getFullPathName());
             juce::GZIPDecompressorInputStream unzipped(
                 &input, false, juce::GZIPDecompressorInputStream::gzipFormat);
             document = juce::XmlDocument::parse(shared::readBounded(unzipped));
@@ -670,10 +671,10 @@ public:
         if (document == nullptr)
             document = juce::XmlDocument::parse(file_);
         if (document == nullptr || !document->hasTagName("Ableton"))
-            return juce::Result::fail("Not an Ableton Live set: " + file_.getFileName());
+            return cydaw::base::Result::fail("Not an Ableton Live set: " + file_.getFileName());
         const auto* liveSet = document->getChildByName("LiveSet");
         if (liveSet == nullptr)
-            return juce::Result::fail("The Live set holds no LiveSet element");
+            return cydaw::base::Result::fail("The Live set holds no LiveSet element");
 
         out_.format = "ableton";
         out_.application = attributeText(document.get(), "Creator", "Ableton Live");
@@ -693,7 +694,7 @@ public:
         if (const auto* tracks = liveSet->getChildByName("Tracks"))
             for (const auto* track : tracks->getChildIterator())
                 readTrack(track);
-        return juce::Result::ok();
+        return cydaw::base::Result::ok();
     }
 
 private:
@@ -957,11 +958,11 @@ public:
     {
     }
 
-    juce::Result read()
+    cydaw::base::Result read()
     {
         juce::ZipFile zip(file_);
         if (zip.getNumEntries() == 0)
-            return juce::Result::fail("Not a Studio One song (no zip entries): " + file_.getFullPathName());
+            return cydaw::base::Result::fail("Not a Studio One song (no zip entries): " + file_.getFullPathName());
         std::vector<std::pair<juce::String, std::unique_ptr<juce::XmlElement>>> documents;
         for (auto index = 0; index < zip.getNumEntries(); ++index) {
             const auto* entry = zip.getEntry(index);
@@ -974,7 +975,7 @@ public:
                 documents.emplace_back(entry->filename, std::move(parsed));
         }
         if (documents.empty())
-            return juce::Result::fail("No XML document inside " + file_.getFileName());
+            return cydaw::base::Result::fail("No XML document inside " + file_.getFileName());
 
         out_.format = "studio-one";
         out_.application = "Studio One";
@@ -996,7 +997,7 @@ public:
                     readTracks(document.get());
         out_.warnings.add("Studio One songs are read by best effort; the DAWproject export "
                           "of Studio One is the reliable path.");
-        return juce::Result::ok();
+        return cydaw::base::Result::ok();
     }
 
 private:
@@ -1608,18 +1609,18 @@ public:
     {
     }
 
-    juce::Result read()
+    cydaw::base::Result read()
     {
         if (!file_.loadFileAsData(data_) || data_.getSize() < 48)
-            return juce::Result::fail("The file could not be read: " + file_.getFullPathName());
+            return cydaw::base::Result::fail("The file could not be read: " + file_.getFullPathName());
         parser_.reset(data_);
         const auto* bytes = static_cast<const char*>(data_.getData());
         if (std::memcmp(bytes, "BtWg", 4) != 0)
-            return juce::Result::fail("Not a Bitwig project: " + file_.getFileName());
+            return cydaw::base::Result::fail("Not a Bitwig project: " + file_.getFileName());
         const auto header = juce::String::fromUTF8(bytes, 42);
         const auto contentOffset = static_cast<std::size_t>(header.substring(16, 24).getHexValue32());
         if (contentOffset < 42 || contentOffset >= data_.getSize())
-            return juce::Result::fail("The Bitwig file header points outside the file (packaged or"
+            return cydaw::base::Result::fail("The Bitwig file header points outside the file (packaged or"
                                       " encrypted content is not readable).");
         out_.format = "bitwig";
         out_.application = "Bitwig Studio";
@@ -1631,12 +1632,12 @@ public:
         if (parser_.ok() && !parser_.atEnd())
             roots.push_back(parser_.object(0));
         if (roots.empty() || roots.front().kind != Value::Kind::object)
-            return juce::Result::fail("The Bitwig project holds no readable object tree.");
+            return cydaw::base::Result::fail("The Bitwig project holds no readable object tree.");
         if (!parser_.ok())
             out_.warnings.add("The Bitwig file could not be read to its end; what came before is imported.");
         const auto* root = roots.front().object.get();
         readRoot(root);
-        return juce::Result::ok();
+        return cydaw::base::Result::ok();
     }
 
 private:
@@ -2312,40 +2313,40 @@ juce::File resolveProjectAudioFile(const juce::File& projectFolder, const juce::
     return {};
 }
 
-juce::Result importDawProject(const juce::File& file, ImportedProject& out)
+cydaw::base::Result importDawProject(const juce::File& file, ImportedProject& out)
 {
     out.source = file;
     DawProjectReader reader(file, out);
     return reader.read();
 }
 
-juce::Result importAbletonLiveSet(const juce::File& file, ImportedProject& out)
+cydaw::base::Result importAbletonLiveSet(const juce::File& file, ImportedProject& out)
 {
     out.source = file;
     AbletonReader reader(file, out);
     return reader.read();
 }
 
-juce::Result importStudioOneSong(const juce::File& file, ImportedProject& out)
+cydaw::base::Result importStudioOneSong(const juce::File& file, ImportedProject& out)
 {
     out.source = file;
     StudioOneReader reader(file, out);
     return reader.read();
 }
 
-juce::Result importBitwigProject(const juce::File& file, ImportedProject& out)
+cydaw::base::Result importBitwigProject(const juce::File& file, ImportedProject& out)
 {
     out.source = file;
     bitwig::Reader reader(file, out);
     return reader.read();
 }
 
-juce::Result importProjectFile(const juce::File& file, ImportedProject& out)
+cydaw::base::Result importProjectFile(const juce::File& file, ImportedProject& out)
 {
     if (!file.existsAsFile())
-        return juce::Result::fail("No file at " + file.getFullPathName());
+        return cydaw::base::Result::fail("No file at " + file.getFullPathName());
     const auto extension = file.getFileExtension().toLowerCase();
-    auto result = juce::Result::fail("Unsupported project format \"" + extension + "\"; CyDAW reads "
+    auto result = cydaw::base::Result::fail("Unsupported project format \"" + extension + "\"; CyDAW reads "
                                      + supportedProjectExtensions().joinIntoString(", "));
     if (extension == ".dawproject")
         result = importDawProject(file, out);
@@ -2378,7 +2379,7 @@ juce::Result importProjectFile(const juce::File& file, ImportedProject& out)
     auto index = 0;
     for (auto& track : out.tracks)
         track.name = uniqueName(used, track.name, (track.midi ? "Inst " : "Audio ") + juce::String(++index));
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 juce::String describeImportedProject(const ImportedProject& project)

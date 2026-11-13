@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "JsfxView.h"
 #include "PluginFiles.h"
 #include "Theme.h"
@@ -54,7 +55,7 @@ class JsfxView::Compiler final : public juce::Thread
             done = true;
             return;
         }
-        auto data = juce::JSON::parse(result);
+        auto data = cydaw::base::JSON::parse(result);
         if (auto *list = data.getArray(); list && !list->isEmpty())
         {
             const auto &item = list->getFirst();
@@ -387,7 +388,7 @@ void JsfxView::draw()
     }
     ImGui::End();
 }
-juce::var JsfxView::command(const juce::var &request)
+cydaw::base::Value JsfxView::command(const cydaw::base::Value &request)
 {
     poll();
     state_.showJsfx = true;
@@ -409,12 +410,12 @@ juce::var JsfxView::command(const juce::var &request)
         save();
     else if (action == "new")
         fresh();
-    auto result = juce::DynamicObject::Ptr(new juce::DynamicObject());
+    auto result = cydaw::base::Object::Ptr(new cydaw::base::Object());
     result->setProperty("file", file_.getFullPathName());
     result->setProperty("changed", changed_);
     result->setProperty("compiling", compiler_ != nullptr);
     result->setProperty("error", error_);
     result->setProperty("diagnostics", status_);
-    return juce::var(result.get());
+    return cydaw::base::Value(result.get());
 }
 } // namespace cydaw::v2

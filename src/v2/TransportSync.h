@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #pragma once
 #include <functional>
 #include <juce_audio_devices/juce_audio_devices.h>
@@ -23,7 +24,7 @@ public:
     ~TransportSync();
     void draw(bool& visible);
     void drawButton(bool& visible);
-    juce::var command(const juce::var&);
+    cydaw::base::Value command(const cydaw::base::Value&);
     [[nodiscard]] bool active() const;
     // Its traffic, for the lights: messages received and sent; what it
     // does, in a line (empty: off).

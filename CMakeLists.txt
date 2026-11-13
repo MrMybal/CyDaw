@@ -152,7 +152,20 @@ function(cydaw_configure_plugin_formats target_name)
     )
 endfunction()
 
+add_library(cydaw_base STATIC src/base/Value.cpp src/base/File.cpp)
+target_include_directories(cydaw_base PUBLIC include PRIVATE third_party)
+target_compile_features(cydaw_base PUBLIC cxx_std_20)
+set_target_properties(cydaw_base PROPERTIES POSITION_INDEPENDENT_CODE ON)
+if(WIN32)
+    target_link_libraries(cydaw_base PRIVATE shell32 ole32)
+endif()
+if(MSVC)
+    target_compile_options(cydaw_base PRIVATE /utf-8 /W4 /permissive-)
+endif()
+
 add_library(cydaw_core STATIC
+    src/app/ProjectRecovery.cpp
+    src/app/NativeDspGraphState.cpp
     src/native_plugin/NativeRuntime.cpp
     src/graph/GraphDefinition.cpp
     src/graph/GraphPluginExport.cpp
@@ -224,7 +237,7 @@ add_library(cydaw_core STATIC
     src/ui/WorkspaceLayout.cpp
 )
 add_library(CyDAW::Core ALIAS cydaw_core)
-target_link_libraries(cydaw_core PUBLIC CyAudioCore::Core)
+target_link_libraries(cydaw_core PUBLIC cydaw_base CyAudioCore::Core)
 # The core is also linked into shared plug-ins; in particular its thread-local
 # transport state needs PIC relocations on Linux.
 set_target_properties(cydaw_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -300,6 +313,13 @@ if(CYDAW_BUILD_TESTS)
 
 endif()
 
+if(CYDAW_BUILD_TESTS)
+    add_executable(cydaw_base_tests tests/BaseTests.cpp)
+    target_link_libraries(cydaw_base_tests PRIVATE CyDAW::Core)
+    add_test(NAME cydaw_base_tests COMMAND cydaw_base_tests)
+    cydaw_configure_test(cydaw_base_tests 60)
+endif()
+
 if(CYDAW_BUILD_DESKTOP)
     if(CYDAW_JUCE_SOURCE_DIR)
         add_subdirectory("${CYDAW_JUCE_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/JUCE")
@@ -311,6 +331,17 @@ if(CYDAW_BUILD_DESKTOP)
             GIT_SHALLOW TRUE
         )
         FetchContent_MakeAvailable(JUCE)
+    endif()
+
+    if(CYDAW_BUILD_TESTS AND TARGET juce::juce_core)
+        add_executable(cydaw_base_compatibility_tests tests/BaseCompatibilityTests.cpp)
+        target_link_libraries(cydaw_base_compatibility_tests PRIVATE cydaw_base juce::juce_core)
+        target_compile_definitions(cydaw_base_compatibility_tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
+        if(MSVC)
+            target_compile_options(cydaw_base_compatibility_tests PRIVATE /utf-8 /EHsc)
+        endif()
+        add_test(NAME cydaw_base_compatibility_tests COMMAND cydaw_base_compatibility_tests)
+        cydaw_configure_test(cydaw_base_compatibility_tests 60)
     endif()
 
     # Identity for every executable's Windows version resource. Without these
@@ -460,7 +491,6 @@ if(CYDAW_BUILD_DESKTOP)
                 "${cydaw_root}/src/app/Localization.h"
                 "${cydaw_root}/src/app/ModuleInterfaceEditor.cpp"
                 "${cydaw_root}/src/app/ModuleInterfaceEditor.h"
-                "${cydaw_root}/src/app/NativeDspGraphState.cpp"
                 "${cydaw_root}/src/app/NativeDspGraphState.h"
                 "${cydaw_root}/src/app/NativeDspRuntime.cpp"
                 "${cydaw_root}/src/app/NativeDspRuntime.h"
@@ -978,9 +1008,7 @@ if(CYDAW_BUILD_DESKTOP)
                 src/app/WindowsPluginBridge.cpp
                 src/app/Localization.cpp
                 src/app/NativeDspRuntime.cpp
-                src/app/NativeDspGraphState.cpp
                 src/app/SampleLibrary.cpp
-                src/app/ProjectRecovery.cpp
                 src/app/ProjectImport.cpp
                 src/app/ProjectImportShared.cpp
                 src/app/ProjectImportReaper.cpp

@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "PluginInterface.h"
 
 #include "DeviceBody.h"
@@ -62,11 +63,11 @@ public:
                 return PresetHolder { "device", node.typeKey, "plugin/device/" + juce::String(static_cast<juce::int64>(nodeId)) };
         return std::nullopt;
     }
-    juce::var devicePresetState(const TrackRef& track, const std::uint64_t nodeId) const override
+    cydaw::base::Value devicePresetState(const TrackRef& track, const std::uint64_t nodeId) const override
     {
-        return isValid(track) ? device_ops::presetState(slot_.graph(), nodeId) : juce::var();
+        return isValid(track) ? device_ops::presetState(slot_.graph(), nodeId) : cydaw::base::Value();
     }
-    bool applyDevicePreset(const TrackRef& track, const std::uint64_t nodeId, const juce::var& state, juce::String& error) override
+    bool applyDevicePreset(const TrackRef& track, const std::uint64_t nodeId, const cydaw::base::Value& state, juce::String& error) override
     {
         if (!isValid(track) || !device_ops::applyPreset(slot_.graph(), nodeId, state, error, {}))
             return false;
@@ -127,20 +128,20 @@ public:
 
     // An effect after the instrument (its effects tab): the instrument
     // itself is the plug-in's, never replaced.
-    juce::Result insertDevice(const TrackRef& track, const juce::String& key) override
+    cydaw::base::Result insertDevice(const TrackRef& track, const juce::String& key) override
     {
         if (!isValid(track))
-            return juce::Result::fail("no such track");
+            return cydaw::base::Result::fail("no such track");
         auto& graph = slot_.graph();
         const auto catalogue = graph.deviceCatalogue();
         const auto device = std::find_if(catalogue.begin(), catalogue.end(), [&key](const auto& entry) { return entry.key == key; });
         if (device == catalogue.end())
-            return juce::Result::fail("no device \"" + key + "\"");
+            return cydaw::base::Result::fail("no device \"" + key + "\"");
         if (device->soundSource)
-            return juce::Result::fail("\"" + device->name + "\" " + ui::Ls("est un instrument", "is an instrument"));
+            return cydaw::base::Result::fail("\"" + device->name + "\" " + ui::Ls("est un instrument", "is an instrument"));
         const auto notes = device->input == "midi" && device->output == "midi";
         if (notes && !track_.midi)
-            return juce::Result::fail("\"" + device->name + "\" " + ui::Ls("joue sur les notes", "works on notes"));
+            return cydaw::base::Result::fail("\"" + device->name + "\" " + ui::Ls("joue sur les notes", "works on notes"));
         auto applied = device->kind == "preset" ? graph.insertFactoryDevice(key)
                        : notes                  ? graph.insertNodeBeforeInstrument(key)
                        : device->input == "none" ? graph.insertNode(key)
@@ -412,7 +413,7 @@ app::NodeGraphComponent& PluginInterface::graph()
     return impl_->host.slot().graph();
 }
 
-void PluginInterface::restore(const juce::var& editorState)
+void PluginInterface::restore(const cydaw::base::Value& editorState)
 {
     impl_->host.slot().restore(editorState);
 }

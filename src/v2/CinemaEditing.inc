@@ -193,7 +193,7 @@ void FoundryView::drawCinemaVideo(Tab& t,ImVec2 size){
 
 #include "CinemaTimeline.inc"
 
-juce::var FoundryView::cinemaCommand(const juce::var& request){
+cydaw::base::Value FoundryView::cinemaCommand(const cydaw::base::Value& request){
     const auto action=request.getProperty("action",{}).toString();
     if(!tab())newDocument();auto& t=*tab();syncProcessing(t);
     auto id=[&](const char* key,std::uint64_t fallback){return static_cast<std::uint64_t>(static_cast<juce::int64>(request.getProperty(key,static_cast<juce::int64>(fallback))));};
@@ -254,7 +254,7 @@ juce::var FoundryView::cinemaCommand(const juce::var& request){
         if(request.hasProperty("length")){auto next=t.document->session();next.span=static_cast<std::int64_t>(std::max(0.0,number(request,"length",60))*next.rate);edit(t,std::move(next),"Project length");}
     }
     tickCinemaVideo();commitProcessing(t,true);
-    juce::var status(new juce::DynamicObject());status.getDynamicObject()->setProperty("action","status");return command(status);
+    cydaw::base::Value status(new cydaw::base::Object());status.getDynamicObject()->setProperty("action","status");return command(status);
 }
 
 void FoundryView::importCinemaAudio(const bool automatic){

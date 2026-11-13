@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "AppUi.h"
 #include "NativeDspRuntime.h"
 
@@ -1032,12 +1033,12 @@ public:
         if (!probe && options_.controlPort > 0)
             remoteControl_ = std::make_unique<app::RemoteControlServer>(
                 options_.controlPort,
-                [this](const juce::var& request) {
+                [this](const cydaw::base::Value& request) {
                     if (window_ == nullptr || studio_ == nullptr) {
-                        auto* object = new juce::DynamicObject();
+                        auto* object = new cydaw::base::Object();
                         object->setProperty("ok", false);
                         object->setProperty("error", "no window");
-                        return juce::var(object);
+                        return cydaw::base::Value(object);
                     }
                     return handleRemoteCommand(*studio_, window_->content().ui(), request);
                 },

@@ -7,3 +7,5 @@
 # Preserve upstream bytes: these sources carry recorded SHA-256 provenance.
 third_party/asio-sdk/** -text -whitespace
 third_party/portaudio-asio/** -text -whitespace
+
+third_party/nlohmann/** -text -whitespace

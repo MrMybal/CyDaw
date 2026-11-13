@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "AudioEditorView.h"
 
@@ -405,7 +406,7 @@ bool AudioEditorView::removeEvent(const TrackRef& track, const AudioClip& clip, 
     return engine.removeLauncherClipEvent(track.audioIndex, scene_, event);
 }
 
-juce::Result AudioEditorView::replaceEvents(const TrackRef& track, const AudioClip& clip, std::vector<AudioEvent> events)
+cydaw::base::Result AudioEditorView::replaceEvents(const TrackRef& track, const AudioClip& clip, std::vector<AudioEvent> events)
 {
     auto& engine = studio_.engine();
     if (!launcher())
@@ -549,12 +550,12 @@ void AudioEditorView::process(const TrackRef& track, const AudioClip& clip, cons
 {
     const auto start = part ? part->first : -1.0;
     const auto length = part ? part->second : 0.0;
-    juce::Result done = juce::Result::ok();
+    cydaw::base::Result done = cydaw::base::Result::ok();
     if (launcher()) {
         remember(track, label);
         const auto id = launcherEvent(track, clip, event.id);
         done = id != 0 ? studio_.editLauncherAudioEvent(track, scene_, id, request, start, length)
-                       : juce::Result::fail(ui::Ls("Son introuvable", "No such sound"));
+                       : cydaw::base::Result::fail(ui::Ls("Son introuvable", "No such sound"));
     } else if (!clip.usesEventTimeline && event.id == clip.id) {
         // The clip's own sound: a new version, the history kept.
         done = studio_.editAudioClip(track, clip.id, request, part ? part->first : event.sourceOffsetSeconds,

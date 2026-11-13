@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "RoutingUi.h"
 #include "MidiDevices.h"
 #include "DevicesView.h"
@@ -423,7 +424,7 @@ void DevicesView::draw()
                 },
                 L("CHAÎNES DE CYDAW (REMPLACENT TOUTE LA CHAÎNE)", "CYDAW'S CHAINS (REPLACE THE WHOLE CHAIN)") };
             presets_.button("chainPresets", *holder, [this, track] { return studio_.chainPresetState(track); },
-                            [this, track](const juce::var& preset, juce::String& error) {
+                            [this, track](const cydaw::base::Value& preset, juce::String& error) {
                                 return studio_.applyChainPreset(track, preset, error);
                             },
                             ImVec2(dp(20.0f), dp(20.0f)), chains.empty() ? nullptr : &factory,
@@ -992,7 +993,7 @@ void DevicesView::drawCard(Strip& strip, const app::NodeGraphComponent::EditorNo
         if (ImGui::BeginPopup("##sidechain")) {
             ImGui::TextDisabled("%s", L("Ce que le détecteur écoute", "What the detector listens to"));
             ImGui::Separator();
-            const auto report = [this](const juce::Result& result) {
+            const auto report = [this](const cydaw::base::Result& result) {
                 if (result.failed()) {
                     state_.status = result.getErrorMessage();
                     state_.statusIsError = true;
@@ -1048,7 +1049,7 @@ void DevicesView::drawCard(Strip& strip, const app::NodeGraphComponent::EditorNo
         if (const auto holder = studio_.devicePresetHolder(track, node->id)) {
             const auto nodeId = node->id;
             presets_.button("devicePresets", *holder, [this, track, nodeId] { return studio_.devicePresetState(track, nodeId); },
-                            [this, track, nodeId](const juce::var& preset, juce::String& error) {
+                            [this, track, nodeId](const cydaw::base::Value& preset, juce::String& error) {
                                 return studio_.applyDevicePreset(track, nodeId, preset, error);
                             },
                             button);
@@ -1116,9 +1117,9 @@ void DevicesView::drawCard(Strip& strip, const app::NodeGraphComponent::EditorNo
             const ImVec2 min(x, origin.y + bodyTop);
             const ImVec2 max(x + missingWidth, origin.y + bodyTop + bodyHeight);
             list->AddRectFilled(min, max, p.bg1, dp(4.0f));
-            const auto about = juce::JSON::parse(node->description);
-            const auto vendor = about.getProperty("vendor", juce::var()).toString();
-            const auto format = about.getProperty("format", juce::var()).toString();
+            const auto about = cydaw::base::JSON::parse(node->description);
+            const auto vendor = about.getProperty("vendor", cydaw::base::Value()).toString();
+            const auto format = about.getProperty("format", cydaw::base::Value()).toString();
             const auto missingInstrument = node->typeKey == "missing-instrument";
             auto y = min.y + std::max(dp(8.0f), bodyHeight * 0.18f);
             const auto centre = (min.x + max.x) * 0.5f;
@@ -2127,7 +2128,7 @@ void DevicesView::drawSoundModelPane(const TrackRef& track, app::NodeGraphCompon
                                   if (file == juce::File())
                                       return;
                                   // On this very card, even inside a device.
-                                  juce::var json;
+                                  cydaw::base::Value json;
                                   juce::String error;
                                   auto* slot = studio_.graphFor(track);
                                   if (slot == nullptr || app::loadSoundModelFile(file, json, error) == nullptr
@@ -2414,7 +2415,7 @@ void DevicesView::drawPlugins(const TrackRef& track, const float height)
                 }
             };
             presets_.button("pluginPresets", *holder, [this, track, pluginIndex] { return studio_.pluginPresetState(track, pluginIndex); },
-                            [this, track, pluginIndex](const juce::var& preset, juce::String& error) {
+                            [this, track, pluginIndex](const cydaw::base::Value& preset, juce::String& error) {
                                 return studio_.applyPluginPreset(track, pluginIndex, preset, error);
                             },
                             button, &programs);

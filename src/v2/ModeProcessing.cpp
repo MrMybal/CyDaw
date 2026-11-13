@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "JsfxView.h"
 #include "ModeProcessing.h"
 #include "DeviceEditorView.h"
@@ -24,15 +25,15 @@ using ui::dp;
 using ui::L;
 namespace
 {
-juce::var object()
+cydaw::base::Value object()
 {
-    return juce::var(new juce::DynamicObject());
+    return cydaw::base::Value(new cydaw::base::Object());
 }
-void put(juce::var &v, const char *k, const juce::var &x)
+void put(cydaw::base::Value &v, const char *k, const cydaw::base::Value &x)
 {
     v.getDynamicObject()->setProperty(k, x);
 }
-double num(const juce::var &v, const char *k, double fallback = 0)
+double num(const cydaw::base::Value &v, const char *k, double fallback = 0)
 {
     return static_cast<double>(v.getProperty(k, fallback));
 }
@@ -348,25 +349,25 @@ void ModeProcessing::chooseInstrument(std::uint64_t id)
     openLibrary();
     state_.libraryTab = 1;
 }
-juce::Result ModeProcessing::loadSample(std::uint64_t id, const juce::File &file)
+cydaw::base::Result ModeProcessing::loadSample(std::uint64_t id, const juce::File &file)
 {
     const auto track = inputTrack(id);
     if (!track || !track->midi)
-        return juce::Result::fail("No MIDI track");
+        return cydaw::base::Result::fail("No MIDI track");
     if (const auto result = studio_.replaceInstrument(*track, "simple-sampler-instrument"); result.failed())
         return result;
     juce::String error;
     if (!studio_.loadSamplerFile(file, track, error))
-        return juce::Result::fail(error);
-    return juce::Result::ok();
+        return cydaw::base::Result::fail(error);
+    return cydaw::base::Result::ok();
 }
-juce::var ModeProcessing::inputRuntimeState(std::uint64_t id) const
+cydaw::base::Value ModeProcessing::inputRuntimeState(std::uint64_t id) const
 {
     const auto track = inputTrack(id);
     if (!track)
         return {};
     const auto *slot = studio_.graphFor(*track);
-    return slot != nullptr ? slot->graph().createVst3RuntimeState() : juce::var();
+    return slot != nullptr ? slot->graph().createVst3RuntimeState() : cydaw::base::Value();
 }
 std::vector<ModeProcessing::Parameter> ModeProcessing::parameters(std::uint64_t id) const
 {
@@ -613,10 +614,10 @@ void ModeProcessing::openLibrary()
     state_.libraryFocus = true;
 }
 
-juce::var ModeProcessing::serialise() const
+cydaw::base::Value ModeProcessing::serialise() const
 {
     std::set<std::uint64_t> live;
-    const auto snapshot = [&](std::uint64_t key, const GraphSlot& slot) -> juce::var {
+    const auto snapshot = [&](std::uint64_t key, const GraphSlot& slot) -> cydaw::base::Value {
         live.insert(key);
         auto& cached = graphSnapshots_[key];
         if (cached.source != &slot || cached.revision != slot.revision()) {
@@ -628,7 +629,7 @@ juce::var ModeProcessing::serialise() const
     };
     auto state = object();
     put(state, "version", 1);
-    juce::Array<juce::var> tracks;
+    cydaw::base::Array<cydaw::base::Value> tracks;
     for (const auto &track : studio_.tracks())
     {
         auto t = object();
@@ -647,7 +648,7 @@ juce::var ModeProcessing::serialise() const
         put(t, "pan", mix.pan);
         put(t, "mute", mix.muted);
         put(t, "solo", mix.solo);
-        juce::Array<juce::var> outputs;
+        cydaw::base::Array<cydaw::base::Value> outputs;
         for (const auto &o : studio_.trackOutputs(track))
         {
             auto v = object();
@@ -671,14 +672,14 @@ namespace
 {
 // The library's classes a graph state does not carry, added to it (those it
 // carries kept as they are).
-juce::var withMissingClasses(const juce::var &graphState, const juce::var &library)
+cydaw::base::Value withMissingClasses(const cydaw::base::Value &graphState, const cydaw::base::Value &library)
 {
     const auto *graph = graphState.getDynamicObject();
     const auto *shared = library.getArray();
     if (graph == nullptr || shared == nullptr)
         return graphState;
     std::set<juce::String> present;
-    juce::Array<juce::var> modules;
+    cydaw::base::Array<cydaw::base::Value> modules;
     if (const auto *local = graph->getProperty("modules").getArray())
         for (const auto &module : *local)
         {
@@ -694,15 +695,15 @@ juce::var withMissingClasses(const juce::var &graphState, const juce::var &libra
         }
     if (!added)
         return graphState;
-    auto copy = juce::DynamicObject::Ptr(new juce::DynamicObject());
+    auto copy = cydaw::base::Object::Ptr(new cydaw::base::Object());
     for (const auto &property : graph->getProperties())
         copy->setProperty(property.name, property.value);
-    copy->setProperty("modules", juce::var(modules));
-    return juce::var(copy.get());
+    copy->setProperty("modules", cydaw::base::Value(modules));
+    return cydaw::base::Value(copy.get());
 }
 } // namespace
 
-void ModeProcessing::restore(const juce::var &state)
+void ModeProcessing::restore(const cydaw::base::Value &state)
 {
     if (!state.getDynamicObject())
         return;
@@ -798,7 +799,7 @@ std::uint64_t ModeProcessing::revision() const
     mix(studio_.engine().isMasterMuted());
     return h;
 }
-juce::var ModeProcessing::command(const juce::var &request)
+cydaw::base::Value ModeProcessing::command(const cydaw::base::Value &request)
 {
     const auto action = request.getProperty("op", "status").toString();
     juce::String error;
@@ -873,7 +874,7 @@ juce::var ModeProcessing::command(const juce::var &request)
     put(result, "result", state);
     return result;
 }
-engine::foundry::Sound ModeProcessing::render(const engine::foundry::Session &session, const juce::var &state, std::int64_t start,
+engine::foundry::Sound ModeProcessing::render(const engine::foundry::Session &session, const cydaw::base::Value &state, std::int64_t start,
                                               std::int64_t end, double tail)
 {
     ModeProcessing processor;

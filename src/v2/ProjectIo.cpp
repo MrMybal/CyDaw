@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "Studio.h"
 
 #include "JsonValue.h"
@@ -25,184 +26,184 @@ constexpr int documentVersion = 36;
 static_assert(app::ProjectRecovery::maximumProjectVersion >= documentVersion);
 
 namespace keys {
-const juce::Identifier activeTake("activeTake");
-const juce::Identifier amount("amount");
-const juce::Identifier armed("armed");
-const juce::Identifier arrangementPlayback("arrangementPlayback");
-const juce::Identifier arrangementSnapMode("arrangementSnapMode");
-const juce::Identifier arrangementSnapType("arrangementSnapType");
-const juce::Identifier arrangementTool("arrangementTool");
-const juce::Identifier audioChannels("audioChannels");
-const juce::Identifier audioClips("audioClips");
-const juce::Identifier audioFile("audioFile");
-const juce::Identifier automation("automation");
-const juce::Identifier automationVisible("automationVisible");
-const juce::Identifier parameterAutomation("parameterAutomation");
-const juce::Identifier shownAutomation("shownAutomation");
-const juce::Identifier base("base");
-const juce::Identifier binding("binding");
-const juce::Identifier channels("channels");
-const juce::Identifier clipDuration("clipDuration");
-const juce::Identifier clipStart("clipStart");
-const juce::Identifier clips("clips");
-const juce::Identifier colour("colour");
-const juce::Identifier connections("connections");
-const juce::Identifier curve("curve");
+const cydaw::base::Identifier activeTake("activeTake");
+const cydaw::base::Identifier amount("amount");
+const cydaw::base::Identifier armed("armed");
+const cydaw::base::Identifier arrangementPlayback("arrangementPlayback");
+const cydaw::base::Identifier arrangementSnapMode("arrangementSnapMode");
+const cydaw::base::Identifier arrangementSnapType("arrangementSnapType");
+const cydaw::base::Identifier arrangementTool("arrangementTool");
+const cydaw::base::Identifier audioChannels("audioChannels");
+const cydaw::base::Identifier audioClips("audioClips");
+const cydaw::base::Identifier audioFile("audioFile");
+const cydaw::base::Identifier automation("automation");
+const cydaw::base::Identifier automationVisible("automationVisible");
+const cydaw::base::Identifier parameterAutomation("parameterAutomation");
+const cydaw::base::Identifier shownAutomation("shownAutomation");
+const cydaw::base::Identifier base("base");
+const cydaw::base::Identifier binding("binding");
+const cydaw::base::Identifier channels("channels");
+const cydaw::base::Identifier clipDuration("clipDuration");
+const cydaw::base::Identifier clipStart("clipStart");
+const cydaw::base::Identifier clips("clips");
+const cydaw::base::Identifier colour("colour");
+const cydaw::base::Identifier connections("connections");
+const cydaw::base::Identifier curve("curve");
 // A Bezier point's handles: [inTime, inValue, outTime, outValue].
-const juce::Identifier handles("handles");
-const juce::Identifier curveAmount("curveAmount");
-const juce::Identifier cutoffHz("cutoffHz");
-const juce::Identifier destination("destination");
-const juce::Identifier destinationA("destinationA");
-const juce::Identifier destinationB("destinationB");
-const juce::Identifier direction("direction");
-const juce::Identifier driveDb("driveDb");
-const juce::Identifier duration("duration");
-const juce::Identifier durationBeats("durationBeats");
-const juce::Identifier editorMode("editorMode");
-const juce::Identifier enabled("enabled");
-const juce::Identifier eventTimeline("eventTimeline");
-const juce::Identifier events("events");
-const juce::Identifier exposeToSystem("exposeToSystem");
-const juce::Identifier factoryPreset("factoryPreset");
-const juce::Identifier fadeIn("fadeIn");
-const juce::Identifier fadeOut("fadeOut");
-const juce::Identifier file("file");
-const juce::Identifier filterCutoffHz("filterCutoffHz");
-const juce::Identifier format("format");
-const juce::Identifier gain("gain");
-const juce::Identifier gainAutomation("gainAutomation");
-const juce::Identifier clipLanes("lanes");
-const juce::Identifier gainDb("gainDb");
-const juce::Identifier id("id");
-const juce::Identifier inline_("inline");
-const juce::Identifier inputBusId("inputBusId");
-const juce::Identifier key("key");
-const juce::Identifier label("label");
-const juce::Identifier laneHeight("laneHeight");
-const juce::Identifier launchQuantization("launchQuantization");
-const juce::Identifier launcherActionReplay("launcherActionReplay");
-const juce::Identifier launcherActions("launcherActions");
-const juce::Identifier launcherClips("launcherClips");
-const juce::Identifier lengthBeats("lengthBeats");
-const juce::Identifier loop("loop");
-const juce::Identifier launcherScene("launcherScene");
-const juce::Identifier loopEnd("loopEnd");
-const juce::Identifier loopEndBeats("loopEndBeats");
-const juce::Identifier loopRangeExplicit("loopRangeExplicit");
-const juce::Identifier loopStart("loopStart");
-const juce::Identifier loopStartBeats("loopStartBeats");
-const juce::Identifier masterGainDb("masterGainDb");
-const juce::Identifier masterMuted("masterMuted");
-const juce::Identifier maximum("maximum");
-const juce::Identifier midiEditorVisible("midiEditorVisible");
-const juce::Identifier midiNotes("midiNotes");
-const juce::Identifier midiTracks("midiTracks");
-const juce::Identifier minimum("minimum");
-const juce::Identifier modulationAssignments("modulationAssignments");
-const juce::Identifier modulationGraph("modulationGraph");
-const juce::Identifier modules("modules");
-const juce::Identifier monitor("monitor");
-const juce::Identifier mute("mute");
-const juce::Identifier muted("muted");
-const juce::Identifier name("name");
-const juce::Identifier nodeGraph("nodeGraph");
-const juce::Identifier nodes("nodes");
-const juce::Identifier note("note");
-const juce::Identifier notes("notes");
-const juce::Identifier offset("offset");
-const juce::Identifier pan("pan");
-const juce::Identifier parameter("parameter");
-const juce::Identifier parameters("parameters");
-const juce::Identifier physicalA("physicalA");
-const juce::Identifier physicalB("physicalB");
-const juce::Identifier playEnd("playEnd");
-const juce::Identifier playEndBeats("playEndBeats");
-const juce::Identifier playStart("playStart");
-const juce::Identifier playStartBeats("playStartBeats");
-const juce::Identifier pluginFile("pluginFile");
-const juce::Identifier pluginState("pluginState");
-const juce::Identifier plugins("plugins");
-const juce::Identifier pitch("pitch");
-const juce::Identifier points("points");
-const juce::Identifier position("position");
-const juce::Identifier scene("scene");
-const juce::Identifier sharedModulationModules("sharedModulationModules");
-const juce::Identifier sharedNodeModules("sharedNodeModules");
-const juce::Identifier solo("solo");
-const juce::Identifier source("source");
-const juce::Identifier sourceDuration("sourceDuration");
-const juce::Identifier sourceOffset("sourceOffset");
-const juce::Identifier sourceTempo("sourceTempo");
-const juce::Identifier start("start");
-const juce::Identifier startBeats("startBeats");
-const juce::Identifier state("state");
-const juce::Identifier stretchMarkers("stretchMarkers");
-const juce::Identifier stretchMode("stretchMode");
-const juce::Identifier takes("takes");
-const juce::Identifier tempo("tempo");
-const juce::Identifier time("time");
-const juce::Identifier timeline("timeline");
-const juce::Identifier track("track");
-const juce::Identifier tracks("tracks");
-const juce::Identifier type("type");
-const juce::Identifier value("value");
-const juce::Identifier valueDb("valueDb");
-const juce::Identifier velocity("velocity");
-const juce::Identifier version("version");
-const juce::Identifier virtualBuses("virtualBuses");
-const juce::Identifier workspaceLayout("workspaceLayout");
+const cydaw::base::Identifier handles("handles");
+const cydaw::base::Identifier curveAmount("curveAmount");
+const cydaw::base::Identifier cutoffHz("cutoffHz");
+const cydaw::base::Identifier destination("destination");
+const cydaw::base::Identifier destinationA("destinationA");
+const cydaw::base::Identifier destinationB("destinationB");
+const cydaw::base::Identifier direction("direction");
+const cydaw::base::Identifier driveDb("driveDb");
+const cydaw::base::Identifier duration("duration");
+const cydaw::base::Identifier durationBeats("durationBeats");
+const cydaw::base::Identifier editorMode("editorMode");
+const cydaw::base::Identifier enabled("enabled");
+const cydaw::base::Identifier eventTimeline("eventTimeline");
+const cydaw::base::Identifier events("events");
+const cydaw::base::Identifier exposeToSystem("exposeToSystem");
+const cydaw::base::Identifier factoryPreset("factoryPreset");
+const cydaw::base::Identifier fadeIn("fadeIn");
+const cydaw::base::Identifier fadeOut("fadeOut");
+const cydaw::base::Identifier file("file");
+const cydaw::base::Identifier filterCutoffHz("filterCutoffHz");
+const cydaw::base::Identifier format("format");
+const cydaw::base::Identifier gain("gain");
+const cydaw::base::Identifier gainAutomation("gainAutomation");
+const cydaw::base::Identifier clipLanes("lanes");
+const cydaw::base::Identifier gainDb("gainDb");
+const cydaw::base::Identifier id("id");
+const cydaw::base::Identifier inline_("inline");
+const cydaw::base::Identifier inputBusId("inputBusId");
+const cydaw::base::Identifier key("key");
+const cydaw::base::Identifier label("label");
+const cydaw::base::Identifier laneHeight("laneHeight");
+const cydaw::base::Identifier launchQuantization("launchQuantization");
+const cydaw::base::Identifier launcherActionReplay("launcherActionReplay");
+const cydaw::base::Identifier launcherActions("launcherActions");
+const cydaw::base::Identifier launcherClips("launcherClips");
+const cydaw::base::Identifier lengthBeats("lengthBeats");
+const cydaw::base::Identifier loop("loop");
+const cydaw::base::Identifier launcherScene("launcherScene");
+const cydaw::base::Identifier loopEnd("loopEnd");
+const cydaw::base::Identifier loopEndBeats("loopEndBeats");
+const cydaw::base::Identifier loopRangeExplicit("loopRangeExplicit");
+const cydaw::base::Identifier loopStart("loopStart");
+const cydaw::base::Identifier loopStartBeats("loopStartBeats");
+const cydaw::base::Identifier masterGainDb("masterGainDb");
+const cydaw::base::Identifier masterMuted("masterMuted");
+const cydaw::base::Identifier maximum("maximum");
+const cydaw::base::Identifier midiEditorVisible("midiEditorVisible");
+const cydaw::base::Identifier midiNotes("midiNotes");
+const cydaw::base::Identifier midiTracks("midiTracks");
+const cydaw::base::Identifier minimum("minimum");
+const cydaw::base::Identifier modulationAssignments("modulationAssignments");
+const cydaw::base::Identifier modulationGraph("modulationGraph");
+const cydaw::base::Identifier modules("modules");
+const cydaw::base::Identifier monitor("monitor");
+const cydaw::base::Identifier mute("mute");
+const cydaw::base::Identifier muted("muted");
+const cydaw::base::Identifier name("name");
+const cydaw::base::Identifier nodeGraph("nodeGraph");
+const cydaw::base::Identifier nodes("nodes");
+const cydaw::base::Identifier note("note");
+const cydaw::base::Identifier notes("notes");
+const cydaw::base::Identifier offset("offset");
+const cydaw::base::Identifier pan("pan");
+const cydaw::base::Identifier parameter("parameter");
+const cydaw::base::Identifier parameters("parameters");
+const cydaw::base::Identifier physicalA("physicalA");
+const cydaw::base::Identifier physicalB("physicalB");
+const cydaw::base::Identifier playEnd("playEnd");
+const cydaw::base::Identifier playEndBeats("playEndBeats");
+const cydaw::base::Identifier playStart("playStart");
+const cydaw::base::Identifier playStartBeats("playStartBeats");
+const cydaw::base::Identifier pluginFile("pluginFile");
+const cydaw::base::Identifier pluginState("pluginState");
+const cydaw::base::Identifier plugins("plugins");
+const cydaw::base::Identifier pitch("pitch");
+const cydaw::base::Identifier points("points");
+const cydaw::base::Identifier position("position");
+const cydaw::base::Identifier scene("scene");
+const cydaw::base::Identifier sharedModulationModules("sharedModulationModules");
+const cydaw::base::Identifier sharedNodeModules("sharedNodeModules");
+const cydaw::base::Identifier solo("solo");
+const cydaw::base::Identifier source("source");
+const cydaw::base::Identifier sourceDuration("sourceDuration");
+const cydaw::base::Identifier sourceOffset("sourceOffset");
+const cydaw::base::Identifier sourceTempo("sourceTempo");
+const cydaw::base::Identifier start("start");
+const cydaw::base::Identifier startBeats("startBeats");
+const cydaw::base::Identifier state("state");
+const cydaw::base::Identifier stretchMarkers("stretchMarkers");
+const cydaw::base::Identifier stretchMode("stretchMode");
+const cydaw::base::Identifier takes("takes");
+const cydaw::base::Identifier tempo("tempo");
+const cydaw::base::Identifier time("time");
+const cydaw::base::Identifier timeline("timeline");
+const cydaw::base::Identifier track("track");
+const cydaw::base::Identifier tracks("tracks");
+const cydaw::base::Identifier type("type");
+const cydaw::base::Identifier value("value");
+const cydaw::base::Identifier valueDb("valueDb");
+const cydaw::base::Identifier velocity("velocity");
+const cydaw::base::Identifier version("version");
+const cydaw::base::Identifier virtualBuses("virtualBuses");
+const cydaw::base::Identifier workspaceLayout("workspaceLayout");
 } // namespace keys
 
 // ---- Values ------------------------------------------------------------------------
 
-juce::DynamicObject::Ptr makeObject()
+cydaw::base::Object::Ptr makeObject()
 {
-    return juce::DynamicObject::Ptr(new juce::DynamicObject());
+    return cydaw::base::Object::Ptr(new cydaw::base::Object());
 }
 
-double number(const juce::DynamicObject& object, const juce::Identifier& property)
+double number(const cydaw::base::Object& object, const cydaw::base::Identifier& property)
 {
     return static_cast<double>(object.getProperty(property));
 }
 
-double numberOr(const juce::DynamicObject& object, const juce::Identifier& property, const double fallback)
+double numberOr(const cydaw::base::Object& object, const cydaw::base::Identifier& property, const double fallback)
 {
     return object.hasProperty(property) ? number(object, property) : fallback;
 }
 
-float toFloat(const juce::var& value)
+float toFloat(const cydaw::base::Value& value)
 {
     return static_cast<float>(static_cast<double>(value));
 }
 
-std::uint32_t colourOf(const juce::DynamicObject& object)
+std::uint32_t colourOf(const cydaw::base::Object& object)
 {
     return static_cast<std::uint32_t>(static_cast<juce::int64>(object.getProperty(keys::colour)));
 }
 
-std::uint64_t idOf(const juce::var& value)
+std::uint64_t idOf(const cydaw::base::Value& value)
 {
     return static_cast<std::uint64_t>(static_cast<juce::int64>(value));
 }
 
-Engine::AutomationCurve curveOf(const juce::DynamicObject& point)
+Engine::AutomationCurve curveOf(const cydaw::base::Object& point)
 {
     return static_cast<Engine::AutomationCurve>(engine::clampedCurveShape(static_cast<int>(point.getProperty(keys::curve))));
 }
 
 // A point's handles, written only when it has some.
-void writeHandles(juce::DynamicObject& point, const engine::CurveHandles& handles)
+void writeHandles(cydaw::base::Object& point, const engine::CurveHandles& handles)
 {
     if (handles == engine::CurveHandles {})
         return;
-    juce::Array<juce::var> values;
+    cydaw::base::Array<cydaw::base::Value> values;
     for (const auto value : { handles.inTime, handles.inValue, handles.outTime, handles.outValue })
         values.add(static_cast<double>(value));
     point.setProperty(keys::handles, values);
 }
 
-engine::CurveHandles handlesOf(const juce::DynamicObject& point)
+engine::CurveHandles handlesOf(const cydaw::base::Object& point)
 {
     engine::CurveHandles handles;
     if (const auto* values = point.getProperty(keys::handles).getArray(); values != nullptr && values->size() >= 4) {
@@ -215,20 +216,20 @@ engine::CurveHandles handlesOf(const juce::DynamicObject& point)
     return handles;
 }
 
-float curveAmountOf(const juce::DynamicObject& point)
+float curveAmountOf(const cydaw::base::Object& point)
 {
     return point.hasProperty(keys::curveAmount) ? toFloat(point.getProperty(keys::curveAmount)) : 0.0f;
 }
 
 // v1 also takes an array: the node positions of the oldest projects.
-bool isNodeGraphState(const juce::var& state)
+bool isNodeGraphState(const cydaw::base::Value& state)
 {
     return state.getDynamicObject() != nullptr || state.getArray() != nullptr;
 }
 
 // The mixed audio-and-synth default graph of early versions, replaced by the
 // factory graph when it is read.
-bool isLegacyMixedFactoryAudioGraph(const juce::var& state)
+bool isLegacyMixedFactoryAudioGraph(const cydaw::base::Value& state)
 {
     const auto* root = state.getDynamicObject();
     const auto* nodes = root != nullptr ? root->getProperty(keys::nodes).getArray() : nullptr;
@@ -292,9 +293,9 @@ bool isLegacyMixedFactoryAudioGraph(const juce::var& state)
 
 // ---- Class libraries -------------------------------------------------------------------
 
-std::map<juce::String, juce::var> modulesByKey(const juce::var& library)
+std::map<juce::String, cydaw::base::Value> modulesByKey(const cydaw::base::Value& library)
 {
-    std::map<juce::String, juce::var> byKey;
+    std::map<juce::String, cydaw::base::Value> byKey;
     if (const auto* modules = library.getArray())
         for (const auto& module : *modules)
             if (const auto* object = module.getDynamicObject())
@@ -305,9 +306,9 @@ std::map<juce::String, juce::var> modulesByKey(const juce::var& library)
 // The classes of a graph whose body differs from the library's, as a state
 // Studio::mergeModules reads. A class only restored from the library is left
 // out, so a graph merged after the one that edited a class cannot undo the edit.
-juce::var editedModules(const juce::var& graphState, const std::map<juce::String, juce::var>& library)
+cydaw::base::Value editedModules(const cydaw::base::Value& graphState, const std::map<juce::String, cydaw::base::Value>& library)
 {
-    juce::Array<juce::var> edited;
+    cydaw::base::Array<cydaw::base::Value> edited;
     if (const auto* graph = graphState.getDynamicObject())
         if (const auto* modules = graph->getProperty(keys::modules).getArray())
             for (const auto& module : *modules) {
@@ -322,8 +323,8 @@ juce::var editedModules(const juce::var& graphState, const std::map<juce::String
                     edited.add(module);
             }
     auto state = makeObject();
-    state->setProperty(keys::modules, juce::var(edited));
-    return juce::var(state.get());
+    state->setProperty(keys::modules, cydaw::base::Value(edited));
+    return cydaw::base::Value(state.get());
 }
 
 // ---- Writing -------------------------------------------------------------------------------
@@ -341,12 +342,12 @@ juce::String projectAssetPath(const juce::File& asset, const juce::File& project
 
 // A track's outputs: the master, or a track by its kind and its place
 // among those of its kind, at a level.
-juce::var outputsToVar(Studio& studio, const TrackRef& track)
+cydaw::base::Value outputsToVar(Studio& studio, const TrackRef& track)
 {
-    juce::Array<juce::var> list;
+    cydaw::base::Array<cydaw::base::Value> list;
     const auto summaries = studio.engine().midiTrackSummaries();
     for (const auto& output : studio.trackOutputs(track)) {
-        auto value = juce::DynamicObject::Ptr(new juce::DynamicObject());
+        auto value = cydaw::base::Object::Ptr(new cydaw::base::Object());
         value->setProperty("gainDb", output.gainDb);
         if (output.preFader)
             value->setProperty("preFader", true);
@@ -375,15 +376,15 @@ juce::var outputsToVar(Studio& studio, const TrackRef& track)
         } else {
             continue;
         }
-        list.add(juce::var(value.get()));
+        list.add(cydaw::base::Value(value.get()));
     }
     return list;
 }
 
 // The launcher's empty slots whose stop was taken off, by scene.
-juce::var stopsOffToVar(const Studio& studio, const TrackRef& track)
+cydaw::base::Value stopsOffToVar(const Studio& studio, const TrackRef& track)
 {
-    juce::Array<juce::var> scenes;
+    cydaw::base::Array<cydaw::base::Value> scenes;
     for (auto scene = 0; scene < app::AudioTrackController::maximumLauncherScenes; ++scene)
         if (!studio.slotStops(track, scene))
             scenes.add(scene);
@@ -421,7 +422,7 @@ std::uint64_t softwareBus(const Studio& studio, const BusIds& ids, const std::ui
     return 0;
 }
 
-BusIds mapProjectBuses(const Studio& studio, const juce::DynamicObject& root)
+BusIds mapProjectBuses(const Studio& studio, const cydaw::base::Object& root)
 {
     BusIds ids;
     if (const auto* buses = root.getProperty(keys::virtualBuses).getArray())
@@ -431,7 +432,7 @@ BusIds mapProjectBuses(const Studio& studio, const juce::DynamicObject& root)
                 continue;
             const auto direction = static_cast<app::VirtualBusDirection>(
                 juce::jlimit(0, 1, static_cast<int>(value.getProperty(keys::direction, 0))));
-            ids[id] = softwareBus(studio, {}, id, value.getProperty(keys::name, juce::var()).toString(), direction);
+            ids[id] = softwareBus(studio, {}, id, value.getProperty(keys::name, cydaw::base::Value()).toString(), direction);
         }
     return ids;
 }
@@ -440,10 +441,10 @@ BusIds mapProjectBuses(const Studio& studio, const juce::DynamicObject& root)
 // The controllers' assignments name a track by its key ("track/<key>/volume",
 // "param/<key>/<binding>"), which an opened project gives anew: saved, a
 // track is named by where it is ("@midi:2", "@audio:0"), as routing does.
-juce::var portableAssignments(Studio& studio, const juce::var& assignments)
+cydaw::base::Value portableAssignments(Studio& studio, const cydaw::base::Value& assignments)
 {
     const auto summaries = studio.engine().midiTrackSummaries();
-    juce::Array<juce::var> out;
+    cydaw::base::Array<cydaw::base::Value> out;
     if (const auto* list = assignments.getArray())
         for (const auto& item : *list) {
             auto parts = juce::StringArray::fromTokens(item.getProperty("target", {}).toString(), "/", "");
@@ -461,17 +462,17 @@ juce::var portableAssignments(Studio& studio, const juce::var& assignments)
                     parts.set(1, "@audio:" + juce::String(static_cast<int>(track->audioIndex)));
                 }
             }
-            auto copy = juce::var(item.getDynamicObject() != nullptr ? item.getDynamicObject()->clone().release() : new juce::DynamicObject());
+            auto copy = cydaw::base::Value(item.getDynamicObject() != nullptr ? item.getDynamicObject()->clone().release() : new cydaw::base::Object());
             copy.getDynamicObject()->setProperty("target", parts.joinIntoString("/"));
             out.add(copy);
         }
     return out;
 }
 
-juce::var localAssignments(Studio& studio, const juce::var& saved)
+cydaw::base::Value localAssignments(Studio& studio, const cydaw::base::Value& saved)
 {
     const auto summaries = studio.engine().midiTrackSummaries();
-    juce::Array<juce::var> out;
+    cydaw::base::Array<cydaw::base::Value> out;
     if (const auto* list = saved.getArray())
         for (const auto& item : *list) {
             auto parts = juce::StringArray::fromTokens(item.getProperty("target", {}).toString(), "/", "");
@@ -486,18 +487,18 @@ juce::var localAssignments(Studio& studio, const juce::var& saved)
                     continue;
                 parts.set(1, juce::String(static_cast<juce::int64>(studio.routingKey(*track))));
             }
-            auto copy = juce::var(item.getDynamicObject() != nullptr ? item.getDynamicObject()->clone().release() : new juce::DynamicObject());
+            auto copy = cydaw::base::Value(item.getDynamicObject() != nullptr ? item.getDynamicObject()->clone().release() : new cydaw::base::Object());
             copy.getDynamicObject()->setProperty("target", parts.joinIntoString("/"));
             out.add(copy);
         }
     return out;
 }
 
-void restoreRouting(Studio& studio, const juce::DynamicObject& root, const BusIds& busIds)
+void restoreRouting(Studio& studio, const cydaw::base::Object& root, const BusIds& busIds)
 {
     auto& engine = studio.engine();
     const auto summaries = engine.midiTrackSummaries();
-    const auto keyOf = [&](const juce::var& value) -> std::optional<std::uint64_t> {
+    const auto keyOf = [&](const cydaw::base::Value& value) -> std::optional<std::uint64_t> {
         if (static_cast<bool>(value.getProperty("master", false)))
             return 0;
         const auto position = static_cast<int>(value.getProperty("position", -1));
@@ -509,14 +510,14 @@ void restoreRouting(Studio& studio, const juce::DynamicObject& root, const BusId
         }
         return std::nullopt;
     };
-    const auto apply = [&](const TrackRef& track, const juce::var& saved) {
+    const auto apply = [&](const TrackRef& track, const cydaw::base::Value& saved) {
         std::vector<TrackOutput> outputs;
-        if (const auto* list = saved.getProperty("outputs", juce::var()).getArray())
+        if (const auto* list = saved.getProperty("outputs", cydaw::base::Value()).getArray())
             for (const auto& item : *list)
                 if (const auto hardware = static_cast<juce::int64>(item.getProperty("hardware", 0)); hardware > 0) {
                     TrackOutput output;
                     output.hardware = softwareBus(studio, busIds, static_cast<std::uint64_t>(hardware),
-                                                  item.getProperty("hardwareName", juce::var()).toString(),
+                                                  item.getProperty("hardwareName", cydaw::base::Value()).toString(),
                                                   app::VirtualBusDirection::output);
                     output.gainDb = static_cast<float>(static_cast<double>(item.getProperty("gainDb", 0.0)));
                     output.preFader = static_cast<bool>(item.getProperty("preFader", false));
@@ -535,7 +536,7 @@ void restoreRouting(Studio& studio, const juce::DynamicObject& root, const BusId
         if (outputs.size() == 1 && outputs.front() == TrackOutput {})
             outputs.clear();
         studio.restoreTrackRouting(track, std::move(outputs), static_cast<bool>(saved.getProperty("bus", false)));
-        if (const auto* off = saved.getProperty("launcherStopOff", juce::var()).getArray())
+        if (const auto* off = saved.getProperty("launcherStopOff", cydaw::base::Value()).getArray())
             for (const auto& scene : *off)
                 studio.setSlotStops(track, static_cast<int>(scene), false);
     };
@@ -549,19 +550,19 @@ void restoreRouting(Studio& studio, const juce::DynamicObject& root, const BusId
     // companions are not shown).
     if (const auto* hybrids = root.getProperty("hybrids").getArray())
         for (const auto& item : *hybrids) {
-            const auto track = keyOf(item.getProperty("track", juce::var()));
-            const auto companion = keyOf(item.getProperty("companion", juce::var()));
+            const auto track = keyOf(item.getProperty("track", cydaw::base::Value()));
+            const auto companion = keyOf(item.getProperty("companion", cydaw::base::Value()));
             if (track && companion)
                 studio.restoreCompanion(*track, *companion, static_cast<bool>(item.getProperty("recordsAudio", false)));
         }
     // Its groups: each group's track, its tracks, folded or not.
     if (const auto* groups = root.getProperty("groups").getArray())
         for (const auto& item : *groups) {
-            const auto group = keyOf(item.getProperty("group", juce::var()));
+            const auto group = keyOf(item.getProperty("group", cydaw::base::Value()));
             if (!group || *group == 0)
                 continue;
             std::vector<std::uint64_t> members;
-            if (const auto* list = item.getProperty("members", juce::var()).getArray())
+            if (const auto* list = item.getProperty("members", cydaw::base::Value()).getArray())
                 for (const auto& member : *list)
                     if (const auto key = keyOf(member); key && *key != 0)
                         members.push_back(*key);
@@ -579,9 +580,9 @@ void restoreRouting(Studio& studio, const juce::DynamicObject& root, const BusId
     studio.publishRouting();
 }
 
-juce::var automationPointsToVar(const std::vector<Engine::AutomationPoint>& points)
+cydaw::base::Value automationPointsToVar(const std::vector<Engine::AutomationPoint>& points)
 {
-    juce::Array<juce::var> values;
+    cydaw::base::Array<cydaw::base::Value> values;
     values.ensureStorageAllocated(static_cast<int>(points.size()));
     for (const auto& point : points) {
         auto value = makeObject();
@@ -590,22 +591,22 @@ juce::var automationPointsToVar(const std::vector<Engine::AutomationPoint>& poin
         value->setProperty(keys::curve, static_cast<int>(point.curve));
         value->setProperty(keys::curveAmount, point.curveAmount);
         writeHandles(*value, point.handles);
-        values.add(juce::var(value.get()));
+        values.add(cydaw::base::Value(value.get()));
     }
     return values;
 }
 
 // A track's device automation: [{binding, points: [{time, value, curve,
 // curveAmount}]}].
-juce::var parameterLanesToVar(const ParameterLanes& lanes)
+cydaw::base::Value parameterLanesToVar(const ParameterLanes& lanes)
 {
-    juce::Array<juce::var> values;
+    cydaw::base::Array<cydaw::base::Value> values;
     for (const auto& [name, points] : lanes.lanes) {
         if (points.empty())
             continue;
         auto lane = makeObject();
         lane->setProperty(keys::binding, name);
-        juce::Array<juce::var> list;
+        cydaw::base::Array<cydaw::base::Value> list;
         for (const auto& point : points) {
             auto item = makeObject();
             item->setProperty(keys::time, point.timeSeconds);
@@ -613,23 +614,23 @@ juce::var parameterLanesToVar(const ParameterLanes& lanes)
             item->setProperty(keys::curve, static_cast<int>(point.curve));
             item->setProperty(keys::curveAmount, point.curveAmount);
             writeHandles(*item, point.handles);
-            list.add(juce::var(item.get()));
+            list.add(cydaw::base::Value(item.get()));
         }
         lane->setProperty(keys::points, list);
-        values.add(juce::var(lane.get()));
+        values.add(cydaw::base::Value(lane.get()));
     }
     return values;
 }
 
 // A clip's automation lanes: [{binding, points:[{time, value, curve, curveAmount}]}].
-juce::var clipLanesToVar(const std::map<juce::String, std::vector<Engine::AutomationPoint>>& lanes)
+cydaw::base::Value clipLanesToVar(const std::map<juce::String, std::vector<Engine::AutomationPoint>>& lanes)
 {
     ParameterLanes shaped;
     shaped.lanes = lanes;
     return parameterLanesToVar(shaped);
 }
 
-std::map<juce::String, std::vector<Engine::AutomationPoint>> readClipLanes(const juce::DynamicObject& clip)
+std::map<juce::String, std::vector<Engine::AutomationPoint>> readClipLanes(const cydaw::base::Object& clip)
 {
     std::map<juce::String, std::vector<Engine::AutomationPoint>> lanes;
     const auto* list = clip.getProperty(keys::clipLanes).getArray();
@@ -664,7 +665,7 @@ std::map<juce::String, std::vector<Engine::AutomationPoint>> readClipLanes(const
     return lanes;
 }
 
-void readParameterLanes(const juce::DynamicObject& track, ParameterLanes& lanes)
+void readParameterLanes(const cydaw::base::Object& track, ParameterLanes& lanes)
 {
     lanes = {};
     lanes.shown = track.getProperty(keys::shownAutomation).toString();
@@ -699,16 +700,16 @@ void readParameterLanes(const juce::DynamicObject& track, ParameterLanes& lanes)
 
 // A note's expression: [[position, value(, bend)], ...] (none: not
 // written; the bend only when the way to the next point is bent).
-juce::var expressionToVar(const std::vector<Engine::NoteExpressionPoint>& points)
+cydaw::base::Value expressionToVar(const std::vector<Engine::NoteExpressionPoint>& points)
 {
-    juce::Array<juce::var> values;
+    cydaw::base::Array<cydaw::base::Value> values;
     for (const auto& point : points)
-        values.add(point.bend != 0.0f ? juce::Array<juce::var> { point.position, point.value, point.bend }
-                                      : juce::Array<juce::var> { point.position, point.value });
+        values.add(point.bend != 0.0f ? cydaw::base::Array<cydaw::base::Value> { point.position, point.value, point.bend }
+                                      : cydaw::base::Array<cydaw::base::Value> { point.position, point.value });
     return values;
 }
 
-std::vector<Engine::NoteExpressionPoint> expressionFromVar(const juce::var& value)
+std::vector<Engine::NoteExpressionPoint> expressionFromVar(const cydaw::base::Value& value)
 {
     std::vector<Engine::NoteExpressionPoint> points;
     if (const auto* items = value.getArray())
@@ -723,9 +724,9 @@ std::vector<Engine::NoteExpressionPoint> expressionFromVar(const juce::var& valu
     return points;
 }
 
-juce::var midiNotesToVar(const std::vector<Engine::MidiNote>& notes)
+cydaw::base::Value midiNotesToVar(const std::vector<Engine::MidiNote>& notes)
 {
-    juce::Array<juce::var> values;
+    cydaw::base::Array<cydaw::base::Value> values;
     values.ensureStorageAllocated(static_cast<int>(notes.size()));
     for (const auto& noteInfo : notes) {
         auto value = makeObject();
@@ -745,29 +746,29 @@ juce::var midiNotesToVar(const std::vector<Engine::MidiNote>& notes)
             value->setProperty("pan", expressionToVar(noteInfo.pan));
         if (noteInfo.chance < 1.0f)
             value->setProperty("chance", noteInfo.chance);
-        values.add(juce::var(value.get()));
+        values.add(cydaw::base::Value(value.get()));
     }
     return values;
 }
 
 // A clip's markers carry no id; an event's do.
-juce::var stretchMarkersToVar(const std::vector<Engine::StretchMarker>& markers, const bool withIds)
+cydaw::base::Value stretchMarkersToVar(const std::vector<Engine::StretchMarker>& markers, const bool withIds)
 {
-    juce::Array<juce::var> values;
+    cydaw::base::Array<cydaw::base::Value> values;
     for (const auto& marker : markers) {
         auto value = makeObject();
         if (withIds)
             value->setProperty(keys::id, static_cast<juce::int64>(marker.id));
         value->setProperty(keys::source, marker.sourceSeconds);
         value->setProperty(keys::timeline, marker.timelineSeconds);
-        values.add(juce::var(value.get()));
+        values.add(cydaw::base::Value(value.get()));
     }
     return values;
 }
 
-juce::var eventsToVar(const std::vector<Engine::AudioEvent>& events, const juce::File& projectFile)
+cydaw::base::Value eventsToVar(const std::vector<Engine::AudioEvent>& events, const juce::File& projectFile)
 {
-    juce::Array<juce::var> values;
+    cydaw::base::Array<cydaw::base::Value> values;
     for (const auto& event : events) {
         auto value = makeObject();
         value->setProperty(keys::id, static_cast<juce::int64>(event.id));
@@ -788,12 +789,12 @@ juce::var eventsToVar(const std::vector<Engine::AudioEvent>& events, const juce:
             value->setProperty("pitch", event.pitchSemitones);
         if (!event.lanes.empty())
             value->setProperty(keys::clipLanes, clipLanesToVar(event.lanes));
-        values.add(juce::var(value.get()));
+        values.add(cydaw::base::Value(value.get()));
     }
     return values;
 }
 
-juce::var audioClipToVar(const Engine::AudioClip& clip, const juce::File& projectFile)
+cydaw::base::Value audioClipToVar(const Engine::AudioClip& clip, const juce::File& projectFile)
 {
     auto value = makeObject();
     value->setProperty(keys::name, clip.name);
@@ -819,32 +820,32 @@ juce::var audioClipToVar(const Engine::AudioClip& clip, const juce::File& projec
     value->setProperty(keys::colour, static_cast<juce::int64>(clip.colour));
     value->setProperty(keys::source, projectAssetPath(clip.sourceFile, projectFile));
     value->setProperty(keys::activeTake, static_cast<juce::int64>(clip.activeTakeIndex));
-    juce::Array<juce::var> takes;
+    cydaw::base::Array<cydaw::base::Value> takes;
     for (const auto& take : clip.takes) {
         auto takeValue = makeObject();
         takeValue->setProperty(keys::name, take.name);
         takeValue->setProperty(keys::source, projectAssetPath(take.sourceFile, projectFile));
         if (take.shiftSeconds != 0.0)
             takeValue->setProperty("shift", take.shiftSeconds);
-        takes.add(juce::var(takeValue.get()));
+        takes.add(cydaw::base::Value(takeValue.get()));
     }
     value->setProperty(keys::takes, takes);
     // Transposed; its takes' passages; its destructive edits' history.
     if (clip.pitchSemitones != 0.0)
         value->setProperty("pitch", clip.pitchSemitones);
     if (!clip.comp.empty()) {
-        juce::Array<juce::var> comp;
+        cydaw::base::Array<cydaw::base::Value> comp;
         for (const auto& part : clip.comp) {
             auto partValue = makeObject();
             partValue->setProperty(keys::start, part.startSeconds);
             partValue->setProperty("end", part.endSeconds);
             partValue->setProperty("take", static_cast<juce::int64>(part.take));
-            comp.add(juce::var(partValue.get()));
+            comp.add(cydaw::base::Value(partValue.get()));
         }
         value->setProperty("comp", comp);
     }
     if (!clip.versions.empty()) {
-        juce::Array<juce::var> versions;
+        cydaw::base::Array<cydaw::base::Value> versions;
         for (const auto& version : clip.versions) {
             auto versionValue = makeObject();
             versionValue->setProperty(keys::label, version.label);
@@ -853,15 +854,15 @@ juce::var audioClipToVar(const Engine::AudioClip& clip, const juce::File& projec
             versionValue->setProperty(keys::duration, version.durationSeconds);
             versionValue->setProperty(keys::sourceDuration, version.sourceDurationSeconds);
             versionValue->setProperty("sourceLength", version.sourceLengthSeconds);
-            versions.add(juce::var(versionValue.get()));
+            versions.add(cydaw::base::Value(versionValue.get()));
         }
         value->setProperty("versions", versions);
         value->setProperty("version", static_cast<juce::int64>(clip.version));
     }
-    return juce::var(value.get());
+    return cydaw::base::Value(value.get());
 }
 
-juce::var launcherClipToVar(const Engine::LauncherClip& clip, const juce::File& projectFile)
+cydaw::base::Value launcherClipToVar(const Engine::LauncherClip& clip, const juce::File& projectFile)
 {
     auto value = makeObject();
     value->setProperty(keys::scene, clip.sceneIndex);
@@ -880,14 +881,14 @@ juce::var launcherClipToVar(const Engine::LauncherClip& clip, const juce::File& 
     value->setProperty(keys::gainAutomation, automationPointsToVar(clip.automation));
     if (!clip.lanes.empty())
         value->setProperty(keys::clipLanes, clipLanesToVar(clip.lanes));
-    return juce::var(value.get());
+    return cydaw::base::Value(value.get());
 }
 
-juce::var pluginsToVar(Engine& engine, const std::size_t trackIndex, const Engine::TrackInfo& info,
+cydaw::base::Value pluginsToVar(Engine& engine, const std::size_t trackIndex, const Engine::TrackInfo& info,
                        const bool refreshPluginState, const juce::File& projectFile)
 {
     const auto lanes = engine.pluginAutomationLanes(trackIndex);
-    juce::Array<juce::var> plugins;
+    cydaw::base::Array<cydaw::base::Value> plugins;
     for (std::size_t pluginIndex = 0; pluginIndex < info.plugins.size(); ++pluginIndex) {
         auto value = makeObject();
         value->setProperty(keys::file, projectAssetPath(info.plugins[pluginIndex].file, projectFile));
@@ -897,14 +898,14 @@ juce::var pluginsToVar(Engine& engine, const std::size_t trackIndex, const Engin
                                      : engine.getCachedTrackPluginState(trackIndex, pluginIndex, pluginState);
         if (stateResult.wasOk())
             value->setProperty(keys::state, pluginState.toBase64Encoding());
-        juce::Array<juce::var> automation;
+        cydaw::base::Array<cydaw::base::Value> automation;
         for (const auto& lane : lanes) {
             if (lane.pluginIndex != pluginIndex)
                 continue;
             auto laneValue = makeObject();
             laneValue->setProperty(keys::parameter, static_cast<juce::int64>(lane.parameterIndex));
             laneValue->setProperty(keys::name, lane.parameterName);
-            juce::Array<juce::var> points;
+            cydaw::base::Array<cydaw::base::Value> points;
             points.ensureStorageAllocated(static_cast<int>(lane.points.size()));
             for (const auto& point : lane.points) {
                 auto pointValue = makeObject();
@@ -913,25 +914,25 @@ juce::var pluginsToVar(Engine& engine, const std::size_t trackIndex, const Engin
                 pointValue->setProperty(keys::curve, static_cast<int>(point.curve));
                 pointValue->setProperty(keys::curveAmount, point.curveAmount);
                 writeHandles(*pointValue, point.handles);
-                points.add(juce::var(pointValue.get()));
+                points.add(cydaw::base::Value(pointValue.get()));
             }
             laneValue->setProperty(keys::points, points);
-            automation.add(juce::var(laneValue.get()));
+            automation.add(cydaw::base::Value(laneValue.get()));
         }
         value->setProperty(keys::automation, automation);
-        plugins.add(juce::var(value.get()));
+        plugins.add(cydaw::base::Value(value.get()));
     }
     return plugins;
 }
 
-const juce::var& graphOr(const std::map<std::uint64_t, juce::var>& graphs, const std::uint64_t ownerId,
-                         const juce::var& fallback)
+const cydaw::base::Value& graphOr(const std::map<std::uint64_t, cydaw::base::Value>& graphs, const std::uint64_t ownerId,
+                         const cydaw::base::Value& fallback)
 {
     const auto found = graphs.find(ownerId);
     return found != graphs.end() && found->second.getDynamicObject() != nullptr ? found->second : fallback;
 }
 
-juce::var interfaceValue(const Studio& studio, const juce::Identifier& property, const juce::var& fallback)
+cydaw::base::Value interfaceValue(const Studio& studio, const cydaw::base::Identifier& property, const cydaw::base::Value& fallback)
 {
     if (const auto* ui = studio.interfaceState.getDynamicObject(); ui != nullptr && ui->hasProperty(property))
         return ui->getProperty(property);
@@ -967,7 +968,7 @@ juce::File resolveAsset(const juce::String& path, const juce::File& projectFile,
 }
 
 // A volume lane as saved: its points, their shapes and handles.
-std::vector<Engine::AutomationPoint> readGainPoints(const juce::var& points)
+std::vector<Engine::AutomationPoint> readGainPoints(const cydaw::base::Value& points)
 {
     std::vector<Engine::AutomationPoint> read;
     if (const auto* values = points.getArray())
@@ -986,7 +987,7 @@ std::vector<Engine::AutomationPoint> readGainPoints(const juce::var& points)
 }
 
 template <typename Add, typename SetCurve>
-void restoreGainPoints(const juce::var& points, Add&& add, SetCurve&& setCurve)
+void restoreGainPoints(const cydaw::base::Value& points, Add&& add, SetCurve&& setCurve)
 {
     const auto* values = points.getArray();
     if (values == nullptr)
@@ -1003,7 +1004,7 @@ void restoreGainPoints(const juce::var& points, Add&& add, SetCurve&& setCurve)
 
 // False when an event is unreadable or its file is missing: v1 then leaves
 // the clip's events as they are.
-bool readEvents(const juce::Array<juce::var>& saved, const juce::File& fallbackSource, const juce::File& projectFile,
+bool readEvents(const cydaw::base::Array<cydaw::base::Value>& saved, const juce::File& fallbackSource, const juce::File& projectFile,
                 juce::StringArray& warnings, std::vector<Engine::AudioEvent>& events)
 {
     events.reserve(static_cast<std::size_t>(saved.size()));
@@ -1045,12 +1046,12 @@ bool readEvents(const juce::Array<juce::var>& saved, const juce::File& fallbackS
 }
 
 // The modulation assignments in v1's own shape.
-juce::var readAssignments(const juce::var& saved)
+cydaw::base::Value readAssignments(const cydaw::base::Value& saved)
 {
     const auto* values = saved.getArray();
     if (values == nullptr)
         return {};
-    juce::Array<juce::var> assignments;
+    cydaw::base::Array<cydaw::base::Value> assignments;
     for (const auto& value : *values) {
         const auto* stored = value.getDynamicObject();
         if (stored == nullptr)
@@ -1063,13 +1064,13 @@ juce::var readAssignments(const juce::var& saved)
         assignment->setProperty(keys::maximum, number(*stored, keys::maximum));
         assignment->setProperty(keys::amount, number(*stored, keys::amount));
         assignment->setProperty(keys::enabled, static_cast<bool>(stored->getProperty(keys::enabled)));
-        assignments.add(juce::var(assignment.get()));
+        assignments.add(cydaw::base::Value(assignment.get()));
     }
     return assignments;
 }
 
 // Clamped and in time order, as v1 holds them.
-juce::var readLauncherActions(const juce::var& saved)
+cydaw::base::Value readLauncherActions(const cydaw::base::Value& saved)
 {
     struct Action {
         double time {};
@@ -1087,19 +1088,19 @@ juce::var readLauncherActions(const juce::var& saved)
                                     static_cast<int>(action->getProperty(keys::scene)) });
     std::stable_sort(actions.begin(), actions.end(),
                      [](const Action& first, const Action& second) { return first.time < second.time; });
-    juce::Array<juce::var> values;
+    cydaw::base::Array<cydaw::base::Value> values;
     for (const auto& action : actions) {
         auto value = makeObject();
         value->setProperty(keys::time, action.time);
         value->setProperty(keys::type, action.type);
         value->setProperty(keys::track, action.track);
         value->setProperty(keys::scene, action.scene);
-        values.add(juce::var(value.get()));
+        values.add(cydaw::base::Value(value.get()));
     }
     return values;
 }
 
-void restoreAudioClip(Engine& engine, const std::size_t trackIndex, const juce::DynamicObject& clip,
+void restoreAudioClip(Engine& engine, const std::size_t trackIndex, const cydaw::base::Object& clip,
                       const juce::File& trackFile, const juce::File& projectFile, juce::StringArray& warnings)
 {
     const auto clipSource = resolveAsset(clip.getProperty(keys::source).toString(), projectFile, trackFile);
@@ -1216,7 +1217,7 @@ void restoreAudioClip(Engine& engine, const std::size_t trackIndex, const juce::
 }
 
 void restorePlugin(Engine& engine, const std::size_t trackIndex, const juce::String& path,
-                   const juce::String& stateBase64, const juce::var& automationLanes, const juce::File& projectFile,
+                   const juce::String& stateBase64, const cydaw::base::Value& automationLanes, const juce::File& projectFile,
                    juce::StringArray& warnings)
 {
     if (path.isEmpty())
@@ -1262,7 +1263,7 @@ void restorePlugin(Engine& engine, const std::size_t trackIndex, const juce::Str
     }
 }
 
-void restoreLauncherClip(Engine& engine, const std::size_t trackIndex, const juce::DynamicObject& clip,
+void restoreLauncherClip(Engine& engine, const std::size_t trackIndex, const cydaw::base::Object& clip,
                          const juce::File& trackFile, const juce::File& projectFile, juce::StringArray& warnings)
 {
     const auto sceneIndex = static_cast<int>(clip.getProperty(keys::scene));
@@ -1325,20 +1326,20 @@ struct SavedAudioTrack {
     double clipDuration {};
     float driveDb {};
     float filterCutoffHz { 20'000.0f };
-    juce::var plugins;
+    cydaw::base::Value plugins;
     juce::String legacyPluginPath;
     juce::String legacyPluginState;
-    juce::var automation;
-    juce::var audioClips;
-    juce::var launcherClips;
-    juce::var nodeGraph;
-    juce::var modulationGraph;
-    juce::var modulationAssignments;
+    cydaw::base::Value automation;
+    cydaw::base::Value audioClips;
+    cydaw::base::Value launcherClips;
+    cydaw::base::Value nodeGraph;
+    cydaw::base::Value modulationGraph;
+    cydaw::base::Value modulationAssignments;
     // The track itself, for its automation lanes.
-    juce::var parameterLanes;
+    cydaw::base::Value parameterLanes;
 };
 
-SavedAudioTrack readSavedTrack(const juce::DynamicObject& track)
+SavedAudioTrack readSavedTrack(const cydaw::base::Object& track)
 {
     SavedAudioTrack saved;
     saved.audioPath = track.getProperty(keys::audioFile).toString();
@@ -1364,13 +1365,13 @@ SavedAudioTrack readSavedTrack(const juce::DynamicObject& track)
     saved.nodeGraph = track.getProperty(keys::nodeGraph);
     saved.modulationGraph = track.getProperty(keys::modulationGraph);
     saved.modulationAssignments = track.getProperty(keys::modulationAssignments);
-    saved.parameterLanes = juce::var(const_cast<juce::DynamicObject*>(&track));
+    saved.parameterLanes = cydaw::base::Value(const_cast<cydaw::base::Object*>(&track));
     return saved;
 }
 
 // v1's addSavedTrack. Returns the engine index of the track made.
 std::optional<std::size_t> restoreAudioTrack(Studio& studio, const SavedAudioTrack& saved,
-                                             const juce::var& legacyNodeGraph, const juce::File& projectFile,
+                                             const cydaw::base::Value& legacyNodeGraph, const juce::File& projectFile,
                                              juce::StringArray& warnings)
 {
     auto& engine = studio.engine();
@@ -1398,10 +1399,10 @@ std::optional<std::size_t> restoreAudioTrack(Studio& studio, const SavedAudioTra
     auto graphState = isNodeGraphState(saved.nodeGraph) ? saved.nodeGraph : legacyNodeGraph;
     if (isLegacyMixedFactoryAudioGraph(graphState)) {
         Studio::mergeModules(studio.sharedNodeModules(), graphState);
-        graphState = juce::var();
+        graphState = cydaw::base::Value();
     }
     if (graphState.getDynamicObject() == nullptr)
-        graphState = juce::var();
+        graphState = cydaw::base::Value();
     {
         auto& state = studio.adoptAudioTrack(trackIndex, graphState);
         if (saved.name.trim().isNotEmpty())
@@ -1493,7 +1494,7 @@ std::optional<std::size_t> restoreAudioTrack(Studio& studio, const SavedAudioTra
 }
 
 // The virtual buses of a list, their graphs (with their classes) beside.
-std::vector<app::VirtualAudioBus> readBuses(Studio& studio, const juce::var& list, std::map<std::uint64_t, juce::var>& graphs)
+std::vector<app::VirtualAudioBus> readBuses(Studio& studio, const cydaw::base::Value& list, std::map<std::uint64_t, cydaw::base::Value>& graphs)
 {
     std::vector<app::VirtualAudioBus> restored;
     if (const auto* buses = list.getArray()) {
@@ -1536,10 +1537,10 @@ std::vector<app::VirtualAudioBus> readBuses(Studio& studio, const juce::var& lis
 
 // Every bus with its graph; `withClasses`: the classes its graph uses kept
 // in it (a file of its own), rather than in the document's library.
-juce::var busesToVar(Studio& studio, const std::map<std::uint64_t, juce::var>& busGraphs, const bool withClasses)
+cydaw::base::Value busesToVar(Studio& studio, const std::map<std::uint64_t, cydaw::base::Value>& busGraphs, const bool withClasses)
 {
     auto& engine = studio.engine();
-    juce::Array<juce::var> buses;
+    cydaw::base::Array<cydaw::base::Value> buses;
     for (const auto& bus : engine.virtualBuses()) {
         auto value = makeObject();
         value->setProperty(keys::id, static_cast<juce::int64>(bus.id));
@@ -1551,7 +1552,7 @@ juce::var busesToVar(Studio& studio, const std::map<std::uint64_t, juce::var>& b
         value->setProperty(keys::destinationA, bus.destinationChannelA);
         value->setProperty(keys::destinationB, bus.destinationChannelB);
         if (bus.channels > 2) {
-            juce::Array<juce::var> more;
+            cydaw::base::Array<cydaw::base::Value> more;
             for (const auto channel : bus.moreChannels)
                 more.add(channel);
             value->setProperty("moreChannels", more);
@@ -1564,12 +1565,12 @@ juce::var busesToVar(Studio& studio, const std::map<std::uint64_t, juce::var>& b
         const auto& graph = graphOr(busGraphs, bus.id, studio.factoryBusGraph());
         value->setProperty(keys::nodeGraph, withClasses ? app::cloneJsonValue(graph) : Studio::withoutSharedModules(graph));
         value->setProperty(keys::exposeToSystem, bus.exposeToSystem);
-        buses.add(juce::var(value.get()));
+        buses.add(cydaw::base::Value(value.get()));
     }
     return buses;
 }
 
-void restoreMidiClip(Engine& engine, const std::uint64_t trackId, const juce::DynamicObject& clip)
+void restoreMidiClip(Engine& engine, const std::uint64_t trackId, const cydaw::base::Object& clip)
 {
     const auto length = std::max(0.25, number(clip, keys::lengthBeats));
     const auto looping = static_cast<bool>(clip.getProperty(keys::loop));
@@ -1615,7 +1616,7 @@ void restoreMidiClip(Engine& engine, const std::uint64_t trackId, const juce::Dy
 
 // Returns the armed track's id, 0 when none is.
 // One MIDI track of the file; its id when it is armed, else 0.
-std::uint64_t restoreMidiTrack(Studio& studio, const juce::DynamicObject& saved, juce::StringArray& warnings)
+std::uint64_t restoreMidiTrack(Studio& studio, const cydaw::base::Object& saved, juce::StringArray& warnings)
 {
     auto& engine = studio.engine();
     const auto trackName = saved.getProperty(keys::name).toString();
@@ -1649,7 +1650,7 @@ std::uint64_t restoreMidiTrack(Studio& studio, const juce::DynamicObject& saved,
     if (auto points = readGainPoints(saved.getProperty(keys::gainAutomation)); !points.empty())
         engine.replaceMidiAutomationPoints(trackId, std::move(points));
     const auto graph = saved.getProperty(keys::nodeGraph);
-    auto& state = studio.adoptMidiTrack(trackId, graph.getDynamicObject() != nullptr ? graph : juce::var());
+    auto& state = studio.adoptMidiTrack(trackId, graph.getDynamicObject() != nullptr ? graph : cydaw::base::Value());
     // CyDAW 2's own keys; CyDAW 1 ignores them.
     if (const auto savedColour = colourOf(saved); savedColour != 0)
         state.colour = savedColour;
@@ -1669,7 +1670,7 @@ std::uint64_t restoreMidiTrack(Studio& studio, const juce::DynamicObject& saved,
 
 // A file without MIDI tracks: older than them, one instrument holding the
 // notes it kept; newer, none.
-std::uint64_t restoreLegacyMidi(Studio& studio, const juce::DynamicObject& root)
+std::uint64_t restoreLegacyMidi(Studio& studio, const cydaw::base::Object& root)
 {
     auto& engine = studio.engine();
     const auto* legacyNotes = root.getProperty(keys::midiNotes).getArray();
@@ -1684,17 +1685,17 @@ std::uint64_t restoreLegacyMidi(Studio& studio, const juce::DynamicObject& root)
                 (void) engine.addMidiNote(static_cast<int>(note->getProperty(keys::note)),
                                           number(*note, keys::startBeats), number(*note, keys::durationBeats),
                                           toFloat(note->getProperty(keys::velocity)));
-    (void) studio.adoptMidiTrack(trackId, juce::var());
+    (void) studio.adoptMidiTrack(trackId, cydaw::base::Value());
     return trackId;
 }
 
 // Values v1 applied to its views, kept for the interface under the same keys.
-void restoreInterfaceState(Studio& studio, const juce::DynamicObject& root)
+void restoreInterfaceState(Studio& studio, const cydaw::base::Object& root)
 {
     if (studio.interfaceState.getDynamicObject() == nullptr)
-        studio.interfaceState = juce::var(new juce::DynamicObject());
+        studio.interfaceState = cydaw::base::Value(new cydaw::base::Object());
     auto& ui = *studio.interfaceState.getDynamicObject();
-    const auto integerOr = [&root](const juce::Identifier& property, const int fallback) {
+    const auto integerOr = [&root](const cydaw::base::Identifier& property, const int fallback) {
         return root.hasProperty(property) ? static_cast<int>(root.getProperty(property)) : fallback;
     };
     ui.setProperty(keys::arrangementSnapMode, juce::jlimit(1, 5, integerOr(keys::arrangementSnapMode, 4)));
@@ -1719,34 +1720,34 @@ void restoreInterfaceState(Studio& studio, const juce::DynamicObject& root)
 
 // ---- Saving ----------------------------------------------------------------------------------
 
-juce::var buildDocument(Studio& studio, const juce::File& projectFile, const bool refreshPluginState)
+cydaw::base::Value buildDocument(Studio& studio, const juce::File& projectFile, const bool refreshPluginState)
 {
     auto& engine = studio.engine();
 
     // Every live graph serialised once. A class edited in one of them joins
     // the library first, so the library written below carries the edit.
     const auto nodeLibrary = modulesByKey(studio.sharedNodeModules());
-    const auto absorb = [&studio, &nodeLibrary](const juce::var& graphState) {
+    const auto absorb = [&studio, &nodeLibrary](const cydaw::base::Value& graphState) {
         Studio::mergeModules(studio.sharedNodeModules(), editedModules(graphState, nodeLibrary));
     };
-    std::vector<juce::var> trackGraphs(engine.trackCount());
+    std::vector<cydaw::base::Value> trackGraphs(engine.trackCount());
     for (std::size_t index = 0; index < trackGraphs.size(); ++index)
         if (const auto* slot = studio.graphFor(TrackRef { false, index, 0 })) {
             trackGraphs[index] = slot->serialise();
             absorb(trackGraphs[index]);
         }
-    std::map<std::uint64_t, juce::var> midiGraphs;
+    std::map<std::uint64_t, cydaw::base::Value> midiGraphs;
     for (const auto& [trackId, midiState] : studio.midiStates())
         if (midiState.graph != nullptr) {
             midiGraphs[trackId] = midiState.graph->serialise();
             absorb(midiGraphs[trackId]);
         }
-    juce::var masterGraph;
+    cydaw::base::Value masterGraph;
     if (const auto* slot = studio.graphFor(Studio::masterTrack())) {
         masterGraph = slot->serialise();
         absorb(masterGraph);
     }
-    std::map<std::uint64_t, juce::var> busGraphs;
+    std::map<std::uint64_t, cydaw::base::Value> busGraphs;
     for (const auto& [busId, busState] : studio.busStates())
         if (busState.graph != nullptr) {
             busGraphs[busId] = busState.graph->serialise();
@@ -1765,7 +1766,7 @@ juce::var buildDocument(Studio& studio, const juce::File& projectFile, const boo
     // track's input, an output sent to), it does not bring them back.
     document->setProperty(keys::virtualBuses, busesToVar(studio, busGraphs, false));
 
-    juce::Array<juce::var> tracks;
+    cydaw::base::Array<cydaw::base::Value> tracks;
     auto& audioStates = studio.audioStates();
     for (std::size_t index = 0; index < engine.trackCount(); ++index) {
         const auto info = engine.trackInfo(index);
@@ -1799,7 +1800,7 @@ juce::var buildDocument(Studio& studio, const juce::File& projectFile, const boo
         track->setProperty(keys::clipStart, info.clipStartSeconds);
         track->setProperty(keys::sourceOffset, info.sourceOffsetSeconds);
         track->setProperty(keys::clipDuration, info.clipDurationSeconds);
-        juce::Array<juce::var> audioClips;
+        cydaw::base::Array<cydaw::base::Value> audioClips;
         for (const auto& clip : info.clips)
             audioClips.add(audioClipToVar(clip, projectFile));
         track->setProperty(keys::audioClips, audioClips);
@@ -1817,7 +1818,7 @@ juce::var buildDocument(Studio& studio, const juce::File& projectFile, const boo
         track->setProperty(keys::modulationAssignments,
                            state != nullptr && state->modulationAssignments.isArray()
                                ? state->modulationAssignments
-                               : juce::var(juce::Array<juce::var>()));
+                               : cydaw::base::Value(cydaw::base::Array<cydaw::base::Value>()));
         {
             auto plugins = pluginsToVar(engine, index, info, refreshPluginState, projectFile);
             // The knobs pinned on each plug-in's card.
@@ -1825,7 +1826,7 @@ juce::var buildDocument(Studio& studio, const juce::File& projectFile, const boo
                 for (int at = 0; at < list->size() && at < static_cast<int>(state->pluginPins.size()); ++at)
                     if (const auto& pins = state->pluginPins[static_cast<std::size_t>(at)])
                         if (auto* plugin = (*list)[at].getDynamicObject()) {
-                            juce::Array<juce::var> pinned;
+                            cydaw::base::Array<cydaw::base::Value> pinned;
                             for (const auto pin : *pins)
                                 pinned.add(static_cast<int>(pin));
                             plugin->setProperty("pinned", pinned);
@@ -1837,15 +1838,15 @@ juce::var buildDocument(Studio& studio, const juce::File& projectFile, const boo
             track->setProperty(keys::parameterAutomation, parameterLanesToVar(state->parameterLanes));
             track->setProperty(keys::shownAutomation, state->parameterLanes.shown);
         }
-        juce::Array<juce::var> launcherClips;
+        cydaw::base::Array<cydaw::base::Value> launcherClips;
         for (const auto& clip : engine.launcherClips(index))
             launcherClips.add(launcherClipToVar(clip, projectFile));
         track->setProperty(keys::launcherClips, launcherClips);
-        tracks.add(juce::var(track.get()));
+        tracks.add(cydaw::base::Value(track.get()));
     }
     document->setProperty(keys::tracks, tracks);
 
-    juce::Array<juce::var> midiTracks;
+    cydaw::base::Array<cydaw::base::Value> midiTracks;
     for (const auto& info : engine.midiTracks()) {
         const auto found = studio.midiStates().find(info.id);
         const auto* state = found != studio.midiStates().end() ? &found->second : nullptr;
@@ -1861,7 +1862,7 @@ juce::var buildDocument(Studio& studio, const juce::File& projectFile, const boo
         track->setProperty(keys::armed, info.armed);
         // What it hears, where its notes also go.
         {
-            juce::Array<juce::var> inputs;
+            cydaw::base::Array<cydaw::base::Value> inputs;
             for (const auto& input : engine.midiTrackInputs(info.id))
                 inputs.add(input);
             track->setProperty("midiInputs", inputs);
@@ -1886,7 +1887,7 @@ juce::var buildDocument(Studio& studio, const juce::File& projectFile, const boo
             track->setProperty(keys::parameterAutomation, parameterLanesToVar(state->parameterLanes));
             track->setProperty(keys::shownAutomation, state->parameterLanes.shown);
         }
-        juce::Array<juce::var> clips;
+        cydaw::base::Array<cydaw::base::Value> clips;
         for (const auto& clipInfo : info.clips) {
             auto clip = makeObject();
             clip->setProperty(keys::name, clipInfo.name);
@@ -1902,16 +1903,16 @@ juce::var buildDocument(Studio& studio, const juce::File& projectFile, const boo
                 clip->setProperty(keys::launcherScene, clipInfo.launcherScene);
             clip->setProperty(keys::notes, midiNotesToVar(clipInfo.notes));
             clip->setProperty(keys::gainAutomation, automationPointsToVar(clipInfo.automation));
-            clips.add(juce::var(clip.get()));
+            clips.add(cydaw::base::Value(clip.get()));
         }
         track->setProperty(keys::clips, clips);
-        midiTracks.add(juce::var(track.get()));
+        midiTracks.add(cydaw::base::Value(track.get()));
     }
     document->setProperty(keys::midiTracks, midiTracks);
     {
         // The order shown: each track by its kind and its place among them.
         const auto summaries = engine.midiTrackSummaries();
-        juce::Array<juce::var> order;
+        cydaw::base::Array<cydaw::base::Value> order;
         for (const auto& track : studio.tracks()) {
             auto value = makeObject();
             value->setProperty("midi", track.midi);
@@ -1921,7 +1922,7 @@ juce::var buildDocument(Studio& studio, const juce::File& projectFile, const boo
                     if (summaries[index].id == track.midiId)
                         position = static_cast<int>(index);
             value->setProperty("position", position);
-            order.add(juce::var(value.get()));
+            order.add(cydaw::base::Value(value.get()));
         }
         document->setProperty("trackOrder", order);
         // The groups: each group's track and its tracks, by kind and place.
@@ -1934,25 +1935,25 @@ juce::var buildDocument(Studio& studio, const juce::File& projectFile, const boo
                     if (summaries[index].id == track.midiId)
                         position = static_cast<int>(index);
             value->setProperty("position", position);
-            return juce::var(value.get());
+            return cydaw::base::Value(value.get());
         };
-        juce::Array<juce::var> groups;
+        cydaw::base::Array<cydaw::base::Value> groups;
         for (const auto& track : studio.tracks())
             if (studio.isGroupTrack(track)) {
                 auto value = makeObject();
                 value->setProperty("group", placeOf(track));
-                juce::Array<juce::var> members;
+                cydaw::base::Array<cydaw::base::Value> members;
                 for (const auto& member : studio.groupMembers(track))
                     members.add(placeOf(member));
                 value->setProperty("members", members);
                 if (studio.isFolded(track))
                     value->setProperty("folded", true);
-                groups.add(juce::var(value.get()));
+                groups.add(cydaw::base::Value(value.get()));
             }
         if (!groups.isEmpty())
             document->setProperty("groups", groups);
         // The hybrid tracks: each track and its companion, by kind and place.
-        juce::Array<juce::var> hybrids;
+        cydaw::base::Array<cydaw::base::Value> hybrids;
         for (const auto& track : studio.tracks())
             if (const auto companion = studio.companionOf(track)) {
                 auto value = makeObject();
@@ -1960,7 +1961,7 @@ juce::var buildDocument(Studio& studio, const juce::File& projectFile, const boo
                 value->setProperty("companion", placeOf(*companion));
                 if (studio.recordsHybridAudio(track))
                     value->setProperty("recordsAudio", true);
-                hybrids.add(juce::var(value.get()));
+                hybrids.add(cydaw::base::Value(value.get()));
             }
         if (!hybrids.isEmpty())
             document->setProperty("hybrids", hybrids);
@@ -1986,19 +1987,19 @@ juce::var buildDocument(Studio& studio, const juce::File& projectFile, const boo
     document->setProperty(keys::launchQuantization, static_cast<int>(engine.launchQuantization()));
     // The master's launcher clips: by scene, their lanes' points in beats.
     {
-        juce::Array<juce::var> masterClips;
+        cydaw::base::Array<cydaw::base::Value> masterClips;
         for (const auto& [scene, clip] : studio.masterClips()) {
-            auto* entry = new juce::DynamicObject();
+            auto* entry = new cydaw::base::Object();
             entry->setProperty("scene", scene);
             entry->setProperty("name", clip.name);
             entry->setProperty("colour", static_cast<juce::int64>(clip.colour));
             entry->setProperty("lengthBeats", clip.lengthBeats);
             entry->setProperty("looping", clip.looping);
-            juce::Array<juce::var> lanes;
+            cydaw::base::Array<cydaw::base::Value> lanes;
             for (const auto& [binding, points] : clip.lanes) {
-                juce::Array<juce::var> list;
+                cydaw::base::Array<cydaw::base::Value> list;
                 for (const auto& point : points) {
-                    juce::Array<juce::var> pair;
+                    cydaw::base::Array<cydaw::base::Value> pair;
                     pair.add(point.beats);
                     pair.add(static_cast<double>(point.value));
                     if (point.shape != 0 || point.handles != engine::CurveHandles {})
@@ -2007,13 +2008,13 @@ juce::var buildDocument(Studio& studio, const juce::File& projectFile, const boo
                             pair.add(static_cast<double>(value));
                     list.add(pair);
                 }
-                auto* lane = new juce::DynamicObject();
+                auto* lane = new cydaw::base::Object();
                 lane->setProperty("binding", binding);
                 lane->setProperty("points", list);
-                lanes.add(juce::var(lane));
+                lanes.add(cydaw::base::Value(lane));
             }
             entry->setProperty("lanes", lanes);
-            masterClips.add(juce::var(entry));
+            masterClips.add(cydaw::base::Value(entry));
         }
         if (!masterClips.isEmpty())
             document->setProperty("masterClips", masterClips);
@@ -2023,7 +2024,7 @@ juce::var buildDocument(Studio& studio, const juce::File& projectFile, const boo
                           static_cast<bool>(interfaceValue(studio, keys::launcherActionReplay, false)));
     const auto launcherActions = interfaceValue(studio, keys::launcherActions, {});
     document->setProperty(keys::launcherActions,
-                          launcherActions.isArray() ? launcherActions : juce::var(juce::Array<juce::var>()));
+                          launcherActions.isArray() ? launcherActions : cydaw::base::Value(cydaw::base::Array<cydaw::base::Value>()));
     document->setProperty(keys::editorMode, static_cast<int>(interfaceValue(studio, keys::editorMode, 1)));
     // The loop switch as the file had it; a session that never loaded one
     // follows the transport, which loops when it holds a loop range.
@@ -2034,17 +2035,17 @@ juce::var buildDocument(Studio& studio, const juce::File& projectFile, const boo
     document->setProperty(keys::position, engine.position());
     // The compatibility field v1 recovers edited classes from: a whole graph
     // with the whole library.
-    document->setProperty(keys::nodeGraph, studio.withLibrary(trackGraphs.empty() ? juce::var() : trackGraphs.front(),
+    document->setProperty(keys::nodeGraph, studio.withLibrary(trackGraphs.empty() ? cydaw::base::Value() : trackGraphs.front(),
                                                               studio.factoryAudioGraph()));
     auto nodeModules = makeObject();
     nodeModules->setProperty(keys::modules, studio.sharedNodeModules());
-    document->setProperty(keys::sharedNodeModules, juce::var(nodeModules.get()));
+    document->setProperty(keys::sharedNodeModules, cydaw::base::Value(nodeModules.get()));
     auto modulationModules = makeObject();
     modulationModules->setProperty(keys::modules, studio.sharedModulationModules());
-    document->setProperty(keys::sharedModulationModules, juce::var(modulationModules.get()));
+    document->setProperty(keys::sharedModulationModules, cydaw::base::Value(modulationModules.get()));
     if (const auto layout = interfaceValue(studio, keys::workspaceLayout, {}); !layout.isVoid())
         document->setProperty(keys::workspaceLayout, layout);
-    return juce::var(document.get());
+    return cydaw::base::Value(document.get());
 }
 
 // ---- Loading ---------------------------------------------------------------------------------
@@ -2052,7 +2053,7 @@ juce::var buildDocument(Studio& studio, const juce::File& projectFile, const boo
 namespace {
 
 // One audio track of the file, with its input.
-void restoreAudioEntry(Studio& studio, const juce::DynamicObject& track, const juce::var& legacyNodeGraph,
+void restoreAudioEntry(Studio& studio, const cydaw::base::Object& track, const cydaw::base::Value& legacyNodeGraph,
                        const BusIds& busIds, const juce::File& projectFile, juce::StringArray& warnings)
 {
     auto& engine = studio.engine();
@@ -2079,7 +2080,7 @@ void restoreAudioEntry(Studio& studio, const juce::DynamicObject& track, const j
                            : state.automationVisible ? 172 : 88;
 }
 
-juce::String nameOf(const juce::var& track)
+juce::String nameOf(const cydaw::base::Value& track)
 {
     return track.getProperty(keys::name, {}).toString();
 }
@@ -2092,24 +2093,24 @@ struct DocumentLoad::State {
     enum class Stage { prelude, audio, middle, midi, routing, publish, finish, done };
 
     Studio& studio;
-    juce::var document;
+    cydaw::base::Value document;
     juce::File projectFile;
     juce::StringArray& warnings;
-    const juce::DynamicObject* root {};
+    const cydaw::base::Object* root {};
     Stage stage { Stage::prelude };
     std::size_t index {};
-    const juce::Array<juce::var>* audioTracks {};
-    const juce::Array<juce::var>* midiTracks {};
-    juce::var legacyNodeGraph;
+    const cydaw::base::Array<cydaw::base::Value>* audioTracks {};
+    const cydaw::base::Array<cydaw::base::Value>* midiTracks {};
+    cydaw::base::Value legacyNodeGraph;
     BusIds busIds;
     double tempo { 120.0 };
     std::uint64_t armedTrack {};
     std::vector<TrackRef> toPublish;
     int total { 1 };
     int finished {};
-    juce::Result result { juce::Result::ok() };
+    cydaw::base::Result result { cydaw::base::Result::ok() };
 
-    State(Studio& owner, juce::var doc, juce::File file, juce::StringArray& lines)
+    State(Studio& owner, cydaw::base::Value doc, juce::File file, juce::StringArray& lines)
         : studio(owner), document(std::move(doc)), projectFile(std::move(file)), warnings(lines)
     {
         root = document.getDynamicObject();
@@ -2125,7 +2126,7 @@ struct DocumentLoad::State {
     }
 };
 
-DocumentLoad::DocumentLoad(Studio& studio, juce::var document, juce::File projectFile, juce::StringArray& warnings)
+DocumentLoad::DocumentLoad(Studio& studio, cydaw::base::Value document, juce::File projectFile, juce::StringArray& warnings)
     : state_(std::make_unique<State>(studio, std::move(document), std::move(projectFile), warnings))
 {
 }
@@ -2143,7 +2144,7 @@ juce::String DocumentLoad::doing() const
 {
     auto& s = *state_;
     using Stage = State::Stage;
-    const auto count = [](const juce::Array<juce::var>* list) { return list != nullptr ? list->size() : 0; };
+    const auto count = [](const cydaw::base::Array<cydaw::base::Value>* list) { return list != nullptr ? list->size() : 0; };
     const auto ofTotal = [](const std::size_t at, const int all) {
         return juce::String(static_cast<int>(at) + 1) + "/" + juce::String(std::max(1, all));
     };
@@ -2174,7 +2175,7 @@ juce::String DocumentLoad::doing() const
     return ui::Ls("Fin", "Done");
 }
 
-juce::Result DocumentLoad::result() const
+cydaw::base::Result DocumentLoad::result() const
 {
     return state_->result;
 }
@@ -2189,7 +2190,7 @@ bool DocumentLoad::next()
     switch (s.stage) {
     case Stage::prelude: {
         if (s.root == nullptr || s.root->getProperty(keys::format).toString() != "CyDAW Project") {
-            s.result = juce::Result::fail("not a CyDAW project");
+            s.result = cydaw::base::Result::fail("not a CyDAW project");
             s.stage = Stage::done;
             return false;
         }
@@ -2224,11 +2225,11 @@ bool DocumentLoad::next()
                     clip.colour = static_cast<juce::uint32>(static_cast<juce::int64>(entry.getProperty("colour", static_cast<juce::int64>(0xffffb84d))));
                     clip.lengthBeats = std::clamp(static_cast<double>(entry.getProperty("lengthBeats", 16.0)), 0.25, 4'096.0);
                     clip.looping = static_cast<bool>(entry.getProperty("looping", true));
-                    if (const auto* lanes = entry.getProperty("lanes", juce::var()).getArray())
+                    if (const auto* lanes = entry.getProperty("lanes", cydaw::base::Value()).getArray())
                         for (const auto& lane : *lanes) {
                             const auto binding = lane.getProperty("binding", juce::String()).toString();
                             std::vector<MasterClip::Point> points;
-                            if (const auto* values = lane.getProperty("points", juce::var()).getArray())
+                            if (const auto* values = lane.getProperty("points", cydaw::base::Value()).getArray())
                                 for (const auto& value : *values)
                                     if (const auto* pair = value.getArray(); pair != nullptr && pair->size() >= 2) {
                                         MasterClip::Point point { static_cast<double>((*pair)[0]), static_cast<float>(static_cast<double>((*pair)[1])) };
@@ -2355,7 +2356,7 @@ bool DocumentLoad::next()
     return false;
 }
 
-juce::Result applyDocument(Studio& studio, const juce::var& document, const juce::File& projectFile,
+cydaw::base::Result applyDocument(Studio& studio, const cydaw::base::Value& document, const juce::File& projectFile,
                            juce::StringArray& warnings)
 {
     DocumentLoad load(studio, document, projectFile, warnings);
@@ -2364,9 +2365,9 @@ juce::Result applyDocument(Studio& studio, const juce::var& document, const juce
     return load.result();
 }
 
-juce::var virtualIoDocument(Studio& studio)
+cydaw::base::Value virtualIoDocument(Studio& studio)
 {
-    std::map<std::uint64_t, juce::var> graphs;
+    std::map<std::uint64_t, cydaw::base::Value> graphs;
     for (const auto& [busId, busState] : studio.busStates())
         if (busState.graph != nullptr)
             graphs[busId] = busState.graph->serialise();
@@ -2374,21 +2375,21 @@ juce::var virtualIoDocument(Studio& studio)
     document->setProperty("format", "CyDAW Virtual IO");
     document->setProperty("version", 1);
     document->setProperty(keys::virtualBuses, busesToVar(studio, graphs, true));
-    return juce::var(document.get());
+    return cydaw::base::Value(document.get());
 }
 
-void applyVirtualIo(Studio& studio, const juce::var& document)
+void applyVirtualIo(Studio& studio, const cydaw::base::Value& document)
 {
     auto& engine = studio.engine();
-    std::map<std::uint64_t, juce::var> graphs;
-    auto buses = readBuses(studio, document.getProperty(keys::virtualBuses, juce::var()), graphs);
+    std::map<std::uint64_t, cydaw::base::Value> graphs;
+    auto buses = readBuses(studio, document.getProperty(keys::virtualBuses, cydaw::base::Value()), graphs);
     if (buses.empty())
         return;
     engine.replaceVirtualBuses(std::move(buses));
     studio.busStates().clear();
     for (const auto& bus : engine.virtualBuses()) {
         const auto found = graphs.find(bus.id);
-        auto& state = studio.adoptBus(bus.id, found != graphs.end() ? found->second : juce::var());
+        auto& state = studio.adoptBus(bus.id, found != graphs.end() ? found->second : cydaw::base::Value());
         (void) engine.setVirtualBusGraph(bus.id, state.graph->graph().nativeDspGraph());
     }
 }

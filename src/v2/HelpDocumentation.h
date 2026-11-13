@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #pragma once
 #include <juce_core/juce_core.h>
 
@@ -11,15 +12,15 @@ public:
     juce::String link(juce::String page = {}, juce::String anchor = {}, juce::String locale = "en",
                       const juce::StringPairArray& state = {});
     juce::String follow(const juce::String& target, juce::String locale = "en");
-    juce::var command(const juce::var&, bool allowBrowser);
+    cydaw::base::Value command(const cydaw::base::Value&, bool allowBrowser);
     const juce::String& error() const { return error_; }
 private:
     juce::File directory_;
-    juce::var catalog_;
+    cydaw::base::Value catalog_;
     juce::String error_, lastUrl_, locale_ {"en"}, page_ {"welcome"}, anchor_;
     int requests_ {};
     bool launchSuppressed_ {}, launched_ {};
-    const juce::var* page(const juce::String& id) const;
+    const cydaw::base::Value* page(const juce::String& id) const;
     bool canonical(juce::String& page, juce::String& anchor) const;
     static juce::String encode(const juce::String&);
 };

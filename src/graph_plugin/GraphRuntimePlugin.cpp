@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "CyDawLookAndFeel.h"
 #include <cydaw/engine/EffectCatalogue.h>
 #include "GraphPolySynthRenderer.h"
@@ -1041,7 +1042,7 @@ public:
             programs_[static_cast<std::size_t>(index)].name = name.trim();
     }
 
-    juce::Result applyEditorGraph(const juce::var& editorState,
+    cydaw::base::Result applyEditorGraph(const cydaw::base::Value& editorState,
                                   const cydaw::engine::NativeDspGraph& graph,
                                   const std::vector<cydaw::graph::PublishedParameter>&
                                       publishedParameters,
@@ -1070,7 +1071,7 @@ public:
         return result;
     }
 
-    juce::var editorState() const
+    cydaw::base::Value editorState() const
     {
         const juce::ScopedLock lock(stateLock_);
         return editorState_;
@@ -1259,7 +1260,7 @@ public:
 
     void getStateInformation(juce::MemoryBlock& destination) override
     {
-        juce::var editor;
+        cydaw::base::Value editor;
         cydaw::engine::NativeDspGraph native;
         std::vector<cydaw::graph::PublishedParameter> published;
         cydaw::engine::PolySynthGraphPlan instrumentPlan;
@@ -1270,7 +1271,7 @@ public:
             published = publishedParameters_;
             instrumentPlan = instrumentPlan_;
         }
-        auto root = juce::DynamicObject::Ptr(new juce::DynamicObject());
+        auto root = cydaw::base::Object::Ptr(new cydaw::base::Object());
         root->setProperty("schema", 2);
         root->setProperty("editor", editor);
         // Where a sampler's factory samples are ("factory:" paths), as
@@ -1284,9 +1285,9 @@ public:
         root->setProperty(
             "polySynth",
             cydaw::app::serialisePolySynthGraphPlan(instrumentPlan));
-        juce::Array<juce::var> publishedValues;
+        cydaw::base::Array<cydaw::base::Value> publishedValues;
         for (const auto& parameter : published) {
-            auto value = juce::DynamicObject::Ptr(new juce::DynamicObject());
+            auto value = cydaw::base::Object::Ptr(new cydaw::base::Object());
             value->setProperty("id", static_cast<juce::int64>(parameter.id));
             value->setProperty("key", juce::String(parameter.key));
             value->setProperty("name", juce::String(parameter.displayName));
@@ -1302,10 +1303,10 @@ public:
             value->setProperty("modulatable", parameter.modulatable);
             value->setProperty("visibleInDevice", parameter.visibleInDevice);
             value->setProperty("exportedToHost", parameter.exportedToHost);
-            publishedValues.add(juce::var(value.get()));
+            publishedValues.add(cydaw::base::Value(value.get()));
         }
         root->setProperty("publishedParameters", publishedValues);
-        juce::Array<juce::var> hostValues;
+        cydaw::base::Array<cydaw::base::Value> hostValues;
         for (auto slot = std::size_t {}; slot < parameterCapacity_; ++slot)
             hostValues.add(hostParameters_[slot] != nullptr
                                ? hostParameters_[slot]->getValue() : 0.0f);
@@ -1313,21 +1314,21 @@ public:
         {
             const juce::ScopedLock lock(stateLock_);
             if (!programs_.empty()) {
-                juce::Array<juce::var> programs;
+                cydaw::base::Array<cydaw::base::Value> programs;
                 for (const auto& program : programs_) {
-                    auto entry = juce::DynamicObject::Ptr(new juce::DynamicObject());
+                    auto entry = cydaw::base::Object::Ptr(new cydaw::base::Object());
                     entry->setProperty("name", program.name);
-                    juce::Array<juce::var> values;
+                    cydaw::base::Array<cydaw::base::Value> values;
                     for (const auto value : program.hostValues)
                         values.add(value);
                     entry->setProperty("hostValues", values);
-                    programs.add(juce::var(entry.get()));
+                    programs.add(cydaw::base::Value(entry.get()));
                 }
                 root->setProperty("programs", programs);
                 root->setProperty("program", currentProgram_);
             }
         }
-        const auto json = juce::JSON::toString(juce::var(root.get()), false);
+        const auto json = cydaw::base::JSON::toString(cydaw::base::Value(root.get()), false);
         destination.replaceAll(json.toRawUTF8(), json.getNumBytesAsUTF8());
     }
 
@@ -1335,7 +1336,7 @@ public:
     {
         if (data == nullptr || size <= 0)
             return;
-        const auto parsed = juce::JSON::parse(
+        const auto parsed = cydaw::base::JSON::parse(
             juce::String::fromUTF8(static_cast<const char*>(data), size));
         const auto* root = parsed.getDynamicObject();
         const auto schema = root != nullptr
@@ -1529,7 +1530,7 @@ private:
     std::vector<RuntimeProgram> programs_;
     int currentProgram_ {};
     cydaw::app::NativeDspRuntime runtime_;
-    juce::var editorState_;
+    cydaw::base::Value editorState_;
     cydaw::engine::NativeDspGraph nativeGraph_;
     std::vector<cydaw::graph::PublishedParameter> publishedParameters_;
     cydaw::engine::PolySynthGraphPlan instrumentPlan_;

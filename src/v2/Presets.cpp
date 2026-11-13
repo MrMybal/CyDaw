@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "Presets.h"
 
 #include "Locations.h"
@@ -62,7 +63,7 @@ const Entry* find(const std::vector<Entry>& entries, const juce::String& name)
     return found;
 }
 
-bool save(const juce::String& kind, const juce::String& target, const juce::String& name, const juce::var& state,
+bool save(const juce::String& kind, const juce::String& target, const juce::String& name, const cydaw::base::Value& state,
           juce::String& error)
 {
     const auto fileName = fileNameOf(name);
@@ -79,7 +80,7 @@ bool save(const juce::String& kind, const juce::String& target, const juce::Stri
         error = "cannot make " + folder.getFullPathName();
         return false;
     }
-    auto* document = new juce::DynamicObject();
+    auto* document = new cydaw::base::Object();
     document->setProperty("format", format);
     document->setProperty("version", 1);
     document->setProperty("kind", kind);
@@ -88,20 +89,20 @@ bool save(const juce::String& kind, const juce::String& target, const juce::Stri
     document->setProperty("created", juce::Time::getCurrentTime().toISO8601(true));
     document->setProperty("state", state);
     const auto file = folder.getChildFile(fileName + fileExtension);
-    if (!file.replaceWithText(juce::JSON::toString(juce::var(document), true))) {
+    if (!file.replaceWithText(cydaw::base::JSON::toString(cydaw::base::Value(document), true))) {
         error = "cannot write " + file.getFullPathName();
         return false;
     }
     return true;
 }
 
-juce::var read(const Entry& entry, const juce::String& kind, juce::String& error)
+cydaw::base::Value read(const Entry& entry, const juce::String& kind, juce::String& error)
 {
     if (entry.file.getSize() > 256 * 1024 * 1024) {
         error = "the preset is too large";
         return {};
     }
-    const auto document = juce::JSON::parse(entry.file.loadFileAsString());
+    const auto document = cydaw::base::JSON::parse(entry.file.loadFileAsString());
     if (document.getProperty("format", {}).toString() != format || document.getProperty("kind", {}).toString() != kind) {
         error = "not a " + kind + " preset: " + entry.file.getFileName();
         return {};
@@ -147,10 +148,10 @@ bool rename(const Entry& entry, const juce::String& name, juce::String& error)
         error = "a preset is already called " + name.trim();
         return false;
     }
-    auto document = juce::JSON::parse(entry.file.loadFileAsString());
+    auto document = cydaw::base::JSON::parse(entry.file.loadFileAsString());
     if (auto* object = document.getDynamicObject())
         object->setProperty("name", name.trim());
-    if (!target.replaceWithText(juce::JSON::toString(document, true))) {
+    if (!target.replaceWithText(cydaw::base::JSON::toString(document, true))) {
         error = "cannot write " + target.getFullPathName();
         return false;
     }

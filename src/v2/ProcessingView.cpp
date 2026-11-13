@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "ProcessingView.h"
 
 #include "FoundryPlayer.h"
@@ -526,12 +527,12 @@ void MidiTrial::stopListening()
     heard_ = -1;
 }
 
-juce::Result MidiTrial::apply()
+cydaw::base::Result MidiTrial::apply()
 {
     if (busy())
-        return juce::Result::fail(ui::Ls("Le script tourne encore", "The script is still running"));
+        return cydaw::base::Result::fail(ui::Ls("Le script tourne encore", "The script is still running"));
     if (!result_.ok)
-        return juce::Result::fail(result_.error.isNotEmpty() ? result_.error : ui::Ls("Le script ne tourne pas", "The script does not run"));
+        return cydaw::base::Result::fail(result_.error.isNotEmpty() ? result_.error : ui::Ls("Le script ne tourne pas", "The script does not run"));
     stopListening();
     const auto applied = studio_.setMidiClipNotes(track_, clipId_, result_.notes, true);
     if (applied.wasOk())
@@ -1415,7 +1416,7 @@ void ProcessingView::drawApply()
                             : (applyTrial_.result() != nullptr && applyTrial_.result()->ok && !applyTrial_.busy());
     ImGui::BeginDisabled(!ready);
     if (ui::primaryButton(L("Appliquer", "Apply"), ImVec2(dp(120.0f), 0.0f))) {
-        juce::Result applied = juce::Result::ok();
+        cydaw::base::Result applied = cydaw::base::Result::ok();
         if (midi) {
             applied = applyMidi_.apply();
         } else {
@@ -1449,16 +1450,16 @@ void ProcessingView::drawApply()
 
 // ---- The `processing` command's interface part ------------------------------------------
 
-juce::var ProcessingView::command(const juce::var& request)
+cydaw::base::Value ProcessingView::command(const cydaw::base::Value& request)
 {
-    auto* result = new juce::DynamicObject();
+    auto* result = new cydaw::base::Object();
     if (static_cast<bool>(request.getProperty("show", false)))
         state_.mode = AppMode::processing;
     if (request.hasProperty("select")) {
         reload();
         const auto name = request.getProperty("select", {}).toString();
         for (int i = 0; i < static_cast<int>(library_.size()); ++i)
-            if (library_[static_cast<std::size_t>(i)].name.equalsIgnoreCase(name))
+            if (library_[static_cast<std::size_t>(i)].name.equalsIgnoreCase(name.toRawUTF8()))
                 select(i);
     }
     if (request.hasProperty("testFile"))
@@ -1476,7 +1477,7 @@ juce::var ProcessingView::command(const juce::var& request)
         result->setProperty("trialError", done->error);
     }
     result->setProperty("applyOpen", applyOpen_ || applyRequested_);
-    return juce::var(result);
+    return cydaw::base::Value(result);
 }
 
 } // namespace cydaw::v2

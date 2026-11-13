@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "AiModels.h"
 
 #include "Locations.h"
@@ -29,7 +30,7 @@ constexpr std::uint32_t rotate(const std::uint32_t value, const int bits)
     return (value >> bits) | (value << (32 - bits));
 }
 
-juce::String languageText(const juce::var& value)
+juce::String languageText(const cydaw::base::Value& value)
 {
     if (value.isString())
         return value.toString();
@@ -202,7 +203,7 @@ void AiModels::loadCatalogue()
     catalogueText_ = text;
     models_.clear();
     packages_.clear();
-    const auto json = juce::JSON::parse(text);
+    const auto json = cydaw::base::JSON::parse(text);
     if (const auto* list = json.getProperty("engine", {}).getProperty("packages", {}).getArray())
         for (const auto& item : *list)
             packages_.push_back({ item.getProperty("name", {}).toString(), item.getProperty("licence", {}).toString(),
@@ -279,10 +280,10 @@ bool AiModels::installed(const juce::String& id) const
     return true;
 }
 
-juce::var AiModels::receiptOf(const juce::String& id) const
+cydaw::base::Value AiModels::receiptOf(const juce::String& id) const
 {
     const auto* model = find(id);
-    return model != nullptr ? juce::JSON::parse(folderOf(*model).getChildFile("receipt.json")) : juce::var();
+    return model != nullptr ? cydaw::base::JSON::parse(folderOf(*model).getChildFile("receipt.json")) : cydaw::base::Value();
 }
 
 // ---- The download -----------------------------------------------------------------------------
@@ -341,7 +342,7 @@ private:
             error = "cannot make " + partials.getFullPathName();
             return false;
         }
-        juce::Array<juce::var> files;
+        cydaw::base::Array<cydaw::base::Value> files;
         for (const auto& file : model_.files) {
             if (stop_)
                 return fail(error);
@@ -369,22 +370,22 @@ private:
             files.add(entry(file, hash));
         }
         // The receipt last: without it, the model is not installed.
-        auto* receipt = new juce::DynamicObject();
+        auto* receipt = new cydaw::base::Object();
         receipt->setProperty("model", model_.key());
         receipt->setProperty("title", model_.title);
         receipt->setProperty("revision", model_.revision);
         receipt->setProperty("source", from_ != juce::File {} ? from_.getFullPathName() : model_.baseUrl);
         receipt->setProperty("installed", juce::Time::getCurrentTime().toISO8601(true));
-        auto* licence = new juce::DynamicObject();
+        auto* licence = new cydaw::base::Object();
         licence->setProperty("name", model_.licence);
         licence->setProperty("url", model_.licenceUrl);
         licence->setProperty("page", model_.licencePage);
         licence->setProperty("requiresAcceptance", model_.requiresAcceptance);
         // Ticked by the person, never by CyDAW: said for the record.
         licence->setProperty("acceptedByPerson", accepted_);
-        receipt->setProperty("licence", juce::var(licence));
+        receipt->setProperty("licence", cydaw::base::Value(licence));
         receipt->setProperty("files", files);
-        if (!target_.getChildFile("receipt.json").replaceWithText(juce::JSON::toString(juce::var(receipt)))) {
+        if (!target_.getChildFile("receipt.json").replaceWithText(cydaw::base::JSON::toString(cydaw::base::Value(receipt)))) {
             error = "cannot write the receipt in " + target_.getFullPathName();
             return false;
         }
@@ -392,13 +393,13 @@ private:
         return true;
     }
 
-    static juce::var entry(const AiModel::File& file, const juce::String& hash)
+    static cydaw::base::Value entry(const AiModel::File& file, const juce::String& hash)
     {
-        auto* object = new juce::DynamicObject();
+        auto* object = new cydaw::base::Object();
         object->setProperty("path", file.path);
         object->setProperty("size", file.size);
         object->setProperty("sha256", hash);
-        return juce::var(object);
+        return cydaw::base::Value(object);
     }
 
     bool fail(juce::String& error)

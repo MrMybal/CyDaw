@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #include "ProjectImport.h"
 #include "ProjectImportShared.h"
 
@@ -122,18 +123,18 @@ class ReaperReader {
 public:
     ReaperReader(const juce::File& file, ImportedProject& out) : file_(file), out_(out), folder_(file.getParentDirectory()) {}
 
-    juce::Result read()
+    cydaw::base::Result read()
     {
         const auto content = file_.loadFileAsString();
         if (!content.trimStart().startsWith("<REAPER_PROJECT"))
-            return juce::Result::fail("Not a Reaper project: " + file_.getFileName());
+            return cydaw::base::Result::fail("Not a Reaper project: " + file_.getFileName());
         const auto root = parse(content);
         const Block* project = nullptr;
         for (const auto& entry : root->entries)
             if (entry.block != nullptr && entry.block->name() == "REAPER_PROJECT")
                 project = entry.block.get();
         if (project == nullptr)
-            return juce::Result::fail("The Reaper project holds no REAPER_PROJECT block");
+            return cydaw::base::Result::fail("The Reaper project holds no REAPER_PROJECT block");
         out_.format = "reaper";
         out_.application = "Reaper " + (project->head.size() > 2 ? project->head[2] : juce::String());
         out_.tempo = juce::jlimit(20.0, 960.0, project->number("TEMPO", 1, 120.0));
@@ -150,7 +151,7 @@ public:
         for (const auto& entry : project->entries)
             if (entry.block != nullptr && entry.block->name() == "TRACK")
                 readTrack(*entry.block);
-        return juce::Result::ok();
+        return cydaw::base::Result::ok();
     }
 
 private:
@@ -384,7 +385,7 @@ private:
 
 } // namespace
 
-juce::Result importReaperProject(const juce::File& file, ImportedProject& out)
+cydaw::base::Result importReaperProject(const juce::File& file, ImportedProject& out)
 {
     out.source = file;
     ReaperReader reader(file, out);

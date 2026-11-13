@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 // The factory's processings (Factory/Processings): written by writeFactory
 // (the `processing` command's "writeFactory"), kept with the content. Their
 // names in English, as every factory preset's.
@@ -254,11 +255,11 @@ Processing roomReverb()
     ModeProcessing mixer;
     mixer.restore(step.chain);
     mixer.ensureInput(1, "Sound");
-    auto* request = new juce::DynamicObject();
+    auto* request = new cydaw::base::Object();
     request->setProperty("op", "add_effect");
     request->setProperty("inputId", 1);
     request->setProperty("key", "reverb-pro");
-    (void) mixer.command(juce::var(request));
+    (void) mixer.command(cydaw::base::Value(request));
     step.chain = mixer.serialise();
     for (const auto& knob : mixer.parameters(1)) {
         const auto label = juce::String(knob.label).toLowerCase();
@@ -274,7 +275,7 @@ Processing roomReverb()
 
 } // namespace
 
-juce::Result writeFactory(const juce::File& folder)
+cydaw::base::Result writeFactory(const juce::File& folder)
 {
     std::vector<Processing> all {
         audio("Remove Noise", "Background noise (hiss, hum of fans) measured in the quietest moments and taken out.",
@@ -314,7 +315,7 @@ juce::Result writeFactory(const juce::File& folder)
         if (const auto saved = save(processing, folder.getChildFile(juce::File::createLegalFileName(processing.name) + fileExtension));
             saved.failed())
             return saved;
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 } // namespace cydaw::v2::processing

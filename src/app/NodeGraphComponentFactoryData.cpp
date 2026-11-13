@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "NodeGraphComponent.h"
 
 #include <cydaw/engine/EffectCatalogue.h>
@@ -1416,7 +1417,7 @@ void NodeGraphComponent::ensureFactoryModules()
                    && stored->factoryModule) {
             // The metadata below is rewritten, so the description this class
             // was read from stops matching it.
-            stored->source = juce::var();
+            stored->source = cydaw::base::Value();
             stored->definitionCache.reset();
             // Migrate the library metadata without replacing a class body
             // that may already be referenced by the current project.

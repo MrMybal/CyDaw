@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #pragma once
 
 #include "NodeGraphComponent.h"
@@ -76,8 +77,8 @@ public:
     // A change made around the editor's notifications (the control port's).
     void touch() noexcept { ++revision_; }
     // Restoring does not notify: the caller publishes once afterwards.
-    void restore(const juce::var& stateWithLibrary);
-    [[nodiscard]] juce::var serialise() const;
+    void restore(const cydaw::base::Value& stateWithLibrary);
+    [[nodiscard]] cydaw::base::Value serialise() const;
     [[nodiscard]] juce::String lastCompileError() const { return lastError_; }
     void setLastCompileError(juce::String error) { lastError_ = std::move(error); }
 

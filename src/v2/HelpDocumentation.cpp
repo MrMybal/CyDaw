@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "HelpDocumentation.h"
 #include <set>
 namespace cydaw::v2 {
@@ -11,14 +12,14 @@ bool HelpDocumentation::load() {
     if (catalog_.isObject()) return true;
     const auto file = directory_.getChildFile("DocData/routes.json");
     if (!file.existsAsFile() || file.getSize() > 8 * 1024 * 1024) { error_ = "CyDoc help route catalog is missing or too large"; return false; }
-    const auto data = juce::JSON::parse(file);
+    const auto data = cydaw::base::JSON::parse(file);
     if (data.getProperty("format", {}).toString() != "CyDAW CyDoc Routes" || int(data.getProperty("schema", 0)) != 1
         || !data.getProperty("pages", {}).isArray()) { error_ = "Invalid CyDoc help route catalog"; return false; }
     catalog_ = data;
-    if (!page("welcome")) { catalog_ = juce::var(); error_ = "CyDoc welcome page is missing"; return false; }
+    if (!page("welcome")) { catalog_ = cydaw::base::Value(); error_ = "CyDoc welcome page is missing"; return false; }
     return true;
 }
-const juce::var* HelpDocumentation::page(const juce::String& id) const {
+const cydaw::base::Value* HelpDocumentation::page(const juce::String& id) const {
     if (const auto* pages = catalog_.getProperty("pages", {}).getArray())
         for (const auto& value : *pages) if (value.getProperty("id", {}).toString() == id) return &value;
     return nullptr;
@@ -26,9 +27,9 @@ const juce::var* HelpDocumentation::page(const juce::String& id) const {
 bool HelpDocumentation::canonical(juce::String& id, juce::String& anchor) const {
     std::set<juce::String> visited;
     const auto aliases = catalog_.getProperty("aliases", {});
-    while (aliases.hasProperty(juce::Identifier(id))) {
+    while (aliases.hasProperty(cydaw::base::Identifier(id))) {
         if (!visited.insert(id).second || visited.size() > 16) return false;
-        const auto value = aliases.getProperty(juce::Identifier(id), {}).toString();
+        const auto value = aliases.getProperty(cydaw::base::Identifier(id), {}).toString();
         id = value.upToFirstOccurrenceOf("#", false, false);
         if (anchor.isEmpty() && value.containsChar('#')) anchor = value.fromFirstOccurrenceOf("#", false, false);
     }
@@ -42,14 +43,14 @@ juce::String HelpDocumentation::link(juce::String id, juce::String anchor, juce:
     if (id.isEmpty()) return base; // The reader chooses its home page and saved locale.
     if (id.length() > 256 || anchor.length() > 256 || !canonical(id, anchor)) { error_ = "Unknown help page"; return {}; }
     const auto* target = page(id);
-    auto available = target->getProperty("anchors", {}).getProperty(juce::Identifier(locale), {});
+    auto available = target->getProperty("anchors", {}).getProperty(cydaw::base::Identifier(locale), {});
     if (!available.isArray()) available = target->getProperty("anchors", {}).getProperty("en", {});
     if (anchor.isNotEmpty() && (!available.isArray() || !available.getArray()->contains(anchor))) { error_ = "Unknown help section"; return {}; }
     auto result = base + "#/" + encode(locale) + "/" + encode(id);
     if (anchor.isNotEmpty()) result += "/" + encode(anchor);
     if (state.size()) {
         const auto media = state["media"];
-        auto ids = target->getProperty("media", {}).getProperty(juce::Identifier(locale), {});
+        auto ids = target->getProperty("media", {}).getProperty(cydaw::base::Identifier(locale), {});
         if (!ids.isArray()) ids = target->getProperty("media", {}).getProperty("en", {});
         if (media.isEmpty() || !ids.isArray() || !ids.getArray()->contains(media)) { error_ = "Unknown help media"; return {}; }
         auto keys = state.getAllKeys(); keys.sort(false);
@@ -84,7 +85,7 @@ juce::String HelpDocumentation::follow(const juce::String& target, juce::String 
         state.set(juce::URL::removeEscapeChars(item.upToFirstOccurrenceOf("=", false, false)),juce::URL::removeEscapeChars(item.fromFirstOccurrenceOf("=", false, false)));
     return link(id, anchor, locale, state);
 }
-juce::var HelpDocumentation::command(const juce::var& request, bool allowBrowser) {
+cydaw::base::Value HelpDocumentation::command(const cydaw::base::Value& request, bool allowBrowser) {
     const auto action = request.getProperty("action", "status").toString();
     const auto requestedLocale = request.getProperty("language", locale_).toString();
     if (requestedLocale != "en" && requestedLocale != "fr") return "Help language: en or fr";
@@ -106,11 +107,11 @@ juce::var HelpDocumentation::command(const juce::var& request, bool allowBrowser
         if (!launchSuppressed_ && !launched_) return "Cannot open the local CyDoc reader in the default browser";
     } else if (action != "status") return "CyDoc owns search/history/closing. Help actions: status, open, navigate, follow";
     if (!load()) return error_;
-    auto* result = new juce::DynamicObject();
+    auto* result = new cydaw::base::Object();
     result->setProperty("engine", "CyDoc"); result->setProperty("url", lastUrl_); result->setProperty("language", locale_);
     result->setProperty("topic", page_); result->setProperty("section", anchor_); result->setProperty("requests", requests_);
     result->setProperty("launchSuppressed", launchSuppressed_); result->setProperty("launched", launched_);
     result->setProperty("error", error_); result->setProperty("pages", catalog_.getProperty("pages", {}));
-    return juce::var(result);
+    return cydaw::base::Value(result);
 }
 }

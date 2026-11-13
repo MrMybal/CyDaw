@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "SoundBanks.h"
 
 #include "AiModels.h"
@@ -118,7 +119,7 @@ void SoundBanks::loadRegistry()
     if (busy())
         return;
     const auto file = registryFile();
-    const auto json = juce::JSON::parse(file.loadFileAsString());
+    const auto json = cydaw::base::JSON::parse(file.loadFileAsString());
     // The maps' files stay known: they do not depend on the list.
     banks_.clear();
     lists_.clear();
@@ -140,7 +141,7 @@ void SoundBanks::loadRegistry()
             bank.rate = juce::jlimit(8'000.0, 192'000.0, static_cast<double>(item.getProperty("rate", 48'000.0)));
             // In the interface's language ({"fr": …, "en": …}), else English.
             if (const auto description = item.getProperty("description", {}); description.isObject())
-                bank.description = description.getProperty(juce::Identifier(ui::language()),
+                bank.description = description.getProperty(cydaw::base::Identifier(ui::language()),
                                                            description.getProperty("en", {})).toString();
             else
                 bank.description = description.toString();
@@ -205,7 +206,7 @@ const std::vector<SoundBanks::BankFile>& SoundBanks::filesOf(const juce::String&
 SoundBanks::PreloadedList SoundBanks::readList(const juce::File& listFile)
 {
     PreloadedList read;
-    const auto json = juce::JSON::parse(listFile.loadFileAsString());
+    const auto json = cydaw::base::JSON::parse(listFile.loadFileAsString());
     if (const auto* list = json.getProperty("files", {}).getArray())
         for (const auto& item : *list)
             if (const auto* fields = item.getArray(); fields != nullptr && fields->size() >= 2) {
@@ -322,12 +323,12 @@ void SoundBanks::preloadMaps(std::vector<juce::File> maps)
     });
 }
 
-std::vector<juce::String> SoundBanks::bankPathsOf(const juce::var& mapJson) const
+std::vector<juce::String> SoundBanks::bankPathsOf(const cydaw::base::Value& mapJson) const
 {
     return pathsOfMap(mapJson);
 }
 
-std::vector<juce::String> SoundBanks::pathsOfMap(const juce::var& mapJson)
+std::vector<juce::String> SoundBanks::pathsOfMap(const cydaw::base::Value& mapJson)
 {
     std::vector<juce::String> paths;
     if (const auto* zones = mapJson.getProperty("zones", {}).getArray())
@@ -339,7 +340,7 @@ std::vector<juce::String> SoundBanks::pathsOfMap(const juce::var& mapJson)
     return paths;
 }
 
-SoundBanks::Missing SoundBanks::missingFor(const juce::var& mapJson, const bool exact)
+SoundBanks::Missing SoundBanks::missingFor(const cydaw::base::Value& mapJson, const bool exact)
 {
     Missing missing;
     for (const auto& stored : bankPathsOf(mapJson)) {
@@ -410,15 +411,15 @@ SoundBanks::Missing SoundBanks::missingForFile(const juce::File& mapFile, const 
         entry.generation = -1;
     }
     if (exact || entry.generation != diskGeneration_) {
-        juce::Array<juce::var> zones;
+        cydaw::base::Array<cydaw::base::Value> zones;
         for (const auto& path : entry.paths) {
-            auto* zone = new juce::DynamicObject();
+            auto* zone = new cydaw::base::Object();
             zone->setProperty("file", path);
-            zones.add(juce::var(zone));
+            zones.add(cydaw::base::Value(zone));
         }
-        auto* json = new juce::DynamicObject();
+        auto* json = new cydaw::base::Object();
         json->setProperty("zones", zones);
-        auto missing = missingFor(juce::var(json), exact);
+        auto missing = missingFor(cydaw::base::Value(json), exact);
         if (exact)
             return missing;
         // Kept once every bank of it is counted.
@@ -765,7 +766,7 @@ void SoundBanks::writeBankRecord(const Bank& bank) const
     const auto record = folderOf(bank.id).getChildFile("bank.json");
     if (record.existsAsFile())
         return;
-    auto* json = new juce::DynamicObject();
+    auto* json = new cydaw::base::Object();
     json->setProperty("id", bank.id);
     json->setProperty("title", bank.title);
     json->setProperty("author", bank.author);
@@ -777,7 +778,7 @@ void SoundBanks::writeBankRecord(const Bank& bank) const
         json->setProperty("generator", bank.generator);
     json->setProperty("fetched", juce::Time::getCurrentTime().formatted("%Y-%m-%d"));
     (void) record.getParentDirectory().createDirectory();
-    (void) record.replaceWithText(juce::JSON::toString(juce::var(json)));
+    (void) record.replaceWithText(cydaw::base::JSON::toString(cydaw::base::Value(json)));
 }
 
 bool SoundBanks::remove(const juce::String& id, juce::String& error)

@@ -1,30 +1,31 @@
+#include <cydaw/base/File.h>
 #pragma once
 #include <algorithm>
 #include <cydaw/engine/FoundrySession.h>
 #include <juce_core/juce_core.h>
 namespace cydaw::v2::foundry_json
 {
-inline juce::var automation(const std::vector<engine::foundry::AutomationLane> &lanes)
+inline cydaw::base::Value automation(const std::vector<engine::foundry::AutomationLane> &lanes)
 {
-    juce::Array<juce::var> out;
+    cydaw::base::Array<cydaw::base::Value> out;
     for (const auto &lane : lanes)
     {
-        auto *item = new juce::DynamicObject();
+        auto *item = new cydaw::base::Object();
         item->setProperty("binding", juce::String::fromUTF8(lane.binding.c_str()));
-        juce::Array<juce::var> points;
+        cydaw::base::Array<cydaw::base::Value> points;
         for (const auto &point : lane.points)
         {
-            auto *p = new juce::DynamicObject();
+            auto *p = new cydaw::base::Object();
             p->setProperty("frame", point.frame);
             p->setProperty("value", point.value);
-            points.add(juce::var(p));
+            points.add(cydaw::base::Value(p));
         }
         item->setProperty("points", points);
-        out.add(juce::var(item));
+        out.add(cydaw::base::Value(item));
     }
     return out;
 }
-inline std::vector<engine::foundry::AutomationLane> automation(const juce::var &data)
+inline std::vector<engine::foundry::AutomationLane> automation(const cydaw::base::Value &data)
 {
     std::vector<engine::foundry::AutomationLane> out;
     if (const auto *lanes = data.getArray())
@@ -44,22 +45,22 @@ inline std::vector<engine::foundry::AutomationLane> automation(const juce::var &
         }
     return out;
 }
-inline juce::var notes(const std::vector<engine::foundry::Note> &notes)
+inline cydaw::base::Value notes(const std::vector<engine::foundry::Note> &notes)
 {
-    juce::Array<juce::var> out;
+    cydaw::base::Array<cydaw::base::Value> out;
     for (const auto &n : notes)
     {
-        auto *p = new juce::DynamicObject();
+        auto *p = new cydaw::base::Object();
         p->setProperty("id", static_cast<juce::int64>(n.id));
         p->setProperty("start", n.start);
         p->setProperty("length", n.length);
         p->setProperty("key", n.key);
         p->setProperty("velocity", n.velocity);
-        out.add(juce::var(p));
+        out.add(cydaw::base::Value(p));
     }
     return out;
 }
-inline std::vector<engine::foundry::Note> notes(const juce::var &data, engine::foundry::Session &session)
+inline std::vector<engine::foundry::Note> notes(const cydaw::base::Value &data, engine::foundry::Session &session)
 {
     std::vector<engine::foundry::Note> out;
     if (const auto *notes = data.getArray())

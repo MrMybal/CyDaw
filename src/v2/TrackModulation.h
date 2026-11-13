@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #pragma once
 
 #include <cydaw/engine/NativeDspGraph.h>
@@ -24,11 +25,11 @@ struct Assignment {
     bool enabled {};
 };
 
-[[nodiscard]] std::vector<Assignment> readAssignments(const juce::var& array);
-[[nodiscard]] juce::var writeAssignments(const std::vector<Assignment>& assignments);
+[[nodiscard]] std::vector<Assignment> readAssignments(const cydaw::base::Value& array);
+[[nodiscard]] cydaw::base::Value writeAssignments(const std::vector<Assignment>& assignments);
 
 // The value graph's output at a time, -1..1 for an LFO.
-[[nodiscard]] double evaluate(const juce::var& valueGraph, double timeSeconds);
+[[nodiscard]] double evaluate(const cydaw::base::Value& valueGraph, double timeSeconds);
 
 // Writes a value into the native parameter a binding names; false when the
 // binding is not one a modulation can move.
@@ -56,8 +57,8 @@ struct LfoSettings {
     double offset {};
     int shape {};
 };
-[[nodiscard]] LfoSettings firstLfo(const juce::var& valueGraph);
+[[nodiscard]] LfoSettings firstLfo(const cydaw::base::Value& valueGraph);
 // Changes the first LFO in place; false when the graph has none.
-bool setFirstLfo(juce::var& valueGraph, const LfoSettings& settings);
+bool setFirstLfo(cydaw::base::Value& valueGraph, const LfoSettings& settings);
 
 } // namespace cydaw::v2::modulation

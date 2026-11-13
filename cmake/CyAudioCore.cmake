@@ -47,6 +47,10 @@ if(NOT TARGET CyDSP::Stretch)
 endif()
 
 function(cydaw_copy_audio_notices target destination)
+    add_custom_command(TARGET ${target} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${destination}/nlohmann-json"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${PROJECT_SOURCE_DIR}/third_party/nlohmann/LICENSE.MIT" "${destination}/nlohmann-json/LICENSE.MIT"
+        VERBATIM)
     if(WIN32 AND CYDAW_ENABLE_ASIO)
         add_custom_command(TARGET ${target} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E make_directory "${destination}/ASIO"
@@ -85,3 +89,5 @@ foreach(dependency IN ITEMS CyAudioCore CyDSP)
     install(DIRECTORY "${source}/third_party/licenses/"
         DESTINATION "Licenses/${dependency}/third-party" COMPONENT CyDAWRuntime)
 endforeach()
+
+install(FILES "${PROJECT_SOURCE_DIR}/third_party/nlohmann/LICENSE.MIT" DESTINATION Licenses/nlohmann-json COMPONENT CyDAWRuntime)

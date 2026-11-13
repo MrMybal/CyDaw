@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "DjLibrary.h"
 
@@ -19,9 +20,9 @@ bool isAudioFile(const juce::File& file)
     return file.hasFileExtension("wav;wave;aif;aiff;flac;ogg;mp3;wma;m4a");
 }
 
-double number(const juce::var& object, const char* key, const double fallback = 0.0)
+double number(const cydaw::base::Value& object, const char* key, const double fallback = 0.0)
 {
-    const auto value = object.getProperty(key, juce::var());
+    const auto value = object.getProperty(key, cydaw::base::Value());
     return value.isVoid() ? fallback : static_cast<double>(value);
 }
 
@@ -56,7 +57,7 @@ void DjLibrary::load()
         return;
     const auto file = collectionFile();
     if (file.existsAsFile()) {
-        fromJson(juce::JSON::parse(file));
+        fromJson(cydaw::base::JSON::parse(file));
     } else if (!automated) {
         // The first time: the person's music.
         const auto music = juce::File::getSpecialLocation(juce::File::userMusicDirectory);
@@ -74,7 +75,7 @@ void DjLibrary::flush()
         return;
     const auto file = collectionFile();
     (void) file.getParentDirectory().createDirectory();
-    (void) file.replaceWithText(juce::JSON::toString(toJson()));
+    (void) file.replaceWithText(cydaw::base::JSON::toString(toJson()));
 }
 
 void DjLibrary::tick()
@@ -358,19 +359,19 @@ void DjLibrary::analyseNow(juce::AudioFormatManager& formats, const juce::File& 
     changed();
 }
 
-juce::var DjLibrary::toJson() const
+cydaw::base::Value DjLibrary::toJson() const
 {
     const std::scoped_lock lock(lock_);
-    auto* root = new juce::DynamicObject();
+    auto* root = new cydaw::base::Object();
     root->setProperty("format", "CyDAW DJ collection");
     root->setProperty("version", 1);
-    juce::Array<juce::var> folders;
+    cydaw::base::Array<cydaw::base::Value> folders;
     for (const auto& folder : folders_)
         folders.add(folder);
     root->setProperty("folders", folders);
-    juce::Array<juce::var> list;
+    cydaw::base::Array<cydaw::base::Value> list;
     for (const auto& track : tracks_) {
-        auto* item = new juce::DynamicObject();
+        auto* item = new cydaw::base::Object();
         item->setProperty("path", track.file.getFullPathName());
         item->setProperty("title", track.title);
         item->setProperty("artist", track.artist);
@@ -384,7 +385,7 @@ juce::var DjLibrary::toJson() const
         if (track.error.isNotEmpty())
             item->setProperty("error", track.error);
         item->setProperty("cue", track.cuePoint);
-        juce::Array<juce::var> cues;
+        cydaw::base::Array<cydaw::base::Value> cues;
         for (const auto cue : track.hotCues)
             cues.add(cue);
         item->setProperty("hotCues", cues);
@@ -392,28 +393,28 @@ juce::var DjLibrary::toJson() const
         item->setProperty("modified", track.modified);
         item->setProperty("plays", track.plays);
         item->setProperty("lastPlayed", track.lastPlayed);
-        list.add(juce::var(item));
+        list.add(cydaw::base::Value(item));
     }
     root->setProperty("tracks", list);
-    return juce::var(root);
+    return cydaw::base::Value(root);
 }
 
-void DjLibrary::fromJson(const juce::var& document)
+void DjLibrary::fromJson(const cydaw::base::Value& document)
 {
-    if (document.getProperty("format", juce::var()).toString() != "CyDAW DJ collection")
+    if (document.getProperty("format", cydaw::base::Value()).toString() != "CyDAW DJ collection")
         return;
     const std::scoped_lock lock(lock_);
     folders_.clear();
-    if (const auto* folders = document.getProperty("folders", juce::var()).getArray())
+    if (const auto* folders = document.getProperty("folders", cydaw::base::Value()).getArray())
         for (const auto& folder : *folders)
             folders_.add(folder.toString());
     tracks_.clear();
-    if (const auto* list = document.getProperty("tracks", juce::var()).getArray())
+    if (const auto* list = document.getProperty("tracks", cydaw::base::Value()).getArray())
         for (const auto& item : *list) {
             DjTrack track;
-            track.file = juce::File(item.getProperty("path", juce::var()).toString());
-            track.title = item.getProperty("title", juce::var()).toString();
-            track.artist = item.getProperty("artist", juce::var()).toString();
+            track.file = juce::File(item.getProperty("path", cydaw::base::Value()).toString());
+            track.title = item.getProperty("title", cydaw::base::Value()).toString();
+            track.artist = item.getProperty("artist", cydaw::base::Value()).toString();
             track.seconds = number(item, "seconds");
             track.bpm = number(item, "bpm");
             track.firstBeat = number(item, "firstBeat");
@@ -421,9 +422,9 @@ void DjLibrary::fromJson(const juce::var& document)
             track.key = static_cast<int>(number(item, "key", -1.0));
             track.loudness = number(item, "loudness", -70.0);
             track.analysed = static_cast<bool>(item.getProperty("analysed", false));
-            track.error = item.getProperty("error", juce::var()).toString();
+            track.error = item.getProperty("error", cydaw::base::Value()).toString();
             track.cuePoint = number(item, "cue");
-            if (const auto* cues = item.getProperty("hotCues", juce::var()).getArray())
+            if (const auto* cues = item.getProperty("hotCues", cydaw::base::Value()).getArray())
                 for (int i = 0; i < std::min(8, cues->size()); ++i)
                     track.hotCues[static_cast<std::size_t>(i)] = static_cast<double>((*cues)[i]);
             track.size = static_cast<juce::int64>(number(item, "size"));

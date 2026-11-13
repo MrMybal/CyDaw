@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "ControllersImpl.h"
 
 #include "ImGuiHost.h"
@@ -27,28 +28,28 @@ double secondsNow()
     return juce::Time::getMillisecondCounterHiRes() * 0.001;
 }
 
-juce::String text(const juce::var& value, const char* key, const juce::String& fallback = {})
+juce::String text(const cydaw::base::Value& value, const char* key, const juce::String& fallback = {})
 {
     return value.hasProperty(key) ? value.getProperty(key, {}).toString() : fallback;
 }
 
-double number(const juce::var& value, const char* key, const double fallback)
+double number(const cydaw::base::Value& value, const char* key, const double fallback)
 {
     return value.hasProperty(key) ? static_cast<double>(value.getProperty(key, fallback)) : fallback;
 }
 
-juce::var object()
+cydaw::base::Value object()
 {
-    return juce::var(new juce::DynamicObject());
+    return cydaw::base::Value(new cydaw::base::Object());
 }
 
-void set(juce::var& target, const char* key, const juce::var& value)
+void set(cydaw::base::Value& target, const char* key, const cydaw::base::Value& value)
 {
     if (auto* item = target.getDynamicObject())
         item->setProperty(key, value);
 }
 
-juce::var modifierVar(const control::Modifier& modifier)
+cydaw::base::Value modifierVar(const control::Modifier& modifier)
 {
     auto item = object();
     set(item, "kind", control::modifierName(modifier.kind));
@@ -57,7 +58,7 @@ juce::var modifierVar(const control::Modifier& modifier)
     return item;
 }
 
-std::optional<control::Modifier> modifierFrom(const juce::var& value)
+std::optional<control::Modifier> modifierFrom(const cydaw::base::Value& value)
 {
     const auto kind = control::modifierKindNamed(text(value, "kind").toStdString());
     if (!kind)
@@ -68,7 +69,7 @@ std::optional<control::Modifier> modifierFrom(const juce::var& value)
     return modifier;
 }
 
-std::vector<control::Modifier> chainFrom(const juce::var& value)
+std::vector<control::Modifier> chainFrom(const cydaw::base::Value& value)
 {
     std::vector<control::Modifier> chain;
     if (const auto* list = value.getArray())
@@ -78,15 +79,15 @@ std::vector<control::Modifier> chainFrom(const juce::var& value)
     return chain;
 }
 
-juce::var chainVar(const std::vector<control::Modifier>& chain)
+cydaw::base::Value chainVar(const std::vector<control::Modifier>& chain)
 {
-    juce::Array<juce::var> list;
+    cydaw::base::Array<cydaw::base::Value> list;
     for (const auto& modifier : chain)
         list.add(modifierVar(modifier));
     return list;
 }
 
-juce::var assignmentVar(const control::Assignment& assignment)
+cydaw::base::Value assignmentVar(const control::Assignment& assignment)
 {
     auto item = object();
     set(item, "device", juce::String(assignment.device));
@@ -98,7 +99,7 @@ juce::var assignmentVar(const control::Assignment& assignment)
     return item;
 }
 
-std::optional<control::Assignment> assignmentFrom(const juce::var& value, const bool project)
+std::optional<control::Assignment> assignmentFrom(const cydaw::base::Value& value, const bool project)
 {
     control::Assignment assignment;
     assignment.device = text(value, "device").toStdString();
@@ -318,7 +319,7 @@ std::string pluginDeviceId(const Controllers::Impl& impl, const int index, const
 Controllers::Impl::Impl(Studio& studioIn, UiState& state, ImGuiHost& hostIn, const bool keep)
     : targets(studioIn, state), studio(studioIn), uiState(state), host(hostIn), keepSettings(keep)
 {
-    restoreGlobal(juce::JSON::parse(studio.settings().getValue("controllers")));
+    restoreGlobal(cydaw::base::JSON::parse(studio.settings().getValue("controllers")));
     // The computer's keyboard: always there.
     if (rawDevice(computerKeyboardId) == nullptr) {
         raw.push_back(std::make_unique<RawDevice>());
@@ -1158,11 +1159,11 @@ void Controllers::Impl::stopLearning()
 
 // ---- Files ---------------------------------------------------------------------------------------------
 
-juce::var Controllers::Impl::globalState() const
+cydaw::base::Value Controllers::Impl::globalState() const
 {
     auto state = object();
     set(state, "version", 1);
-    juce::Array<juce::var> devices;
+    cydaw::base::Array<cydaw::base::Value> devices;
     for (const auto& device : raw) {
         auto item = object();
         set(item, "id", juce::String(device->id));
@@ -1179,14 +1180,14 @@ juce::var Controllers::Impl::globalState() const
         devices.add(item);
     }
     set(state, "raw", devices);
-    juce::Array<juce::var> virtualDevices;
+    cydaw::base::Array<cydaw::base::Value> virtualDevices;
     for (const auto& device : router.devices) {
         auto item = object();
         set(item, "id", juce::String(device.id));
         set(item, "name", juce::String(device.name));
         set(item, "input", juce::String(device.input));
         set(item, "output", juce::String(device.output));
-        juce::Array<juce::var> controls;
+        cydaw::base::Array<cydaw::base::Value> controls;
         for (const auto& control : device.controls) {
             auto entry = object();
             set(entry, "id", juce::String(control.id));
@@ -1203,7 +1204,7 @@ juce::var Controllers::Impl::globalState() const
         virtualDevices.add(item);
     }
     set(state, "virtual", virtualDevices);
-    juce::Array<juce::var> assignments;
+    cydaw::base::Array<cydaw::base::Value> assignments;
     for (const auto& assignment : router.assignments)
         if (!assignment.project)
             assignments.add(assignmentVar(assignment));
@@ -1211,7 +1212,7 @@ juce::var Controllers::Impl::globalState() const
     return state;
 }
 
-void Controllers::Impl::restoreGlobal(const juce::var& state)
+void Controllers::Impl::restoreGlobal(const cydaw::base::Value& state)
 {
     if (!state.isObject())
         return;
@@ -1273,16 +1274,16 @@ void Controllers::Impl::restoreGlobal(const juce::var& state)
                 router.assignments.push_back(*assignment);
 }
 
-juce::var Controllers::Impl::projectAssignments() const
+cydaw::base::Value Controllers::Impl::projectAssignments() const
 {
-    juce::Array<juce::var> list;
+    cydaw::base::Array<cydaw::base::Value> list;
     for (const auto& assignment : router.assignments)
         if (assignment.project)
             list.add(assignmentVar(assignment));
     return list;
 }
 
-void Controllers::Impl::restoreProject(const juce::var& assignments)
+void Controllers::Impl::restoreProject(const cydaw::base::Value& assignments)
 {
     auto& list = router.assignments;
     list.erase(std::remove_if(list.begin(), list.end(), [](const auto& a) { return a.project; }), list.end());
@@ -1308,16 +1309,16 @@ void Controllers::Impl::saveNow()
     globalDirty = false;
     if (!keepSettings)
         return;
-    studio.settings().setValue("controllers", juce::JSON::toString(globalState(), true));
+    studio.settings().setValue("controllers", juce::String::fromUTF8(cydaw::base::JSON::toString(globalState(), true).toRawUTF8()));
     studio.settings().saveIfNeeded();
 }
 
 // ---- The control port --------------------------------------------------------------------------------
 
-juce::var Controllers::Impl::describe() const
+cydaw::base::Value Controllers::Impl::describe() const
 {
     auto result = object();
-    juce::Array<juce::var> devices;
+    cydaw::base::Array<cydaw::base::Value> devices;
     for (const auto& device : raw) {
         auto item = object();
         set(item, "id", juce::String(device->id));
@@ -1340,14 +1341,14 @@ juce::var Controllers::Impl::describe() const
         devices.add(item);
     }
     set(result, "raw", devices);
-    juce::Array<juce::var> virtualDevices;
+    cydaw::base::Array<cydaw::base::Value> virtualDevices;
     for (const auto& device : router.devices) {
         auto item = object();
         set(item, "id", juce::String(device.id));
         set(item, "name", juce::String(device.name));
         set(item, "input", juce::String(device.input));
         set(item, "output", juce::String(device.output));
-        juce::Array<juce::var> controls;
+        cydaw::base::Array<cydaw::base::Value> controls;
         for (const auto& control : device.controls) {
             auto entry = object();
             set(entry, "id", juce::String(control.id));
@@ -1366,7 +1367,7 @@ juce::var Controllers::Impl::describe() const
         virtualDevices.add(item);
     }
     set(result, "virtual", virtualDevices);
-    juce::Array<juce::var> assignments;
+    cydaw::base::Array<cydaw::base::Value> assignments;
     for (const auto& assignment : router.assignments) {
         auto item = assignmentVar(assignment);
         const auto info = targets.describe(assignment.target);
@@ -1375,7 +1376,7 @@ juce::var Controllers::Impl::describe() const
         assignments.add(item);
     }
     set(result, "assignments", assignments);
-    juce::Array<juce::var> loaded;
+    cydaw::base::Array<cydaw::base::Value> loaded;
     for (const auto& plugin : plugins) {
         auto item = object();
         set(item, "name", plugin->name);
@@ -1394,10 +1395,10 @@ juce::var Controllers::Impl::describe() const
     return result;
 }
 
-juce::var Controllers::Impl::command(const juce::var& request)
+cydaw::base::Value Controllers::Impl::command(const cydaw::base::Value& request)
 {
     const auto action = text(request, "action", "status");
-    const auto fail = [](const juce::String& message) { return juce::var(message); };
+    const auto fail = [](const juce::String& message) { return cydaw::base::Value(message); };
     const auto device = text(request, "device").toStdString();
     const auto controlId = text(request, "control").toStdString();
     if (action == "show") {
@@ -1589,7 +1590,7 @@ juce::var Controllers::Impl::command(const juce::var& request)
     }
     if (action == "targets") {
         const auto filter = text(request, "filter");
-        juce::Array<juce::var> list;
+        cydaw::base::Array<cydaw::base::Value> list;
         for (const auto& key : targets.list()) {
             if (filter.isNotEmpty() && !juce::String(key).containsIgnoreCase(filter))
                 continue;
@@ -1628,7 +1629,7 @@ juce::var Controllers::Impl::command(const juce::var& request)
     }
     if (action == "monitor") {
         const auto count = static_cast<int>(number(request, "count", 50));
-        juce::Array<juce::var> list;
+        cydaw::base::Array<cydaw::base::Value> list;
         const auto from = monitor.size() > static_cast<std::size_t>(std::max(0, count)) ? monitor.size() - static_cast<std::size_t>(count) : 0;
         for (auto index = from; index < monitor.size(); ++index) {
             const auto& seen = monitor[index];
@@ -1693,7 +1694,7 @@ bool Controllers::learning() const
     return impl_->learnMode;
 }
 
-juce::var Controllers::command(const juce::var& request)
+cydaw::base::Value Controllers::command(const cydaw::base::Value& request)
 {
     return impl_->command(request);
 }

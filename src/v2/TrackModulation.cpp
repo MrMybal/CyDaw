@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "TrackModulation.h"
 
 #include <cydaw/engine/EffectCatalogue.h>
@@ -11,14 +12,14 @@
 namespace cydaw::v2::modulation {
 namespace {
 
-double number(const juce::DynamicObject& object, const char* key, const double fallback)
+double number(const cydaw::base::Object& object, const char* key, const double fallback)
 {
     return object.hasProperty(key) ? static_cast<double>(object.getProperty(key)) : fallback;
 }
 
 } // namespace
 
-std::vector<Assignment> readAssignments(const juce::var& array)
+std::vector<Assignment> readAssignments(const cydaw::base::Value& array)
 {
     std::vector<Assignment> out;
     if (const auto* values = array.getArray())
@@ -38,11 +39,11 @@ std::vector<Assignment> readAssignments(const juce::var& array)
     return out;
 }
 
-juce::var writeAssignments(const std::vector<Assignment>& assignments)
+cydaw::base::Value writeAssignments(const std::vector<Assignment>& assignments)
 {
-    juce::Array<juce::var> values;
+    cydaw::base::Array<cydaw::base::Value> values;
     for (const auto& assignment : assignments) {
-        auto object = juce::DynamicObject::Ptr(new juce::DynamicObject());
+        auto object = cydaw::base::Object::Ptr(new cydaw::base::Object());
         object->setProperty("binding", assignment.binding);
         object->setProperty("label", assignment.label);
         object->setProperty("base", assignment.base);
@@ -50,12 +51,12 @@ juce::var writeAssignments(const std::vector<Assignment>& assignments)
         object->setProperty("maximum", assignment.maximum);
         object->setProperty("amount", assignment.amount);
         object->setProperty("enabled", assignment.enabled);
-        values.add(juce::var(object.get()));
+        values.add(cydaw::base::Value(object.get()));
     }
-    return juce::var(values);
+    return cydaw::base::Value(values);
 }
 
-double evaluate(const juce::var& state, const double timeSeconds)
+double evaluate(const cydaw::base::Value& state, const double timeSeconds)
 {
     struct ValueNode {
         std::uint64_t id {};
@@ -316,7 +317,7 @@ std::optional<double> readFromNativeGraph(const engine::NativeDspGraph& graph, c
     return static_cast<double>(field.read(*parameters));
 }
 
-LfoSettings firstLfo(const juce::var& valueGraph)
+LfoSettings firstLfo(const cydaw::base::Value& valueGraph)
 {
     LfoSettings settings;
     if (const auto* root = valueGraph.getDynamicObject())
@@ -335,7 +336,7 @@ LfoSettings firstLfo(const juce::var& valueGraph)
     return settings;
 }
 
-bool setFirstLfo(juce::var& valueGraph, const LfoSettings& settings)
+bool setFirstLfo(cydaw::base::Value& valueGraph, const LfoSettings& settings)
 {
     if (const auto* root = valueGraph.getDynamicObject())
         if (const auto* nodes = root->getProperty("nodes").getArray())
@@ -343,7 +344,7 @@ bool setFirstLfo(juce::var& valueGraph, const LfoSettings& settings)
                 if (auto* object = value.getDynamicObject(); object != nullptr && object->getProperty("type").toString() == "lfo") {
                     auto* parameters = object->getProperty("parameters").getDynamicObject();
                     if (parameters == nullptr) {
-                        object->setProperty("parameters", juce::var(new juce::DynamicObject()));
+                        object->setProperty("parameters", cydaw::base::Value(new cydaw::base::Object()));
                         parameters = object->getProperty("parameters").getDynamicObject();
                     }
                     parameters->setProperty("modulationRateHz", juce::jlimit(0.01, 40.0, settings.rate));

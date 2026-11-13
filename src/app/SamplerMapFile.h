@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #pragma once
 
 #include <cydaw/engine/Sampler.h>
@@ -111,13 +112,13 @@ bool decodeSampleFile(const juce::File& file, cydaw::engine::SampleData& data, j
 // when CyDAW shipped their notes as FLAC files ("factory:Instruments/…flac",
 // no longer there) on the banks' recordings they were cut from, where
 // Factory/Instruments/legacy.json says. The same var when nothing changes.
-[[nodiscard]] juce::var upgradedSamplerMap(const juce::var& json);
+[[nodiscard]] cydaw::base::Value upgradedSamplerMap(const cydaw::base::Value& json);
 // The JSON as parsed, every sample asked of the store. Null with `error` set
 // when it holds no zone this version can play.
-[[nodiscard]] cydaw::engine::SamplerMapRef samplerMapFromVar(const juce::var& json, juce::String& error);
-[[nodiscard]] juce::var loadSamplerMapFile(const juce::File& file, juce::String& error);
+[[nodiscard]] cydaw::engine::SamplerMapRef samplerMapFromVar(const cydaw::base::Value& json, juce::String& error);
+[[nodiscard]] cydaw::base::Value loadSamplerMapFile(const juce::File& file, juce::String& error);
 // "Steinway B · 63 zones · A0–C8 · 3 layers".
-[[nodiscard]] juce::String describeSamplerMap(const juce::var& json);
+[[nodiscard]] juce::String describeSamplerMap(const cydaw::base::Value& json);
 
 // Files made into a map: each file's note from its name ("C#4", "A-1",
 // "_60_") checked against the pitch heard in it, or the pitch alone; files
@@ -125,16 +126,16 @@ bool decodeSampleFile(const juce::File& file, cydaw::engine::SampleData& data, j
 // by loudness) or round robins ("rr2"); every key between two notes goes to
 // the nearer. A file with no pitch (a drum) gets one key of its own, from C1
 // up. `name` names the map.
-[[nodiscard]] juce::var samplerMapFromFiles(const juce::Array<juce::File>& files, const juce::String& name);
+[[nodiscard]] cydaw::base::Value samplerMapFromFiles(const juce::Array<juce::File>& files, const juce::String& name);
 // The simple sampler's map: this one file over the whole keyboard, around
 // its note (its name's, its pitch's; middle C for a sound without one),
 // without settings of its own (the card keeps its own).
-[[nodiscard]] juce::var simpleSamplerMap(const juce::File& file);
+[[nodiscard]] cydaw::base::Value simpleSamplerMap(const juce::File& file);
 // The zones of `json` with these files added, mapped as above among the
 // notes already there.
-[[nodiscard]] juce::var withFilesAdded(const juce::var& json, const juce::Array<juce::File>& files);
+[[nodiscard]] cydaw::base::Value withFilesAdded(const cydaw::base::Value& json, const juce::Array<juce::File>& files);
 // Every zone's keys spread again around the roots (after a root moved).
-[[nodiscard]] juce::var withKeysSpread(const juce::var& json);
+[[nodiscard]] cydaw::base::Value withKeysSpread(const cydaw::base::Value& json);
 
 // An SFZ instrument read: its regions (sample, keys, velocities, tune,
 // volume, pan, offset, end, loops, round robins, choke groups), with
@@ -147,11 +148,11 @@ bool decodeSampleFile(const juce::File& file, cydaw::engine::SampleData& data, j
 // rt_decay). Regions of a held keyswitch (sw_down/up/previous) are skipped.
 // A sample not where the SFZ says is looked for without an undefined $name,
 // then in ../Samples (a mapping meant to be included).
-[[nodiscard]] juce::var samplerMapFromSfz(const juce::File& file, juce::String& error,
+[[nodiscard]] cydaw::base::Value samplerMapFromSfz(const juce::File& file, juce::String& error,
                                           const std::map<int, double>& controllers = {});
 // The map written as SFZ, its samples by path relative to the SFZ's folder
 // when they are under it.
-[[nodiscard]] juce::String samplerMapToSfz(const juce::var& json, const juce::File& sfzFile);
+[[nodiscard]] juce::String samplerMapToSfz(const cydaw::base::Value& json, const juce::File& sfzFile);
 
 // The note a name holds ("C#4" 61, "Db3" 49, "A-1" 9; "60" in "_60_"), or -1.
 [[nodiscard]] int noteFromName(const juce::String& name);

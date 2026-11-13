@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "Widgets.h"
 
 #include "Icons.h"
@@ -126,7 +127,7 @@ void setLanguage(const juce::String& code)
     if (!file.existsAsFile() || file.getSize() > 8 * 1024 * 1024)
         return;
     // The parsed value owns the object: kept alive while it is read.
-    const auto parsed = juce::JSON::parse(file);
+    const auto parsed = cydaw::base::JSON::parse(file);
     if (const auto* object = parsed.getDynamicObject())
         for (const auto& property : object->getProperties())
             gDictionary.emplace(property.name.toString().toStdString(), property.value.toString().toStdString());

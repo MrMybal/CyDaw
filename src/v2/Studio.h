@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #pragma once
 
 #include "AiModels.h"
@@ -126,8 +127,8 @@ struct AudioTrackState {
     std::unique_ptr<GraphSlot> graph;
     // The value graph that modulates the track and its assignments, kept as
     // the project stores them.
-    juce::var modulationGraph;
-    juce::var modulationAssignments;
+    cydaw::base::Value modulationGraph;
+    cydaw::base::Value modulationAssignments;
     // Runtime only: the graph revision the assignments follow, and what the
     // modulation last applied.
     std::uint64_t modulationSyncedRevision {};
@@ -217,7 +218,7 @@ public:
     // A sample heard from the library: a loop with a tempo, at the project's
     // when `atTempo` (stretched as its family asks: drums by their attacks,
     // the rest keeping their tone), anything else as it is.
-    juce::Result auditionSample(const juce::String& path, double startSeconds, bool atTempo);
+    cydaw::base::Result auditionSample(const juce::String& path, double startSeconds, bool atTempo);
     // The tempo the sample auditioned now was taken at, 0 when as it is.
     [[nodiscard]] double auditionTempoOf(const juce::String& path) const;
     [[nodiscard]] AiModels& aiModels() noexcept { return aiModels_; }
@@ -266,8 +267,8 @@ public:
     [[nodiscard]] std::optional<PresetHolder> devicePresetHolder(const TrackRef& track, std::uint64_t nodeId) const override;
     [[nodiscard]] std::optional<PresetHolder> pluginPresetHolder(const TrackRef& track, int pluginIndex) const;
     [[nodiscard]] std::optional<PresetHolder> chainPresetHolder(const TrackRef& track) const;
-    [[nodiscard]] juce::var devicePresetState(const TrackRef& track, std::uint64_t nodeId) const override;
-    bool applyDevicePreset(const TrackRef& track, std::uint64_t nodeId, const juce::var& state, juce::String& error) override;
+    [[nodiscard]] cydaw::base::Value devicePresetState(const TrackRef& track, std::uint64_t nodeId) const override;
+    bool applyDevicePreset(const TrackRef& track, std::uint64_t nodeId, const cydaw::base::Value& state, juce::String& error) override;
 
     // ---- Audio editing (a clip's own sound) -----------------------------------------
     // Where destructive edits' results are written: the project's folder
@@ -275,12 +276,12 @@ public:
     [[nodiscard]] juce::File audioEditFolder() const;
     // ---- Processings (Processing.h, the Traitements mode) ----------------------------
     // An audio clip's sound (its source, the take it plays) to process.
-    juce::Result readAudioClipSound(const TrackRef& track, std::uint64_t clipId, engine::repair::Channels& channels,
+    cydaw::base::Result readAudioClipSound(const TrackRef& track, std::uint64_t clipId, engine::repair::Channels& channels,
                                     double& rate) const;
     // A processing's result (of that whole sound) as the clip's new version
     // (its history keeps the others; one undo step): the clip longer when the
     // processing rang past the end it played to, shorter when it trimmed.
-    juce::Result applyAudioProcessing(const TrackRef& track, std::uint64_t clipId, const processing::AudioResult& result,
+    cydaw::base::Result applyAudioProcessing(const TrackRef& track, std::uint64_t clipId, const processing::AudioResult& result,
                                       double rate, std::int64_t sourceFrames, const juce::String& label);
     // A MIDI clip's notes (and its length, in beats) for a note script.
     [[nodiscard]] std::vector<processing::ScriptNote> midiClipNotes(const TrackRef& track, std::uint64_t clipId,
@@ -288,28 +289,28 @@ public:
     // Its notes made the processed ones (each keeping what it carries: its
     // expressions). With `undoable`, one undo step; without, a preview to put
     // back (restoreMidiClipNotes).
-    juce::Result setMidiClipNotes(const TrackRef& track, std::uint64_t clipId, const std::vector<processing::ScriptNote>& notes,
+    cydaw::base::Result setMidiClipNotes(const TrackRef& track, std::uint64_t clipId, const std::vector<processing::ScriptNote>& notes,
                                   bool undoable);
     void restoreMidiClipNotes(const TrackRef& track, std::uint64_t clipId);
 
     // A destructive edit of a clip's selection (seconds in its source):
     // rendered to a new file, which the clip then plays; its history keeps
     // every version. One undo step (Ctrl+Z).
-    juce::Result editAudioClip(const TrackRef& track, std::uint64_t clipId, const app::AudioEditRequest& request,
+    cydaw::base::Result editAudioClip(const TrackRef& track, std::uint64_t clipId, const app::AudioEditRequest& request,
                                double sourceStart, double sourceLength, const juce::String& label);
     // A clip's comp made into one file (its best passages joined, as they
     // play): the clip keeps that take alone. One undo step.
-    juce::Result reverseAudioClip(const TrackRef& track, std::uint64_t id);
-    juce::Result reverseLauncherClip(const TrackRef& track, int scene);
-    juce::Result flattenAudioClipComp(const TrackRef& track, std::uint64_t clipId);
+    cydaw::base::Result reverseAudioClip(const TrackRef& track, std::uint64_t id);
+    cydaw::base::Result reverseLauncherClip(const TrackRef& track, int scene);
+    cydaw::base::Result flattenAudioClipComp(const TrackRef& track, std::uint64_t clipId);
     // An event of a clip edited in place (normalize, gain, reverse... what
     // keeps its length): a new file, which the event then plays.
     // `sourceStart` and `sourceLength` (seconds of its file) edit a part of
     // what it plays; a negative start: all it plays.
-    juce::Result editAudioEvent(const TrackRef& track, std::uint64_t clipId, std::uint64_t eventId,
+    cydaw::base::Result editAudioEvent(const TrackRef& track, std::uint64_t clipId, std::uint64_t eventId,
                                 const app::AudioEditRequest& request, double sourceStart = -1.0, double sourceLength = 0.0);
     // The same for an event of a launcher slot's audio clip.
-    juce::Result editLauncherAudioEvent(const TrackRef& track, int scene, std::uint64_t eventId, const app::AudioEditRequest& request,
+    cydaw::base::Result editLauncherAudioEvent(const TrackRef& track, int scene, std::uint64_t eventId, const app::AudioEditRequest& request,
                                         double sourceStart = -1.0, double sourceLength = 0.0);
     // A stretch of a source copied, for paste.
     struct AudioClipboard {
@@ -352,20 +353,20 @@ public:
     // card (project, presets, an exported plug-in). One undo step.
     bool loadCabImpulse(const TrackRef& track, std::uint64_t nodeId, const juce::File& file, juce::String& error) override;
     bool clearCabImpulse(const TrackRef& track, std::uint64_t nodeId) override;
-    [[nodiscard]] juce::var pluginPresetState(const TrackRef& track, int pluginIndex);
-    bool applyPluginPreset(const TrackRef& track, int pluginIndex, const juce::var& state, juce::String& error);
+    [[nodiscard]] cydaw::base::Value pluginPresetState(const TrackRef& track, int pluginIndex);
+    bool applyPluginPreset(const TrackRef& track, int pluginIndex, const cydaw::base::Value& state, juce::String& error);
     // A hosted plug-in's own programs (its factory presets) and the current
     // one; choosing one (the plug-in's state then changes, as a preset's).
     bool pluginPrograms(const TrackRef& track, int pluginIndex, juce::StringArray& names, int& current);
     bool selectPluginProgram(const TrackRef& track, int pluginIndex, int program, juce::String& error);
-    [[nodiscard]] juce::var chainPresetState(const TrackRef& track) const;
-    bool applyChainPreset(const TrackRef& track, const juce::var& state, juce::String& error);
+    [[nodiscard]] cydaw::base::Value chainPresetState(const TrackRef& track) const;
+    bool applyChainPreset(const TrackRef& track, const cydaw::base::Value& state, juce::String& error);
     // CyDAW's whole chains of effects a track can take in place of its own
     // (an audio track's, a bus's, the master's; none for an instrument
     // track), as key and name, and one of them applied: every card replaced.
     // The track's preset button has them; a "+" never does.
     [[nodiscard]] std::vector<std::pair<juce::String, juce::String>> factoryChains(const TrackRef& track) const;
-    juce::Result applyFactoryChain(const TrackRef& track, const juce::String& key);
+    cydaw::base::Result applyFactoryChain(const TrackRef& track, const juce::String& key);
     // The preset last loaded or saved on a holder (by its key), shown on it.
     [[nodiscard]] juce::String presetName(const juce::String& holderKey) const override;
     void setPresetName(const juce::String& holderKey, const juce::String& name) override;
@@ -390,7 +391,7 @@ public:
 
     // ---- Project --------------------------------------------------------------
     void newProject();
-    juce::Result loadProject(const juce::File& file);
+    cydaw::base::Result loadProject(const juce::File& file);
     // Opening a project without stopping the interface: the file read and
     // decoded on a thread of its own, then the tracks a few at a time
     // between frames. While it goes on, nothing else touches the session.
@@ -413,10 +414,10 @@ public:
     [[nodiscard]] const juce::String& importSummary() const noexcept { return importSummary_; }
     // About budgetMs of the work, once a frame; the outcome once the project
     // is open (or could not be), nothing while it goes on.
-    std::optional<juce::Result> continueOpeningProject(double budgetMs);
+    std::optional<cydaw::base::Result> continueOpeningProject(double budgetMs);
     [[nodiscard]] ProjectOpening projectOpening() const;
     [[nodiscard]] bool openingProject() const noexcept { return opening_ != nullptr; }
-    juce::Result saveProject(const juce::File& file);
+    cydaw::base::Result saveProject(const juce::File& file);
     [[nodiscard]] const juce::File& projectFile() const noexcept { return projectFile_; }
     [[nodiscard]] juce::String projectName() const;
     [[nodiscard]] bool isDirty() const noexcept { return dirty_; }
@@ -428,7 +429,7 @@ public:
     // The ready-to-play projects next to the executable.
     [[nodiscard]] juce::Array<juce::File> templates() const;
     // Another application's project (Ableton, Bitwig, Studio One, DAWproject).
-    juce::Result importProject(const juce::File& file, juce::String& summary);
+    cydaw::base::Result importProject(const juce::File& file, juce::String& summary);
 
     // ---- Autosave and recovery -------------------------------------------------------
     // While the session has unsaved changes, a copy is written in the
@@ -436,7 +437,7 @@ public:
     [[nodiscard]] static juce::File recoveryFile();
     // A session left by a crash: when it was written, empty if none.
     [[nodiscard]] juce::String pendingRecoveryDescription() const;
-    juce::Result restoreRecovery();
+    cydaw::base::Result restoreRecovery();
     void discardRecovery();
     // On quit: written when there are unsaved changes, removed otherwise.
     void finishRecovery();
@@ -476,7 +477,7 @@ public:
     // A launcher clip dragged to another slot, of a track of its kind
     // (copy: it stays where it was too); the slot it lands on loses what it
     // had.
-    juce::Result moveLauncherClip(const TrackRef& from, int fromScene, const TrackRef& to, int toScene, bool copy);
+    cydaw::base::Result moveLauncherClip(const TrackRef& from, int fromScene, const TrackRef& to, int toScene, bool copy);
     // From a project: a group track and its tracks (routing keys).
     void restoreGroup(std::uint64_t group, const std::vector<std::uint64_t>& members, bool folded);
 
@@ -514,7 +515,7 @@ public:
     std::optional<std::pair<TrackRef, std::uint64_t>> newSlotMidiClip(const TrackRef& track, int scene);
     // An audio file put into a slot of any track (an instrument track's
     // companion holds it), what the slot had replaced.
-    juce::Result placeSlotAudio(const TrackRef& track, int scene, const juce::File& file);
+    cydaw::base::Result placeSlotAudio(const TrackRef& track, int scene, const juce::File& file);
     // A new empty audio clip, a bar long, looping, in a slot of any track
     // (an instrument track's companion holds it): that track. What the slot
     // had goes.
@@ -526,8 +527,8 @@ public:
     // long as what was played (whole bars), looping, launched.
     // `midi`: the kind recorded (a hybrid track records the other one into
     // its companion); none: the track's own.
-    juce::Result recordIntoSlot(const TrackRef& track, int scene, std::optional<bool> midi = std::nullopt);
-    juce::Result stopSlotRecording(bool keep = true);
+    cydaw::base::Result recordIntoSlot(const TrackRef& track, int scene, std::optional<bool> midi = std::nullopt);
+    cydaw::base::Result stopSlotRecording(bool keep = true);
     [[nodiscard]] std::optional<std::pair<TrackRef, int>> slotRecording() const { return slotRecording_; }
     [[nodiscard]] std::size_t trackCount() const;
     [[nodiscard]] bool isValid(const TrackRef& track) const override;
@@ -594,7 +595,7 @@ public:
     // in it, its devices process every channel, and its sound converts into
     // what it is routed to.
     [[nodiscard]] int trackChannels(const TrackRef& track) const;
-    juce::Result setTrackChannels(const TrackRef& track, int channels);
+    cydaw::base::Result setTrackChannels(const TrackRef& track, int channels);
     // "Mono", "Stéréo", "Quad", "5.1"…
     [[nodiscard]] static juce::String formatName(int channels);
 
@@ -602,11 +603,11 @@ public:
     // The inputs tracks record from and the outputs the master and the tracks
     // sent there come out of, as the engine keeps them; a change is saved
     // with the project.
-    juce::Result updateHardwareBus(const app::VirtualAudioBus& bus);
+    cydaw::base::Result updateHardwareBus(const app::VirtualAudioBus& bus);
     std::uint64_t addHardwareBus(app::VirtualBusDirection direction);
-    juce::Result removeHardwareBus(std::uint64_t id);
+    cydaw::base::Result removeHardwareBus(std::uint64_t id);
     // The device's channels open (the first so many of each).
-    juce::Result setDeviceChannelCounts(int inputs, int outputs);
+    cydaw::base::Result setDeviceChannelCounts(int inputs, int outputs);
     // A bus as the interface names it: "Micro", and whether it exists.
     [[nodiscard]] std::optional<app::VirtualAudioBus> hardwareBus(std::uint64_t id) const;
 
@@ -635,7 +636,7 @@ public:
     // Never empty: the master when nothing else is set.
     [[nodiscard]] std::vector<TrackOutput> trackOutputs(const TrackRef& track) const;
     // Fails, changing nothing, on a loop or a track that is not there.
-    juce::Result setTrackOutputs(const TrackRef& track, std::vector<TrackOutput> outputs);
+    cydaw::base::Result setTrackOutputs(const TrackRef& track, std::vector<TrackOutput> outputs);
     // The tracks routed into this one.
     [[nodiscard]] std::vector<TrackRef> trackSenders(const TrackRef& track) const;
     // Whether `from` may be routed into `to`: another track, no loop.
@@ -654,7 +655,7 @@ public:
     // Its graph's new input node, or nothing (the master, no room left).
     std::optional<std::uint64_t> addTrackInput(const TrackRef& track, const juce::String& name = {});
     // The input goes, and what was routed into it.
-    juce::Result removeTrackInput(const TrackRef& track, std::uint64_t node);
+    cydaw::base::Result removeTrackInput(const TrackRef& track, std::uint64_t node);
     // "Entrée 2", or the name it was given; the main one for 0.
     [[nodiscard]] juce::String trackInputName(const TrackRef& track, std::uint64_t node) const;
     // A device's sidechain (a compressor's, a gate's): what its detector
@@ -665,7 +666,7 @@ public:
     // the last, none silences it.
     [[nodiscard]] bool hasSidechain(const TrackRef& track, std::uint64_t node) const;
     [[nodiscard]] std::optional<TrackRef> sidechainSource(const TrackRef& track, std::uint64_t node) const;
-    juce::Result setSidechainSource(const TrackRef& track, std::uint64_t node, const std::optional<TrackRef>& source);
+    cydaw::base::Result setSidechainSource(const TrackRef& track, std::uint64_t node, const std::optional<TrackRef>& source);
 
     // ---- The master track ------------------------------------------------------------
     // The tracks mixed go through its devices, then its fader: a graph of
@@ -682,7 +683,7 @@ public:
     // Back to the default: the limiter alone.
     void resetMasterGraph();
     // A project's (empty: the default), published.
-    void restoreMasterGraph(const juce::var& graphState);
+    void restoreMasterGraph(const cydaw::base::Value& graphState);
 
     // ---- The device workshop --------------------------------------------------------
     // One device made of a graph, an effect or an instrument, edited on its
@@ -719,27 +720,27 @@ public:
     // The device's audio input and output widths: the chain between takes
     // the input's; a mono and a stereo end meet through a converter before
     // the output. Why not, when it cannot.
-    juce::Result setWorkshopChannels(int input, int output);
+    cydaw::base::Result setWorkshopChannels(int input, int output);
     // Its widths now; 0 for an end it does not have.
     [[nodiscard]] std::pair<int, int> workshopChannels();
-    juce::Result openWorkshopFile(const juce::File& file);
+    cydaw::base::Result openWorkshopFile(const juce::File& file);
     // A device of a track (a card made of a graph, or an instrument track's
     // whole graph when nodeId is 0), opened linked.
-    juce::Result openWorkshopFromTrack(const TrackRef& track, std::uint64_t nodeId);
+    cydaw::base::Result openWorkshopFromTrack(const TrackRef& track, std::uint64_t nodeId);
     // The device put on a track (an effect into its chain, an instrument as
     // its graph) and linked to it.
-    juce::Result linkWorkshop(const TrackRef& track);
+    cydaw::base::Result linkWorkshop(const TrackRef& track);
     void unlinkWorkshop();
     void closeWorkshop();
     // Into My devices: under its file, or a new file named after it.
-    juce::Result saveWorkshop(juce::File& written, bool asNewFile);
+    cydaw::base::Result saveWorkshop(juce::File& written, bool asNewFile);
     // A portable graph snapshot, independent of the local device library.
     // Does not change the working tab's save destination or dirty flag.
-    juce::Result exportWorkshop(const juce::File& file, juce::StringArray& externalFiles);
+    cydaw::base::Result exportWorkshop(const juce::File& file, juce::StringArray& externalFiles);
     // Its name, author, description: the exported plugin's name follows
     // the device's until the person gives it another.
     void setWorkshopInfo(const app::NodeGraphComponent::EditorGraphInfo& info);
-    juce::Result enterWorkshopDevice(std::uint64_t nodeId);
+    cydaw::base::Result enterWorkshopDevice(std::uint64_t nodeId);
     void leaveWorkshopDevice();
     void leaveWorkshopDevices();
     // After an edit made outside the editor (the control port): the levels
@@ -785,7 +786,7 @@ public:
         int sideSource { 0 };
     };
     [[nodiscard]] const SimulatorSettings& simulatorSettings() const noexcept { return simulator_; }
-    juce::Result setSimulatorSettings(const SimulatorSettings& settings);
+    cydaw::base::Result setSimulatorSettings(const SimulatorSettings& settings);
     // On while the workshop shows a device (the keyboard plays, tails ring).
     void setSimulatorActive(bool active);
     [[nodiscard]] bool simulatorActive() const noexcept { return simulatorActive_; }
@@ -817,10 +818,10 @@ public:
         juce::String description;    // the last model made
         juce::File model;            // its file
         std::optional<TrackRef> track; // the instrument that plays it
-        juce::var zones;             // the companion's report: pitch, partials, how close
+        cydaw::base::Value zones;             // the companion's report: pitch, partials, how close
     };
     // `options`: more of the companion's arguments ("--kind", "string"...).
-    juce::Result recreateSound(const juce::Array<juce::File>& files, const juce::String& name = {}, bool refine = false,
+    cydaw::base::Result recreateSound(const juce::Array<juce::File>& files, const juce::String& name = {}, bool refine = false,
                                const juce::StringArray& options = {});
     // A synth patch found for a recorded note, as Synplant's Genopatch: the
     // settings of Opale (subtractive) or Quartz (FM) whose sound comes closest
@@ -829,7 +830,7 @@ public:
     // progress and its end are soundMatching()'s, as an analysis's; a new
     // instrument track plays the patch found, at the level that matches.
     // `note` < 0: the recording's pitch; `evaluations`: the candidates heard per synth.
-    juce::Result matchSynth(const juce::File& file, const juce::String& synth = "auto", int note = -1, int evaluations = 3'000);
+    cydaw::base::Result matchSynth(const juce::File& file, const juce::String& synth = "auto", int note = -1, int evaluations = 3'000);
     void cancelSoundMatching();
     [[nodiscard]] SoundMatching soundMatching() const { return soundMatching_; }
     // A model file played: on `track`'s sound-model card, or by a new
@@ -839,9 +840,9 @@ public:
     // The readable patch of a model: a wavetable instrument (its table the
     // partials' evolution, eight frames over the note), the analysed ADSR and
     // a low-pass, on a new instrument track: every knob a usual one.
-    std::optional<TrackRef> buildReadablePatch(const juce::var& json, juce::String& error);
+    std::optional<TrackRef> buildReadablePatch(const cydaw::base::Value& json, juce::String& error);
     // The JSON of `track`'s sound-model card, or void.
-    [[nodiscard]] juce::var soundModelJsonOf(const TrackRef& track) const;
+    [[nodiscard]] cydaw::base::Value soundModelJsonOf(const TrackRef& track) const;
     [[nodiscard]] Companion& companion() noexcept { return companion_; }
 
     // ---- The sampler ----------------------------------------------------------------
@@ -857,9 +858,9 @@ public:
         juce::String englishName;  // inside a module
         juce::String englishCategory;
         juce::File map;
-        juce::var settings;        // the sampler card's knobs it was made for
-        juce::var envelope;        // attack and release, ms
-        juce::var voicing;         // {mode: legato|mono, glide: ms}: one note at a time
+        cydaw::base::Value settings;        // the sampler card's knobs it was made for
+        cydaw::base::Value envelope;        // attack and release, ms
+        cydaw::base::Value voicing;         // {mode: legato|mono, glide: ms}: one note at a time
         double filterHz {};        // the voice filter's cutoff, 0: open
         juce::String source;       // where its samples come from ("VCSL")
         juce::String bank;         // its bank's id
@@ -868,7 +869,7 @@ public:
         // The same notes as a sound model (the companion's analysis), when
         // one was made, and the sound-model card's settings for it.
         juce::File model;
-        juce::var modelSettings;
+        cydaw::base::Value modelSettings;
         // Its samples still to download (Factory ships the maps, not the
         // samples), and the banks they come from.
         int missingFiles {};
@@ -889,7 +890,7 @@ public:
     // the catalogue, an instrument preset): the effects after it, their
     // automation and modulators stay. Named after it when its name was its
     // instrument's (or the default one).
-    juce::Result replaceInstrument(const TrackRef& track, const juce::String& key, const juce::String& name = {});
+    cydaw::base::Result replaceInstrument(const TrackRef& track, const juce::String& key, const juce::String& name = {});
 
     // ---- A Replacer's instrument (Containers.h) ----------------------------------------------
     // Its graph (an instrument, as a track's) is addressed as a pad of the
@@ -902,7 +903,7 @@ public:
     [[nodiscard]] juce::String replacerInstrumentName(const TrackRef& owner, std::uint64_t head);
     // An instrument of the catalogue for a replacer: made, kept on its card,
     // played at each transient (its sound set to Instrument).
-    juce::Result setReplacerInstrument(const TrackRef& owner, std::uint64_t head, const juce::String& instrumentKey);
+    cydaw::base::Result setReplacerInstrument(const TrackRef& owner, std::uint64_t head, const juce::String& instrumentKey);
     // The chain shown for a pad (a rack's, a replacer's): its name.
     [[nodiscard]] juce::String padName(const TrackRef& track) const;
     // Each replacer's instrument into a graph being published.
@@ -967,9 +968,9 @@ public:
     void fillDefaultLayers(const TrackRef& track);
     // Its pads as a project keeps them, and back; the container they were
     // made for, by name ("drum", "layer", "selector").
-    [[nodiscard]] juce::var rackPadsState(const TrackRef& track) const;
+    [[nodiscard]] cydaw::base::Value rackPadsState(const TrackRef& track) const;
     [[nodiscard]] juce::String padsKindName(const TrackRef& track) const;
-    void restoreRackPads(const TrackRef& track, const juce::var& state, const juce::String& kind = {});
+    void restoreRackPads(const TrackRef& track, const cydaw::base::Value& state, const juce::String& kind = {});
     // A plug-in that is not here, its place kept on the track: a card that
     // says so (its name, its maker, its format); an instrument's is silent,
     // an effect's lets the sound through. Its card.
@@ -995,7 +996,7 @@ public:
     std::uint64_t addGrooveClip(const TrackRef& track, int groove, int bars, int fill, double startBeats, juce::String& error);
     // A map on a card (an edit, files added): published, undoable. The map's
     // "settings" go to the card's knobs when `applySettings`.
-    bool setSamplerMap(const TrackRef& track, std::uint64_t nodeId, const juce::var& json, bool applySettings,
+    bool setSamplerMap(const TrackRef& track, std::uint64_t nodeId, const cydaw::base::Value& json, bool applySettings,
                        juce::String& error);
     // The companion's last other job (info, setup), finished: for its window.
     [[nodiscard]] const std::optional<Companion::Status>& companionJob() const noexcept { return companionJob_; }
@@ -1012,9 +1013,9 @@ public:
     [[nodiscard]] std::vector<LibraryDevice> libraryDevices() const;
     // A library device put on a track: an effect into its chain, an
     // instrument as its graph.
-    juce::Result insertLibraryDevice(const TrackRef& track, const juce::File& file);
+    cydaw::base::Result insertLibraryDevice(const TrackRef& track, const juce::File& file);
     // To the recycle bin.
-    juce::Result removeLibraryDevice(const juce::File& file);
+    cydaw::base::Result removeLibraryDevice(const juce::File& file);
     // Whether a parameter of the track's graph can follow a lane: a card of
     // its chain, a knob inside a module there, or a setting of its
     // instrument's voice (Prisme's, Kick's, a sampler's...).
@@ -1029,8 +1030,8 @@ public:
     // The controllers' assignments kept with the project (Controllers.cpp
     // reads and writes them, ProjectIo saves them); the revision moves when
     // a project is opened or made.
-    [[nodiscard]] const juce::var& controllerAssignments() const noexcept { return controllerAssignments_; }
-    void setControllerAssignments(const juce::var& assignments, bool fromProject)
+    [[nodiscard]] const cydaw::base::Value& controllerAssignments() const noexcept { return controllerAssignments_; }
+    void setControllerAssignments(const cydaw::base::Value& assignments, bool fromProject)
     {
         controllerAssignments_ = assignments;
         if (fromProject)
@@ -1139,22 +1140,22 @@ public:
     [[nodiscard]] GraphSlot* busGraph(std::uint64_t busId);
     // A whole device from the catalogue: a preset replaces the graph, a
     // module or node is spliced before the output.
-    juce::Result insertDevice(const TrackRef& track, const juce::String& key) override;
+    cydaw::base::Result insertDevice(const TrackRef& track, const juce::String& key) override;
     // A device (a container too) into a branch of a container, before the
     // card `before` (0: at the branch's end).
-    juce::Result insertDeviceInBranch(const TrackRef& track, const juce::String& key, std::uint64_t head, int branch,
+    cydaw::base::Result insertDeviceInBranch(const TrackRef& track, const juce::String& key, std::uint64_t head, int branch,
                                       std::uint64_t before = 0);
     // A device, or a library device, put on the chain before the card
     // `before` (0: where it goes by itself). One that cannot go there (a
     // sound before an instrument) stays where it went.
-    juce::Result insertDeviceBefore(const TrackRef& track, const juce::String& key, std::uint64_t before);
+    cydaw::base::Result insertDeviceBefore(const TrackRef& track, const juce::String& key, std::uint64_t before);
     // The whole instrument a synth's own card is the heart of ("opale-synth"
     // → "opale-instrument"): what an instrument track gets for that card.
     // Empty for any other card.
     [[nodiscard]] static juce::String instrumentOfCard(const juce::String& key);
-    juce::Result insertLibraryDeviceBefore(const TrackRef& track, const juce::File& file, std::uint64_t before);
+    cydaw::base::Result insertLibraryDeviceBefore(const TrackRef& track, const juce::File& file, std::uint64_t before);
     // Recompiles and publishes a track's graph to the engine.
-    juce::Result publishGraph(const TrackRef& track, bool structural);
+    cydaw::base::Result publishGraph(const TrackRef& track, bool structural);
     // The graph the live values are fed to (the one on screen).
     void setWatchedGraph(std::optional<TrackRef> track) { watched_ = track; }
 
@@ -1203,33 +1204,33 @@ public:
     // `withCompanion`: a hybrid track's other part records with it (its
     // notes; its sound when an audio input was chosen for it). A slot's
     // recording takes one kind alone.
-    juce::Result startRecording(std::optional<TrackRef> track, std::uint64_t midiClip, bool withCompanion = true);
+    cydaw::base::Result startRecording(std::optional<TrackRef> track, std::uint64_t midiClip, bool withCompanion = true);
     // Keeps or discards the take; the transport stops if recording started it.
-    juce::Result stopRecording(bool keep);
+    cydaw::base::Result stopRecording(bool keep);
     [[nodiscard]] bool isRecording() const noexcept;
     [[nodiscard]] std::optional<TrackRef> recordingTrack() const noexcept { return recordingTrack_; }
 
     // ---- Used by the project reader and writer (ProjectIo.cpp) -----------------
-    [[nodiscard]] const juce::var& factoryAudioGraph() const noexcept { return factoryAudioGraph_; }
-    [[nodiscard]] const juce::var& factoryMidiGraph() const noexcept { return factoryMidiGraph_; }
-    [[nodiscard]] const juce::var& factoryBusGraph() const noexcept { return factoryAudioGraph_; }
-    [[nodiscard]] const juce::var& factoryModulationGraph() const noexcept { return factoryModulationGraph_; }
-    [[nodiscard]] juce::var& sharedNodeModules() noexcept { return sharedNodeModules_; }
-    [[nodiscard]] juce::var& sharedModulationModules() noexcept { return sharedModulationModules_; }
+    [[nodiscard]] const cydaw::base::Value& factoryAudioGraph() const noexcept { return factoryAudioGraph_; }
+    [[nodiscard]] const cydaw::base::Value& factoryMidiGraph() const noexcept { return factoryMidiGraph_; }
+    [[nodiscard]] const cydaw::base::Value& factoryBusGraph() const noexcept { return factoryAudioGraph_; }
+    [[nodiscard]] const cydaw::base::Value& factoryModulationGraph() const noexcept { return factoryModulationGraph_; }
+    [[nodiscard]] cydaw::base::Value& sharedNodeModules() noexcept { return sharedNodeModules_; }
+    [[nodiscard]] cydaw::base::Value& sharedModulationModules() noexcept { return sharedModulationModules_; }
     // The library merged into a stored state, ready to restore.
-    [[nodiscard]] juce::var withLibrary(const juce::var& state, const juce::var& fallback) const;
+    [[nodiscard]] cydaw::base::Value withLibrary(const cydaw::base::Value& state, const cydaw::base::Value& fallback) const;
     // The same with the modulation graphs' shared modules (the LFO's).
-    [[nodiscard]] juce::var withModulationLibrary(const juce::var& state) const;
+    [[nodiscard]] cydaw::base::Value withModulationLibrary(const cydaw::base::Value& state) const;
     // The state as projects store it: inline classes only.
-    [[nodiscard]] static juce::var withoutSharedModules(const juce::var& state);
-    static void mergeModules(juce::var& library, const juce::var& graphState);
+    [[nodiscard]] static cydaw::base::Value withoutSharedModules(const cydaw::base::Value& state);
+    static void mergeModules(cydaw::base::Value& library, const cydaw::base::Value& graphState);
 
     std::vector<AudioTrackState>& audioStates() noexcept { return audioTracks_; }
     std::map<std::uint64_t, MidiTrackState>& midiStates() noexcept { return midiTracks_; }
     std::map<std::uint64_t, BusState>& busStates() noexcept { return buses_; }
     // Graph slots for an engine track that already exists.
-    AudioTrackState& adoptAudioTrack(std::size_t index, const juce::var& graphState);
-    MidiTrackState& adoptMidiTrack(std::uint64_t id, const juce::var& graphState);
+    AudioTrackState& adoptAudioTrack(std::size_t index, const cydaw::base::Value& graphState);
+    MidiTrackState& adoptMidiTrack(std::uint64_t id, const cydaw::base::Value& graphState);
     // A pad's mix sent to the engine (silent when its track's instrument is
     // not the container it was made for); every pad's at once.
     void publishRackPadMix(const TrackRef& track, std::size_t pad);
@@ -1240,10 +1241,10 @@ public:
     // A factory instrument's samples onto a graph (a track's, a pad's, a Replacer's).
     bool applyFactoryInstrument(const TrackRef& target, const FactoryInstrument& instrument, juce::String& error);
     [[nodiscard]] RackPadState* rackPadState(const TrackRef& track);
-    BusState& adoptBus(std::uint64_t id, const juce::var& graphState);
+    BusState& adoptBus(std::uint64_t id, const cydaw::base::Value& graphState);
 
     // Settings and layout values a project carries for the interface.
-    juce::var interfaceState;
+    cydaw::base::Value interfaceState;
 
 private:
     // The tracks' order on screen, by routing key (kept up to date by
@@ -1283,7 +1284,7 @@ private:
     std::unique_ptr<GraphSlot> makeSlot(GraphSlot::Owner owner);
     // The one card a device made on the chain (the ids before are `had`),
     // moved before `before`.
-    juce::Result placeNewCard(const TrackRef& track, const std::vector<std::uint64_t>& had, std::uint64_t before);
+    cydaw::base::Result placeNewCard(const TrackRef& track, const std::vector<std::uint64_t>& had, std::uint64_t before);
     void graphChanged(GraphSlot& slot, bool structural);
     [[nodiscard]] std::optional<TrackRef> trackOf(const GraphSlot& slot) const;
     void clearSession();
@@ -1294,7 +1295,7 @@ private:
     void modulateNativeGraph(AudioTrackState& state, cydaw::engine::NativeDspGraph& graph);
     // A finished audio recording kept: loop passes as takes, a take of the
     // clip it was played over, or a clip of its own.
-    juce::Result keepRecordedAudio(const TrackRef& track);
+    cydaw::base::Result keepRecordedAudio(const TrackRef& track);
     static void applyBallistics(MeterState& meter, const float* peak, const float* rms, int channels);
 
     app::AudioTrackController engine_;
@@ -1307,7 +1308,7 @@ private:
     // Whether a parameter of a track's graph glides on a logarithmic scale
     // (a frequency, a time), as its knob does.
     [[nodiscard]] bool logarithmicParameter(const TrackRef& track, const juce::String& binding) const;
-    juce::var controllerAssignments_;
+    cydaw::base::Value controllerAssignments_;
     std::uint64_t controllerAssignmentsRevision_ { 1 };
     std::map<juce::String, juce::String> pluginParameterNames_;
     struct ModuleEdit {
@@ -1399,11 +1400,11 @@ private:
     double simulatorLevelTime_ {};
     void publishSimulation(bool force);
     void publishSimulatorPattern();
-    [[nodiscard]] juce::var deviceDocument(app::NodeGraphComponent& graph, bool instrument) const;
+    [[nodiscard]] cydaw::base::Value deviceDocument(app::NodeGraphComponent& graph, bool instrument) const;
     // A plugin identity of its own for a device that has none yet: named
     // after it, with a plugin code no other device is likely to share.
     static void giveOwnIdentity(app::NodeGraphComponent& graph, bool always);
-    static juce::Result setDeviceChannels(app::NodeGraphComponent& graph, int input, int output);
+    static cydaw::base::Result setDeviceChannels(app::NodeGraphComponent& graph, int input, int output);
     [[nodiscard]] static std::pair<std::uint64_t, std::uint64_t> audioEnds(const app::NodeGraphComponent& graph);
     [[nodiscard]] ParameterLanes* lanesOf(const TrackRef& track);
     [[nodiscard]] const ParameterLanes* lanesOf(const TrackRef& track) const;
@@ -1425,11 +1426,11 @@ private:
     void compileReplacer(ReplacerSlot& slot);
     std::map<std::uint64_t, BusState> buses_;
 
-    juce::var factoryAudioGraph_;
-    juce::var factoryMidiGraph_;
-    juce::var factoryModulationGraph_;
-    juce::var sharedNodeModules_;
-    juce::var sharedModulationModules_;
+    cydaw::base::Value factoryAudioGraph_;
+    cydaw::base::Value factoryMidiGraph_;
+    cydaw::base::Value factoryModulationGraph_;
+    cydaw::base::Value sharedNodeModules_;
+    cydaw::base::Value sharedModulationModules_;
 
     juce::File projectFile_;
     bool auxiliary_ {};
@@ -1449,10 +1450,10 @@ private:
     // One step of it; false once it is done.
     bool importStep(ImportBuild& build);
     juce::String importSummary_;
-    void beginApplying(const juce::File& file, const juce::var& document);
+    void beginApplying(const juce::File& file, const cydaw::base::Value& document);
     // The factory models a project names that could not be read, among its warnings.
     void noteMissingModels(const juce::StringArray& missing);
-    juce::Result finishApplying(const juce::File& file, const juce::Result& applied);
+    cydaw::base::Result finishApplying(const juce::File& file, const cydaw::base::Result& applied);
     std::unique_ptr<project_io::DocumentLoad> applying_;
     bool loopEnabled_ {};
     void autosaveIfDue();
@@ -1489,26 +1490,26 @@ private:
 // Project documents (ProjectIo.cpp): the same .cydaw files CyDAW 1 reads and
 // writes, version 36.
 namespace project_io {
-[[nodiscard]] juce::var buildDocument(Studio& studio, const juce::File& projectFile, bool refreshPluginState);
+[[nodiscard]] cydaw::base::Value buildDocument(Studio& studio, const juce::File& projectFile, bool refreshPluginState);
 // The virtual inputs and outputs with their effects, as VirtualIO.json keeps
 // them, and back.
-[[nodiscard]] juce::var virtualIoDocument(Studio& studio);
-void applyVirtualIo(Studio& studio, const juce::var& document);
-juce::Result applyDocument(Studio& studio, const juce::var& document, const juce::File& projectFile,
+[[nodiscard]] cydaw::base::Value virtualIoDocument(Studio& studio);
+void applyVirtualIo(Studio& studio, const cydaw::base::Value& document);
+cydaw::base::Result applyDocument(Studio& studio, const cydaw::base::Value& document, const juce::File& projectFile,
                            juce::StringArray& warnings);
 // The same, a step at a time (the project's settings, a track, the master,
 // the routing, a track's sound prepared…), so the interface can draw
 // between them.
 class DocumentLoad final {
 public:
-    DocumentLoad(Studio& studio, juce::var document, juce::File projectFile, juce::StringArray& warnings);
+    DocumentLoad(Studio& studio, cydaw::base::Value document, juce::File projectFile, juce::StringArray& warnings);
     ~DocumentLoad();
     // Does the next step; false once there is none left (then result()).
     bool next();
     [[nodiscard]] float progress() const noexcept;
     // What the next step does, for a person to read.
     [[nodiscard]] juce::String doing() const;
-    [[nodiscard]] juce::Result result() const;
+    [[nodiscard]] cydaw::base::Result result() const;
 
 private:
     struct State;

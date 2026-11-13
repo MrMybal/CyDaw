@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "DjView.h"
 #include "ModeProcessing.h"
 
@@ -109,15 +110,15 @@ juce::String keyText(const int key)
     return juce::String(engine::dj::camelotName(key)) + " " + engine::dj::keyName(key);
 }
 
-double number(const juce::var& request, const char* key, const double fallback)
+double number(const cydaw::base::Value& request, const char* key, const double fallback)
 {
-    const auto value = request.getProperty(key, juce::var());
+    const auto value = request.getProperty(key, cydaw::base::Value());
     return value.isVoid() ? fallback : static_cast<double>(value);
 }
 
-bool flag(const juce::var& request, const char* key, const bool fallback)
+bool flag(const cydaw::base::Value& request, const char* key, const bool fallback)
 {
-    const auto value = request.getProperty(key, juce::var());
+    const auto value = request.getProperty(key, cydaw::base::Value());
     return value.isVoid() ? fallback : static_cast<bool>(value);
 }
 
@@ -182,7 +183,7 @@ void DjView::saveProcessing(const bool force)
     processingWriteFailed_.store(false);
     // JSON encoding and disk I/O never run in the knob's draw callback.
     processingWriter_.addJob([this, file, snapshot] {
-        if (!file.getParentDirectory().createDirectory() || !file.replaceWithText(juce::JSON::toString(snapshot)))
+        if (!file.getParentDirectory().createDirectory() || !file.replaceWithText(cydaw::base::JSON::toString(snapshot)))
             processingWriteFailed_.store(true);
     });
 }
@@ -198,7 +199,7 @@ void DjView::ensureLoaded()
     processing_=std::make_shared<ModeProcessing>(&host_);
     const auto override=juce::SystemStats::getEnvironmentVariable("CYDAW_DJ_PROCESSING_FILE",{});
     const auto file=override.isNotEmpty()?juce::File(override):locations::folder(Location::mixes).getChildFile("DJ processing.cydjmix");
-    processing_->restore(juce::JSON::parse(file));
+    processing_->restore(cydaw::base::JSON::parse(file));
     for(int i=0;i<4;++i)processing_->ensureInput(static_cast<std::uint64_t>(i+1),juce::String("Deck ")+deckLetter(i));
     auto* device=studio_.engine().deviceManager().getCurrentAudioDevice();
     processing_->prepare(device?device->getCurrentSampleRate():48000,device?device->getCurrentBufferSizeSamples():512);
@@ -1457,12 +1458,12 @@ void DjView::drawTrackTable(const ImVec2 size)
 
 // ---- The control port --------------------------------------------------------------------------
 
-juce::var DjView::deckJson(const int index) const
+cydaw::base::Value DjView::deckJson(const int index) const
 {
     auto& dj = studio_.engine().dj();
     const auto deck = dj.deck(index);
     const auto channel = dj.channel(index);
-    auto* item = new juce::DynamicObject();
+    auto* item = new cydaw::base::Object();
     static constexpr const char* states[4] { "empty", "loading", "ready", "failed" };
     item->setProperty("deck", deckLetter(index));
     item->setProperty("state", states[static_cast<int>(deck.state)]);
@@ -1493,7 +1494,7 @@ juce::var DjView::deckJson(const int index) const
     item->setProperty("loopStart", deck.loopStart);
     item->setProperty("loopEnd", deck.loopEnd);
     item->setProperty("cuePoint", deck.cuePoint);
-    juce::Array<juce::var> cues;
+    cydaw::base::Array<cydaw::base::Value> cues;
     for (const auto cue : deck.hotCues)
         cues.add(cue);
     item->setProperty("hotCues", cues);
@@ -1502,10 +1503,10 @@ juce::var DjView::deckJson(const int index) const
     item->setProperty("fader", channel.fader);
     item->setProperty("effect", engine::dj::effectInfo(channel.effect.kind).key);
     item->setProperty("effectOn", channel.effect.on);
-    return juce::var(item);
+    return cydaw::base::Value(item);
 }
 
-juce::var DjView::command(const juce::var& request)
+cydaw::base::Value DjView::command(const cydaw::base::Value& request)
 {
     ensureLoaded();
     auto& dj = studio_.engine().dj();
@@ -1516,7 +1517,7 @@ juce::var DjView::command(const juce::var& request)
     }
     // A deck by its letter or its index.
     auto deck = -1;
-    if (const auto value = request.getProperty("deck", juce::var()); !value.isVoid()) {
+    if (const auto value = request.getProperty("deck", cydaw::base::Value()); !value.isVoid()) {
         if (value.isString()) {
             const auto letter = value.toString().trim().toUpperCase();
             deck = letter.isNotEmpty() ? static_cast<int>(letter[0] - 'A') : -1;
@@ -1534,7 +1535,7 @@ juce::var DjView::command(const juce::var& request)
         // Below.
     } else if (action == "load") {
         if ((error = needDeck()).isEmpty()) {
-            const juce::File file(request.getProperty("file", juce::var()).toString());
+            const juce::File file(request.getProperty("file", cydaw::base::Value()).toString());
             if (!file.existsAsFile())
                 error = "no file \"" + file.getFullPathName() + "\"";
             else
@@ -1619,11 +1620,11 @@ juce::var DjView::command(const juce::var& request)
             channel.resonance = static_cast<float>(number(request, "resonance", channel.resonance));
             channel.fader = static_cast<float>(number(request, "fader", channel.fader));
             channel.cue = flag(request, "cue", channel.cue);
-            if (const auto side = request.getProperty("side", juce::var()); !side.isVoid())
+            if (const auto side = request.getProperty("side", cydaw::base::Value()); !side.isVoid())
                 channel.side = side.isString() ? (side.toString().equalsIgnoreCase("left") ? 0 : side.toString().equalsIgnoreCase("right") ? 2 : 1)
                                                : static_cast<int>(side);
-            if (const auto effect = request.getProperty("effect", juce::var()); effect.isObject()) {
-                const auto kind = effect.getProperty("kind", juce::var()).toString();
+            if (const auto effect = request.getProperty("effect", cydaw::base::Value()); effect.isObject()) {
+                const auto kind = effect.getProperty("kind", cydaw::base::Value()).toString();
                 for (int k = 0; k < engine::dj::effectKindCount; ++k)
                     if (kind.equalsIgnoreCase(engine::dj::effectInfo(static_cast<engine::dj::EffectKind>(k)).key))
                         channel.effect.kind = static_cast<engine::dj::EffectKind>(k);
@@ -1651,8 +1652,8 @@ juce::var DjView::command(const juce::var& request)
             dj.setLimiter(flag(request, "limiter", true));
     } else if (action == "record") {
         if (flag(request, "on", true)) {
-            const auto path = request.getProperty("path", juce::var()).toString();
-            const auto result = path.isNotEmpty() ? dj.startRecording(juce::File(path)) : juce::Result::ok();
+            const auto path = request.getProperty("path", cydaw::base::Value()).toString();
+            const auto result = path.isNotEmpty() ? dj.startRecording(juce::File(path)) : cydaw::base::Result::ok();
             if (path.isEmpty())
                 startRecording();
             if (result.failed())
@@ -1661,14 +1662,14 @@ juce::var DjView::command(const juce::var& request)
             dj.stopRecording();
         }
     } else if (action == "folders") {
-        if (const auto add = request.getProperty("add", juce::var()).toString(); add.isNotEmpty())
+        if (const auto add = request.getProperty("add", cydaw::base::Value()).toString(); add.isNotEmpty())
             library_->addFolder(juce::File(add));
-        if (const auto remove = request.getProperty("remove", juce::var()).toString(); remove.isNotEmpty())
+        if (const auto remove = request.getProperty("remove", cydaw::base::Value()).toString(); remove.isNotEmpty())
             library_->removeFolder(juce::File(remove));
         if (flag(request, "scan", false))
             library_->rescan();
     } else if (action == "analyse") {
-        if (const auto file = request.getProperty("file", juce::var()).toString(); file.isNotEmpty())
+        if (const auto file = request.getProperty("file", cydaw::base::Value()).toString(); file.isNotEmpty())
             library_->analyse(juce::File(file));
         else
             library_->analyseAll();
@@ -1680,8 +1681,8 @@ juce::var DjView::command(const juce::var& request)
     }
     if (error.isNotEmpty())
         return error;
-    auto* result = new juce::DynamicObject();
-    juce::Array<juce::var> decks;
+    auto* result = new cydaw::base::Object();
+    cydaw::base::Array<cydaw::base::Value> decks;
     for (int index = 0; index < DjEngine::deckCount; ++index)
         decks.add(deckJson(index));
     result->setProperty("decks", decks);
@@ -1702,17 +1703,17 @@ juce::var DjView::command(const juce::var& request)
     const auto progress = library_->progress();
     result->setProperty("scanning", progress.scanning);
     result->setProperty("analysing", progress.waiting);
-    juce::Array<juce::var> folders;
+    cydaw::base::Array<cydaw::base::Value> folders;
     for (const auto& folder : library_->folders())
         folders.add(folder);
     result->setProperty("folders", folders);
     if (action == "tracks") {
-        juce::Array<juce::var> list;
-        const auto query = request.getProperty("query", juce::var()).toString().toLowerCase();
+        cydaw::base::Array<cydaw::base::Value> list;
+        const auto query = request.getProperty("query", cydaw::base::Value()).toString().toLowerCase();
         for (const auto& track : library_->tracks()) {
             if (query.isNotEmpty() && !(track.title + " " + track.artist + " " + track.file.getFileName()).toLowerCase().contains(query))
                 continue;
-            auto* item = new juce::DynamicObject();
+            auto* item = new cydaw::base::Object();
             item->setProperty("file", track.file.getFullPathName());
             item->setProperty("title", track.title);
             item->setProperty("artist", track.artist);
@@ -1723,12 +1724,12 @@ juce::var DjView::command(const juce::var& request)
             item->setProperty("seconds", track.seconds);
             item->setProperty("analysed", track.analysed);
             item->setProperty("plays", track.plays);
-            list.add(juce::var(item));
+            list.add(cydaw::base::Value(item));
         }
         result->setProperty("tracks", list);
     }
     result->setProperty("trackCount", static_cast<int>(library_->tracks().size()));
-    return juce::var(result);
+    return cydaw::base::Value(result);
 }
 
 } // namespace cydaw::v2

@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #pragma once
 
 #include "DjLibrary.h"
@@ -37,7 +38,7 @@ public:
     // mix recorded.
     void drawTransport();
     // The control port's "dj" command.
-    [[nodiscard]] juce::var command(const juce::var& request);
+    [[nodiscard]] cydaw::base::Value command(const cydaw::base::Value& request);
     void loadFile(int deck, const juce::File& file);
     // Files dropped on the window: the first deck that is not playing.
     bool dropFiles(const juce::StringArray& files);
@@ -93,7 +94,7 @@ private:
     void chooseFolder();
     void startRecording();
     [[nodiscard]] int freeDeck() const;
-    [[nodiscard]] juce::var deckJson(int deck) const;
+    [[nodiscard]] cydaw::base::Value deckJson(int deck) const;
 
     Studio& studio_;
     UiState& state_;

@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #pragma once
 
 #include <juce_core/juce_core.h>
@@ -41,12 +42,12 @@ struct AiModel {
     juce::String kind; // "clap"
     bool isDefault {};
     bool validated {};
-    juce::var description; // {fr, en}
+    cydaw::base::Value description; // {fr, en}
     juce::String homepage;
     juce::String licence;
     juce::String licenceUrl;
     juce::String licencePage;
-    juce::var licenceNote; // {fr, en}
+    cydaw::base::Value licenceNote; // {fr, en}
     bool requiresAcceptance {};
     juce::String host;
     juce::String revision;
@@ -107,7 +108,7 @@ public:
     [[nodiscard]] juce::File folderOf(const AiModel& model) const;
     [[nodiscard]] bool installed(const juce::String& id) const;
     // When it was installed, and whether the person accepted its licence then.
-    [[nodiscard]] juce::var receiptOf(const juce::String& id) const;
+    [[nodiscard]] cydaw::base::Value receiptOf(const juce::String& id) const;
 
     // Downloads a model on a thread of its own. Refused (false, `error`) when
     // its licence asks to be accepted and was not, when one runs already.

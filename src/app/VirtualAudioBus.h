@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #pragma once
 
 #include "NativeDspRuntime.h"
@@ -118,9 +119,9 @@ public:
     [[nodiscard]] std::uint64_t defaultInputBusId() const noexcept;
     [[nodiscard]] std::array<float, 2> meterLevels(
         std::uint64_t busId) const noexcept;
-    [[nodiscard]] juce::Result setGraph(
+    [[nodiscard]] cydaw::base::Result setGraph(
         std::uint64_t busId, const cydaw::engine::NativeDspGraph& graph);
-    [[nodiscard]] juce::Result updateGraphParameters(
+    [[nodiscard]] cydaw::base::Result updateGraphParameters(
         std::uint64_t busId, const cydaw::engine::NativeDspGraph& graph);
     [[nodiscard]] cydaw::engine::NativeDspGraph graph(
         std::uint64_t busId) const;

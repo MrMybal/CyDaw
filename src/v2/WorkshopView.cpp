@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #include "WorkshopView.h"
 
 #include "GraphEditor.h"
@@ -150,7 +151,7 @@ bool WorkshopView::textField(const char* id, std::vector<char>& buffer, const ju
 
 void WorkshopView::perform(const WorkshopRequest& request)
 {
-    auto result = juce::Result::ok();
+    auto result = cydaw::base::Result::ok();
     switch (request.kind) {
     case WorkshopRequest::Kind::trackDevice: result = studio_.openWorkshopFromTrack(request.track, request.nodeId); break;
     case WorkshopRequest::Kind::file: result = studio_.openWorkshopFile(request.file); break;

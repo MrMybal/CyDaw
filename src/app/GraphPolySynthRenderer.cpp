@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "MidiEffectsHost.h"
 #include "GraphPolySynthRenderer.h"
 #include "NativeDspRuntime.h"
@@ -319,10 +320,10 @@ void GraphPolySynthRenderer::renderWithPlan(
     impl_->plan.realtimeOverride = nullptr;
 }
 
-juce::var serialisePolySynthGraphPlan(
+cydaw::base::Value serialisePolySynthGraphPlan(
     const cydaw::engine::PolySynthGraphPlan& plan)
 {
-    auto root = juce::DynamicObject::Ptr(new juce::DynamicObject());
+    auto root = cydaw::base::Object::Ptr(new cydaw::base::Object());
     root->setProperty("schema", 1);
     root->setProperty("enabled", plan.enabled);
     root->setProperty("graphNodeCount",
@@ -347,43 +348,43 @@ juce::var serialisePolySynthGraphPlan(
     root->setProperty("maximumMidiNote", plan.maximumMidiNote);
     root->setProperty("velocityScale", plan.velocityScale);
     // A sound model's settings (its data rides with the graph's JSON).
-    juce::Array<juce::var> modelValues;
+    cydaw::base::Array<cydaw::base::Value> modelValues;
     for (const auto value : plan.soundModelValues)
         modelValues.add(value);
     root->setProperty("soundModelValues", modelValues);
     // A sampler's settings (its zones ride with the graph's JSON).
-    juce::Array<juce::var> samplerValues;
+    cydaw::base::Array<cydaw::base::Value> samplerValues;
     for (const auto value : plan.samplerValues)
         samplerValues.add(value);
     root->setProperty("samplerValues", samplerValues);
     // Its card's controllers, those it sets.
     {
-        auto* controllers = new juce::DynamicObject();
-        const juce::var controllersVar(controllers);
+        auto* controllers = new cydaw::base::Object();
+        const cydaw::base::Value controllersVar(controllers);
         for (std::size_t number = 0; number < plan.samplerControllers.size(); ++number)
             if (plan.samplerControllers[number] >= 0.0f)
-                controllers->setProperty(juce::Identifier(juce::String(static_cast<int>(number))), plan.samplerControllers[number]);
+                controllers->setProperty(cydaw::base::Identifier(juce::String(static_cast<int>(number))), plan.samplerControllers[number]);
         if (!controllers->getProperties().isEmpty())
             root->setProperty("samplerControllers", controllersVar);
     }
     // The MIDI effects: each its kind and its values.
     if (plan.midiEffects != nullptr && plan.midiEffects->count > 0) {
-        juce::Array<juce::var> effects;
+        cydaw::base::Array<cydaw::base::Value> effects;
         for (std::size_t index = 0; index < plan.midiEffects->count; ++index) {
             const auto& effect = plan.midiEffects->effects[index];
-            auto* item = new juce::DynamicObject();
+            auto* item = new cydaw::base::Object();
             item->setProperty("kind", static_cast<int>(effect.kind));
-            juce::Array<juce::var> values;
+            cydaw::base::Array<cydaw::base::Value> values;
             for (const auto value : effect.values)
                 values.add(value);
             item->setProperty("values", values);
-            effects.add(juce::var(item));
+            effects.add(cydaw::base::Value(item));
         }
         root->setProperty("midiEffects", effects);
     }
     if (plan.drumKit) {
         root->setProperty("drumKit", true);
-        juce::Array<juce::var> drumValues;
+        cydaw::base::Array<cydaw::base::Value> drumValues;
         for (int index = 0; index < cydaw::engine::drum::valueCount; ++index)
             drumValues.add(plan.drumValues[static_cast<std::size_t>(index)]);
         root->setProperty("drumValues", drumValues);
@@ -391,13 +392,13 @@ juce::var serialisePolySynthGraphPlan(
     // Prisme's settings (its own tables, imported waves, ride with the
     // graph's JSON on its card; attachVoiceAssets puts them back).
     if (plan.waveform == cydaw::engine::PolyOscillatorWaveform::prism) {
-        juce::Array<juce::var> prismValues;
+        cydaw::base::Array<cydaw::base::Value> prismValues;
         for (const auto value : plan.prismValues)
             prismValues.add(value);
         root->setProperty("prismValues", prismValues);
     }
     if (plan.waveform == cydaw::engine::PolyOscillatorWaveform::kick) {
-        juce::Array<juce::var> kickValues;
+        cydaw::base::Array<cydaw::base::Value> kickValues;
         for (const auto value : plan.kickValues)
             kickValues.add(value);
         root->setProperty("kickValues", kickValues);
@@ -405,26 +406,26 @@ juce::var serialisePolySynthGraphPlan(
     // A synth of the family: its model and its settings, in its order.
     if (plan.waveform == cydaw::engine::PolyOscillatorWaveform::family) {
         root->setProperty("synthModel", static_cast<int>(plan.synthModel));
-        juce::Array<juce::var> synthValues;
+        cydaw::base::Array<cydaw::base::Value> synthValues;
         for (int index = 0; index < cydaw::engine::synth::parameterCount(plan.synthModel); ++index)
             synthValues.add(plan.synthValues[static_cast<std::size_t>(index)]);
         root->setProperty("synthValues", synthValues);
     }
-    return juce::var(root.get());
+    return cydaw::base::Value(root.get());
 }
 
-void attachReplacerInstruments(cydaw::engine::NativeDspGraph& graph, const juce::var& runtimeState, const bool waitForSamples)
+void attachReplacerInstruments(cydaw::engine::NativeDspGraph& graph, const cydaw::base::Value& runtimeState, const bool waitForSamples)
 {
-    const auto* replacers = runtimeState.getProperty("replacers", juce::var()).getArray();
+    const auto* replacers = runtimeState.getProperty("replacers", cydaw::base::Value()).getArray();
     if (replacers == nullptr)
         return;
     for (const auto& entry : *replacers) {
         const auto id = static_cast<std::uint64_t>(static_cast<juce::int64>(entry.getProperty("node", 0)));
         juce::String error;
-        auto plan = restorePolySynthGraphPlan(entry.getProperty("polySynth", juce::var()), error);
+        auto plan = restorePolySynthGraphPlan(entry.getProperty("polySynth", cydaw::base::Value()), error);
         if (!plan)
             continue;
-        attachVoiceAssets(*plan, entry.getProperty("editor", juce::var()));
+        attachVoiceAssets(*plan, entry.getProperty("editor", cydaw::base::Value()));
         if (waitForSamples && plan->sampler != nullptr)
             (void) SampleStore::instance().waitUntilReady(*plan->sampler, 60'000);
         for (auto& node : graph.nodes)
@@ -433,7 +434,7 @@ void attachReplacerInstruments(cydaw::engine::NativeDspGraph& graph, const juce:
     }
 }
 
-void attachVoiceAssets(cydaw::engine::PolySynthGraphPlan& plan, const juce::var& graphState)
+void attachVoiceAssets(cydaw::engine::PolySynthGraphPlan& plan, const cydaw::base::Value& graphState)
 {
     const auto assets = voiceAssetsFromGraphState(graphState);
     plan.soundModel = assets.soundModel;
@@ -445,7 +446,7 @@ void attachVoiceAssets(cydaw::engine::PolySynthGraphPlan& plan, const juce::var&
 }
 
 std::optional<cydaw::engine::PolySynthGraphPlan>
-restorePolySynthGraphPlan(const juce::var& state, juce::String& error)
+restorePolySynthGraphPlan(const cydaw::base::Value& state, juce::String& error)
 {
     const auto* root = state.getDynamicObject();
     if (root == nullptr || static_cast<int>(root->getProperty("schema")) != 1) {
@@ -547,16 +548,16 @@ restorePolySynthGraphPlan(const juce::var& state, juce::String& error)
             }
             plan.soundModelValues[static_cast<std::size_t>(index)] = value;
         }
-    if (root->hasProperty(juce::Identifier("wavetablePosition")))
+    if (root->hasProperty(cydaw::base::Identifier("wavetablePosition")))
         plan.wavetablePosition = static_cast<float>(
             static_cast<double>(root->getProperty("wavetablePosition")));
-    if (root->hasProperty(juce::Identifier("wavetableDetune")))
+    if (root->hasProperty(cydaw::base::Identifier("wavetableDetune")))
         plan.wavetableDetuneCents = static_cast<float>(
             static_cast<double>(root->getProperty("wavetableDetune")));
-    if (root->hasProperty(juce::Identifier("stringDamping")))
+    if (root->hasProperty(cydaw::base::Identifier("stringDamping")))
         plan.stringDamping = static_cast<float>(
             static_cast<double>(root->getProperty("stringDamping")));
-    if (root->hasProperty(juce::Identifier("stringDecay")))
+    if (root->hasProperty(cydaw::base::Identifier("stringDecay")))
         plan.stringDecaySeconds = static_cast<float>(
             static_cast<double>(root->getProperty("stringDecay")));
 #define CYDAW_READ_PLAN(name) plan.name = static_cast<float>(static_cast<double>(root->getProperty(#name)))

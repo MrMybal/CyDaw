@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 // The graph as plain data for CyDAW 2, whose editor is drawn with Dear ImGui
 // and never shows this component. Every edit below goes through the same
 // paths the canvas uses, so history, validation and the change handlers that
@@ -177,7 +178,7 @@ bool NodeGraphComponent::editorSetPortExposure(const std::uint64_t id, const std
     if (port == node->ports.end()) return false;
     // Connected sockets remain visible. Hiding one never deletes its cable.
     port->exposure = exposed ? 1 : 0;
-    node->serialised = juce::var();
+    node->serialised = cydaw::base::Value();
     notifyLayoutChanged("v2-port-exposure");
     return true;
 }
@@ -190,7 +191,7 @@ bool NodeGraphComponent::editorSetPortDetails(const std::uint64_t id, const std:
     auto port = std::ranges::find(node->ports, portId, &NodePort::id);
     if (port == node->ports.end()) return false;
     port->name = name.trim().substring(0, 96); port->category = category.trim().substring(0, 128);
-    node->serialised = juce::var(); notifyLayoutChanged("v2-port-details"); return true;
+    node->serialised = cydaw::base::Value(); notifyLayoutChanged("v2-port-details"); return true;
 }
 
 bool NodeGraphComponent::editorRemoveBoundary(const std::uint64_t id)
@@ -203,33 +204,33 @@ bool NodeGraphComponent::editorRemoveBoundary(const std::uint64_t id)
     notifyLayoutChanged("v2-remove-boundary"); return true;
 }
 
-juce::Result NodeGraphComponent::editorPromoteValue(const std::uint64_t id, std::uint64_t portId,
+cydaw::base::Result NodeGraphComponent::editorPromoteValue(const std::uint64_t id, std::uint64_t portId,
     const juce::String& binding, const bool graphInput, std::uint64_t& created)
 {
     created = 0;
-    if (editingLocked_) return juce::Result::fail(localText("Ce graphe est verrouillé", "This graph is locked"));
+    if (editingLocked_) return cydaw::base::Result::fail(localText("Ce graphe est verrouillé", "This graph is locked"));
     const auto all = editorNodes();
     const auto target = std::ranges::find(all, id, &EditorNode::id);
-    if (target == all.end()) return juce::Result::fail("Unknown node");
+    if (target == all.end()) return cydaw::base::Result::fail("Unknown node");
     const auto parameter = std::ranges::find(target->parameters, binding, &EditorParameter::binding);
     if (binding.isNotEmpty()) {
-        if (parameter == target->parameters.end()) return juce::Result::fail("Unknown parameter");
+        if (parameter == target->parameters.end()) return cydaw::base::Result::fail("Unknown parameter");
         portId = parameter->inputPortId;
     }
     const auto socket = std::ranges::find(target->ports, portId, &EditorPort::id);
     if (socket == target->ports.end() || !socket->input)
-        return juce::Result::fail(localText("Cette valeur n'a pas encore d'entrée pilotable dans le moteur.",
+        return cydaw::base::Result::fail(localText("Cette valeur n'a pas encore d'entrée pilotable dans le moteur.",
                                           "This value does not yet have a controllable input in the engine."));
     if (!graphInput && socket->kind != 2)
-        return juce::Result::fail(localText("Une variable locale doit être une valeur.", "A local variable must be a value."));
+        return cydaw::base::Result::fail(localText("Une variable locale doit être une valeur.", "A local variable must be a value."));
     if (std::ranges::any_of(connections_, [&](const auto& c) {return c.destination==id && c.destinationPort==portId;}))
-        return juce::Result::fail(localText("Cette entrée est déjà reliée. Débranchez-la avant de la promouvoir.",
+        return cydaw::base::Result::fail(localText("Cette entrée est déjà reliée. Débranchez-la avant de la promouvoir.",
                                           "This input is already connected. Disconnect it before promoting it."));
     const auto key = !graphInput ? juce::String("value-constant")
         : socket->kind==0 ? juce::String("graph-audio-input-")+juce::String(socket->channels)
         : juce::String(socket->kind==1 ? "graph-midi-input" : socket->kind==2 ? "graph-value-input" : "graph-transport-input");
     const auto* type = findType(key);
-    if (!type) return juce::Result::fail("Input type is unavailable");
+    if (!type) return cydaw::base::Result::fail("Input type is unavailable");
     const auto beforeInterface = graphInterfaceState_;
     const auto beforeSelection = selectedNodes_;
     const auto beforeNext = nextNodeId_;
@@ -258,19 +259,19 @@ juce::Result NodeGraphComponent::editorPromoteValue(const std::uint64_t id, std:
     if (!outputId || !connectReplacingInput(sourceId,id,outputId,portId)) {
         std::erase_if(nodes_, [sourceId](const auto& n){return n.id==sourceId;});
         graphInterfaceState_ = beforeInterface; selectedNodes_=beforeSelection; nextNodeId_=beforeNext;
-        return juce::Result::fail("The promoted value could not be connected");
+        return cydaw::base::Result::fail("The promoted value could not be connected");
     }
     // A promoted value sets its destination exactly; it is not an LFO.
     for (auto& c : connections_) if(c.source==sourceId && c.destination==id && c.destinationPort==portId) c.mode=0;
     if (auto* destination=findNode(id)) {
         if(auto p=std::ranges::find(destination->ports,portId,&NodePort::id);p!=destination->ports.end()) p->exposure=1;
-        destination->serialised=juce::var();
+        destination->serialised=cydaw::base::Value();
     }
-    source->serialised=juce::var();
+    source->serialised=cydaw::base::Value();
     synchroniseGraphInterface(); rebuildEmbeddedSliders();
     notifyLayoutChanged(graphInput ? "v2-create-input" : "v2-create-variable");
     created=sourceId;
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 ModuleInterfaceState NodeGraphComponent::editorNodeInterface(const std::uint64_t nodeId) const
@@ -325,7 +326,7 @@ bool NodeGraphComponent::editorSetConnectionMode(const std::uint64_t source, con
     found->amount = nextAmount;
     for (auto& node : nodes_)
         if (node.id == source || node.id == destination)
-            node.serialised = juce::var();
+            node.serialised = cydaw::base::Value();
     notifyLayoutChanged("v2-connection-mode");
     return true;
 }
@@ -498,7 +499,7 @@ std::uint64_t NodeGraphComponent::editorConnectThroughConverter(const std::uint6
         && connectReplacingInput(id, static_cast<NodeId>(destination), 2, static_cast<cydaw::graph::PortId>(destinationPort))) {
         for (auto& node : nodes_)
             if (node.id == source || node.id == destination || node.id == id)
-                node.serialised = juce::var();
+                node.serialised = cydaw::base::Value();
         synchroniseGraphInterface();
         rebuildEmbeddedSliders();
         notifyLayoutChanged("v2-connect-converter");
@@ -596,7 +597,7 @@ void NodeGraphComponent::editorMoveNodes(const std::vector<std::pair<std::uint64
     for (const auto& [id, position] : positions)
         if (auto* node = findNode(id)) {
             node->position = clampedPosition(position);
-            node->serialised = juce::var();
+            node->serialised = cydaw::base::Value();
         }
     if (commit)
         notifyLayoutChanged("v2-move");
@@ -631,7 +632,7 @@ juce::String NodeGraphComponent::editorConnect(const std::uint64_t source, const
     }
     for (auto& node : nodes_)
         if (node.id == source || node.id == destination)
-            node.serialised = juce::var();
+            node.serialised = cydaw::base::Value();
     applyDefaultCableMode(source, destination, destinationPort);
     synchroniseGraphInterface();
     rebuildEmbeddedSliders();
@@ -653,7 +654,7 @@ bool NodeGraphComponent::editorDisconnect(const std::uint64_t source, const std:
         return false;
     for (auto& node : nodes_)
         if (node.id == source || node.id == destination)
-            node.serialised = juce::var();
+            node.serialised = cydaw::base::Value();
     selectedConnection_ = -1;
     synchroniseGraphInterface();
     rebuildEmbeddedSliders();
@@ -679,13 +680,13 @@ std::optional<NodeGraphComponent::EditorModuleInfo> NodeGraphComponent::editorMo
                               module->inlineModule };
 }
 
-juce::var NodeGraphComponent::editorModuleGraphState(const juce::String& key) const
+cydaw::base::Value NodeGraphComponent::editorModuleGraphState(const juce::String& key) const
 {
     const auto* module = findModule(key);
-    return module != nullptr ? moduleGraphState(*module) : juce::var();
+    return module != nullptr ? moduleGraphState(*module) : cydaw::base::Value();
 }
 
-void NodeGraphComponent::editorApplyModuleGraphState(const juce::String& key, const juce::var& state, const bool structural)
+void NodeGraphComponent::editorApplyModuleGraphState(const juce::String& key, const cydaw::base::Value& state, const bool structural)
 {
     if (editingLocked_ || findModule(key) == nullptr)
         return;
@@ -893,7 +894,7 @@ std::uint64_t NodeGraphComponent::editorCreateModuleFromSelection(const std::vec
         if (noteDestinations.insert({ connection.destination, connection.destinationPort }).second)
             (void) connectNodes(instance, connection.destination, socket(false, PortKind::midi), connection.destinationPort);
     for (auto& node : nodes_)
-        node.serialised = juce::var();
+        node.serialised = cydaw::base::Value();
     synchroniseGraphInterface();
     rebuildEmbeddedSliders();
     notifyLayoutChanged("v2-module-from-selection");
@@ -913,7 +914,7 @@ std::uint64_t NodeGraphComponent::editorCreateEmptyDevice(const cydaw::graph::Gr
     return 0;
 }
 
-std::uint64_t NodeGraphComponent::editorInsertModuleFromState(const juce::var& state, const cydaw::graph::GraphRole role,
+std::uint64_t NodeGraphComponent::editorInsertModuleFromState(const cydaw::base::Value& state, const cydaw::graph::GraphRole role,
                                                               const juce::String& name)
 {
     const auto* root = state.getDynamicObject();
@@ -960,10 +961,10 @@ std::uint64_t NodeGraphComponent::editorInsertModuleFromState(const juce::var& s
     return instance;
 }
 
-juce::Result NodeGraphComponent::editorSetInterface(const ModuleInterfaceState& state, const bool commit)
+cydaw::base::Result NodeGraphComponent::editorSetInterface(const ModuleInterfaceState& state, const bool commit)
 {
     if (editingLocked_)
-        return juce::Result::fail(localText("Ce graphe est verrouillé", "This graph is locked"));
+        return cydaw::base::Result::fail(localText("Ce graphe est verrouillé", "This graph is locked"));
     auto next = graphInterfaceState_;
     next.controls = state.controls;
     next.deviceControls = state.deviceControls;
@@ -987,7 +988,7 @@ juce::Result NodeGraphComponent::editorSetInterface(const ModuleInterfaceState& 
     graphInterfaceState_ = std::move(next);
     if (commit)
         notifyLayoutChanged("v2-interface");
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 NodeGraphComponent::EditorGraphInfo NodeGraphComponent::editorGraphInfo() const
@@ -1451,7 +1452,7 @@ std::uint64_t NodeGraphComponent::editorInsertContainer(const juce::String& type
         (void) connectReplacingInput(source.source, head, source.sourcePort, containers::headInputPort);
     (void) connectReplacingInput(end, targetId, containers::endOutputPort, targetPort);
     for (auto& item : nodes_)
-        item.serialised = juce::var();
+        item.serialised = cydaw::base::Value();
     synchroniseGraphInterface();
     rebuildEmbeddedSliders();
     notifyLayoutChanged("v2-insert-container");
@@ -1577,7 +1578,7 @@ bool NodeGraphComponent::editorMoveCard(const std::uint64_t id, const std::uint6
     (void) connectReplacingInput(span.last, targetId, span.out, targetPort);
     selectedConnection_ = -1;
     for (auto& item : nodes_)
-        item.serialised = juce::var();
+        item.serialised = cydaw::base::Value();
     synchroniseGraphInterface();
     rebuildEmbeddedSliders();
     notifyLayoutChanged("v2-move-card");
@@ -1635,7 +1636,7 @@ bool NodeGraphComponent::editorAddBranch(const std::uint64_t head)
     (void) setGraphInterfaceParameter("node." + juce::String(static_cast<juce::int64>(head)) + "." + juce::String(std::string(chains->suffix)),
                                       count + 1);
     for (auto& item : nodes_)
-        item.serialised = juce::var();
+        item.serialised = cydaw::base::Value();
     notifyLayoutChanged("v2-add-branch");
     return true;
 }
@@ -1714,7 +1715,7 @@ bool NodeGraphComponent::editorRemoveBranch(const std::uint64_t head, const int 
             (void) setGraphInterfaceParameter(prefix + juce::String(std::string(selected->suffix)),
                                               juce::jmax(0, current == branch ? juce::jmin(current, count - 2) : current - 1));
     for (auto& item : nodes_)
-        item.serialised = juce::var();
+        item.serialised = cydaw::base::Value();
     synchroniseGraphInterface();
     rebuildEmbeddedSliders();
     notifyLayoutChanged("v2-remove-branch");
@@ -1725,20 +1726,20 @@ namespace {
 
 // A graph state's keys (as NodeGraphComponent.cpp writes them).
 namespace jsonKeys {
-const juce::Identifier audioChannels("audioChannels");
-const juce::Identifier connections("connections");
-const juce::Identifier destination("destination");
-const juce::Identifier destinationPort("destinationPort");
-const juce::Identifier id("id");
-const juce::Identifier kind("kind");
-const juce::Identifier nextNodeId("nextNodeId");
-const juce::Identifier nodes("nodes");
-const juce::Identifier parameters("parameters");
-const juce::Identifier source("source");
-const juce::Identifier sourcePort("sourcePort");
-const juce::Identifier type("type");
-const juce::Identifier x("x");
-const juce::Identifier y("y");
+const cydaw::base::Identifier audioChannels("audioChannels");
+const cydaw::base::Identifier connections("connections");
+const cydaw::base::Identifier destination("destination");
+const cydaw::base::Identifier destinationPort("destinationPort");
+const cydaw::base::Identifier id("id");
+const cydaw::base::Identifier kind("kind");
+const cydaw::base::Identifier nextNodeId("nextNodeId");
+const cydaw::base::Identifier nodes("nodes");
+const cydaw::base::Identifier parameters("parameters");
+const cydaw::base::Identifier source("source");
+const cydaw::base::Identifier sourcePort("sourcePort");
+const cydaw::base::Identifier type("type");
+const cydaw::base::Identifier x("x");
+const cydaw::base::Identifier y("y");
 } // namespace jsonKeys
 
 // The whole of a container: its head, every card it holds (nested
@@ -1765,13 +1766,13 @@ std::set<std::uint64_t> containerFamily(const NodeGraphComponent& graph, const s
 }
 
 // A copy of a JSON value that shares nothing with it.
-juce::var deepCopy(const juce::var& value)
+cydaw::base::Value deepCopy(const cydaw::base::Value& value)
 {
-    return juce::JSON::parse(juce::JSON::toString(value, true));
+    return cydaw::base::JSON::parse(cydaw::base::JSON::toString(value, true));
 }
 
 // Every "node.<id>." in a value's strings for its new id.
-juce::var renumbered(const juce::var& value, const std::map<std::uint64_t, std::uint64_t>& ids)
+cydaw::base::Value renumbered(const cydaw::base::Value& value, const std::map<std::uint64_t, std::uint64_t>& ids)
 {
     if (value.isString()) {
         const auto text = value.toString();
@@ -1786,23 +1787,23 @@ juce::var renumbered(const juce::var& value, const std::map<std::uint64_t, std::
         return "node." + juce::String(static_cast<juce::int64>(found->second)) + text.substring(5 + number.length());
     }
     if (const auto* array = value.getArray()) {
-        juce::Array<juce::var> items;
+        cydaw::base::Array<cydaw::base::Value> items;
         for (const auto& item : *array)
             items.add(renumbered(item, ids));
         return items;
     }
     if (const auto* object = value.getDynamicObject()) {
-        auto copy = juce::DynamicObject::Ptr(new juce::DynamicObject());
+        auto copy = cydaw::base::Object::Ptr(new cydaw::base::Object());
         for (const auto& property : object->getProperties())
             copy->setProperty(property.name, renumbered(property.value, ids));
-        return juce::var(copy.get());
+        return cydaw::base::Value(copy.get());
     }
     return value;
 }
 
 } // namespace
 
-juce::var NodeGraphComponent::editorContainerState(const std::uint64_t head) const
+cydaw::base::Value NodeGraphComponent::editorContainerState(const std::uint64_t head) const
 {
     const auto container = editorContainer(head);
     if (!container || container->end == 0)
@@ -1812,28 +1813,28 @@ juce::var NodeGraphComponent::editorContainerState(const std::uint64_t head) con
         if (const auto owner = editorModulatorOwner(candidate.id); owner != 0 && family.contains(owner))
             family.insert(candidate.id);
     const auto whole = serialise();
-    juce::Array<juce::var> nodes;
+    cydaw::base::Array<cydaw::base::Value> nodes;
     if (const auto* values = whole.getProperty(jsonKeys::nodes, {}).getArray())
         for (const auto& value : *values)
             if (family.contains(static_cast<std::uint64_t>(static_cast<juce::int64>(value.getProperty(jsonKeys::id, 0)))))
                 nodes.add(deepCopy(value));
-    juce::Array<juce::var> links;
+    cydaw::base::Array<cydaw::base::Value> links;
     if (const auto* values = whole.getProperty(jsonKeys::connections, {}).getArray())
         for (const auto& value : *values)
             if (family.contains(static_cast<std::uint64_t>(static_cast<juce::int64>(value.getProperty(jsonKeys::source, 0))))
                 && family.contains(static_cast<std::uint64_t>(static_cast<juce::int64>(value.getProperty(jsonKeys::destination, 0)))))
                 links.add(deepCopy(value));
-    auto state = juce::DynamicObject::Ptr(new juce::DynamicObject());
+    auto state = cydaw::base::Object::Ptr(new cydaw::base::Object());
     state->setProperty("format", "CyDAW Container");
     state->setProperty("type", container->typeKey);
     state->setProperty("head", static_cast<juce::int64>(head));
     state->setProperty("end", static_cast<juce::int64>(container->end));
     state->setProperty(jsonKeys::nodes, nodes);
     state->setProperty(jsonKeys::connections, links);
-    return juce::var(state.get());
+    return cydaw::base::Value(state.get());
 }
 
-bool NodeGraphComponent::editorApplyContainerState(const std::uint64_t head, const juce::var& state)
+bool NodeGraphComponent::editorApplyContainerState(const std::uint64_t head, const cydaw::base::Value& state)
 {
     const auto container = editorContainer(head);
     const auto* headNode = readNode(static_cast<NodeId>(head));
@@ -1844,7 +1845,7 @@ bool NodeGraphComponent::editorApplyContainerState(const std::uint64_t head, con
     if (editingLocked_ || !container || container->end == 0 || headNode == nullptr || savedNodes == nullptr || savedLinks == nullptr
         || savedHead == 0 || savedEnd == 0 || state.getProperty("type", {}).toString() != headNode->typeKey)
         return false;
-    const juce::var* savedHeadValue {};
+    const cydaw::base::Value* savedHeadValue {};
     auto endSaved = false;
     for (const auto& value : *savedNodes) {
         const auto id = static_cast<std::uint64_t>(static_cast<juce::int64>(value.getProperty(jsonKeys::id, 0)));
@@ -1870,7 +1871,7 @@ bool NodeGraphComponent::editorApplyContainerState(const std::uint64_t head, con
     auto* links = root != nullptr ? root->getProperty(jsonKeys::connections).getArray() : nullptr;
     if (nodes == nullptr || links == nullptr)
         return false;
-    const auto idOf = [](const juce::var& value, const juce::Identifier& key) {
+    const auto idOf = [](const cydaw::base::Value& value, const cydaw::base::Identifier& key) {
         return static_cast<std::uint64_t>(static_cast<juce::int64>(value.getProperty(key, 0)));
     };
     for (int index = nodes->size(); --index >= 0;)
@@ -1935,20 +1936,20 @@ bool NodeGraphComponent::editorApplyContainerState(const std::uint64_t head, con
     }
     // Its sound on, from its new last end.
     for (const auto& connection : onward) {
-        auto link = juce::DynamicObject::Ptr(new juce::DynamicObject());
+        auto link = cydaw::base::Object::Ptr(new cydaw::base::Object());
         link->setProperty(jsonKeys::source, static_cast<juce::int64>(ids[savedEnd]));
         link->setProperty(jsonKeys::destination, static_cast<juce::int64>(connection.destination));
         link->setProperty(jsonKeys::kind, static_cast<int>(connection.kind));
         link->setProperty(jsonKeys::audioChannels, static_cast<int>(connection.audioChannels));
         link->setProperty(jsonKeys::sourcePort, static_cast<juce::int64>(containers::endOutputPort));
         link->setProperty(jsonKeys::destinationPort, static_cast<juce::int64>(connection.destinationPort));
-        links->add(juce::var(link.get()));
+        links->add(cydaw::base::Value(link.get()));
     }
     root->setProperty(jsonKeys::nextNodeId, static_cast<juce::int64>(next));
     return editorApplyState(whole);
 }
 
-bool NodeGraphComponent::editorApplyState(const juce::var& state)
+bool NodeGraphComponent::editorApplyState(const cydaw::base::Value& state)
 {
     if (editingLocked_ || state.getDynamicObject() == nullptr)
         return false;
@@ -1959,7 +1960,7 @@ bool NodeGraphComponent::editorApplyState(const juce::var& state)
         restore(state);
     }
     for (auto& item : nodes_)
-        item.serialised = juce::var();
+        item.serialised = cydaw::base::Value();
     notifyLayoutChanged("v2-apply-state");
     return true;
 }
@@ -1985,7 +1986,7 @@ bool NodeGraphComponent::editorRenameBranch(const std::uint64_t head, const int 
     // Only names given are kept.
     while (!node->branchNames.isEmpty() && node->branchNames[node->branchNames.size() - 1].isEmpty())
         node->branchNames.remove(node->branchNames.size() - 1);
-    node->serialised = juce::var();
+    node->serialised = cydaw::base::Value();
     notifyLayoutChanged("v2-rename-branch");
     return true;
 }
@@ -2039,7 +2040,7 @@ bool NodeGraphComponent::editorRemoveContainer(const std::uint64_t head)
         for (const auto& destination : onward)
             (void) connectReplacingInput(source.source, destination.destination, source.sourcePort, destination.destinationPort);
     for (auto& item : nodes_)
-        item.serialised = juce::var();
+        item.serialised = cydaw::base::Value();
     synchroniseGraphInterface();
     rebuildEmbeddedSliders();
     notifyLayoutChanged("v2-remove-container");
@@ -2119,7 +2120,7 @@ bool NodeGraphComponent::editorSetAlias(const std::uint64_t id, const juce::Stri
     if (node == nullptr || editingLocked_)
         return false;
     node->alias = alias.trim().substring(0, 96);
-    node->serialised = juce::var();
+    node->serialised = cydaw::base::Value();
     notifyLayoutChanged("v2-alias");
     return true;
 }
@@ -2130,7 +2131,7 @@ bool NodeGraphComponent::editorSetDescription(const std::uint64_t id, const juce
     if (node == nullptr || editingLocked_)
         return false;
     node->description = description.substring(0, 2'000);
-    node->serialised = juce::var();
+    node->serialised = cydaw::base::Value();
     notifyLayoutChanged("v2-description");
     return true;
 }
@@ -2141,7 +2142,7 @@ bool NodeGraphComponent::editorSetBypassed(const std::uint64_t id, const bool by
     if (node == nullptr || isBoundaryNode(*node) || node->bypassed == bypassed)
         return node != nullptr && node->bypassed == bypassed;
     node->bypassed = bypassed;
-    node->serialised = juce::var();
+    node->serialised = cydaw::base::Value();
     // Published as a knob is (the shape stays), its undo step taken as one.
     parameterHistoryPending_ = true;
     lastParameterUiChangeTimeMs_ = juce::Time::currentTimeMillis();
@@ -2157,7 +2158,7 @@ bool NodeGraphComponent::editorSetCollapsed(const std::uint64_t id, const bool c
     if (node == nullptr)
         return false;
     node->collapsed = collapsed;
-    node->serialised = juce::var();
+    node->serialised = cydaw::base::Value();
     notifyLayoutChanged("v2-collapse");
     return true;
 }

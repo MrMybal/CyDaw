@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #pragma once
 #include "../native_plugin/NativeRuntime.h"
 #include <juce_audio_basics/juce_audio_basics.h>
@@ -11,8 +12,8 @@ class NativeDspRuntime final : public cydaw::native::NativeDspRuntime
     using Base = cydaw::native::NativeDspRuntime;
 
   public:
-    [[nodiscard]] juce::Result setGraph(const engine::NativeDspGraph &graph);
-    [[nodiscard]] juce::Result updateParameters(const engine::NativeDspGraph &graph);
+    [[nodiscard]] cydaw::base::Result setGraph(const engine::NativeDspGraph &graph);
+    [[nodiscard]] cydaw::base::Result updateParameters(const engine::NativeDspGraph &graph);
     [[nodiscard]] bool process(juce::AudioBuffer<float> &buffer, int start, int frames) noexcept;
     [[nodiscard]] bool process(juce::AudioBuffer<float> &buffer, int start, int frames, double seconds) noexcept;
     void setExtraInputs(const juce::AudioBuffer<float> *const *buses, std::size_t count) noexcept;

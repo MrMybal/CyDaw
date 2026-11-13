@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #include "ProjectImport.h"
 #include "ProjectImportShared.h"
 
@@ -23,11 +24,11 @@ class ArdourReader {
 public:
     ArdourReader(const juce::File& file, ImportedProject& out) : file_(file), out_(out), folder_(file.getParentDirectory()) {}
 
-    juce::Result read()
+    cydaw::base::Result read()
     {
         const auto document = juce::XmlDocument::parse(file_);
         if (document == nullptr || !document->hasTagName("Session"))
-            return juce::Result::fail("Not an Ardour session: " + file_.getFileName());
+            return cydaw::base::Result::fail("Not an Ardour session: " + file_.getFileName());
         out_.format = "ardour";
         out_.application = "Ardour (session " + document->getStringAttribute("version") + ")";
         out_.name = document->getStringAttribute("name");
@@ -44,7 +45,7 @@ public:
         if (const auto* routes = document->getChildByName("Routes"))
             for (const auto* route : routes->getChildWithTagNameIterator("Route"))
                 readRoute(*route);
-        return juce::Result::ok();
+        return cydaw::base::Result::ok();
     }
 
 private:
@@ -278,7 +279,7 @@ private:
 
 } // namespace
 
-juce::Result importArdourSession(const juce::File& file, ImportedProject& out)
+cydaw::base::Result importArdourSession(const juce::File& file, ImportedProject& out)
 {
     out.source = file;
     ArdourReader reader(file, out);

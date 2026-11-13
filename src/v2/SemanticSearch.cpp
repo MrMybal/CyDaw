@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "SemanticSearch.h"
 
@@ -116,7 +117,7 @@ float dot(const float* a, const float* b, const int dimension)
     return sum;
 }
 
-std::vector<float> floatsOf(const juce::var& value)
+std::vector<float> floatsOf(const cydaw::base::Value& value)
 {
     std::vector<float> out;
     if (const auto* list = value.getArray()) {
@@ -221,7 +222,7 @@ public:
 
     // stop: asked to give up (indexing stopped). The model is then ended: its
     // answer, come later, would be read as the next request's.
-    juce::var request(const juce::var& json, juce::String& error, const int timeoutMs = 600'000,
+    cydaw::base::Value request(const cydaw::base::Value& json, juce::String& error, const int timeoutMs = 600'000,
                       const std::atomic<bool>* stop = nullptr)
     {
         const std::scoped_lock lock(requestMutex_);
@@ -231,7 +232,7 @@ public:
         }
         if (auto* object = json.getDynamicObject())
             object->setProperty("token", token_);
-        const auto line = juce::JSON::toString(json, true).replace("\n", " ") + "\n";
+        const auto line = cydaw::base::JSON::toString(json, true).replace("\n", " ") + "\n";
         const auto* bytes = line.toRawUTF8();
         const auto size = static_cast<int>(line.getNumBytesAsUTF8());
         for (auto sent = 0; sent < size;) {
@@ -276,7 +277,7 @@ public:
             if (buffer[read - 1] == '\n')
                 break;
         }
-        const auto answer = juce::JSON::parse(juce::String::fromUTF8(static_cast<const char*>(received.getData()),
+        const auto answer = cydaw::base::JSON::parse(juce::String::fromUTF8(static_cast<const char*>(received.getData()),
                                                                      static_cast<int>(received.getSize())));
         if (!static_cast<bool>(answer.getProperty("ok", false))) {
             error = answer.getProperty("error", ui::Ls("réponse illisible du modèle", "unreadable answer from the model")).toString();
@@ -328,7 +329,7 @@ private:
             line.reset();
             if (text.isEmpty())
                 continue;
-            const auto value = juce::JSON::parse(text);
+            const auto value = cydaw::base::JSON::parse(text);
             const std::scoped_lock lock(outputMutex_);
             if (value.isObject() && value.hasProperty("port")) {
                 device_ = value.getProperty("device", {}).toString();
@@ -613,7 +614,7 @@ public:
             // The windows one after another in a file, for the model.
             const auto audioFile = work.getChildFile("batch.f32");
             const auto vectorFile = work.getChildFile("vectors.f32");
-            juce::Array<juce::var> windows;
+            cydaw::base::Array<cydaw::base::Value> windows;
             std::vector<std::pair<std::size_t, int>> owners; // (slot, windows)
             {
                 (void) audioFile.deleteFile();
@@ -630,7 +631,7 @@ public:
                     }
                     for (const auto& window : decoded[slot]) {
                         (void) out.write(window.data(), window.size() * sizeof(float));
-                        juce::Array<juce::var> item;
+                        cydaw::base::Array<cydaw::base::Value> item;
                         item.add(offset);
                         item.add(static_cast<juce::int64>(window.size()));
                         windows.add(item);
@@ -641,12 +642,12 @@ public:
                 out.flush();
             }
             if (!windows.isEmpty()) {
-                auto* request = new juce::DynamicObject();
+                auto* request = new cydaw::base::Object();
                 request->setProperty("op", "embed_audio");
                 request->setProperty("file", audioFile.getFullPathName());
                 request->setProperty("items", windows);
                 request->setProperty("out", vectorFile.getFullPathName());
-                const auto answer = worker->request(juce::var(request), error, 600'000, &stop_);
+                const auto answer = worker->request(cydaw::base::Value(request), error, 600'000, &stop_);
                 if (!answer.isObject()) {
                     finish(error);
                     return;
@@ -708,7 +709,7 @@ private:
             owner_.status_.message = ui::Ls("Catégories des sons sans nom…", "Categories of the unnamed sounds…");
         }
         owner_.changed();
-        juce::Array<juce::var> texts;
+        cydaw::base::Array<cydaw::base::Value> texts;
         std::vector<int> categoryOf;
         const auto& taxonomy = app::SampleLibrary::categoryTaxonomy();
         for (std::size_t index = 0; index < taxonomy.size(); ++index)
@@ -716,11 +717,11 @@ private:
                 texts.add(juce::String(promptTemplate) + prompt);
                 categoryOf.push_back(static_cast<int>(index));
             }
-        auto* request = new juce::DynamicObject();
+        auto* request = new cydaw::base::Object();
         request->setProperty("op", "embed_text");
         request->setProperty("texts", texts);
         juce::String error;
-        const auto answer = worker.request(juce::var(request), error, 600'000, &stop_);
+        const auto answer = worker.request(cydaw::base::Value(request), error, 600'000, &stop_);
         const auto* list = answer.getProperty("vectors", {}).getArray();
         if (list == nullptr || list->size() != texts.size())
             return;
@@ -1293,13 +1294,13 @@ SemanticSearch::Answer SemanticSearch::run(const Query& query)
         }
         // The phrase as it is, and as the categories are asked about: the two
         // meanings averaged.
-        auto* request = new juce::DynamicObject();
+        auto* request = new cydaw::base::Object();
         request->setProperty("op", "embed_text");
-        juce::Array<juce::var> texts;
+        cydaw::base::Array<cydaw::base::Value> texts;
         texts.add(answer.english);
         texts.add(juce::String(promptTemplate) + answer.english);
         request->setProperty("texts", texts);
-        const auto reply = worker->request(juce::var(request), error, 60'000);
+        const auto reply = worker->request(cydaw::base::Value(request), error, 60'000);
         const auto* list = reply.getProperty("vectors", {}).getArray();
         if (list == nullptr || list->isEmpty()) {
             answer.failed = true;

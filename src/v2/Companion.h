@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #pragma once
 
 #include <juce_core/juce_core.h>
@@ -23,7 +24,7 @@ public:
         double progress {};
         juce::String message;
         juce::String error;
-        juce::var result;    // the {"done": true, ...} object
+        cydaw::base::Value result;    // the {"done": true, ...} object
         juce::String command; // what runs ("analyse", "setup", "info")
         juce::StringArray log; // its last messages (pip's lines while it installs)
     };
@@ -46,10 +47,10 @@ public:
     // package): each component's id, title, description, size, sources, the
     // setup arguments, whether its licences ask to be accepted, and its
     // packages with their licences, shown before anything is downloaded.
-    [[nodiscard]] static juce::var componentCatalogue();
-    [[nodiscard]] static juce::var component(const juce::String& id);
+    [[nodiscard]] static cydaw::base::Value componentCatalogue();
+    [[nodiscard]] static cydaw::base::Value component(const juce::String& id);
     // Whether `info`'s answer says a component is there.
-    [[nodiscard]] static bool componentInstalled(const juce::String& id, const juce::var& info);
+    [[nodiscard]] static bool componentInstalled(const juce::String& id, const cydaw::base::Value& info);
     // Installs a component into its environment (setup), refused when its
     // licences ask to be accepted and were not, or when one job runs. What
     // was accepted, and when, is kept in <environment>/receipts/<id>.json.
@@ -65,7 +66,7 @@ public:
     [[nodiscard]] std::optional<Status> takeFinished();
 
     // A short command run to its end (info): its last JSON line, or why not.
-    [[nodiscard]] juce::var runNow(const juce::StringArray& arguments, juce::String& error, int timeoutMs = 60'000) const;
+    [[nodiscard]] cydaw::base::Value runNow(const juce::StringArray& arguments, juce::String& error, int timeoutMs = 60'000) const;
     // The command line that runs `python -m cydaw_companion <arguments>`.
     [[nodiscard]] juce::StringArray commandLine(const juce::StringArray& arguments) const;
 

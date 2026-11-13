@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "GraphManagerComponent.h"
 
 #include "GraphPresetFile.h"
@@ -1171,7 +1172,7 @@ void GraphManagerComponent::editAssetMetadata(const Asset& asset)
             || asset.file.getSize() > maximumGraphPresetBytes)
             return;
         const auto parsed = parseGraphPresetDocument(
-            juce::JSON::parse(asset.file.loadFileAsString()));
+            cydaw::base::JSON::parse(asset.file.loadFileAsString()));
         if (!parsed.has_value())
             return;
 
@@ -1204,7 +1205,7 @@ void GraphManagerComponent::editAssetMetadata(const Asset& asset)
                     if (safeThis == nullptr || result != 1)
                         return;
                     auto document = parseGraphPresetDocument(
-                        juce::JSON::parse(destination.loadFileAsString()));
+                        cydaw::base::JSON::parse(destination.loadFileAsString()));
                     if (!document.has_value())
                         return;
                     const auto name = dialog->getTextEditorContents("name")
@@ -1242,13 +1243,13 @@ void GraphManagerComponent::editAssetMetadata(const Asset& asset)
                         graph->setProperty(
                             "graphDescription",
                             document->metadata.description);
-                        juce::Array<juce::var> graphTags;
+                        cydaw::base::Array<cydaw::base::Value> graphTags;
                         for (const auto& tag : tags)
                             graphTags.add(tag);
                         graph->setProperty("graphTags", graphTags);
                     }
 
-                    const auto encoded = juce::JSON::toString(
+                    const auto encoded = cydaw::base::JSON::toString(
                         makeGraphPresetDocument(document->name,
                                                 document->graph,
                                                 document->metadata), true);
@@ -1284,7 +1285,7 @@ void GraphManagerComponent::editAssetMetadata(const Asset& asset)
         return;
 
     const auto parsed = parseNodeParameterPresetDocument(
-        juce::JSON::parse(asset.file.loadFileAsString()));
+        cydaw::base::JSON::parse(asset.file.loadFileAsString()));
     if (!parsed.has_value())
         return;
 
@@ -1314,7 +1315,7 @@ void GraphManagerComponent::editAssetMetadata(const Asset& asset)
                 if (safeThis == nullptr || result != 1)
                     return;
                 auto document = parseNodeParameterPresetDocument(
-                    juce::JSON::parse(destination.loadFileAsString()));
+                    cydaw::base::JSON::parse(destination.loadFileAsString()));
                 if (!document.has_value())
                     return;
                 const auto name = dialog->getTextEditorContents("name")
@@ -1337,7 +1338,7 @@ void GraphManagerComponent::editAssetMetadata(const Asset& asset)
                     tags.remove(tags.size() - 1);
                 document->tags = std::move(tags);
 
-                const auto encoded = juce::JSON::toString(
+                const auto encoded = cydaw::base::JSON::toString(
                     makeNodeParameterPresetDocument(*document), true);
                 juce::TemporaryFile temporary(destination);
                 const auto saved
@@ -1370,7 +1371,7 @@ void GraphManagerComponent::duplicateUserGraph(const Asset& asset)
         || asset.file.getSize() > maximumGraphPresetBytes)
         return;
     auto document = parseGraphPresetDocument(
-        juce::JSON::parse(asset.file.loadFileAsString()));
+        cydaw::base::JSON::parse(asset.file.loadFileAsString()));
     if (!document.has_value())
         return;
 
@@ -1407,7 +1408,7 @@ void GraphManagerComponent::duplicateUserGraph(const Asset& asset)
         baseName = "Graph Copy";
     const auto destination = asset.file.getParentDirectory()
         .getNonexistentChildFile(baseName, graphPresetFileExtension, false);
-    const auto encoded = juce::JSON::toString(
+    const auto encoded = cydaw::base::JSON::toString(
         makeGraphPresetDocument(document->name, document->graph,
                                 document->metadata), true);
     const auto saved = encoded.getNumBytesAsUTF8() > 0

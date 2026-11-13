@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "ProjectImport.h"
 #include "ProjectImportShared.h"
@@ -22,15 +23,15 @@ class MidiStemsReader {
 public:
     MidiStemsReader(const juce::File& file, ImportedProject& out) : file_(file), out_(out) {}
 
-    juce::Result read()
+    cydaw::base::Result read()
     {
         juce::FileInputStream input(file_);
         juce::MidiFile midi;
         if (!input.openedOk() || !midi.readFrom(input))
-            return juce::Result::fail("Not a MIDI file: " + file_.getFileName());
+            return cydaw::base::Result::fail("Not a MIDI file: " + file_.getFileName());
         const auto perQuarter = midi.getTimeFormat();
         if (perQuarter <= 0)
-            return juce::Result::fail("A MIDI file counted in timecode (SMPTE) is not read: " + file_.getFileName());
+            return cydaw::base::Result::fail("A MIDI file counted in timecode (SMPTE) is not read: " + file_.getFileName());
         out_.format = "midi";
         out_.application = "MIDI file and stems";
         out_.name = file_.getFileNameWithoutExtension();
@@ -121,7 +122,7 @@ public:
         }
         if (!stems.isEmpty())
             out_.warnings.add(juce::String(stems.size()) + " audio file(s) beside the MIDI file came in as stems, from the start.");
-        return juce::Result::ok();
+        return cydaw::base::Result::ok();
     }
 
 private:
@@ -131,7 +132,7 @@ private:
 
 } // namespace
 
-juce::Result importMidiAndStems(const juce::File& file, ImportedProject& out)
+cydaw::base::Result importMidiAndStems(const juce::File& file, ImportedProject& out)
 {
     out.source = file;
     MidiStemsReader reader(file, out);

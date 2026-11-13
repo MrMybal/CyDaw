@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #pragma once
 
 #include <cydaw/graph/GraphDefinition.h>
@@ -27,7 +28,7 @@ struct GraphPresetMetadata {
 
 struct GraphPresetDocument {
     juce::String name;
-    juce::var graph;
+    cydaw::base::Value graph;
     GraphPresetMetadata metadata;
 };
 
@@ -74,8 +75,8 @@ parseGraphVersion(const juce::String& value)
     };
 }
 
-[[nodiscard]] inline juce::var makeGraphPresetDocument(
-    const juce::String& name, const juce::var& graph,
+[[nodiscard]] inline cydaw::base::Value makeGraphPresetDocument(
+    const juce::String& name, const cydaw::base::Value& graph,
     GraphPresetMetadata metadata = {})
 {
     const auto safeName = name.trim().substring(0, 128);
@@ -87,7 +88,7 @@ parseGraphVersion(const juce::String& value)
         metadata.definitionId = "user." + slug.trimCharactersAtStart("-")
             .trimCharactersAtEnd("-");
     }
-    auto root = juce::DynamicObject::Ptr(new juce::DynamicObject());
+    auto root = cydaw::base::Object::Ptr(new cydaw::base::Object());
     root->setProperty("format", graphPresetFileFormat);
     root->setProperty("schema", graphPresetFileSchema);
     root->setProperty("name", safeName);
@@ -99,17 +100,17 @@ parseGraphVersion(const juce::String& value)
     root->setProperty("description",
                       metadata.description.trim().substring(0, 2'048));
     root->setProperty("author", metadata.author.trim().substring(0, 128));
-    juce::Array<juce::var> tags;
+    cydaw::base::Array<cydaw::base::Value> tags;
     for (const auto& tag : metadata.tags)
         if (tag.trim().isNotEmpty() && tags.size() < 64)
             tags.add(tag.trim().substring(0, 64));
     root->setProperty("tags", tags);
     root->setProperty("graph", graph);
-    return juce::var(root.get());
+    return cydaw::base::Value(root.get());
 }
 
 [[nodiscard]] inline std::optional<GraphPresetDocument>
-parseGraphPresetDocument(const juce::var& value)
+parseGraphPresetDocument(const cydaw::base::Value& value)
 {
     const auto* root = value.getDynamicObject();
     if (root == nullptr

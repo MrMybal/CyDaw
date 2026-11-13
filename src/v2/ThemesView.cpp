@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "ThemesView.h"
 
 #include "Locations.h"
@@ -30,14 +31,14 @@ void ThemesView::reload()
                                                  : entry.name;
     std::vector<theme::Theme> own;
     for (const auto& file : folder().findChildFiles(juce::File::findFiles, false, "*.cytheme")) {
-        const auto json = juce::JSON::parse(file);
-        if (json.getProperty("format", juce::var()).toString() != "CyDAW Theme")
+        const auto json = cydaw::base::JSON::parse(file);
+        if (json.getProperty("format", cydaw::base::Value()).toString() != "CyDAW Theme")
             continue;
         theme::Theme entry;
         entry.key = "file:" + file.getFileNameWithoutExtension();
         entry.name = json.getProperty("name", file.getFileNameWithoutExtension()).toString();
         // What a file lacks: the default theme's.
-        entry.palette = theme::paletteFromJson(json.getProperty("colours", juce::var()), theme::builtInThemes().front().palette);
+        entry.palette = theme::paletteFromJson(json.getProperty("colours", cydaw::base::Value()), theme::builtInThemes().front().palette);
         entry.file = file;
         own.push_back(std::move(entry));
     }
@@ -90,11 +91,11 @@ juce::String ThemesView::createFrom(const juce::String& from, const juce::String
     auto file = dir.getNonexistentChildFile(stem, ".cytheme", false);
     const auto palette = base->palette;
     const auto key = "file:" + file.getFileNameWithoutExtension();
-    auto* root = new juce::DynamicObject();
+    auto* root = new cydaw::base::Object();
     root->setProperty("format", "CyDAW Theme");
     root->setProperty("name", name.trim().isNotEmpty() ? name.trim() : file.getFileNameWithoutExtension());
     root->setProperty("colours", theme::paletteToJson(palette));
-    if (!file.replaceWithText(juce::JSON::toString(juce::var(root))))
+    if (!file.replaceWithText(cydaw::base::JSON::toString(cydaw::base::Value(root))))
         return {};
     reload();
     return key;
@@ -105,11 +106,11 @@ bool ThemesView::save(const juce::String& key, const juce::String& name, const t
     const auto* found = find(key);
     if (found == nullptr || found->builtIn)
         return false;
-    auto* root = new juce::DynamicObject();
+    auto* root = new cydaw::base::Object();
     root->setProperty("format", "CyDAW Theme");
     root->setProperty("name", name);
     root->setProperty("colours", theme::paletteToJson(palette));
-    if (!found->file.replaceWithText(juce::JSON::toString(juce::var(root))))
+    if (!found->file.replaceWithText(cydaw::base::JSON::toString(cydaw::base::Value(root))))
         return false;
     for (auto& entry : themes_)
         if (entry.key == key) {

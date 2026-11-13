@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "Companion.h"
 
 #include "Locations.h"
@@ -62,7 +63,7 @@ public:
         }
         juce::String pending;
         juce::String lastError;
-        juce::var done;
+        cydaw::base::Value done;
         // A byte at a time: JUCE's read waits until the whole request is
         // filled, and a line of progress is short.
         juce::MemoryBlock bytes;
@@ -83,7 +84,7 @@ public:
             for (auto end = pending.indexOfChar('\n'); end >= 0; end = pending.indexOfChar('\n')) {
                 const auto line = pending.substring(0, end).trim();
                 pending = pending.substring(end + 1);
-                const auto value = juce::JSON::parse(line);
+                const auto value = cydaw::base::JSON::parse(line);
                 if (!value.isObject()) {
                     // Python's own complaints (a missing module…) come as text.
                     if (line.isNotEmpty())
@@ -117,7 +118,7 @@ public:
     }
 
 private:
-    void finish(const bool ok, juce::var result, juce::String error)
+    void finish(const bool ok, cydaw::base::Value result, juce::String error)
     {
         const std::scoped_lock lock(owner_.mutex_);
         owner_.status_.running = false;
@@ -188,12 +189,12 @@ juce::File Companion::environmentFolder()
     return locations::folder(Location::companion);
 }
 
-juce::var Companion::componentCatalogue()
+cydaw::base::Value Companion::componentCatalogue()
 {
-    return juce::JSON::parse(packageFolder().getChildFile("cydaw_companion").getChildFile("components.json"));
+    return cydaw::base::JSON::parse(packageFolder().getChildFile("cydaw_companion").getChildFile("components.json"));
 }
 
-juce::var Companion::component(const juce::String& id)
+cydaw::base::Value Companion::component(const juce::String& id)
 {
     // Held: the list lives as long as the catalogue does.
     const auto catalogue = componentCatalogue();
@@ -205,7 +206,7 @@ juce::var Companion::component(const juce::String& id)
     return {};
 }
 
-bool Companion::componentInstalled(const juce::String& id, const juce::var& info)
+bool Companion::componentInstalled(const juce::String& id, const cydaw::base::Value& info)
 {
     if (!info.isObject())
         return false;
@@ -248,7 +249,7 @@ bool Companion::install(const juce::String& id, const bool licencesAccepted, juc
         return false;
     }
     // The receipt: what was asked for, from where, and the licences shown.
-    auto* receipt = new juce::DynamicObject();
+    auto* receipt = new cydaw::base::Object();
     receipt->setProperty("component", id);
     receipt->setProperty("when", juce::Time::getCurrentTime().toISO8601(true));
     receipt->setProperty("licencesAccepted", licencesAccepted);
@@ -256,7 +257,7 @@ bool Companion::install(const juce::String& id, const bool licencesAccepted, juc
     receipt->setProperty("packages", item.getProperty("packages", {}));
     const auto file = environment.getChildFile("receipts").getChildFile(id + ".json");
     (void) file.getParentDirectory().createDirectory();
-    (void) file.replaceWithText(juce::JSON::toString(juce::var(receipt)));
+    (void) file.replaceWithText(cydaw::base::JSON::toString(cydaw::base::Value(receipt)));
     return true;
 }
 
@@ -314,7 +315,7 @@ std::optional<Companion::Status> Companion::takeFinished()
     return finished;
 }
 
-juce::var Companion::runNow(const juce::StringArray& arguments, juce::String& error, const int timeoutMs) const
+cydaw::base::Value Companion::runNow(const juce::StringArray& arguments, juce::String& error, const int timeoutMs) const
 {
     juce::ChildProcess process;
     const auto command = commandLine(arguments);
@@ -340,9 +341,9 @@ juce::var Companion::runNow(const juce::StringArray& arguments, juce::String& er
     }
     juce::StringArray lines;
     lines.addLines(output);
-    juce::var last;
+    cydaw::base::Value last;
     for (const auto& line : lines) {
-        const auto value = juce::JSON::parse(line.trim());
+        const auto value = cydaw::base::JSON::parse(line.trim());
         if (value.isObject())
             last = value;
     }

@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "ModuleInterfaceEditor.h"
 #include "PaintProfile.h"
 
@@ -16,43 +17,43 @@ namespace jsonKeys {
 // Property names as identifiers made once: an Identifier built from a
 // literal is a string-pool lookup, and a restore or a save of a large
 // graph made tens of thousands of them.
-static const juce::Identifier automatable("automatable");
-static const juce::Identifier binding("binding");
-static const juce::Identifier controls("controls");
-static const juce::Identifier defaultValue("defaultValue");
-static const juce::Identifier description("description");
-static const juce::Identifier deviceControls("deviceControls");
-static const juce::Identifier extraBindings("extraBindings");
-static const juce::Identifier gridColumns("gridColumns");
-static const juce::Identifier gridRows("gridRows");
-static const juce::Identifier windowWidth("windowWidth");
-static const juce::Identifier windowHeight("windowHeight");
-static const juce::Identifier designed("designed");
-static const juce::Identifier height("height");
-static const juce::Identifier hostParameterId("hostParameterId");
-static const juce::Identifier id("id");
-static const juce::Identifier key("key");
-static const juce::Identifier kind("kind");
-static const juce::Identifier label("label");
-static const juce::Identifier maximum("maximum");
-static const juce::Identifier minimum("minimum");
-static const juce::Identifier modulatable("modulatable");
-static const juce::Identifier nextControlId("nextControlId");
-static const juce::Identifier parameters("parameters");
-static const juce::Identifier portChannels("portChannels");
-static const juce::Identifier portKind("portKind");
-static const juce::Identifier publishToHost("publishToHost");
-static const juce::Identifier quaternaryBinding("quaternaryBinding");
-static const juce::Identifier schema("schema");
-static const juce::Identifier secondaryBinding("secondaryBinding");
-static const juce::Identifier showInDevice("showInDevice");
-static const juce::Identifier snapToGrid("snapToGrid");
-static const juce::Identifier tertiaryBinding("tertiaryBinding");
-static const juce::Identifier unit("unit");
-static const juce::Identifier value("value");
-static const juce::Identifier width("width");
-static const juce::Identifier x("x");
-static const juce::Identifier y("y");
+static const cydaw::base::Identifier automatable("automatable");
+static const cydaw::base::Identifier binding("binding");
+static const cydaw::base::Identifier controls("controls");
+static const cydaw::base::Identifier defaultValue("defaultValue");
+static const cydaw::base::Identifier description("description");
+static const cydaw::base::Identifier deviceControls("deviceControls");
+static const cydaw::base::Identifier extraBindings("extraBindings");
+static const cydaw::base::Identifier gridColumns("gridColumns");
+static const cydaw::base::Identifier gridRows("gridRows");
+static const cydaw::base::Identifier windowWidth("windowWidth");
+static const cydaw::base::Identifier windowHeight("windowHeight");
+static const cydaw::base::Identifier designed("designed");
+static const cydaw::base::Identifier height("height");
+static const cydaw::base::Identifier hostParameterId("hostParameterId");
+static const cydaw::base::Identifier id("id");
+static const cydaw::base::Identifier key("key");
+static const cydaw::base::Identifier kind("kind");
+static const cydaw::base::Identifier label("label");
+static const cydaw::base::Identifier maximum("maximum");
+static const cydaw::base::Identifier minimum("minimum");
+static const cydaw::base::Identifier modulatable("modulatable");
+static const cydaw::base::Identifier nextControlId("nextControlId");
+static const cydaw::base::Identifier parameters("parameters");
+static const cydaw::base::Identifier portChannels("portChannels");
+static const cydaw::base::Identifier portKind("portKind");
+static const cydaw::base::Identifier publishToHost("publishToHost");
+static const cydaw::base::Identifier quaternaryBinding("quaternaryBinding");
+static const cydaw::base::Identifier schema("schema");
+static const cydaw::base::Identifier secondaryBinding("secondaryBinding");
+static const cydaw::base::Identifier showInDevice("showInDevice");
+static const cydaw::base::Identifier snapToGrid("snapToGrid");
+static const cydaw::base::Identifier tertiaryBinding("tertiaryBinding");
+static const cydaw::base::Identifier unit("unit");
+static const cydaw::base::Identifier value("value");
+static const cydaw::base::Identifier width("width");
+static const cydaw::base::Identifier x("x");
+static const cydaw::base::Identifier y("y");
 } // namespace jsonKeys
 
 
@@ -1482,9 +1483,9 @@ void rebuildAutomaticDeviceControls(ModuleInterfaceState& state)
     }
 }
 
-juce::var serialiseModuleInterface(const ModuleInterfaceState& state)
+cydaw::base::Value serialiseModuleInterface(const ModuleInterfaceState& state)
 {
-    auto root = juce::DynamicObject::Ptr(new juce::DynamicObject());
+    auto root = cydaw::base::Object::Ptr(new cydaw::base::Object());
     root->setProperty(jsonKeys::schema, std::max(18, static_cast<int>(state.schema)));
     root->setProperty(jsonKeys::nextControlId, static_cast<juce::int64>(state.nextControlId));
     root->setProperty(jsonKeys::snapToGrid, state.snapToGrid);
@@ -1501,7 +1502,7 @@ juce::var serialiseModuleInterface(const ModuleInterfaceState& state)
     root->setProperty("deviceWidth",static_cast<int>(state.deviceWidth));
     root->setProperty("deviceHeight",static_cast<int>(state.deviceHeight));
 
-    juce::Array<juce::var> parameters;
+    cydaw::base::Array<cydaw::base::Value> parameters;
     for (const auto& parameter : state.parameters) {
         // Every field the object below is built from, and nothing else: a
         // field left out here would let a stale object through, and the
@@ -1536,7 +1537,7 @@ juce::var serialiseModuleInterface(const ModuleInterfaceState& state)
             parameters.add(parameter.serialised);
             continue;
         }
-        auto value = juce::DynamicObject::Ptr(new juce::DynamicObject());
+        auto value = cydaw::base::Object::Ptr(new cydaw::base::Object());
         value->setProperty(jsonKeys::key, parameter.key);
         value->setProperty(jsonKeys::label, parameter.label);
         value->setProperty(jsonKeys::unit, parameter.unit);
@@ -1556,14 +1557,14 @@ juce::var serialiseModuleInterface(const ModuleInterfaceState& state)
         value->setProperty(jsonKeys::automatable, parameter.automatable);
         value->setProperty(jsonKeys::modulatable, parameter.modulatable);
         value->setProperty(jsonKeys::description, parameter.description);
-        parameter.serialised = juce::var(value.get());
+        parameter.serialised = cydaw::base::Value(value.get());
         parameter.serialisedSignature = signature;
         parameters.add(parameter.serialised);
     }
     root->setProperty(jsonKeys::parameters, parameters);
 
     const auto serialiseControls = [](const auto& source) {
-        juce::Array<juce::var> controls;
+        cydaw::base::Array<cydaw::base::Value> controls;
         for (const auto& control : source) {
             auto signature = std::uint64_t { 1469598103934665603ull };
             const auto mix = [&signature](const std::uint64_t bits) {
@@ -1593,13 +1594,13 @@ juce::var serialiseModuleInterface(const ModuleInterfaceState& state)
             mixFloat(control.height);
             mix(control.portKind);
             mix(control.portChannels);
-            if (control.design.isObject()) mixString(juce::JSON::toString(control.design,false));
+            if (control.design.isObject()) mixString(cydaw::base::JSON::toString(control.design,false));
             if (!control.serialised.isVoid()
                 && control.serialisedSignature == signature) {
                 controls.add(control.serialised);
                 continue;
             }
-            auto value = juce::DynamicObject::Ptr(new juce::DynamicObject());
+            auto value = cydaw::base::Object::Ptr(new cydaw::base::Object());
             value->setProperty(jsonKeys::id, static_cast<juce::int64>(control.id));
             value->setProperty(jsonKeys::kind, controlKindKey(control.kind));
             value->setProperty(jsonKeys::label, control.label);
@@ -1612,7 +1613,7 @@ juce::var serialiseModuleInterface(const ModuleInterfaceState& state)
             value->setProperty(jsonKeys::quaternaryBinding,
                                control.quaternaryParameterBinding);
             if (!control.extraParameterBindings.empty()) {
-                juce::Array<juce::var> extras;
+                cydaw::base::Array<cydaw::base::Value> extras;
                 for (const auto& binding : control.extraParameterBindings)
                     extras.add(binding);
                 value->setProperty(jsonKeys::extraBindings, extras);
@@ -1624,7 +1625,7 @@ juce::var serialiseModuleInterface(const ModuleInterfaceState& state)
             value->setProperty(jsonKeys::portKind, static_cast<int>(control.portKind));
             value->setProperty(jsonKeys::portChannels,
                                static_cast<int>(control.portChannels));
-            control.serialised = juce::var(value.get());
+            control.serialised = cydaw::base::Value(value.get());
             control.serialisedSignature = signature;
             controls.add(control.serialised);
         }
@@ -1634,19 +1635,19 @@ juce::var serialiseModuleInterface(const ModuleInterfaceState& state)
     // unconstrained graph layout.
     root->setProperty(jsonKeys::controls, serialiseControls(state.controls));
     root->setProperty(jsonKeys::deviceControls, serialiseControls(state.deviceControls));
-    return juce::var(root.get());
+    return cydaw::base::Value(root.get());
 }
 
 void dropSerialisedPresentation(ModuleInterfaceState& state)
 {
     for (auto& parameter : state.parameters)
-        parameter.serialised = juce::var();
+        parameter.serialised = cydaw::base::Value();
     for (auto* controls : { &state.controls, &state.deviceControls })
         for (auto& control : *controls)
-            control.serialised = juce::var();
+            control.serialised = cydaw::base::Value();
 }
 
-ModuleInterfaceState restoreModuleInterface(const juce::var& value)
+ModuleInterfaceState restoreModuleInterface(const cydaw::base::Value& value)
 {
     ModuleInterfaceState state;
     const auto* root = value.getDynamicObject();
@@ -1675,8 +1676,8 @@ ModuleInterfaceState restoreModuleInterface(const juce::var& value)
     state.deviceDesigned = static_cast<bool>(root->getProperty("deviceDesigned"));
     if(root->getProperty("windowDesign").isObject())state.windowDesign=root->getProperty("windowDesign").clone();
     if(root->getProperty("deviceDesign").isObject())state.deviceDesign=root->getProperty("deviceDesign").clone();
-    state.deviceWidth=static_cast<std::uint16_t>(juce::jlimit(120,4096,static_cast<int>((root->hasProperty("deviceWidth")?root->getProperty("deviceWidth"):juce::var(480)))));
-    state.deviceHeight=static_cast<std::uint16_t>(juce::jlimit(80,2160,static_cast<int>((root->hasProperty("deviceHeight")?root->getProperty("deviceHeight"):juce::var(240)))));
+    state.deviceWidth=static_cast<std::uint16_t>(juce::jlimit(120,4096,static_cast<int>((root->hasProperty("deviceWidth")?root->getProperty("deviceWidth"):cydaw::base::Value(480)))));
+    state.deviceHeight=static_cast<std::uint16_t>(juce::jlimit(80,2160,static_cast<int>((root->hasProperty("deviceHeight")?root->getProperty("deviceHeight"):cydaw::base::Value(240)))));
     std::set<juce::String> parameterKeys;
     if (const auto* parameters = root->getProperty(jsonKeys::parameters).getArray()) {
         for (const auto& parameterValue : *parameters) {
@@ -1724,7 +1725,7 @@ ModuleInterfaceState restoreModuleInterface(const juce::var& value)
     std::uint64_t highestId {};
     const auto restoreControls = [&parameterKeys, &controlIds, &highestId,
                                   sourceSchema](
-                                     const juce::var& value,
+                                     const cydaw::base::Value& value,
                                      std::vector<ModuleInterfaceControl>& destination) {
       if (const auto* controls = value.getArray()) {
         for (const auto& controlValue : *controls) {
@@ -1880,9 +1881,9 @@ ModuleInterfaceState restoreModuleInterface(const juce::var& value)
     return state;
 }
 
-juce::Result validateModuleInterfaceDocument(const juce::var& document, const ModuleInterfaceState& parameters)
+cydaw::base::Result validateModuleInterfaceDocument(const cydaw::base::Value& document, const ModuleInterfaceState& parameters)
 {
-    const auto fail=[](const juce::String& reason){return juce::Result::fail(reason);};
+    const auto fail=[](const juce::String& reason){return cydaw::base::Result::fail(reason);};
     if(!document.isObject())return fail("Interface document must be a JSON object");
     for(const auto* surface:{"windowDesign","deviceDesign"}) {
         const auto design=document.getProperty(surface,{});
@@ -1952,51 +1953,51 @@ juce::Result validateModuleInterfaceDocument(const juce::var& document, const Mo
     return validateModuleInterface(restored);
 }
 
-juce::Result validateModuleInterface(const ModuleInterfaceState& state)
+cydaw::base::Result validateModuleInterface(const ModuleInterfaceState& state)
 {
     if (state.gridColumns < 4 || state.gridColumns > 64
         || state.gridRows < 4 || state.gridRows > 64)
-        return juce::Result::fail("Module interface grid dimensions are invalid");
+        return cydaw::base::Result::fail("Module interface grid dimensions are invalid");
     std::set<juce::String> parameterKeys;
     std::set<std::uint32_t> hostParameterIds;
     for (const auto& parameter : state.parameters) {
         if (parameter.key.isEmpty() || parameterKeys.contains(parameter.key))
-            return juce::Result::fail("Published module parameters need unique stable keys");
+            return cydaw::base::Result::fail("Published module parameters need unique stable keys");
         if (parameter.minimum > parameter.maximum
             || parameter.value < parameter.minimum
             || parameter.value > parameter.maximum)
-            return juce::Result::fail("Published module parameter range is invalid");
+            return cydaw::base::Result::fail("Published module parameter range is invalid");
         const auto hostParameterId = parameter.hostParameterId != 0
             ? parameter.hostParameterId
             : stableModuleParameterId(parameter.key);
         if (hostParameterId == 0
             || (parameter.publishToHost
                 && !hostParameterIds.insert(hostParameterId).second))
-            return juce::Result::fail(
+            return cydaw::base::Result::fail(
                 "Host-published module parameters need unique non-zero stable IDs");
         parameterKeys.insert(parameter.key);
     }
     std::set<std::uint64_t> controlIds;
     const auto validateControls = [&parameterKeys, &controlIds](
-                                      const auto& controls) -> juce::Result {
+                                      const auto& controls) -> cydaw::base::Result {
       for (const auto& control : controls) {
         if (control.id == 0 || controlIds.contains(control.id))
-            return juce::Result::fail("Module interface controls need unique non-zero IDs");
+            return cydaw::base::Result::fail("Module interface controls need unique non-zero IDs");
         if (control.x < 0.0f || control.y < 0.0f
             || control.width <= 0.0f || control.height <= 0.0f
             || control.x + control.width > 1.001f
             || control.y + control.height > 1.001f)
-            return juce::Result::fail("Module interface control bounds are invalid");
+            return cydaw::base::Result::fail("Module interface control bounds are invalid");
         if (isParameterControl(control.kind)
             && !parameterKeys.contains(control.parameterBinding))
-            return juce::Result::fail("Module interface control binding is missing");
+            return cydaw::base::Result::fail("Module interface control binding is missing");
         if ((control.kind == ModuleControlKind::xyPad
              || control.kind == ModuleControlKind::filterResponse
              || control.kind == ModuleControlKind::dynamicsResponse)
             && (!parameterKeys.contains(control.secondaryParameterBinding)
                 || control.secondaryParameterBinding
                        == control.parameterBinding))
-            return juce::Result::fail(
+            return cydaw::base::Result::fail(
                 "Module interface two-parameter control needs two different bindings");
         if (control.kind == ModuleControlKind::eqCurve) {
             const auto& extras = control.extraParameterBindings;
@@ -2007,7 +2008,7 @@ juce::Result validateModuleInterface(const ModuleInterfaceState& state)
                                 [&parameterKeys](const auto& binding) {
                                     return parameterKeys.contains(binding);
                                 }))
-                return juce::Result::fail(
+                return cydaw::base::Result::fail(
                     "Module EQ curve needs three distinct bindings per band");
         }
         if (control.kind == ModuleControlKind::envelope) {
@@ -2021,21 +2022,21 @@ juce::Result validateModuleInterface(const ModuleInterfaceState& state)
                 || !parameterKeys.contains(control.secondaryParameterBinding)
                 || !parameterKeys.contains(control.tertiaryParameterBinding)
                 || !parameterKeys.contains(control.quaternaryParameterBinding))
-                return juce::Result::fail(
+                return cydaw::base::Result::fail(
                     "Module envelope needs four different bindings");
         }
         if (isPortControl(control.kind)
             && (control.portChannels < 1 || control.portChannels > 8
                 || (control.portKind != 0 && control.portChannels != 1)))
-            return juce::Result::fail(
+            return cydaw::base::Result::fail(
                 "Module interface port channel contract is invalid");
         if (control.kind == ModuleControlKind::levelMeter
             && (control.portChannels < 1 || control.portChannels > 8))
-            return juce::Result::fail(
+            return cydaw::base::Result::fail(
                 "Module interface meter channel format is invalid");
         controlIds.insert(control.id);
       }
-      return juce::Result::ok();
+      return cydaw::base::Result::ok();
     };
     if (const auto graphResult = validateControls(state.controls);
         graphResult.failed())
@@ -2043,7 +2044,7 @@ juce::Result validateModuleInterface(const ModuleInterfaceState& state)
     if (const auto deviceResult = validateControls(state.deviceControls);
         deviceResult.failed())
         return deviceResult;
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 std::uint32_t stableModuleParameterId(
@@ -2339,7 +2340,7 @@ void ModuleInterfaceEditorComponent::setState(ModuleInterfaceState state)
     undoStates_.clear();
     redoStates_.clear();
     historyGestureActive_ = false;
-    historyGestureStart_ = juce::var();
+    historyGestureStart_ = cydaw::base::Value();
     snapButton_.setToggleState(state_.snapToGrid, juce::dontSendNotification);
     rebuildAutomaticDeviceControls(state_);
     committedState_ = serialiseModuleInterface(state_);
@@ -4652,7 +4653,7 @@ void ModuleInterfaceEditorComponent::endHistoryGesture()
             redoStates_.clear();
         }
     }
-    historyGestureStart_ = juce::var();
+    historyGestureStart_ = cydaw::base::Value();
     committedState_ = std::move(current);
     refreshHistoryButtons();
 }

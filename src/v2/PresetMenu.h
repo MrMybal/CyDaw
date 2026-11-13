@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #pragma once
 
 #include "Presets.h"
@@ -20,8 +21,8 @@ namespace cydaw::v2 {
 
 class PresetMenu final {
 public:
-    using Capture = std::function<juce::var()>;
-    using Apply = std::function<bool(const juce::var&, juce::String&)>;
+    using Capture = std::function<cydaw::base::Value()>;
+    using Apply = std::function<bool(const cydaw::base::Value&, juce::String&)>;
     // A hosted plug-in's own programs: listed (with the current one) when
     // the list opens, one chosen. Any list of that kind (a track's factory
     // chains) under its own heading.

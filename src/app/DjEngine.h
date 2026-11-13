@@ -1,3 +1,4 @@
+#include <cydaw/base/Text.h>
 #pragma once
 #include "ModeProcessor.h"
 #include <cydaw/realtime/RtPublisher.h>
@@ -187,7 +188,7 @@ public:
     [[nodiscard]] bool anyPlaying() const noexcept;
 
     // ---- The mix recorded --------------------------------------------------------------------
-    juce::Result startRecording(const juce::File& file);
+    cydaw::base::Result startRecording(const juce::File& file);
     void stopRecording();
     [[nodiscard]] bool recording() const noexcept { return recording_.load(std::memory_order_acquire); }
     [[nodiscard]] double recordedSeconds() const noexcept;

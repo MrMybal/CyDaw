@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "JsfxView.h"
 #include "HelpDocumentation.h"
 #include "AppUi.h"
@@ -61,13 +62,13 @@ namespace cydaw::v2 {
 
 using ui::dp;
 using ui::L;
-juce::var AppUi::jsfx(const juce::var& request){return jsfx_->command(request);}
-juce::var AppUi::manual(const juce::var& request){return help_->command(request, studio_.keepsSettings());}
+cydaw::base::Value AppUi::jsfx(const cydaw::base::Value& request){return jsfx_->command(request);}
+cydaw::base::Value AppUi::manual(const cydaw::base::Value& request){return help_->command(request, studio_.keepsSettings());}
 void AppUi::openManual(const juce::String& topic, const juce::String& section){
-    auto* request = new juce::DynamicObject();
+    auto* request = new cydaw::base::Object();
     request->setProperty("action", "open"); request->setProperty("topic", topic); request->setProperty("section", section);
     request->setProperty("language", studio_.settings().getValue("manualLanguage", "en"));
-    const auto result = help_->command(juce::var(request), studio_.keepsSettings());
+    const auto result = help_->command(cydaw::base::Value(request), studio_.keepsSettings());
     if (result.isString()) notify(result.toString(), true);
 }
 
@@ -322,34 +323,34 @@ juce::StringArray AppUi::layoutNames() const
     return names;
 }
 
-juce::Result AppUi::saveLayoutAs(const juce::String& name)
+cydaw::base::Result AppUi::saveLayoutAs(const juce::String& name)
 {
     const auto file = namedLayoutFile(name);
     if (file == juce::File())
-        return juce::Result::fail(ui::Ls("Donnez un nom à la disposition", "Give the layout a name"));
+        return cydaw::base::Result::fail(ui::Ls("Donnez un nom à la disposition", "Give the layout a name"));
     if (ImGui::GetCurrentContext() == nullptr)
-        return juce::Result::fail("no interface");
+        return cydaw::base::Result::fail("no interface");
     size_t size = 0;
     const auto* data = ImGui::SaveIniSettingsToMemory(&size);
     if (size == 0 || !file.getParentDirectory().createDirectory() || !file.replaceWithData(data, size))
-        return juce::Result::fail(ui::Ls("La disposition n'a pas pu être écrite : ", "The layout could not be written: ")
+        return cydaw::base::Result::fail(ui::Ls("La disposition n'a pas pu être écrite : ", "The layout could not be written: ")
                                   + file.getFullPathName());
     notify(ui::Ls("Disposition enregistrée : ", "Layout saved: ") + file.getFileNameWithoutExtension());
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
-juce::Result AppUi::loadLayout(const juce::String& name)
+cydaw::base::Result AppUi::loadLayout(const juce::String& name)
 {
     const auto file = namedLayoutFile(name);
     if (!file.existsAsFile())
-        return juce::Result::fail(ui::Ls("Aucune disposition « ", "No layout \"") + name
+        return cydaw::base::Result::fail(ui::Ls("Aucune disposition « ", "No layout \"") + name
                                   + ui::Ls(" »", "\""));
     pendingLayout_ = file.loadFileAsString();
     if (pendingLayout_.isEmpty())
-        return juce::Result::fail(ui::Ls("Cette disposition est vide", "This layout is empty"));
+        return cydaw::base::Result::fail(ui::Ls("Cette disposition est vide", "This layout is empty"));
     notify(ui::Ls("Disposition : ", "Layout: ") + file.getFileNameWithoutExtension());
     host_.wake();
-    return juce::Result::ok();
+    return cydaw::base::Result::ok();
 }
 
 bool AppUi::deleteLayout(const juce::String& name)
@@ -863,7 +864,7 @@ bool AppUi::importProjectInSteps(const juce::File& file)
     return true;
 }
 
-void AppUi::projectOpened(const juce::File& file, const juce::Result& result)
+void AppUi::projectOpened(const juce::File& file, const cydaw::base::Result& result)
 {
     opening_ = juce::File {};
     const auto selectedBefore = state_.pixelsPerSecond;
@@ -1357,34 +1358,34 @@ void AppUi::resolveMode()
     }
 }
 
-juce::var AppUi::controllers(const juce::var& request)
+cydaw::base::Value AppUi::controllers(const cydaw::base::Value& request)
 {
     if (request.getProperty("action", "").toString() == "show" || static_cast<bool>(request.getProperty("show", false)))
         showControllers_ = true;
     return controllers_->command(request);
 }
 
-juce::var AppUi::transportSync(const juce::var& request)
+cydaw::base::Value AppUi::transportSync(const cydaw::base::Value& request)
 {
     if(static_cast<bool>(request.getProperty("show",false)))showTransportSync_=true;
     return transportSync_->command(request);
 }
 
-juce::var AppUi::dj(const juce::var& request)
+cydaw::base::Value AppUi::dj(const cydaw::base::Value& request)
 {
     if (static_cast<bool>(request.getProperty("show", false)))
         state_.mode = AppMode::dj;
     return dj_->command(request);
 }
 
-juce::var AppUi::foundry(const juce::var& request)
+cydaw::base::Value AppUi::foundry(const cydaw::base::Value& request)
 {
     if (static_cast<bool>(request.getProperty("show", false)))
         state_.mode = AppMode::foundry;
     return foundry_->command(request);
 }
 
-juce::var AppUi::processing(const juce::var& request)
+cydaw::base::Value AppUi::processing(const cydaw::base::Value& request)
 {
     return processing_->command(request);
 }
@@ -1395,7 +1396,7 @@ bool AppUi::openProcessing(const TrackRef& track, const std::uint64_t clipId)
     return true;
 }
 
-juce::var AppUi::cinema(const juce::var& request)
+cydaw::base::Value AppUi::cinema(const cydaw::base::Value& request)
 {
     if(static_cast<bool>(request.getProperty("show",false)))state_.mode=AppMode::cinema;
     return cinema_->command(request);
@@ -1806,24 +1807,24 @@ void AppUi::drawMidiInputs()
     ImGui::PopTextWrapPos();
 }
 
-juce::var AppUi::themes(const juce::var& request)
+cydaw::base::Value AppUi::themes(const cydaw::base::Value& request)
 {
     if (request.hasProperty("create")) {
         const auto from = request.getProperty("from", themes_->currentKey()).toString();
-        const auto key = themes_->createFrom(from, request.getProperty("create", juce::var()).toString());
+        const auto key = themes_->createFrom(from, request.getProperty("create", cydaw::base::Value()).toString());
         if (key.isEmpty())
-            return juce::var("no theme \"" + from + "\" to make one from");
+            return cydaw::base::Value("no theme \"" + from + "\" to make one from");
         (void) themes_->choose(key);
     }
     for (const auto* field : { "key", "name" })
         if (request.hasProperty(field) && !request.hasProperty("colours")) {
-            const auto wanted = request.getProperty(field, juce::var()).toString();
+            const auto wanted = request.getProperty(field, cydaw::base::Value()).toString();
             auto found = false;
             for (const auto& entry : themes_->themes())
                 if (entry.key == wanted || entry.name == wanted)
                     found = themes_->choose(entry.key);
             if (!found)
-                return juce::var("no theme \"" + wanted + "\"");
+                return cydaw::base::Value("no theme \"" + wanted + "\"");
         }
     if (request.hasProperty("colours")) {
         const auto key = request.getProperty("key", themes_->currentKey()).toString();
@@ -1832,34 +1833,34 @@ juce::var AppUi::themes(const juce::var& request)
             if (entry.key == key)
                 target = &entry;
         if (target == nullptr || target->builtIn)
-            return juce::var("only a theme of one's own changes its colours");
-        const auto palette = theme::paletteFromJson(request.getProperty("colours", juce::var()), target->palette);
+            return cydaw::base::Value("only a theme of one's own changes its colours");
+        const auto palette = theme::paletteFromJson(request.getProperty("colours", cydaw::base::Value()), target->palette);
         if (!themes_->save(key, target->name, palette))
-            return juce::var("the theme could not be written");
+            return cydaw::base::Value("the theme could not be written");
         (void) themes_->choose(key);
     }
-    auto* result = new juce::DynamicObject();
+    auto* result = new cydaw::base::Object();
     result->setProperty("current", themes_->currentKey());
-    juce::Array<juce::var> list;
+    cydaw::base::Array<cydaw::base::Value> list;
     for (const auto& entry : themes_->themes()) {
-        auto* item = new juce::DynamicObject();
+        auto* item = new cydaw::base::Object();
         item->setProperty("key", entry.key);
         item->setProperty("name", entry.name);
         item->setProperty("builtIn", entry.builtIn);
         if (entry.key == themes_->currentKey())
             item->setProperty("colours", theme::paletteToJson(entry.palette));
-        list.add(juce::var(item));
+        list.add(cydaw::base::Value(item));
     }
     result->setProperty("themes", list);
     result->setProperty("folder", ThemesView::folder().getFullPathName());
-    return juce::var(result);
+    return cydaw::base::Value(result);
 }
 
-juce::var AppUi::midiInputs(const juce::String& command, const juce::var& request)
+cydaw::base::Value AppUi::midiInputs(const juce::String& command, const cydaw::base::Value& request)
 {
     auto& keyboard = *computerKeyboard_;
     auto& manager = studio_.engine().deviceManager();
-    auto* result = new juce::DynamicObject();
+    auto* result = new cydaw::base::Object();
     if (command == "computer_keyboard") {
         if (request.hasProperty("enabled"))
             keyboard.setEnabled(static_cast<bool>(request.getProperty("enabled", true)));
@@ -1871,23 +1872,23 @@ juce::var AppUi::midiInputs(const juce::String& command, const juce::var& reques
         result->setProperty("active", keyboard.active());
         result->setProperty("octave", keyboard.octave());
         result->setProperty("velocity", keyboard.velocity());
-        juce::Array<juce::var> held;
+        cydaw::base::Array<cydaw::base::Value> held;
         for (const auto note : keyboard.heldNotes())
             held.add(note);
         result->setProperty("held", held);
-        juce::Array<juce::var> keys;
+        cydaw::base::Array<cydaw::base::Value> keys;
         for (const auto& key : keyboard.keys()) {
-            auto* entry = new juce::DynamicObject();
+            auto* entry = new cydaw::base::Object();
             entry->setProperty("label", juce::String(key.label));
             entry->setProperty("semitone", key.semitone);
-            keys.add(juce::var(entry));
+            keys.add(cydaw::base::Value(entry));
         }
         result->setProperty("keys", keys);
-        return juce::var(result);
+        return cydaw::base::Value(result);
     }
     const auto devices = juce::MidiInput::getAvailableDevices();
     if (request.hasProperty("device")) {
-        const auto wanted = request.getProperty("device", juce::var()).toString();
+        const auto wanted = request.getProperty("device", cydaw::base::Value()).toString();
         auto found = false;
         for (const auto& device : devices)
             if (device.identifier == wanted || device.name == wanted) {
@@ -1897,19 +1898,19 @@ juce::var AppUi::midiInputs(const juce::String& command, const juce::var& reques
                 found = true;
             }
         if (!found)
-            return juce::var("no MIDI device \"" + wanted + "\"");
+            return cydaw::base::Value("no MIDI device \"" + wanted + "\"");
     }
-    juce::Array<juce::var> list;
+    cydaw::base::Array<cydaw::base::Value> list;
     for (const auto& device : devices) {
-        auto* entry = new juce::DynamicObject();
+        auto* entry = new cydaw::base::Object();
         entry->setProperty("name", device.name);
         entry->setProperty("identifier", device.identifier);
         entry->setProperty("enabled", manager.isMidiInputDeviceEnabled(device.identifier));
-        list.add(juce::var(entry));
+        list.add(cydaw::base::Value(entry));
     }
     result->setProperty("devices", list);
     result->setProperty("computerKeyboard", keyboard.enabled());
-    return juce::var(result);
+    return cydaw::base::Value(result);
 }
 
 void AppUi::drawAudioDevice()
@@ -2080,8 +2081,8 @@ void AppUi::drawCompanionWindow()
                   "Empty: its own environment when made, else \"python\" from the PATH."));
     // What the last check said.
     const auto& job = studio_.companionJob();
-    const auto info = job && job->command == "info" && !job->failed ? job->result : juce::var();
-    const auto setupInfo = job && job->command == "setup" && !job->failed ? job->result.getProperty("info", {}) : juce::var();
+    const auto info = job && job->command == "info" && !job->failed ? job->result : cydaw::base::Value();
+    const auto setupInfo = job && job->command == "setup" && !job->failed ? job->result.getProperty("info", {}) : cydaw::base::Value();
     const auto shown = info.isObject() ? info : setupInfo;
     row("Python");
     if (shown.isObject())
@@ -2092,7 +2093,7 @@ void AppUi::drawCompanionWindow()
         ImGui::TextDisabled("%s", L("vérification…", "checking…"));
     const auto field = [&](const char* label, const char* key, const char* missing) {
         row(label);
-        const auto value = shown.isObject() ? shown.getProperty(key, {}) : juce::var();
+        const auto value = shown.isObject() ? shown.getProperty(key, {}) : cydaw::base::Value();
         if (value.isVoid() || value.toString().isEmpty() || value.toString() == "null")
             ImGui::TextColored(theme::vec(p.textFaint), "%s", missing);
         else
@@ -2127,7 +2128,7 @@ void AppUi::drawCompanionWindow()
                   "Options › Locations: everything installed here (and its temporary files) stays in this folder."));
     const auto catalogue = Companion::componentCatalogue();
     const auto french = ui::french();
-    const auto text = [french](const juce::var& value) {
+    const auto text = [french](const cydaw::base::Value& value) {
         return value.isObject() ? value.getProperty(french ? "fr" : "en", {}).toString() : value.toString();
     };
     ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + dp(620.0f));
@@ -2477,7 +2478,7 @@ void AppUi::showView(const int view)
     host_.wake();
 }
 
-juce::String AppUi::injectInput(const juce::var& events)
+juce::String AppUi::injectInput(const cydaw::base::Value& events)
 {
     const auto* list = events.getArray();
     if (list == nullptr)
@@ -2485,13 +2486,13 @@ juce::String AppUi::injectInput(const juce::var& events)
     if (!host_.isReady())
         return "the window is not ready";
     for (const auto& event : *list) {
-        const auto type = event.getProperty("type", juce::var()).toString();
+        const auto type = event.getProperty("type", cydaw::base::Value()).toString();
         if (type != "move" && type != "down" && type != "up" && type != "wheel" && type != "wait" && type != "release"
             && type != "text" && type != "key" && type != "file_drop")
             return "unknown event type \"" + type + "\"";
     }
     for (const auto& event : *list) {
-        const auto type = event.getProperty("type", juce::var()).toString();
+        const auto type = event.getProperty("type", cydaw::base::Value()).toString();
         if(type=="file_drop") {
             host_.renderNow();
             juce::StringArray files;
@@ -2514,7 +2515,7 @@ juce::String AppUi::injectInput(const juce::var& events)
         for (auto frame = 0; frame < frames; ++frame)
             host_.renderNow();
     }
-    scriptedEvent_ = juce::var();
+    scriptedEvent_ = cydaw::base::Value();
     return {};
 }
 
@@ -2525,7 +2526,7 @@ void AppUi::applyScriptedInput()
     if (!scriptedMouse_)
         return;
     auto& io = ImGui::GetIO();
-    const auto event = std::exchange(scriptedEvent_, juce::var());
+    const auto event = std::exchange(scriptedEvent_, cydaw::base::Value());
     if (const auto* object = event.getDynamicObject()) {
         if (object->hasProperty("x") && object->hasProperty("y")) {
             scriptedX_ = static_cast<float>(static_cast<double>(object->getProperty("x")));
@@ -2542,7 +2543,7 @@ void AppUi::applyScriptedInput()
     const auto* viewport = ImGui::GetMainViewport();
     io.AddMousePosEvent(viewport->Pos.x + scriptedX_, viewport->Pos.y + scriptedY_);
     io.AddMouseViewportEvent(viewport->ID);
-    const auto type = event.getProperty("type", juce::var()).toString();
+    const auto type = event.getProperty("type", cydaw::base::Value()).toString();
     const auto button = juce::jlimit(0, 2, static_cast<int>(event.getProperty("button", 0)));
     if (type == "down")
         io.AddMouseButtonEvent(button, true);
@@ -2556,9 +2557,9 @@ void AppUi::applyScriptedInput()
     // space, the arrows up, down, left, right, a letter or a digit; ctrl,
     // shift, alt down with "down": true, up with false).
     else if (type == "text")
-        io.AddInputCharactersUTF8(event.getProperty("text", juce::var()).toString().toRawUTF8());
+        io.AddInputCharactersUTF8(event.getProperty("text", cydaw::base::Value()).toString().toRawUTF8());
     else if (type == "key") {
-        const auto name = event.getProperty("key", juce::var()).toString().toLowerCase();
+        const auto name = event.getProperty("key", cydaw::base::Value()).toString().toLowerCase();
         const auto key = name == "enter"       ? ImGuiKey_Enter
                          : name == "escape"    ? ImGuiKey_Escape
                          : name == "tab"       ? ImGuiKey_Tab
@@ -2664,7 +2665,7 @@ void AppUi::selectSample(const juce::File& file)
     browser_->selectSample(file);
 }
 
-juce::var AppUi::library(const juce::String& command, const juce::var& request)
+cydaw::base::Value AppUi::library(const juce::String& command, const cydaw::base::Value& request)
 {
     static const char* facets[] = { "category", "group", "source", "type", "key", "tempo", "length" };
     static const std::pair<const char*, int> columns[] = {
@@ -2673,8 +2674,8 @@ juce::var AppUi::library(const juce::String& command, const juce::var& request)
         { "length", SampleCatalog::colLength },       { "bpm", SampleCatalog::colBpm },       { "key", SampleCatalog::colKey },
         { "channels", SampleCatalog::colChannels },   { "rate", SampleCatalog::colRate },     { "score", SampleCatalog::colScore },
     };
-    auto* result = new juce::DynamicObject();
-    juce::var answer(result);
+    auto* result = new cydaw::base::Object();
+    cydaw::base::Value answer(result);
     if (command == "library_perf") {
         // The catalog built over as many sounds as asked, then queried the
         // ways the window does.
@@ -2684,7 +2685,7 @@ juce::var AppUi::library(const juce::String& command, const juce::var& request)
         result->setProperty("items", static_cast<int>(data->items.size()));
         result->setProperty("buildMs", data->buildMs);
         result->setProperty("syntheticMs", juce::Time::getMillisecondCounterHiRes() - started);
-        auto* queries = new juce::DynamicObject();
+        auto* queries = new cydaw::base::Object();
         const auto time = [&](const char* name, const SampleCatalog::Query& query) {
             // The slowest of three.
             auto slowest = 0.0;
@@ -2694,10 +2695,10 @@ juce::var AppUi::library(const juce::String& command, const juce::var& request)
                 slowest = std::max(slowest, answered.ms);
                 rows = answered.matched;
             }
-            auto* entry = new juce::DynamicObject();
+            auto* entry = new cydaw::base::Object();
             entry->setProperty("ms", slowest);
             entry->setProperty("rows", rows);
-            queries->setProperty(name, juce::var(entry));
+            queries->setProperty(name, cydaw::base::Value(entry));
         };
         SampleCatalog::Query all;
         time("all", all);
@@ -2720,7 +2721,7 @@ juce::var AppUi::library(const juce::String& command, const juce::var& request)
         SampleCatalog::Query byCategory;
         byCategory.sortColumn = SampleCatalog::colCategory;
         time("sortCategory", byCategory);
-        result->setProperty("queries", juce::var(queries));
+        result->setProperty("queries", cydaw::base::Value(queries));
         return answer;
     }
     // library_window
@@ -2762,15 +2763,15 @@ juce::var AppUi::library(const juce::String& command, const juce::var& request)
     result->setProperty("buildMs", probe.buildMs);
     result->setProperty("extractMs", probe.extractMs);
     result->setProperty("frameMs", probe.frameMs);
-    auto* facetCounts = new juce::DynamicObject();
+    auto* facetCounts = new cydaw::base::Object();
     for (const auto& [name, values] : probe.facets) {
-        auto* counts = new juce::DynamicObject();
+        auto* counts = new cydaw::base::Object();
         for (const auto& [key, count] : values)
             counts->setProperty(key, count);
-        facetCounts->setProperty(name, juce::var(counts));
+        facetCounts->setProperty(name, cydaw::base::Value(counts));
     }
-    result->setProperty("facets", juce::var(facetCounts));
-    juce::Array<juce::var> names;
+    result->setProperty("facets", cydaw::base::Value(facetCounts));
+    cydaw::base::Array<cydaw::base::Value> names;
     for (const auto& name : probe.names)
         names.add(name);
     result->setProperty("names", names);

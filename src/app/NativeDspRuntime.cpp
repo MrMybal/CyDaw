@@ -1,18 +1,19 @@
+#include <cydaw/base/Text.h>
 #include "NativeDspRuntime.h"
 namespace cydaw::app
 {
 namespace
 {
-juce::Result desktopResult(const cydaw::native::Result &result)
+cydaw::base::Result desktopResult(const cydaw::native::Result &result)
 {
-    return result.failed() ? juce::Result::fail(juce::String::fromUTF8(result.error.c_str())) : juce::Result::ok();
+    return result.failed() ? cydaw::base::Result::fail(juce::String::fromUTF8(result.error.c_str())) : cydaw::base::Result::ok();
 }
 } // namespace
-juce::Result NativeDspRuntime::setGraph(const engine::NativeDspGraph &graph)
+cydaw::base::Result NativeDspRuntime::setGraph(const engine::NativeDspGraph &graph)
 {
     return desktopResult(Base::setGraph(graph));
 }
-juce::Result NativeDspRuntime::updateParameters(const engine::NativeDspGraph &graph)
+cydaw::base::Result NativeDspRuntime::updateParameters(const engine::NativeDspGraph &graph)
 {
     return desktopResult(Base::updateParameters(graph));
 }

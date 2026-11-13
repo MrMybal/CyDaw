@@ -1,3 +1,4 @@
+#include <cydaw/base/File.h>
 #include "DeviceBody.h"
 
 #include "CardFiles.h"
@@ -59,7 +60,7 @@ void drawDeviceBody(DeviceBody& body, int& pane, DeviceHost& host, UiState& stat
     if (const auto holder = host.devicePresetHolder(track, nodeId)) {
         auto* devices = &host;
         presets.bar("devicePresets", *holder, [devices, track, nodeId] { return devices->devicePresetState(track, nodeId); },
-                    [devices, track, nodeId](const juce::var& preset, juce::String& error) {
+                    [devices, track, nodeId](const cydaw::base::Value& preset, juce::String& error) {
                         return devices->applyDevicePreset(track, nodeId, preset, error);
                     },
                     std::min(ImGui::GetContentRegionAvail().x * 0.42f, dp(380.0f)));
