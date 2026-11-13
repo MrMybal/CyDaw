@@ -104,8 +104,8 @@ float ModulatorsView::width()
     return dp(184.0f);
 }
 
-void ModulatorsView::begin(const TrackRef& track, const std::uint64_t trackKey, app::NodeGraphComponent& graph,
-                           const std::vector<app::NodeGraphComponent::EditorNode>& nodes)
+void ModulatorsView::begin(const TrackRef& track, const std::uint64_t trackKey, app::GraphDocument& graph,
+                           const std::vector<app::GraphDocument::EditorNode>& nodes)
 {
     juce::ignoreUnused(track);
     graph_ = &graph;
@@ -359,7 +359,7 @@ void ModulatorsView::draw(const std::uint64_t owner, const ImVec2 at, const ImVe
     ImGui::PopID();
 }
 
-void ModulatorsView::drawSettings(const app::NodeGraphComponent::EditorNode& node, const ImVec2 at, const float width,
+void ModulatorsView::drawSettings(const app::GraphDocument::EditorNode& node, const ImVec2 at, const float width,
                                   const ImU32 colour)
 {
     const auto& p = theme::palette();
@@ -368,10 +368,10 @@ void ModulatorsView::drawSettings(const app::NodeGraphComponent::EditorNode& nod
         (void) graph_->editorSetParameter(binding, value);
         state_.focused = Panel::devices;
     };
-    std::vector<const app::NodeGraphComponent::EditorParameter*> choices;
-    std::vector<const app::NodeGraphComponent::EditorParameter*> switches;
-    std::vector<const app::NodeGraphComponent::EditorParameter*> knobs;
-    std::vector<const app::NodeGraphComponent::EditorParameter*> steps;
+    std::vector<const app::GraphDocument::EditorParameter*> choices;
+    std::vector<const app::GraphDocument::EditorParameter*> switches;
+    std::vector<const app::GraphDocument::EditorParameter*> knobs;
+    std::vector<const app::GraphDocument::EditorParameter*> steps;
     auto stepCount = modulator::stepCount;
     for (const auto& parameter : node.parameters) {
         if (hidden(parameter.binding))

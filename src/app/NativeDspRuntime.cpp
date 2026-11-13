@@ -17,26 +17,4 @@ cydaw::base::Result NativeDspRuntime::updateParameters(const engine::NativeDspGr
 {
     return desktopResult(Base::updateParameters(graph));
 }
-bool NativeDspRuntime::process(juce::AudioBuffer<float> &buffer, int start, int frames) noexcept
-{
-    return process(buffer, start, frames, std::numeric_limits<double>::quiet_NaN());
-}
-bool NativeDspRuntime::process(juce::AudioBuffer<float> &buffer, int start, int frames, double seconds) noexcept
-{
-    cydaw::native::PlanarBuffer view{buffer.getArrayOfWritePointers(), buffer.getNumChannels(), buffer.getNumSamples()};
-    return Base::process(view, start, frames, seconds);
-}
-void NativeDspRuntime::setExtraInputs(const juce::AudioBuffer<float> *const *buses, std::size_t count) noexcept
-{
-    std::array<const cydaw::native::PlanarBuffer *, maximumExtraInputs> views{};
-    for (std::size_t i = 0; i < std::min(count, maximumExtraInputs); ++i)
-        if (buses && buses[i])
-        {
-            // Borrow read-only host inputs; the runtime never writes to these views.
-            extraViews_[i] = {const_cast<float *const *>(buses[i]->getArrayOfReadPointers()),
-                              buses[i]->getNumChannels(), buses[i]->getNumSamples()};
-            views[i] = &extraViews_[i];
-        }
-    Base::setExtraInputs(views.data(), views.size());
-}
 } // namespace cydaw::app

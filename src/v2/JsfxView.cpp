@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #include "JsfxView.h"
 #include "PluginFiles.h"
@@ -14,7 +15,7 @@ static std::vector<JsfxView *> &scriptEditors()
     return editors;
 }
 
-class JsfxView::Compiler final : public juce::Thread
+class JsfxView::Compiler final : public cydaw::base::Thread
 {
   public:
     cydaw::base::File source, result;
@@ -22,7 +23,7 @@ class JsfxView::Compiler final : public juce::Thread
     bool success{};
     std::atomic<bool> done{};
     explicit Compiler(cydaw::base::File f)
-        : juce::Thread("CyDAW JSFX compile"), source(std::move(f)),
+        : cydaw::base::Thread("CyDAW JSFX compile"), source(std::move(f)),
           result(source.withFileExtension("diagnostics.json"))
     {
     }

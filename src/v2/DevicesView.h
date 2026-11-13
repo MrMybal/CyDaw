@@ -61,8 +61,8 @@ private:
     struct Strip {
         const TrackRef& track;
         GraphSlot* slot {};
-        app::NodeGraphComponent& graph;
-        const std::vector<app::NodeGraphComponent::EditorNode>& nodes;
+        app::GraphDocument& graph;
+        const std::vector<app::GraphDocument::EditorNode>& nodes;
         std::map<cydaw::base::Text, float>& modulated;
         const visual::Setter& setParameter;
         std::optional<std::uint64_t> removeNode;
@@ -76,31 +76,31 @@ private:
         std::uint64_t next {};
         int depth {};
     };
-    void drawCard(Strip& strip, const app::NodeGraphComponent::EditorNode& node, float height, const CardPlace& place);
+    void drawCard(Strip& strip, const app::GraphDocument::EditorNode& node, float height, const CardPlace& place);
     // A small "+" before a card of the chain: the device chosen goes there
     // (a card dropped on it too).
     void insertGap(Strip& strip, std::uint64_t before, float height);
     // The catalogue for a track: the library window, or the quick list.
     void chooseDevice(const TrackRef& track, bool quick);
-    [[nodiscard]] bool movable(const Strip& strip, const app::NodeGraphComponent::EditorNode& node) const;
+    [[nodiscard]] bool movable(const Strip& strip, const app::GraphDocument::EditorNode& node) const;
     // A container's chosen branch: its cards after the container's card,
     // inside its frame, and a "+" at its end.
-    void drawBranch(Strip& strip, const app::NodeGraphComponent::EditorNode& head, ImVec2 headOrigin, float height,
+    void drawBranch(Strip& strip, const app::GraphDocument::EditorNode& head, ImVec2 headOrigin, float height,
                     const CardPlace& place);
     // A container's own panel on its card: its branches, its mix.
-    void drawContainerPanel(Strip& strip, const app::NodeGraphComponent::EditorNode& head, ImVec2 at, ImVec2 size, ImU32 colour);
+    void drawContainerPanel(Strip& strip, const app::GraphDocument::EditorNode& head, ImVec2 at, ImVec2 size, ImU32 colour);
     // A branch named by hand: the popup that asks (opened by
     // startBranchRename in the same ID scope as drawBranchRename).
-    void startBranchRename(const app::NodeGraphComponent& graph, std::uint64_t head, int branch);
-    void drawBranchRename(app::NodeGraphComponent& graph);
+    void startBranchRename(const app::GraphDocument& graph, std::uint64_t head, int branch);
+    void drawBranchRename(app::GraphDocument& graph);
     std::optional<std::pair<std::uint64_t, int>> renamedBranch_;
     char branchNameBuffer_[72] {};
     void drawCatalogue(const TrackRef& track);
     // The catalogue as a tree (nothing searched): My devices, the graphs by
     // their category, whole chains, the nodes.
     void drawCatalogueTree(const TrackRef& track,
-                           const std::vector<const app::NodeGraphComponent::DeviceCatalogueEntry*>& shown,
-                           const app::NodeGraphComponent::DeviceCatalogueEntry*& chosen,
+                           const std::vector<const app::GraphDocument::DeviceCatalogueEntry*>& shown,
+                           const app::GraphDocument::DeviceCatalogueEntry*& chosen,
                            std::optional<cydaw::base::File>& chosenFile);
     void drawPlugins(const TrackRef& track, float height);
     // A plug-in's parameters in a window of their own: knobs or a list.
@@ -115,7 +115,7 @@ private:
     void drawParameterMenu();
     // A card's list of values: every parameter it has, raw, searched, the
     // last touched first (a knob turned anywhere goes to the top).
-    void drawValueList(const TrackRef& track, app::NodeGraphComponent& graph, const app::NodeGraphComponent::EditorNode& node,
+    void drawValueList(const TrackRef& track, app::GraphDocument& graph, const app::GraphDocument::EditorNode& node,
                        ImVec2 at, ImVec2 size, ImU32 colour, const std::map<cydaw::base::Text, float>& modulated);
     std::map<std::pair<std::uint64_t, std::uint64_t>, std::array<char, 64>> valueSearch_;
     // A plug-in card's list of values: every parameter, searched, the last
@@ -192,7 +192,7 @@ private:
     RackView* rack_ {};
     // A device's designed interface (the workshop's), played in its card.
     std::unique_ptr<InterfaceEditor> designed_;
-    void drawSoundModelPane(const TrackRef& track, app::NodeGraphComponent& graph, std::uint64_t nodeId, ImVec2 at,
+    void drawSoundModelPane(const TrackRef& track, app::GraphDocument& graph, std::uint64_t nodeId, ImVec2 at,
                             ImVec2 size, ImU32 colour);
 };
 

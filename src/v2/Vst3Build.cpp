@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #include "Vst3Build.h"
@@ -130,7 +131,7 @@ cydaw::base::File Vst3Build::workFolder()
     return locations::folder(Location::cache).getChildFile("vst3-native");
 }
 
-Vst3Build::Vst3Build() : juce::Thread("CyDAW VST3 build") {}
+Vst3Build::Vst3Build() : cydaw::base::Thread("CyDAW VST3 build") {}
 
 Vst3Build::~Vst3Build()
 {
@@ -154,7 +155,7 @@ bool Vst3Build::startBatch(const std::vector<Job>& jobs,const Tools& tools)
         jobs_=jobs;tools_=tools;results_.clear();log_.clear();bundle_=cydaw::base::File();failure_.clear();
         started_=cydaw::base::Time::getMillisecondCounterHiRes()*.001;finished_=0;
     }
-    phase_=Phase::configuring;startThread(juce::Thread::Priority::low);return true;
+    phase_=Phase::configuring;startThread(cydaw::base::Thread::Priority::low);return true;
 }
 std::vector<Vst3Build::JobResult> Vst3Build::results()const
 {

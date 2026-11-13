@@ -1,3 +1,4 @@
+#include <cydaw/base/Character.h>
 #include <cydaw/base/File.h>
 #include "GraphPluginProjectGenerator.h"
 #include "SamplerMapFile.h"
@@ -36,7 +37,7 @@ cydaw::base::Text slug(cydaw::base::Text value)
     value = value.toLowerCase();
     cydaw::base::Text result;
     for (const auto character : value)
-        if (juce::CharacterFunctions::isLetterOrDigit(character))
+        if (cydaw::base::CharacterFunctions::isLetterOrDigit(character))
             result << character;
         else if (result.isNotEmpty() && !result.endsWithChar('-'))
             result << '-';
@@ -152,7 +153,7 @@ cydaw::base::Result generateGraphVst3Project(const cydaw::base::File &destinatio
     // Each Replacer's instrument (Containers.h): its plan, and its voice data
     // in a file of its own ("Voice1.cyvoice"...), beside the instrument's.
     struct ReplacerExport {
-        juce::int64 node {};
+        cydaw::base::int64 node {};
         cydaw::base::Value poly;
         cydaw::base::Text assets;
     };
@@ -161,7 +162,7 @@ cydaw::base::Result generateGraphVst3Project(const cydaw::base::File &destinatio
         for (const auto &entry : *list)
         {
             ReplacerExport made;
-            made.node = static_cast<juce::int64>(entry.getProperty("node", 0));
+            made.node = static_cast<cydaw::base::int64>(entry.getProperty("node", 0));
             made.poly = entry.getProperty("polySynth", {});
             const auto replacerWaveform =
                 static_cast<cydaw::engine::PolyOscillatorWaveform>(static_cast<int>(made.poly.getProperty("waveform", 0)));
@@ -179,7 +180,7 @@ cydaw::base::Result generateGraphVst3Project(const cydaw::base::File &destinatio
         }
     const auto prop = [](const cydaw::base::Value &v, const char *key) { return v.getProperty(key, {}); };
     const auto number = [](const cydaw::base::Value &value) { return cydaw::base::Text(static_cast<double>(value), 12); };
-    const auto integer = [](const cydaw::base::Value &value) { return cydaw::base::Text(static_cast<juce::int64>(value)); };
+    const auto integer = [](const cydaw::base::Value &value) { return cydaw::base::Text(static_cast<cydaw::base::int64>(value)); };
     const auto quote = [&](const cydaw::base::Value &v, const char *key) { return cppString(prop(v, key).toString()); };
     cydaw::base::Text cpp = "#include \"PluginDefinition.h\"\n#include <cydaw/engine/MidiEffects.h>\n";
     cydaw::base::Text customDeclarations, customSources;
@@ -454,7 +455,7 @@ cydaw::base::Result generateGraphVst3Project(const cydaw::base::File &destinatio
                         "n.parameters." + cydaw::base::Text(key) + "[" + cydaw::base::Text(i) + "]=" + number((*a)[i]) + "f;\n";
         // A Replacer's instrument.
         for (std::size_t index = 0; index < replacers.size(); ++index)
-            if (replacers[index].node == static_cast<juce::int64>(prop(n, "id")))
+            if (replacers[index].node == static_cast<cydaw::base::int64>(prop(n, "id")))
                 cpp += "n.instrument=std::make_shared<const engine::PolySynthGraphPlan>(makeReplacerPlan" +
                        cydaw::base::Text(static_cast<int>(index) + 1) + "());\n";
         cpp += "g.nodes.push_back(std::move(n));}\n";
@@ -475,7 +476,7 @@ cydaw::base::Result generateGraphVst3Project(const cydaw::base::File &destinatio
             cpp += "g.bypasses.push_back({" + integer(prop(b, "node")) + "ull," + integer(prop(b, "from")) + "ull});\n";
     cpp += "return g;}\n" + emitPlan(poly, "makeInstrumentPlan") + "}\n";
     const auto code = [](const std::string &s) {
-        juce::uint32 result = 0;
+        cydaw::base::uint32 result = 0;
         for (auto c : s)
             result = (result << 8) | static_cast<unsigned char>(c);
         return "0x" + cydaw::base::Text::toHexString(result);

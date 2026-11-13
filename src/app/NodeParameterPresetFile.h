@@ -1,7 +1,7 @@
 #include <cydaw/base/File.h>
 #pragma once
 
-#include <juce_core/juce_core.h>
+#include <cydaw/base/Utilities.h>
 
 #include <optional>
 
@@ -11,7 +11,7 @@ inline constexpr auto nodeParameterPresetFileExtension = ".cydawnode";
 inline constexpr auto nodeParameterPresetFileFormat =
     "CyDAW Node Parameter Preset";
 inline constexpr int nodeParameterPresetFileSchema = 1;
-inline constexpr juce::int64 maximumNodeParameterPresetBytes = 512 * 1024;
+inline constexpr std::int64_t maximumNodeParameterPresetBytes = 512 * 1024;
 
 struct NodeParameterPresetDocument {
     cydaw::base::Text name;

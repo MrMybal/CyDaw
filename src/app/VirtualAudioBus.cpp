@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/base/Text.h>
 #include "VirtualAudioBus.h"
 
@@ -44,14 +45,14 @@ VirtualBusRouter::VirtualBusRouter(juce::AudioSource& source)
 
 std::vector<VirtualAudioBus> VirtualBusRouter::buses() const
 {
-    const juce::ScopedLock lock(busesLock_);
+    const cydaw::base::ScopedLock lock(busesLock_);
     return buses_;
 }
 
 std::optional<VirtualAudioBus> VirtualBusRouter::bus(
     const std::uint64_t busId) const
 {
-    const juce::ScopedLock lock(busesLock_);
+    const cydaw::base::ScopedLock lock(busesLock_);
     const auto found = std::find_if(
         buses_.begin(), buses_.end(), [busId](const auto& candidate) {
             return candidate.id == busId;
@@ -62,7 +63,7 @@ std::optional<VirtualAudioBus> VirtualBusRouter::bus(
 
 std::uint64_t VirtualBusRouter::addBus(const VirtualBusDirection direction)
 {
-    const juce::ScopedLock lock(busesLock_);
+    const cydaw::base::ScopedLock lock(busesLock_);
     if (buses_.size() >= maximumBusCount)
         return 0;
     const auto ordinal = static_cast<int>(std::count_if(
@@ -88,7 +89,7 @@ std::uint64_t VirtualBusRouter::addBus(const VirtualBusDirection direction)
 
 bool VirtualBusRouter::updateBus(const VirtualAudioBus& updated)
 {
-    const juce::ScopedLock lock(busesLock_);
+    const cydaw::base::ScopedLock lock(busesLock_);
     const auto found = std::find_if(
         buses_.begin(), buses_.end(), [&updated](const auto& candidate) {
             return candidate.id == updated.id;
@@ -108,7 +109,7 @@ bool VirtualBusRouter::updateBus(const VirtualAudioBus& updated)
 
 bool VirtualBusRouter::removeBus(const std::uint64_t busId)
 {
-    const juce::ScopedLock lock(busesLock_);
+    const cydaw::base::ScopedLock lock(busesLock_);
     const auto found = std::find_if(
         buses_.begin(), buses_.end(), [busId](const auto& candidate) {
             return candidate.id == busId;
@@ -140,7 +141,7 @@ bool VirtualBusRouter::removeBus(const std::uint64_t busId)
 
 void VirtualBusRouter::replaceBuses(std::vector<VirtualAudioBus> buses)
 {
-    const juce::ScopedLock lock(busesLock_);
+    const cydaw::base::ScopedLock lock(busesLock_);
     std::vector<std::uint64_t> ids;
     buses.erase(std::remove_if(
                     buses.begin(), buses.end(), [&ids](auto& bus) {
@@ -213,7 +214,7 @@ void VirtualBusRouter::replaceBuses(std::vector<VirtualAudioBus> buses)
 
 void VirtualBusRouter::resetToDefaults()
 {
-    const juce::ScopedLock lock(busesLock_);
+    const cydaw::base::ScopedLock lock(busesLock_);
     buses_.clear();
     graphs_.clear();
     nextBusId_ = 1;
@@ -274,7 +275,7 @@ cydaw::base::Result VirtualBusRouter::setGraph(
     const std::uint64_t busId,
     const cydaw::engine::NativeDspGraph& graph)
 {
-    const juce::ScopedLock lock(busesLock_);
+    const cydaw::base::ScopedLock lock(busesLock_);
     const auto bus = std::find_if(
         buses_.begin(), buses_.end(), [busId](const auto& candidate) {
             return candidate.id == busId;
@@ -294,7 +295,7 @@ cydaw::base::Result VirtualBusRouter::updateGraphParameters(
     const std::uint64_t busId,
     const cydaw::engine::NativeDspGraph& graph)
 {
-    const juce::ScopedLock lock(busesLock_);
+    const cydaw::base::ScopedLock lock(busesLock_);
     const auto bus = std::find_if(
         buses_.begin(), buses_.end(), [busId](const auto& candidate) {
             return candidate.id == busId;
@@ -309,7 +310,7 @@ cydaw::base::Result VirtualBusRouter::updateGraphParameters(
 std::vector<std::pair<std::uint64_t, float>> VirtualBusRouter::controlValues(
     const std::uint64_t busId) const
 {
-    const juce::ScopedLock lock(busesLock_);
+    const cydaw::base::ScopedLock lock(busesLock_);
     const auto found = graphs_.find(busId);
     return found != graphs_.end() && found->second != nullptr
                ? found->second->controlValues()
@@ -319,7 +320,7 @@ std::vector<std::pair<std::uint64_t, float>> VirtualBusRouter::controlValues(
 cydaw::engine::NativeDspGraph VirtualBusRouter::graph(
     const std::uint64_t busId) const
 {
-    const juce::ScopedLock lock(busesLock_);
+    const cydaw::base::ScopedLock lock(busesLock_);
     const auto found = graphs_.find(busId);
     return found != graphs_.end() && found->second != nullptr
                ? found->second->graph()
@@ -338,7 +339,7 @@ void VirtualBusRouter::prepareToPlay(const int samplesPerBlockExpected,
     for (auto& buffer : inputsAfter_)
         buffer.setSize(VirtualAudioBus::maximumChannels, maximumBlockSize_, false, true, true);
     {
-        const juce::ScopedLock lock(busesLock_);
+        const cydaw::base::ScopedLock lock(busesLock_);
         for (const auto& bus : buses_)
             if (auto found = graphs_.find(bus.id);
                 found != graphs_.end() && found->second != nullptr)
@@ -589,7 +590,7 @@ bool VirtualBusRouter::inputBusBlock(const std::uint64_t busId, const bool after
 
 void VirtualBusRouter::setTaps(const std::uint64_t busId, const std::vector<NativeDspRuntime::TapRequest>& taps)
 {
-    const juce::ScopedLock lock(busesLock_);
+    const cydaw::base::ScopedLock lock(busesLock_);
     if (const auto found = graphs_.find(busId); found != graphs_.end() && found->second != nullptr)
         found->second->setTaps(taps);
 }
@@ -597,7 +598,7 @@ void VirtualBusRouter::setTaps(const std::uint64_t busId, const std::vector<Nati
 bool VirtualBusRouter::readTap(const std::uint64_t busId, const std::uint64_t nodeId, const bool input,
                                cydaw::engine::AudioAnalysisFrame& frame) const
 {
-    const juce::ScopedLock lock(busesLock_);
+    const cydaw::base::ScopedLock lock(busesLock_);
     const auto found = graphs_.find(busId);
     return found != graphs_.end() && found->second != nullptr && found->second->readTap(nodeId, input, frame);
 }
@@ -615,7 +616,7 @@ void VirtualBusRouter::audioDeviceAboutToStart(juce::AudioIODevice* device)
         buffer.setSize(VirtualAudioBus::maximumChannels, maximumBlockSize_, false, true, true);
     inputSamples_ = 0;
     {
-        const juce::ScopedLock lock(busesLock_);
+        const cydaw::base::ScopedLock lock(busesLock_);
         for (const auto& bus : buses_)
             if (auto found = graphs_.find(bus.id);
                 found != graphs_.end() && found->second != nullptr)

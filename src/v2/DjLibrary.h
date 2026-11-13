@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/File.h>
 #pragma once
@@ -45,7 +46,7 @@ struct DjTrack {
     DjTrack() { hotCues.fill(-1.0); }
 };
 
-class DjLibrary final : private juce::Thread {
+class DjLibrary final : private cydaw::base::Thread {
 public:
     DjLibrary();
     ~DjLibrary() override;
@@ -104,7 +105,7 @@ private:
     std::atomic<bool> dirty_ {};
     double dirtySince_ {};
     bool saving_ { true };
-    juce::WaitableEvent wake_;
+    cydaw::base::WaitableEvent wake_;
 };
 
 } // namespace cydaw::v2

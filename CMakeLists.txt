@@ -152,9 +152,22 @@ function(cydaw_configure_plugin_formats target_name)
     )
 endfunction()
 
-add_library(cydaw_base STATIC src/base/Value.cpp src/base/File.cpp src/base/Xml.cpp src/base/Properties.cpp third_party/pugixml/pugixml.cpp)
+add_library(cydaw_miniz STATIC third_party/miniz/miniz.c third_party/miniz/miniz_tdef.c third_party/miniz/miniz_tinfl.c third_party/miniz/miniz_zip.c)
+target_include_directories(cydaw_miniz PRIVATE third_party/miniz)
+set_target_properties(cydaw_miniz PROPERTIES POSITION_INDEPENDENT_CODE ON)
+add_library(cydaw_base STATIC src/base/Image.cpp src/base/Value.cpp src/base/Compression.cpp src/base/Thread.cpp src/base/File.cpp src/base/Xml.cpp src/base/Properties.cpp third_party/pugixml/pugixml.cpp)
 target_include_directories(cydaw_base PUBLIC include PRIVATE third_party)
 target_compile_features(cydaw_base PUBLIC cxx_std_20)
+target_link_libraries(cydaw_base PRIVATE cydaw_miniz)
+include(cmake/Translations.cmake)
+add_library(cydaw_localization STATIC src/app/Localization.cpp)
+target_link_libraries(cydaw_localization PUBLIC cydaw_base CyDAWTranslations)
+target_include_directories(cydaw_localization PUBLIC src/app)
+target_compile_features(cydaw_localization PUBLIC cxx_std_20)
+set_target_properties(cydaw_localization PROPERTIES POSITION_INDEPENDENT_CODE ON)
+if(MSVC)
+    target_compile_options(cydaw_localization PRIVATE /utf-8)
+endif()
 add_library(cydaw_audio_files STATIC src/integration/CyAudioCoreAudioFormats.cpp)
 target_link_libraries(cydaw_audio_files PUBLIC cydaw_base CyAudioCore::Files)
 target_compile_features(cydaw_audio_files PUBLIC cxx_std_20)
@@ -173,6 +186,7 @@ endif()
 
 add_library(cydaw_core STATIC
     src/app/ProjectRecovery.cpp
+    src/app/NativeDspRuntime.cpp
     src/app/ModuleInterfaceState.cpp
     src/app/NativeDspGraphState.cpp
     src/native_plugin/NativeRuntime.cpp
@@ -260,6 +274,22 @@ else()
     target_compile_options(cydaw_core PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
+add_library(cydaw_assets STATIC src/app/PolySynthState.cpp src/app/SamplerMapFile.cpp src/app/SoundModelFile.cpp src/app/GraphPluginProjectGenerator.cpp)
+target_link_libraries(cydaw_assets PUBLIC CyDAW::Core cydaw_audio_files)
+target_include_directories(cydaw_assets PUBLIC src/app)
+target_compile_features(cydaw_assets PUBLIC cxx_std_20)
+set_target_properties(cydaw_assets PROPERTIES POSITION_INDEPENDENT_CODE ON)
+if(MSVC)
+    target_compile_options(cydaw_assets PRIVATE /utf-8)
+endif()
+
+add_library(cydaw_graph_document STATIC src/app/GraphDocument.cpp src/app/GraphDocumentEditorAccess.cpp src/app/GraphDocumentFactoryData.cpp)
+target_link_libraries(cydaw_graph_document PUBLIC cydaw_assets cydaw_localization)
+target_compile_features(cydaw_graph_document PUBLIC cxx_std_20)
+if(MSVC)
+    target_compile_options(cydaw_graph_document PRIVATE /utf-8 /bigobj)
+endif()
+
 if(CYDAW_BUILD_TESTS)
     enable_testing()
     add_executable(cydaw_core_tests tests/CoreTests.cpp)
@@ -323,6 +353,27 @@ if(CYDAW_BUILD_TESTS)
 endif()
 
 if(CYDAW_BUILD_TESTS)
+    add_executable(cydaw_graph_document_tests tests/GraphDocumentTests.cpp)
+    target_link_libraries(cydaw_graph_document_tests PRIVATE cydaw_graph_document)
+    add_test(NAME cydaw_graph_document_tests COMMAND cydaw_graph_document_tests)
+    cydaw_configure_test(cydaw_graph_document_tests 120)
+    add_executable(cydaw_asset_services_tests tests/AssetServicesTests.cpp)
+    target_link_libraries(cydaw_asset_services_tests PRIVATE cydaw_assets)
+    add_test(NAME cydaw_asset_services_tests COMMAND cydaw_asset_services_tests)
+    cydaw_configure_test(cydaw_asset_services_tests 60)
+    add_executable(cydaw_compression_tests tests/CompressionTests.cpp)
+    target_link_libraries(cydaw_compression_tests PRIVATE cydaw_base)
+    add_test(NAME cydaw_compression_tests COMMAND cydaw_compression_tests)
+    cydaw_configure_test(cydaw_compression_tests 30)
+    add_executable(cydaw_localization_tests tests/LocalizationTests.cpp)
+    target_link_libraries(cydaw_localization_tests PRIVATE cydaw_localization)
+    target_compile_definitions(cydaw_localization_tests PRIVATE CYDAW_TRANSLATIONS_SOURCE="${CMAKE_CURRENT_SOURCE_DIR}/resources/i18n")
+    add_test(NAME cydaw_localization_tests COMMAND cydaw_localization_tests)
+    cydaw_configure_test(cydaw_localization_tests 60)
+    add_executable(cydaw_thread_tests tests/ThreadTests.cpp)
+    target_link_libraries(cydaw_thread_tests PRIVATE cydaw_base)
+    add_test(NAME cydaw_thread_tests COMMAND cydaw_thread_tests)
+    cydaw_configure_test(cydaw_thread_tests 30)
     add_executable(cydaw_audio_files_tests tests/AudioFilesTests.cpp)
     target_link_libraries(cydaw_audio_files_tests PRIVATE cydaw_audio_files)
     add_test(NAME cydaw_audio_files_tests COMMAND cydaw_audio_files_tests)
@@ -436,13 +487,6 @@ if(CYDAW_BUILD_DESKTOP)
         if(CYDAW_VST2_AVAILABLE)
             juce_set_vst2_sdk_path("${CYDAW_VST2_SDK_PATH}")
         endif()
-        juce_add_binary_data(CyDAWTranslations
-            HEADER_NAME CyDAWTranslations.h
-            NAMESPACE cydaw::translations
-            SOURCES
-                resources/i18n/en.json
-                resources/i18n/fr.json
-        )
         # Dear ImGui (docking branch, third_party/imgui), drawn with Direct3D 11:
         # CyDAW 2's interface, and the window of every plug-in exported from it.
         if(WIN32 AND NOT TARGET cydaw_imgui)
@@ -496,21 +540,16 @@ if(CYDAW_BUILD_DESKTOP)
                 "${cydaw_root}/src/app/GraphManagerComponent.h"
                 "${cydaw_root}/src/app/GraphPluginExportComponent.cpp"
                 "${cydaw_root}/src/app/GraphPluginExportComponent.h"
-                "${cydaw_root}/src/app/GraphPluginProjectGenerator.cpp"
                 "${cydaw_root}/src/app/GraphPluginProjectGenerator.h"
                 "${cydaw_root}/src/app/GraphPolySynthRenderer.cpp"
                 "${cydaw_root}/src/app/GraphPolySynthRenderer.h"
-                "${cydaw_root}/src/app/Localization.cpp"
                 "${cydaw_root}/src/app/Localization.h"
                 "${cydaw_root}/src/app/ModuleInterfaceEditor.cpp"
                 "${cydaw_root}/src/app/ModuleInterfaceEditor.h"
                 "${cydaw_root}/src/app/NativeDspGraphState.h"
-                "${cydaw_root}/src/app/NativeDspRuntime.cpp"
                 "${cydaw_root}/src/app/NativeDspRuntime.h"
                 "${cydaw_root}/src/app/NodeGraphComponent.cpp"
                 "${cydaw_root}/src/app/NodeGraphComponentEditorAccess.cpp"
-                "${cydaw_root}/src/app/SoundModelFile.cpp"
-                "${cydaw_root}/src/app/SamplerMapFile.cpp"
                 "${cydaw_root}/src/app/NodeGraphComponentFactoryData.cpp"
                 "${cydaw_root}/src/app/NodeGraphComponent.h")
             if(GRAPH_CONFIG_DIRECTORY)
@@ -565,7 +604,9 @@ if(CYDAW_BUILD_DESKTOP)
             )
             target_link_libraries(${target_name} PRIVATE
                 CyDAW::Core
-                CyDAWTranslations
+                cydaw_localization
+                cydaw_graph_document
+                cydaw_assets
                 juce::juce_audio_processors
                 juce::juce_audio_utils
                 juce::juce_data_structures
@@ -1019,8 +1060,6 @@ if(CYDAW_BUILD_DESKTOP)
                 src/app/IsolatedPluginHost.cpp
                 src/plugin_worker/WorkerWake.cpp
                 src/app/WindowsPluginBridge.cpp
-                src/app/Localization.cpp
-                src/app/NativeDspRuntime.cpp
                 src/app/SampleLibrary.cpp
                 src/app/ProjectImport.cpp
                 src/app/ProjectImportShared.cpp
@@ -1032,17 +1071,9 @@ if(CYDAW_BUILD_DESKTOP)
                 src/app/ProjectImportZrythm.cpp
                 src/app/ProjectImportMidi.cpp
                 src/app/RemoteControlServer.cpp
-                # The graph model and compiler, used without being shown.
-                src/app/NodeGraphComponent.cpp
-                src/app/SoundModelFile.cpp
-                src/app/SamplerMapFile.cpp
-                src/app/NodeGraphComponentFactoryData.cpp
-                src/app/NodeGraphComponentEditorAccess.cpp
-                src/app/ModuleInterfaceEditor.cpp
                 src/app/GraphPolySynthRenderer.cpp
                 src/app/GraphManagerComponent.cpp
                 src/app/GraphPluginExportComponent.cpp
-                src/app/GraphPluginProjectGenerator.cpp
                 src/app/CyDawLookAndFeel.cpp
             )
             target_include_directories(CyDAW2 PRIVATE src/app src/v2)
@@ -1097,7 +1128,9 @@ if(CYDAW_BUILD_DESKTOP)
             cydaw_use_precompiled_header(CyDAW2)
             target_link_libraries(CyDAW2 PRIVATE
                 CyDAW::Core
-                CyDAWTranslations
+                cydaw_localization
+                cydaw_assets
+                cydaw_graph_document
                 CyDAW2Branding
                 CyUI::Core CyUI::Audio CyUI::AudioViews CyUI::Nodes
                 CyUI::CodeEditor CyUI::Images CyUI::Inspector

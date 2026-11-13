@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/base/Properties.h>
 #include <cydaw/base/File.h>
 #pragma once
@@ -308,7 +309,7 @@ private:
     // gave are given again (nothing read again).
     bool rulesOutdated_ {};
     // The cache's reading and writing, one at a time, off the message thread.
-    juce::ThreadPool io_ { 1 };
+    cydaw::base::ThreadPool io_ { 1 };
     std::atomic<bool> saving_ {};
     bool saveAgain_ {};
     int autoRescanMinutes_ { 10 };

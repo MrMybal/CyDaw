@@ -139,7 +139,7 @@ std::vector<Group> groupsOf(const engine::SamplerMap& map)
 
 } // namespace
 
-Count count(app::NodeGraphComponent& graph, const std::uint64_t nodeId)
+Count count(app::GraphDocument& graph, const std::uint64_t nodeId)
 {
     const auto map = graph.nodeSampler(nodeId);
     if (map == nullptr)
@@ -151,7 +151,7 @@ Count count(app::NodeGraphComponent& graph, const std::uint64_t nodeId)
     return result;
 }
 
-void draw(Studio& studio, UiState& state, const TrackRef& track, app::NodeGraphComponent& graph, const std::uint64_t nodeId,
+void draw(Studio& studio, UiState& state, const TrackRef& track, app::GraphDocument& graph, const std::uint64_t nodeId,
           const ImU32 colour)
 {
     const auto& p = theme::palette();

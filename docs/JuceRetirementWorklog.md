@@ -133,3 +133,54 @@ Native runner in build/cyaudio-native currently selects LV2: its real audio,
 state/parameters and editor protocol test PASSED (0.70s). Do not infer a fresh
 CLAP build from this single configured target. The app session independently
 hosted the existing CLAP/LV2/VST3 fixtures. Staged Gitleaks scan: 3.26MB, clean.
+
+## Next services phase after e1fbd3f (uncommitted)
+
+- Native UTF-8 translation embedding in cmake/Translations.cmake replaces
+  juce_add_binary_data. Byte-array generation avoids MSVC literal limits.
+  cydaw_localization + Localization have no JUCE lifecycle, locks or broadcaster.
+  Existing app refreshes languages explicitly; no listeners used the old signal.
+- Original base::Thread/ThreadPool/ThreadPoolJob/WaitableEvent and lock guards
+  replace JUCE types across sources. Actual OS thread naming/priority, cooperative
+  cancellation, restart, TLS job cancellation and task ownership are implemented.
+  Recorder no longer creates unused JUCE TimeSliceThread writers; its own bounded
+  native writer owns the disk thread. Old TimeSlice reader boundaries still exist.
+- Actual desktop NativeDspRuntime buffer adapter is generic and compiles in Core,
+  without a JUCE audio buffer include. A real gain-graph test processes samples.
+- cydaw_assets now compiles actual SamplerMapFile, SoundModelFile,
+  GraphPluginProjectGenerator and PolySynthState with NO JUCE.
+  Sample buffers use CyDSP; background workers use native threads. Explicit
+  SampleStore::shutdown is called after Studio dies. Historical GraphRuntime
+  plugin has a per-module last-user lease to stop sample workers before unload.
+- Original polyphonic serialization/restore and voice/replacer asset attachment
+  moved out of the JUCE renderer into document/PolySynthState.h + PolySynthState.cpp.
+  Do not re-extract ModuleInterface or PolySynthState; already done.
+- Imported miniz 3.1.0 MIT unmodified, SHA256 provenance + generated static export
+  header. base::InflateStream supports zlib/raw/gzip, bounded caller reads, seek,
+  gzip headers/CRC/trailers; Base64 utility uses standard encoding. SoundModel
+  now uses these functions and rejects failed compressed-table checksums.
+- Standalone no-JUCE tests pass: thread restart/events/queue/cancellation;
+  exact embedded en/fr resource bytes and language selection; deferred sample
+  load/cache/original PCM; actual compressed spectral model and corrupt rejection;
+  actual polyphonic state roundtrip; external Python zlib/gzip/raw fixtures with
+  1/17/4096/16384-byte reads, rewind, corruption; real native gain graph.
+  Tests and logs: output/cyaudio-native-*-test-build.log and
+  output/cyaudio-native-plan-state-build.log.
+
+Current build: output/cyaudio-native-services-desktop-build.log (session returned
+by exec). Must verify this full desktop build, then unchanged app format scenario
+and relevant regressions before committing services phase. Previous full desktop
+build with native sample assets passed; newest PolySynthState split is pending.
+Native miniz notice copied/installed/required by package test. Need final format,
+Gitleaks staged scan and commit after validation. No push.
+
+Remaining: complete GraphDocument separation (no new GraphDocument file yet),
+platform window/event loop/dialogs/process/socket/image services; source/transport/
+MIDI/voice/device/plugin-worker ABIs. The production desktop STILL links JUCE.
+Do NOT end task with another partial report. Continue to strict no-JUCE build.
+
+The native service checkpoint also extracts the actual polyphonic instrument plan state and asset attachment code into PolySynthState, compiled without JUCE. The unchanged desktop format scenario passed (output/cyaudio-services-runtime/132af7b4b21d48d3bf3467e97d6b5ce4), as did DJ, Foundry and project import (38.80 s total). Thread, localisation, compression and sample/model service tests passed. The production desktop still requires JUCE; graph document separation is the next step, not a claim of completed retirement.
+
+The actual V2 GraphSlot now owns GraphDocument, an application model extracted from the original catalogue, persistence, graph editing and compilation algorithms. It is compiled as cydaw_graph_document without JUCE. Its native tests exercise catalogue/factory data, editing notifications, JSON restore, undo/redo, alias changes, layout and native effect/instrument compilation. The model owns no window or legacy controls; V2 ticks deferred wavetable work, validation and parameter notifications, preserving the 180 ms history coalescing window. The old NodeGraphComponent remains only in the historical JUCE graph-plugin fixture and legacy shell, pending removal from the final production configuration.
+
+Desktop logos, PNG snapshots and FFmpeg video frames now use the app-owned straight RGBA Image service. Decode/PNG encoding reuse the already-vendored stb implementation (MIT/public-domain, with a separate distribution notice); scaling handles alpha before interpolation. GPU upload consumes contiguous RGBA directly rather than converting every pixel through a JUCE colour object. Native PNG/channel/alpha/resize/error tests pass. The desktop build with these changes succeeded. This is a checkpoint of the complete retirement, not completion of the production no-JUCE build.

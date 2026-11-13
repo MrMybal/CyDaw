@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 // Cinema uses the same clip document, editor, MIDI instruments, automation and processing rack.
 namespace {
@@ -267,7 +268,7 @@ void FoundryView::importCinemaAudio(const bool automatic){
     task->documentIdentity=t->cinemaIdentity;cinemaAudioTask_=task;cinemaAudioTasks_.push_back(task);
     cinemaAudioWorker_.addJob([task]{
         task->target.getParentDirectory().createDirectory();
-        const auto result=CinemaVideo::extractAudio(task->source,task->target,[]{auto* job=juce::ThreadPoolJob::getCurrentThreadPoolJob();return job&&job->shouldExit();},&task->hasAudio);
+        const auto result=CinemaVideo::extractAudio(task->source,task->target,[]{auto* job=cydaw::base::ThreadPoolJob::getCurrentThreadPoolJob();return job&&job->shouldExit();},&task->hasAudio);
         if(result.failed()){task->error=result.getErrorMessage();task->target.deleteFile();}
         task->done.store(true,std::memory_order_release);
     });

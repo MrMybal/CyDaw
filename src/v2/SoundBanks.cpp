@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #include "SoundBanks.h"
 
@@ -79,9 +80,9 @@ juce::MemoryBlock wavOf(const std::vector<float>& samples, const int rate)
 
 } // namespace
 
-class SoundBanks::Worker final : public juce::Thread {
+class SoundBanks::Worker final : public cydaw::base::Thread {
 public:
-    explicit Worker(SoundBanks& owner) : juce::Thread("CyDAW bank download"), owner_(owner) {}
+    explicit Worker(SoundBanks& owner) : cydaw::base::Thread("CyDAW bank download"), owner_(owner) {}
     void run() override { owner_.work(*this); }
 
 private:
@@ -193,7 +194,7 @@ const std::vector<SoundBanks::BankFile>& SoundBanks::filesOf(const cydaw::base::
                 if (!listsWaiting_.contains(id))
                     break;
             }
-            juce::Thread::sleep(2);
+            cydaw::base::Thread::sleep(2);
         }
         if (!read)
             read = readList(bank->list);
@@ -295,7 +296,7 @@ void SoundBanks::preloadMaps(std::vector<cydaw::base::File> maps)
             listsWaiting_.insert(id);
     }
     preloader_ = std::thread([this, maps = std::move(maps), lists = std::move(lists)] {
-        juce::Thread::setCurrentThreadName("CyDAW maps");
+        cydaw::base::Thread::setCurrentThreadName("CyDAW maps");
         for (const auto& [id, file] : lists) {
             if (stopPreload_)
                 break;
@@ -478,7 +479,7 @@ void SoundBanks::download(const cydaw::base::Text& label, const Missing& missing
     if (workers_.empty())
         for (auto count = 0; count < kWorkers; ++count) {
             workers_.push_back(std::make_unique<Worker>(*this));
-            workers_.back()->startThread(juce::Thread::Priority::low);
+            workers_.back()->startThread(cydaw::base::Thread::Priority::low);
         }
     for (auto count = 0; count < kWorkers; ++count)
         wake_.signal();
@@ -557,7 +558,7 @@ void SoundBanks::finishFrontJob()
         jobs_.front().started = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
 }
 
-void SoundBanks::work(juce::Thread& thread)
+void SoundBanks::work(cydaw::base::Thread& thread)
 {
     while (!thread.threadShouldExit()) {
         std::optional<Wanted> item;
@@ -637,7 +638,7 @@ bool SoundBanks::fetch(const Wanted& wanted, const int generation, cydaw::base::
         if (stopped())
             return false;
         if (attempt > 0)
-            juce::Thread::sleep(1'000 * attempt);
+            cydaw::base::Thread::sleep(1'000 * attempt);
         auto status = 0;
         const auto url = urlOf(*bank, wanted.file, lfs);
         auto stream = juce::URL(url).createInputStream(juce::URL::InputStreamOptions(juce::URL::ParameterHandling::inAddress)

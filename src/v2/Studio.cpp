@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/Properties.h>
 #include <cydaw/base/File.h>
@@ -147,7 +148,7 @@ Studio::Studio(const bool auxiliary) : auxiliary_(auxiliary)
 
     // The factory graphs and the class library every graph refers to.
     {
-        app::NodeGraphComponent factory;
+        app::GraphDocument factory;
         factoryAudioGraph_ = app::cloneJsonValue(factory.serialise());
         if (const auto* object = factoryAudioGraph_.getDynamicObject())
             sharedNodeModules_ = app::cloneJsonValue(object->getProperty("modules"));
@@ -155,7 +156,7 @@ Studio::Studio(const bool auxiliary) : auxiliary_(auxiliary)
         factoryMidiGraph_ = app::cloneJsonValue(factory.serialise());
     }
     {
-        app::NodeGraphComponent modulation;
+        app::GraphDocument modulation;
         modulation.initialiseValueModulationGraph();
         factoryModulationGraph_ = app::cloneJsonValue(modulation.serialise());
         if (const auto* object = factoryModulationGraph_.getDynamicObject())
@@ -172,7 +173,7 @@ void Studio::resetMasterGraph()
 void Studio::restoreMasterGraph(const cydaw::base::Value& graphState)
 {
     {
-        const juce::ScopedValueSetter<bool> quiet(loading_, true);
+        const cydaw::base::ScopedValueSetter<bool> quiet(loading_, true);
         masterGraph_ = makeSlot(GraphSlot::Owner::master);
         if (isGraphState(graphState)) {
             mergeModules(sharedNodeModules_, graphState);
@@ -237,7 +238,7 @@ Studio::~Studio()
     background_.removeAllJobs(true, 10'000);
     semantic_.reset();
     while (autosaveWriting_.load())
-        juce::Thread::sleep(5);
+        cydaw::base::Thread::sleep(5);
     engine_.stop();
     if (samples_ != nullptr && !auxiliary_)
         samples_->saveNow();
@@ -688,7 +689,7 @@ void Studio::loadVirtualIo()
     const auto document = cydaw::base::JSON::parse(file);
     if (document.getProperty("format", cydaw::base::Value()).toString() != "CyDAW Virtual IO")
         return;
-    const juce::ScopedValueSetter<bool> guard(loading_, true);
+    const cydaw::base::ScopedValueSetter<bool> guard(loading_, true);
     project_io::applyVirtualIo(*this, document);
     virtualIoDirty_ = false;
 }
@@ -2964,7 +2965,7 @@ void Studio::workshopRootChanged(Workshop& tab, const bool structural)
     }
 }
 
-app::NodeGraphComponent* Studio::nestedParent(Workshop& tab, const std::size_t level)
+app::GraphDocument* Studio::nestedParent(Workshop& tab, const std::size_t level)
 {
     if (level >= tab.nested.size())
         return nullptr;
@@ -2986,7 +2987,7 @@ void Studio::nestedChanged(Workshop& tab, const std::size_t level, GraphSlot& sl
     tab.unsaved = true;
 }
 
-void Studio::giveOwnIdentity(app::NodeGraphComponent& graph, const bool always)
+void Studio::giveOwnIdentity(app::GraphDocument& graph, const bool always)
 {
     auto identity = graph.pluginExportIdentity();
     // The factory graph's identity, which every new graph starts with.
@@ -3012,7 +3013,7 @@ void Studio::giveOwnIdentity(app::NodeGraphComponent& graph, const bool always)
     graph.setPluginExportIdentity(identity);
 }
 
-void Studio::setWorkshopInfo(const app::NodeGraphComponent::EditorGraphInfo& info)
+void Studio::setWorkshopInfo(const app::GraphDocument::EditorGraphInfo& info)
 {
     auto* root = workshopRoot();
     if (root == nullptr)
@@ -3028,7 +3029,7 @@ void Studio::setWorkshopInfo(const app::NodeGraphComponent::EditorGraphInfo& inf
     }
 }
 
-std::pair<std::uint64_t, std::uint64_t> Studio::audioEnds(const app::NodeGraphComponent& graph)
+std::pair<std::uint64_t, std::uint64_t> Studio::audioEnds(const app::GraphDocument& graph)
 {
     std::uint64_t input {};
     std::uint64_t output {};
@@ -3041,7 +3042,7 @@ std::pair<std::uint64_t, std::uint64_t> Studio::audioEnds(const app::NodeGraphCo
     return { input, output };
 }
 
-cydaw::base::Result Studio::setDeviceChannels(app::NodeGraphComponent& graph, const int input, const int output)
+cydaw::base::Result Studio::setDeviceChannels(app::GraphDocument& graph, const int input, const int output)
 {
     using Kind = cydaw::engine::PortKind;
     const auto [in, out] = audioEnds(graph);
@@ -3056,14 +3057,14 @@ cydaw::base::Result Studio::setDeviceChannels(app::NodeGraphComponent& graph, co
     if (input == output) {
         // A converter before the output has no use any more: what fed it
         // feeds the output again.
-        std::optional<app::NodeGraphComponent::EditorConnection> converted;
+        std::optional<app::GraphDocument::EditorConnection> converted;
         for (const auto& connection : graph.editorConnections())
             if (connection.destination == out && connection.kind == 0)
                 for (const auto& node : graph.editorNodes())
                     if (node.id == connection.source && (node.typeKey == "mono-to-stereo" || node.typeKey == "stereo-to-mono"))
                         converted = connection;
         if (converted) {
-            std::optional<app::NodeGraphComponent::EditorConnection> before;
+            std::optional<app::GraphDocument::EditorConnection> before;
             for (const auto& connection : graph.editorConnections())
                 if (connection.destination == converted->source && connection.kind == 0)
                     before = connection;
@@ -3087,7 +3088,7 @@ cydaw::base::Result Studio::setDeviceChannels(app::NodeGraphComponent& graph, co
                                          "Between the input and the output, only mono to stereo and stereo to mono convert"));
     // What feeds the output goes through a converter, unless it is one
     // already of the right kind.
-    std::optional<app::NodeGraphComponent::EditorConnection> feeding;
+    std::optional<app::GraphDocument::EditorConnection> feeding;
     for (const auto& connection : graph.editorConnections())
         if (connection.destination == out && connection.kind == 0)
             feeding = connection;
@@ -3324,7 +3325,7 @@ void Studio::closeWorkshop()
     closeWorkshopTab(0);
 }
 
-cydaw::base::Value Studio::deviceDocument(app::NodeGraphComponent& graph, const bool instrument) const
+cydaw::base::Value Studio::deviceDocument(app::GraphDocument& graph, const bool instrument) const
 {
     const auto info = graph.editorGraphInfo();
     auto document = cydaw::base::Object::Ptr(new cydaw::base::Object());
@@ -3947,7 +3948,7 @@ std::optional<TrackRef> Studio::buildReadablePatch(const cydaw::base::Value& jso
     }
     (void) graph.setNodeWavetable("wavetable", shape);
     // Built now: the instrument is published right after.
-    graph.rebuildWavetableBanksForTest();
+    graph.processPendingChanges();
 
     // The knobs: the table read where the note is loudest, the analysed
     // envelope, a low-pass well above the partials' own fall.
@@ -5125,7 +5126,7 @@ void Studio::reloadSamplers(const cydaw::base::TextList& banks)
                 continue;
             // The same map again: its samples asked of the store anew, now
             // that they are here. Not an edit of the project.
-            const juce::ScopedValueSetter<bool> quiet(loading_, true);
+            const cydaw::base::ScopedValueSetter<bool> quiet(loading_, true);
             cydaw::base::Text error;
             changed = graph.setNodeSampler(id, json, error) || changed;
         }
@@ -5193,7 +5194,7 @@ std::vector<Studio::FactoryInstrument> Studio::factoryInstruments() const
     return instruments;
 }
 
-const std::vector<app::NodeGraphComponent::DeviceCatalogueEntry>& Studio::deviceCatalogue()
+const std::vector<app::GraphDocument::DeviceCatalogueEntry>& Studio::deviceCatalogue()
 {
     if (deviceCatalogueLanguage_ != ui::languageRevision() || deviceCatalogue_.empty()) {
         deviceCatalogueLanguage_ = ui::languageRevision();
@@ -5204,7 +5205,7 @@ const std::vector<app::NodeGraphComponent::DeviceCatalogueEntry>& Studio::device
                 deviceCatalogue_ = slot->graph().deviceCatalogue();
         }
         if (deviceCatalogue_.empty()) {
-            app::NodeGraphComponent graph;
+            app::GraphDocument graph;
             graph.initialiseEmptyMidiTrackGraph();
             deviceCatalogue_ = graph.deviceCatalogue();
         }
@@ -5905,7 +5906,7 @@ bool Studio::startOpeningProject(const cydaw::base::File& file)
     opening->started = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
     opening->read = std::make_shared<Opening::Read>();
     auto read = opening->read;
-    juce::Thread::launch([read, file] {
+    cydaw::base::Thread::launch([read, file] {
         cydaw::base::Value document;
         auto result = app::ProjectRecovery::readDocument(file, document);
         if (result.wasOk() && document.getProperty("format", cydaw::base::Value()).toString() != "CyDAW Project")
@@ -5933,7 +5934,7 @@ bool Studio::startImportingProject(const cydaw::base::File& file)
     opening->started = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
     opening->imported = std::make_shared<Opening::ImportRead>();
     auto imported = opening->imported;
-    juce::Thread::launch([imported, file] {
+    cydaw::base::Thread::launch([imported, file] {
         imported->result = app::project_import::importProjectFile(file, imported->project);
         imported->done.store(true, std::memory_order_release);
     });
@@ -6270,7 +6271,7 @@ void Studio::discardRecovery()
     if (auxiliary_ || !autosaveEnabled_ || !ownsRecovery()) return;
     // A copy being written now would come back after this.
     while (autosaveWriting_.load())
-        juce::Thread::sleep(5);
+        cydaw::base::Thread::sleep(5);
     (void) app::ProjectRecovery::discard(recoveryFile());
 }
 
@@ -6293,7 +6294,7 @@ void Studio::autosaveIfDue()
     auto document = app::cloneJsonValue(app::withFactoryModelReferences(project_io::buildDocument(*this, projectFile_, false)));
     document = app::ProjectRecovery::makeRecoveryDocument(document, projectFile_);
     autosaveWriting_.store(true);
-    juce::Thread::launch([this, document] {
+    cydaw::base::Thread::launch([this, document] {
         (void) app::ProjectRecovery::writeDocumentAtomically(recoveryFile(), document, false);
         autosaveWriting_.store(false);
     });
@@ -6302,7 +6303,7 @@ void Studio::autosaveIfDue()
 void Studio::finishRecovery()
 {
     while (autosaveWriting_.load())
-        juce::Thread::sleep(5);
+        cydaw::base::Thread::sleep(5);
     if (!autosaveEnabled_ || !ownsRecovery())
         return;
     if (dirty_ && trackCount() > 0) {
@@ -6375,6 +6376,7 @@ MeterState Studio::trackMeter(const TrackRef& track) const
 
 void Studio::tick()
 {
+    GraphSlot::processPending();
     engine_.pollPluginWorkers();
     followMasterClip();
     followClipLanes();
@@ -6663,7 +6665,7 @@ struct LfoCard {
     double rateValue { 1.0 }, depthValue { 1.0 }, offsetValue {}, shapeValue {};
 };
 
-std::optional<LfoCard> firstLfoCard(const app::NodeGraphComponent& graph)
+std::optional<LfoCard> firstLfoCard(const app::GraphDocument& graph)
 {
     for (const auto& node : graph.editorNodes()) {
         if (node.typeKey != "lfo" && node.typeKey != "lfo-core")

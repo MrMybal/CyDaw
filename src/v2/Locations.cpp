@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #include "Locations.h"
 
@@ -244,9 +245,9 @@ cydaw::base::Array<cydaw::base::File> contentOf(const Location location, const c
 // ---- Moving ----------------------------------------------------------------------------
 
 Move::Move(const Location location, cydaw::base::File from, cydaw::base::File to)
-    : juce::Thread("CyDAW location move"), location_(location), from_(std::move(from)), to_(std::move(to))
+    : cydaw::base::Thread("CyDAW location move"), location_(location), from_(std::move(from)), to_(std::move(to))
 {
-    startThread(juce::Thread::Priority::low);
+    startThread(cydaw::base::Thread::Priority::low);
 }
 
 Move::~Move()

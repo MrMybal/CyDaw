@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/base/TextMap.h>
 #include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/File.h>
@@ -258,9 +259,8 @@ private:
     float limiterGain_ { 1.0f };
 
     // Recording: written on a thread of its own.
-    juce::TimeSliceThread writerThread_ { "CyDAW DJ mix writer" };
     std::unique_ptr<cydaw::audio::AudioFormatWriter::ThreadedWriter> writer_;
-    juce::CriticalSection writerLock_;
+    cydaw::base::CriticalSection writerLock_;
     std::atomic<bool> recording_ {};
     std::atomic<std::int64_t> recordedFrames_ {};
     cydaw::base::File recordingFile_;

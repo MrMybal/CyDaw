@@ -3,8 +3,7 @@
 
 #include <cydaw/engine/Sampler.h>
 
-#include <juce_core/juce_core.h>
-#include <juce_events/juce_events.h>
+
 
 #include <map>
 #include <memory>
@@ -62,14 +61,14 @@ void setBanksFolder(const cydaw::base::File& folder);
 // ---- The store ----------------------------------------------------------------------
 // Every decoded file once, shared by the zones, cards and tracks that play
 // it, freed when the last of them goes. Decoding runs on threads of its own;
-// a sample is playable once its `ready` is set. Deleted when JUCE shuts down
-// (an exported plug-in: when its last instance goes), not when a DLL is
-// unloaded, where Windows lets no thread finish.
-class SampleStore final : public juce::DeletedAtShutdown {
+// a sample is playable once its `ready` is set. The desktop and plugin owners
+// stop this service explicitly before unloading code or exiting.
+class SampleStore final {
 public:
     static SampleStore& instance();
-    ~SampleStore() override;
-    JUCE_DECLARE_SINGLETON(SampleStore, false)
+    ~SampleStore();
+    // Control thread, after users/audio callbacks are stopped.
+    static void shutdown();
 
     // `deferred`: not decoded until something asks for it (SampleData::
     // request(): a note that reaches its zone, or want()); a file already
@@ -78,7 +77,7 @@ public:
     // (from there, through `until`: its loop) and is read from the disk as
     // it plays (CYDAW_SAMPLE_STREAMING=0: every file whole).
     [[nodiscard]] cydaw::engine::SampleDataRef acquire(const cydaw::base::File& file, bool deferred = false,
-                                                       juce::int64 first = -1, juce::int64 until = -1);
+                                                       cydaw::base::int64 first = -1, cydaw::base::int64 until = -1);
     // Asks for every sample of the zones a map reaches with these controllers
     // and articulation (a card's settings moved: a microphone raised).
     void want(const cydaw::engine::SamplerMap& map, const cydaw::engine::SamplerCues& cues);
@@ -93,7 +92,7 @@ public:
         int deferred {};
         // Long recordings with only their head in memory.
         int streamed {};
-        juce::int64 bytes {};
+        cydaw::base::int64 bytes {};
     };
     [[nodiscard]] Stats stats();
 

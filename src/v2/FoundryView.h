@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #pragma once
 
@@ -240,7 +241,7 @@ private:
         std::atomic<bool> done{};
         bool consumed{},hasAudio{},automatic{};
     };
-    juce::ThreadPool cinemaAudioWorker_{1};
+    cydaw::base::ThreadPool cinemaAudioWorker_{1};
     std::shared_ptr<CinemaAudioTask> cinemaAudioTask_;
     std::vector<std::shared_ptr<CinemaAudioTask>> cinemaAudioTasks_;
     bool cinema_{};

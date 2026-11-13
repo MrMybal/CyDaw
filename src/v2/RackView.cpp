@@ -59,7 +59,7 @@ std::map<std::uint64_t, std::size_t>& chosenLayers()
 
 // A selector's card: its settings by their keys (their bindings and values).
 struct SelectorCard {
-    app::NodeGraphComponent* graph {};
+    app::GraphDocument* graph {};
     std::map<cydaw::base::Text, std::pair<cydaw::base::Text, float>> values;
 
     [[nodiscard]] float value(const cydaw::base::Text& key, const float fallback) const

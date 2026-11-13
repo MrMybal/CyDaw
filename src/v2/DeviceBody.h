@@ -27,15 +27,15 @@ struct DeviceBody {
 
 // What a card shows large. `span`: where it runs in the engine (its sound
 // tapped), none when it is not.
-[[nodiscard]] DeviceBody deviceBodyOf(app::NodeGraphComponent& graph, const app::NodeGraphComponent::EditorNode& node,
-                                      const app::NodeGraphComponent::EditorNativeSpan* span);
+[[nodiscard]] DeviceBody deviceBodyOf(app::GraphDocument& graph, const app::GraphDocument::EditorNode& node,
+                                      const app::GraphDocument::EditorNativeSpan* span);
 
 // The card's view in the space left in the current window. `pane`: the one
 // shown (-2 the drawn interface, -1 all displays at once, 0… one display),
 // kept by the caller. `detachId`: the window's id for the button that takes
 // it out of the studio's window (none in a plug-in).
 void drawDeviceBody(DeviceBody& body, int& pane, DeviceHost& host, UiState& state, PresetMenu& presets, InterfaceEditor& designed,
-                    const TrackRef& track, app::NodeGraphComponent& graph, const app::NodeGraphComponent::EditorNode& node,
+                    const TrackRef& track, app::GraphDocument& graph, const app::GraphDocument::EditorNode& node,
                     const visual::Live& live, const char* detachId);
 
 } // namespace cydaw::v2

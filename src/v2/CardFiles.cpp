@@ -57,7 +57,7 @@ const std::vector<float>& curveOf(const engine::ImpulseResponseRef& response)
 
 } // namespace
 
-CardFileScope::CardFileScope(DeviceHost& studio, UiState& state, const TrackRef& track, app::NodeGraphComponent& graph,
+CardFileScope::CardFileScope(DeviceHost& studio, UiState& state, const TrackRef& track, app::GraphDocument& graph,
                              const std::uint64_t nodeId, const cydaw::base::Text& typeKey)
 {
     if (typeKey != "cab-sim" && typeKey != "empreinte")

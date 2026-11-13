@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #include "ControllersImpl.h"
 
@@ -269,8 +270,8 @@ private:
 
 // ---- Application plug-ins: their thread --------------------------------------------------------
 
-struct Controllers::Impl::PluginThread final : juce::Thread {
-    explicit PluginThread(Impl& owner) : juce::Thread("cydaw-control-plugins"), owner_(owner) {}
+struct Controllers::Impl::PluginThread final : cydaw::base::Thread {
+    explicit PluginThread(Impl& owner) : cydaw::base::Thread("cydaw-control-plugins"), owner_(owner) {}
     void run() override
     {
         while (!threadShouldExit()) {

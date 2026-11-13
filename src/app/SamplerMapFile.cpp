@@ -1,9 +1,11 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/File.h>
 #include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "SamplerMapFile.h"
 
-#include <juce_audio_formats/juce_audio_formats.h>
+#include <cydaw/base/Character.h>
+#include <cydsp/core/AudioBuffer.h>
 
 #include <algorithm>
 #include <array>
@@ -86,7 +88,7 @@ cydaw::base::File banksFolder()
     }
     if (const auto other = cydaw::base::SystemStats::getEnvironmentVariable("CYDAW_BANKS_DIR", {}); other.isNotEmpty())
         return cydaw::base::File(other);
-   #if JUCE_WINDOWS
+   #if defined(_WIN32)
     const auto base = cydaw::base::File::getSpecialLocation(cydaw::base::File::windowsLocalAppData);
    #else
     const auto base = cydaw::base::File::getSpecialLocation(cydaw::base::File::userApplicationDataDirectory);
@@ -182,10 +184,10 @@ cydaw::base::Value upgradedSamplerMap(const cydaw::base::Value& json)
             if (!entry.isObject())
                 continue;
             // Frames of the cut file are frames of the recording, `offset` later.
-            const auto offset = static_cast<juce::int64>(entry.getProperty("offset", 0));
-            const auto frames = static_cast<juce::int64>(entry.getProperty("frames", 0));
-            const auto start = static_cast<juce::int64>(zone.getProperty("start", 0));
-            const auto end = static_cast<juce::int64>(zone.getProperty("end", -1));
+            const auto offset = static_cast<cydaw::base::int64>(entry.getProperty("offset", 0));
+            const auto frames = static_cast<cydaw::base::int64>(entry.getProperty("frames", 0));
+            const auto start = static_cast<cydaw::base::int64>(zone.getProperty("start", 0));
+            const auto end = static_cast<cydaw::base::int64>(zone.getProperty("end", -1));
             object->setProperty("file", entry.getProperty("file", {}));
             object->setProperty("start", offset + start);
             object->setProperty("end", offset + (end >= 0 ? std::min(end, frames) : frames));
@@ -193,8 +195,8 @@ cydaw::base::Value upgradedSamplerMap(const cydaw::base::Value& json)
                 object->setProperty("endFade", entry.getProperty("endFade", 0));
             if (const auto* loop = zone.getProperty("loop", {}).getArray(); loop != nullptr && loop->size() == 2) {
                 cydaw::base::Array<cydaw::base::Value> moved;
-                moved.add(offset + static_cast<juce::int64>((*loop)[0]));
-                moved.add(offset + static_cast<juce::int64>((*loop)[1]));
+                moved.add(offset + static_cast<cydaw::base::int64>((*loop)[0]));
+                moved.add(offset + static_cast<cydaw::base::int64>((*loop)[1]));
                 object->setProperty("loop", moved);
             }
         }
@@ -223,8 +225,8 @@ constexpr int streamCount = 320;
 
 // `first` below 0: the whole file. Else, a recording long enough past
 // `first` keeps only its head in memory (from `first`, through `until`).
-bool decodeSampleWindow(const cydaw::base::File& file, SampleData& data, cydaw::base::Text& error, const juce::int64 first,
-                        const juce::int64 until)
+bool decodeSampleWindow(const cydaw::base::File& file, SampleData& data, cydaw::base::Text& error, const cydaw::base::int64 first,
+                        const cydaw::base::int64 until)
 {
     cydaw::audio::AudioFormatManager formats;
     cydaw::integration::registerCyAudioCoreReaders(formats);
@@ -235,22 +237,22 @@ bool decodeSampleWindow(const cydaw::base::File& file, SampleData& data, cydaw::
     }
     const auto channels = std::clamp(static_cast<int>(reader->numChannels), 1, 2);
     // Twenty minutes is more than a sample; past it, the rest is left out.
-    const auto limit = static_cast<juce::int64>(reader->sampleRate * 60.0 * 20.0);
-    const auto frames = std::min<juce::int64>(reader->lengthInSamples, limit);
+    const auto limit = static_cast<cydaw::base::int64>(reader->sampleRate * 60.0 * 20.0);
+    const auto frames = std::min<cydaw::base::int64>(reader->lengthInSamples, limit);
     if (frames <= 0 || reader->sampleRate <= 0.0) {
         error = "empty " + file.getFullPathName();
         return false;
     }
     // Long past where it starts: its head only.
-    juce::int64 from = 0;
+    cydaw::base::int64 from = 0;
     auto to = frames;
     auto streamed = false;
     if (first >= 0 && streamingAllowed()) {
-        const auto head = static_cast<juce::int64>(reader->sampleRate * headSeconds);
+        const auto head = static_cast<cydaw::base::int64>(reader->sampleRate * headSeconds);
         const auto kept = std::max(first + head, until + 64);
-        if (frames - kept > static_cast<juce::int64>(reader->sampleRate * streamedPast)) {
-            from = std::clamp<juce::int64>(first - 64, 0, frames);
-            to = std::clamp<juce::int64>(kept, from + 1, frames);
+        if (frames - kept > static_cast<cydaw::base::int64>(reader->sampleRate * streamedPast)) {
+            from = std::clamp<cydaw::base::int64>(first - 64, 0, frames);
+            to = std::clamp<cydaw::base::int64>(kept, from + 1, frames);
             streamed = true;
             cydaw::engine::SampleStreams::instance().reserve(streamCount);
         }
@@ -258,17 +260,17 @@ bool decodeSampleWindow(const cydaw::base::File& file, SampleData& data, cydaw::
     const auto count = to - from;
     std::vector<float> decoded(static_cast<std::size_t>(count) * static_cast<std::size_t>(channels));
     constexpr int chunk = 1 << 16;
-    juce::AudioBuffer<float> buffer(channels, chunk);
+    cydsp::AudioBuffer<float> buffer;if(buffer.resize(channels,chunk)!=cydsp::Status::ok){error="Cannot allocate sample decode buffer";return false;}
     auto peak = 0.0f;
-    for (juce::int64 done = 0; done < count; done += chunk) {
-        const auto part = static_cast<int>(std::min<juce::int64>(chunk, count - done));
-        buffer.clear();
-        if (!reader->read(&buffer, 0, part, from + done, true, channels > 1)) {
+    for (cydaw::base::int64 done = 0; done < count; done += chunk) {
+        const auto part = static_cast<int>(std::min<cydaw::base::int64>(chunk, count - done));
+        for(std::size_t channel=0;channel<buffer.block().channels();++channel)std::fill(buffer.block().channel(channel).begin(),buffer.block().channel(channel).end(),0.f);
+        if (!reader->read(buffer.block().channelData(), channels, from + done, part)) {
             error = "cannot decode " + file.getFullPathName();
             return false;
         }
         for (int channel = 0; channel < channels; ++channel) {
-            const auto* source = buffer.getReadPointer(channel);
+            const auto* source = buffer.block().channel(channel).data();
             for (int frame = 0; frame < part; ++frame) {
                 const auto value = std::isfinite(source[frame]) ? source[frame] : 0.0f;
                 decoded[static_cast<std::size_t>(done + frame) * static_cast<std::size_t>(channels)
@@ -308,8 +310,8 @@ bool decodeSampleFile(const cydaw::base::File& file, SampleData& data, cydaw::ba
 // Several threads decode at once (a piano is dozens of files): the queue is
 // shared, a file is taken by one of them.
 struct SampleStore::Impl final {
-    struct Worker final : juce::Thread {
-        Worker(Impl& owner, const int index) : juce::Thread("cydaw-sample-loader-" + cydaw::base::Text(index)), owner_(owner) {}
+    struct Worker final : cydaw::base::Thread {
+        Worker(Impl& owner, const int index) : cydaw::base::Thread("cydaw-sample-loader-" + cydaw::base::Text(index)), owner_(owner) {}
         void run() override { owner_.work(*this); }
         Impl& owner_;
     };
@@ -318,22 +320,22 @@ struct SampleStore::Impl final {
     struct Job {
         cydaw::base::File file;
         std::weak_ptr<SampleData> data;
-        juce::int64 first { -1 };
-        juce::int64 until { -1 };
+        cydaw::base::int64 first { -1 };
+        cydaw::base::int64 until { -1 };
     };
 
     // Fills the rings of the lanes playing past a head, from the disk.
-    struct Streamer final : juce::Thread {
-        Streamer() : juce::Thread("cydaw-sample-streamer") {}
+    struct Streamer final : cydaw::base::Thread {
+        Streamer() : cydaw::base::Thread("cydaw-sample-streamer") {}
         void run() override;
     };
 
     Impl()
     {
-        const auto count = juce::jlimit(1, 6, cydaw::base::SystemStats::getNumCpus() / 2);
+        const auto count = cydaw::base::jlimit(1, 6, cydaw::base::SystemStats::getNumCpus() / 2);
         for (int index = 0; index < count; ++index) {
             workers.push_back(std::make_unique<Worker>(*this, index));
-            workers.back()->startThread(juce::Thread::Priority::low);
+            workers.back()->startThread(cydaw::base::Thread::Priority::low);
         }
     }
 
@@ -350,10 +352,10 @@ struct SampleStore::Impl final {
 
     void startStreamer()
     {
-        std::call_once(streamerStarted, [this] { streamer.startThread(juce::Thread::Priority::high); });
+        std::call_once(streamerStarted, [this] { streamer.startThread(cydaw::base::Thread::Priority::high); });
     }
 
-    SampleDataRef acquire(const cydaw::base::File& file, const bool deferred, const juce::int64 first, const juce::int64 until)
+    SampleDataRef acquire(const cydaw::base::File& file, const bool deferred, const cydaw::base::int64 first, const cydaw::base::int64 until)
     {
         auto key = file.getFullPathName() + "|" + cydaw::base::Text(file.getLastModificationTime().toMilliseconds())
                    + "|" + cydaw::base::Text(file.getSize());
@@ -412,7 +414,7 @@ struct SampleStore::Impl final {
             wake.signal();
     }
 
-    void work(juce::Thread& thread)
+    void work(cydaw::base::Thread& thread)
     {
         while (!thread.threadShouldExit()) {
             Job job;
@@ -457,7 +459,7 @@ struct SampleStore::Impl final {
     // Deferred, not asked for yet.
     std::vector<Job> sleeping;
     std::uint32_t requestsSeen {};
-    juce::WaitableEvent wake;
+    cydaw::base::WaitableEvent wake;
     std::vector<std::unique_ptr<Worker>> workers;
     Streamer streamer;
     std::once_flag streamerStarted;
@@ -474,29 +476,29 @@ void SampleStore::Impl::Streamer::run()
     cydaw::integration::registerCyAudioCoreReaders(formats);
     auto& pool = cydaw::engine::SampleStreams::instance();
     std::vector<std::unique_ptr<cydaw::audio::AudioFormatReader>> readers;
-    juce::AudioBuffer<float> buffer(2, chunk);
+    cydsp::AudioBuffer<float> buffer;if(buffer.resize(2,chunk)!=cydsp::Status::ok)return;
     const auto fill = [&buffer](SampleStream& stream, cydaw::audio::AudioFormatReader& reader) {
         const auto frames = stream.sample != nullptr ? stream.sample->frames : 0;
         const auto read = stream.reading.load(std::memory_order_acquire);
-        juce::int64 first {};
+        cydaw::base::int64 first {};
         int count {};
         if (stream.direction > 0) {
             first = stream.high.load(std::memory_order_relaxed);
-            const auto limit = std::min<juce::int64>(frames, read + SampleStream::capacity - SampleStream::margin);
-            count = static_cast<int>(std::min<juce::int64>(chunk, limit - first));
+            const auto limit = std::min<cydaw::base::int64>(frames, read + SampleStream::capacity - SampleStream::margin);
+            count = static_cast<int>(std::min<cydaw::base::int64>(chunk, limit - first));
         } else {
             const auto low = stream.low.load(std::memory_order_relaxed);
-            const auto limit = std::max<juce::int64>(0, read - SampleStream::capacity + SampleStream::margin);
-            count = static_cast<int>(std::min<juce::int64>(chunk, low - limit));
+            const auto limit = std::max<cydaw::base::int64>(0, read - SampleStream::capacity + SampleStream::margin);
+            count = static_cast<int>(std::min<cydaw::base::int64>(chunk, low - limit));
             first = low - count;
         }
         if (count <= 0)
             return false;
-        buffer.clear();
-        if (!reader.read(&buffer, 0, count, first, true, true))
+        for(std::size_t channel=0;channel<buffer.block().channels();++channel)std::fill(buffer.block().channel(channel).begin(),buffer.block().channel(channel).end(),0.f);
+        if (!reader.read(buffer.block().channelData(), 2, first, count))
             return false;
-        const auto* left = buffer.getReadPointer(0);
-        const auto* right = reader.numChannels > 1 ? buffer.getReadPointer(1) : left;
+        const auto* left = buffer.block().channel(0).data();
+        const auto* right = reader.numChannels > 1 ? buffer.block().channel(1).data() : left;
         const auto toShort = [](const float value) {
             return static_cast<std::int16_t>(std::lround(std::clamp(std::isfinite(value) ? value : 0.0f, -1.0f, 1.0f) * 32'767.0f));
         };
@@ -552,23 +554,14 @@ void SampleStore::Impl::Streamer::run()
     }
 }
 
-JUCE_IMPLEMENT_SINGLETON(SampleStore)
+namespace {std::mutex sampleStoreMutex;std::unique_ptr<SampleStore> sampleStoreOwner;}
+SampleStore& SampleStore::instance(){std::lock_guard lock(sampleStoreMutex);if(!sampleStoreOwner)sampleStoreOwner.reset(new SampleStore);return *sampleStoreOwner;}
+void SampleStore::shutdown(){std::unique_ptr<SampleStore> retired;{std::lock_guard lock(sampleStoreMutex);retired=std::move(sampleStoreOwner);}retired.reset();}
+SampleStore::SampleStore():impl_(std::make_unique<Impl>()){}
+SampleStore::~SampleStore()=default;
 
-SampleStore& SampleStore::instance()
-{
-    return *getInstance();
-}
-
-SampleStore::SampleStore() : impl_(std::make_unique<Impl>()) {}
-
-SampleStore::~SampleStore()
-{
-    impl_.reset();
-    clearSingletonInstance();
-}
-
-SampleDataRef SampleStore::acquire(const cydaw::base::File& file, const bool deferred, const juce::int64 first,
-                                   const juce::int64 until)
+SampleDataRef SampleStore::acquire(const cydaw::base::File& file, const bool deferred, const cydaw::base::int64 first,
+                                   const cydaw::base::int64 until)
 {
     return impl_->acquire(file, deferred, first, until);
 }
@@ -602,7 +595,7 @@ bool SampleStore::waitUntilReady(const SamplerMap& map, const int timeoutMs)
             });
         if (cydaw::base::Time::getMillisecondCounterHiRes() > deadline)
             return false;
-        juce::Thread::sleep(5);
+        cydaw::base::Thread::sleep(5);
     }
 }
 
@@ -614,7 +607,7 @@ SampleStore::Stats SampleStore::stats()
         if (const auto data = weak.lock()) {
             if (data->ready.load(std::memory_order_acquire)) {
                 ++stats.loaded;
-                stats.bytes += static_cast<juce::int64>(data->pcm.size() * sizeof(std::int16_t));
+                stats.bytes += static_cast<cydaw::base::int64>(data->pcm.size() * sizeof(std::int16_t));
             } else if (data->failed.load(std::memory_order_acquire)) {
                 ++stats.failed;
             } else if (data->asleep()) {
@@ -807,9 +800,9 @@ int intOf(const cydaw::base::Value& value, const int fallback)
     return value.isVoid() || value.isUndefined() ? fallback : static_cast<int>(value);
 }
 
-juce::int64 int64Of(const cydaw::base::Value& value, const juce::int64 fallback)
+cydaw::base::int64 int64Of(const cydaw::base::Value& value, const cydaw::base::int64 fallback)
 {
-    return value.isVoid() || value.isUndefined() ? fallback : static_cast<juce::int64>(value);
+    return value.isVoid() || value.isUndefined() ? fallback : static_cast<cydaw::base::int64>(value);
 }
 
 float floatOf(const cydaw::base::Value& value, const float fallback)
@@ -827,14 +820,14 @@ std::pair<int, int> pairOf(const cydaw::base::Value& value, const std::pair<int,
     return fallback;
 }
 
-std::pair<juce::int64, juce::int64> pair64Of(const cydaw::base::Value& value, const std::pair<juce::int64, juce::int64> fallback)
+std::pair<cydaw::base::int64, cydaw::base::int64> pair64Of(const cydaw::base::Value& value, const std::pair<cydaw::base::int64, cydaw::base::int64> fallback)
 {
     if (const auto* list = value.getArray(); list != nullptr && list->size() == 2)
-        return { static_cast<juce::int64>((*list)[0]), static_cast<juce::int64>((*list)[1]) };
+        return { static_cast<cydaw::base::int64>((*list)[0]), static_cast<cydaw::base::int64>((*list)[1]) };
     return fallback;
 }
 
-cydaw::base::Value pairVar(const juce::int64 first, const juce::int64 second)
+cydaw::base::Value pairVar(const cydaw::base::int64 first, const cydaw::base::int64 second)
 {
     cydaw::base::Array<cydaw::base::Value> list;
     list.add(first);
@@ -886,10 +879,10 @@ struct ZoneSpec {
     float tune {};
     float gain {};
     float pan {};
-    juce::int64 start {};
-    juce::int64 end { -1 };
-    juce::int64 loopStart { -1 };
-    juce::int64 loopEnd { -1 };
+    cydaw::base::int64 start {};
+    cydaw::base::int64 end { -1 };
+    cydaw::base::int64 loopStart { -1 };
+    cydaw::base::int64 loopEnd { -1 };
     int loopCrossfade {};
     int endFade {};
     int sequenceLength { 1 };
@@ -917,7 +910,7 @@ ZoneSpec zoneFromVar(const cydaw::base::Value& value)
     zone.tune = std::clamp(floatOf(value.getProperty("tune", {}), 0.0f), -2'400.0f, 2'400.0f);
     zone.gain = std::clamp(floatOf(value.getProperty("gain", {}), 0.0f), -96.0f, 24.0f);
     zone.pan = std::clamp(floatOf(value.getProperty("pan", {}), 0.0f), -1.0f, 1.0f);
-    zone.start = std::max<juce::int64>(0, int64Of(value.getProperty("start", {}), 0));
+    zone.start = std::max<cydaw::base::int64>(0, int64Of(value.getProperty("start", {}), 0));
     zone.end = int64Of(value.getProperty("end", {}), -1);
     const auto loop = pair64Of(value.getProperty("loop", {}), { -1, -1 });
     zone.loopStart = loop.first;
@@ -1538,9 +1531,9 @@ std::vector<std::pair<cydaw::base::Text, Opcodes>> parseSfz(const cydaw::base::T
                     end = at;
                     break;
                 }
-                if (at > 0 && juce::CharacterFunctions::isWhitespace(rest[at - 1])) {
+                if (at > 0 && cydaw::base::CharacterFunctions::isWhitespace(rest[at - 1])) {
                     auto scan = at;
-                    while (scan < rest.length() && (juce::CharacterFunctions::isLetterOrDigit(rest[scan]) || rest[scan] == '_'))
+                    while (scan < rest.length() && (cydaw::base::CharacterFunctions::isLetterOrDigit(rest[scan]) || rest[scan] == '_'))
                         ++scan;
                     if (scan > at && scan < rest.length() && rest[scan] == '=') {
                         end = at;
@@ -1858,7 +1851,7 @@ cydaw::base::Value samplerMapFromSfz(const cydaw::base::File& file, cydaw::base:
         zone.tune = static_cast<float>(get("tune").getDoubleValue() + 100.0 * get("transpose").getDoubleValue());
         zone.gain = static_cast<float>(get("volume").getDoubleValue() + extraDb);
         zone.pan = static_cast<float>(std::clamp(get("pan").getDoubleValue() / 100.0, -1.0, 1.0));
-        zone.start = std::max<juce::int64>(0, get("offset").getLargeIntValue());
+        zone.start = std::max<cydaw::base::int64>(0, get("offset").getLargeIntValue());
         if (get("end").isNotEmpty())
             zone.end = get("end").getLargeIntValue();
         const auto loopMode = get("loop_mode").isNotEmpty() ? get("loop_mode") : get("loopmode");

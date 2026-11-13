@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
@@ -410,7 +411,7 @@ public:
 private:
     [[nodiscard]] int indexOf(const juce::AudioSource* source) const noexcept;
 
-    juce::CriticalSection lock_;
+    cydaw::base::CriticalSection lock_;
     std::vector<juce::AudioSource*> inputs_;
     // Each track's sound and what reaches each of its inputs, in buffers of
     // the widest format; the block reads them through views of its own.
@@ -468,7 +469,6 @@ public:
     void audioDeviceStopped() override;
 
 private:
-    juce::TimeSliceThread writerThread_ { "CyDAW recording writer" };
     std::unique_ptr<cydaw::audio::AudioFormatWriter::ThreadedWriter> threadedWriter_;
     std::atomic<cydaw::audio::AudioFormatWriter::ThreadedWriter*> activeWriter_ {};
     std::atomic<int> callbacksInFlight_ {};
@@ -604,7 +604,6 @@ private:
         const juce::AudioSourceChannelInfo& bufferToFill) noexcept;
 
     juce::AudioSource& input_;
-    juce::TimeSliceThread writerThread_ { "CyDAW master export writer" };
     std::unique_ptr<cydaw::audio::AudioFormatWriter::ThreadedWriter> threadedWriter_;
     std::atomic<cydaw::audio::AudioFormatWriter::ThreadedWriter*> activeWriter_ {};
     std::atomic<int> callbacksInFlight_ {};
@@ -2407,7 +2406,7 @@ private:
         void handleIncomingMidiMessage(juce::MidiInput* source, const juce::MidiMessage& message) override;
         AudioTrackController& owner_;
     } gatedMidiInput_ { *this };
-    juce::SpinLock midiGateLock_;
+    cydaw::base::SpinLock midiGateLock_;
     std::shared_ptr<const MidiInputGate> midiGate_;
     // Guarded by midiGateLock_ too.
     std::shared_ptr<const LiveMidiRoute> liveRoute_;

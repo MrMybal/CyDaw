@@ -194,8 +194,7 @@ class AudioFormatWriter::ThreadedWriter {
   }
 
 public:
-  template <class Thread>
-  ThreadedWriter(AudioFormatWriter *writer, Thread &, int samples)
+  ThreadedWriter(AudioFormatWriter *writer, int samples)
       : writer_(writer),
         ring_(writer->numChannels * std::size_t(std::max(4096, samples))),
         scratch_(writer->numChannels * 4096), pointers_(writer->numChannels),

@@ -1269,7 +1269,7 @@ unsigned long long AppUi::logo(const float pixels)
     while (size < 512 && static_cast<float>(size) < pixels)
         size *= 2;
     const auto key = "logo-" + cydaw::base::Text(size);
-    static const auto source = juce::ImageCache::getFromMemory(cydaw::branding::cydawlogo512_png,
+    static const auto source = cydaw::base::Image::decode(cydaw::branding::cydawlogo512_png,
                                                                cydaw::branding::cydawlogo512_pngSize);
     if (!source.isValid())
         return 0;
@@ -1279,7 +1279,7 @@ unsigned long long AppUi::logo(const float pixels)
     if (const auto cached = host_.texture(key, {}); cached != 0)
         return cached;
     return host_.texture(key, size == source.getWidth() ? source
-                                                        : source.rescaled(size, size, juce::Graphics::highResamplingQuality));
+                                                        : source.rescaled(size, size));
 }
 
 void AppUi::drawOpening()

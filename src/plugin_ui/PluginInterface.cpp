@@ -327,7 +327,7 @@ struct PluginInterface::Impl {
         // The devices in signal order, those with something to show large.
         auto nodes = graph.editorNodes();
         std::stable_sort(nodes.begin(), nodes.end(), [](const auto& a, const auto& b) { return a.position.x < b.position.x; });
-        std::vector<std::pair<app::NodeGraphComponent::EditorNode, DeviceBody>> devices;
+        std::vector<std::pair<app::GraphDocument::EditorNode, DeviceBody>> devices;
         for (const auto& node : nodes) {
             if (node.boundary)
                 continue;
@@ -408,7 +408,7 @@ PluginInterface::PluginInterface(const cydaw::base::Text& productName, const boo
 
 PluginInterface::~PluginInterface() = default;
 
-app::NodeGraphComponent& PluginInterface::graph()
+app::GraphDocument& PluginInterface::graph()
 {
     return impl_->host.slot().graph();
 }

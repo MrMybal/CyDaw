@@ -274,7 +274,7 @@ int SamplerView::drawMap(const cydaw::base::Value& json, const ImVec2 at, const 
     return ImGui::IsItemClicked() ? hovered : -2;
 }
 
-void SamplerView::drawPane(const TrackRef& track, app::NodeGraphComponent& graph, const std::uint64_t nodeId, const ImVec2 at,
+void SamplerView::drawPane(const TrackRef& track, app::GraphDocument& graph, const std::uint64_t nodeId, const ImVec2 at,
                            const ImVec2 size, const ImU32 colour)
 {
     // Inside a module: English, whatever the language.
@@ -367,7 +367,7 @@ void SamplerView::drawPane(const TrackRef& track, app::NodeGraphComponent& graph
     ImGui::PopID();
 }
 
-void SamplerView::drawSimplePane(const TrackRef& track, app::NodeGraphComponent& graph, const std::uint64_t nodeId, const ImVec2 at,
+void SamplerView::drawSimplePane(const TrackRef& track, app::GraphDocument& graph, const std::uint64_t nodeId, const ImVec2 at,
                                  const ImVec2 size)
 {
     // Inside a module: English, whatever the language.
@@ -385,7 +385,7 @@ void SamplerView::drawSimplePane(const TrackRef& track, app::NodeGraphComponent&
     ImGui::PushFont(nullptr, ui::currentFontBase() * 0.78f);
     const auto row = ImGui::GetFrameHeight() + dp(3.0f);
     // Granular (Nuée): its grains' settings, a row of knobs under the sound.
-    std::vector<app::NodeGraphComponent::EditorParameter> grainSettings;
+    std::vector<app::GraphDocument::EditorParameter> grainSettings;
     auto granular = false;
     for (const auto& node : graph.editorNodes())
         if (node.id == nodeId)

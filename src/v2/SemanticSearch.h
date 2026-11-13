@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #pragma once
@@ -204,8 +205,8 @@ private:
     std::atomic<int> searching_ {};
     std::atomic<int> nextQuery_ { 1 };
     // Queries one at a time, the newest first; the engine check.
-    juce::ThreadPool queries_ { 1 };
-    juce::ThreadPool checks_ { 1 };
+    cydaw::base::ThreadPool queries_ { 1 };
+    cydaw::base::ThreadPool checks_ { 1 };
     // A rescan ended: new sounds to index, once things are quiet.
     bool indexOwed_ {};
     double indexOwedAt_ {};

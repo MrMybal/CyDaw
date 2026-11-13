@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #ifndef NOMINMAX
@@ -86,7 +87,7 @@ public:
     }
 };
 }
-class CinemaVideo::Worker final:public juce::Thread {
+class CinemaVideo::Worker final:public cydaw::base::Thread {
 public:
     explicit Worker(int width):Thread("CyDAW cinema video"),maximumWidth(width){startThread();}
     ~Worker()override{signalThreadShouldExit();notify();stopThread(10000);}
@@ -139,11 +140,10 @@ public:
             if(reader->error<0&&reader->error!=AVERROR_EOF){problem(mediaError("FFmpeg, décodage vidéo",reader->error),seq);av_frame_free(&selected);continue;}
             const auto factor=std::min(1.0,static_cast<double>(maximumWidth)/std::max(static_cast<double>(selected->width),selected->height*16.0/9));
             const auto outW=std::max(1,static_cast<int>(selected->width*factor)),outH=std::max(1,static_cast<int>(selected->height*factor));
-            scaler=sws_getCachedContext(scaler,selected->width,selected->height,static_cast<AVPixelFormat>(selected->format),outW,outH,AV_PIX_FMT_BGRA,SWS_BILINEAR,nullptr,nullptr,nullptr);
+            scaler=sws_getCachedContext(scaler,selected->width,selected->height,static_cast<AVPixelFormat>(selected->format),outW,outH,AV_PIX_FMT_RGBA,SWS_BILINEAR,nullptr,nullptr,nullptr);
             if(!scaler){problem("FFmpeg : conversion de l'image impossible",seq);av_frame_free(&selected);continue;}
-            juce::Image image(juce::Image::ARGB,outW,outH,false);
-            {juce::Image::BitmapData pixels(image,juce::Image::BitmapData::writeOnly);
-                std::uint8_t* planes[]={pixels.data,nullptr,nullptr,nullptr};int strides[]={pixels.lineStride,0,0,0};
+            cydaw::base::Image image(outW,outH);
+            {std::uint8_t* planes[]={image.writableData(),nullptr,nullptr,nullptr};int strides[]={image.stride(),0,0,0};
                 sws_scale(scaler,selected->data,selected->linesize,0,selected->height,planes,strides);
             }
             av_frame_free(&selected);

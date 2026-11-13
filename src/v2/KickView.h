@@ -26,7 +26,7 @@ public:
 
     // The card's pane: as wide as this.
     [[nodiscard]] static float paneWidth();
-    void drawPane(const TrackRef& track, app::NodeGraphComponent& graph, std::uint64_t nodeId, ImVec2 origin, ImVec2 size,
+    void drawPane(const TrackRef& track, app::GraphDocument& graph, std::uint64_t nodeId, ImVec2 origin, ImVec2 size,
                   ImU32 colour);
     // `detached`: in a window of its own out of the studio's, as a plug-in's.
     void openEditor(const TrackRef& track, std::uint64_t nodeId, bool detached = false);
@@ -41,11 +41,11 @@ public:
 private:
     struct Card {
         TrackRef track;
-        app::NodeGraphComponent* graph {};
+        app::GraphDocument* graph {};
         std::uint64_t nodeId {};
         engine::kick::KickValues values {};
     };
-    [[nodiscard]] bool bind(const TrackRef& track, app::NodeGraphComponent& graph, std::uint64_t nodeId);
+    [[nodiscard]] bool bind(const TrackRef& track, app::GraphDocument& graph, std::uint64_t nodeId);
     [[nodiscard]] float value(int index) const;
     void set(int index, float value);
     bool knob(int index, const char* label, float diameter = 32.0f);

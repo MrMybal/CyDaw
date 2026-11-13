@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #pragma once
@@ -15,7 +16,7 @@
 
 namespace cydaw::v2 {
 
-class Vst3Build final : private juce::Thread {
+class Vst3Build final : private cydaw::base::Thread {
 public:
     // What a build needs: CMake (Visual Studio's own will do), CyDAW's
     // sources, and the MIT VST3 SDK (fetched when absent).

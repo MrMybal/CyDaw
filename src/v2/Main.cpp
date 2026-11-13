@@ -1,3 +1,4 @@
+#include "SamplerMapFile.h"
 #include <cydaw/base/File.h>
 #include "AppUi.h"
 #include "NativeDspRuntime.h"
@@ -501,7 +502,7 @@ cydaw::base::Text effectsTest()
         if (slot->lastCompileError().isNotEmpty())
             return typeKey + " does not compile: " + slot->lastCompileError();
         auto& graph = slot->graph();
-        const app::NodeGraphComponent::EditorNode* card = nullptr;
+        const app::GraphDocument::EditorNode* card = nullptr;
         const auto nodes = graph.editorNodes();
         for (const auto& node : nodes)
             if (node.typeKey == typeKey)
@@ -1069,6 +1070,7 @@ public:
         }
         window_.reset();
         studio_.reset();
+        app::SampleStore::shutdown();
     }
 
     // Unsaved changes are asked about first, except for probes.

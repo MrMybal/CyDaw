@@ -31,8 +31,8 @@ public:
     // Before the track's cards are drawn: its modulators and modulations,
     // for the column and the knobs (host()). `trackKey` keys its cards in
     // UiState (its routing key and pad).
-    void begin(const TrackRef& track, std::uint64_t trackKey, app::NodeGraphComponent& graph,
-               const std::vector<app::NodeGraphComponent::EditorNode>& nodes);
+    void begin(const TrackRef& track, std::uint64_t trackKey, app::GraphDocument& graph,
+               const std::vector<app::GraphDocument::EditorNode>& nodes);
     // After them: the browser of modulators, opened from a "+".
     void end();
     [[nodiscard]] ui::ModulationHost* host() noexcept { return &host_; }
@@ -60,7 +60,7 @@ private:
         void dropped(const std::string& binding, std::uint64_t source) override;
         void setAmount(const std::string& binding, std::uint64_t source, float amount) override;
     };
-    void drawSettings(const app::NodeGraphComponent::EditorNode& modulator, ImVec2 at, float width, ImU32 colour);
+    void drawSettings(const app::GraphDocument::EditorNode& modulator, ImVec2 at, float width, ImU32 colour);
     void drawBrowser();
     void report(const cydaw::base::Text& problem);
     [[nodiscard]] std::pair<std::uint64_t, std::uint64_t> key(std::uint64_t owner) const { return { trackKey_, owner }; }
@@ -68,11 +68,11 @@ private:
     Studio& studio_;
     UiState& state_;
     Host host_;
-    app::NodeGraphComponent* graph_ {};
+    app::GraphDocument* graph_ {};
     std::uint64_t trackKey_ {};
     // This frame's: each modulator's card, its node, its name; each knob's modulations.
     std::map<std::uint64_t, std::uint64_t> owners_;
-    std::map<std::uint64_t, app::NodeGraphComponent::EditorNode> modulators_;
+    std::map<std::uint64_t, app::GraphDocument::EditorNode> modulators_;
     std::map<std::uint64_t, std::string> names_;
     std::map<std::uint64_t, ImU32> colours_;
     std::map<std::string, std::vector<ui::KnobModulation>> byBinding_;

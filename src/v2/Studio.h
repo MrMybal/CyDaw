@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/base/Properties.h>
 #include <cydaw/base/File.h>
 #pragma once
@@ -6,7 +7,7 @@
 #include "AudioTrackController.h"
 #include "Companion.h"
 #include "Locations.h"
-#include "NodeGraphComponent.h"
+#include "GraphDocument.h"
 #include "SampleLibrary.h"
 #include "SemanticSearch.h"
 #include "SoundBanks.h"
@@ -31,7 +32,7 @@
 // the settings and the meters the interface reads. Everything here runs on
 // the message thread.
 //
-// Each track owns its graph model — a NodeGraphComponent that is never
+// Each track owns its graph model — a GraphDocument that is never
 // shown, used for its model, its catalogue and its compiler. An edit made on
 // it (by the v2 graph editor, the device panel, the control port) calls back
 // here, and the result is published to the engine at once.
@@ -740,7 +741,7 @@ public:
     cydaw::base::Result exportWorkshop(const cydaw::base::File& file, cydaw::base::TextList& externalFiles);
     // Its name, author, description: the exported plugin's name follows
     // the device's until the person gives it another.
-    void setWorkshopInfo(const app::NodeGraphComponent::EditorGraphInfo& info);
+    void setWorkshopInfo(const app::GraphDocument::EditorGraphInfo& info);
     cydaw::base::Result enterWorkshopDevice(std::uint64_t nodeId);
     void leaveWorkshopDevice();
     void leaveWorkshopDevices();
@@ -880,7 +881,7 @@ public:
     [[nodiscard]] std::vector<FactoryInstrument> factoryInstruments() const;
     // What a graph can take (presets, modules, nodes), as a fresh graph lists
     // them: made once, and again when the language changes.
-    [[nodiscard]] const std::vector<app::NodeGraphComponent::DeviceCatalogueEntry>& deviceCatalogue();
+    [[nodiscard]] const std::vector<app::GraphDocument::DeviceCatalogueEntry>& deviceCatalogue();
     // A new instrument track playing it, its knobs as made: its samples on a
     // sampler, or (`model`) its sound model.
     // On a new track, or `onto` an instrument track (its instrument
@@ -1346,7 +1347,7 @@ private:
     std::unique_ptr<GraphSlot> makeWorkshopSlot();
     void workshopRootChanged(Workshop& tab, bool structural);
     void nestedChanged(Workshop& tab, std::size_t level, GraphSlot& slot, bool structural);
-    [[nodiscard]] app::NodeGraphComponent* nestedParent(Workshop& tab, std::size_t level);
+    [[nodiscard]] app::GraphDocument* nestedParent(Workshop& tab, std::size_t level);
     // The simulator.
     SimulatorSettings simulator_;
     // Sound matching.
@@ -1360,14 +1361,14 @@ private:
     mutable double factoryCacheTime_ {};
     AiModels aiModels_;
     std::unique_ptr<SemanticSearch> semantic_;
-    std::vector<app::NodeGraphComponent::DeviceCatalogueEntry> deviceCatalogue_;
+    std::vector<app::GraphDocument::DeviceCatalogueEntry> deviceCatalogue_;
     int deviceCatalogueLanguage_ { -1 };
     bool samplesStarted_ {};
     bool samplesAutomatic_ {};
     // Work done off the message thread (the banks' catalogue read), and a
     // token its answer checks the studio is still there with.
     std::shared_ptr<int> alive_ { std::make_shared<int>(0) };
-    juce::ThreadPool background_ { 1 };
+    cydaw::base::ThreadPool background_ { 1 };
     std::unique_ptr<locations::Move> locationMove_;
     std::vector<std::pair<Location, cydaw::base::File>> pendingLocations_;
     bool pendingTake_ { true };
@@ -1401,12 +1402,12 @@ private:
     double simulatorLevelTime_ {};
     void publishSimulation(bool force);
     void publishSimulatorPattern();
-    [[nodiscard]] cydaw::base::Value deviceDocument(app::NodeGraphComponent& graph, bool instrument) const;
+    [[nodiscard]] cydaw::base::Value deviceDocument(app::GraphDocument& graph, bool instrument) const;
     // A plugin identity of its own for a device that has none yet: named
     // after it, with a plugin code no other device is likely to share.
-    static void giveOwnIdentity(app::NodeGraphComponent& graph, bool always);
-    static cydaw::base::Result setDeviceChannels(app::NodeGraphComponent& graph, int input, int output);
-    [[nodiscard]] static std::pair<std::uint64_t, std::uint64_t> audioEnds(const app::NodeGraphComponent& graph);
+    static void giveOwnIdentity(app::GraphDocument& graph, bool always);
+    static cydaw::base::Result setDeviceChannels(app::GraphDocument& graph, int input, int output);
+    [[nodiscard]] static std::pair<std::uint64_t, std::uint64_t> audioEnds(const app::GraphDocument& graph);
     [[nodiscard]] ParameterLanes* lanesOf(const TrackRef& track);
     [[nodiscard]] const ParameterLanes* lanesOf(const TrackRef& track) const;
     std::vector<AudioTrackState> audioTracks_;

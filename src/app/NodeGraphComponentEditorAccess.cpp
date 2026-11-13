@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 // The graph as plain data for CyDAW 2, whose editor is drawn with Dear ImGui
 // and never shows this component. Every edit below goes through the same
@@ -489,7 +490,7 @@ std::uint64_t NodeGraphComponent::editorConnectThroughConverter(const std::uint6
     // cannot be made): the card is added without a step of its own.
     std::uint64_t converter {};
     {
-        const juce::ScopedValueSetter<bool> quiet(restoringHistory_, true);
+        const cydaw::base::ScopedValueSetter<bool> quiet(restoringHistory_, true);
         converter = addNodeForRemote(key, clampedPosition(middle));
     }
     if (converter == 0)
@@ -506,7 +507,7 @@ std::uint64_t NodeGraphComponent::editorConnectThroughConverter(const std::uint6
         return converter;
     }
     {
-        const juce::ScopedValueSetter<bool> quiet(restoringHistory_, true);
+        const cydaw::base::ScopedValueSetter<bool> quiet(restoringHistory_, true);
         (void) editorRemoveNodes({ converter });
     }
     return 0;
@@ -1956,7 +1957,7 @@ bool NodeGraphComponent::editorApplyState(const cydaw::base::Value& state)
     flushParameterNotification();
     {
         // Restored as an undo would, the history kept: this is one step of it.
-        const juce::ScopedValueSetter<bool> restoring(restoringHistory_, true);
+        const cydaw::base::ScopedValueSetter<bool> restoring(restoringHistory_, true);
         restore(state);
     }
     for (auto& item : nodes_)

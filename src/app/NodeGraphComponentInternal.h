@@ -4,7 +4,7 @@
 #include <cydaw/engine/EffectCatalogue.h>
 #include <cydaw/engine/SynthFamily.h>
 
-#include <juce_core/juce_core.h>
+#include <cydaw/base/Utilities.h>
 
 namespace cydaw::app::detail {
 

@@ -134,7 +134,7 @@ std::string valueFormat(const double minimum, const double maximum)
 
 // A module's sockets are named after their ids ("input-37001"): the kind of
 // signal says more. A value input takes the name of the knob it drives.
-cydaw::base::Text portLabel(const app::NodeGraphComponent::EditorPort& port, const app::NodeGraphComponent::EditorNode* node = nullptr)
+cydaw::base::Text portLabel(const app::GraphDocument::EditorPort& port, const app::GraphDocument::EditorNode* node = nullptr)
 {
     const auto name = port.name.trim();
     const auto lower = name.toLowerCase();
@@ -1254,7 +1254,7 @@ void GraphEditor::drawWires(ImDrawList* list, const std::vector<EditorConnection
         host_.wake(2);
 }
 
-void GraphEditor::drawNode(app::NodeGraphComponent& graph, const NodeLayout& layout, ImDrawList* list)
+void GraphEditor::drawNode(app::GraphDocument& graph, const NodeLayout& layout, ImDrawList* list)
 {
     // Inside a module: English, whatever the language.
     const ui::ModuleText english;
@@ -1310,7 +1310,7 @@ void GraphEditor::drawNode(app::NodeGraphComponent& graph, const NodeLayout& lay
     }
     if (ImGui::IsItemActive() && movingNodes_ && ImGui::IsMouseDragging(ImGuiMouseButton_Left, 2.0f)) {
         const ImVec2 delta((io.MousePos.x - moveStartMouse_.x) / s, (io.MousePos.y - moveStartMouse_.y) / s);
-        std::vector<std::pair<std::uint64_t, juce::Point<float>>> positions;
+        std::vector<std::pair<std::uint64_t, cydaw::base::Point<float>>> positions;
         for (const auto& [id, origin] : moveOrigins_) {
             auto world = ImVec2(origin.x + delta.x, origin.y + delta.y);
             if (!io.KeyAlt) {
@@ -1517,7 +1517,7 @@ void GraphEditor::drawNode(app::NodeGraphComponent& graph, const NodeLayout& lay
     ImGui::PopID();
 }
 
-void GraphEditor::drawComments(app::NodeGraphComponent& graph, ImDrawList* list)
+void GraphEditor::drawComments(app::GraphDocument& graph, ImDrawList* list)
 {
     const auto& p = theme::palette();
     const auto s = scale();
@@ -1631,7 +1631,7 @@ float GraphEditor::frameAll(const std::vector<EditorNode>& nodes, const bool sel
 namespace {
 
 // An audio input and an audio output, both free: a card that can go in a cable.
-bool freeAudioEnds(const app::NodeGraphComponent::EditorNode& node, const std::vector<app::NodeGraphComponent::EditorConnection>& connections,
+bool freeAudioEnds(const app::GraphDocument::EditorNode& node, const std::vector<app::GraphDocument::EditorConnection>& connections,
                    std::uint64_t& input, std::uint64_t& output)
 {
     input = output = 0;
@@ -1688,7 +1688,7 @@ void GraphEditor::findSpliceTarget(const std::vector<EditorConnection>& connecti
     }
 }
 
-void GraphEditor::splice(app::NodeGraphComponent& graph, const std::vector<NodeLayout>& layouts)
+void GraphEditor::splice(app::GraphDocument& graph, const std::vector<NodeLayout>& layouts)
 {
     if (!spliceTarget_ || !droppedNode_)
         return;
@@ -2010,7 +2010,7 @@ void GraphEditor::handleKeys(GraphSlot& slot)
 }
 
 
-void GraphEditor::promoteValue(app::NodeGraphComponent& graph, std::uint64_t node, std::uint64_t port,
+void GraphEditor::promoteValue(app::GraphDocument& graph, std::uint64_t node, std::uint64_t port,
     const cydaw::base::Text& binding, bool input)
 {
     std::uint64_t created{};
@@ -2019,8 +2019,8 @@ void GraphEditor::promoteValue(app::NodeGraphComponent& graph, std::uint64_t nod
     else {selection_={created};state_.focused=panel();}
 }
 
-void GraphEditor::valueActions(app::NodeGraphComponent& graph, const EditorNode& node,
-    const app::NodeGraphComponent::EditorParameter& parameter)
+void GraphEditor::valueActions(app::GraphDocument& graph, const EditorNode& node,
+    const app::GraphDocument::EditorParameter& parameter)
 {
     if(ImGui::BeginPopupContextItem("##valueActions")) {
         ImGui::TextDisabled("%s",parameter.label.toRawUTF8());ImGui::Separator();

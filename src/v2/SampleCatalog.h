@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/base/Text.h>
 #pragma once
 
@@ -158,7 +159,7 @@ private:
     double changedAt_ {};
     double builtAt_ {};
     int generation_ {};
-    juce::ThreadPool pool_ { 1 };
+    cydaw::base::ThreadPool pool_ { 1 };
 
     JUCE_DECLARE_WEAK_REFERENCEABLE(SampleCatalog)
 };

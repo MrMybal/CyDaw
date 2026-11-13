@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #pragma once
 
 #include <cydaw/engine/PolySynthGraph.h>
@@ -143,7 +144,7 @@ public:
         }
         // A closed hat cuts the open one: the voices its group chokes go first.
         if (const auto group = info.chokeGroup; group != 0) {
-            const juce::ScopedLock guard(lock);
+            const cydaw::base::ScopedLock guard(lock);
             for (auto* voice : voices)
                 if (voice->isVoiceActive())
                     if (auto* planVoice = dynamic_cast<PlanVoice*>(voice); planVoice != nullptr && planVoice->chokedBy() == group) {
@@ -157,7 +158,7 @@ public:
             juce::Synthesiser::noteOn(channel, note, velocity);
             return;
         }
-        const juce::ScopedLock guard(lock);
+        const cydaw::base::ScopedLock guard(lock);
         auto* sound = sounds.isEmpty() ? nullptr : sounds.getUnchecked(0).get();
         if (sound == nullptr)
             return;
@@ -218,7 +219,7 @@ public:
             return;
         }
         if (!v.prism) {
-            const juce::ScopedLock guard(lock);
+            const cydaw::base::ScopedLock guard(lock);
             forget(note);
             // The voice still holding it (one that gave way is done with it).
             auto playing = false;
@@ -239,7 +240,7 @@ public:
             juce::Synthesiser::noteOff(channel, note, velocity, allowTailOff);
             return;
         }
-        const juce::ScopedLock guard(lock);
+        const cydaw::base::ScopedLock guard(lock);
         forget(note);
         juce::SynthesiserVoice* voice = nullptr;
         for (auto* candidate : voices)

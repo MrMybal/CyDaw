@@ -49,6 +49,10 @@ endif()
 function(cydaw_copy_audio_notices target destination)
     set(cydaw_notice_root "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/..")
     add_custom_command(TARGET ${target} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${destination}/stb"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${cydaw_notice_root}/third_party/ysfx/thirdparty/stb/LICENSE" "${destination}/stb/LICENSE"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${destination}/miniz"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${cydaw_notice_root}/third_party/miniz/LICENSE" "${destination}/miniz/LICENSE"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${destination}/pugixml"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different "${cydaw_notice_root}/third_party/pugixml/LICENSE.md" "${destination}/pugixml/LICENSE.md"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${destination}/nlohmann-json"
@@ -96,3 +100,7 @@ endforeach()
 install(FILES "${PROJECT_SOURCE_DIR}/third_party/nlohmann/LICENSE.MIT" DESTINATION Licenses/nlohmann-json COMPONENT CyDAWRuntime)
 
 install(FILES "${PROJECT_SOURCE_DIR}/third_party/pugixml/LICENSE.md" DESTINATION Licenses/pugixml COMPONENT CyDAWRuntime)
+
+install(FILES "${PROJECT_SOURCE_DIR}/third_party/miniz/LICENSE" DESTINATION Licenses/miniz COMPONENT CyDAWRuntime)
+
+install(FILES "${PROJECT_SOURCE_DIR}/third_party/ysfx/thirdparty/stb/LICENSE" DESTINATION Licenses/stb COMPONENT CyDAWRuntime)

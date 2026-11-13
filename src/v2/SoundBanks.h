@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #pragma once
 
@@ -182,7 +183,7 @@ private:
     bool fetch(const Wanted& wanted, int generation, cydaw::base::Text& error);
     bool generate(const Bank& bank, const Wanted& wanted, int generation, cydaw::base::Text& error);
     [[nodiscard]] cydaw::base::Text urlOf(const Bank& bank, const BankFile& file, bool lfs) const;
-    void work(juce::Thread& thread);
+    void work(cydaw::base::Thread& thread);
     void finishFrontJob();
     void writeBankRecord(const Bank& bank) const;
     [[nodiscard]] std::vector<cydaw::base::Text> bankPathsOf(const cydaw::base::Value& mapJson) const;
@@ -230,10 +231,10 @@ private:
     std::vector<Finished> finished_;
     int inFlight_ {};
     std::atomic<int> generation_ {};
-    juce::WaitableEvent wake_;
+    cydaw::base::WaitableEvent wake_;
     std::vector<std::unique_ptr<Worker>> workers_;
     // Last: gone (its counts finished) before what they write to.
-    juce::ThreadPool counter_ { 1 };
+    cydaw::base::ThreadPool counter_ { 1 };
 };
 
 } // namespace cydaw::v2

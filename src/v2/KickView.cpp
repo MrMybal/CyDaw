@@ -80,7 +80,7 @@ float KickView::paneWidth()
     return dp(360.0f);
 }
 
-bool KickView::bind(const TrackRef& track, app::NodeGraphComponent& graph, const std::uint64_t nodeId)
+bool KickView::bind(const TrackRef& track, app::GraphDocument& graph, const std::uint64_t nodeId)
 {
     const auto values = graph.editorKickValues(nodeId);
     if (!values)
@@ -529,7 +529,7 @@ void KickView::drawGlobal()
 
 // ---- The card's pane, the window --------------------------------------------------------------
 
-void KickView::drawPane(const TrackRef& track, app::NodeGraphComponent& graph, const std::uint64_t nodeId, const ImVec2 origin,
+void KickView::drawPane(const TrackRef& track, app::GraphDocument& graph, const std::uint64_t nodeId, const ImVec2 origin,
                         const ImVec2 size, const ImU32 colour)
 {
     // Inside a module: English, whatever the language.

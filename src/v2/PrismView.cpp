@@ -103,7 +103,7 @@ float PrismView::paneWidth()
     return dp(330.0f);
 }
 
-bool PrismView::bind(const TrackRef& track, app::NodeGraphComponent& graph, const std::uint64_t nodeId)
+bool PrismView::bind(const TrackRef& track, app::GraphDocument& graph, const std::uint64_t nodeId)
 {
     const auto values = graph.editorPrismValues(nodeId);
     if (!values)
@@ -1249,7 +1249,7 @@ void PrismView::drawGlobalTab()
 
 // ---- The card's pane, the window -------------------------------------------------------------
 
-void PrismView::drawPane(const TrackRef& track, app::NodeGraphComponent& graph, const std::uint64_t nodeId, const ImVec2 origin,
+void PrismView::drawPane(const TrackRef& track, app::GraphDocument& graph, const std::uint64_t nodeId, const ImVec2 origin,
                          const ImVec2 size, const ImU32 colour)
 {
     // Inside a module: English, whatever the language.

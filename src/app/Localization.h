@@ -2,23 +2,18 @@
 #include <cydaw/base/Text.h>
 #pragma once
 
-#include <juce_core/juce_core.h>
-#include <juce_data_structures/juce_data_structures.h>
-#include <juce_events/juce_events.h>
+#include <shared_mutex>
 
 #include <unordered_map>
 #include <vector>
 
 namespace cydaw::app {
 
-// One for the program, made on first use and deleted when JUCE shuts down
-// (not when the module is unloaded: a plug-in's would then be destroyed
-// after JUCE, under the loader's lock, and its host would hang).
-class Localization final : public juce::ChangeBroadcaster, private juce::DeletedAtShutdown {
+// Shared language data has no GUI lifecycle dependency.
+class Localization final {
 public:
     static Localization& instance();
-    ~Localization() override;
-    JUCE_DECLARE_SINGLETON(Localization, false)
+    ~Localization() = default;
 
     [[nodiscard]] cydaw::base::Text text(cydaw::base::Text key) const;
     // The same in English, whatever the language (what a module shows).
@@ -47,7 +42,7 @@ private:
     Mappings english_;
     Mappings current_;
     cydaw::base::ApplicationProperties properties_;
-    mutable juce::ReadWriteLock mappingsLock_;
+    mutable std::shared_mutex mappingsLock_;
 };
 
 [[nodiscard]] cydaw::base::Text tr(cydaw::base::Text key);

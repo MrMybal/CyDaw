@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
@@ -1145,13 +1146,11 @@ void GainPanAudioSource::getNextAudioBlock(const juce::AudioSourceChannelInfo& b
 
 InputRecorder::InputRecorder()
 {
-    writerThread_.startThread(juce::Thread::Priority::normal);
 }
 
 InputRecorder::~InputRecorder()
 {
     stop();
-    writerThread_.stopThread(3'000);
 }
 
 cydaw::base::Result InputRecorder::start(const cydaw::base::File& destination,
@@ -1186,7 +1185,7 @@ cydaw::base::Result InputRecorder::start(const cydaw::base::File& destination,
 
     droppedBlocks_.store(0, std::memory_order_relaxed);
     threadedWriter_ = std::make_unique<cydaw::audio::AudioFormatWriter::ThreadedWriter>(
-        writer.release(), writerThread_, static_cast<int>(sampleRate * 4.0));
+        writer.release(), static_cast<int>(sampleRate * 4.0));
     const auto startDelaySamples = static_cast<juce::int64>(std::llround(
         std::max(0.0, startDelaySeconds) * sampleRate));
     samplesUntilStart_.store(startDelaySamples, std::memory_order_release);
@@ -1502,7 +1501,7 @@ void TrackMixer::addInputSource(juce::AudioSource* source, const bool deleteWhen
     double rate {};
     bool prepared {};
     {
-        const juce::ScopedLock lock(lock_);
+        const cydaw::base::ScopedLock lock(lock_);
         block = blockSize_;
         rate = sampleRate_;
         prepared = prepared_;
@@ -1513,7 +1512,7 @@ void TrackMixer::addInputSource(juce::AudioSource* source, const bool deleteWhen
     std::vector<juce::AudioBuffer<float>> routed;
     for (std::size_t bus = 0; bus < buses; ++bus)
         routed.emplace_back(maximumChannels, std::max(1, block));
-    const juce::ScopedLock lock(lock_);
+    const cydaw::base::ScopedLock lock(lock_);
     inputs_.push_back(source);
     rendered_.push_back(std::move(rendered));
     for (auto& buffer : routed) {
@@ -1527,7 +1526,7 @@ void TrackMixer::addInputSource(juce::AudioSource* source, const bool deleteWhen
 void TrackMixer::removeInputSource(juce::AudioSource* source)
 {
     {
-        const juce::ScopedLock lock(lock_);
+        const cydaw::base::ScopedLock lock(lock_);
         const auto index = indexOf(source);
         if (index < 0)
             return;
@@ -1574,7 +1573,7 @@ void TrackMixer::prepareToPlay(const int samplesPerBlockExpected, const double s
 {
     std::vector<juce::AudioSource*> inputs;
     {
-        const juce::ScopedLock lock(lock_);
+        const cydaw::base::ScopedLock lock(lock_);
         blockSize_ = std::max(1, samplesPerBlockExpected);
         sampleRate_ = sampleRate;
         prepared_ = true;
@@ -1597,7 +1596,7 @@ void TrackMixer::releaseResources()
 {
     std::vector<juce::AudioSource*> inputs;
     {
-        const juce::ScopedLock lock(lock_);
+        const cydaw::base::ScopedLock lock(lock_);
         prepared_ = false;
         inputs = inputs_;
     }
@@ -1618,7 +1617,7 @@ const juce::AudioBuffer<float>* TrackMixer::directOutput(const std::uint64_t bus
 
 void TrackMixer::getNextAudioBlock(const juce::AudioSourceChannelInfo& output)
 {
-    const juce::ScopedLock lock(lock_);
+    const cydaw::base::ScopedLock lock(lock_);
     output.clearActiveBufferRegion();
     directSamples_ = 0;
     if (output.buffer == nullptr || output.numSamples <= 0)
@@ -1752,13 +1751,11 @@ MasterOutputAudioSource::MasterOutputAudioSource(juce::AudioSource& input)
       analysisFrames_(std::make_unique<cydaw::realtime::SpscRing<
           cydaw::engine::AudioAnalysisFrame, 8>>())
 {
-    writerThread_.startThread(juce::Thread::Priority::normal);
 }
 
 MasterOutputAudioSource::~MasterOutputAudioSource()
 {
     stopCapture();
-    writerThread_.stopThread(3'000);
 }
 
 cydaw::base::Result MasterOutputAudioSource::startCapture(
@@ -1800,7 +1797,7 @@ cydaw::base::Result MasterOutputAudioSource::startCapture(
     captureComplete_.store(false, std::memory_order_release);
     droppedBlocks_.store(0, std::memory_order_relaxed);
     threadedWriter_ = std::make_unique<cydaw::audio::AudioFormatWriter::ThreadedWriter>(
-        writer.release(), writerThread_, static_cast<int>(sampleRate * 4.0));
+        writer.release(), static_cast<int>(sampleRate * 4.0));
     activeWriter_.store(threadedWriter_.get(), std::memory_order_release);
     return cydaw::base::Result::ok();
 }
@@ -4270,20 +4267,20 @@ struct AudioTrackController::MidiOutQueue {
 
 // The tracks' MIDI outputs: each device opened once, a thread sending what
 // the tracks queued (a millisecond apart at most).
-class AudioTrackController::MidiOutputHub final : juce::Thread {
+class AudioTrackController::MidiOutputHub final : cydaw::base::Thread {
 public:
-    explicit MidiOutputHub(std::atomic<std::uint32_t>& sent) : juce::Thread("CyDAW MIDI out"), sent_(sent) { startThread(); }
+    explicit MidiOutputHub(std::atomic<std::uint32_t>& sent) : cydaw::base::Thread("CyDAW MIDI out"), sent_(sent) { startThread(); }
     ~MidiOutputHub() override
     {
         stopThread(2'000);
-        const juce::ScopedLock hold(lock_);
+        const cydaw::base::ScopedLock hold(lock_);
         for (auto& [queue, identifier] : queues_)
             queue->device.store(nullptr, std::memory_order_release);
     }
     // Every track's queue and the device it sends to (empty: none).
     void setQueues(std::vector<std::pair<std::shared_ptr<MidiOutQueue>, cydaw::base::Text>> queues)
     {
-        const juce::ScopedLock hold(lock_);
+        const cydaw::base::ScopedLock hold(lock_);
         for (auto& [queue, identifier] : queues) {
             juce::MidiOutput* device {};
             if (identifier.isNotEmpty()) {
@@ -4308,7 +4305,7 @@ private:
     {
         while (!threadShouldExit()) {
             {
-                const juce::ScopedLock hold(lock_);
+                const cydaw::base::ScopedLock hold(lock_);
                 for (auto& [queue, identifier] : queues_) {
                     MidiOutQueue::Event event;
                     while (queue->ring.tryPop(event)) {
@@ -4325,7 +4322,7 @@ private:
     }
 
     std::atomic<std::uint32_t>& sent_;
-    juce::CriticalSection lock_;
+    cydaw::base::CriticalSection lock_;
     std::vector<std::pair<std::shared_ptr<MidiOutQueue>, cydaw::base::Text>> queues_;
     std::map<cydaw::base::Text, std::unique_ptr<juce::MidiOutput>> devices_;
 };
@@ -5855,7 +5852,7 @@ void AudioTrackController::refreshMidiInputs() noexcept
                         route->devices.push_back(input);
             }
     std::shared_ptr<const LiveMidiRoute> shared = std::move(route);
-    const juce::SpinLock::ScopedLockType hold(midiGateLock_);
+    const cydaw::base::SpinLock::ScopedLockType hold(midiGateLock_);
     liveRoute_.swap(shared);
 }
 
@@ -5975,7 +5972,7 @@ void AudioTrackController::computerKeyboardNote(const int note, const float velo
     midiInCount_.fetch_add(1, std::memory_order_relaxed);
     std::shared_ptr<const LiveMidiRoute> route;
     {
-        const juce::SpinLock::ScopedLockType hold(midiGateLock_);
+        const cydaw::base::SpinLock::ScopedLockType hold(midiGateLock_);
         route = liveRoute_;
     }
     // A key let go always reaches it (it may have been pressed before the
@@ -6001,7 +5998,7 @@ std::array<float, 4> AudioTrackController::midiTrackInputLevels(const std::uint6
 void AudioTrackController::setMidiInputGate(MidiInputGate gate)
 {
     auto shared = gate ? std::make_shared<const MidiInputGate>(std::move(gate)) : nullptr;
-    const juce::SpinLock::ScopedLockType hold(midiGateLock_);
+    const cydaw::base::SpinLock::ScopedLockType hold(midiGateLock_);
     midiGate_.swap(shared);
 }
 
@@ -6009,7 +6006,7 @@ void AudioTrackController::GatedMidiInput::handleIncomingMidiMessage(juce::MidiI
 {
     std::shared_ptr<const MidiInputGate> gate;
     {
-        const juce::SpinLock::ScopedLockType hold(owner_.midiGateLock_);
+        const cydaw::base::SpinLock::ScopedLockType hold(owner_.midiGateLock_);
         gate = owner_.midiGate_;
     }
     const auto identifier = source != nullptr ? cydaw::base::Text(source->getIdentifier()) : cydaw::base::Text();
@@ -6020,7 +6017,7 @@ void AudioTrackController::GatedMidiInput::handleIncomingMidiMessage(juce::MidiI
     // The live track hears it when it listens to that keyboard.
     std::shared_ptr<const LiveMidiRoute> route;
     {
-        const juce::SpinLock::ScopedLockType hold(owner_.midiGateLock_);
+        const cydaw::base::SpinLock::ScopedLockType hold(owner_.midiGateLock_);
         route = owner_.liveRoute_;
     }
     if (route != nullptr && !route->all && std::find(route->devices.begin(), route->devices.end(), identifier) == route->devices.end())
@@ -6505,7 +6502,7 @@ bool LoopAuditionSource::clock(std::int64_t& frames, const std::function<void()>
     for (int tries = 0; tries < 200; ++tries) {
         const auto before = sequence_.load(std::memory_order_acquire);
         if ((before & 1u) != 0u) {
-            juce::Thread::sleep(1);
+            cydaw::base::Thread::sleep(1);
             continue;
         }
         frames = frames_.load(std::memory_order_acquire);
@@ -7481,7 +7478,7 @@ cydaw::base::Result AudioTrackController::selfTestDoubleDeckLauncher(
             0.05, true, 16.0 / sampleRate);
         for (int attempt = 0;
              attempt < 500 && !source.pendingDeckHasReadAhead(); ++attempt)
-            juce::Thread::sleep(2);
+            cydaw::base::Thread::sleep(2);
         if (!source.pendingDeckHasReadAhead()) {
             result = cydaw::base::Result::fail("Standby deck did not prefetch");
         } else {
@@ -7506,7 +7503,7 @@ cydaw::base::Result AudioTrackController::selfTestDoubleDeckLauncher(
                     0.05, true, 0.0);
                 for (int attempt = 0;
                      attempt < 500 && !source.pendingDeckHasReadAhead(); ++attempt)
-                    juce::Thread::sleep(2);
+                    cydaw::base::Thread::sleep(2);
                 rendered.clear();
                 source.getNextAudioBlock({ &rendered, 0, blockSize });
                 expected.clear();
@@ -7530,7 +7527,7 @@ cydaw::base::Result AudioTrackController::selfTestDoubleDeckLauncher(
             source.scheduleLauncherClip(7, 0.0, 0.05, true, 0.0);
             for (int attempt = 0;
                  attempt < 500 && !source.pendingDeckHasReadAhead(); ++attempt)
-                juce::Thread::sleep(2);
+                cydaw::base::Thread::sleep(2);
             juce::AudioBuffer<float> rendered(2, blockSize);
             rendered.clear();
             source.getNextAudioBlock({ &rendered, 0, blockSize });
@@ -7602,13 +7599,13 @@ cydaw::base::Result AudioTrackController::selfTestLauncherTimeline(
              result.wasOk() && attempt < 500
              && !source.pendingDeckHasReadAhead(); ++attempt) {
             source.scheduleLauncherClip(6, 0.0, 0.05, false, 0.0);
-            juce::Thread::sleep(2);
+            cydaw::base::Thread::sleep(2);
         }
         if (result.wasOk()) {
             source.scheduleLauncherClip(6, 0.0, 0.05, false, 0.0);
             for (int attempt = 0;
                  attempt < 500 && !source.pendingDeckHasReadAhead(); ++attempt)
-                juce::Thread::sleep(2);
+                cydaw::base::Thread::sleep(2);
             const auto eventSamples = static_cast<int>(std::llround(
                 event.durationSeconds * source.sampleRate()));
             juce::AudioBuffer<float> rendered(2, eventSamples);
@@ -7699,7 +7696,7 @@ cydaw::base::Result AudioTrackController::selfTestMulticlipArrangement(
         for (int attempt = 0;
              result.wasOk() && attempt < 500
              && !source.arrangementHasReadAhead(); ++attempt)
-            juce::Thread::sleep(2);
+            cydaw::base::Thread::sleep(2);
         if (result.wasOk() && !source.arrangementHasReadAhead())
             result = cydaw::base::Result::fail(
                 "Arrangement regions did not prefetch");
@@ -7769,7 +7766,7 @@ cydaw::base::Result AudioTrackController::selfTestMulticlipArrangement(
             for (int attempt = 0;
                  result.wasOk() && attempt < 500
                  && !source.arrangementHasReadAhead(); ++attempt)
-                juce::Thread::sleep(2);
+                cydaw::base::Thread::sleep(2);
             const auto durationSamples = static_cast<int>(std::llround(
                 regionDuration * sampleRate));
             const auto fadeSamples = static_cast<int>(std::llround(
@@ -7824,7 +7821,7 @@ cydaw::base::Result AudioTrackController::selfTestMulticlipArrangement(
             for (int attempt = 0;
                  result.wasOk() && attempt < 500
                  && !source.arrangementHasReadAhead(); ++attempt)
-                juce::Thread::sleep(2);
+                cydaw::base::Thread::sleep(2);
             constexpr int loopRenderSamples = 6;
             juce::AudioBuffer<float> looped(2, loopRenderSamples);
             looped.clear();
@@ -7885,7 +7882,7 @@ cydaw::base::Result AudioTrackController::selfTestMulticlipArrangement(
                 for (int attempt = 0;
                      result.wasOk() && attempt < 500
                      && !source.arrangementHasReadAhead(); ++attempt)
-                    juce::Thread::sleep(2);
+                    cydaw::base::Thread::sleep(2);
                 juce::AudioBuffer<float> converted(2, blockSize);
                 converted.clear();
                 if (result.wasOk()) {
@@ -8839,7 +8836,7 @@ cydaw::base::Result AudioTrackController::selfTestAudioTakeRendering(
         for (int attempt = 0;
              attempt < 1'000
              && !track->clipSource->arrangementHasReadAhead(); ++attempt)
-            juce::Thread::sleep(2);
+            cydaw::base::Thread::sleep(2);
         return track->clipSource->arrangementHasReadAhead();
     };
     const auto renderCorrelation = [track, &waitForReadAhead](
@@ -16536,7 +16533,7 @@ cydaw::base::Result AudioTrackController::startMasterExport(
         if (track->file == destination)
             return cydaw::base::Result::fail(tr("error.masterExportSource"));
 
-    const juce::ScopedLock audioLock(deviceManager_.getAudioCallbackLock());
+    const cydaw::base::ScopedLock audioLock(deviceManager_.getAudioCallbackLock());
     stop();
     setPosition(0.0);
     masterExportPreviousLooping_ = looping_;
@@ -16562,7 +16559,7 @@ cydaw::base::Result AudioTrackController::finishMasterExport()
     const auto destination = masterExportDestination_;
     const auto dropped = masterOutput_.droppedBlockCount();
     {
-        const juce::ScopedLock audioLock(deviceManager_.getAudioCallbackLock());
+        const cydaw::base::ScopedLock audioLock(deviceManager_.getAudioCallbackLock());
         masterOutput_.stopCapture();
         stop();
         setPosition(0.0);
@@ -16582,7 +16579,7 @@ void AudioTrackController::cancelMasterExport()
 {
     const auto destination = masterExportDestination_;
     {
-        const juce::ScopedLock audioLock(deviceManager_.getAudioCallbackLock());
+        const cydaw::base::ScopedLock audioLock(deviceManager_.getAudioCallbackLock());
         masterOutput_.stopCapture();
         stop();
         setPosition(0.0);

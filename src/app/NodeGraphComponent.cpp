@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/Properties.h>
 #include <cydaw/base/File.h>
@@ -18143,7 +18144,7 @@ std::uint64_t NodeGraphComponent::editorAddModulator(const std::uint64_t owner, 
     // step (undone, no modulator without a card is left).
     std::uint64_t id {};
     {
-        const juce::ScopedValueSetter<bool> quiet(restoringHistory_, true);
+        const cydaw::base::ScopedValueSetter<bool> quiet(restoringHistory_, true);
         id = editorAddNode(typeKey, position);
     }
     auto* made = findNode(id);
@@ -21050,7 +21051,7 @@ void NodeGraphComponent::notifyLayoutChanged(const char* origin)
     // whole call takes, which is either a profile from another call or a
     // second pass hiding inside the first.
     ++layoutChangeCalls_;
-    const juce::ScopedValueSetter<int> depth(layoutChangeDepth_,
+    const cydaw::base::ScopedValueSetter<int> depth(layoutChangeDepth_,
                                              layoutChangeDepth_ + 1);
     auto mark = cydaw::base::Time::getHighResolutionTicks();
     const auto since = [&mark] {
@@ -21169,7 +21170,7 @@ void NodeGraphComponent::restoreEditHistoryState(const cydaw::base::Value& state
 {
     if (state.isVoid())
         return;
-    const juce::ScopedValueSetter<bool> restoring(restoringHistory_, true);
+    const cydaw::base::ScopedValueSetter<bool> restoring(restoringHistory_, true);
     // Handed over as it stands. restore() reads the description through const
     // pointers — the compiler refuses an attempt to write to it — and it keeps
     // the objects it is given so that unchanged classes are recognised next

@@ -1,3 +1,4 @@
+#include <cydaw/base/Image.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #pragma once
@@ -53,9 +54,9 @@ public:
     void renderNow();
     // An image the interface can draw (ImGui::Image), made once per key and
     // kept; 0 until the graphics device exists.
-    [[nodiscard]] unsigned long long texture(const cydaw::base::Text& key, const juce::Image& image);
+    [[nodiscard]] unsigned long long texture(const cydaw::base::Text& key, const cydaw::base::Image& image);
 
-    [[nodiscard]] unsigned long long updateTexture(const cydaw::base::Text& key,const juce::Image& image);
+    [[nodiscard]] unsigned long long updateTexture(const cydaw::base::Text& key,const cydaw::base::Image& image);
     void releaseTexture(const cydaw::base::Text& key);
 
     void resized() override;

@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/File.h>
 #include <cydaw/integration/CyAudioCoreAudioFormats.h>
@@ -164,7 +165,7 @@ struct GraphTarget {
     // The device the workshop edits ("track": "workshop"), not a track's.
     bool workshop {};
 
-    [[nodiscard]] app::NodeGraphComponent& graph() const noexcept { return slot->graph(); }
+    [[nodiscard]] app::GraphDocument& graph() const noexcept { return slot->graph(); }
 };
 
 class Commands final {
@@ -670,7 +671,7 @@ private:
         // The cards described once, found by id: described again for each
         // card, a graph of a thousand took seconds to answer.
         const auto cards = target.graph().editorNodes();
-        std::unordered_map<std::uint64_t, const app::NodeGraphComponent::EditorNode*> cardById;
+        std::unordered_map<std::uint64_t, const app::GraphDocument::EditorNode*> cardById;
         cardById.reserve(cards.size());
         for (const auto& card : cards)
             cardById.emplace(card.id, &card);
@@ -754,7 +755,7 @@ private:
     }
 
     // The published key of a knob on the last card of a type.
-    [[nodiscard]] static cydaw::base::Text knobKey(const app::NodeGraphComponent& graph, const cydaw::base::Text& typeKey,
+    [[nodiscard]] static cydaw::base::Text knobKey(const app::GraphDocument& graph, const cydaw::base::Text& typeKey,
                                               const cydaw::base::Text& suffix)
     {
         const auto id = graph.lastNodeIdOfType(typeKey);
@@ -763,7 +764,7 @@ private:
 
     // The graph whose catalogue answers list_devices and describe_node_type:
     // the selected track's, else any, else a fresh one.
-    [[nodiscard]] app::NodeGraphComponent& catalogueGraph()
+    [[nodiscard]] app::GraphDocument& catalogueGraph()
     {
         if (const auto selected = ui_.selectedTrack())
             if (auto* slot = studio_.graphFor(*selected))
@@ -774,7 +775,7 @@ private:
         for (auto& entry : studio_.busStates())
             if (entry.second.graph != nullptr)
                 return entry.second.graph->graph();
-        scratchGraph_ = std::make_unique<app::NodeGraphComponent>();
+        scratchGraph_ = std::make_unique<app::GraphDocument>();
         return *scratchGraph_;
     }
 
@@ -1033,7 +1034,7 @@ private:
     RemoteUi& ui_;
     const cydaw::base::Value& request_;
     const cydaw::base::Text command_;
-    std::unique_ptr<app::NodeGraphComponent> scratchGraph_;
+    std::unique_ptr<app::GraphDocument> scratchGraph_;
 };
 
 cydaw::base::Value Commands::run()
@@ -1311,7 +1312,7 @@ cydaw::base::Value Commands::run()
                     moves.push_back({ juce::jlimit(0, 127, static_cast<int>((*fields)[0])), juce::jlimit(0, 127, static_cast<int>((*fields)[1])),
                                       static_cast<int>(juce::jmax(0.0, static_cast<double>((*fields)[2])) * rate) });
         // Faster than real time: a lane waits for frames still on the disk.
-        const juce::ScopedValueSetter<bool> mayWait(engine::samplerMayWait, true);
+        const cydaw::base::ScopedValueSetter<bool> mayWait(engine::samplerMayWait, true);
         for (auto start = 0; start < samples; start += block) {
             const auto count = std::min(block, samples - start);
             juce::MidiBuffer midi;
@@ -1785,7 +1786,7 @@ cydaw::base::Value Commands::run()
         if (node == nodes.end())
             return fail("no card " + cydaw::base::Text(static_cast<juce::int64>(nodeId)) + " on that track");
         const auto filter = text("filter").trim();
-        std::vector<std::pair<std::uint64_t, const app::NodeGraphComponent::EditorParameter*>> order;
+        std::vector<std::pair<std::uint64_t, const app::GraphDocument::EditorParameter*>> order;
         for (const auto& parameter : node->parameters)
             if ((filter.isEmpty() || parameter.label.containsIgnoreCase(filter) || parameter.binding.containsIgnoreCase(filter))
                 && !parameter.binding.endsWith(".ownerLow") && !parameter.binding.endsWith(".ownerHigh"))
@@ -3344,7 +3345,7 @@ cydaw::base::Value Commands::onBanks()
     if (has("wait")) {
         const auto deadline = cydaw::base::Time::getMillisecondCounterHiRes() + number("wait", 30.0) * 1'000.0;
         while (banks.busy() && cydaw::base::Time::getMillisecondCounterHiRes() < deadline)
-            juce::Thread::sleep(20);
+            cydaw::base::Thread::sleep(20);
     }
     auto result = object();
     set(result, "folder", app::banksFolder().getFullPathName());

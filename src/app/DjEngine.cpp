@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/base/TextMap.h>
 #include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/File.h>
@@ -183,7 +184,7 @@ struct DjEngine::Deck {
 
 // ---- The loader --------------------------------------------------------------------------------
 
-class DjEngine::Loader final : public juce::Thread {
+class DjEngine::Loader final : public cydaw::base::Thread {
 public:
     struct Job {
         int deck {};
@@ -191,7 +192,7 @@ public:
         std::uint64_t ticket {};
     };
 
-    explicit Loader(DjEngine& owner) : juce::Thread("CyDAW DJ loader"), owner_(owner) { startThread(juce::Thread::Priority::normal); }
+    explicit Loader(DjEngine& owner) : cydaw::base::Thread("CyDAW DJ loader"), owner_(owner) { startThread(cydaw::base::Thread::Priority::normal); }
 
     ~Loader() override
     {
@@ -259,7 +260,7 @@ private:
     DjEngine& owner_;
     std::mutex lock_;
     std::deque<Job> jobs_;
-    juce::WaitableEvent wake_;
+    cydaw::base::WaitableEvent wake_;
 };
 
 // ---- The engine --------------------------------------------------------------------------------
@@ -282,7 +283,6 @@ DjEngine::~DjEngine()
 {
     stopRecording();
     loader_.reset();
-    writerThread_.stopThread(3'000);
     const std::scoped_lock lock(retiredLock);
     retired.clear();
 }
@@ -1013,7 +1013,7 @@ void DjEngine::getNextAudioBlock(const juce::AudioSourceChannelInfo& output)
             masterPeak = std::max(masterPeak, mix_.getMagnitude(c, 0, n));
         // Recorded as it is mixed.
         if (recording_.load(std::memory_order_acquire)) {
-            const juce::ScopedTryLock lock(writerLock_);
+            const cydaw::base::ScopedTryLock lock(writerLock_);
             if (lock.isLocked() && writer_ != nullptr) {
                 const float* channels[2] { mix_.getReadPointer(0), mix_.getReadPointer(1) };
                 if (writer_->write(channels, n))
@@ -1060,11 +1060,9 @@ cydaw::base::Result DjEngine::startRecording(const cydaw::base::File& file)
     auto writer = wav.createWriterFor(output, options);
     if (writer == nullptr)
         return cydaw::base::Result::fail(cydaw::base::Text::fromUTF8("Format impossible à écrire"));
-    if (!writerThread_.isThreadRunning())
-        writerThread_.startThread();
     {
-        const juce::ScopedLock lock(writerLock_);
-        writer_ = std::make_unique<cydaw::audio::AudioFormatWriter::ThreadedWriter>(writer.release(), writerThread_,
+        const cydaw::base::ScopedLock lock(writerLock_);
+        writer_ = std::make_unique<cydaw::audio::AudioFormatWriter::ThreadedWriter>(writer.release(),
                                                                             static_cast<int>(rate_ * 4.0));
         recordingFile_ = file;
         recordedFrames_.store(0, std::memory_order_relaxed);
@@ -1076,7 +1074,7 @@ cydaw::base::Result DjEngine::startRecording(const cydaw::base::File& file)
 void DjEngine::stopRecording()
 {
     recording_.store(false, std::memory_order_release);
-    const juce::ScopedLock lock(writerLock_);
+    const cydaw::base::ScopedLock lock(writerLock_);
     writer_.reset();
 }
 
@@ -1087,7 +1085,7 @@ double DjEngine::recordedSeconds() const noexcept
 
 cydaw::base::File DjEngine::recordingFile() const
 {
-    const juce::ScopedLock lock(writerLock_);
+    const cydaw::base::ScopedLock lock(writerLock_);
     return recordingFile_;
 }
 

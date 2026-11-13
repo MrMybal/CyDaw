@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #pragma once
 
@@ -11,7 +12,7 @@ namespace cydaw::app {
 // The local control port an agent talks to (see tools/mcp): one JSON
 // object per line in, one per line out, every request answered on the
 // message thread. Listens on the loopback address only.
-class RemoteControlServer final : private juce::Thread {
+class RemoteControlServer final : private cydaw::base::Thread {
 public:
     using Handler = std::function<cydaw::base::Value(const cydaw::base::Value&)>;
 

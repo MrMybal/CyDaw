@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/base/TextMap.h>
 #include <cydaw/base/File.h>
 #include "AiModels.h"
@@ -289,10 +290,10 @@ cydaw::base::Value AiModels::receiptOf(const cydaw::base::Text& id) const
 
 // ---- The download -----------------------------------------------------------------------------
 
-class AiModels::Job final : public juce::Thread {
+class AiModels::Job final : public cydaw::base::Thread {
 public:
     Job(AiModels& owner, AiModel model, cydaw::base::File target, cydaw::base::File from, const bool accepted)
-        : juce::Thread("CyDAW model install"),
+        : cydaw::base::Thread("CyDAW model install"),
           owner_(owner), model_(std::move(model)), target_(std::move(target)), from_(std::move(from)), accepted_(accepted)
     {
     }
@@ -461,7 +462,7 @@ private:
             if (stop_)
                 return false;
             if (attempt > 0)
-                juce::Thread::sleep(1'500 * attempt);
+                cydaw::base::Thread::sleep(1'500 * attempt);
             // Where a stopped download got to: asked for from there.
             auto have = partial.existsAsFile() ? partial.getSize() : 0;
             if (have > file.size) {
@@ -613,7 +614,7 @@ bool AiModels::start(const cydaw::base::Text& id, const bool licenceAccepted, co
         finished_.reset();
     }
     job_ = std::make_unique<Job>(*this, *model, target, from, licenceAccepted);
-    job_->startThread(juce::Thread::Priority::low);
+    job_->startThread(cydaw::base::Thread::Priority::low);
     return true;
 }
 

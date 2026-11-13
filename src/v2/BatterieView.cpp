@@ -74,7 +74,7 @@ float BatterieView::paneWidth()
     return dp(360.0f);
 }
 
-bool BatterieView::bind(const TrackRef& track, app::NodeGraphComponent& graph, const std::uint64_t nodeId)
+bool BatterieView::bind(const TrackRef& track, app::GraphDocument& graph, const std::uint64_t nodeId)
 {
     const auto values = graph.editorDrumValues(nodeId);
     if (!values)
@@ -486,7 +486,7 @@ void BatterieView::drawGroovesTab()
         ImGui::TextDisabled("%s", grooveReport_.toRawUTF8());
 }
 
-void BatterieView::drawPane(const TrackRef& track, app::NodeGraphComponent& graph, const std::uint64_t nodeId, const ImVec2 origin,
+void BatterieView::drawPane(const TrackRef& track, app::GraphDocument& graph, const std::uint64_t nodeId, const ImVec2 origin,
                             const ImVec2 size, const ImU32 colour)
 {
     // Inside a module: English, whatever the language.

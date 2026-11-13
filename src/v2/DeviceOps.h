@@ -1,7 +1,7 @@
 #include <cydaw/base/File.h>
 #pragma once
 
-#include "NodeGraphComponent.h"
+#include "GraphDocument.h"
 
 #include <cstdint>
 #include <functional>
@@ -19,21 +19,21 @@ namespace cydaw::v2::device_ops {
 // A card's settings as a preset holds them (its knobs by key, a sampler's
 // map, a model card's model, a wavetable's table, Prisme's tables, a
 // response); none for a card it does not have.
-[[nodiscard]] cydaw::base::Value presetState(const app::NodeGraphComponent& graph, std::uint64_t nodeId);
+[[nodiscard]] cydaw::base::Value presetState(const app::GraphDocument& graph, std::uint64_t nodeId);
 
 // A preset put back on a card: its assets, then its knobs. A Batterie's kit
 // changes through `setBatterieKit` (none: a preset of another kit fails).
-bool applyPreset(app::NodeGraphComponent& graph, std::uint64_t nodeId, const cydaw::base::Value& state, cydaw::base::Text& error,
+bool applyPreset(app::GraphDocument& graph, std::uint64_t nodeId, const cydaw::base::Value& state, cydaw::base::Text& error,
                  const std::function<bool(int kit, cydaw::base::Text& error)>& setBatterieKit);
 
 // A sound file made the table of a Prisme card's oscillator (0 A, 1 B);
 // back to the factory table its setting names.
-bool importPrismTable(app::NodeGraphComponent& graph, std::uint64_t nodeId, int oscillator, const cydaw::base::File& file,
+bool importPrismTable(app::GraphDocument& graph, std::uint64_t nodeId, int oscillator, const cydaw::base::File& file,
                       cydaw::base::Text& error);
-bool clearPrismTable(app::NodeGraphComponent& graph, std::uint64_t nodeId, int oscillator);
+bool clearPrismTable(app::GraphDocument& graph, std::uint64_t nodeId, int oscillator);
 
 // A cabinet's (two seconds) or a place's (Empreinte, eight seconds)
 // response read from a sound file, its silences trimmed.
-bool loadImpulse(app::NodeGraphComponent& graph, std::uint64_t nodeId, const cydaw::base::File& file, cydaw::base::Text& error);
+bool loadImpulse(app::GraphDocument& graph, std::uint64_t nodeId, const cydaw::base::File& file, cydaw::base::Text& error);
 
 } // namespace cydaw::v2::device_ops

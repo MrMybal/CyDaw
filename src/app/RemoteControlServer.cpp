@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #include "RemoteControlServer.h"
 
@@ -21,7 +22,7 @@ cydaw::base::Text failure(const cydaw::base::Text& message)
 
 RemoteControlServer::RemoteControlServer(const int port, Handler handler,
                                          cydaw::base::Text token)
-    : juce::Thread("CyDAW remote control"),
+    : cydaw::base::Thread("CyDAW remote control"),
       port_(port),
       handler_(std::move(handler)),
       token_(std::move(token))
@@ -113,7 +114,7 @@ cydaw::base::Text RemoteControlServer::respond(const cydaw::base::Text& line) co
     // up rather than hang on a modal dialog.
     struct Pending {
         cydaw::base::Value response;
-        juce::WaitableEvent done;
+        cydaw::base::WaitableEvent done;
         // Given up on (too late, or CyDAW closing): not run when its turn
         // comes, so a client trying again does not have it done twice.
         std::atomic<bool> abandoned { false };

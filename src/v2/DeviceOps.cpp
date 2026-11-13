@@ -24,7 +24,7 @@ cydaw::base::Text parameterKeyOf(const cydaw::base::Text& binding, const std::ui
     return binding.startsWith(prefix) ? binding.substring(prefix.length()) : binding;
 }
 
-cydaw::base::Value presetState(const app::NodeGraphComponent& graph, const std::uint64_t nodeId)
+cydaw::base::Value presetState(const app::GraphDocument& graph, const std::uint64_t nodeId)
 {
     for (const auto& node : graph.editorNodes()) {
         if (node.id != nodeId)
@@ -72,7 +72,7 @@ cydaw::base::Value presetState(const app::NodeGraphComponent& graph, const std::
     return {};
 }
 
-bool applyPreset(app::NodeGraphComponent& graph, const std::uint64_t nodeId, const cydaw::base::Value& state, cydaw::base::Text& error,
+bool applyPreset(app::GraphDocument& graph, const std::uint64_t nodeId, const cydaw::base::Value& state, cydaw::base::Text& error,
                  const std::function<bool(int kit, cydaw::base::Text& error)>& setBatterieKit)
 {
     const auto nodes = graph.editorNodes();
@@ -254,7 +254,7 @@ std::vector<float> cycleAt(const std::vector<float>& mono, const double start, c
 
 } // namespace
 
-bool importPrismTable(app::NodeGraphComponent& graph, const std::uint64_t nodeId, const int oscillator, const cydaw::base::File& file,
+bool importPrismTable(app::GraphDocument& graph, const std::uint64_t nodeId, const int oscillator, const cydaw::base::File& file,
                       cydaw::base::Text& error)
 {
     if (!graph.editorPrismValues(nodeId)) {
@@ -331,7 +331,7 @@ bool importPrismTable(app::NodeGraphComponent& graph, const std::uint64_t nodeId
     return true;
 }
 
-bool clearPrismTable(app::NodeGraphComponent& graph, const std::uint64_t nodeId, const int oscillator)
+bool clearPrismTable(app::GraphDocument& graph, const std::uint64_t nodeId, const int oscillator)
 {
     const auto tables = graph.nodePrismTablesJson(nodeId);
     if (!tables.isObject())
@@ -340,7 +340,7 @@ bool clearPrismTable(app::NodeGraphComponent& graph, const std::uint64_t nodeId,
     return graph.setNodePrismTables(nodeId, app::withPrismTable(tables, oscillator, {}), error);
 }
 
-bool loadImpulse(app::NodeGraphComponent& graph, const std::uint64_t nodeId, const cydaw::base::File& file, cydaw::base::Text& error)
+bool loadImpulse(app::GraphDocument& graph, const std::uint64_t nodeId, const cydaw::base::File& file, cydaw::base::Text& error)
 {
     cydaw::audio::AudioFormatManager formats;
     cydaw::integration::registerCyAudioCoreReaders(formats);

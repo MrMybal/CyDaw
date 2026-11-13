@@ -1,7 +1,7 @@
 #pragma once
 
 #include "DeviceVisuals.h"
-#include "NodeGraphComponent.h"
+#include "GraphDocument.h"
 
 #include <optional>
 #include <vector>
@@ -34,20 +34,20 @@ struct CardContent {
     int hiddenKnobs {};
     int columns { 4 };
 };
-[[nodiscard]] CardContent content(const app::NodeGraphComponent::EditorNode& node);
+[[nodiscard]] CardContent content(const app::GraphDocument::EditorNode& node);
 
-[[nodiscard]] float width(const app::NodeGraphComponent::EditorNode& node);
+[[nodiscard]] float width(const app::GraphDocument::EditorNode& node);
 // With every socket but the unconnected value inputs, which show only when
 // wanted (a selected card, a control cable being drawn).
-[[nodiscard]] float height(const app::NodeGraphComponent::EditorNode& node);
+[[nodiscard]] float height(const app::GraphDocument::EditorNode& node);
 // With this many rows of sockets.
-[[nodiscard]] float height(const app::NodeGraphComponent::EditorNode& node, int socketRows);
+[[nodiscard]] float height(const app::GraphDocument::EditorNode& node, int socketRows);
 // The rows of sockets a card shows by default.
-[[nodiscard]] int defaultSocketRows(const app::NodeGraphComponent::EditorNode& node);
+[[nodiscard]] int defaultSocketRows(const app::GraphDocument::EditorNode& node);
 
 // Columns by signal flow: inputs on the left, outputs on the right, each
 // card one column after what feeds it; a modulator sits just before what it
 // modulates. Records one undo step.
-void arrange(app::NodeGraphComponent& graph);
+void arrange(app::GraphDocument& graph);
 
 } // namespace cydaw::v2::graph_layout

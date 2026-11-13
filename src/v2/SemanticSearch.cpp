@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/File.h>
 #include <cydaw/integration/CyAudioCoreAudioFormats.h>
@@ -180,9 +181,9 @@ bool decodeWindows(const cydaw::base::File& file, const double rate, const doubl
 
 // ---- The model's process -----------------------------------------------------------------------
 
-class SemanticSearch::Worker final : private juce::Thread {
+class SemanticSearch::Worker final : private cydaw::base::Thread {
 public:
-    Worker() : juce::Thread("CyDAW CLAP output") {}
+    Worker() : cydaw::base::Thread("CyDAW CLAP output") {}
 
     ~Worker() override { close(); }
 
@@ -199,7 +200,7 @@ public:
         const auto deadline = cydaw::base::Time::getMillisecondCounterHiRes() + 300'000.0;
         while (port_.load() == 0) {
             if (ended_.load() || !process_.isRunning()) {
-                juce::Thread::sleep(100);
+                cydaw::base::Thread::sleep(100);
                 const std::scoped_lock lock(outputMutex_);
                 error = lastError_.isNotEmpty() ? lastError_ : ui::Ls("le modèle s'est arrêté au chargement", "the model stopped while loading");
                 close();
@@ -211,7 +212,7 @@ public:
                 close();
                 return false;
             }
-            juce::Thread::sleep(40);
+            cydaw::base::Thread::sleep(40);
         }
         if (!socket_.connect("127.0.0.1", port_.load(), 10'000)) {
             error = ui::Ls("pas de connexion au modèle", "no connection to the model");
@@ -318,7 +319,7 @@ private:
             if (process_.readProcessOutput(&byte, 1) <= 0) {
                 if (!process_.isRunning())
                     break;
-                juce::Thread::sleep(20);
+                cydaw::base::Thread::sleep(20);
                 continue;
             }
             if (byte != '\n') {
@@ -543,7 +544,7 @@ private:
 
 // ---- The indexing ------------------------------------------------------------------------------
 
-class SemanticSearch::Indexer final : public juce::Thread {
+class SemanticSearch::Indexer final : public cydaw::base::Thread {
 public:
     struct Item {
         cydaw::base::Text path;
@@ -554,7 +555,7 @@ public:
 
     Indexer(SemanticSearch& owner, AiModel model, std::shared_ptr<Store> store, cydaw::base::File storeFile, cydaw::base::File work,
             std::vector<Item> items, cydaw::base::TextList uncategorised, const bool categories)
-        : juce::Thread("CyDAW semantic index"),
+        : cydaw::base::Thread("CyDAW semantic index"),
           owner_(owner), search_(&owner), model_(std::move(model)), store_(std::move(store)), storeFile_(std::move(storeFile)),
           work_(std::move(work)), items_(std::move(items)), uncategorised_(std::move(uncategorised)), categories_(categories)
     {
@@ -586,7 +587,7 @@ public:
         owner_.changed();
         const auto work = work_;
         (void) work.createDirectory();
-        juce::ThreadPool decoders(std::max(2, cydaw::base::SystemStats::getNumCpus() - 2));
+        cydaw::base::ThreadPool decoders(std::max(2, cydaw::base::SystemStats::getNumCpus() - 2));
         auto sinceSave = 0;
         for (std::size_t start = 0; start < items_.size() && !stop_;) {
             // A batch: so many files, so much audio.
@@ -611,7 +612,7 @@ public:
                                    : 0;
                 });
             while (decoders.getNumJobs() > 0)
-                juce::Thread::sleep(5);
+                cydaw::base::Thread::sleep(5);
             // The windows one after another in a file, for the model.
             const auto audioFile = work.getChildFile("batch.f32");
             const auto vectorFile = work.getChildFile("vectors.f32");
@@ -1093,7 +1094,7 @@ void SemanticSearch::startIndexing()
     }
     indexer_ = std::make_unique<Indexer>(*this, *model, current, storeFileOf(*model), workFolder(),
                                          std::move(items), std::move(uncategorised), autoCategories_);
-    indexer_->startThread(juce::Thread::Priority::low);
+    indexer_->startThread(cydaw::base::Thread::Priority::low);
     changed();
 }
 

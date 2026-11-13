@@ -49,8 +49,8 @@ private:
     void drawLibrary();
     void drawPalette();
     void drawSide();
-    void drawInfo(app::NodeGraphComponent& graph);
-    void drawParameters(app::NodeGraphComponent& graph);
+    void drawInfo(app::GraphDocument& graph);
+    void drawParameters(app::GraphDocument& graph);
     void drawExport(GraphSlot& slot);
     void drawDiscard();
     // The devices open, one tab each; + makes another.
@@ -99,7 +99,7 @@ private:
     double libraryTime_ { -100.0 };
     std::vector<char> search_ = std::vector<char>(96, 0);
     std::vector<char> nodeSearch_ = std::vector<char>(96, 0);
-    std::vector<app::NodeGraphComponent::EditorNodeType> nodeTypes_;
+    std::vector<app::GraphDocument::EditorNodeType> nodeTypes_;
     const void* nodeTypesSlot_ {};
     int nodeTypesLanguage_ { -1 };
     bool showLibrary_ { true };

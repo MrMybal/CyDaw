@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #include "IsolatedPluginHost.h"
 
@@ -157,7 +158,7 @@ cydaw::base::Result IsolatedPluginHost::startWorker(PluginWorkerLaunch launch,
             break;
         if (!process_.isRunning())
             break;
-        juce::Thread::sleep(10);
+        cydaw::base::Thread::sleep(10);
     }
     if (state != cydaw::plugins::SharedPluginState::ready) {
         const auto error = cydaw::base::Text::fromUTF8(shared->statusMessage);
@@ -313,7 +314,7 @@ cydaw::base::Result IsolatedPluginHost::sendCommand(const cydaw::plugins::Shared
         }
         if (!process_.isRunning())
             return cydaw::base::Result::fail("Plugin worker exited during control command");
-        juce::Thread::sleep(1);
+        cydaw::base::Thread::sleep(1);
     }
     return cydaw::base::Result::fail("Plugin control command timed out");
 }

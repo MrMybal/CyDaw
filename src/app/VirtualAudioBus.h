@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/base/Text.h>
 #pragma once
 
@@ -172,7 +173,7 @@ private:
 
     juce::AudioSource& source_;
     DirectOutputSource* directOutputs_ {};
-    mutable juce::CriticalSection busesLock_;
+    mutable cydaw::base::CriticalSection busesLock_;
     std::vector<VirtualAudioBus> buses_;
     std::unordered_map<std::uint64_t, std::shared_ptr<NativeDspRuntime>> graphs_;
     // The audio callback borrows this through a lock-free pointer; a bus that

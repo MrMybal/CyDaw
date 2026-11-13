@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #pragma once
@@ -85,7 +86,7 @@ void set(Location location, const cydaw::base::File& folder);
 // A location's content taken to another folder on a thread of its own:
 // renamed on the same drive, else copied, then the originals deleted once
 // every copy is there (cancelled: the copies go, the originals stay).
-class Move final : private juce::Thread {
+class Move final : private cydaw::base::Thread {
 public:
     Move(Location location, cydaw::base::File from, cydaw::base::File to);
     ~Move() override;

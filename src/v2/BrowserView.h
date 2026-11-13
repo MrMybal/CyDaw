@@ -98,7 +98,7 @@ private:
     std::vector<std::pair<cydaw::base::Text, float>> semanticHits_;
 
     // The devices' list, made again when the track changes, not each frame.
-    std::vector<app::NodeGraphComponent::DeviceCatalogueEntry> devices_;
+    std::vector<app::GraphDocument::DeviceCatalogueEntry> devices_;
     std::optional<TrackRef> devicesFor_;
     double devicesTime_ { -100.0 };
 };

@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #include "CyDawLookAndFeel.h"
 #include <cydaw/engine/EffectCatalogue.h>
@@ -6,6 +7,7 @@
 #include "NativeDspGraphState.h"
 #include "NativeDspRuntime.h"
 #include "NodeGraphComponent.h"
+#include "GraphDocument.h"
 #include "SamplerMapFile.h"
 #include "SoundModelFile.h"
 
@@ -825,7 +827,10 @@ private:
 };
 #endif
 
+// Stop sample workers while code can still run, before the module unloads.
+struct SampleResourceUser {inline static std::atomic<unsigned> count{0};SampleResourceUser(){++count;}~SampleResourceUser(){if(count.fetch_sub(1)==1)cydaw::app::SampleStore::shutdown();}};
 class GraphRuntimeProcessor final : public juce::AudioProcessor {
+    SampleResourceUser sampleResourceUser_;
 public:
     GraphRuntimeProcessor()
         : AudioProcessor(makeBusesProperties()),
@@ -907,7 +912,7 @@ public:
                 }
         // A host rendering offline: a sampler's lane waits for frames still
         // on the disk instead of missing them.
-        const juce::ScopedValueSetter<bool> mayWait(cydaw::engine::samplerMayWait, isNonRealtime());
+        const cydaw::base::ScopedValueSetter<bool> mayWait(cydaw::engine::samplerMayWait, isNonRealtime());
         // The instrument's settings the host moves: applied to a copy of its
         // plan while it plays (renderChanged), never copied every block.
         struct InstrumentChanges {
@@ -1005,19 +1010,19 @@ public:
     // parameters it has, as a host's program change does.
     int getNumPrograms() override
     {
-        const juce::ScopedLock lock(stateLock_);
+        const cydaw::base::ScopedLock lock(stateLock_);
         return std::max(1, static_cast<int>(programs_.size()));
     }
     int getCurrentProgram() override
     {
-        const juce::ScopedLock lock(stateLock_);
+        const cydaw::base::ScopedLock lock(stateLock_);
         return programs_.empty() ? 0 : currentProgram_;
     }
     void setCurrentProgram(const int index) override
     {
         std::vector<float> values;
         {
-            const juce::ScopedLock lock(stateLock_);
+            const cydaw::base::ScopedLock lock(stateLock_);
             if (index < 0 || index >= static_cast<int>(programs_.size()))
                 return;
             currentProgram_ = index;
@@ -1030,14 +1035,14 @@ public:
     }
     const juce::String getProgramName(const int index) override
     {
-        const juce::ScopedLock lock(stateLock_);
+        const cydaw::base::ScopedLock lock(stateLock_);
         return index >= 0 && index < static_cast<int>(programs_.size())
                    ? programs_[static_cast<std::size_t>(index)].name
                    : cydaw::base::Text("Graph");
     }
     void changeProgramName(const int index, const juce::String& name) override
     {
-        const juce::ScopedLock lock(stateLock_);
+        const cydaw::base::ScopedLock lock(stateLock_);
         if (index >= 0 && index < static_cast<int>(programs_.size()) && name.trim().isNotEmpty())
             programs_[static_cast<std::size_t>(index)].name = name.trim();
     }
@@ -1063,7 +1068,7 @@ public:
             false, std::memory_order_acq_rel);
         configureHostParameters(graph, instrumentPlan, publishedParameters,
                                 !preserveHostValues);
-        const juce::ScopedLock lock(stateLock_);
+        const cydaw::base::ScopedLock lock(stateLock_);
         editorState_ = editorState;
         nativeGraph_ = graph;
         publishedParameters_ = publishedParameters;
@@ -1073,7 +1078,7 @@ public:
 
     cydaw::base::Value editorState() const
     {
-        const juce::ScopedLock lock(stateLock_);
+        const cydaw::base::ScopedLock lock(stateLock_);
         return editorState_;
     }
 
@@ -1081,7 +1086,7 @@ public:
         currentPublishedParameterValues() const
     {
         std::vector<std::pair<cydaw::base::Text, double>> values;
-        const juce::ScopedLock lock(stateLock_);
+        const cydaw::base::ScopedLock lock(stateLock_);
         values.reserve(publishedParameters_.size());
         auto slot = std::size_t {};
         for (const auto& parameter : publishedParameters_) {
@@ -1265,7 +1270,7 @@ public:
         std::vector<cydaw::graph::PublishedParameter> published;
         cydaw::engine::PolySynthGraphPlan instrumentPlan;
         {
-            const juce::ScopedLock lock(stateLock_);
+            const cydaw::base::ScopedLock lock(stateLock_);
             editor = editorState_;
             native = nativeGraph_;
             published = publishedParameters_;
@@ -1312,7 +1317,7 @@ public:
                                ? hostParameters_[slot]->getValue() : 0.0f);
         root->setProperty("hostValues", hostValues);
         {
-            const juce::ScopedLock lock(stateLock_);
+            const cydaw::base::ScopedLock lock(stateLock_);
             if (!programs_.empty()) {
                 cydaw::base::Array<cydaw::base::Value> programs;
                 for (const auto& program : programs_) {
@@ -1450,7 +1455,7 @@ public:
                     programs.push_back(std::move(program));
             }
         {
-            const juce::ScopedLock lock(stateLock_);
+            const cydaw::base::ScopedLock lock(stateLock_);
             editorState_ = root->getProperty("editor");
             nativeGraph_ = *native;
             publishedParameters_ = published;
@@ -1526,7 +1531,7 @@ private:
         std::vector<float> hostValues;
     };
 
-    mutable juce::CriticalSection stateLock_;
+    mutable cydaw::base::CriticalSection stateLock_;
     std::vector<RuntimeProgram> programs_;
     int currentProgram_ {};
     cydaw::app::NativeDspRuntime runtime_;

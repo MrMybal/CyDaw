@@ -19,7 +19,7 @@
 // views (several: one at a time, chosen at the top). Never the graph.
 
 namespace cydaw::app {
-class NodeGraphComponent;
+class GraphDocument;
 }
 
 namespace cydaw::plugin_ui {
@@ -44,7 +44,7 @@ public:
     PluginInterface(const cydaw::base::Text& productName, bool instrument, PluginSound sound, std::function<void(bool structural)> changed);
     ~PluginInterface() override;
 
-    [[nodiscard]] app::NodeGraphComponent& graph();
+    [[nodiscard]] app::GraphDocument& graph();
     // The graph the plug-in's state holds; nothing is published.
     void restore(const cydaw::base::Value& editorState);
     // The size its window opens at (logical pixels), and the least.

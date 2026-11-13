@@ -33,9 +33,7 @@ int main() {
     auto writer = format.createWriterFor(stream, options);
     require(bool(writer) && !stream, "native writer owns output");
     {
-      int unused = 0;
-      audio::AudioFormatWriter::ThreadedWriter recorder(writer.release(),
-                                                        unused, 8192);
+      audio::AudioFormatWriter::ThreadedWriter recorder(writer.release(), 8192);
       require(recorder.write(input, 512), "recorder accepts prepared block");
     } // drains and finalises
     audio::AudioFormatManager formats;

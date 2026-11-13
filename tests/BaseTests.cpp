@@ -1,3 +1,5 @@
+#include <cydaw/base/Image.h>
+#include "../src/app/NativeDspRuntime.h"
 #include <cydaw/base/Properties.h>
 #include <cydaw/base/Value.h>
 #include <cydaw/document/ModuleInterface.h>
@@ -12,6 +14,13 @@ void require(bool pass, const char *text) {
 }
 int main() {
   try {
+    Image pixels(2,2);pixels.setPixelAt(0,0,Colour::fromRGBA(255,0,0,128));pixels.setPixelAt(1,0,Colour::fromRGBA(0,255,0,255));
+    MemoryOutputStream png;require(pixels.writePng(png),"native PNG encoding");
+    auto image=Image::decode(png.getData(),png.getDataSize());
+    require(image.isValid()&&image.getWidth()==2&&image.getPixelAt(0,0)==pixels.getPixelAt(0,0)&&image.getPixelAt(1,0)==pixels.getPixelAt(1,0),"PNG roundtrip preserves RGBA channels and alpha");
+    auto thumbnail=image.rescaled(8,8);require(thumbnail.isValid()&&thumbnail.getWidth()==8&&thumbnail.getHeight()==8,"native image resizing");
+    require(!Image::decode("bad",3).isValid(),"invalid images are rejected");
+
     Text words = Text::fromUTF8("Fran\xc3\xa7"
                                 "ais \xf0\x9f\x8e\xac");
     require(words.length() == 10, "UTF-8 codepoints");
@@ -49,7 +58,9 @@ int main() {
     graph.nodes.back().parameters.gainDb = -6;
     graph.nodes.push_back({3, cydaw::engine::NativeDspNodeKind::output, {}});
     graph.connections = {{1, 2, 0, 0}, {2, 3, 0, 0}};
-    auto state = cydaw::document::serialiseNativeDspGraphState(graph);
+    struct TestBuffer{std::array<std::array<float,16>,2> audio{};std::array<float*,2> pointers{audio[0].data(),audio[1].data()};float*const* getArrayOfWritePointers(){return pointers.data();}int getNumChannels()const{return 2;}int getNumSamples()const{return 16;}}signal;
+  for(auto& ch:signal.audio)ch.fill(0.5f);cydaw::app::NativeDspRuntime runtime;require(runtime.setGraph(graph).wasOk()&&runtime.process(signal,0,16),"actual desktop DSP adapter processes without JUCE");require(std::abs(signal.audio[0][0]-0.2505936f)<1e-5f,"actual native graph gain");
+  auto state = cydaw::document::serialiseNativeDspGraphState(graph);
     Text error;
     auto restored = cydaw::document::restoreNativeDspGraphState(
         JSON::parse(JSON::toString(state, true)), error);

@@ -210,7 +210,7 @@ void DevicesView::draw()
 
     // The cards in signal order: left to right as the graph lays them out.
     auto nodes = graph.editorNodes();
-    std::vector<const app::NodeGraphComponent::EditorNode*> chain;
+    std::vector<const app::GraphDocument::EditorNode*> chain;
     // Prisme plays the whole voice: the voice section's other cards (the
     // allocator, the envelope, the gain, the voice filter) do nothing it does
     // not, and stay out of sight.
@@ -656,7 +656,7 @@ void DevicesView::insertGap(Strip& strip, const std::uint64_t before, const floa
     ImGui::SameLine(0.0f, dp(4.0f));
 }
 
-void DevicesView::drawCard(Strip& strip, const app::NodeGraphComponent::EditorNode& cardNode, const float height,
+void DevicesView::drawCard(Strip& strip, const app::GraphDocument::EditorNode& cardNode, const float height,
                            const CardPlace& place)
 {
     const auto& p = theme::palette();
@@ -1274,7 +1274,7 @@ void DevicesView::drawCard(Strip& strip, const app::NodeGraphComponent::EditorNo
         drawBranch(strip, *node, origin, height, place);
 }
 
-bool DevicesView::movable(const Strip& strip, const app::NodeGraphComponent::EditorNode& node) const
+bool DevicesView::movable(const Strip& strip, const app::GraphDocument::EditorNode& node) const
 {
     if (node.boundary || wholeVoiceType(node.typeKey) || (strip.track.midi && strip.graph.editorIsVoiceNode(node.id)))
         return false;
@@ -1289,7 +1289,7 @@ bool DevicesView::movable(const Strip& strip, const app::NodeGraphComponent::Edi
 namespace {
 
 // A container's setting on its card, by its catalogue key.
-const app::NodeGraphComponent::EditorParameter* containerSetting(const app::NodeGraphComponent::EditorNode& head,
+const app::GraphDocument::EditorParameter* containerSetting(const app::GraphDocument::EditorNode& head,
                                                                  const std::string_view key)
 {
     const auto* effect = engine::effectForType(head.typeKey.toStdString());
@@ -1313,7 +1313,7 @@ cydaw::base::Text branchName(const engine::NativeDspNodeKind kind, const int bra
 }
 
 // Its name given by hand, else its usual one.
-cydaw::base::Text branchName(const app::NodeGraphComponent& graph, const std::uint64_t head, const engine::NativeDspNodeKind kind,
+cydaw::base::Text branchName(const app::GraphDocument& graph, const std::uint64_t head, const engine::NativeDspNodeKind kind,
                         const int branch)
 {
     const auto named = graph.editorBranchName(head, branch);
@@ -1322,7 +1322,7 @@ cydaw::base::Text branchName(const app::NodeGraphComponent& graph, const std::ui
 
 } // namespace
 
-void DevicesView::drawContainerPanel(Strip& strip, const app::NodeGraphComponent::EditorNode& head, const ImVec2 at, const ImVec2 size,
+void DevicesView::drawContainerPanel(Strip& strip, const app::GraphDocument::EditorNode& head, const ImVec2 at, const ImVec2 size,
                                      const ImU32 colour)
 {
     const auto& p = theme::palette();
@@ -1441,7 +1441,7 @@ void DevicesView::drawContainerPanel(Strip& strip, const app::NodeGraphComponent
         const auto hzOf = [&](const float x) {
             return 20.0 * std::pow(1'000.0, std::clamp(static_cast<double>((x - min.x) / (max.x - min.x)), 0.0, 1.0));
         };
-        std::vector<const app::NodeGraphComponent::EditorParameter*> crossovers;
+        std::vector<const app::GraphDocument::EditorParameter*> crossovers;
         for (const auto* key : { "crossover", "crossover-low", "crossover-high" })
             if (const auto* parameter = containerSetting(head, key))
                 crossovers.push_back(parameter);
@@ -1727,7 +1727,7 @@ void DevicesView::drawContainerPanel(Strip& strip, const app::NodeGraphComponent
     ImGui::Dummy(ImVec2(size.x, 1.0f));
 }
 
-void DevicesView::drawBranch(Strip& strip, const app::NodeGraphComponent::EditorNode& head, const ImVec2 headOrigin, const float height,
+void DevicesView::drawBranch(Strip& strip, const app::GraphDocument::EditorNode& head, const ImVec2 headOrigin, const float height,
                              const CardPlace& place)
 {
     const auto& p = theme::palette();
@@ -1819,14 +1819,14 @@ void DevicesView::drawBranch(Strip& strip, const app::NodeGraphComponent::Editor
     ImGui::SameLine(0.0f, dp(6.0f));
 }
 
-void DevicesView::startBranchRename(const app::NodeGraphComponent& graph, const std::uint64_t head, const int branch)
+void DevicesView::startBranchRename(const app::GraphDocument& graph, const std::uint64_t head, const int branch)
 {
     renamedBranch_ = std::make_pair(head, branch);
     graph.editorBranchName(head, branch).copyToUTF8(branchNameBuffer_, sizeof(branchNameBuffer_));
     ImGui::OpenPopup("##renameBranch");
 }
 
-void DevicesView::drawBranchRename(app::NodeGraphComponent& graph)
+void DevicesView::drawBranchRename(app::GraphDocument& graph)
 {
     if (!ImGui::BeginPopup("##renameBranch"))
         return;
@@ -1845,7 +1845,7 @@ void DevicesView::drawBranchRename(app::NodeGraphComponent& graph)
     ImGui::EndPopup();
 }
 
-void DevicesView::drawValueList(const TrackRef& track, app::NodeGraphComponent& graph, const app::NodeGraphComponent::EditorNode& node,
+void DevicesView::drawValueList(const TrackRef& track, app::GraphDocument& graph, const app::GraphDocument::EditorNode& node,
                                 const ImVec2 at, const ImVec2 size, const ImU32 colour, const std::map<cydaw::base::Text, float>& modulated)
 {
     const auto& p = theme::palette();
@@ -1859,7 +1859,7 @@ void DevicesView::drawValueList(const TrackRef& track, app::NodeGraphComponent& 
     const auto filter = cydaw::base::Text::fromUTF8(search.data()).trim();
     // Every value of the card, those touched first (the last at the top),
     // then the others as the card lists them.
-    std::vector<std::pair<std::uint64_t, const app::NodeGraphComponent::EditorParameter*>> order;
+    std::vector<std::pair<std::uint64_t, const app::GraphDocument::EditorParameter*>> order;
     for (const auto& parameter : node.parameters)
         if ((filter.isEmpty() || parameter.label.containsIgnoreCase(filter) || parameter.binding.containsIgnoreCase(filter))
             && !parameter.binding.endsWith(".ownerLow") && !parameter.binding.endsWith(".ownerHigh"))
@@ -2046,7 +2046,7 @@ void DevicesView::drawPluginValueList(const TrackRef& track, const std::size_t p
     ImGui::PopID();
 }
 
-void DevicesView::drawSoundModelPane(const TrackRef& track, app::NodeGraphComponent& graph, const std::uint64_t nodeId,
+void DevicesView::drawSoundModelPane(const TrackRef& track, app::GraphDocument& graph, const std::uint64_t nodeId,
                                      const ImVec2 at, const ImVec2 size, const ImU32 colour)
 {
     const auto& p = theme::palette();
@@ -2660,7 +2660,7 @@ namespace {
 struct CatalogueBranch {
     cydaw::base::Text name;
     std::vector<CatalogueBranch> children;
-    std::vector<const app::NodeGraphComponent::DeviceCatalogueEntry*> entries;
+    std::vector<const app::GraphDocument::DeviceCatalogueEntry*> entries;
     std::vector<const Studio::LibraryDevice*> devices;
     int count {};
 };
@@ -2724,8 +2724,8 @@ std::vector<cydaw::base::Text> splitCategory(const cydaw::base::Text& category)
 } // namespace
 
 void DevicesView::drawCatalogueTree(const TrackRef& track,
-                                    const std::vector<const app::NodeGraphComponent::DeviceCatalogueEntry*>& shown,
-                                    const app::NodeGraphComponent::DeviceCatalogueEntry*& chosen,
+                                    const std::vector<const app::GraphDocument::DeviceCatalogueEntry*>& shown,
+                                    const app::GraphDocument::DeviceCatalogueEntry*& chosen,
                                     std::optional<cydaw::base::File>& chosenFile)
 {
     CatalogueBranch root;
@@ -2747,7 +2747,7 @@ void DevicesView::drawCatalogueTree(const TrackRef& track,
             if (path.empty())
                 path = { ui::Ls("Utilitaires", "Utilities") };
         } else {
-            app::NodeGraphComponent::EditorNodeType type;
+            app::GraphDocument::EditorNodeType type;
             type.key = entry->key;
             type.categoryKey = entry->categoryKey;
             type.category = entry->category;
@@ -2823,13 +2823,13 @@ void DevicesView::drawCatalogue(const TrackRef& track)
                                                   sizeof(search_), ImGuiInputTextFlags_EnterReturnsTrue);
     const auto query = fold(cydaw::base::Text::fromUTF8(search_).trim());
     // Made when the list opens (or the track changes), not each frame.
-    static std::vector<app::NodeGraphComponent::DeviceCatalogueEntry> entries;
+    static std::vector<app::GraphDocument::DeviceCatalogueEntry> entries;
     static std::optional<TrackRef> entriesFor;
     if (ImGui::IsWindowAppearing() || entriesFor != track || entries.empty()) {
         entries = slot->graph().deviceCatalogue();
         entriesFor = track;
     }
-    std::vector<const app::NodeGraphComponent::DeviceCatalogueEntry*> shown;
+    std::vector<const app::GraphDocument::DeviceCatalogueEntry*> shown;
     for (const auto& entry : entries) {
         if (!track.midi && entry.soundSource)
             continue;
@@ -2850,7 +2850,7 @@ void DevicesView::drawCatalogue(const TrackRef& track)
     if (ImGui::IsKeyPressed(ImGuiKey_UpArrow, true))
         highlight_ = std::max(0, highlight_ - 1);
     highlight_ = std::clamp(highlight_, 0, std::max(0, count - 1));
-    const app::NodeGraphComponent::DeviceCatalogueEntry* chosen = nullptr;
+    const app::GraphDocument::DeviceCatalogueEntry* chosen = nullptr;
     if (entered && count > 0)
         chosen = shown[static_cast<std::size_t>(highlight_)];
 

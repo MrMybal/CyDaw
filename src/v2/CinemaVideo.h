@@ -1,8 +1,9 @@
+#include <cydaw/base/Image.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #pragma once
-#include <juce_graphics/juce_graphics.h>
-#include <juce_core/juce_core.h>
+
+
 #include <memory>
 #include <functional>
 namespace cydaw::v2 {
@@ -10,7 +11,7 @@ namespace cydaw::v2 {
 class CinemaVideo final {
 public:
     struct Snapshot {
-        juce::Image image;
+        cydaw::base::Image image;
         cydaw::base::Text file,error;
         cydaw::base::Text backend{"FFmpeg"},codec;
         double duration{},fps{25},time{};

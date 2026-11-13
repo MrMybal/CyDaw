@@ -13,7 +13,7 @@
 
 namespace cydaw::v2::node_tree {
 
-using Type = app::NodeGraphComponent::EditorNodeType;
+using Type = app::GraphDocument::EditorNodeType;
 
 // Where a node type sits, outermost first, in the language shown.
 [[nodiscard]] std::vector<cydaw::base::Text> pathOf(const Type& type);

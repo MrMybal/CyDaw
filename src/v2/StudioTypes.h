@@ -1,7 +1,7 @@
 #include <cydaw/base/File.h>
 #pragma once
 
-#include "NodeGraphComponent.h"
+#include "GraphDocument.h"
 
 #include <cstdint>
 #include <functional>
@@ -68,9 +68,10 @@ public:
     enum class Owner { audioTrack, midiTrack, bus, module, workshop, master, modulation, plugin };
     GraphSlot(Owner owner, std::function<void(GraphSlot&, bool structural)> changed);
     ~GraphSlot();
+    static void processPending();
 
-    [[nodiscard]] app::NodeGraphComponent& graph() noexcept { return *graph_; }
-    [[nodiscard]] const app::NodeGraphComponent& graph() const noexcept { return *graph_; }
+    [[nodiscard]] app::GraphDocument& graph() noexcept { return *graph_; }
+    [[nodiscard]] const app::GraphDocument& graph() const noexcept { return *graph_; }
     [[nodiscard]] Owner owner() const noexcept { return owner_; }
     // Bumped by every change, so a view can tell when to refresh caches.
     [[nodiscard]] std::uint64_t revision() const noexcept { return revision_; }
@@ -84,7 +85,7 @@ public:
 
 private:
     Owner owner_;
-    std::unique_ptr<app::NodeGraphComponent> graph_;
+    std::unique_ptr<app::GraphDocument> graph_;
     std::uint64_t revision_ { 1 };
     bool restoring_ {};
     cydaw::base::Text lastError_;

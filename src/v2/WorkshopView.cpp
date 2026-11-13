@@ -1074,7 +1074,7 @@ void WorkshopView::drawSide()
     }
 }
 
-void WorkshopView::drawInfo(app::NodeGraphComponent& graph)
+void WorkshopView::drawInfo(app::GraphDocument& graph)
 {
     const auto current = studio_.workshop();
     const auto info = graph.editorGraphInfo();
@@ -1161,7 +1161,7 @@ void WorkshopView::drawInfo(app::NodeGraphComponent& graph)
     }
 }
 
-void WorkshopView::drawParameters(app::NodeGraphComponent& graph)
+void WorkshopView::drawParameters(app::GraphDocument& graph)
 {
     const auto& p = theme::palette();
     const auto parameters = graph.editorGraphParameters();

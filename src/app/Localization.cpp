@@ -6,16 +6,10 @@
 
 namespace cydaw::app {
 
-JUCE_IMPLEMENT_SINGLETON(Localization)
-
 Localization& Localization::instance()
 {
-    return *getInstance();
-}
-
-Localization::~Localization()
-{
-    clearSingletonInstance();
+    static Localization localization;
+    return localization;
 }
 
 Localization::Localization()
@@ -61,7 +55,7 @@ bool isModuleText(const cydaw::base::Text& key)
 cydaw::base::Text Localization::text(const cydaw::base::Text key) const
 {
     const cydaw::base::Text keyText(key);
-    const juce::ScopedReadLock lock(mappingsLock_);
+    const std::shared_lock lock(mappingsLock_);
     if (languageCode_ != "en" && isModuleText(keyText))
         if (const auto english = english_.find(keyText); english != english_.end() && english->second.isNotEmpty())
             return english->second;
@@ -77,7 +71,7 @@ cydaw::base::Text Localization::text(const cydaw::base::Text key) const
 cydaw::base::Text Localization::englishText(const cydaw::base::Text key) const
 {
     const cydaw::base::Text keyText(key);
-    const juce::ScopedReadLock lock(mappingsLock_);
+    const std::shared_lock lock(mappingsLock_);
     if (const auto english = english_.find(keyText); english != english_.end() && english->second.isNotEmpty())
         return english->second;
     return keyText;
@@ -85,7 +79,7 @@ cydaw::base::Text Localization::englishText(const cydaw::base::Text key) const
 
 cydaw::base::Text Localization::languageCode() const
 {
-    const juce::ScopedReadLock lock(mappingsLock_);
+    const std::shared_lock lock(mappingsLock_);
     return languageCode_;
 }
 
@@ -117,13 +111,12 @@ bool Localization::setLanguage(const cydaw::base::Text& languageCode)
     if (mappings.empty())
         return false;
     {
-        const juce::ScopedWriteLock lock(mappingsLock_);
+        const std::unique_lock lock(mappingsLock_);
         languageCode_ = languageCode;
         current_ = std::move(mappings);
     }
     properties_.getUserSettings()->setValue("language", cydaw::base::Value(languageCode_));
     properties_.saveIfNeeded();
-    sendChangeMessage();
     return true;
 }
 

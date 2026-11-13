@@ -61,7 +61,7 @@ int deckIndex(const std::string& letter)
 }
 
 struct FoundParameter {
-    app::NodeGraphComponent::EditorParameter parameter;
+    app::GraphDocument::EditorParameter parameter;
     cydaw::base::Text card;
 };
 

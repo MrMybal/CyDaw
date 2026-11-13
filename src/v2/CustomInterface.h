@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #pragma once
@@ -148,7 +149,7 @@ class CustomInterface final
                         output += "Compilation expirée.\n";
                         return false;
                     }
-                    juce::Thread::sleep(15);
+                    cydaw::base::Thread::sleep(15);
                 }
                 for (int count; (count = child.readProcessOutput(buffer, sizeof(buffer))) > 0;)
                     output += cydaw::base::Text::fromUTF8(buffer, count);

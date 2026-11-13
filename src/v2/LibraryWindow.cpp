@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #include "PluginFiles.h"
 #include "WindowsPluginBridge.h"
@@ -228,7 +229,7 @@ struct LibraryWindow::EffectRow {
 
 // ---- The VST3 plug-ins on this computer, looked for once on a thread of its own ----------------------
 
-class LibraryWindow::PluginScan final : private juce::Thread {
+class LibraryWindow::PluginScan final : private cydaw::base::Thread {
 public:
     struct Plugin {
         cydaw::base::Text name;
@@ -239,7 +240,7 @@ public:
         cydaw::base::File file;
     };
 
-    PluginScan() : juce::Thread("CyDAW plug-in list") {}
+    PluginScan() : cydaw::base::Thread("CyDAW plug-in list") {}
     ~PluginScan() override { stopThread(5'000); }
 
     // The standard VST3 folders and these.
@@ -252,7 +253,7 @@ public:
             extra_ = std::move(folders);
         }
         done_ = false;
-        startThread(juce::Thread::Priority::low);
+        startThread(cydaw::base::Thread::Priority::low);
     }
     [[nodiscard]] bool done() const noexcept { return done_.load(); }
     [[nodiscard]] bool scanning() const { return isThreadRunning(); }

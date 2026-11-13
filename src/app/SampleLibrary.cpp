@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/Properties.h>
 #include <cydaw/base/File.h>
@@ -963,11 +964,11 @@ std::optional<SampleRecord> SampleLibrary::read(juce::InputStream& in)
 
 // ------------------------------------------------------------------ scanner
 
-class SampleLibrary::Scanner final : public juce::Thread {
+class SampleLibrary::Scanner final : public cydaw::base::Thread {
 public:
     Scanner(SampleLibrary& owner, std::vector<Root> roots, std::map<cydaw::base::Text, SampleRecord> known,
             std::shared_ptr<const std::map<cydaw::base::Text, SampleHint>> hints, const bool full, const bool rename)
-        : juce::Thread("CyDAW sample scan"),
+        : cydaw::base::Thread("CyDAW sample scan"),
           owner_(owner), library_(&owner), roots_(std::move(roots)), known_(std::move(known)), hints_(std::move(hints)),
           full_(full), rename_(rename)
     {
@@ -1048,7 +1049,7 @@ public:
 
         // A pool for the reading: every core but one, so the interface and
         // the audio keep theirs.
-        juce::ThreadPool pool(std::max(2, cydaw::base::SystemStats::getNumCpus() - 1));
+        cydaw::base::ThreadPool pool(std::max(2, cydaw::base::SystemStats::getNumCpus() - 1));
         for (const auto& candidate : toAnalyse) {
             const auto found = known_.find(candidate.file.getFullPathName());
             pool.addJob(new AnalyseJob(*this, candidate.file, *candidate.root,
@@ -1066,10 +1067,10 @@ public:
     }
 
 private:
-    class AnalyseJob final : public juce::ThreadPoolJob {
+    class AnalyseJob final : public cydaw::base::ThreadPoolJob {
     public:
         AnalyseJob(Scanner& scanner, cydaw::base::File file, Root root, std::optional<SampleRecord> previous)
-            : juce::ThreadPoolJob(file.getFileName()),
+            : cydaw::base::ThreadPoolJob(file.getFileName()),
               scanner_(scanner), file_(std::move(file)), root_(std::move(root)), previous_(std::move(previous))
         {
         }
@@ -1149,11 +1150,11 @@ private:
 
 // --------------------------------------------------------------- classifier
 
-class SampleLibrary::Classifier final : public juce::Thread {
+class SampleLibrary::Classifier final : public cydaw::base::Thread {
 public:
     Classifier(SampleLibrary& owner, cydaw::base::TextList paths, cydaw::base::File script,
                cydaw::base::Text python, cydaw::base::File workFolder)
-        : juce::Thread("CyDAW sample classifier"),
+        : cydaw::base::Thread("CyDAW sample classifier"),
           owner_(owner), library_(&owner), paths_(std::move(paths)), script_(std::move(script)),
           python_(std::move(python)), workFolder_(std::move(workFolder))
     {
@@ -1563,7 +1564,7 @@ void SampleLibrary::rescan(const bool full)
     analysed_.store(0);
     toAnalyse_.store(0);
     scanner_ = std::make_unique<Scanner>(*this, roots(), std::move(known), hints_, full, rulesOutdated_);
-    scanner_->startThread(juce::Thread::Priority::low);
+    scanner_->startThread(cydaw::base::Thread::Priority::low);
     lastScanMs_ = cydaw::base::Time::currentTimeMillis();
     notifyProgress();
 }
@@ -1752,7 +1753,7 @@ void SampleLibrary::classify(const bool onlyUnclassified)
     classifierMessage_ = "classification CLAP en cours";
     classifier_ = std::make_unique<Classifier>(*this, std::move(paths), classifierScript(),
                                                pythonCommand_, cacheFolder_);
-    classifier_->startThread(juce::Thread::Priority::low);
+    classifier_->startThread(cydaw::base::Thread::Priority::low);
     notifyProgress();
 }
 

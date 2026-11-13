@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/base/Properties.h>
 #include <cydaw/base/File.h>
 #include "Companion.h"
@@ -36,10 +37,10 @@ cydaw::base::File environmentPython()
 } // namespace
 
 // One run of the companion: its output read line by line on its own thread.
-class Companion::Job final : public juce::Thread {
+class Companion::Job final : public cydaw::base::Thread {
 public:
     Job(Companion& owner, cydaw::base::TextList command, cydaw::base::Text name)
-        : juce::Thread("CyDAW companion"), owner_(owner), command_(std::move(command)), name_(std::move(name))
+        : cydaw::base::Thread("CyDAW companion"), owner_(owner), command_(std::move(command)), name_(std::move(name))
     {
     }
 
@@ -73,7 +74,7 @@ public:
             if (process_.readProcessOutput(&byte, 1) <= 0) {
                 if (!process_.isRunning())
                     break;
-                juce::Thread::sleep(20);
+                cydaw::base::Thread::sleep(20);
                 continue;
             }
             if (byte != '\n') {
@@ -327,7 +328,7 @@ cydaw::base::Value Companion::runNow(const cydaw::base::TextList& arguments, cyd
     // Read on a thread of its own: reading lasts until the output ends, which
     // a hung Python never does; past the time allowed it is ended.
     cydaw::base::Text output;
-    juce::WaitableEvent read;
+    cydaw::base::WaitableEvent read;
     std::thread reader([&process, &output, &read] {
         output = process.readAllProcessOutput();
         read.signal();

@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #include "ImGuiHost.h"
@@ -496,7 +497,7 @@ void ImGuiHost::vblank(const double timestampSeconds)
     frame();
 }
 
-unsigned long long ImGuiHost::texture(const cydaw::base::Text& key, const juce::Image& image)
+unsigned long long ImGuiHost::texture(const cydaw::base::Text& key, const cydaw::base::Image& image)
 {
     auto& n = *native_;
     if (const auto found = n.textures.find(key); found != n.textures.end())
@@ -506,16 +507,6 @@ unsigned long long ImGuiHost::texture(const cydaw::base::Text& key, const juce::
     // Straight RGBA, as the renderer blends it.
     const auto width = image.getWidth();
     const auto height = image.getHeight();
-    std::vector<std::uint8_t> pixels(static_cast<std::size_t>(width * height * 4));
-    for (int y = 0; y < height; ++y)
-        for (int x = 0; x < width; ++x) {
-            const auto colour = image.getPixelAt(x, y);
-            auto* pixel = pixels.data() + (static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)) * 4;
-            pixel[0] = colour.getRed();
-            pixel[1] = colour.getGreen();
-            pixel[2] = colour.getBlue();
-            pixel[3] = colour.getAlpha();
-        }
     D3D11_TEXTURE2D_DESC desc {};
     desc.Width = static_cast<UINT>(width);
     desc.Height = static_cast<UINT>(height);
@@ -526,7 +517,7 @@ unsigned long long ImGuiHost::texture(const cydaw::base::Text& key, const juce::
     desc.Usage = D3D11_USAGE_DEFAULT;
     desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
     D3D11_SUBRESOURCE_DATA data {};
-    data.pSysMem = pixels.data();
+    data.pSysMem = image.data();
     data.SysMemPitch = static_cast<UINT>(width * 4);
     ID3D11Texture2D* created {};
     if (FAILED(n.device->CreateTexture2D(&desc, &data, &created)) || created == nullptr)
@@ -545,7 +536,7 @@ unsigned long long ImGuiHost::texture(const cydaw::base::Text& key, const juce::
 }
 
 // Reuse one GPU resource for a video stream instead of caching every frame.
-unsigned long long ImGuiHost::updateTexture(const cydaw::base::Text& key,const juce::Image& image)
+unsigned long long ImGuiHost::updateTexture(const cydaw::base::Text& key,const cydaw::base::Image& image)
 {
     if(!native_||!image.isValid())return 0;
     auto& n=*native_;
@@ -557,13 +548,7 @@ unsigned long long ImGuiHost::updateTexture(const cydaw::base::Text& key,const j
     if(desc.Width!=static_cast<UINT>(image.getWidth())||desc.Height!=static_cast<UINT>(image.getHeight())){
         resource->Release();releaseTexture(key);return texture(key,image);
     }
-    juce::Image::BitmapData bitmap(image,juce::Image::BitmapData::readOnly);
-    std::vector<std::uint8_t> pixels(static_cast<std::size_t>(image.getWidth())*image.getHeight()*4);
-    for(int y=0;y<image.getHeight();++y)for(int x=0;x<image.getWidth();++x){
-        const auto colour=bitmap.getPixelColour(x,y);const auto i=(static_cast<std::size_t>(y)*image.getWidth()+x)*4;
-        pixels[i]=colour.getRed();pixels[i+1]=colour.getGreen();pixels[i+2]=colour.getBlue();pixels[i+3]=255;
-    }
-    n.context->UpdateSubresource(resource,0,nullptr,pixels.data(),static_cast<UINT>(image.getWidth()*4),0);
+    n.context->UpdateSubresource(resource,0,nullptr,image.data(),static_cast<UINT>(image.stride()),0);
     resource->Release();return reinterpret_cast<unsigned long long>(found->second);
 }
 void ImGuiHost::releaseTexture(const cydaw::base::Text& key)
@@ -583,7 +568,7 @@ void ImGuiHost::frame()
     auto& n = *native_;
     if (n.rendering)
         return;
-    const juce::ScopedValueSetter<bool> guard(n.rendering, true);
+    const cydaw::base::ScopedValueSetter<bool> guard(n.rendering, true);
     ImGui::SetCurrentContext(n.imgui);
 
     // The surface keeps the keyboard while the window is the active one.
@@ -637,20 +622,18 @@ void ImGuiHost::frame()
                 n.context->CopyResource(staging, back);
                 D3D11_MAPPED_SUBRESOURCE mapped {};
                 if (SUCCEEDED(n.context->Map(staging, 0, D3D11_MAP_READ, 0, &mapped))) {
-                    juce::Image image(juce::Image::RGB, static_cast<int>(desc.Width), static_cast<int>(desc.Height), false);
-                    juce::Image::BitmapData pixels(image, juce::Image::BitmapData::writeOnly);
+                    cydaw::base::Image image(static_cast<int>(desc.Width), static_cast<int>(desc.Height));
                     for (UINT y = 0; y < desc.Height; ++y) {
                         const auto* row = static_cast<const std::uint8_t*>(mapped.pData) + y * mapped.RowPitch;
                         for (UINT x = 0; x < desc.Width; ++x)
-                            pixels.setPixelColour(static_cast<int>(x), static_cast<int>(y),
-                                                  juce::Colour(row[x * 4], row[x * 4 + 1], row[x * 4 + 2]));
+                            image.setPixelAt(static_cast<int>(x), static_cast<int>(y),
+                                                  cydaw::base::Colour(row[x * 4], row[x * 4 + 1], row[x * 4 + 2]));
                     }
                     n.context->Unmap(staging, 0);
                     captureTarget_.getParentDirectory().createDirectory();
                     captureTarget_.deleteFile();
-                    juce::FileOutputStream stream(captureTarget_);
-                    juce::PNGImageFormat png;
-                    ok = stream.openedOk() && png.writeImageToStream(image, stream);
+                    cydaw::base::FileOutputStream stream(captureTarget_);
+                    ok = stream.openedOk() && image.writePng(stream);
                 }
                 staging->Release();
             }
@@ -711,8 +694,8 @@ void ImGuiHost::captureNextFrame(const cydaw::base::File&, std::function<void(bo
 }
 void ImGuiHost::vblank(double) {}
 void ImGuiHost::renderNow() {}
-unsigned long long ImGuiHost::texture(const cydaw::base::Text&, const juce::Image&) { return 0; }
-unsigned long long ImGuiHost::updateTexture(const cydaw::base::Text&, const juce::Image&) { return 0; }
+unsigned long long ImGuiHost::texture(const cydaw::base::Text&, const cydaw::base::Image&) { return 0; }
+unsigned long long ImGuiHost::updateTexture(const cydaw::base::Text&, const cydaw::base::Image&) { return 0; }
 void ImGuiHost::releaseTexture(const cydaw::base::Text&) {}
 void ImGuiHost::frame() {}
 

@@ -21,7 +21,7 @@
 // mouse, and bound to the device's published settings. Play mode turns the
 // knobs instead of moving them.
 //
-// It edits the root graph's own interface (NodeGraphComponent::
+// It edits the root graph's own interface (GraphDocument::
 // editorSetInterface): a plugin exported from the workshop opens exactly
 // this layout at this size.
 

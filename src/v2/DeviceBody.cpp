@@ -13,8 +13,8 @@ namespace cydaw::v2 {
 using ui::dp;
 using ui::L;
 
-DeviceBody deviceBodyOf(app::NodeGraphComponent& graph, const app::NodeGraphComponent::EditorNode& node,
-                        const app::NodeGraphComponent::EditorNativeSpan* span)
+DeviceBody deviceBodyOf(app::GraphDocument& graph, const app::GraphDocument::EditorNode& node,
+                        const app::GraphDocument::EditorNativeSpan* span)
 {
     DeviceBody body;
     body.parameters.reserve(node.parameters.size());
@@ -32,7 +32,7 @@ DeviceBody deviceBodyOf(app::NodeGraphComponent& graph, const app::NodeGraphComp
 }
 
 void drawDeviceBody(DeviceBody& body, int& pane, DeviceHost& host, UiState& state, PresetMenu& presets, InterfaceEditor& designed,
-                    const TrackRef& track, app::NodeGraphComponent& graph, const app::NodeGraphComponent::EditorNode& node,
+                    const TrackRef& track, app::GraphDocument& graph, const app::GraphDocument::EditorNode& node,
                     const visual::Live& live, const char* detachId)
 {
     auto& surface = body.surface;

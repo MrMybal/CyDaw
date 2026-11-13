@@ -27,7 +27,7 @@ public:
     ~SamplerView();
 
     // The pane on a sampler card (the device panel draws it).
-    void drawPane(const TrackRef& track, app::NodeGraphComponent& graph, std::uint64_t nodeId, ImVec2 at, ImVec2 size,
+    void drawPane(const TrackRef& track, app::GraphDocument& graph, std::uint64_t nodeId, ImVec2 at, ImVec2 size,
                   ImU32 colour);
     // The editor window, while one is open (every frame).
     void drawEditor();
@@ -73,7 +73,7 @@ private:
     void drawWaveform(const Target& target, cydaw::base::Value& json, int zone, ImVec2 size, Peaks& peaks, cydaw::base::Value& working,
                       bool& editing, bool compact);
     // The simple sampler's card: its one sample's waveform and root.
-    void drawSimplePane(const TrackRef& track, app::NodeGraphComponent& graph, std::uint64_t nodeId, ImVec2 at, ImVec2 size);
+    void drawSimplePane(const TrackRef& track, app::GraphDocument& graph, std::uint64_t nodeId, ImVec2 at, ImVec2 size);
 
     Studio& studio_;
     UiState& state_;

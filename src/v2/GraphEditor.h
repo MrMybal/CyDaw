@@ -44,10 +44,10 @@ public:
     static constexpr const char* nodeTypePayload = "CYDAW_NODE_TYPE";
 
 private:
-    using EditorNode = app::NodeGraphComponent::EditorNode;
-    using EditorPort = app::NodeGraphComponent::EditorPort;
-    using EditorConnection = app::NodeGraphComponent::EditorConnection;
-    using EditorNodeType = app::NodeGraphComponent::EditorNodeType;
+    using EditorNode = app::GraphDocument::EditorNode;
+    using EditorPort = app::GraphDocument::EditorPort;
+    using EditorConnection = app::GraphDocument::EditorConnection;
+    using EditorNodeType = app::GraphDocument::EditorNodeType;
 
     struct View {
         ImVec2 scroll {};      // world position at the canvas origin
@@ -90,7 +90,7 @@ private:
     void drawCanvas(GraphSlot& slot, const std::optional<TrackRef>& track);
     void layoutNodes(const std::vector<EditorNode>& nodes, const std::vector<EditorConnection>& connections,
                      std::vector<NodeLayout>& out) const;
-    void drawNode(app::NodeGraphComponent& graph, const NodeLayout& layout, ImDrawList* list);
+    void drawNode(app::GraphDocument& graph, const NodeLayout& layout, ImDrawList* list);
     // The devices menu: the cards picked made one device, My devices, the
     // workshop.
     void newDeviceMenu(GraphSlot& slot, const std::optional<TrackRef>& track);
@@ -107,13 +107,13 @@ private:
     void groupSelection(GraphSlot& slot);
     void drawWires(ImDrawList* list, const std::vector<EditorConnection>& connections,
                    const std::vector<NodeLayout>& layouts);
-    void drawComments(app::NodeGraphComponent& graph, ImDrawList* list);
+    void drawComments(app::GraphDocument& graph, ImDrawList* list);
     void drawMinimap(ImDrawList* list, const std::vector<NodeLayout>& layouts);
     void searchPopup(GraphSlot& slot, const std::optional<TrackRef>& track);
     void nodeContextMenu(GraphSlot& slot);
-    void valueActions(app::NodeGraphComponent& graph, const EditorNode& node,
-                      const app::NodeGraphComponent::EditorParameter& parameter);
-    void promoteValue(app::NodeGraphComponent& graph, std::uint64_t node, std::uint64_t port,
+    void valueActions(app::GraphDocument& graph, const EditorNode& node,
+                      const app::GraphDocument::EditorParameter& parameter);
+    void promoteValue(app::GraphDocument& graph, std::uint64_t node, std::uint64_t port,
                       const cydaw::base::Text& binding, bool input);
     void handleKeys(GraphSlot& slot);
     // Returns the zoom that fits.
@@ -183,7 +183,7 @@ private:
     // The cable a card being dragged would be spliced into.
     std::optional<EditorConnection> spliceTarget_;
     void findSpliceTarget(const std::vector<EditorConnection>& connections, const std::vector<NodeLayout>& layouts);
-    void splice(app::NodeGraphComponent& graph, const std::vector<NodeLayout>& layouts);
+    void splice(app::GraphDocument& graph, const std::vector<NodeLayout>& layouts);
     bool knobHovered_ {};
     const void* programGraph_ {};
     cydaw::base::Text program_;

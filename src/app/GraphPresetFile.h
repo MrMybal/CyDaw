@@ -3,7 +3,7 @@
 
 #include <cydaw/graph/GraphDefinition.h>
 
-#include <juce_core/juce_core.h>
+#include <cydaw/base/Utilities.h>
 
 #include <optional>
 
@@ -13,7 +13,7 @@ inline constexpr auto graphPresetFileExtension = ".cydawgraph";
 inline constexpr auto graphPresetFileFormat = "CyDAW Graph Preset";
 inline constexpr int graphPresetFileSchema = 3;
 inline constexpr int nodeGraphStateSchema = 29;
-inline constexpr juce::int64 maximumGraphPresetBytes = 4 * 1024 * 1024;
+inline constexpr std::int64_t maximumGraphPresetBytes = 4 * 1024 * 1024;
 
 struct GraphPresetMetadata {
     cydaw::base::Text definitionId;
@@ -66,11 +66,11 @@ parseGraphVersion(const cydaw::base::Text& value)
         if (part.isEmpty() || part.containsOnly("0123456789") == false)
             return std::nullopt;
     return cydaw::graph::SemanticVersion {
-        static_cast<std::uint16_t>(juce::jlimit(0, 65535,
+        static_cast<std::uint16_t>(cydaw::base::limit(0, 65535,
                                                 parts[0].getIntValue())),
-        static_cast<std::uint16_t>(juce::jlimit(0, 65535,
+        static_cast<std::uint16_t>(cydaw::base::limit(0, 65535,
                                                 parts[1].getIntValue())),
-        static_cast<std::uint16_t>(juce::jlimit(0, 65535,
+        static_cast<std::uint16_t>(cydaw::base::limit(0, 65535,
                                                 parts[2].getIntValue()))
     };
 }

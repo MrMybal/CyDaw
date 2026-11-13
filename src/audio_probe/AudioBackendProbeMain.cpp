@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #include <cydaw/integration/CyAudioCoreDeviceManager.h>
 #include <juce_audio_devices/juce_audio_devices.h>
@@ -192,7 +193,7 @@ int main(const int argc, char* argv[])
                 if (error.isEmpty() && silentMs > 0) {
                     SilentCallback callback;
                     device->start(&callback);
-                    juce::Thread::sleep(silentMs);
+                    cydaw::base::Thread::sleep(silentMs);
                     const bool running = device->isPlaying();
                     device->stop();
                     openResult->setProperty("silentRunMs", silentMs);

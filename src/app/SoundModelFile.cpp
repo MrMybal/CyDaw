@@ -1,3 +1,4 @@
+#include <cydaw/base/Compression.h>
 #include <cydaw/base/File.h>
 #include "SoundModelFile.h"
 
@@ -34,16 +35,17 @@ bool readRows(const cydaw::base::Value& rows, const int count, const int columns
     if (rows.isString()) {
         const auto text = rows.toString();
         const auto deltas = text.startsWith("z:");
-        juce::MemoryOutputStream bytes;
-        if (!juce::Base64::convertFromBase64(bytes, deltas ? text.substring(2) : text))
+        cydaw::base::MemoryOutputStream bytes;
+        if (!cydaw::base::Base64::convertFromBase64(bytes, deltas ? text.substring(2) : text))
             return false;
-        juce::MemoryOutputStream raw;
+        cydaw::base::MemoryOutputStream raw;
         if (deltas) {
-            juce::MemoryInputStream input(bytes.getData(), bytes.getDataSize(), false);
-            juce::GZIPDecompressorInputStream unzip(&input, false, juce::GZIPDecompressorInputStream::zlibFormat);
+            cydaw::base::MemoryInputStream input(bytes.getData(), bytes.getDataSize(), false);
+            cydaw::base::InflateStream unzip(&input, false, cydaw::base::InflateStream::zlibFormat);
             // Unpacked no further than the rows can take (a small stream of
             // zeros may unpack to gigabytes).
-            (void) raw.writeFromInputStream(unzip, static_cast<juce::int64>(db10.size() * sizeof(std::int16_t)) + 1);
+            (void) raw.writeFromInputStream(unzip, static_cast<cydaw::base::int64>(db10.size() * sizeof(std::int16_t)) + 1);
+            if (unzip.getStatus().failed()) return false;
         }
         const auto& source = deltas ? raw : bytes;
         if (source.getDataSize() != db10.size() * sizeof(std::int16_t))
@@ -166,12 +168,12 @@ bool readStereo(const cydaw::base::Value& stereo, cydaw::engine::SoundModelZone&
 // The recording's first moments, from a zone's "head" object.
 bool readHead(const cydaw::base::Value& head, cydaw::engine::SoundModelZone& zone)
 {
-    const auto channels = juce::jlimit(1, 2, static_cast<int>(head.getProperty("channels", 1)));
+    const auto channels = cydaw::base::jlimit(1, 2, static_cast<int>(head.getProperty("channels", 1)));
     const auto length = static_cast<int>(head.getProperty("length", 0));
     const auto gain = static_cast<float>(static_cast<double>(head.getProperty("gain", 0.0)));
-    juce::MemoryOutputStream bytes;
+    cydaw::base::MemoryOutputStream bytes;
     if (length <= 0 || length > 10 * 192'000
-        || !juce::Base64::convertFromBase64(bytes, head.getProperty("int16", {}).toString())
+        || !cydaw::base::Base64::convertFromBase64(bytes, head.getProperty("int16", {}).toString())
         || bytes.getDataSize() != static_cast<std::size_t>(length) * static_cast<std::size_t>(channels) * sizeof(std::int16_t))
         return false;
     const auto* data = static_cast<const unsigned char*>(bytes.getData());
@@ -185,7 +187,7 @@ bool readHead(const cydaw::base::Value& head, cydaw::engine::SoundModelZone& zon
             (channel == 0 ? zone.headLeft : zone.headRight)[static_cast<std::size_t>(frame)] = gain * static_cast<float>(value);
         }
     zone.headRate = static_cast<float>(static_cast<double>(head.getProperty("rate", 48'000)));
-    zone.headFade = juce::jlimit(1, length / 2, static_cast<int>(head.getProperty("fade", 0)));
+    zone.headFade = cydaw::base::jlimit(1, length / 2, static_cast<int>(head.getProperty("fade", 0)));
     zone.headPhase = readFloats(head.getProperty("phase", {}));
     return zone.headRate > 0.0f;
 }
@@ -211,32 +213,32 @@ cydaw::engine::SoundModelRef soundModelFromVar(const cydaw::base::Value& value, 
     }
     for (const auto& item : *zones) {
         cydaw::engine::SoundModelZone zone;
-        zone.rootNote = juce::jlimit(0, 127, static_cast<int>(item.getProperty("rootNote", 60)));
+        zone.rootNote = cydaw::base::jlimit(0, 127, static_cast<int>(item.getProperty("rootNote", 60)));
         zone.f0 = static_cast<float>(static_cast<double>(item.getProperty("f0", 261.63)));
-        zone.velocity = juce::jlimit(0.0f, 1.0f, static_cast<float>(static_cast<double>(item.getProperty("velocity", 0.8))));
+        zone.velocity = cydaw::base::jlimit(0.0f, 1.0f, static_cast<float>(static_cast<double>(item.getProperty("velocity", 0.8))));
         zone.gain = static_cast<float>(static_cast<double>(item.getProperty("gain", 1.0)));
-        zone.frameSeconds = juce::jlimit(0.001f, 1.0f, static_cast<float>(static_cast<double>(item.getProperty("frameSeconds", 0.01))));
-        zone.frames = juce::jlimit(0, 1'000'000, static_cast<int>(item.getProperty("frames", 0)));
-        zone.inharmonicity = juce::jlimit(0.0f, 0.05f, static_cast<float>(static_cast<double>(item.getProperty("inharmonicity", 0.0))));
+        zone.frameSeconds = cydaw::base::jlimit(0.001f, 1.0f, static_cast<float>(static_cast<double>(item.getProperty("frameSeconds", 0.01))));
+        zone.frames = cydaw::base::jlimit(0, 1'000'000, static_cast<int>(item.getProperty("frames", 0)));
+        zone.inharmonicity = cydaw::base::jlimit(0.0f, 0.05f, static_cast<float>(static_cast<double>(item.getProperty("inharmonicity", 0.0))));
         // Partials that are no harmonics: their ratios to f0 (positive).
         zone.ratios = readFloats(item.getProperty("ratios", {}));
-        zone.onset = juce::jlimit(0.0f, 10.0f, static_cast<float>(static_cast<double>(item.getProperty("onset", 0.0))));
+        zone.onset = cydaw::base::jlimit(0.0f, 10.0f, static_cast<float>(static_cast<double>(item.getProperty("onset", 0.0))));
         // A plucked string in place of its partials.
         if (const auto string = item.getProperty("string", {}); string.isObject()) {
             auto& model = zone.string;
-            model.gain = juce::jlimit(0.0f, 0.999999f, static_cast<float>(static_cast<double>(string.getProperty("gain", 0.99))));
-            model.pole = juce::jlimit(0.0f, 0.99f, static_cast<float>(static_cast<double>(string.getProperty("pole", 0.0))));
-            model.zero = juce::jlimit(-0.99f, model.pole, static_cast<float>(static_cast<double>(string.getProperty("zero", 0.0))));
+            model.gain = cydaw::base::jlimit(0.0f, 0.999999f, static_cast<float>(static_cast<double>(string.getProperty("gain", 0.99))));
+            model.pole = cydaw::base::jlimit(0.0f, 0.99f, static_cast<float>(static_cast<double>(string.getProperty("pole", 0.0))));
+            model.zero = cydaw::base::jlimit(-0.99f, model.pole, static_cast<float>(static_cast<double>(string.getProperty("zero", 0.0))));
             model.order = static_cast<int>(string.getProperty("order", 1)) >= 2 ? 2 : 1;
-            model.dispersion = juce::jlimit(-0.95f, 0.0f, static_cast<float>(static_cast<double>(string.getProperty("dispersion", 0.0))));
-            model.stages = juce::jlimit(0, cydaw::engine::PluckedString::maximumStages, static_cast<int>(string.getProperty("stages", 0)));
-            model.start = juce::jlimit(0, std::max(0, zone.frames - 1), static_cast<int>(string.getProperty("start", 0)));
+            model.dispersion = cydaw::base::jlimit(-0.95f, 0.0f, static_cast<float>(static_cast<double>(string.getProperty("dispersion", 0.0))));
+            model.stages = cydaw::base::jlimit(0, cydaw::engine::PluckedString::maximumStages, static_cast<int>(string.getProperty("stages", 0)));
+            model.start = cydaw::base::jlimit(0, std::max(0, zone.frames - 1), static_cast<int>(string.getProperty("start", 0)));
             if (const auto* dips = string.getProperty("dips", {}).getArray())
                 for (const auto& dip : *dips)
                     if (static_cast<int>(model.dips.size()) < cydaw::engine::PluckedString::maximumDips)
                         model.dips.push_back({ static_cast<float>(static_cast<double>(dip.getProperty("hz", 1000.0))),
                                                static_cast<float>(static_cast<double>(dip.getProperty("q", 1.0))),
-                                               juce::jlimit(-6.0f, 0.0f, static_cast<float>(static_cast<double>(dip.getProperty("db", 0.0)))) });
+                                               cydaw::base::jlimit(-6.0f, 0.0f, static_cast<float>(static_cast<double>(dip.getProperty("db", 0.0)))) });
             for (const auto value : readFloats(string.getProperty("excitation", {})))
                 model.excitationDb.push_back(value / 10.0f);
             model.bodyEdges = readFloats(string.getProperty("bodyEdges", {}));
@@ -260,7 +262,7 @@ cydaw::engine::SoundModelRef soundModelFromVar(const cydaw::base::Value& value, 
         }
         const auto rows = zone.rows();
         const auto harmonics = item.getProperty("harmonics", {});
-        zone.harmonicCount = juce::jlimit(0, 512, static_cast<int>(harmonics.getProperty("count", 0)));
+        zone.harmonicCount = cydaw::base::jlimit(0, 512, static_cast<int>(harmonics.getProperty("count", 0)));
         if (zone.frames <= 0 || !readTable(harmonics.getProperty("db10", {}), rows, zone.harmonicCount, false, zone.harmonics)) {
             error = "a zone's partials do not match its frame count";
             return {};
@@ -276,8 +278,8 @@ cydaw::engine::SoundModelRef soundModelFromVar(const cydaw::base::Value& value, 
         if (static_cast<int>(zone.pitchCents.size()) != rows)
             zone.pitchCents.assign(static_cast<std::size_t>(rows), 0.0f);
         if (const auto attack = item.getProperty("attack", {}); attack.isObject()) {
-            juce::MemoryOutputStream bytes;
-            if (juce::Base64::convertFromBase64(bytes, attack.getProperty("float32", {}).toString())) {
+            cydaw::base::MemoryOutputStream bytes;
+            if (cydaw::base::Base64::convertFromBase64(bytes, attack.getProperty("float32", {}).toString())) {
                 const auto count = bytes.getDataSize() / sizeof(float);
                 zone.attack.resize(count);
                 std::memcpy(zone.attack.data(), bytes.getData(), count * sizeof(float));
@@ -286,13 +288,13 @@ cydaw::engine::SoundModelRef soundModelFromVar(const cydaw::base::Value& value, 
             zone.attackGain = static_cast<float>(static_cast<double>(attack.getProperty("gain", 1.0)));
         }
         if (const auto loop = item.getProperty("loop", {}); loop.isObject()) {
-            zone.loopStart = juce::jlimit(0, zone.frames - 1, static_cast<int>(loop.getProperty("start", -1)));
-            zone.loopEnd = juce::jlimit(0, zone.frames - 1, static_cast<int>(loop.getProperty("end", -1)));
+            zone.loopStart = cydaw::base::jlimit(0, zone.frames - 1, static_cast<int>(loop.getProperty("start", -1)));
+            zone.loopEnd = cydaw::base::jlimit(0, zone.frames - 1, static_cast<int>(loop.getProperty("end", -1)));
             if (zone.loopEnd <= zone.loopStart)
                 zone.loopStart = zone.loopEnd = -1;
         }
         if (const auto release = item.getProperty("release", {}); !release.isVoid() && !release.isUndefined())
-            zone.release = juce::jlimit(0, zone.frames - 1, static_cast<int>(release));
+            zone.release = cydaw::base::jlimit(0, zone.frames - 1, static_cast<int>(release));
         // The two channels, and the recording's first moments: a zone that
         // cannot read them plays without (in mono, with no head).
         if (const auto stereo = item.getProperty("stereo", {}); stereo.isObject() && !readStereo(stereo, zone)) {
@@ -318,7 +320,7 @@ namespace {
 struct FactoryModel {
     cydaw::base::Value json;
     cydaw::base::Time modified;
-    juce::int64 size {};
+    cydaw::base::int64 size {};
 };
 std::mutex& factoryModelsLock()
 {
@@ -584,7 +586,7 @@ const char* prismOscillatorKey(const int oscillator)
 cydaw::base::Value prismTableVar(const cydaw::base::Text& name, const cydaw::base::Text& source, const int frameLength,
                         const std::vector<std::vector<float>>& frames)
 {
-    juce::MemoryOutputStream pcm;
+    cydaw::base::MemoryOutputStream pcm;
     auto count = 0;
     for (const auto& frame : frames) {
         if (static_cast<int>(frame.size()) != frameLength)
@@ -598,7 +600,7 @@ cydaw::base::Value prismTableVar(const cydaw::base::Text& name, const cydaw::bas
     table->setProperty("source", source);
     table->setProperty("frameLength", frameLength);
     table->setProperty("frames", count);
-    table->setProperty("pcm", juce::Base64::toBase64(pcm.getData(), pcm.getDataSize()));
+    table->setProperty("pcm", cydaw::base::Base64::toBase64(pcm.getData(), pcm.getDataSize()));
     return cydaw::base::Value(table.release());
 }
 
@@ -616,11 +618,11 @@ cydaw::engine::prism::TablesRef prismTablesFromVar(const cydaw::base::Value& val
         const auto count = static_cast<int>(table.getProperty("frames", 0));
         if (frameLength < 16 || frameLength > 16'384 || count < 1 || count > 1'024)
             continue;
-        juce::MemoryOutputStream bytes;
-        if (!juce::Base64::convertFromBase64(bytes, table.getProperty("pcm", {}).toString())
+        cydaw::base::MemoryOutputStream bytes;
+        if (!cydaw::base::Base64::convertFromBase64(bytes, table.getProperty("pcm", {}).toString())
             || bytes.getDataSize() < static_cast<std::size_t>(frameLength) * static_cast<std::size_t>(count) * 2)
             continue;
-        juce::MemoryInputStream input(bytes.getData(), bytes.getDataSize(), false);
+        cydaw::base::MemoryInputStream input(bytes.getData(), bytes.getDataSize(), false);
         std::vector<std::vector<float>> frames(static_cast<std::size_t>(count), std::vector<float>(static_cast<std::size_t>(frameLength)));
         for (auto& frame : frames)
             for (auto& sample : frame)
@@ -654,7 +656,7 @@ cydaw::base::Text prismTableName(const cydaw::base::Value& tables, const int osc
 
 cydaw::base::Value impulseVar(const cydaw::engine::ImpulseResponse& response, const cydaw::base::Text& source)
 {
-    juce::MemoryOutputStream pcm;
+    cydaw::base::MemoryOutputStream pcm;
     for (const auto& channel : response.channels)
         for (const auto sample : channel)
             pcm.writeFloat(sample);
@@ -663,8 +665,8 @@ cydaw::base::Value impulseVar(const cydaw::engine::ImpulseResponse& response, co
     value->setProperty("source", source);
     value->setProperty("sampleRate", response.sampleRate);
     value->setProperty("channels", static_cast<int>(response.channels.size()));
-    value->setProperty("frames", static_cast<juce::int64>(response.length()));
-    value->setProperty("pcm", juce::Base64::toBase64(pcm.getData(), pcm.getDataSize()));
+    value->setProperty("frames", static_cast<cydaw::base::int64>(response.length()));
+    value->setProperty("pcm", cydaw::base::Base64::toBase64(pcm.getData(), pcm.getDataSize()));
     return cydaw::base::Value(value.release());
 }
 
@@ -673,16 +675,16 @@ cydaw::engine::ImpulseResponseRef impulseFromVar(const cydaw::base::Value& value
     if (!value.isObject())
         return {};
     const auto channels = static_cast<int>(value.getProperty("channels", 0));
-    const auto frames = static_cast<juce::int64>(value.getProperty("frames", 0));
+    const auto frames = static_cast<cydaw::base::int64>(value.getProperty("frames", 0));
     const auto rate = static_cast<double>(value.getProperty("sampleRate", 0.0));
-    if (channels < 1 || channels > 2 || frames < 1 || frames > static_cast<juce::int64>(cydaw::engine::maximumImpulseSamples) * 4
+    if (channels < 1 || channels > 2 || frames < 1 || frames > static_cast<cydaw::base::int64>(cydaw::engine::maximumImpulseSamples) * 4
         || rate < 8'000.0 || rate > 384'000.0)
         return {};
-    juce::MemoryOutputStream bytes;
-    if (!juce::Base64::convertFromBase64(bytes, value.getProperty("pcm", {}).toString())
-        || static_cast<juce::int64>(bytes.getDataSize()) < frames * channels * 4)
+    cydaw::base::MemoryOutputStream bytes;
+    if (!cydaw::base::Base64::convertFromBase64(bytes, value.getProperty("pcm", {}).toString())
+        || static_cast<cydaw::base::int64>(bytes.getDataSize()) < frames * channels * 4)
         return {};
-    juce::MemoryInputStream input(bytes.getData(), bytes.getDataSize(), false);
+    cydaw::base::MemoryInputStream input(bytes.getData(), bytes.getDataSize(), false);
     auto response = std::make_shared<cydaw::engine::ImpulseResponse>();
     response->name = value.getProperty("name", {}).toString().toStdString();
     response->sampleRate = rate;
@@ -702,7 +704,7 @@ std::map<std::uint64_t, cydaw::engine::ImpulseResponseRef> impulsesFromGraphStat
     if (const auto* nodes = state.getProperty("nodes", {}).getArray())
         for (const auto& node : *nodes)
             if (auto response = impulseFromVar(node.getProperty("impulse", {})))
-                found[static_cast<std::uint64_t>(static_cast<juce::int64>(node.getProperty("id", 0)))] = std::move(response);
+                found[static_cast<std::uint64_t>(static_cast<cydaw::base::int64>(node.getProperty("id", 0)))] = std::move(response);
     return found;
 }
 
@@ -727,7 +729,7 @@ void attachImpulses(cydaw::engine::NativeDspGraph& graph, const cydaw::base::Val
                         const auto read = static_cast<double>((*harmonics)[index++]);
                         amplitude = std::isfinite(read) ? static_cast<float>(read) : 0.0f;
                     }
-                tables[static_cast<std::uint64_t>(static_cast<juce::int64>(value.getProperty("id", 0)))]
+                tables[static_cast<std::uint64_t>(static_cast<cydaw::base::int64>(value.getProperty("id", 0)))]
                     = cydaw::engine::buildWavetableBank(shape);
             }
     for (auto& node : graph.nodes)

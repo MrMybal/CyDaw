@@ -8,7 +8,7 @@
 #include <cydaw/engine/SoundModel.h>
 #include <cydaw/engine/WavetableShape.h>
 
-#include <juce_core/juce_core.h>
+
 
 #include <map>
 

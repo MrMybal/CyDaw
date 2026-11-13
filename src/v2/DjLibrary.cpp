@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/File.h>
 #include <cydaw/integration/CyAudioCoreAudioFormats.h>
@@ -29,9 +30,9 @@ double number(const cydaw::base::Value& object, const char* key, const double fa
 
 } // namespace
 
-DjLibrary::DjLibrary() : juce::Thread("CyDAW DJ collection")
+DjLibrary::DjLibrary() : cydaw::base::Thread("CyDAW DJ collection")
 {
-    startThread(juce::Thread::Priority::low);
+    startThread(cydaw::base::Thread::Priority::low);
 }
 
 DjLibrary::~DjLibrary()

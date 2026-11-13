@@ -97,7 +97,7 @@ bool SynthView::handles(const cydaw::base::Text& typeKey)
     return synth::modelForType(typeKey.toStdString()) != synth::Model::none;
 }
 
-float SynthView::paneWidth(app::NodeGraphComponent& graph, const std::uint64_t nodeId, const float height)
+float SynthView::paneWidth(app::GraphDocument& graph, const std::uint64_t nodeId, const float height)
 {
     const auto values = graph.editorSynthValues(nodeId);
     if (!values || values->first == synth::Model::none)
@@ -112,7 +112,7 @@ float SynthView::paneWidth(app::NodeGraphComponent& graph, const std::uint64_t n
     return std::max(dp(120.0f), width - dp(4.0f));
 }
 
-bool SynthView::bind(const TrackRef& track, app::NodeGraphComponent& graph, const std::uint64_t nodeId)
+bool SynthView::bind(const TrackRef& track, app::GraphDocument& graph, const std::uint64_t nodeId)
 {
     const auto values = graph.editorSynthValues(nodeId);
     if (!values || values->first == synth::Model::none)
@@ -1302,7 +1302,7 @@ void SynthView::drawOrb(ImDrawList* list, const char* prefix, const ImVec2 origi
 
 // ---- The card's pane, the window ------------------------------------------------------------------
 
-void SynthView::drawPane(const TrackRef& track, app::NodeGraphComponent& graph, const std::uint64_t nodeId, const ImVec2 origin,
+void SynthView::drawPane(const TrackRef& track, app::GraphDocument& graph, const std::uint64_t nodeId, const ImVec2 origin,
                          const ImVec2 size, const ImU32 colour)
 {
     // Inside a module: English, whatever the language.

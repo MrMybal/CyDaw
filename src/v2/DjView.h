@@ -1,3 +1,4 @@
+#include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #pragma once
 
@@ -75,7 +76,7 @@ private:
     std::uint64_t observedProcessingRevision_{};
     double processingChangedAt_{};
     std::atomic<bool> processingWriteFailed_{false};
-    juce::ThreadPool processingWriter_{1};
+    cydaw::base::ThreadPool processingWriter_{1};
     float processingHeight_ { 280.0f };
     void learnFromDecks();
     void drawDeck(int deck, ImVec2 size);
