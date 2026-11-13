@@ -1,5 +1,5 @@
 {
-  "schema": 1,
+  "schema": 2,
   "date": "2026-11-13",
   "platform": "Windows x64 / MSVC 19.40 / Release",
   "architecture": "CyDaw -> CyAudioCore -> CyDSP (numerical processing)",
@@ -130,14 +130,98 @@
       "result": "passed",
       "exit_code": 0,
       "log": "output/cyaudio-plugin-3-vst3.log"
+    },
+    {
+      "name": "production_device_and_modes",
+      "result": "passed",
+      "tests_passed": 12,
+      "log": "build/cyaudio-desktop/output/cyaudio-real-integration-tests.xml",
+      "includes": [
+        "ASIO injected API + callback allocation audit",
+        "Core native null-device callback/lifecycle",
+        "Core services/file formats",
+        "VST3 worker IPC/automation/state/crash",
+        "sample search",
+        "editing",
+        "mixing",
+        "DJ",
+        "Foundry",
+        "processing",
+        "project import"
+      ],
+      "disabled_juce_backends": [
+        "ASIO",
+        "WASAPI",
+        "DirectSound",
+        "VST3 host in production worker"
+      ],
+      "final_duration_seconds": 130.4
+    },
+    {
+      "name": "production_plugin_formats",
+      "result": "passed",
+      "log": "output/cyaudio-formats-production/69eb2b89283243e1970df8bc2a7003cc/checks.json",
+      "jsfx_gain_db": -6.0,
+      "jsfx_tempo_60_vs_120_db": -6.1,
+      "invalid_compilation_preserves_active_script": true,
+      "formats": [
+        "CLAP",
+        "LV2",
+        "VST3"
+      ],
+      "project_save_reload": true,
+      "workshop_export_projects": [
+        "VST3",
+        "CLAP",
+        "LV2"
+      ]
+    },
+    {
+      "name": "production_vst3_graph_contract",
+      "result": "passed",
+      "log": "output/cyaudio-worker-vst3-graph.json",
+      "checks": [
+        "process",
+        "state",
+        "editor",
+        "graph parameter names/units/automatable",
+        "graph parameter changes alter audio"
+      ]
+    },
+    {
+      "name": "physical_asio_output_only_silent",
+      "result": "passed",
+      "device": "Fireface USB",
+      "sample_rate": 48000,
+      "client_block_frames": 64,
+      "run_ms": 300,
+      "callbacks": 224,
+      "frames": 14336,
+      "inputs_enabled": false,
+      "backend_declared_output_latency_samples": 1069,
+      "analog_latency_measured": false,
+      "hardware_period_asserted": false,
+      "log": "output/cyaudio-asio-silent-final.json"
+    },
+    {
+      "name": "bundled_asio_sources_notices",
+      "result": "passed",
+      "source_file_hashes_checked": 27,
+      "provenance": "third_party/asio-provenance.json"
     }
   ],
   "not_validated": [
-    "physical audio/MIDI/ASIO/JACK",
-    "PortAudio provider runtime",
-    "third-party installed plugins and their native editors",
+    "physical input/recording and analog latency",
+    "hardware unplug/reconnect and JACK",
+    "installed third-party plugins and interactive editor DPI/focus/keyboard interoperability",
     "Linux/macOS/ARM application runtime",
     "GitHub workflow execution and private-repository credentials",
-    "full desktop without JUCE"
-  ]
+    "full desktop without JUCE",
+    "immediate state snapshot while UI edits await audio consumption"
+  ],
+  "application_integration": {
+    "native_audio": "CyAudioCore, including application-owned GPL PortAudio ASIO extension",
+    "vst3_worker": "CyAudioCore; JUCE VST3 host compiled out",
+    "remaining": "JUCE source/model/MIDI/ABI, production LV2 host and historical VST3 exporter"
+  }
 }

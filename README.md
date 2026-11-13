@@ -22,7 +22,8 @@
 
 > **CyDSP-CORE branch:** the audio integration now uses **CyAudioCore**, which manages
 > **CyDSP** internally for numerical DSP, including the internal/exported plugins.
-> JUCE remains in the desktop shell and some audio/plugin adapters. See the
+> Native audio and production VST3 hosting now use CyAudioCore. JUCE remains in
+> the application ABI, source/MIDI paths and some plugin adapters. See the
 > [build and integration guide](docs/CyAudioCoreIntegration.md) and the
 > [current issue report (French)](docs/CyAudioCoreIntegrationReport.fr.md).
 

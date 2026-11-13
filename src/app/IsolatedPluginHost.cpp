@@ -124,6 +124,7 @@ juce::Result IsolatedPluginHost::startWorker(PluginWorkerLaunch launch,
         static_cast<std::uint32_t>(cydaw::plugins::SharedPluginState::loading),
         std::memory_order_release);
 
+    wake_.open(("Local\\CyDAW.PluginAudio." + sharedFile_.getFileName()).toWideCharPointer());
     auto arguments = launch.command;
     arguments.add(passthrough ? "--realtime-passthrough" : "--realtime-plugin");
     if (!passthrough)
@@ -197,6 +198,7 @@ void IsolatedPluginHost::stop()
     if (mapping_ != nullptr) {
         if (auto* shared = static_cast<cydaw::plugins::SharedPluginAudio*>(mapping_->getData())) {
             cydaw::plugins::sharedAtomic(shared->shutdownRequested).store(1, std::memory_order_release);
+            wake_.signal();
             cydaw::plugins::sharedAtomic(shared->state).store(
                 static_cast<std::uint32_t>(cydaw::plugins::SharedPluginState::stopping),
                 std::memory_order_release);
@@ -204,6 +206,7 @@ void IsolatedPluginHost::stop()
     }
     if (process_.isRunning() && !process_.waitForProcessToFinish(750))
         process_.kill();
+    wake_.close();
     mapping_.reset();
     if (sharedFile_ != juce::File {})
         sharedFile_.deleteFile();
@@ -299,6 +302,7 @@ juce::Result IsolatedPluginHost::sendCommand(const cydaw::plugins::SharedPluginC
     shared->commandStatus[0] = '\0';
     const auto sequence = nextCommandSequence_++;
     request.store(sequence, std::memory_order_release);
+    wake_.signal();
     for (int waited = 0; waited < timeoutMilliseconds; ++waited) {
         if (response.load(std::memory_order_acquire) == sequence) {
             if (shared->commandResult == 0)
@@ -541,10 +545,16 @@ bool IsolatedPluginHost::processBlock(juce::AudioBuffer<float>& buffer,
         shared->outputChannels = static_cast<std::uint16_t>(channelCount);
         submittedAtCallback_ = callback;
         request.store(nextSequence_++, std::memory_order_release);
+        wake_.signal();
     } else {
         missedBlocks_.fetch_add(1, std::memory_order_relaxed);
     }
 
+    // An active worker has one block of declared pipeline latency. A missing
+    // response must not inject the current dry block into the processed path:
+    // that bypasses effects and invalidates both gain and latency compensation.
+    if (!processed)
+        buffer.clear(startSample, numSamples);
     callbacksInFlight_.fetch_sub(1, std::memory_order_acq_rel);
     return processed;
 }

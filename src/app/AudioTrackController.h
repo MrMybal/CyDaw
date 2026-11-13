@@ -1,4 +1,5 @@
 #pragma once
+#include <cydaw/integration/CyAudioCoreDeviceManager.h>
 
 #include "AudioEdit.h"
 #include "DjEngine.h"
@@ -583,6 +584,7 @@ public:
     // follows.
     void setClock(double seconds) noexcept { clock_.store(seconds, std::memory_order_relaxed); }
     void setClockRunning(bool running) noexcept { clockRunning_.store(running, std::memory_order_release); }
+    void setTempo(double bpm) noexcept { tempo_.store(bpm, std::memory_order_relaxed); }
     [[nodiscard]] double clock() const noexcept { return clock_.load(std::memory_order_relaxed); }
     // How late the master's devices make the mix (look-aheads).
     [[nodiscard]] int chainLatencySamples() const noexcept
@@ -606,6 +608,7 @@ private:
     std::atomic<double> sampleRate_ {};
     std::atomic<double> clock_ {};
     std::atomic<bool> clockRunning_ {};
+    std::atomic<double> tempo_ { 120.0 };
     std::atomic<juce::int64> targetSamples_ {};
     std::atomic<juce::int64> capturedSamples_ {};
     std::atomic<juce::int64> skipSamples_ {};
@@ -2328,7 +2331,7 @@ private:
     [[nodiscard]] bool scheduleLauncherStop(std::size_t trackIndex,
                                             double delaySeconds);
 
-    juce::AudioDeviceManager deviceManager_;
+    cydaw::integration::DeviceManager deviceManager_;
     juce::AudioFormatManager formatManager_;
     juce::TimeSliceThread readAheadThread_ { "CyDAW audio read-ahead" };
     TrackMixer mixerSource_;

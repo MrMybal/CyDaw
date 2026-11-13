@@ -45,6 +45,14 @@ def package(build, output, alpha=False, juce_source=None):
     for dependency in ('CyAudioCore', 'CyDSP'):
         required.extend((build / 'Licenses' / dependency / 'LICENSE',
                          build / 'Licenses' / dependency / 'manifest.json'))
+    # ASIO is an application-side GPL extension. Its marker is copied only for
+    # an ASIO-enabled build; reject incomplete notices/sources when present.
+    asio = build / 'Licenses/ASIO'
+    if asio.is_dir():
+        required.extend(asio / name for name in (
+            'asio-provenance.json', 'SDK/LICENSE.txt', 'SDK/COPYING',
+            'SDK/common/asio.cpp', 'PortAudio/pa_asio.cpp',
+            'PortAudio/iasiothiscallresolver.cpp'))
     if not list((build / 'Licenses/FFmpeg/sources').glob('*.tar.gz')):
         raise FileNotFoundError('FFmpeg corresponding source archive is missing')
     for file in required:

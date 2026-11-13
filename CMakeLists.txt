@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.24)
 
 project(CyDAW VERSION 0.78.0 LANGUAGES C CXX)
 
-include(cmake/CyAudioCore.cmake)
 
 # zstd's decoder (third_party/zstd, BSD): Zrythm's projects are compressed with it.
 add_library(cydaw_zstd STATIC
@@ -25,7 +24,11 @@ option(CYDAW_BUILD_DESKTOP "Build the JUCE desktop shell" ON)
 option(CYDAW_BUILD_GRAPH_RUNTIME_PLUGIN
        "Build the editable CyDAW Graph Runtime VST3" ON)
 option(CYDAW_FETCH_JUCE "Download the pinned JUCE release during configure" OFF)
-option(CYDAW_ENABLE_ASIO "Enable the ASIO backend on Windows (licence-sensitive)" OFF)
+set(cydaw_asio_default OFF)
+if(WIN32 AND CYDAW_BUILD_DESKTOP)
+    set(cydaw_asio_default ON)
+endif()
+option(CYDAW_ENABLE_ASIO "Build CyDaw's GPL ASIO backend using PortAudio" ${cydaw_asio_default})
 option(CYDAW_ENABLE_JACK "Enable JACK where JUCE supports it" ON)
 option(CYDAW_ENABLE_VST2 "Enable legacy VST2 hosting with a legally obtained SDK" OFF)
 set(CYDAW_JUCE_SOURCE_DIR "" CACHE PATH "Path to a local JUCE checkout")
@@ -43,6 +46,14 @@ option(CYDAW_ENABLE_LTO "Link the desktop targets with link-time optimisation" O
 option(CYDAW_ENABLE_PCH "Precompile the JUCE surface shared by the desktop sources" ON)
 set(CYDAW_VST2_SDK_PATH "" CACHE PATH
     "Root containing pluginterfaces/vst2.x/aeffect.h from a licensed historical VST2 SDK")
+# The GPL ASIO SDK is selected by CyDaw, outside the MIT source repositories.
+if(WIN32 AND CYDAW_ENABLE_ASIO)
+    set(CYAUDIOCORE_WITH_PORTAUDIO ON CACHE BOOL "" FORCE)
+endif()
+include(cmake/CyAudioCore.cmake)
+if(WIN32 AND CYDAW_ENABLE_ASIO)
+    include(cmake/Asio.cmake)
+endif()
 set(CYDAW_WINDOWS_PLUGIN_WORKER "" CACHE FILEPATH
     "Optional prebuilt Windows CyDAWPluginWorker.exe bundled with Linux packages")
 
@@ -109,17 +120,33 @@ message(STATUS
 function(cydaw_configure_audio_backends target_name)
     cydaw_copy_audio_notices(${target_name} "$<TARGET_FILE_DIR:${target_name}>/Licenses")
     target_compile_definitions(${target_name} PRIVATE
-        JUCE_ASIO=$<BOOL:${CYDAW_ASIO_AVAILABLE}>
+        JUCE_ASIO=0
+        JUCE_WASAPI=0
+        JUCE_DIRECTSOUND=0
+        CYDAW_WITH_ASIO=$<BOOL:${CYDAW_ASIO_AVAILABLE}>
+        CYDAW_CORE_AUDIO_DEVICES=1
         JUCE_JACK=$<BOOL:${CYDAW_JACK_AVAILABLE}>
     )
+    target_sources(${target_name} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/integration/CyAudioCoreDevices.cpp")
+    target_link_libraries(${target_name} PRIVATE CyAudioCore::Devices)
+    if(CYDAW_ASIO_AVAILABLE)
+        target_sources(${target_name} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/integration/CyAudioCoreAsioDevice.cpp")
+        target_link_libraries(${target_name} PRIVATE cydaw_asio)
+    endif()
     if(CYDAW_JACK_AVAILABLE)
         target_include_directories(${target_name} PRIVATE "${CYDAW_JACK_INCLUDE_DIR}")
     endif()
 endfunction()
 
 function(cydaw_configure_plugin_formats target_name)
+    set(cydaw_juce_vst3_host 1)
+    if(target_name STREQUAL "CyDAWPluginWorker")
+        # The production worker uses CyAudioCore's VST3 SDK host exclusively.
+        set(cydaw_juce_vst3_host 0)
+    endif()
     target_compile_definitions(${target_name} PRIVATE
-        JUCE_PLUGINHOST_VST3=1
+        CYDAW_CORE_PLUGIN_HOST=1
+        JUCE_PLUGINHOST_VST3=${cydaw_juce_vst3_host}
         JUCE_PLUGINHOST_LV2=1
         JUCE_PLUGINHOST_VST=$<BOOL:${CYDAW_VST2_AVAILABLE}>
     )
@@ -262,6 +289,14 @@ if(CYDAW_BUILD_TESTS)
     target_link_libraries(cydaw_cyaudio_dsp_tests PRIVATE CyDAW::Core)
     add_test(NAME cydaw_cyaudio_dsp_tests COMMAND cydaw_cyaudio_dsp_tests)
     cydaw_configure_test(cydaw_cyaudio_dsp_tests 120)
+    if(TARGET cydaw_asio)
+        add_executable(cydaw_asio_tests tests/AsioDriverTests.cpp)
+        target_link_libraries(cydaw_asio_tests PRIVATE cydaw_asio)
+        target_include_directories(cydaw_asio_tests PRIVATE src "${CMAKE_CURRENT_SOURCE_DIR}/third_party/portaudio-asio"
+            "${CYDAW_CYAUDIOCORE_SOURCE_DIR}/third_party/portaudio/include")
+        add_test(NAME cydaw_asio_tests COMMAND cydaw_asio_tests)
+        cydaw_configure_test(cydaw_asio_tests 60)
+    endif()
 
 endif()
 
@@ -304,6 +339,16 @@ if(CYDAW_BUILD_DESKTOP)
         target_compile_definitions(cydaw_cyaudio_integration_tests PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
         add_test(NAME cydaw_cyaudio_integration_tests COMMAND cydaw_cyaudio_integration_tests)
         cydaw_configure_test(cydaw_cyaudio_integration_tests 120)
+    endif()
+
+    if(CYDAW_BUILD_TESTS AND TARGET juce::juce_audio_devices)
+        juce_add_console_app(cydaw_cyaudio_device_tests PRODUCT_NAME "CyAudioCore device adapter tests")
+        target_sources(cydaw_cyaudio_device_tests PRIVATE tests/CyAudioCoreDeviceTests.cpp src/integration/CyAudioCoreDevices.cpp)
+        target_include_directories(cydaw_cyaudio_device_tests PRIVATE include)
+        target_link_libraries(cydaw_cyaudio_device_tests PRIVATE CyAudioCore::Devices juce::juce_audio_devices juce::juce_gui_basics)
+        target_compile_definitions(cydaw_cyaudio_device_tests PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
+        add_test(NAME cydaw_cyaudio_device_tests COMMAND cydaw_cyaudio_device_tests)
+        cydaw_configure_test(cydaw_cyaudio_device_tests 60)
     endif()
 
     # JUCE compiles its module .cpp files as part of each consuming target, and
@@ -630,9 +675,14 @@ if(CYDAW_BUILD_DESKTOP)
         endif()
         add_subdirectory(third_party/ysfx EXCLUDE_FROM_ALL)
         target_sources(CyDAWPluginWorker PRIVATE src/plugin_worker/PluginWorkerMain.cpp
-            src/plugin_worker/ExtraPluginFormats.cpp src/plugin_worker/ClapInstance.cpp src/plugin_worker/JsfxInstance.cpp)
+                src/plugin_worker/WorkerWake.cpp
+            src/plugin_worker/ExtraPluginFormats.cpp src/plugin_worker/ClapInstance.cpp src/plugin_worker/JsfxInstance.cpp
+            src/plugin_worker/CyAudioCorePluginFormat.cpp)
         target_include_directories(CyDAWPluginWorker PRIVATE third_party/clap/include)
-        target_link_libraries(CyDAWPluginWorker PRIVATE ysfx::ysfx juce::juce_gui_extra)
+        # One ysfx/EEL runtime per worker. Core embeds its portable runtime;
+        # linking the old JIT archive too mixes VM symbols and breaks scripts.
+        target_include_directories(CyDAWPluginWorker PRIVATE third_party/ysfx/include)
+        target_link_libraries(CyDAWPluginWorker PRIVATE CyAudioCore::Plugins juce::juce_gui_extra)
         target_compile_features(CyDAWPluginWorker PRIVATE cxx_std_20)
         target_compile_definitions(CyDAWPluginWorker PRIVATE
             NOMINMAX WIN32_LEAN_AND_MEAN
@@ -669,6 +719,7 @@ if(CYDAW_BUILD_DESKTOP)
             target_sources(cydaw_plugin_ipc_tests PRIVATE
                 tests/PluginIpcTests.cpp
                 src/app/IsolatedPluginHost.cpp
+                src/plugin_worker/WorkerWake.cpp
                 src/app/IsolatedPluginHost.h
                 src/app/WindowsPluginBridge.cpp
                 src/app/WindowsPluginBridge.h
@@ -923,6 +974,7 @@ if(CYDAW_BUILD_DESKTOP)
                 src/app/AudioTrackController.h
                 src/app/VirtualAudioBus.cpp
                 src/app/IsolatedPluginHost.cpp
+                src/plugin_worker/WorkerWake.cpp
                 src/app/WindowsPluginBridge.cpp
                 src/app/Localization.cpp
                 src/app/NativeDspRuntime.cpp

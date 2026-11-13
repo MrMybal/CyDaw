@@ -122,6 +122,12 @@ int main(const int argc, char* argv[])
     const auto gainIndex = gainParameter != parameters.end() ? gainParameter->index : 0u;
     passed = expect(vstHost.setParameter(gainIndex, 0.25f).wasOk(),
                     "set plugin parameter through worker") && passed;
+    buffer.clear();
+    for(int channel=0;channel<buffer.getNumChannels();++channel)
+        for(int sample=0;sample<buffer.getNumSamples();++sample)buffer.setSample(channel,sample,.4f);
+    const auto firstVstBlock = vstHost.processBlock(buffer,0,buffer.getNumSamples());
+    passed = expect(!firstVstBlock && buffer.getMagnitude(0,0,buffer.getNumSamples())==0,
+                    "an active worker never leaks dry audio before its first response") && passed;
     auto vstReceived = false;
     for (int attempt = 0; attempt < 100 && !vstReceived; ++attempt) {
         for (int channel = 0; channel < buffer.getNumChannels(); ++channel)

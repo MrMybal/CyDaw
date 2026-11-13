@@ -1919,6 +1919,11 @@ void MasterOutputAudioSource::releaseResources()
 void MasterOutputAudioSource::getNextAudioBlock(
     const juce::AudioSourceChannelInfo& bufferToFill)
 {
+    // DSP transport is intentionally per render thread (independent plugin
+    // instances can have different hosts). Publish this session on its actual
+    // callback thread, rather than changing only the UI thread's TLS values.
+    NativeDspRuntime::setSessionTempo(tempo_.load(std::memory_order_relaxed));
+    NativeDspRuntime::setSessionPlaying(clockRunning_.load(std::memory_order_acquire));
     input_.getNextAudioBlock(bufferToFill);
     // Where this block starts on the master's clock (none while stopped:
     // its clip's automation then rests), the clock moved on.
@@ -13548,8 +13553,7 @@ juce::Result AudioTrackController::importMidiFile(
     }
     summary.noteCount = totalNotes;
     if (adoptFileTempo)
-        tempoBpm_ = importedTempo;
-        NativeDspRuntime::setSessionTempo(tempoBpm_);
+        setTempo(importedTempo);
     (void) setLiveMidiTrack(summary.trackIds.front());
     clearMidiEditHistory();
     publishAllMidiSequences();
@@ -14689,6 +14693,7 @@ void AudioTrackController::setTempo(const double beatsPerMinute)
     const auto before = tempoBpm_;
     tempoBpm_ = juce::jlimit(20.0, 400.0, beatsPerMinute);
     NativeDspRuntime::setSessionTempo(tempoBpm_);
+    masterOutput_.setTempo(tempoBpm_);
     // A loop auditioned at the tempo follows it.
     if (tempoPreview_.file != juce::File() && before != tempoBpm_)
         (void) startTempoPreview(tempoPreview_.file, samplePreviewPositionSeconds(), tempoPreview_.tempo);

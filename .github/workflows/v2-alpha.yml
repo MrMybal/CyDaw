@@ -56,7 +56,7 @@ jobs:
           Expand-Archive -LiteralPath $archive -DestinationPath $env:RUNNER_TEMP
           (Join-Path $env:RUNNER_TEMP 'nasm-2.16.03') | Out-File -FilePath $env:GITHUB_PATH -Append
       - name: Configure CyDAW V2 Release
-        run: cmake --preset desktop-windows-wasapi -DCYDAW_BUILD_V2=ON -DCYDAW_ENABLE_LTO=ON
+        run: cmake --preset desktop-windows-wasapi -DCYDAW_BUILD_V2=ON -DCYDAW_ENABLE_LTO=ON -DCYDAW_ENABLE_ASIO=ON
       - name: Build V2 and native tests
         run: cmake --build --preset desktop-windows-wasapi --parallel 2
       - name: Package and CyDoc contract tests

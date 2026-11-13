@@ -7,6 +7,7 @@
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <juce_core/juce_core.h>
 
+#include <cydaw/plugins/WorkerWake.h>
 #include <atomic>
 #include <array>
 #include <memory>
@@ -70,7 +71,8 @@ public:
     [[nodiscard]] juce::Result hideEditor();
 
     // Called by the audio thread. Returns true only when a fresh processed
-    // block was available; false means that the dry input was left untouched.
+    // block was available. An active worker missing its deadline emits silence;
+    // a stopped/crashed worker leaves input untouched for safety bypass.
     [[nodiscard]] bool processBlock(juce::AudioBuffer<float>& buffer,
                                     int startSample,
                                     int numSamples, double timelineSeconds = 0.0, double tempo = 120.0, bool playing = false) noexcept;
@@ -98,6 +100,7 @@ private:
     // the shared block is not written over while it reads it.
     [[nodiscard]] static bool controlBusy(cydaw::plugins::SharedPluginAudio& shared) noexcept;
 
+    cydaw::plugins::WorkerWake wake_;
     juce::ChildProcess process_;
     juce::File sharedFile_;
     juce::File pluginFile_;

@@ -22,7 +22,8 @@
 
 > **Branche CyDSP-CORE :** l'intégration audio utilise désormais **CyAudioCore**,
 > qui gère **CyDSP** en interne pour le calcul DSP, y compris les plugins internes/exportés.
-> JUCE reste présent dans le desktop et certains adaptateurs audio/plugins. Voir le
+> L’audio natif et l’hôte VST3 de production passent par CyAudioCore. JUCE reste
+> dans l’ABI, les sources/MIDI et certains adaptateurs. Voir le
 > [guide de compilation](docs/CyAudioCoreIntegration.md) et le
 > [rapport actuel](docs/CyAudioCoreIntegrationReport.fr.md).
 

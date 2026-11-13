@@ -172,7 +172,8 @@
         "CYDAW_BUILD_V2": "ON",
         "CYDAW_ENABLE_LTO": "OFF",
         "CYDAW_CYDSP_SOURCE_DIR": "${sourceDir}/../CyDSP",
-        "CYDAW_CYAUDIOCORE_SOURCE_DIR": "${sourceDir}/../CyAudioCore"
+        "CYDAW_CYAUDIOCORE_SOURCE_DIR": "${sourceDir}/../CyAudioCore",
+        "CYDAW_ENABLE_ASIO": "ON"
       }
     }
   ],

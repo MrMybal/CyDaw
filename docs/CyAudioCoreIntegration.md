@@ -32,10 +32,19 @@ or obsolete public API fails configuration explicitly. Upstream tests are opt-in
 and disabled here; the integration has its own acceptance tests. Do not enable
 global fast-math/AVX flags: CyDSP owns its per-kernel ISA dispatch.
 
-`CYAUDIOCORE_WITH_PORTAUDIO=ON` enables CyAudioCore's optional provider. This does
-not switch the desktop's device manager to PortAudio. The current desktop still
-uses its established JUCE device/MIDI integration; no saved audio setting is
-changed by this migration.
+The desktop now opens native audio devices through CyAudioCore. A temporary
+`juce::AudioIODevice` adapter preserves the application's callback/preferences
+boundary; it does not call JUCE's native audio drivers. Windows ASIO/WASAPI/
+DirectSound JUCE backends are disabled in these targets. MIDI and the historical
+source graph still use JUCE and remain separate migration work.
+
+Windows desktop builds enable `CYDAW_ENABLE_ASIO` by default. CyDaw extends the
+CyAudioCore PortAudio build with its own GPL-v3 ASIO SDK integration and supplies
+an external public `cyaudio::AudioDeviceDriver`; neither MIT repository is edited.
+`CYDAW_ENABLE_ASIO=OFF` keeps an SDK-free build. Standalone numerical/native
+exports default to desktop OFF and do not acquire this ASIO dependency.
+Provenance, exact source hashes, original per-file notices and the full GPL text
+are under `third_party/asio-*` and copied with the application.
 
 ## Production paths
 
@@ -52,8 +61,19 @@ changed by this migration.
   The new multibus graph, external sidechain dynamics and meters are available
   through the numerical dependency and validated in composition with CyAudioCore
   sources. Availability does not imply every new processor has a DAW UI node.
-- CyAudioCore's host and separate worker are tested independently of JUCE. They
-  do not silently replace CyDaw's current v6 IPC protocol or state envelopes.
+- The production v6 worker now uses CyAudioCore for VST3 scan/creation, ports,
+  processing, parameters, transport, state and native Windows editors. Its JUCE
+  VST3 host is compiled out. JUCE plugin-instance/editor types remain temporary
+  application ABI adapters. Current graph commands' XML payloads are translated
+  at that boundary; historical VST3 projects are not an acceptance requirement.
+- The production CLAP/JSFX adapters and LV2 JUCE host remain in place. A single
+  Core-provided ysfx/EEL runtime is linked into the worker, avoiding duplicate VM
+  symbols. Core's independent hosts for all four formats also pass their tests.
+- Windows worker IPC uses a non-waiting wake signal from the callback rather
+  than coarse GUI polling. An active worker missing its pipeline deadline emits
+  silence; a stopped/crashed worker retains the explicit safety bypass.
+- Session tempo/play state are published on the actual render thread, retaining
+  per-instance TLS isolation in numerical plugins.
 - Build outputs and runtime/native-plugin packages carry both libraries' original
   licenses, manifests and third-party notices. The packager checks their presence.
 
@@ -65,8 +85,8 @@ cmake --build --preset cyaudio-core --parallel 8
 ctest --preset cyaudio-core
 
 cmake --preset cyaudio-desktop -DCYDAW_JUCE_SOURCE_DIR=build/desktop/_deps/juce-src -DFETCHCONTENT_SOURCE_DIR_CYUI=D:/_Project/CyImgui_Interface
-cmake --build --preset cyaudio-desktop --target CyDAW2 CyDAWPluginWorker CyDAWGraphRuntime_VST3 CyDAWTestGain_VST3 cydaw_cyaudio_integration_tests cydaw_cyaudio_services_tests cydaw_plugin_ipc_tests --parallel 6
-ctest --test-dir build/cyaudio-desktop -C Release -R '^cydaw_(cyaudio_integration_tests|cyaudio_services_tests|plugin_ipc_tests)$|^cydaw2_(dj|foundry|processing|editing|sample_search|mixing|project_import)_check$' --output-on-failure
+cmake --build --preset cyaudio-desktop --target CyDAW2 CyDAWPluginWorker CyDAWGraphRuntime_VST3 CyDAWTestGain_VST3 cydaw_cyaudio_integration_tests cydaw_cyaudio_services_tests cydaw_asio_tests cydaw_cyaudio_device_tests cydaw_plugin_ipc_tests --parallel 6
+ctest --test-dir build/cyaudio-desktop -C Release -R '^cydaw_(cyaudio_integration_tests|cyaudio_services_tests|asio_tests|cyaudio_device_tests|plugin_ipc_tests)$|^cydaw2_(dj|foundry|processing|editing|sample_search|mixing|project_import)_check$' --output-on-failure
 ```
 
 Adjust local JUCE/CyUI paths, or use the existing pinned fetch setup. Former
@@ -97,5 +117,19 @@ checkouts; `.dependencies` is ignored. Documentation-only jobs do not need these
 sources. `cmake --install --component CyDAWRuntime` also installs both notices.
 
 [Acceptance evidence](reports/CyAudioCoreAcceptance.json) distinguishes execution
-from inspection. Hardware/ASIO, Linux/macOS, installed third-party plugins and
-native editor interoperability still require their own validation.
+from inspection. A real Fireface ASIO output-only silent start/stop was verified;
+this does not measure analog latency or validate recording/hotplug. Linux/macOS,
+installed third-party plugins and native editor interoperability still require
+platform/device-specific validation.
+
+Additional application acceptance (isolated profile, speakers silenced):
+
+```powershell
+python tests/v2_plugin_formats_check.py --exe "build/cyaudio-desktop/CyDAW2_artefacts/Release/CyDAW 2.exe" --output output/cyaudio-formats --port 47965 --vst3 "build/cyaudio-desktop/CyDAWGraphRuntime_artefacts/Release/VST3/CyDAW Graph Runtime.vst3"
+build/cyaudio-desktop/CyDAWAudioProbe_artefacts/Release/CyDAWAudioProbe.exe --open-type ASIO --open-device Fireface --sample-rate 48000 --block-size 64 --output-only --run-silent-ms 300
+```
+
+Use `--clap`/`--lv2` with built original fixtures for their production-host checks.
+The hardware probe is opt-in; substitute an installed device name. Its default
+mode only enumerates. `--run-silent-ms` starts the selected stream, writes zeros
+and stops it; `--output-only` leaves all inputs disabled.

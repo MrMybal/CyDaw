@@ -60,8 +60,11 @@ def main():
     parser.add_argument('--cydsp-source', type=Path, default=ROOT.parent / 'CyDSP')
     parser.add_argument('--cyaudiocore-source', type=Path, default=ROOT.parent / 'CyAudioCore')
     parser.add_argument('--output', type=Path)
+    parser.add_argument('--summary', action='store_true', help='Omit per-line locations from the JSON snapshot')
     args = parser.parse_args()
     report = inventory(args.cydsp_source.resolve(), args.cyaudiocore_source.resolve())
+    if args.summary:
+        report['remaining_juce'].pop('locations', None)
     result = json.dumps(report, ensure_ascii=False, indent=2) + '\n'
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)

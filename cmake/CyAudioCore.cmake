@@ -47,6 +47,14 @@ if(NOT TARGET CyDSP::Stretch)
 endif()
 
 function(cydaw_copy_audio_notices target destination)
+    if(WIN32 AND CYDAW_ENABLE_ASIO)
+        add_custom_command(TARGET ${target} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${destination}/ASIO"
+            COMMAND ${CMAKE_COMMAND} -E copy_directory "${PROJECT_SOURCE_DIR}/third_party/asio-sdk" "${destination}/ASIO/SDK"
+            COMMAND ${CMAKE_COMMAND} -E copy_directory "${PROJECT_SOURCE_DIR}/third_party/portaudio-asio" "${destination}/ASIO/PortAudio"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different "${PROJECT_SOURCE_DIR}/third_party/asio-provenance.json" "${destination}/ASIO/asio-provenance.json"
+            VERBATIM)
+    endif()
     foreach(dependency IN ITEMS CyAudioCore CyDSP)
         if(dependency STREQUAL "CyAudioCore")
             set(source "${CYDAW_CYAUDIOCORE_SOURCE_DIR}")

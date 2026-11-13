@@ -1,3 +1,4 @@
+#include <cydaw/integration/CyAudioCoreDeviceManager.h>
 #include <juce_audio_devices/juce_audio_devices.h>
 #include <juce_gui_basics/juce_gui_basics.h>
 
@@ -38,6 +39,22 @@ juce::String matchingName(const juce::StringArray& values, const juce::String& r
     return {};
 }
 
+struct SilentCallback final : juce::AudioIODeviceCallback {
+    std::atomic<unsigned> calls { 0 };
+    std::atomic<unsigned long long> frames { 0 };
+    void audioDeviceAboutToStart(juce::AudioIODevice*) override {}
+    void audioDeviceStopped() override {}
+    void audioDeviceIOCallbackWithContext(const float* const*, int,
+        float* const* outputs, int channels, int count,
+        const juce::AudioIODeviceCallbackContext&) override
+    {
+        for (int ch=0; ch<channels; ++ch)
+            if (outputs[ch]) std::fill_n(outputs[ch], count, 0.0f);
+        frames.fetch_add(static_cast<unsigned>(count), std::memory_order_relaxed);
+        calls.fetch_add(1, std::memory_order_release);
+    }
+};
+
 } // namespace
 
 int main(const int argc, char* argv[])
@@ -47,7 +64,7 @@ int main(const int argc, char* argv[])
     for (int index = 1; index < argc; ++index)
         arguments.add(juce::String::fromUTF8(argv[index]));
 
-    juce::AudioDeviceManager manager;
+    cydaw::integration::DeviceManager manager;
     juce::Array<juce::var> deviceTypes;
     juce::StringArray availableTypeNames;
     juce::StringArray allDeviceNames;
@@ -83,7 +100,7 @@ int main(const int argc, char* argv[])
 
     auto report = juce::DynamicObject::Ptr(new juce::DynamicObject());
     report->setProperty("application", "CyDAW Audio Probe");
-    report->setProperty("asioCompiled", JUCE_ASIO != 0);
+    report->setProperty("asioCompiled", CYDAW_WITH_ASIO != 0);
     report->setProperty("jackCompiled", JUCE_JACK != 0);
     report->setProperty("audioDeviceTypes", juce::var(deviceTypes));
     report->setProperty("midiInputs", juce::var(midiInputs));
@@ -94,7 +111,7 @@ int main(const int argc, char* argv[])
         if (!containsIgnoreCase(availableTypeNames, "Windows Audio"))
             exitCode = 10;
 #endif
-#if JUCE_ASIO
+#if CYDAW_WITH_ASIO
         if (!containsIgnoreCase(availableTypeNames, "ASIO"))
             exitCode = 11;
 #endif
@@ -152,7 +169,7 @@ int main(const int argc, char* argv[])
             } else {
                 juce::BigInteger inputChannels;
                 juce::BigInteger outputChannels;
-                for (int channel = 0; channel < std::min(2, device->getInputChannelNames().size()); ++channel)
+                for (int channel = 0; !arguments.contains("--output-only") && channel < std::min(2, device->getInputChannelNames().size()); ++channel)
                     inputChannels.setBit(channel);
                 for (int channel = 0; channel < std::min(2, device->getOutputChannelNames().size()); ++channel)
                     outputChannels.setBit(channel);
@@ -169,6 +186,21 @@ int main(const int argc, char* argv[])
                 openResult->setProperty("outputLatencySamples", device->getOutputLatencyInSamples());
                 openResult->setProperty("inputChannels", stringArrayToVar(device->getInputChannelNames()));
                 openResult->setProperty("outputChannels", stringArrayToVar(device->getOutputChannelNames()));
+                const auto silentMs = juce::jlimit(0, 5000,
+                    argumentValue(arguments, "--run-silent-ms", "0").getIntValue());
+                if (error.isEmpty() && silentMs > 0) {
+                    SilentCallback callback;
+                    device->start(&callback);
+                    juce::Thread::sleep(silentMs);
+                    const bool running = device->isPlaying();
+                    device->stop();
+                    openResult->setProperty("silentRunMs", silentMs);
+                    openResult->setProperty("callbacks", static_cast<int>(callback.calls.load()));
+                    openResult->setProperty("frames", static_cast<juce::int64>(callback.frames.load()));
+                    openResult->setProperty("streamStarted", running && callback.calls.load() > 0);
+                    openResult->setProperty("inputEnabled", !inputChannels.isZero());
+                    if (!running || callback.calls.load() == 0) exitCode = 33;
+                }
                 device->close();
                 if (error.isNotEmpty())
                     exitCode = 32;

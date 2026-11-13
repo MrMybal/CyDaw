@@ -1,5 +1,7 @@
 #include "ExtraPluginFormats.h"
+#include "CyAudioCorePluginFormat.h"
 #include <cydaw/plugins/PluginIsolation.h>
+#include <cydaw/plugins/WorkerWake.h>
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_gui_basics/juce_gui_basics.h>
@@ -140,8 +142,8 @@ PluginFormatSelection formatForPlugin(const juce::File& pluginFile)
     if (pluginFile.hasFileExtension("lv2")) return {std::make_unique<juce::LV2PluginFormat>(), "LV2", {}};
     if (cydaw::plugins::isExtraFormat(pluginFile)) return {cydaw::plugins::extraPluginFormat(pluginFile), pluginFile.hasFileExtension("clap") ? "CLAP" : "JSFX", {}};
     if (pluginFile.hasFileExtension("vst3")) {
-#if JUCE_PLUGINHOST_VST3
-        return { std::make_unique<juce::VST3PluginFormat>(), "VST3", {} };
+#if CYDAW_CORE_PLUGIN_HOST
+        return { cydaw::plugins::cyAudioCoreVst3Format(), "VST3", {} };
 #else
         return { {}, "VST3", "This worker was built without VST3 hosting" };
 #endif
@@ -171,6 +173,12 @@ juce::var graphStateFromPlugin(juce::AudioProcessor& processor)
     processor.getStateInformation(state);
     if (state.isEmpty())
         return {};
+    if (state.getSize() >= 24 && std::memcmp(state.getData(), "CyDSP.VST3State1", 16) == 0) {
+        const auto* p=static_cast<const unsigned char*>(state.getData());
+        const auto size=std::uint32_t(p[16])|(std::uint32_t(p[17])<<8)|(std::uint32_t(p[18])<<16)|(std::uint32_t(p[19])<<24);
+        if(size<=state.getSize()-24) return juce::JSON::parse(juce::String::fromUTF8(reinterpret_cast<const char*>(p+24),int(size)));
+        return {};
+    }
     if (auto xml = juce::AudioProcessor::getXmlFromBinary(
             state.getData(), static_cast<int>(state.getSize()))) {
         const auto* component = xml->getChildByName("IComponent");
@@ -701,9 +709,7 @@ int runRealtimeWorker(const juce::File& pluginFile,
     const auto maximumBlockSize = static_cast<int>(cydaw::plugins::maximumSharedAudioFrames);
     juce::ignoreUnused(requestedBlockSize);
     ParentWatch parent(parentPid);
-    // A block answered late is a block played dry: the waits between blocks
-    // last a millisecond (Windows' default tick is 15.6), and the worker runs
-    // ahead of the programs that are not playing.
+    // Wake the audio worker independently of coarse GUI dispatch timeouts.
 #if JUCE_WINDOWS
     struct FineTimer {
         FineTimer() { (void) timeBeginPeriod(1); }
@@ -720,6 +726,8 @@ int runRealtimeWorker(const juce::File& pluginFile,
         || shared->protocolVersion != cydaw::plugins::workerProtocolVersion)
         return 11;
 
+    cydaw::plugins::WorkerWake wake;
+    wake.open(("Local\\CyDAW.PluginAudio." + sharedFile.getFileName()).toWideCharPointer());
     try {
         WorkerPlayHead playHead;
         std::unique_ptr<juce::AudioPluginInstance> instance;
@@ -768,6 +776,7 @@ int runRealtimeWorker(const juce::File& pluginFile,
 
         juce::AudioBuffer<float> buffer(processingChannels, maximumBlockSize);
         juce::MidiBuffer midi;
+        midi.ensureSize(256*1024);
         std::unique_ptr<WorkerPluginEditorWindow> editorWindow;
         setWorkerStatus(*shared, cydaw::plugins::SharedPluginState::ready,
                         passthrough ? "IPC passthrough ready"
@@ -957,10 +966,13 @@ int runRealtimeWorker(const juce::File& pluginFile,
                 didWork = true;
             }
 
+#if JUCE_WINDOWS
+            if ((editorWindow != nullptr && editorWindow->isVisible()) || !didWork)
+                wake.waitAndDispatch();
+#else
             if ((editorWindow != nullptr && editorWindow->isVisible()) || !didWork)
                 juce::MessageManager::getInstance()->runDispatchLoopUntil(1);
-            else if (!didWork)
-                juce::Thread::sleep(1);
+#endif
         }
         editorWindow.reset();
         if (instance != nullptr)
