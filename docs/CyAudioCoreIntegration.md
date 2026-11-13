@@ -123,3 +123,7 @@ The [controlled Windows comparison](CyAudioCoreComparison.fr.md) measures the ac
 ## CPU attribution after the comparison
 
 The [application CPU diagnostic](CyAudioCoreCpuDiagnostic.fr.md) separates the UI thread, live audio, worker IPC and vector backends. It includes controlled null-driver UI experiments and repeated ASIO measurements. The global CPU regression must not be attributed to SDK DSP kernels without this thread/function breakdown. Production audio code and sibling dependencies are unchanged by this campaign.
+
+## Direct UI comparison and benchmark corrections
+
+The [paired UI investigation](CyAudioCoreUiPair.fr.md) measures both frozen executables with matching layout, panels and a common frame ceiling. It identifies hidden-window pacing and Windows special-folder layout resolution differences. It also corrects duplicate-name workload targeting: the historical FX case was a serial 48-effect chain, while the new indexed case checks three effects on each of 16 tracks. Historical numbers remain evidence of those original processes; they do not establish identical visual workload or a DSP-kernel regression.

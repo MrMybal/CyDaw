@@ -1,5 +1,7 @@
 # Comparaison JUCE / CyAudioCore — CyDaw Windows
 
+> **Rectificatif du 14 novembre 2026 :** voir la [comparaison directe des interfaces](CyAudioCoreUiPair.fr.md). La disposition n’était pas entièrement isolée dans la référence JUCE et la cadence hors écran différait. Le cas historique nommé « 16 pistes × FX » insérait en réalité48 effets en série sur la première piste portant le nom commun `long` ; les 8 VST3 étaient réunis sur la première des8pistes. Ces relevés restent conservés, mais ne constituent pas une comparaison du même travail visuel ni de 16 chaînes indépendantes. Le nouveau banc utilise les index et vérifie les topologies.
+
 
 Résultat mesuré : le remplacement est autonome et améliore plusieurs opérations de projet, mais le coût CPU en lecture est supérieur dans les charges testées. 36/37 scénarios fonctionnels réussis côté Core, contre 33/37 côté JUCE ; le CUE ASIO constitue l’échec commun.
 
@@ -24,9 +26,9 @@ Comparaison de deux états du produit, sur le même poste. Les chiffres ne perme
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | Session vide | 0,76 % | 1,03 % | +36,3 % | 296,6 | 249,8 | -15,8 % |
 | 32 pistes audio | 9,11 % | 17,00 % | +86,7 % | 730,1 | 691,9 | -5,2 % |
-| 16 pistes × compresseur/chorus/réverbération | 67,14 % | 145,01 % | +116,0 % | 597,7 | 645,4 | +8,0 % |
+| 16 pistes, 48 FX en série sur la première (nom historique : effects16) | 67,14 % | 145,01 % | +116,0 % | 597,7 | 645,4 | +8,0 % |
 | 64 voix Ambre / 8 pistes | 20,31 % | 31,12 % | +53,2 % | 485,6 | 461,2 | -5,0 % |
-| 8 pistes × même VST3 / 8 workers | 3,03 % | 15,06 % | +396,4 % | 510,0 | 552,1 | +8,3 % |
+| 8 VST3 sur la première de 8 pistes / 8 workers | 3,03 % | 15,06 % | +396,4 % | 510,0 | 552,1 | +8,3 % |
 | Mix DJ, 4 platines + 8 VST3 au repos | 6,55 % | 18,62 % | +184,4 % | 611,2 | 674,8 | +10,4 % |
 | Fonderie WAV + 8 VST3 au repos | 9,37 % | 18,97 % | +102,6 % | 669,0 | 741,2 | +10,8 % |
 | Cinéma 720p24 + WAV + 8 VST3 au repos | 18,70 % | 27,81 % | +48,7 % | 783,3 | 866,8 | +10,7 % |
@@ -54,9 +56,9 @@ Un écart négatif indique une consommation inférieure. Les scénarios se succ�
 | --- | ---: | ---: |
 | Session vide | 9,66 | 15,77 |
 | 32 pistes audio | 15,93 | 22,02 |
-| 16 pistes × compresseur/chorus/réverbération | 22,19 | 22,07 |
+| 16 pistes, 48 FX en série sur la première (nom historique : effects16) | 22,19 | 22,07 |
 | 64 voix Ambre / 8 pistes | 15,58 | 22,89 |
-| 8 pistes × même VST3 / 8 workers | 1,42 | 2,80 |
+| 8 VST3 sur la première de 8 pistes / 8 workers | 1,42 | 2,80 |
 | Mix DJ, 4 platines + 8 VST3 au repos | 1,49 | 3,51 |
 | Fonderie WAV + 8 VST3 au repos | 2,51 | 11,82 |
 | Cinéma 720p24 + WAV + 8 VST3 au repos | 2,45 | 17,78 |

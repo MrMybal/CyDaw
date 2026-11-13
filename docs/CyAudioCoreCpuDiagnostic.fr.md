@@ -1,5 +1,7 @@
 # Diagnostic CPU de CyDAW après migration CyAudioCore
 
+> **Rectificatif du 14 novembre 2026 :** la [comparaison directe des interfaces](CyAudioCoreUiPair.fr.md) mesure les deux cadences et révèle des biais du banc précédent : disposition/onglets différents et ciblage des pistes par un nom dupliqué. Le cas historique `effects16` porte 48 effets en série sur la première de 16 pistes, et les 8 VST3 sont sur la première de 8 pistes. L’attribution 95 % décrit les anciens processus mesurés, sans démontrer une hausse du coût par image à affichage identique. Les chiffres et preuves ci-dessous restent conservés.
+
 **Le principal surcoût localisé se trouve dans l’interface de CyDAW.** Pour 16 chaînes FX, la médiane ASIO du parent passe de 71.23 % à 151.51 % d’un cœur.
 
 Sur le banc null et le même binaire instrumenté, limiter seulement le dessin à 30 Hz fait passer cette charge de 155.99 % à 80.34 % ; désactiver le dessin la ramène à 49.55 %. Ce contrôle conserve les appels audio et les plugins ; leurs états et fréquences sont enregistrés.
