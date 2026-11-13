@@ -1,3 +1,4 @@
+#include <cydaw/base/Process.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
@@ -22,7 +23,7 @@ class CustomInterface final
         std::mutex mutex;
         cydaw::base::Text log;
         cydaw::base::File file;
-        juce::DynamicLibrary library;
+        cydaw::base::DynamicLibrary library;
         Draw draw{};
     };
     static cydaw::base::Text key(const cydaw::base::Text &source)
@@ -130,7 +131,7 @@ class CustomInterface final
                                         "Path=" + cydaw::base::SystemStats::getEnvironmentVariable("PATH", {}),
                                         "--"};
                 clean.addArray(args);
-                juce::ChildProcess child;
+                cydaw::base::ChildProcess child;
                 if (!child.start(clean))
                 {
                     output += "Impossible de lancer CMake.\n";

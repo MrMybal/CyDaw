@@ -1,3 +1,4 @@
+#include <cydaw/base/FileDialog.h>
 #include <cydaw/base/File.h>
 #include "RoutingUi.h"
 #include "MidiDevices.h"
@@ -2120,10 +2121,10 @@ void DevicesView::drawSoundModelPane(const TrackRef& track, app::GraphDocument& 
         ImGui::SetTooltip("%s", description.toRawUTF8());
     ImGui::SetCursorScreenPos(ImVec2(end.x - dp(54.0f), plotEnd.y + dp(2.0f)));
     if (ImGui::SmallButton(L("Charger…", "Load…"))) {
-        chooser_ = std::make_unique<juce::FileChooser>(L("Un modèle de son pour cette carte", "A sound model for this card"),
+        chooser_ = std::make_unique<cydaw::base::FileDialog>(L("Un modèle de son pour cette carte", "A sound model for this card"),
                                                        Studio::soundModelFolder(), "*.cysound");
-        chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-                              [this, track, nodeId](const juce::FileChooser& chooser) {
+        chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles,
+                              [this, track, nodeId](const cydaw::base::FileDialog& chooser) {
                                   const auto file = chooser.getResult();
                                   if (file == cydaw::base::File())
                                       return;
@@ -2927,12 +2928,12 @@ void DevicesView::drawCatalogue(const TrackRef& track)
         ImGui::SameLine();
     if (plugins && ImGui::Button(L("Plugin VST3 / CLAP / LV2 / JSFX…", "VST3 / CLAP / LV2 / JSFX plugin…"), ImVec2(-1.0f, 0.0f))) {
         ImGui::CloseCurrentPopup();
-        chooser_ = std::make_unique<juce::FileChooser>(L("Choisir un plugin", "Choose a plugin"),
+        chooser_ = std::make_unique<cydaw::base::FileDialog>(L("Choisir un plugin", "Choose a plugin"),
                                                        cydaw::base::File("C:\\Program Files\\Common Files\\VST3"), "*.vst3;*.clap;*.lv2;*.jsfx;*.cyplugin");
         const auto index = track.audioIndex;
-        chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
-                                  | juce::FileBrowserComponent::canSelectDirectories,
-                              [this, index](const juce::FileChooser& chooser) {
+        chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles
+                                  | cydaw::base::FileDialogFlags::canSelectDirectories,
+                              [this, index](const cydaw::base::FileDialog& chooser) {
                                   const auto file = chooser.getResult();
                                   if (file == cydaw::base::File {})
                                       return;

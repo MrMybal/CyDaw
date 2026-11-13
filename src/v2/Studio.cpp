@@ -1,3 +1,4 @@
+#include <cydaw/base/EventLoop.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/Properties.h>
@@ -4538,7 +4539,7 @@ void Studio::ensureSamples()
     background_.addJob([alive = std::weak_ptr<int>(alive_), this, factory = app::factoryContentFolder(),
                         banks = locations::folder(Location::banks), registry = banks_.registryFile(), french = ui::french()] {
         auto hints = sampleHintsOf(factory, banks, registry, french);
-        juce::MessageManager::callAsync([alive, this, hints = std::move(hints)]() mutable {
+        cydaw::base::EventLoop::post([alive, this, hints = std::move(hints)]() mutable {
             if (alive.expired())
                 return;
             samples_->setHints(std::move(hints));

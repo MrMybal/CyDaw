@@ -1,3 +1,4 @@
+#include <cydaw/base/FileDialog.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #pragma once
@@ -89,7 +90,7 @@ private:
     bool showSimulator_ { true };
     // The note the mouse holds down on the keyboard.
     int mouseNote_ { -1 };
-    std::unique_ptr<juce::FileChooser> chooser_;
+    std::unique_ptr<cydaw::base::FileDialog> chooser_;
     std::function<void()> quitWaiting_;
     bool askDiscard_ {};
     cydaw::base::File removing_;

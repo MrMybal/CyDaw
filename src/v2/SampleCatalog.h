@@ -1,3 +1,4 @@
+#include <cydaw/base/EventLoop.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/Text.h>
 #pragma once
@@ -28,7 +29,7 @@
 
 namespace cydaw::v2 {
 
-class SampleCatalog final : private app::SampleLibrary::Listener, private juce::Timer {
+class SampleCatalog final : private app::SampleLibrary::Listener, private cydaw::base::Timer {
 public:
     enum Facet { category, group, source, type, key, tempo, length, facetCount };
     enum Column {
@@ -161,7 +162,8 @@ private:
     int generation_ {};
     cydaw::base::ThreadPool pool_ { 1 };
 
-    JUCE_DECLARE_WEAK_REFERENCEABLE(SampleCatalog)
+    template<class> friend class cydaw::base::WeakReference;
+    cydaw::base::CallbackLifetime callbackLifetime_;
 };
 
 } // namespace cydaw::v2

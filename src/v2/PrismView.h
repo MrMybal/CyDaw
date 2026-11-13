@@ -1,3 +1,4 @@
+#include <cydaw/base/FileDialog.h>
 #pragma once
 
 #include "PresetMenu.h"
@@ -121,7 +122,7 @@ private:
     // The window to put back in the studio's window on its next frame.
     std::string placeHere_;
     float drawnLastValue_ {};
-    std::unique_ptr<juce::FileChooser> chooser_;
+    std::unique_ptr<cydaw::base::FileDialog> chooser_;
 };
 
 } // namespace cydaw::v2

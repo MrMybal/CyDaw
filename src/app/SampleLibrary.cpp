@@ -1,3 +1,5 @@
+#include <cydaw/base/Process.h>
+#include <cydaw/base/EventLoop.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/Properties.h>
@@ -1130,7 +1132,7 @@ private:
         std::vector<cydaw::base::File> roots;
         for (const auto& root : roots_)
             roots.push_back(root.folder);
-        juce::MessageManager::callAsync([library = library_, batch = std::move(batch), finished, complete,
+        cydaw::base::EventLoop::post([library = library_, batch = std::move(batch), finished, complete,
                                          present = std::move(present), roots = std::move(roots)]() mutable {
             if (auto* owner = library.get())
                 owner->mergeRecords(std::move(batch), finished, complete, std::move(present), std::move(roots));
@@ -1138,7 +1140,7 @@ private:
     }
 
     SampleLibrary& owner_;
-    juce::WeakReference<SampleLibrary> library_;
+    cydaw::base::WeakReference<SampleLibrary> library_;
     std::vector<Root> roots_;
     std::map<cydaw::base::Text, SampleRecord> known_;
     std::shared_ptr<const std::map<cydaw::base::Text, SampleHint>> hints_;
@@ -1182,10 +1184,10 @@ public:
             request->setProperty("tags", tagList);
             const auto requestFile = workFolder_.getChildFile("clap-request.json");
             requestFile.replaceWithText(cydaw::base::JSON::toString(cydaw::base::Value(request)));
-            juce::ChildProcess process;
+            cydaw::base::ChildProcess process;
             cydaw::base::TextList command { python_, script_.getFullPathName(),
                                         requestFile.getFullPathName() };
-            if (!process.start(command, juce::ChildProcess::wantStdOut))
+            if (!process.start(command, cydaw::base::ChildProcess::wantStdOut))
                 return report({}, true, "impossible de lancer " + python_);
             const auto output = process.readAllProcessOutput();
             std::vector<SampleRecord> results;
@@ -1222,7 +1224,7 @@ public:
 private:
     void report(std::vector<SampleRecord> results, const bool finished, cydaw::base::Text message)
     {
-        juce::MessageManager::callAsync(
+        cydaw::base::EventLoop::post(
             [library = library_, results = std::move(results), finished, message = std::move(message)]() mutable {
                 if (auto* owner = library.get())
                     owner->applyClassification(std::move(results), finished, std::move(message));
@@ -1230,7 +1232,7 @@ private:
     }
 
     SampleLibrary& owner_;
-    juce::WeakReference<SampleLibrary> library_;
+    cydaw::base::WeakReference<SampleLibrary> library_;
     cydaw::base::TextList paths_;
     cydaw::base::File script_;
     cydaw::base::Text python_;
@@ -1855,7 +1857,7 @@ void SampleLibrary::mergeRecords(std::vector<SampleRecord> records, const bool f
         saveCache();
         if (pendingRescan_) {
             const auto full = pendingFull_;
-            juce::MessageManager::callAsync([this, full] {
+            cydaw::base::EventLoop::post([this, full] {
                 if (!isScanning())
                     rescan(full);
             });
@@ -2056,9 +2058,9 @@ void SampleLibrary::loadCache()
     // Read off the message thread: a library of the banks holds tens of
     // thousands of sounds.
     const auto generation = ++loadGeneration_;
-    io_.addJob([library = juce::WeakReference<SampleLibrary>(this), folder = cacheFolder_, generation] {
+    io_.addJob([library = cydaw::base::WeakReference<SampleLibrary>(this), folder = cacheFolder_, generation] {
         auto records = readCacheFile(folder);
-        juce::MessageManager::callAsync([library, records = std::move(records), generation]() mutable {
+        cydaw::base::EventLoop::post([library, records = std::move(records), generation]() mutable {
             if (auto* owner = library.get())
                 owner->cacheLoaded(std::move(records), generation);
         });
@@ -2101,9 +2103,9 @@ void SampleLibrary::saveCache()
     saving_ = true;
     saveAgain_ = false;
     dirty_ = false;
-    io_.addJob([library = juce::WeakReference<SampleLibrary>(this), folder = cacheFolder_, snapshot = samples_] {
+    io_.addJob([library = cydaw::base::WeakReference<SampleLibrary>(this), folder = cacheFolder_, snapshot = samples_] {
         const auto written = writeCacheFile(folder, snapshot);
-        juce::MessageManager::callAsync([library, written] {
+        cydaw::base::EventLoop::post([library, written] {
             if (auto* owner = library.get()) {
                 owner->saving_ = false;
                 if (!written || owner->saveAgain_)

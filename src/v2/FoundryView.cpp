@@ -1,3 +1,4 @@
+#include <cydaw/base/FileDialog.h>
 #include <cydaw/base/File.h>
 #include "FoundryView.h"
 #include "FoundryJson.h"
@@ -224,11 +225,11 @@ bool FoundryView::dropFiles(const cydaw::base::TextList& files, const float x, c
 
 void FoundryView::chooseOpen()
 {
-    chooser_ = std::make_unique<juce::FileChooser>(ui::Ls("Un fichier son ou une session", "A sound file or a session"), cydaw::base::File {},
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(ui::Ls("Un fichier son ou une session", "A sound file or a session"), cydaw::base::File {},
                                                    cinema_?"*.cycinema;*.mp4;*.mov;*.m4v;*.avi;*.wmv;*.mkv;*.webm;*.mpeg;*.mpg;*.mxf;*.ts;*.mts;*.m2ts;*.m2v;*.vob;*.ogv;*.flv;*.3gp;*.3g2;*.dv;*.nut;*.rm;*.rmvb;*.wav;*.flac":"*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg;*.mp3;*.wma;*.cyfoundry");
-    chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
-                              | juce::FileBrowserComponent::canSelectMultipleItems,
-                          [this](const juce::FileChooser& chooser) {
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles
+                              | cydaw::base::FileDialogFlags::canSelectMultipleItems,
+                          [this](const cydaw::base::FileDialog& chooser) {
                               for (const auto& file : chooser.getResults())
                                   (void) open(file);
                           });
@@ -240,11 +241,11 @@ void FoundryView::chooseImport()
         chooseOpen();
         return;
     }
-    chooser_ = std::make_unique<juce::FileChooser>(ui::Ls("Des sons à ajouter, chacun sur une piste", "Sounds to add, each on a track"),
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(ui::Ls("Des sons à ajouter, chacun sur une piste", "Sounds to add, each on a track"),
                                                    cydaw::base::File {}, "*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg;*.mp3;*.wma");
-    chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
-                              | juce::FileBrowserComponent::canSelectMultipleItems,
-                          [this](const juce::FileChooser& chooser) {
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles
+                              | cydaw::base::FileDialogFlags::canSelectMultipleItems,
+                          [this](const cydaw::base::FileDialog& chooser) {
                               if (auto* current = tab())
                                   for (const auto& file : chooser.getResults())
                                       if(cinema_){cydaw::base::TextList files;files.add(file.getFullPathName());dropCinemaFiles(files,-1,-1);}
@@ -280,11 +281,11 @@ void FoundryView::save(const bool as)
         }
         const auto folder = document.file() != cydaw::base::File() ? document.file().getParentDirectory() : locations::folder(Location::foundry);
         (void) folder.createDirectory();
-        chooser_ = std::make_unique<juce::FileChooser>(ui::Ls("Enregistrer le son sous", "Save the sound as"),
+        chooser_ = std::make_unique<cydaw::base::FileDialog>(ui::Ls("Enregistrer le son sous", "Save the sound as"),
                                                        folder.getChildFile(document.name()).withFileExtension("wav"), "*.wav;*.flac;*.aiff;*.ogg");
         const auto index = current_;
-        chooser_->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
-                              [this, index](const juce::FileChooser& chooser) {
+        chooser_->launchAsync(cydaw::base::FileDialogFlags::saveMode | cydaw::base::FileDialogFlags::warnAboutOverwriting,
+                              [this, index](const cydaw::base::FileDialog& chooser) {
                                   auto file = chooser.getResult();
                                   if (file == cydaw::base::File() || index < 0 || index >= static_cast<int>(tabs_.size()))
                                       return;
@@ -304,12 +305,12 @@ void FoundryView::save(const bool as)
     }
     const auto folder = locations::folder(Location::foundry);
     (void) folder.createDirectory();
-    chooser_ = std::make_unique<juce::FileChooser>(ui::Ls("Enregistrer la session", "Save the session"),
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(ui::Ls("Enregistrer la session", "Save the session"),
                                                    folder.getChildFile(cydaw::base::File::createLegalFileName(document.name())).withFileExtension(cinema_?"cycinema":"cyfoundry"),
                                                    cinema_?"*.cycinema":"*.cyfoundry");
     const auto index = current_;
-    chooser_->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
-                          [this, index](const juce::FileChooser& chooser) {
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::saveMode | cydaw::base::FileDialogFlags::warnAboutOverwriting,
+                          [this, index](const cydaw::base::FileDialog& chooser) {
                               auto file = chooser.getResult();
                               if (file == cydaw::base::File() || index < 0 || index >= static_cast<int>(tabs_.size()))
                                   return;
@@ -329,15 +330,15 @@ void FoundryView::chooseExport()
         return;
     const auto folder = locations::folder(Location::foundry);
     (void) folder.createDirectory();
-    chooser_ = std::make_unique<juce::FileChooser>(ui::Ls("Exporter le mixage", "Export the mix"),
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(ui::Ls("Exporter le mixage", "Export the mix"),
                                                    folder.getChildFile(cydaw::base::File::createLegalFileName(tab->document->name()))
                                                        .withFileExtension("wav"),
                                                    "*.wav;*.flac;*.aiff;*.ogg");
     const auto index = current_;
     const auto start = hasSelection(*tab) ? tab->selectionStart : std::int64_t {};
     const auto end = hasSelection(*tab) ? tab->selectionEnd : std::int64_t {};
-    chooser_->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
-                          [this, index, start, end](const juce::FileChooser& chooser) {
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::saveMode | cydaw::base::FileDialogFlags::warnAboutOverwriting,
+                          [this, index, start, end](const cydaw::base::FileDialog& chooser) {
                               auto file = chooser.getResult();
                               if (file == cydaw::base::File() || index < 0 || index >= static_cast<int>(tabs_.size()))
                                   return;

@@ -1,3 +1,4 @@
+#include <cydaw/base/FileDialog.h>
 #include <cydaw/base/File.h>
 #include "ProcessingView.h"
 
@@ -970,9 +971,9 @@ void ProcessingView::drawScript()
 
 void ProcessingView::chooseTestSound()
 {
-    chooser_ = std::make_unique<juce::FileChooser>(ui::Ls("Un son pour essayer le traitement", "A sound to try the processing on"), cydaw::base::File {},
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(ui::Ls("Un son pour essayer le traitement", "A sound to try the processing on"), cydaw::base::File {},
                                                    "*.wav;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
-    chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [this](const juce::FileChooser& chooser) {
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles, [this](const cydaw::base::FileDialog& chooser) {
         const auto file = chooser.getResult();
         if (file == cydaw::base::File {})
             return;
@@ -1043,12 +1044,12 @@ void ProcessingView::drawTrial()
             if (ImGui::Button(L("Enregistrer le résultat…", "Save the result…"))) {
                 const auto channels = result->channels;
                 const auto rate = trial_.rate();
-                chooser_ = std::make_unique<juce::FileChooser>(ui::Ls("Le son traité", "The processed sound"),
+                chooser_ = std::make_unique<cydaw::base::FileDialog>(ui::Ls("Le son traité", "The processed sound"),
                                                                proc::userFolder().getChildFile("Results").getChildFile(
                                                                    trial_.soundName().upToLastOccurrenceOf(".", false, false) + " (" + edited_.name + ").wav"),
                                                                "*.wav");
-                chooser_->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
-                                      [this, channels, rate](const juce::FileChooser& chooser) {
+                chooser_->launchAsync(cydaw::base::FileDialogFlags::saveMode | cydaw::base::FileDialogFlags::warnAboutOverwriting,
+                                      [this, channels, rate](const cydaw::base::FileDialog& chooser) {
                                           const auto file = chooser.getResult();
                                           if (file == cydaw::base::File {})
                                               return;

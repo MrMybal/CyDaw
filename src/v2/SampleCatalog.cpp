@@ -1,3 +1,4 @@
+#include <cydaw/base/EventLoop.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #include "SampleCatalog.h"
@@ -675,11 +676,11 @@ void SampleCatalog::startBuild()
     auto copied = std::make_shared<Extract>(extract());
     const auto extractMs = nowMs() - started;
     const auto generation = ++generation_;
-    pool_.addJob([catalog = juce::WeakReference<SampleCatalog>(this), copied, generation, extractMs]() mutable {
+    pool_.addJob([catalog = cydaw::base::WeakReference<SampleCatalog>(this), copied, generation, extractMs]() mutable {
         auto built = build(std::move(*copied), generation);
         built->extractMs = extractMs;
         std::shared_ptr<const Data> data = std::move(built);
-        juce::MessageManager::callAsync([catalog, data] {
+        cydaw::base::EventLoop::post([catalog, data] {
             auto* owner = catalog.get();
             if (owner == nullptr)
                 return;

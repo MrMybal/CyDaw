@@ -1,3 +1,5 @@
+#include <cydaw/base/Process.h>
+#include <cydaw/base/FileDialog.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #include "PluginFiles.h"
@@ -304,7 +306,7 @@ private:
                         auto command = launch.command; const auto resultFile = cache.getChildFile(key + "-" + juce::Uuid().toString() + ".probe.json");
                         (void) resultFile.deleteFile();
                         command.addArray({"--probe-plugin", file.getFullPathName(), "--output", resultFile.getFullPathName()});
-                        juce::ChildProcess process;
+                        cydaw::base::ChildProcess process;
                         if (launch.isValid() && process.start(command, 0)) {
                             const auto deadline=cydaw::base::Time::getMillisecondCounterHiRes()+15000;
                             while(process.isRunning() && !threadShouldExit() && cydaw::base::Time::getMillisecondCounterHiRes()<deadline) wait(30);
@@ -808,9 +810,9 @@ void LibraryWindow::drawSamples()
         if (remove)
             library.removeFolder(*remove);
         if (ImGui::Selectable(L("Ajouter un dossier…", "Add a folder…"))) {
-            chooser_ = std::make_unique<juce::FileChooser>(L("Dossier de samples", "Sample folder"), cydaw::base::File {});
-            chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
-                                  [this](const juce::FileChooser& chooser) {
+            chooser_ = std::make_unique<cydaw::base::FileDialog>(L("Dossier de samples", "Sample folder"), cydaw::base::File {});
+            chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectDirectories,
+                                  [this](const cydaw::base::FileDialog& chooser) {
                                       if (const auto folder = chooser.getResult(); folder.isDirectory())
                                           studio_.samples().addFolder(folder);
                                   });
@@ -1309,11 +1311,11 @@ void LibraryWindow::drawInstruments()
                              sizeof(instrumentSearch_));
     ImGui::SameLine();
     if (ImGui::Button(L("Nouveau sampler…", "New sampler…"))) {
-        chooser_ = std::make_unique<juce::FileChooser>(L("Les échantillons du sampler", "The sampler's samples"), cydaw::base::File {},
+        chooser_ = std::make_unique<cydaw::base::FileDialog>(L("Les échantillons du sampler", "The sampler's samples"), cydaw::base::File {},
                                                        "*.wav;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
-        chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
-                                  | juce::FileBrowserComponent::canSelectMultipleItems,
-                              [this](const juce::FileChooser& chooser) {
+        chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles
+                                  | cydaw::base::FileDialogFlags::canSelectMultipleItems,
+                              [this](const cydaw::base::FileDialog& chooser) {
                                   if (chooser.getResults().isEmpty())
                                       return;
                                   cydaw::base::Text error;
@@ -1617,9 +1619,9 @@ void LibraryWindow::drawEffects()
             ImGui::PopID();
         }
         if (ImGui::Selectable(L("Ajouter un dossier…", "Add a folder…"))) {
-            chooser_ = std::make_unique<juce::FileChooser>(L("Un dossier de plug-ins VST3", "A VST3 plug-in folder"), cydaw::base::File {});
-            chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
-                                  [this](const juce::FileChooser& chooser) {
+            chooser_ = std::make_unique<cydaw::base::FileDialog>(L("Un dossier de plug-ins VST3", "A VST3 plug-in folder"), cydaw::base::File {});
+            chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectDirectories,
+                                  [this](const cydaw::base::FileDialog& chooser) {
                                       const auto folder = chooser.getResult();
                                       if (!folder.isDirectory())
                                           return;

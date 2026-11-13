@@ -1,3 +1,4 @@
+#include <cydaw/base/FileDialog.h>
 #include <cydaw/base/Text.h>
 #pragma once
 
@@ -120,7 +121,7 @@ private:
     bool scrollToSelected_ {};
     bool autoPreview_ { true };
     float facetHeight_ { 190.0f };
-    std::unique_ptr<juce::FileChooser> chooser_;
+    std::unique_ptr<cydaw::base::FileDialog> chooser_;
 
     // ---- Instruments and effects: small, filtered each time they change.
     std::unique_ptr<Facets> instrumentFacets_;

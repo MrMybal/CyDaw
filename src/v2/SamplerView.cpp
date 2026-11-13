@@ -1,3 +1,4 @@
+#include <cydaw/base/FileDialog.h>
 #include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/File.h>
 #include <cydaw/integration/CyAudioCoreAudioFormats.h>
@@ -153,11 +154,11 @@ void SamplerView::addFiles(const TrackRef& track, const std::uint64_t nodeId, co
 
 void SamplerView::chooseFiles(const Target& target)
 {
-    chooser_ = std::make_unique<juce::FileChooser>(L("Des échantillons pour ce sampler", "Samples for this sampler"),
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(L("Des échantillons pour ce sampler", "Samples for this sampler"),
                                                    cydaw::base::File(), "*.wav;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
-    chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
-                              | juce::FileBrowserComponent::canSelectMultipleItems,
-                          [this, target](const juce::FileChooser& chooser) {
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles
+                              | cydaw::base::FileDialogFlags::canSelectMultipleItems,
+                          [this, target](const cydaw::base::FileDialog& chooser) {
                               cydaw::base::TextList paths;
                               for (const auto& file : chooser.getResults())
                                   paths.add(file.getFullPathName());
@@ -168,11 +169,11 @@ void SamplerView::chooseFiles(const Target& target)
 
 void SamplerView::chooseSfz(const Target& target)
 {
-    chooser_ = std::make_unique<juce::FileChooser>(L("Un instrument SFZ (ou une carte .cysampler)",
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(L("Un instrument SFZ (ou une carte .cysampler)",
                                                      "An SFZ instrument (or a .cysampler map)"),
                                                    cydaw::base::File(), "*.sfz;*.cysampler");
-    chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-                          [this, target](const juce::FileChooser& chooser) {
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles,
+                          [this, target](const cydaw::base::FileDialog& chooser) {
                               if (const auto file = chooser.getResult(); file != cydaw::base::File())
                                   addFiles(target.track, target.nodeId, cydaw::base::TextList { file.getFullPathName() });
                           });
@@ -180,9 +181,9 @@ void SamplerView::chooseSfz(const Target& target)
 
 void SamplerView::exportSfz(const Target& target)
 {
-    chooser_ = std::make_unique<juce::FileChooser>(L("Enregistrer en SFZ", "Save as SFZ"), cydaw::base::File(), "*.sfz");
-    chooser_->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
-                          [this, target](const juce::FileChooser& chooser) {
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(L("Enregistrer en SFZ", "Save as SFZ"), cydaw::base::File(), "*.sfz");
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::saveMode | cydaw::base::FileDialogFlags::warnAboutOverwriting,
+                          [this, target](const cydaw::base::FileDialog& chooser) {
                               auto file = chooser.getResult();
                               if (file == cydaw::base::File())
                                   return;

@@ -1,3 +1,5 @@
+#include <cydaw/base/Process.h>
+#include <cydaw/base/EventLoop.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #include "ControllersImpl.h"
@@ -669,7 +671,7 @@ void Controllers::Impl::loadPlugins()
             auto plugin = std::make_unique<Plugin>();
             plugin->file = file;
             plugin->name = file.getFileNameWithoutExtension();
-            plugin->library = std::make_unique<juce::DynamicLibrary>();
+            plugin->library = std::make_unique<cydaw::base::DynamicLibrary>();
             if (!plugin->library->open(file.getFullPathName())) {
                 plugin->error = ui::Ls("Bibliothèque illisible", "Library cannot be loaded");
             } else if (auto* entry = reinterpret_cast<CyControlPluginEntry>(plugin->library->getFunction(CYDAW_CONTROL_PLUGIN_ENTRY));

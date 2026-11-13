@@ -1,3 +1,4 @@
+#include <cydaw/base/Process.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #include "ExtraPluginFormats.h"
@@ -25,7 +26,7 @@ namespace cydaw::plugins
 {
 struct ClapModule
 {
-    juce::DynamicLibrary library;
+    cydaw::base::DynamicLibrary library;
     const clap_plugin_entry_t *entry{};
     const clap_plugin_factory_t *factory{};
     bool initialized{};

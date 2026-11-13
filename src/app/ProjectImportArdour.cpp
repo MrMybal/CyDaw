@@ -4,7 +4,7 @@
 #include "ProjectImport.h"
 #include "ProjectImportShared.h"
 
-#include <juce_audio_basics/juce_audio_basics.h>
+#include <cydaw/midi/StandardMidiFile.h>
 
 #include <map>
 
@@ -218,25 +218,17 @@ private:
             if (file == cydaw::base::File()) {
                 out_.missingFiles.addIfNotAlreadyThere(source.getStringAttribute("name"));
             } else {
-                juce::FileInputStream input(file);
-                juce::MidiFile smf;
-                if (input.openedOk() && smf.readFrom(input)) {
-                    const auto perQuarter = std::max<short>(1, smf.getTimeFormat());
-                    for (int index = 0; index < smf.getNumTracks(); ++index) {
-                        juce::MidiMessageSequence sequence(*smf.getTrack(index));
-                        sequence.updateMatchedPairs();
-                        for (const auto* event : sequence) {
-                            if (!event->message.isNoteOn() || event->noteOffObject == nullptr)
-                                continue;
-                            const auto start = event->message.getTimeStamp() / perQuarter - offset;
-                            const auto end = event->noteOffObject->message.getTimeStamp() / perQuarter - offset;
-                            if (start < -1.0e-9 || start >= clip.lengthBeats)
-                                continue;
-                            clip.notes.push_back({ event->message.getNoteNumber(), start,
-                                                   std::max(1.0e-3, std::min(end, clip.lengthBeats) - start),
-                                                   event->message.getFloatVelocity() });
+                cyaudio::MidiFile smf;
+                if (cydaw::midi::loadStandardFile(file,smf).wasOk()) {
+                    const auto perQuarter = std::max<int>(1,static_cast<std::int16_t>(smf.division));
+                    for (const auto& events : smf.tracks)
+                        for (const auto& note : cydaw::midi::pairedNotes(events)) {
+                            if (!note.end) continue;
+                            const auto start = double(note.tick)/perQuarter-offset;
+                            const auto end = double(*note.end)/perQuarter-offset;
+                            if (start < -1.0e-9 || start >= clip.lengthBeats) continue;
+                            clip.notes.push_back({int(note.key),start,std::max(1.0e-3,std::min(end,clip.lengthBeats)-start),float(note.velocity)/127.f});
                         }
-                    }
                 }
             }
             track.midi = true;

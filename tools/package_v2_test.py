@@ -40,6 +40,7 @@ def package(build, output, alpha=False, juce_source=None):
                      build / 'Licenses/nlohmann-json/LICENSE.MIT',
                      build / 'Licenses/pugixml/LICENSE.md',
                      build / 'Licenses/miniz/LICENSE',
+                     build / 'Licenses/stb/LICENSE',
                      build / 'Licenses/CyUI/LICENSE', build / 'Licenses/CyUI/THIRD_PARTY_NOTICES.md',
                      build / 'Licenses/CyUI/third_party/texteditor/LICENSE',
                      build / 'Licenses/CyUI/third_party/lexilla/License.txt',

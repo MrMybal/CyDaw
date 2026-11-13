@@ -1,3 +1,4 @@
+#include <cydaw/base/FileDialog.h>
 #include <cydaw/base/File.h>
 #pragma once
 #include "SourceEditor.h"
@@ -198,7 +199,7 @@ private:
     std::uint64_t chainRevision_ {};
     AudioTrial trial_;
     MidiTrial midiTrial_;
-    std::unique_ptr<juce::FileChooser> chooser_;
+    std::unique_ptr<cydaw::base::FileDialog> chooser_;
     char nameBuffer_[128] {};
     char descriptionBuffer_[512] {};
     // The apply window.

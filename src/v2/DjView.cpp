@@ -1,3 +1,4 @@
+#include <cydaw/base/FileDialog.h>
 #include <cydaw/base/File.h>
 #include "DjView.h"
 #include "ModeProcessing.h"
@@ -1232,10 +1233,10 @@ void DjView::drawBrowser(const ImVec2 size)
 
 void DjView::chooseFolder()
 {
-    chooser_ = std::make_unique<juce::FileChooser>(ui::Ls("Un dossier de musique", "A music folder"),
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(ui::Ls("Un dossier de musique", "A music folder"),
                                                    cydaw::base::File::getSpecialLocation(cydaw::base::File::userMusicDirectory));
-    chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
-                          [this](const juce::FileChooser& chooser) {
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectDirectories,
+                          [this](const cydaw::base::FileDialog& chooser) {
                               if (const auto folder = chooser.getResult(); folder.isDirectory())
                                   library_->addFolder(folder);
                           });

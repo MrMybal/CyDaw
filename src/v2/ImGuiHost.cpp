@@ -1,3 +1,4 @@
+#include <cydaw/base/EventLoop.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
@@ -641,7 +642,7 @@ void ImGuiHost::frame()
         }
         captureTarget_ = cydaw::base::File {};
         if (auto done = std::exchange(captureDone_, {}))
-            juce::MessageManager::callAsync([done, ok] { done(ok); });
+            cydaw::base::EventLoop::post([done, ok] { done(ok); });
     }
 
     n.swapChain->Present(0, 0);

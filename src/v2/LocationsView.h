@@ -1,3 +1,4 @@
+#include <cydaw/base/FileDialog.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #pragma once
@@ -33,7 +34,7 @@ private:
     bool takeContent_ { true };
     bool withCreations_ {};
     void chooseRoot();
-    std::unique_ptr<juce::FileChooser> chooser_;
+    std::unique_ptr<cydaw::base::FileDialog> chooser_;
 };
 
 } // namespace cydaw::v2

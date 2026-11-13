@@ -1,3 +1,4 @@
+#include <cydaw/base/FileDialog.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #pragma once
@@ -181,7 +182,7 @@ private:
     bool pluginWindowOpen_ {};
     bool pluginWindowFocus_ {};
     int pluginWindowView_ {}; // 0 knobs, 1 list
-    std::unique_ptr<juce::FileChooser> chooser_;
+    std::unique_ptr<cydaw::base::FileDialog> chooser_;
     // The presets of a card, a plug-in, the track's chain.
     PresetMenu presets_;
     SamplerView* sampler_ {};

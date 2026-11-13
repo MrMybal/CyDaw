@@ -1,3 +1,6 @@
+#include <cydaw/base/Socket.h>
+#include <cydaw/base/Process.h>
+#include <cydaw/base/EventLoop.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/File.h>
@@ -191,7 +194,7 @@ public:
     {
         // Every request carries it: the worker answers no other connection.
         command.addArray({ "--token", token_ });
-        if (!process_.start(command, juce::ChildProcess::wantStdOut | juce::ChildProcess::wantStdErr)) {
+        if (!process_.start(command, cydaw::base::ChildProcess::wantStdOut | cydaw::base::ChildProcess::wantStdErr)) {
             error = ui::Ls("Python ne démarre pas : ", "Python does not start: ") + command[0];
             return false;
         }
@@ -345,8 +348,8 @@ private:
         ended_ = true;
     }
 
-    juce::ChildProcess process_;
-    juce::StreamingSocket socket_;
+    cydaw::base::ChildProcess process_;
+    cydaw::base::StreamingSocket socket_;
     const cydaw::base::Text token_ { juce::Uuid().toString() };
     std::mutex requestMutex_;
     mutable std::mutex outputMutex_;
@@ -763,7 +766,7 @@ private:
             if (probability >= categoryFloor)
                 results.push_back({ path, taxonomy[static_cast<std::size_t>(top)].key, probability });
         }
-        juce::MessageManager::callAsync([search = search_, results = std::move(results)] {
+        cydaw::base::EventLoop::post([search = search_, results = std::move(results)] {
             if (auto* owner = search.get()) {
                 const auto count = owner->library_.applyClassified(results);
                 {
@@ -790,7 +793,7 @@ private:
     }
 
     SemanticSearch& owner_;
-    juce::WeakReference<SemanticSearch> search_;
+    cydaw::base::WeakReference<SemanticSearch> search_;
     AiModel model_;
     std::shared_ptr<Store> store_;
     cydaw::base::File storeFile_;

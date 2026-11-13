@@ -1,3 +1,4 @@
+#include <cydaw/base/FileDialog.h>
 #include <cydaw/base/File.h>
 #pragma once
 
@@ -405,7 +406,7 @@ private:
     std::unique_ptr<LibraryWindow> library_;
     std::unique_ptr<InspectorView> inspector_;
     std::unique_ptr<LauncherView> launcher_;
-    std::unique_ptr<juce::FileChooser> chooser_;
+    std::unique_ptr<cydaw::base::FileDialog> chooser_;
 
     bool inspectorVisible_ { true };
     bool browserVisible_ { true };

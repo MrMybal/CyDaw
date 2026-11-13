@@ -1,3 +1,4 @@
+#include <cydaw/base/EventLoop.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
@@ -39,7 +40,7 @@
 
 namespace cydaw::v2 {
 
-class SemanticSearch final : private juce::Timer, private app::SampleLibrary::Listener {
+class SemanticSearch final : private cydaw::base::Timer, private app::SampleLibrary::Listener {
 public:
     SemanticSearch(app::SampleLibrary& library, AiModels& models, Companion& companion);
     ~SemanticSearch() override;
@@ -211,7 +212,8 @@ private:
     bool indexOwed_ {};
     double indexOwedAt_ {};
 
-    JUCE_DECLARE_WEAK_REFERENCEABLE(SemanticSearch)
+    template<class> friend class cydaw::base::WeakReference;
+    cydaw::base::CallbackLifetime callbackLifetime_;
 };
 
 } // namespace cydaw::v2

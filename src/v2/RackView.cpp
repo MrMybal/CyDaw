@@ -1,3 +1,4 @@
+#include <cydaw/base/FileDialog.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #include "RackView.h"
@@ -29,7 +30,7 @@ constexpr int kDefaultFirst = 36;
 constexpr int kColumns = 4;
 constexpr int kRows = 4;
 
-std::unique_ptr<juce::FileChooser> chooser;
+std::unique_ptr<cydaw::base::FileDialog> chooser;
 
 cydaw::base::Text noteName(const int note)
 {
@@ -162,12 +163,12 @@ bool RackView::instrumentMenu(Studio& studio, const TrackRef& track, const int n
 
 void RackView::chooseSample(const TrackRef& track, const int note)
 {
-    chooser = std::make_unique<juce::FileChooser>(L("Un son pour ce pad", "A sound for this pad"), cydaw::base::File(),
+    chooser = std::make_unique<cydaw::base::FileDialog>(L("Un son pour ce pad", "A sound for this pad"), cydaw::base::File(),
                                                   "*.wav;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
     auto* studio = &studio_;
     auto* state = &state_;
-    chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-                         [studio, state, track, note](const juce::FileChooser& picked) {
+    chooser->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles,
+                         [studio, state, track, note](const cydaw::base::FileDialog& picked) {
                              const auto file = picked.getResult();
                              if (file == cydaw::base::File())
                                  return;

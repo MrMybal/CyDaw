@@ -1,8 +1,9 @@
+#include <cydaw/base/Socket.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #pragma once
 
-#include <juce_core/juce_core.h>
+
 
 #include <functional>
 #include <string>
@@ -25,14 +26,14 @@ public:
 
 private:
     void run() override;
-    void serve(juce::StreamingSocket& client);
+    void serve(cydaw::base::StreamingSocket& client);
     // The reply to one line: the handler's answer, or why there is none.
     [[nodiscard]] cydaw::base::Text respond(const cydaw::base::Text& line) const;
 
     int port_ {};
     Handler handler_;
     cydaw::base::Text token_;
-    juce::StreamingSocket listener_;
+    cydaw::base::StreamingSocket listener_;
     bool listening_ {};
 };
 

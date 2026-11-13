@@ -1,3 +1,5 @@
+#include <cydaw/base/Process.h>
+#include <cydaw/base/EventLoop.h>
 #include <cydaw/base/File.h>
 #pragma once
 
@@ -26,7 +28,7 @@ inline constexpr const char* computerKeyboardId = "keyboard:computer";
 // A raw address as a person reads it: "CC 74 · ch. 1", "Key F1".
 [[nodiscard]] cydaw::base::Text readableAddress(const std::string& address);
 
-class Controllers::Impl final : private juce::MidiInputCallback, private juce::AsyncUpdater, private juce::Timer {
+class Controllers::Impl final : private juce::MidiInputCallback, private cydaw::base::AsyncUpdater, private cydaw::base::Timer {
 public:
     Impl(Studio& studio, UiState& state, ImGuiHost& host, bool keepSettings);
     ~Impl() override;
@@ -95,7 +97,7 @@ public:
     // ---- Application plug-ins -------------------------------------------------------------
     struct Plugin {
         cydaw::base::File file;
-        std::unique_ptr<juce::DynamicLibrary> library;
+        std::unique_ptr<cydaw::base::DynamicLibrary> library;
         const CyControlPlugin* api {};
         cydaw::base::Text name;
         cydaw::base::Text error;

@@ -1,3 +1,4 @@
+#include <cydaw/base/FileDialog.h>
 #include <cydaw/base/File.h>
 #include "PrismView.h"
 #include "InstrumentPanels.h"
@@ -149,11 +150,11 @@ void PrismView::chooseTableFile(const int osc)
 {
     const auto track = card_.track;
     const auto nodeId = card_.nodeId;
-    chooser_ = std::make_unique<juce::FileChooser>(
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(
         ui::Ls("Une table d'ondes (ou un son) pour l'oscillateur ", "A wavetable (or a sound) for oscillator ") + (osc == 0 ? "A" : "B"),
         cydaw::base::File(), "*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg");
-    chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-                          [this, track, nodeId, osc](const juce::FileChooser& chooser) {
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles,
+                          [this, track, nodeId, osc](const cydaw::base::FileDialog& chooser) {
                               const auto file = chooser.getResult();
                               if (file == cydaw::base::File())
                                   return;

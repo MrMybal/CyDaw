@@ -1,3 +1,5 @@
+#include <cydaw/base/FileDialog.h>
+#include <cydaw/base/EventLoop.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #include "BrowserView.h"
@@ -39,7 +41,7 @@ BrowserView::BrowserView(Studio& studio, UiState& state, ImGuiHost& host, Sample
         host_.wake();
     });
     studio_.semantic().setOnChange([alive = std::weak_ptr<int>(alive_), host = &host_] {
-        juce::MessageManager::callAsync([alive, host] {
+        cydaw::base::EventLoop::post([alive, host] {
             if (!alive.expired())
                 host->wake();
         });
@@ -444,9 +446,9 @@ void BrowserView::drawSamples()
         if (library.folders().empty())
             ImGui::TextDisabled("%s", L("Aucun dossier à vous pour l'instant.", "No folder of yours yet."));
         if (ImGui::Selectable(L("Ajouter un dossier…", "Add a folder…"))) {
-            chooser_ = std::make_unique<juce::FileChooser>(L("Dossier de samples", "Sample folder"), cydaw::base::File {});
-            chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
-                                  [this](const juce::FileChooser& chooser) {
+            chooser_ = std::make_unique<cydaw::base::FileDialog>(L("Dossier de samples", "Sample folder"), cydaw::base::File {});
+            chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectDirectories,
+                                  [this](const cydaw::base::FileDialog& chooser) {
                                       const auto folder = chooser.getResult();
                                       if (folder.isDirectory()) {
                                           studio_.samples().addFolder(folder);
@@ -721,11 +723,11 @@ void BrowserView::drawInstruments()
 {
     const auto& p = theme::palette();
     if (ImGui::Button(L("Nouveau sampler…", "New sampler…"))) {
-        chooser_ = std::make_unique<juce::FileChooser>(L("Les échantillons du sampler", "The sampler's samples"), cydaw::base::File {},
+        chooser_ = std::make_unique<cydaw::base::FileDialog>(L("Les échantillons du sampler", "The sampler's samples"), cydaw::base::File {},
                                                        "*.wav;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
-        chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
-                                  | juce::FileBrowserComponent::canSelectMultipleItems,
-                              [this](const juce::FileChooser& chooser) {
+        chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles
+                                  | cydaw::base::FileDialogFlags::canSelectMultipleItems,
+                              [this](const cydaw::base::FileDialog& chooser) {
                                   if (chooser.getResults().isEmpty())
                                       return;
                                   cydaw::base::Text error;
@@ -741,10 +743,10 @@ void BrowserView::drawInstruments()
                   "Samples on a new track: each one's note comes from its name or its pitch."));
     ImGui::SameLine();
     if (ImGui::Button(L("Ouvrir un SFZ…", "Open an SFZ…"))) {
-        chooser_ = std::make_unique<juce::FileChooser>(L("Un instrument SFZ ou une carte .cysampler", "An SFZ instrument or a .cysampler map"),
+        chooser_ = std::make_unique<cydaw::base::FileDialog>(L("Un instrument SFZ ou une carte .cysampler", "An SFZ instrument or a .cysampler map"),
                                                        cydaw::base::File {}, "*.sfz;*.cysampler");
-        chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-                              [this](const juce::FileChooser& chooser) {
+        chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles,
+                              [this](const cydaw::base::FileDialog& chooser) {
                                   if (chooser.getResult() == cydaw::base::File())
                                       return;
                                   cydaw::base::Text error;

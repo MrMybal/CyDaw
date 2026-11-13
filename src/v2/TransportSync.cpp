@@ -1,3 +1,5 @@
+#include <cydaw/base/Process.h>
+#include <cydaw/base/EventLoop.h>
 #include <cydaw/base/Properties.h>
 #include <cydaw/base/File.h>
 #include "TransportSync.h"
@@ -101,7 +103,7 @@ namespace {
     }
 }
 
-class TransportSync::Impl final : private juce::Timer,
+class TransportSync::Impl final : private cydaw::base::Timer,
                                   private juce::MidiInputCallback,
                                   private juce::HighResolutionTimer {
 public:
@@ -198,7 +200,7 @@ public:
         }
         if (config.enabled) {
             publishOutput(previous, true);
-            juce::Timer::startTimer(10);
+            cydaw::base::Timer::startTimer(10);
             if (config.protocol < 2 && config.send)
                 juce::HighResolutionTimer::startTimer(1);
         }
@@ -354,7 +356,7 @@ private:
     double nextPulse {};
     int quarterPiece {};
     timecode::Code outgoingCode;
-    juce::DynamicLibrary jackLibrary;
+    cydaw::base::DynamicLibrary jackLibrary;
     jack_client_t* client {};
     std::atomic<bool> jackDead {};
     std::atomic<double> jackBpm { 120 };
@@ -372,7 +374,7 @@ private:
     jack_nframes_t (*jackRate)(jack_client_t*) {};
     void disconnect()
     {
-        juce::Timer::stopTimer();
+        cydaw::base::Timer::stopTimer();
         juce::HighResolutionTimer::stopTimer();
         if (registeredInput.isNotEmpty()) {
             midiManager.removeMidiInputDeviceCallback(registeredInput, this);

@@ -1,3 +1,5 @@
+#include <cydaw/base/Process.h>
+#include <cydaw/base/FileDialog.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #include "JsfxView.h"
@@ -39,7 +41,7 @@ class JsfxView::Compiler final : public cydaw::base::Thread
         auto launch = app::WindowsPluginBridge::workerLaunchFor(source);
         auto args = launch.command;
         args.addArray({"--probe-plugin", source.getFullPathName(), "--output", result.getFullPathName()});
-        juce::ChildProcess child;
+        cydaw::base::ChildProcess child;
         if (!launch.isValid() || !child.start(args, 0))
         {
             message = "Cannot start JSFX compiler: " + launch.error;
@@ -156,15 +158,15 @@ bool JsfxView::save()
 void JsfxView::choose(bool saving)
 {
     (void)plugin_files::scripts().createDirectory();
-    chooser_ = std::make_unique<juce::FileChooser>(
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(
         saving ? "Save JSFX" : "Open JSFX",
         file_ == cydaw::base::File() ? plugin_files::scripts().getChildFile("CyDAW Gain.jsfx") : file_,
         saving ? "*.jsfx" : "*");
     chooser_->launchAsync(
-        (saving ? juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting
-                : juce::FileBrowserComponent::openMode) |
-            juce::FileBrowserComponent::canSelectFiles,
-        [this, saving](const juce::FileChooser &chooser)
+        (saving ? cydaw::base::FileDialogFlags::saveMode | cydaw::base::FileDialogFlags::warnAboutOverwriting
+                : cydaw::base::FileDialogFlags::openMode) |
+            cydaw::base::FileDialogFlags::canSelectFiles,
+        [this, saving](const cydaw::base::FileDialog &chooser)
         {
             auto file = chooser.getResult();
             if (file == cydaw::base::File())

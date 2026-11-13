@@ -1,8 +1,11 @@
+#include <iostream>
+#include <cydaw/base/Socket.h>
+#include <cydaw/base/EventLoop.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #include "RemoteControlServer.h"
 
-#include <juce_events/juce_events.h>
+
 
 #include <atomic>
 #include <memory>
@@ -32,11 +35,11 @@ RemoteControlServer::RemoteControlServer(const int port, Handler handler,
     listening_ = listener_.createListener(port_, "127.0.0.1");
     if (listening_)
         startThread();
-    juce::Logger::writeToLog(
+    std::clog << (
         listening_ ? "remote control: listening on 127.0.0.1:"
                          + cydaw::base::Text(port_)
                    : "remote control: port " + cydaw::base::Text(port_)
-                         + " is not available");
+                         + " is not available") << "\n";
 }
 
 RemoteControlServer::~RemoteControlServer()
@@ -49,7 +52,7 @@ RemoteControlServer::~RemoteControlServer()
 void RemoteControlServer::run()
 {
     while (!threadShouldExit()) {
-        std::unique_ptr<juce::StreamingSocket> client(
+        std::unique_ptr<cydaw::base::StreamingSocket> client(
             listener_.waitForNextConnection());
         if (client == nullptr) {
             if (threadShouldExit())
@@ -61,7 +64,7 @@ void RemoteControlServer::run()
     }
 }
 
-void RemoteControlServer::serve(juce::StreamingSocket& client)
+void RemoteControlServer::serve(cydaw::base::StreamingSocket& client)
 {
     std::string buffer;
     // A connection starts with a JSON object. One that starts otherwise (a web
@@ -120,7 +123,7 @@ cydaw::base::Text RemoteControlServer::respond(const cydaw::base::Text& line) co
         std::atomic<bool> abandoned { false };
     };
     auto pending = std::make_shared<Pending>();
-    juce::MessageManager::callAsync([pending, request, handler = handler_] {
+    cydaw::base::EventLoop::post([pending, request, handler = handler_] {
         if (pending->abandoned.load())
             return;
         pending->response = handler(request);

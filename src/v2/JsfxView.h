@@ -1,3 +1,4 @@
+#include <cydaw/base/FileDialog.h>
 #include <cydaw/base/File.h>
 #pragma once
 #include "SourceEditor.h"
@@ -21,7 +22,7 @@ class JsfxView final
     Studio &studio_;
     UiState &state_;
     std::unique_ptr<Compiler> compiler_;
-    std::unique_ptr<juce::FileChooser> chooser_;
+    std::unique_ptr<cydaw::base::FileDialog> chooser_;
     cydaw::base::File file_;
     std::vector<char> code_;
     bool changed_{}, applyAfterCompile_{}, insertAfterCompile_{};

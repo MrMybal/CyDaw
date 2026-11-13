@@ -1,3 +1,4 @@
+#include <cydaw/base/FileDialog.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #include "LocationsView.h"
@@ -104,9 +105,9 @@ void LocationsView::apply(const Location location, const cydaw::base::File& fold
 
 void LocationsView::choose(const Location location)
 {
-    chooser_ = std::make_unique<juce::FileChooser>(cydaw::base::Text::fromUTF8(nameOf(location)), locations::folder(location));
-    chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
-                          [this, location](const juce::FileChooser& chooser) {
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(cydaw::base::Text::fromUTF8(nameOf(location)), locations::folder(location));
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectDirectories,
+                          [this, location](const cydaw::base::FileDialog& chooser) {
                               if (const auto folder = chooser.getResult(); folder != cydaw::base::File {})
                                   apply(location, folder);
                           });
@@ -114,10 +115,10 @@ void LocationsView::choose(const Location location)
 
 void LocationsView::chooseRoot()
 {
-    chooser_ = std::make_unique<juce::FileChooser>(ui::Ls("Le dossier de CyDAW", "CyDAW's folder"),
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(ui::Ls("Le dossier de CyDAW", "CyDAW's folder"),
                                                    locations::folder(Location::banks).getParentDirectory());
-    chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
-                          [this](const juce::FileChooser& chooser) {
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectDirectories,
+                          [this](const cydaw::base::FileDialog& chooser) {
                               const auto folder = chooser.getResult();
                               if (folder == cydaw::base::File {})
                                   return;

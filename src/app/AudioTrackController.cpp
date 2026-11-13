@@ -1,3 +1,4 @@
+#include <cydaw/midi/StandardMidiFile.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/File.h>
@@ -13374,43 +13375,19 @@ cydaw::base::Result AudioTrackController::importMidiFile(
         return cydaw::base::Result::fail(tr("error.midiImportRecording"));
     if (!file.existsAsFile())
         return cydaw::base::Result::fail(tr("error.midiImportMissing"));
-    auto input = juce::File(file).createInputStream();
-    if (input == nullptr)
-        return cydaw::base::Result::fail(tr("error.midiImportRead"));
-
-    juce::MidiFile midiFile;
-    int midiFileType = -1;
-    if (!midiFile.readFrom(*input, true, &midiFileType)
-        || midiFile.getNumTracks() <= 0)
+    cyaudio::MidiFile midiFile;
+    if (cydaw::midi::loadStandardFile(file,midiFile).failed() || midiFile.tracks.empty())
         return cydaw::base::Result::fail(tr("error.midiImportInvalid"));
-    juce::ignoreUnused(midiFileType);
-
     auto importedTempo = tempoBpm_;
-    auto earliestTempoTime = std::numeric_limits<double>::max();
-    for (int trackIndex = 0; trackIndex < midiFile.getNumTracks();
-         ++trackIndex) {
-        const auto* sequence = midiFile.getTrack(trackIndex);
-        if (sequence == nullptr)
-            continue;
-        for (int eventIndex = 0; eventIndex < sequence->getNumEvents();
-             ++eventIndex) {
-            const auto* event = sequence->getEventPointer(eventIndex);
-            if (event == nullptr || !event->message.isTempoMetaEvent()
-                || event->message.getTimeStamp() >= earliestTempoTime)
-                continue;
-            const auto secondsPerQuarter =
-                event->message.getTempoSecondsPerQuarterNote();
-            if (secondsPerQuarter > 0.0
-                && std::isfinite(secondsPerQuarter)) {
-                importedTempo = juce::jlimit(
-                    20.0, 400.0, 60.0 / secondsPerQuarter);
-                earliestTempoTime = event->message.getTimeStamp();
+    auto earliestTempoTime = std::numeric_limits<std::uint64_t>::max();
+    for (const auto& events : midiFile.tracks)
+        for (const auto& event : events)
+            if (const auto bpm = cydaw::midi::tempo(event); bpm && event.tick < earliestTempoTime) {
+                importedTempo = std::clamp(*bpm,20.0,400.0); earliestTempoTime = event.tick;
             }
-        }
-    }
     summary.tempoBpm = importedTempo;
 
-    const auto timeFormat = midiFile.getTimeFormat();
+    const auto timeFormat = static_cast<std::int16_t>(midiFile.division);
     if (timeFormat == 0)
         return cydaw::base::Result::fail(tr("error.midiImportInvalid"));
     const auto timestampToBeats = [timeFormat, importedTempo](
@@ -13448,38 +13425,22 @@ cydaw::base::Result AudioTrackController::importMidiFile(
     const auto fileBaseName = file.getFileNameWithoutExtension();
     auto totalNotes = std::size_t {};
 
-    for (int trackIndex = 0; trackIndex < midiFile.getNumTracks();
-         ++trackIndex) {
-        const auto* sequence = midiFile.getTrack(trackIndex);
-        if (sequence == nullptr)
-            continue;
-        auto sourceName = cydaw::base::Text {};
-        for (int eventIndex = 0; eventIndex < sequence->getNumEvents();
-             ++eventIndex) {
-            const auto* event = sequence->getEventPointer(eventIndex);
-            if (event != nullptr && event->message.isTrackNameEvent()) {
-                sourceName = event->message.getTextFromTextMetaEvent().trim();
-                if (sourceName.isNotEmpty())
-                    break;
-            }
-        }
+    for (std::size_t trackIndex = 0; trackIndex < midiFile.tracks.size(); ++trackIndex) {
+        const auto& sequence = midiFile.tracks[trackIndex];
+        auto sourceName = cydaw::midi::trackName(sequence);
         if (sourceName.isEmpty()) {
             sourceName = fileBaseName;
-            if (midiFile.getNumTracks() > 1)
+            if (midiFile.tracks.size() > 1)
                 sourceName += " " + cydaw::base::Text(trackIndex + 1);
         }
 
         std::array<int, 16> channelGroupIndices;
         channelGroupIndices.fill(-1);
-        for (int eventIndex = 0; eventIndex < sequence->getNumEvents();
-             ++eventIndex) {
-            const auto* event = sequence->getEventPointer(eventIndex);
-            if (event == nullptr || !event->message.isNoteOn())
-                continue;
+        for (const auto& note : cydaw::midi::pairedNotes(sequence)) {
             if (++totalNotes > maximumImportedNotes)
                 return cydaw::base::Result::fail(tr("error.midiImportTooLarge"));
             const auto channel = juce::jlimit(
-                1, 16, event->message.getChannel());
+                1, 16, int(note.channel));
             auto& groupIndex = channelGroupIndices[
                 static_cast<std::size_t>(channel - 1)];
             if (groupIndex < 0) {
@@ -13488,14 +13449,13 @@ cydaw::base::Result AudioTrackController::importMidiFile(
                         tr("error.midiImportTooLarge"));
                 groupIndex = static_cast<int>(groups.size());
                 groups.push_back(
-                    { trackIndex, channel, sourceName, {}, 0.0 });
+                    { int(trackIndex), channel, sourceName, {}, 0.0 });
             }
             auto startBeats = timestampToBeats(
-                event->message.getTimeStamp());
+                double(note.tick));
             auto endBeats = startBeats + 0.25;
-            if (event->noteOffObject != nullptr)
-                endBeats = timestampToBeats(
-                    event->noteOffObject->message.getTimeStamp());
+            if (note.end)
+                endBeats = timestampToBeats(double(*note.end));
             startBeats = std::max(0.0, startBeats);
             const auto durationBeats = std::max(
                 0.03125, endBeats - startBeats);
@@ -13505,10 +13465,10 @@ cydaw::base::Result AudioTrackController::importMidiFile(
                 return cydaw::base::Result::fail(tr("error.midiImportTooLarge"));
             auto& group = groups[static_cast<std::size_t>(groupIndex)];
             group.notes.push_back(
-                { 0, event->message.getNoteNumber(), startBeats,
+                { 0, int(note.key), startBeats,
                   durationBeats, juce::jlimit(
                                      0.01f, 1.0f,
-                                     event->message.getFloatVelocity()) });
+                                     float(note.velocity)/127.f) });
             group.requiredEndBeats = std::max(
                 group.requiredEndBeats, startBeats + durationBeats);
         }
@@ -13577,59 +13537,27 @@ cydaw::base::Result AudioTrackController::exportMidiClipToFile(
         return cydaw::base::Result::fail(tr("error.midiExportCreate"));
 
     constexpr int ticksPerQuarterNote = 960;
-    juce::MidiMessageSequence sequence;
-    auto trackName = juce::MidiMessage::textMetaEvent(
-        3, track->name + " - " + clip->name);
-    trackName.setTimeStamp(0.0);
-    sequence.addEvent(std::move(trackName));
-    const auto microsecondsPerQuarter = static_cast<int>(std::lround(
-        60'000'000.0 / juce::jlimit(20.0, 400.0, tempoBpm_)));
-    auto tempo = juce::MidiMessage::tempoMetaEvent(
-        microsecondsPerQuarter);
-    tempo.setTimeStamp(0.0);
-    sequence.addEvent(std::move(tempo));
-    auto timeSignature = juce::MidiMessage::timeSignatureMetaEvent(timeSignatureNumerator_, timeSignatureDenominator_);
-    timeSignature.setTimeStamp(0.0);
-    sequence.addEvent(std::move(timeSignature));
-
-    auto latestEndBeats = 0.0;
-    for (const auto& note : clip->notes) {
-        const auto startBeats = std::max(0.0, note.startBeats);
-        const auto endBeats = std::max(
-            startBeats + 0.03125,
-            note.startBeats + note.durationBeats);
-        auto noteOn = juce::MidiMessage::noteOn(
-            1, juce::jlimit(0, 127, note.noteNumber),
-            juce::jlimit(0.01f, 1.0f, note.velocity));
-        noteOn.setTimeStamp(startBeats * ticksPerQuarterNote);
-        sequence.addEvent(std::move(noteOn));
-        auto noteOff = juce::MidiMessage::noteOff(
-            1, juce::jlimit(0, 127, note.noteNumber));
-        noteOff.setTimeStamp(endBeats * ticksPerQuarterNote);
-        sequence.addEvent(std::move(noteOff));
-        latestEndBeats = std::max(latestEndBeats, endBeats);
+    cyaudio::MidiFile midiFile; midiFile.format=0; midiFile.division=ticksPerQuarterNote;
+    auto& events=midiFile.tracks.emplace_back();
+    const auto addMeta=[&](std::uint64_t tick,std::uint8_t type,std::vector<std::uint8_t> data){events.push_back({tick,cyaudio::MidiFileEventKind::meta,type,std::move(data)});};
+    const auto name=(track->name+" - "+clip->name).toStdString();
+    addMeta(0,3,{name.begin(),name.end()});
+    const auto micros=static_cast<unsigned>(std::lround(60000000./std::clamp(tempoBpm_,20.,400.)));
+    addMeta(0,0x51,{std::uint8_t(micros>>16),std::uint8_t(micros>>8),std::uint8_t(micros)});
+    unsigned denominatorPower=0;while((1u<<denominatorPower)<unsigned(timeSignatureDenominator_)&&denominatorPower<7)++denominatorPower;
+    addMeta(0,0x58,{std::uint8_t(timeSignatureNumerator_),std::uint8_t(denominatorPower),24,8});
+    auto latestEndBeats=0.;
+    const auto addMessage=[&](double beat,cyaudio::ShortMidiMessage message){events.push_back({static_cast<std::uint64_t>(std::llround(beat*ticksPerQuarterNote)),cyaudio::MidiFileEventKind::message,0,{message.bytes().begin(),message.bytes().end()}});};
+    for(const auto& note:clip->notes){
+        const auto start=std::max(0.,note.startBeats);
+        const auto end=std::max(start+.03125,note.startBeats+note.durationBeats);
+        addMessage(start,cyaudio::midiNoteOn(1,std::clamp(note.noteNumber,0,127),unsigned(std::lround(std::clamp(note.velocity,.01f,1.f)*127.f))));
+        addMessage(end,cyaudio::midiNoteOff(1,std::clamp(note.noteNumber,0,127)));
+        latestEndBeats=std::max(latestEndBeats,end);
     }
-    auto endOfTrack = juce::MidiMessage::endOfTrack();
-    endOfTrack.setTimeStamp(
-        std::max(latestEndBeats, clip->lengthBeats)
-        * ticksPerQuarterNote);
-    sequence.addEvent(std::move(endOfTrack));
-    sequence.updateMatchedPairs();
-    sequence.sort();
-
-    juce::MidiFile midiFile;
-    midiFile.setTicksPerQuarterNote(ticksPerQuarterNote);
-    midiFile.addTrack(sequence);
-    auto output = juce::File(file).createOutputStream();
-    if (output == nullptr || !output->setPosition(0)
-        || output->truncate().failed())
-        return cydaw::base::Result::fail(tr("error.midiExportCreate"));
-    if (!midiFile.writeTo(*output, 0)) {
-        output.reset();
-        (void) file.deleteFile();
+    addMeta(static_cast<std::uint64_t>(std::llround(std::max(latestEndBeats,clip->lengthBeats)*ticksPerQuarterNote)),0x2f,{});
+    if(cydaw::midi::saveStandardFile(file,std::move(midiFile)).failed())
         return cydaw::base::Result::fail(tr("error.midiExportWrite"));
-    }
-    output->flush();
     return cydaw::base::Result::ok();
 }
 

@@ -1,3 +1,4 @@
+#include <cydaw/base/FileDialog.h>
 #include <cydaw/base/Text.h>
 #pragma once
 
@@ -44,7 +45,7 @@ private:
     bool openConfirm_ {};
     // The NVIDIA build's licences (CUDA, cuDNN) accepted in the confirmation.
     bool engineLicencesAccepted_ {};
-    std::unique_ptr<juce::FileChooser> chooser_;
+    std::unique_ptr<cydaw::base::FileDialog> chooser_;
 };
 
 } // namespace cydaw::v2

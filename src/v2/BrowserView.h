@@ -1,3 +1,4 @@
+#include <cydaw/base/FileDialog.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #pragma once
@@ -74,7 +75,7 @@ private:
     bool autoPreview_ { true };
     bool showSamplesTab_ {};
     int currentTab_ {};
-    std::unique_ptr<juce::FileChooser> chooser_;
+    std::unique_ptr<cydaw::base::FileDialog> chooser_;
 
     // What the catalog gave, and what of it is shown.
     std::shared_ptr<const SampleCatalog::Data> data_;

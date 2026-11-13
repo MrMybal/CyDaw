@@ -1,3 +1,4 @@
+#include <cydaw/base/Process.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #pragma once
@@ -103,12 +104,12 @@ private:
     [[nodiscard]] static bool controlBusy(cydaw::plugins::SharedPluginAudio& shared) noexcept;
 
     cydaw::plugins::WorkerWake wake_;
-    juce::ChildProcess process_;
+    cydaw::base::ChildProcess process_;
     cydaw::base::File sharedFile_;
     cydaw::base::File pluginFile_;
     cydaw::base::Text pluginName_;
     cydaw::base::Text lastStatus_;
-    std::unique_ptr<juce::MemoryMappedFile> mapping_;
+    std::unique_ptr<cydaw::base::MemoryMappedFile> mapping_;
     std::atomic<cydaw::plugins::SharedPluginAudio*> active_ {};
     std::atomic<int> callbacksInFlight_ {};
     std::atomic<std::uint64_t> missedBlocks_ {};

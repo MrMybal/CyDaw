@@ -1,3 +1,4 @@
+#include <cydaw/base/Process.h>
 #include <cydaw/base/File.h>
 #include "ExtraPluginFormats.h"
 #include "CyAudioCorePluginFormat.h"
@@ -720,7 +721,7 @@ int runRealtimeWorker(const cydaw::base::File& pluginFile,
     juce::Process::setPriority(juce::Process::HighPriority);
     if (!sharedFile.existsAsFile())
         return 10;
-    juce::MemoryMappedFile mapping(sharedFile, juce::MemoryMappedFile::readWrite, false);
+    cydaw::base::MemoryMappedFile mapping(sharedFile, cydaw::base::MemoryMappedFile::readWrite, false);
     auto* shared = static_cast<cydaw::plugins::SharedPluginAudio*>(mapping.getData());
     if (shared == nullptr || mapping.getSize() < sizeof(cydaw::plugins::SharedPluginAudio)
         || shared->magic != cydaw::plugins::workerProtocolMagic

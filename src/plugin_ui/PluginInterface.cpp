@@ -263,6 +263,7 @@ struct PluginInterface::Impl {
 
     void frame()
     {
+        GraphSlot::processPending();
         // A plug-in's window is a module: English, whatever the language.
         const ui::ModuleText english;
         if (snapshot.isNotEmpty() && ++frames == 45)

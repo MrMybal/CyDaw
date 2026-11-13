@@ -1,3 +1,4 @@
+#include <cydaw/base/Process.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #include "ProjectImport.h"
@@ -49,7 +50,7 @@ public:
 
     cydaw::base::Result open(const cydaw::base::File& file)
     {
-        map_ = std::make_unique<juce::MemoryMappedFile>(file, juce::MemoryMappedFile::readOnly);
+        map_ = std::make_unique<cydaw::base::MemoryMappedFile>(file, cydaw::base::MemoryMappedFile::readOnly);
         if (map_->getData() == nullptr || map_->getSize() < 512)
             return cydaw::base::Result::fail("The file could not be read: " + file.getFullPathName());
         data_ = static_cast<const juce::uint8*>(map_->getData());
@@ -204,7 +205,7 @@ private:
         return block;
     }
 
-    std::unique_ptr<juce::MemoryMappedFile> map_;
+    std::unique_ptr<cydaw::base::MemoryMappedFile> map_;
     const juce::uint8* data_ {};
     std::size_t size_ {};
     int sectorShift_ { 9 };

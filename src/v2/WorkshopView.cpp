@@ -1,3 +1,4 @@
+#include <cydaw/base/FileDialog.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #include "WorkshopView.h"
@@ -184,13 +185,13 @@ void WorkshopView::chooseDevice(const bool exporting)
     const auto tab = studio_.activeWorkshopTab();
     auto name = cydaw::base::File::createLegalFileName(studio_.workshop().name).trim();
     if (name.isEmpty()) name = "Device";
-    chooser_ = std::make_unique<juce::FileChooser>(
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(
         exporting ? ui::Ls("Exporter le périphérique CyDAW", "Export CyDAW device") : ui::Ls("Ouvrir un périphérique CyDAW", "Open CyDAW device"),
         exporting ? locations::folder(Location::pluginExports).getChildFile(name + ".cydawdevice") : Studio::deviceLibraryFolder(),
         "*.cydawdevice");
-    chooser_->launchAsync((exporting ? juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting
-                                   : juce::FileBrowserComponent::openMode) | juce::FileBrowserComponent::canSelectFiles,
-        [this, exporting, tab](const juce::FileChooser& chooser) {
+    chooser_->launchAsync((exporting ? cydaw::base::FileDialogFlags::saveMode | cydaw::base::FileDialogFlags::warnAboutOverwriting
+                                   : cydaw::base::FileDialogFlags::openMode) | cydaw::base::FileDialogFlags::canSelectFiles,
+        [this, exporting, tab](const cydaw::base::FileDialog& chooser) {
             auto file = chooser.getResult();
             if (file == cydaw::base::File()) return;
             if (!exporting) {
@@ -618,10 +619,10 @@ void WorkshopView::drawTabs()
 
 void WorkshopView::chooseSample()
 {
-    chooser_ = std::make_unique<juce::FileChooser>(ui::Ls("Un son pour le simulateur", "A sound for the simulator"),
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(ui::Ls("Un son pour le simulateur", "A sound for the simulator"),
                                                    studio_.simulatorSettings().sample, "*.wav;*.aif;*.aiff;*.flac;*.mp3;*.ogg");
-    chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-                          [this](const juce::FileChooser& chooser) {
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles,
+                          [this](const cydaw::base::FileDialog& chooser) {
                               const auto file = chooser.getResult();
                               if (file == cydaw::base::File())
                                   return;

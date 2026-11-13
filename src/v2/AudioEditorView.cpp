@@ -1,3 +1,4 @@
+#include <cydaw/base/FileDialog.h>
 #include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
@@ -876,10 +877,10 @@ void AudioEditorView::drawToolbar(const TrackRef& track, const AudioClip& clip, 
         const auto clipId = clip.id;
         const auto at = cursor_;
         const auto scene = scene_;
-        chooser_ = std::make_unique<juce::FileChooser>(ui::Ls("Un son pour ce clip", "A sound for this clip"), cydaw::base::File(),
+        chooser_ = std::make_unique<cydaw::base::FileDialog>(ui::Ls("Un son pour ce clip", "A sound for this clip"), cydaw::base::File(),
                                                        "*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
-        chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-                              [this, track, clipId, at, scene](const juce::FileChooser& chosen) {
+        chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles,
+                              [this, track, clipId, at, scene](const cydaw::base::FileDialog& chosen) {
                                   const auto file = chosen.getResult();
                                   if (file == cydaw::base::File())
                                       return;
@@ -1775,10 +1776,10 @@ void AudioEditorView::eventMenu(const TrackRef& track, const AudioClip& clip, co
             const auto clipId = clip.id;
             const auto at = cursor_;
             const auto scene = scene_;
-            chooser_ = std::make_unique<juce::FileChooser>(ui::Ls("Un son pour ce clip", "A sound for this clip"), cydaw::base::File(),
+            chooser_ = std::make_unique<cydaw::base::FileDialog>(ui::Ls("Un son pour ce clip", "A sound for this clip"), cydaw::base::File(),
                                                            "*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
-            chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-                                  [this, track, clipId, at, scene](const juce::FileChooser& chosen) {
+            chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles,
+                                  [this, track, clipId, at, scene](const cydaw::base::FileDialog& chosen) {
                                       const auto file = chosen.getResult();
                                       if (file == cydaw::base::File())
                                           return;
@@ -2832,10 +2833,10 @@ void AudioEditorView::drawTakes(const TrackRef& track, const AudioClip& clip)
     // The toolbar.
     if (ImGui::SmallButton(L("+ Prise depuis un fichier\xe2\x80\xa6", "+ Take from a file\xe2\x80\xa6"))) {
         const auto clipId = clip.id;
-        chooser_ = std::make_unique<juce::FileChooser>(ui::Ls("Une prise pour ce clip", "A take for this clip"), cydaw::base::File(),
+        chooser_ = std::make_unique<cydaw::base::FileDialog>(ui::Ls("Une prise pour ce clip", "A take for this clip"), cydaw::base::File(),
                                                        "*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
-        chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-                              [this, track, clipId](const juce::FileChooser& chosen) {
+        chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles,
+                              [this, track, clipId](const cydaw::base::FileDialog& chosen) {
                                   const auto file = chosen.getResult();
                                   if (file == cydaw::base::File())
                                       return;

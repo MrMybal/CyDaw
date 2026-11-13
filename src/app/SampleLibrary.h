@@ -1,3 +1,4 @@
+#include <cydaw/base/EventLoop.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/Properties.h>
 #include <cydaw/base/File.h>
@@ -89,7 +90,7 @@ struct SampleHint {
 // classifier (CLAP, through tools/samples/classify_samples.py, with a model
 // installed beforehand) that names what the file name did not. Everything
 // public runs on the message thread; the threads report back through it.
-class SampleLibrary final : private juce::Timer {
+class SampleLibrary final : private cydaw::base::Timer {
 public:
     struct Listener {
         virtual ~Listener() = default;
@@ -335,7 +336,8 @@ private:
     std::atomic<int> classified_ {};
     std::atomic<int> toClassify_ {};
 
-    JUCE_DECLARE_WEAK_REFERENCEABLE(SampleLibrary)
+    template<class> friend class cydaw::base::WeakReference;
+    cydaw::base::CallbackLifetime callbackLifetime_;
 };
 
 } // namespace cydaw::app

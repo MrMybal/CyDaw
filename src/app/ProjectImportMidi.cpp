@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
@@ -5,8 +6,8 @@
 #include "ProjectImport.h"
 #include "ProjectImportShared.h"
 
-#include <juce_audio_basics/juce_audio_basics.h>
-#include <juce_audio_formats/juce_audio_formats.h>
+#include <cydaw/midi/StandardMidiFile.h>
+
 
 #include <map>
 
@@ -27,11 +28,10 @@ public:
 
     cydaw::base::Result read()
     {
-        juce::FileInputStream input(file_);
-        juce::MidiFile midi;
-        if (!input.openedOk() || !midi.readFrom(input))
+        cyaudio::MidiFile midi;
+        if (cydaw::midi::loadStandardFile(file_,midi).failed())
             return cydaw::base::Result::fail("Not a MIDI file: " + file_.getFileName());
-        const auto perQuarter = midi.getTimeFormat();
+        const auto perQuarter = static_cast<std::int16_t>(midi.division);
         if (perQuarter <= 0)
             return cydaw::base::Result::fail("A MIDI file counted in timecode (SMPTE) is not read: " + file_.getFileName());
         out_.format = "midi";
@@ -40,43 +40,28 @@ public:
         // The tempo and signature: the first ones.
         auto tempoFound = false;
         auto tempoChanges = 0;
-        for (int index = 0; index < midi.getNumTracks(); ++index)
-            for (const auto* event : *midi.getTrack(index)) {
-                const auto& message = event->message;
-                if (message.isTempoMetaEvent()) {
+        for (const auto& track : midi.tracks)
+            for (const auto& event : track) {
+                if (const auto bpm = cydaw::midi::tempo(event)) {
                     ++tempoChanges;
-                    if (!tempoFound) {
-                        out_.tempo = juce::jlimit(20.0, 999.0, 60.0 / std::max(1.0e-6, message.getTempoSecondsPerQuarterNote()));
-                        tempoFound = true;
-                    }
-                } else if (message.isTimeSignatureMetaEvent() && event->message.getTimeStamp() <= 0.0) {
-                    int numerator = 4;
-                    int denominator = 4;
-                    message.getTimeSignatureInfo(numerator, denominator);
-                    out_.numerator = juce::jlimit(1, 32, numerator);
-                    out_.denominator = juce::jlimit(1, 32, denominator);
+                    if (!tempoFound) { out_.tempo = cydaw::base::limit(20.0,999.0,*bpm); tempoFound = true; }
+                } else if (const auto meter = cydaw::midi::signature(event); meter && event.tick == 0) {
+                    out_.numerator = cydaw::base::limit(1,32,int(meter->first));
+                    out_.denominator = cydaw::base::limit(1,32,int(meter->second));
                 }
             }
         if (tempoChanges > 1)
             out_.warnings.add("The tempo changes along the MIDI file: CyDAW keeps " + cydaw::base::Text(out_.tempo, 2) + " BPM.");
-        for (int index = 0; index < midi.getNumTracks(); ++index) {
-            juce::MidiMessageSequence sequence(*midi.getTrack(index));
-            sequence.updateMatchedPairs();
-            cydaw::base::Text name;
-            // By channel: a part of its own each.
+        for (std::size_t index = 0; index < midi.tracks.size(); ++index) {
+            auto name = cydaw::midi::trackName(midi.tracks[index]);
             std::map<int, std::vector<ImportedNote>> byChannel;
             auto last = 0.0;
-            for (const auto* event : sequence) {
-                const auto& message = event->message;
-                if (message.isTrackNameEvent() && name.isEmpty())
-                    name = message.getTextFromTextMetaEvent().trim();
-                if (!message.isNoteOn() || event->noteOffObject == nullptr)
-                    continue;
-                const auto start = message.getTimeStamp() / perQuarter;
-                const auto end = event->noteOffObject->message.getTimeStamp() / perQuarter;
-                byChannel[message.getChannel()].push_back(
-                    { message.getNoteNumber(), start, std::max(1.0e-3, end - start), message.getFloatVelocity() });
-                last = std::max(last, end);
+            for (const auto& note : cydaw::midi::pairedNotes(midi.tracks[index])) {
+                if (!note.end) continue;
+                const auto start = double(note.tick) / perQuarter;
+                const auto end = double(*note.end) / perQuarter;
+                byChannel[int(note.channel)].push_back({int(note.key),start,std::max(1.0e-3,end-start),float(note.velocity)/127.f});
+                last=std::max(last,end);
             }
             for (auto& [channel, notes] : byChannel) {
                 ImportedTrack track;

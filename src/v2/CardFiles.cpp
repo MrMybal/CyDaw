@@ -1,3 +1,4 @@
+#include <cydaw/base/FileDialog.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #include "CardFiles.h"
@@ -14,7 +15,7 @@ namespace cydaw::v2 {
 
 namespace {
 
-std::unique_ptr<juce::FileChooser> chooser;
+std::unique_ptr<cydaw::base::FileDialog> chooser;
 
 // A response's curve, made once (it never changes: a new one is a new object).
 const std::vector<float>& curveOf(const engine::ImpulseResponseRef& response)
@@ -70,11 +71,11 @@ CardFileScope::CardFileScope(DeviceHost& studio, UiState& state, const TrackRef&
     auto* studioPointer = &studio;
     auto* statePointer = &state;
     file_.load = [studioPointer, statePointer, track, nodeId, room] {
-        chooser = std::make_unique<juce::FileChooser>(room ? ui::Ls("La réponse impulsionnelle d'un lieu", "A place's impulse response")
+        chooser = std::make_unique<cydaw::base::FileDialog>(room ? ui::Ls("La réponse impulsionnelle d'un lieu", "A place's impulse response")
                                                            : ui::Ls("Une réponse impulsionnelle de baffle", "A cabinet impulse response"),
                                                       cydaw::base::File(), "*.wav;*.wave;*.aif;*.aiff;*.flac");
-        chooser->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-                             [studioPointer, statePointer, track, nodeId](const juce::FileChooser& picked) {
+        chooser->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles,
+                             [studioPointer, statePointer, track, nodeId](const cydaw::base::FileDialog& picked) {
                                  const auto file = picked.getResult();
                                  if (file == cydaw::base::File())
                                      return;

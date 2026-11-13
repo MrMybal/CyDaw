@@ -1,3 +1,4 @@
+#include <cydaw/base/FileDialog.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #include "SemanticSearchView.h"
@@ -298,10 +299,10 @@ void SemanticSearchView::drawModel(const AiModel& model)
         if (ImGui::Button(L("Depuis un dossier…", "From a folder…"))) {
             const auto id = model.id;
             const auto accepted = !model.requiresAcceptance || ticked;
-            chooser_ = std::make_unique<juce::FileChooser>(L("Dossier qui contient déjà ce modèle", "Folder that already holds this model"),
+            chooser_ = std::make_unique<cydaw::base::FileDialog>(L("Dossier qui contient déjà ce modèle", "Folder that already holds this model"),
                                                            cydaw::base::File {});
-            chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectDirectories,
-                                  [this, id, accepted](const juce::FileChooser& chooser) {
+            chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectDirectories,
+                                  [this, id, accepted](const cydaw::base::FileDialog& chooser) {
                                       const auto folder = chooser.getResult();
                                       if (!folder.isDirectory())
                                           return;

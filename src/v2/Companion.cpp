@@ -1,3 +1,4 @@
+#include <cydaw/base/Process.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/Properties.h>
 #include <cydaw/base/File.h>
@@ -59,7 +60,7 @@ public:
 
     void run() override
     {
-        if (!process_.start(command_, juce::ChildProcess::wantStdOut | juce::ChildProcess::wantStdErr)) {
+        if (!process_.start(command_, cydaw::base::ChildProcess::wantStdOut | cydaw::base::ChildProcess::wantStdErr)) {
             finish(false, {}, "Python could not be started: " + command_[0]);
             return;
         }
@@ -134,7 +135,7 @@ private:
     Companion& owner_;
     cydaw::base::TextList command_;
     cydaw::base::Text name_;
-    juce::ChildProcess process_;
+    cydaw::base::ChildProcess process_;
 };
 
 Companion::Companion()
@@ -319,9 +320,9 @@ std::optional<Companion::Status> Companion::takeFinished()
 
 cydaw::base::Value Companion::runNow(const cydaw::base::TextList& arguments, cydaw::base::Text& error, const int timeoutMs) const
 {
-    juce::ChildProcess process;
+    cydaw::base::ChildProcess process;
     const auto command = commandLine(arguments);
-    if (!process.start(command, juce::ChildProcess::wantStdOut | juce::ChildProcess::wantStdErr)) {
+    if (!process.start(command, cydaw::base::ChildProcess::wantStdOut | cydaw::base::ChildProcess::wantStdErr)) {
         error = "Python could not be started: " + command[0];
         return {};
     }

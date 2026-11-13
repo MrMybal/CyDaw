@@ -1,3 +1,4 @@
+#include <cydaw/base/FileDialog.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #pragma once
@@ -117,7 +118,7 @@ private:
     std::vector<DjTrack> rows_;
     cydaw::base::File selected_;
     std::vector<cydaw::base::File> history_;
-    std::unique_ptr<juce::FileChooser> chooser_;
+    std::unique_ptr<cydaw::base::FileDialog> chooser_;
 };
 
 } // namespace cydaw::v2

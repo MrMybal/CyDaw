@@ -1,3 +1,4 @@
+#include <cydaw/base/Process.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #include "IsolatedPluginHost.h"
@@ -104,8 +105,8 @@ cydaw::base::Result IsolatedPluginHost::startWorker(PluginWorkerLaunch launch,
         output->flush();
     }
 
-    mapping_ = std::make_unique<juce::MemoryMappedFile>(sharedFile_,
-                                                        juce::MemoryMappedFile::readWrite,
+    mapping_ = std::make_unique<cydaw::base::MemoryMappedFile>(sharedFile_,
+                                                        cydaw::base::MemoryMappedFile::readWrite,
                                                         false);
     auto* shared = mapping_ != nullptr
                        ? static_cast<cydaw::plugins::SharedPluginAudio*>(mapping_->getData())

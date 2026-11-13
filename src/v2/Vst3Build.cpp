@@ -1,3 +1,4 @@
+#include <cydaw/base/Process.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
@@ -214,7 +215,7 @@ void Vst3Build::finish(const Phase phase, const cydaw::base::Text& failure)
 bool Vst3Build::runStep(const cydaw::base::TextList& command)
 {
     addLine("> " + command.joinIntoString(" "));
-    juce::ChildProcess process;
+    cydaw::base::ChildProcess process;
     const auto windows=cydaw::base::SystemStats::getEnvironmentVariable("SystemRoot","C:/Windows");
     const auto path=windows+"/System32;"+windows+";"+cydaw::base::SystemStats::getEnvironmentVariable("PATH",{});
     cydaw::base::TextList clean {tools_.cmake.getFullPathName(), "-E", "env", "--unset=PATH", "--unset=Path", "Path="+path, "--"};
@@ -224,7 +225,7 @@ bool Vst3Build::runStep(const cydaw::base::TextList& command)
     if(command.size()>2 && command[1]=="--build")
         clean.addArray({command[0],"-E","chdir",command[2]});
     clean.addArray(command);
-    if (!process.start(clean, juce::ChildProcess::wantStdOut | juce::ChildProcess::wantStdErr)) {
+    if (!process.start(clean, cydaw::base::ChildProcess::wantStdOut | cydaw::base::ChildProcess::wantStdErr)) {
         addLine("could not start " + command[0]);
         return false;
     }

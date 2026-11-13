@@ -1,3 +1,4 @@
+#include <cydaw/base/FileDialog.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #pragma once
@@ -308,7 +309,7 @@ private:
     int effectsTrack_ { -1 };
     float tailSeconds_ { 2.0f };
     int saveBits_ { 24 };
-    std::unique_ptr<juce::FileChooser> chooser_;
+    std::unique_ptr<cydaw::base::FileDialog> chooser_;
 };
 
 } // namespace cydaw::v2

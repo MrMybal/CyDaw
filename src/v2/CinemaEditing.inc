@@ -1,3 +1,4 @@
+#include <cydaw/base/FileDialog.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 // Cinema uses the same clip document, editor, MIDI instruments, automation and processing rack.
@@ -76,9 +77,9 @@ bool FoundryView::openCinemaVideo(const cydaw::base::File& file){
 }
 void FoundryView::chooseCinemaClipAudio(Tab& t,std::uint64_t track,std::int64_t at){
     const auto identity=t.cinemaIdentity;
-    chooser_=std::make_unique<juce::FileChooser>(ui::Ls("Importer un son dans la sous-piste", "Import sound into subtrack"),cydaw::base::File(),"*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg;*.mp3;*.wma");
-    chooser_->launchAsync(juce::FileBrowserComponent::openMode|juce::FileBrowserComponent::canSelectFiles,
-        [this,identity,track,at](const juce::FileChooser& chooser){
+    chooser_=std::make_unique<cydaw::base::FileDialog>(ui::Ls("Importer un son dans la sous-piste", "Import sound into subtrack"),cydaw::base::File(),"*.wav;*.wave;*.aif;*.aiff;*.flac;*.ogg;*.mp3;*.wma");
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode|cydaw::base::FileDialogFlags::canSelectFiles,
+        [this,identity,track,at](const cydaw::base::FileDialog& chooser){
             const auto file=chooser.getResult();if(file==cydaw::base::File())return;
             for(auto& target:tabs_)if(target.cinemaIdentity==identity){
                 const auto index=target.document->session().trackIndex(track);if(index<0)return;
@@ -98,10 +99,10 @@ void FoundryView::createCinemaAudioClip(Tab& t,int track,std::int64_t at){
     pickTrack(t,track,false);t.detailsFocus=true;
 }
 void FoundryView::chooseCinemaVideo(){
-    chooser_=std::make_unique<juce::FileChooser>(ui::Ls("Charger une vidéo de référence","Load reference video"),cydaw::base::File(),
+    chooser_=std::make_unique<cydaw::base::FileDialog>(ui::Ls("Charger une vidéo de référence","Load reference video"),cydaw::base::File(),
         "*.mp4;*.mov;*.m4v;*.avi;*.wmv;*.mkv;*.webm;*.mpeg;*.mpg;*.mxf;*.ts;*.mts;*.m2ts;*.m2v;*.vob;*.ogv;*.flv;*.3gp;*.3g2;*.dv;*.nut;*.rm;*.rmvb");
-    chooser_->launchAsync(juce::FileBrowserComponent::openMode|juce::FileBrowserComponent::canSelectFiles,
-        [this](const juce::FileChooser& f){if(f.getResult()!=cydaw::base::File())openCinemaVideo(f.getResult());});
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode|cydaw::base::FileDialogFlags::canSelectFiles,
+        [this](const cydaw::base::FileDialog& f){if(f.getResult()!=cydaw::base::File())openCinemaVideo(f.getResult());});
 }
 void FoundryView::tickCinemaVideo(){
     if(!cinema_)return;

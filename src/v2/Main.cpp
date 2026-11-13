@@ -1,3 +1,4 @@
+#include <cydaw/base/EventLoop.h>
 #include "SamplerMapFile.h"
 #include <cydaw/base/File.h>
 #include "AppUi.h"
@@ -1093,7 +1094,7 @@ public:
 private:
     struct TickTimer final : juce::Timer {
         explicit TickTimer(Studio& studio) : studio_(studio) {}
-        void timerCallback() override { studio_.tick(); }
+        void timerCallback() override { cydaw::base::EventLoop::dispatchPending(); studio_.tick(); }
         Studio& studio_;
     };
 

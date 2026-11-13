@@ -1,3 +1,6 @@
+#include <cydaw/base/Process.h>
+#include <cydaw/base/FileDialog.h>
+#include <cydaw/base/EventLoop.h>
 #include <cydaw/base/File.h>
 #include "JsfxView.h"
 #include "HelpDocumentation.h"
@@ -417,14 +420,14 @@ void AppUi::drawLayoutNamePrompt()
 void AppUi::chooseSoundToRecreate(const cydaw::base::Text& kind)
 {
     const auto synth = kind == "synth";
-    chooser_ = std::make_unique<juce::FileChooser>(
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(
         synth ? L("La note dont chercher le patch (une note isolée)", "The note to find a patch for (one isolated note)")
               : L("Les notes à recréer (une note isolée par fichier, ou un enregistrement de plusieurs notes)",
                   "The notes to recreate (one isolated note per file, or a recording of several notes)"),
         cydaw::base::File {}, synth ? "*.wav;*.aif;*.aiff;*.flac" : "*.wav");
-    const auto flags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
-                       | (synth ? 0 : juce::FileBrowserComponent::canSelectMultipleItems);
-    chooser_->launchAsync(flags, [this, kind, synth](const juce::FileChooser& chooser) {
+    const auto flags = cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles
+                       | (synth ? 0 : cydaw::base::FileDialogFlags::canSelectMultipleItems);
+    chooser_->launchAsync(flags, [this, kind, synth](const cydaw::base::FileDialog& chooser) {
         const auto files = chooser.getResults();
         if (files.isEmpty())
             return;
@@ -581,11 +584,11 @@ void AppUi::newPrismTrack()
 
 void AppUi::chooseSamplerFiles()
 {
-    chooser_ = std::make_unique<juce::FileChooser>(L("Les échantillons du sampler", "The sampler's samples"), cydaw::base::File {},
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(L("Les échantillons du sampler", "The sampler's samples"), cydaw::base::File {},
                                                    "*.wav;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
-    chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles
-                              | juce::FileBrowserComponent::canSelectMultipleItems,
-                          [this](const juce::FileChooser& chooser) {
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles
+                              | cydaw::base::FileDialogFlags::canSelectMultipleItems,
+                          [this](const cydaw::base::FileDialog& chooser) {
                               const auto files = chooser.getResults();
                               if (files.isEmpty())
                                   return;
@@ -602,10 +605,10 @@ void AppUi::chooseSamplerFiles()
 
 void AppUi::chooseSamplerInstrument()
 {
-    chooser_ = std::make_unique<juce::FileChooser>(L("Un instrument SFZ ou une carte .cysampler", "An SFZ instrument or a .cysampler map"),
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(L("Un instrument SFZ ou une carte .cysampler", "An SFZ instrument or a .cysampler map"),
                                                    cydaw::base::File {}, "*.sfz;*.cysampler");
-    chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-                          [this](const juce::FileChooser& chooser) {
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles,
+                          [this](const cydaw::base::FileDialog& chooser) {
                               const auto file = chooser.getResult();
                               if (file == cydaw::base::File())
                                   return;
@@ -679,10 +682,10 @@ void AppUi::drawFactoryInstrumentsMenu()
 
 void AppUi::chooseSoundModel()
 {
-    chooser_ = std::make_unique<juce::FileChooser>(L("Un modèle de son", "A sound model"), Studio::soundModelFolder(),
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(L("Un modèle de son", "A sound model"), Studio::soundModelFolder(),
                                                    "*.cysound");
-    chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-                          [this](const juce::FileChooser& chooser) {
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles,
+                          [this](const cydaw::base::FileDialog& chooser) {
                               const auto file = chooser.getResult();
                               if (file == cydaw::base::File())
                                   return;
@@ -888,10 +891,10 @@ void AppUi::projectOpened(const cydaw::base::File& file, const cydaw::base::Resu
 
 void AppUi::chooseOpenProject()
 {
-    chooser_ = std::make_unique<juce::FileChooser>(L("Ouvrir un projet CyDAW", "Open a CyDAW project"), cydaw::base::File {},
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(L("Ouvrir un projet CyDAW", "Open a CyDAW project"), cydaw::base::File {},
                                                    "*.cydaw");
-    chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-                          [this](const juce::FileChooser& chooser) {
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles,
+                          [this](const cydaw::base::FileDialog& chooser) {
                               const auto file = chooser.getResult();
                               if (file.existsAsFile())
                                   openProject(file);
@@ -917,11 +920,11 @@ void AppUi::chooseSaveAs()
 
 void AppUi::chooseSaveAsThen(std::function<void()> then)
 {
-    chooser_ = std::make_unique<juce::FileChooser>(L("Enregistrer le projet", "Save the project"), studio_.projectFile(),
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(L("Enregistrer le projet", "Save the project"), studio_.projectFile(),
                                                    "*.cydaw");
-    chooser_->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
-                              | juce::FileBrowserComponent::warnAboutOverwriting,
-                          [this, then = std::move(then)](const juce::FileChooser& chooser) {
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::saveMode | cydaw::base::FileDialogFlags::canSelectFiles
+                              | cydaw::base::FileDialogFlags::warnAboutOverwriting,
+                          [this, then = std::move(then)](const cydaw::base::FileDialog& chooser) {
                               auto file = chooser.getResult();
                               if (file == cydaw::base::File {})
                                   return;
@@ -937,12 +940,12 @@ void AppUi::chooseSaveAsThen(std::function<void()> then)
 
 void AppUi::chooseImportProject()
 {
-    chooser_ = std::make_unique<juce::FileChooser>(
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(
         L("Importer un projet (Live, Bitwig, Studio One, Reaper, FL Studio, Ardour, LMMS, Zrythm, DAWproject, AAF, MIDI et pistes audio)",
           "Import a project (Live, Bitwig, Studio One, Reaper, FL Studio, Ardour, LMMS, Zrythm, DAWproject, AAF, MIDI and stems)"),
         cydaw::base::File {}, app::project_import::supportedProjectWildcard());
-    chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-                          [this](const juce::FileChooser& chooser) {
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles,
+                          [this](const cydaw::base::FileDialog& chooser) {
                               const auto file = chooser.getResult();
                               if (file.existsAsFile())
                                   importProjectInSteps(file);
@@ -954,10 +957,10 @@ void AppUi::chooseExportMix()
     const auto suggested = studio_.projectFile() != cydaw::base::File {} ? studio_.projectFile().withFileExtension(".wav")
                                                                   : cydaw::base::File::getSpecialLocation(cydaw::base::File::userMusicDirectory)
                                                                         .getChildFile("CyDAW mix.wav");
-    chooser_ = std::make_unique<juce::FileChooser>(L("Exporter le mix", "Export the mix"), suggested, "*.wav");
-    chooser_->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles
-                              | juce::FileBrowserComponent::warnAboutOverwriting,
-                          [this](const juce::FileChooser& chooser) {
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(L("Exporter le mix", "Export the mix"), suggested, "*.wav");
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::saveMode | cydaw::base::FileDialogFlags::canSelectFiles
+                              | cydaw::base::FileDialogFlags::warnAboutOverwriting,
+                          [this](const cydaw::base::FileDialog& chooser) {
                               const auto file = chooser.getResult();
                               if (file == cydaw::base::File {})
                                   return;
@@ -970,9 +973,9 @@ void AppUi::chooseExportMix()
 
 void AppUi::chooseImportMidi()
 {
-    chooser_ = std::make_unique<juce::FileChooser>(L("Importer un fichier MIDI", "Import a MIDI file"), cydaw::base::File {}, "*.mid;*.midi");
-    chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
-                          [this](const juce::FileChooser& chooser) {
+    chooser_ = std::make_unique<cydaw::base::FileDialog>(L("Importer un fichier MIDI", "Import a MIDI file"), cydaw::base::File {}, "*.mid;*.midi");
+    chooser_->launchAsync(cydaw::base::FileDialogFlags::openMode | cydaw::base::FileDialogFlags::canSelectFiles,
+                          [this](const cydaw::base::FileDialog& chooser) {
                               const auto file = chooser.getResult();
                               if (!file.existsAsFile())
                                   return;
@@ -2031,9 +2034,9 @@ void AppUi::drawCompanionWindow()
         python.copyToUTF8(companionPython_, sizeof(companionPython_));
         // An NVIDIA card makes the CUDA build worth its size.
         nvidiaGpu_.clear();
-        juce::ChildProcess smi;
+        cydaw::base::ChildProcess smi;
         if (smi.start(cydaw::base::TextList { "nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader" },
-                      juce::ChildProcess::wantStdOut)) {
+                      cydaw::base::ChildProcess::wantStdOut)) {
             const auto output = smi.readAllProcessOutput().trim();
             if (smi.waitForProcessToFinish(3'000) && smi.getExitCode() == 0)
                 nvidiaGpu_ = output.upToFirstOccurrenceOf("\n", false, false).trim();
@@ -2651,7 +2654,7 @@ void AppUi::tracksChanged()
 void AppUi::requestQuit()
 {
     // After the answer has gone out.
-    juce::Timer::callAfterDelay(300, [] {
+    cydaw::base::Timer::callAfterDelay(300, [] {
         if (juce::JUCEApplicationBase::getInstance() != nullptr)
             juce::JUCEApplicationBase::quit();
     });
