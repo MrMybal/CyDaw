@@ -1,4 +1,4 @@
-#include <cydaw/integration/CyDSPAudioFormats.h>
+#include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "DjEngine.h"
 
 #include <algorithm>
@@ -211,7 +211,7 @@ public:
     {
         const DecodingThreadScope decoding;
         juce::AudioFormatManager formats;
-        cydaw::integration::registerCyDSPReaders(formats);
+        cydaw::integration::registerCyAudioCoreReaders(formats);
         while (!threadShouldExit()) {
             wake_.wait(500);
             owner_.freeRetired();

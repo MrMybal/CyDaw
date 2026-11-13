@@ -1,4 +1,4 @@
-#include <cydaw/integration/CyDSPAudioFormats.h>
+#include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "NodeGraphComponent.h"
 
 #include <cydaw/engine/EffectCatalogue.h>
@@ -9708,7 +9708,7 @@ juce::Result NodeGraphComponent::importWavetableFile(const NodeId nodeId,
     if (file.getSize() > maximumWavetableFileBytes)
         return juce::Result::fail(tr("module.ui.wavetableTooLarge"));
     juce::AudioFormatManager formats;
-    cydaw::integration::registerCyDSPReaders(formats);
+    cydaw::integration::registerCyAudioCoreReaders(formats);
     const auto reader = std::unique_ptr<juce::AudioFormatReader>(
         formats.createReaderFor(file));
     if (reader == nullptr || reader->lengthInSamples < 8)

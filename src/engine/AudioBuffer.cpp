@@ -6,8 +6,20 @@
 #include <limits>
 #include <stdexcept>
 #include <utility>
+#include <cydsp/math/VectorOps.h>
 
 namespace cydaw::engine {
+
+namespace {
+// Resolve SIMD before rendering; shared by the DAW and exported internal plugins.
+const cydsp::VectorOps audioOps = [] {
+    cydsp::VectorOps result;
+    const auto status = cydsp::VectorOps::create(cydsp::CpuBackend::automatic, result);
+    assert(status == cydsp::Status::ok);
+    (void) status;
+    return result;
+}();
+}
 
 float* AudioBlockView::channel(const std::uint32_t index) const noexcept
 {
@@ -31,7 +43,7 @@ AudioBuffer::AudioBuffer(const AudioBuffer& other)
     const auto input = other.storage_.block();
     auto output = storage_.block();
     for (std::size_t ch = 0; ch < input.channels(); ++ch)
-        std::copy(input.channel(ch).begin(), input.channel(ch).end(), output.channel(ch).begin());
+        (void) audioOps.copy(input.channel(ch), output.channel(ch));
 }
 
 AudioBuffer& AudioBuffer::operator=(const AudioBuffer& other)
@@ -100,16 +112,24 @@ std::uint32_t AudioBuffer::maximumFrameCount() const noexcept { return maximumFr
 void clearAudio(const AudioBlockView block) noexcept
 {
     for (std::uint32_t channel = 0; channel < block.channelCount; ++channel)
-        std::fill_n(block.channel(channel), block.frameCount, 0.0f);
+        audioOps.fill({block.channel(channel), block.frameCount}, 0.0f);
 }
 
 void copyAudio(const AudioBlockView destination, const AudioBlockView source) noexcept
 {
-    clearAudio(destination);
     const auto channels = std::min(destination.channelCount, source.channelCount);
     const auto frames = std::min(destination.frameCount, source.frameCount);
-    for (std::uint32_t channel = 0; channel < channels; ++channel)
-        std::copy_n(source.channel(channel), frames, destination.channel(channel));
+    for (std::uint32_t channel = 0; channel < destination.channelCount; ++channel) {
+        auto* output = destination.channel(channel);
+        if (channel < channels) {
+            const auto status = audioOps.copy({source.channel(channel), frames}, {output, frames});
+            assert(status == cydsp::Status::ok); // Disjoint views or exactly in-place.
+            (void) status;
+            audioOps.fill({frames ? output + frames : output, destination.frameCount - frames}, 0.0f);
+        } else {
+            audioOps.fill({output, destination.frameCount}, 0.0f);
+        }
+    }
 }
 
 void addAudio(const AudioBlockView destination, const AudioBlockView source) noexcept
@@ -119,8 +139,9 @@ void addAudio(const AudioBlockView destination, const AudioBlockView source) noe
     for (std::uint32_t channel = 0; channel < channels; ++channel) {
         auto* output = destination.channel(channel);
         const auto* input = source.channel(channel);
-        for (std::uint32_t frame = 0; frame < frames; ++frame)
-            output[frame] += input[frame];
+        const auto status = audioOps.addScaled({input, frames}, {output, frames}, 1.0f);
+        assert(status == cydsp::Status::ok);
+        (void) status;
     }
 }
 

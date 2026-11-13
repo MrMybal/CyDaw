@@ -117,7 +117,7 @@
     },
     {
       "name": "cydsp-core",
-      "displayName": "CyDSP core integration (no JUCE)",
+      "displayName": "Compatibility alias: cyaudio-core",
       "generator": "Visual Studio 17 2022",
       "architecture": "x64",
       "binaryDir": "${sourceDir}/build/cydsp-core",
@@ -135,13 +135,44 @@
     },
     {
       "name": "cydsp-desktop",
-      "displayName": "CyDSP audio integration (JUCE desktop services retained)",
+      "displayName": "Compatibility alias: cyaudio-desktop",
       "inherits": "desktop-windows-wasapi",
       "binaryDir": "${sourceDir}/build/cydsp-desktop",
       "cacheVariables": {
         "CYDAW_BUILD_V2": "ON",
         "CYDAW_ENABLE_LTO": "OFF",
         "CYDAW_CYDSP_SOURCE_DIR": "${sourceDir}/../CyDSP"
+      }
+    },
+    {
+      "name": "cyaudio-core",
+      "displayName": "CyAudioCore core integration (no JUCE)",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build/cyaudio-core",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "cacheVariables": {
+        "CYDAW_BUILD_DESKTOP": "OFF",
+        "CYDAW_BUILD_TESTS": "ON",
+        "CYDAW_ENABLE_JACK": "OFF",
+        "CYDAW_CYDSP_SOURCE_DIR": "${sourceDir}/../CyDSP",
+        "CYDAW_CYAUDIOCORE_SOURCE_DIR": "${sourceDir}/../CyAudioCore"
+      }
+    },
+    {
+      "name": "cyaudio-desktop",
+      "displayName": "CyAudioCore audio integration (JUCE desktop services retained)",
+      "inherits": "desktop-windows-wasapi",
+      "binaryDir": "${sourceDir}/build/cyaudio-desktop",
+      "cacheVariables": {
+        "CYDAW_BUILD_V2": "ON",
+        "CYDAW_ENABLE_LTO": "OFF",
+        "CYDAW_CYDSP_SOURCE_DIR": "${sourceDir}/../CyDSP",
+        "CYDAW_CYAUDIOCORE_SOURCE_DIR": "${sourceDir}/../CyAudioCore"
       }
     }
   ],
@@ -185,6 +216,16 @@
     {
       "name": "cydsp-desktop",
       "configurePreset": "cydsp-desktop",
+      "configuration": "Release"
+    },
+    {
+      "name": "cyaudio-core",
+      "configurePreset": "cyaudio-core",
+      "configuration": "Release"
+    },
+    {
+      "name": "cyaudio-desktop",
+      "configurePreset": "cyaudio-desktop",
       "configuration": "Release"
     }
   ],
@@ -237,6 +278,22 @@
     {
       "name": "cydsp-desktop",
       "configurePreset": "cydsp-desktop",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "cyaudio-core",
+      "configurePreset": "cyaudio-core",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "cyaudio-desktop",
+      "configurePreset": "cyaudio-desktop",
       "configuration": "Release",
       "output": {
         "outputOnFailure": true

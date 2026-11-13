@@ -1,4 +1,4 @@
-#include <cydaw/integration/CyDSPAudioFormats.h>
+#include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "SamplerMapFile.h"
 
 #include <juce_audio_formats/juce_audio_formats.h>
@@ -225,7 +225,7 @@ bool decodeSampleWindow(const juce::File& file, SampleData& data, juce::String& 
                         const juce::int64 until)
 {
     juce::AudioFormatManager formats;
-    cydaw::integration::registerCyDSPReaders(formats);
+    cydaw::integration::registerCyAudioCoreReaders(formats);
     std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
     if (reader == nullptr) {
         error = "cannot read " + file.getFullPathName();
@@ -469,7 +469,7 @@ void SampleStore::Impl::Streamer::run()
     using cydaw::engine::SampleStream;
     constexpr int chunk = 2'048;
     juce::AudioFormatManager formats;
-    cydaw::integration::registerCyDSPReaders(formats);
+    cydaw::integration::registerCyAudioCoreReaders(formats);
     auto& pool = cydaw::engine::SampleStreams::instance();
     std::vector<std::unique_ptr<juce::AudioFormatReader>> readers;
     juce::AudioBuffer<float> buffer(2, chunk);
@@ -1874,7 +1874,7 @@ juce::var samplerMapFromSfz(const juce::File& file, juce::String& error, const s
             // The loop the file carries (a WAV's sampler chunk), from its
             // header alone: nothing decoded for it.
             if (formats.getNumKnownFormats() == 0)
-                cydaw::integration::registerCyDSPReaders(formats);
+                cydaw::integration::registerCyAudioCoreReaders(formats);
             if (const std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(sampleFile)); reader != nullptr) {
                 const auto start = reader->metadataValues.getValue("Loop0Start", "-1").getLargeIntValue();
                 const auto end = reader->metadataValues.getValue("Loop0End", "-1").getLargeIntValue();

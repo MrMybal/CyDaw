@@ -1,4 +1,4 @@
-#include <cydaw/integration/CyDSPAudioFormats.h>
+#include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "ProjectImport.h"
 #include "ProjectImportShared.h"
 
@@ -46,7 +46,7 @@ juce::File joinChannels(const juce::File& left, const juce::File& right, const j
         && target.getLastModificationTime() >= right.getLastModificationTime())
         return target;
     juce::AudioFormatManager formats;
-    cydaw::integration::registerCyDSPReaders(formats);
+    cydaw::integration::registerCyAudioCoreReaders(formats);
     std::unique_ptr<juce::AudioFormatReader> leftReader(formats.createReaderFor(left));
     std::unique_ptr<juce::AudioFormatReader> rightReader(formats.createReaderFor(right));
     if (leftReader == nullptr || rightReader == nullptr) {

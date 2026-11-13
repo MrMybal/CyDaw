@@ -21,6 +21,9 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/audio-dependencies
+        with:
+          token: ${{ secrets.CYDAW_DEPENDENCIES_TOKEN || github.token }}
       - name: Configure Windows worker
         # Only the worker: CyDAW 2 (and its FFmpeg SDK) is not built here.
         run: cmake --preset desktop-windows-wasapi -DCYDAW_BUILD_V2=OFF
@@ -50,6 +53,9 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/audio-dependencies
+        with:
+          token: ${{ secrets.CYDAW_DEPENDENCIES_TOKEN || github.token }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -96,6 +102,9 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/audio-dependencies
+        with:
+          token: ${{ secrets.CYDAW_DEPENDENCIES_TOKEN || github.token }}
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

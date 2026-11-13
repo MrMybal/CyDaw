@@ -1,4 +1,4 @@
-#include <cydaw/integration/CyDSPAudioFormats.h>
+#include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "FoundryDocument.h"
 #include "FoundryJson.h"
 
@@ -46,7 +46,7 @@ std::shared_ptr<const engine::foundry::Sound> FoundryDocument::readSound(const j
                                                                          std::vector<FoundryMarker>* markers)
 {
     juce::AudioFormatManager formats;
-    cydaw::integration::registerCyDSPReaders(formats);
+    cydaw::integration::registerCyAudioCoreReaders(formats);
     std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
     if (reader == nullptr) {
         error = file.existsAsFile() ? ui::Ls("Format non lu : ", "Format not read: ") + file.getFileName()

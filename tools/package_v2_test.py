@@ -42,6 +42,9 @@ def package(build, output, alpha=False, juce_source=None):
                      build / 'Licenses/CyUI/third_party/lexilla/License.txt',
                      build / 'Licenses/CyUI/third_party/scintilla/License.txt',
                      build / 'Licenses/CyUI/third_party/SciTE-Properties-License.txt'))
+    for dependency in ('CyAudioCore', 'CyDSP'):
+        required.extend((build / 'Licenses' / dependency / 'LICENSE',
+                         build / 'Licenses' / dependency / 'manifest.json'))
     if not list((build / 'Licenses/FFmpeg/sources').glob('*.tar.gz')):
         raise FileNotFoundError('FFmpeg corresponding source archive is missing')
     for file in required:

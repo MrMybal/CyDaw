@@ -20,10 +20,11 @@
 
 <h1 align="center">CyDaw</h1>
 
-> **CyDSP-CORE branch:** audio integration is in progress; the complete desktop
-> still uses JUCE services. The current integration targets CyDSP `ea2361a` via
-> `CYDAW_CYDSP_SOURCE_DIR`. See [build instructions and status](docs/CyDSPIntegration.md)
-> and the [detailed issue report (French)](docs/CyDSPIntegrationReport.fr.md).
+> **CyDSP-CORE branch:** the audio integration now uses **CyAudioCore**, which manages
+> **CyDSP** internally for numerical DSP, including the internal/exported plugins.
+> JUCE remains in the desktop shell and some audio/plugin adapters. See the
+> [build and integration guide](docs/CyAudioCoreIntegration.md) and the
+> [current issue report (French)](docs/CyAudioCoreIntegrationReport.fr.md).
 
 **CyDaw** is an open-source digital audio workstation for musicians, sound designers and audio creators. Compose and arrange music, perform a DJ set, edit recordings, work to picture or build your own instruments and effects.
 

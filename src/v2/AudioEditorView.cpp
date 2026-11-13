@@ -1,4 +1,4 @@
-#include <cydaw/integration/CyDSPAudioFormats.h>
+#include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "AudioEditorView.h"
 
 #include "Icons.h"
@@ -234,7 +234,7 @@ const AudioEditorView::Format& AudioEditorView::formatOf(const juce::File& file)
         return found->second;
     Format format;
     juce::AudioFormatManager manager;
-    cydaw::integration::registerCyDSPReaders(manager);
+    cydaw::integration::registerCyAudioCoreReaders(manager);
     if (std::unique_ptr<juce::AudioFormatReader> reader(manager.createReaderFor(file)); reader != nullptr && reader->sampleRate > 0.0) {
         format.rate = reader->sampleRate;
         format.channels = static_cast<int>(reader->numChannels);

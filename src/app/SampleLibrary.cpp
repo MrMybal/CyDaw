@@ -1,4 +1,4 @@
-#include <cydaw/integration/CyDSPAudioFormats.h>
+#include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "SampleLibrary.h"
 
 #include "AudioTrackController.h"
@@ -206,7 +206,7 @@ juce::AudioFormatManager& threadFormatManager()
     if (manager == nullptr) {
         std::lock_guard<std::mutex> lock(formatManagerMutex());
         manager = std::make_unique<juce::AudioFormatManager>();
-        cydaw::integration::registerCyDSPReaders(*manager);
+        cydaw::integration::registerCyAudioCoreReaders(*manager);
     }
     return *manager;
 }

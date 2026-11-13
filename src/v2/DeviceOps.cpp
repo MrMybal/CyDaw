@@ -1,4 +1,4 @@
-#include <cydaw/integration/CyDSPAudioFormats.h>
+#include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "DeviceOps.h"
 
 #include "SoundModelFile.h"
@@ -260,7 +260,7 @@ bool importPrismTable(app::NodeGraphComponent& graph, const std::uint64_t nodeId
         return false;
     }
     juce::AudioFormatManager formats;
-    cydaw::integration::registerCyDSPReaders(formats);
+    cydaw::integration::registerCyAudioCoreReaders(formats);
     const std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
     if (reader == nullptr || reader->lengthInSamples < 16 || reader->numChannels == 0) {
         error = ui::Ls("Ce fichier ne se lit pas comme un son : ", "This file does not read as a sound: ") + file.getFileName();
@@ -341,7 +341,7 @@ bool clearPrismTable(app::NodeGraphComponent& graph, const std::uint64_t nodeId,
 bool loadImpulse(app::NodeGraphComponent& graph, const std::uint64_t nodeId, const juce::File& file, juce::String& error)
 {
     juce::AudioFormatManager formats;
-    cydaw::integration::registerCyDSPReaders(formats);
+    cydaw::integration::registerCyAudioCoreReaders(formats);
     const std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
     if (reader == nullptr || reader->lengthInSamples < 4 || reader->numChannels == 0 || reader->sampleRate <= 0.0) {
         error = ui::Ls("Ce fichier ne se lit pas comme un son : ", "This file does not read as a sound: ") + file.getFileName();

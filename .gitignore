@@ -51,3 +51,6 @@ __pycache__/
 /.CyDocBuild/internal/previous-assets/
 /.CyDocBuild/internal/previous-manual-*/
 /.CyDocBuild/internal/previous-tools/
+
+# Read-only dependency checkouts used by GitHub Actions.
+/.dependencies/

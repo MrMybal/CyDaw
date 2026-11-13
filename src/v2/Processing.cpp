@@ -1,4 +1,4 @@
-#include <cydaw/integration/CyDSPAudioFormats.h>
+#include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "Processing.h"
 
 #include "Locations.h"
@@ -677,7 +677,7 @@ AudioResult renderAudio(const Prepared& prepared, engine::repair::Channels chann
 juce::Result readAudioFile(const juce::File& file, engine::repair::Channels& channels, double& rate)
 {
     juce::AudioFormatManager formats;
-    cydaw::integration::registerCyDSPReaders(formats);
+    cydaw::integration::registerCyAudioCoreReaders(formats);
     std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(file));
     if (reader == nullptr || reader->lengthInSamples <= 0 || !std::isfinite(reader->sampleRate) || reader->sampleRate < 1'000.0
         || reader->sampleRate > 384'000.0)

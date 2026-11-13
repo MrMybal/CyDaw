@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.24)
 
 project(CyDAW VERSION 0.78.0 LANGUAGES C CXX)
 
-include(cmake/CyDSP.cmake)
+include(cmake/CyAudioCore.cmake)
 
 # zstd's decoder (third_party/zstd, BSD): Zrythm's projects are compressed with it.
 add_library(cydaw_zstd STATIC
@@ -107,7 +107,7 @@ message(STATUS
     "plugin formats: VST3=ON, VST2=${CYDAW_VST2_AVAILABLE}")
 
 function(cydaw_configure_audio_backends target_name)
-    cydaw_copy_cydsp_notices(${target_name} "$<TARGET_FILE_DIR:${target_name}>/Licenses/CyDSP")
+    cydaw_copy_audio_notices(${target_name} "$<TARGET_FILE_DIR:${target_name}>/Licenses")
     target_compile_definitions(${target_name} PRIVATE
         JUCE_ASIO=$<BOOL:${CYDAW_ASIO_AVAILABLE}>
         JUCE_JACK=$<BOOL:${CYDAW_JACK_AVAILABLE}>
@@ -197,7 +197,7 @@ add_library(cydaw_core STATIC
     src/ui/WorkspaceLayout.cpp
 )
 add_library(CyDAW::Core ALIAS cydaw_core)
-target_link_libraries(cydaw_core PUBLIC CyDSP::CyDSP)
+target_link_libraries(cydaw_core PUBLIC CyAudioCore::Core)
 # The core is also linked into shared plug-ins; in particular its thread-local
 # transport state needs PIC relocations on Linux.
 set_target_properties(cydaw_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -251,13 +251,17 @@ if(CYDAW_BUILD_TESTS)
     add_test(NAME cydaw_engine_tests COMMAND cydaw_engine_tests)
     cydaw_configure_test(cydaw_engine_tests 120)
 
-    # Independent acceptance for the expanded CyDSP services. No JUCE target,
+    # Independent acceptance for the CyAudioCore services. No JUCE target,
     # headers, physical device or installed third-party plugin is required.
-    add_executable(cydaw_cydsp_services_tests tests/CyDSPServicesTests.cpp)
-    target_link_libraries(cydaw_cydsp_services_tests PRIVATE CyDSP::Files CyDSP::Devices CyDSP::Plugins)
-    target_compile_features(cydaw_cydsp_services_tests PRIVATE cxx_std_20)
-    add_test(NAME cydaw_cydsp_services_tests COMMAND cydaw_cydsp_services_tests)
-    cydaw_configure_test(cydaw_cydsp_services_tests 120)
+    add_executable(cydaw_cyaudio_services_tests tests/CyAudioCoreServicesTests.cpp)
+    target_link_libraries(cydaw_cyaudio_services_tests PRIVATE CyAudioCore::Files CyAudioCore::Devices CyAudioCore::Plugins)
+    target_compile_features(cydaw_cyaudio_services_tests PRIVATE cxx_std_20)
+    add_test(NAME cydaw_cyaudio_services_tests COMMAND cydaw_cyaudio_services_tests)
+    cydaw_configure_test(cydaw_cyaudio_services_tests 120)
+    add_executable(cydaw_cyaudio_dsp_tests tests/CyAudioCoreDspTests.cpp)
+    target_link_libraries(cydaw_cyaudio_dsp_tests PRIVATE CyDAW::Core)
+    add_test(NAME cydaw_cyaudio_dsp_tests COMMAND cydaw_cyaudio_dsp_tests)
+    cydaw_configure_test(cydaw_cyaudio_dsp_tests 120)
 
 endif()
 
@@ -284,22 +288,22 @@ if(CYDAW_BUILD_DESKTOP)
                  "Copyright (C) 2026 CyDAW")
 
     # Transitional source interfaces remain JUCE; every application reader
-    # decodes samples through CyDSP. Explicit legacy metadata parser is retained.
+    # decodes samples through CyAudioCore. Explicit legacy metadata parser is retained.
     if(TARGET juce_audio_formats)
-        target_sources(juce_audio_formats INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/src/integration/CyDSPAudioFormats.cpp")
+        target_sources(juce_audio_formats INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/src/integration/CyAudioCoreAudioFormats.cpp")
         target_include_directories(juce_audio_formats INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/include")
-        target_link_libraries(juce_audio_formats INTERFACE CyDSP::Files)
+        target_link_libraries(juce_audio_formats INTERFACE CyAudioCore::Files)
     endif()
 
     if(CYDAW_BUILD_TESTS AND TARGET juce::juce_audio_formats)
-        juce_add_console_app(cydaw_cydsp_integration_tests PRODUCT_NAME "CyDSP integration tests")
-        target_sources(cydaw_cydsp_integration_tests PRIVATE tests/CyDSPIntegrationTests.cpp)
-        target_link_libraries(cydaw_cydsp_integration_tests PRIVATE CyDAW::Core
-            CyDSP::Files CyDSP::Devices CyDSP::Sources CyDSP::Stretch juce::juce_audio_formats
+        juce_add_console_app(cydaw_cyaudio_integration_tests PRODUCT_NAME "CyAudioCore integration tests")
+        target_sources(cydaw_cyaudio_integration_tests PRIVATE tests/CyAudioCoreIntegrationTests.cpp)
+        target_link_libraries(cydaw_cyaudio_integration_tests PRIVATE CyDAW::Core
+            CyAudioCore::Files CyAudioCore::Devices CyAudioCore::Sources CyDSP::Stretch juce::juce_audio_formats
             juce::juce_recommended_config_flags)
-        target_compile_definitions(cydaw_cydsp_integration_tests PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
-        add_test(NAME cydaw_cydsp_integration_tests COMMAND cydaw_cydsp_integration_tests)
-        cydaw_configure_test(cydaw_cydsp_integration_tests 120)
+        target_compile_definitions(cydaw_cyaudio_integration_tests PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
+        add_test(NAME cydaw_cyaudio_integration_tests COMMAND cydaw_cyaudio_integration_tests)
+        cydaw_configure_test(cydaw_cyaudio_integration_tests 120)
     endif()
 
     # JUCE compiles its module .cpp files as part of each consuming target, and

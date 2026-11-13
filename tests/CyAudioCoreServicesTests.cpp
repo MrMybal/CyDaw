@@ -1,10 +1,10 @@
-#include <cydsp/core/AudioBuffer.h>
-#include <cydsp/io/AudioDevice.h>
-#include <cydsp/io/AudioMetadata.h>
-#include <cydsp/io/EditingPcmProxy.h>
-#include <cydsp/io/MidiDevice.h>
-#include <cydsp/plugins/Plugin.h>
-#include <cydsp/plugins/PluginWorker.h>
+#include <cyaudio/core/DspTypes.h>
+#include <cyaudio/io/AudioDevice.h>
+#include <cyaudio/io/AudioMetadata.h>
+#include <cyaudio/io/EditingPcmProxy.h>
+#include <cyaudio/io/MidiDevice.h>
+#include <cyaudio/plugins/Plugin.h>
+#include <cyaudio/plugins/PluginWorker.h>
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -17,7 +17,7 @@
 #include <thread>
 
 namespace {
-using namespace cydsp;
+using namespace cyaudio;
 void require(bool ok, const char* message) { if (!ok) throw std::runtime_error(message); }
 void check(Status status, const char* message) {
     if (status != Status::ok) throw std::runtime_error(std::string(message) + " (status " + std::to_string(int(status)) + ")");
@@ -130,7 +130,7 @@ void host(PluginFormat format, const std::filesystem::path& path, bool jsfxFixtu
     }
     check(instance.close(), "plugin close");
     PluginWorker worker; PluginWorkerOptions options; options.processing.maximumFrames = 64;
-    check(worker.launch(executable, format, path, descriptors[0].id, options), "separate CyDSP worker");
+    check(worker.launch(executable, format, path, descriptors[0].id, options), "separate CyAudioCore worker");
     require(worker.info() && worker.info()->pipelineLatencyFrames == 64, "worker pipeline latency");
     in.reset(); PluginWorkerBlockResult result; bool received = false;
     for (unsigned tries = 0; tries < 500 && !received; ++tries) {
@@ -140,11 +140,11 @@ void host(PluginFormat format, const std::filesystem::path& path, bool jsfxFixtu
     require(received, "worker processed response");
     if (jsfxFixture) require(std::abs(audio.outputs[0].channel(0)[0] - .25f) < 1e-6, "worker samples");
     check(worker.saveState(state), "worker state save"); check(worker.loadState(state), "worker state restore"); worker.close();
-    std::cout << "CyDSP host and separate worker passed: " << path.filename().string() << '\n';
+    std::cout << "CyAudioCore host and separate worker passed: " << path.filename().string() << '\n';
 }
 }
 int main(int argc, char** argv) {
-    if (argc == 3 && std::string_view(argv[1]) == "--cydsp-worker") return cydsp::runPluginWorker(argv[2]);
+    if (argc == 3 && std::string_view(argv[1]) == "--cydsp-worker") return cyaudio::runPluginWorker(argv[2]);
     try {
         const auto executable = std::filesystem::absolute(argv[0]);
         if (argc == 4 && std::string_view(argv[1]) == "--plugin") {
@@ -156,6 +156,6 @@ int main(int argc, char** argv) {
         const auto script = scratch.root / "SparseGain.jsfx";
         { std::ofstream file(script); file << "desc:CyDaw sparse gain fixture\nslider7:0.5<0,1,0.01>Gain\nin_pin:left\nin_pin:right\nout_pin:left\nout_pin:right\n@sample\nspl0 *= slider7; spl1 *= slider7;\n"; require(bool(file), "write original script fixture"); }
         host(PluginFormat::jsfx, script, true, executable);
-        std::cout << "CyDSP services acceptance passed without JUCE\n"; return 0;
+        std::cout << "CyAudioCore services acceptance passed without JUCE\n"; return 0;
     } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
 }

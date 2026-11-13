@@ -28,6 +28,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           lfs: true
+      - uses: ./.github/actions/audio-dependencies
+        with:
+          token: ${{ secrets.CYDAW_DEPENDENCIES_TOKEN || github.token }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'

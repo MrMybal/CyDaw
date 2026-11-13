@@ -1,7 +1,7 @@
-#include <cydaw/integration/CyDSPAudioFormats.h>
-#include <cydsp/io/AudioFile.h>
-#include <cydsp/io/AudioMetadata.h>
-#include <cydsp/core/AudioBuffer.h>
+#include <cydaw/integration/CyAudioCoreAudioFormats.h>
+#include <cyaudio/io/AudioFile.h>
+#include <cyaudio/io/AudioMetadata.h>
+#include <cyaudio/core/DspTypes.h>
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
@@ -57,16 +57,16 @@ private:
 };
 
 // The persisted application vocabulary remains stable while the implementation
-// uses CyDSP's public versioned contract. Unknown legacy keys must take the
+// uses CyAudioCore's public versioned contract. Unknown legacy keys must take the
 // explicit compatibility path; never silently discard metadata during export.
 bool writeMetadata(const std::unordered_map<juce::String, juce::String>& values,
-                   cydsp::AudioFileInfo& info) {
+                   cyaudio::AudioFileInfo& info) {
     if (values.empty()) return true;
     juce::StringPairArray v;
     for (const auto& [key, value] : values) v.set(key, value);
-    cydsp::AudioMetadata m;
+    cyaudio::AudioMetadata m;
     if (const auto opaque = v["cydsp.metadata"]; opaque.isNotEmpty()) {
-        if (cydsp::parseAudioMetadata(opaque.toStdString(), m) != cydsp::Status::ok) return false;
+        if (cyaudio::parseAudioMetadata(opaque.toStdString(), m) != cyaudio::Status::ok) return false;
     }
     std::set<std::string> used {"cydsp.metadata", "cydsp.format", "MetaDataSource"};
     const auto text = [&](const juce::String& key, const juce::String& fallback = {}) {
@@ -88,7 +88,7 @@ bool writeMetadata(const std::unordered_map<juce::String, juce::String>& values,
             m.markers.clear();
             for (unsigned i = 0, n = count("NumCuePoints"); i < n; ++i) {
                 const auto k = "Cue" + juce::String(i);
-                cydsp::AudioMarker marker;
+                cyaudio::AudioMarker marker;
                 marker.id = static_cast<std::uint32_t>(number(k + "Identifier"));
                 marker.frame = number(k + "Offset");
                 marker.position = static_cast<std::uint32_t>(number(k + "Order", i));
@@ -113,7 +113,7 @@ bool writeMetadata(const std::unordered_map<juce::String, juce::String>& values,
             m.regions.clear();
             for (unsigned i = 0, n = count("NumCueRegions"); i < n; ++i) {
                 const auto k = "CueRegion" + juce::String(i);
-                cydsp::AudioRegion region;
+                cyaudio::AudioRegion region;
                 region.markerId = static_cast<std::uint32_t>(number(k + "Identifier"));
                 region.lengthFrames = number(k + "SampleLength");
                 region.purpose = static_cast<std::uint32_t>(number(k + "Purpose"));
@@ -133,11 +133,11 @@ bool writeMetadata(const std::unordered_map<juce::String, juce::String>& values,
             m.loops.clear();
             for (unsigned i = 0, n = count("NumSampleLoops"); i < n; ++i) {
                 const auto k = "Loop" + juce::String(i);
-                cydsp::AudioSamplerLoop loop;
+                cyaudio::AudioSamplerLoop loop;
                 loop.id = static_cast<std::uint32_t>(number(k + "Identifier"));
                 const auto mode = number(k + "Type");
                 if (mode > 2) return false;
-                loop.mode = static_cast<cydsp::AudioLoopMode>(mode);
+                loop.mode = static_cast<cyaudio::AudioLoopMode>(mode);
                 loop.startFrame = number(k + "Start");
                 loop.endFrame = number(k + "End") + 1; // Legacy WAV endpoint is inclusive.
                 loop.fractionalOffset = static_cast<std::uint32_t>(number(k + "Fraction"));
@@ -149,19 +149,19 @@ bool writeMetadata(const std::unordered_map<juce::String, juce::String>& values,
         m.pitchFraction = static_cast<std::uint32_t>(number("MidiPitchFraction", m.pitchFraction));
         for (const auto& [key, value] : values) {
             if (used.contains(key.toStdString())) continue;
-            // Four-character RIFF INFO names accepted by CyDSP's public tags API.
+            // Four-character RIFF INFO names accepted by CyAudioCore's public tags API.
             if (key.length() != 4 || !key.startsWithChar('I')) return false;
             m.tags.push_back({key.toStdString(), value.toStdString()});
         }
-        return cydsp::setAudioMetadata(info, m) == cydsp::Status::ok;
+        return cyaudio::setAudioMetadata(info, m) == cyaudio::Status::ok;
     } catch (const std::invalid_argument&) { return false; }
 }
 
-void readTypedMetadata(const cydsp::AudioFileInfo& info, juce::StringPairArray& values) {
-    cydsp::AudioMetadata m;
-    if (cydsp::getAudioMetadata(info, m) != cydsp::Status::ok || m.container != "WAV") return;
+void readTypedMetadata(const cyaudio::AudioFileInfo& info, juce::StringPairArray& values) {
+    cyaudio::AudioMetadata m;
+    if (cyaudio::getAudioMetadata(info, m) != cyaudio::Status::ok || m.container != "WAV") return;
     std::string serialized;
-    if (cydsp::serializeAudioMetadata(m, serialized) == cydsp::Status::ok)
+    if (cyaudio::serializeAudioMetadata(m, serialized) == cyaudio::Status::ok)
         values.set("cydsp.metadata", juce::String::fromUTF8(serialized.c_str()));
     const auto set = [&](const juce::String& key, std::uint64_t n) { values.set(key, juce::String(n)); };
     set("NumCuePoints", m.markers.size());
@@ -201,14 +201,14 @@ void readTypedMetadata(const cydsp::AudioFileInfo& info, juce::StringPairArray& 
     for (const auto& tag : m.tags) values.set(juce::String::fromUTF8(tag.key.c_str()), juce::String::fromUTF8(tag.value.c_str()));
 }
 
-unsigned bits(cydsp::AudioEncoding encoding) {
+unsigned bits(cyaudio::AudioEncoding encoding) {
     switch (encoding) {
-        case cydsp::AudioEncoding::pcm8: return 8;
-        case cydsp::AudioEncoding::pcm16: return 16;
-        case cydsp::AudioEncoding::pcm24: return 24;
-        case cydsp::AudioEncoding::pcm32:
-        case cydsp::AudioEncoding::float32: return 32;
-        case cydsp::AudioEncoding::float64: return 64;
+        case cyaudio::AudioEncoding::pcm8: return 8;
+        case cyaudio::AudioEncoding::pcm16: return 16;
+        case cyaudio::AudioEncoding::pcm24: return 24;
+        case cyaudio::AudioEncoding::pcm32:
+        case cyaudio::AudioEncoding::float32: return 32;
+        case cyaudio::AudioEncoding::float64: return 64;
     }
     return 0;
 }
@@ -216,12 +216,12 @@ unsigned bits(cydsp::AudioEncoding encoding) {
 class Reader final : public juce::AudioFormatReader {
 public:
     explicit Reader(juce::InputStream* stream)
-        : juce::AudioFormatReader(stream, "CyDSP"), bridge_(*stream),
+        : juce::AudioFormatReader(stream, "CyAudioCore"), bridge_(*stream),
           stream_(std::make_shared<std::istream>(&bridge_)) {}
 
     bool open() {
         // Preserve the established application's metadata vocabulary. This is
-        // intentionally NOT a decoder fallback: only CyDSP reads sample data.
+        // intentionally NOT a decoder fallback: only CyAudioCore reads sample data.
         juce::AudioFormatManager metadataFormats;
         metadataFormats.registerBasicFormats();
         input->setPosition(0);
@@ -230,7 +230,7 @@ public:
             metadataValues = metadata->metadataValues;
         }
         input->setPosition(0);
-        cydsp::Status status;
+        cyaudio::Status status;
         if (auto* file = dynamic_cast<juce::FileInputStream*>(input)) {
 #if JUCE_WINDOWS
             status = reader_.open(std::filesystem::path(file->getFile().getFullPathName().toWideCharPointer()), chunkFrames);
@@ -240,7 +240,7 @@ public:
         } else {
             status = reader_.open(stream_, chunkFrames);
         }
-        if (status != cydsp::Status::ok) return false;
+        if (status != cyaudio::Status::ok) return false;
         const auto& info = *reader_.info();
         if (info.frames > static_cast<std::uint64_t>(std::numeric_limits<juce::int64>::max())) return false;
         sampleRate = info.sampleRate;
@@ -250,7 +250,7 @@ public:
         readTypedMetadata(info, metadataValues);
         metadataValues.set("cydsp.format", juce::String::fromUTF8(info.formatName.c_str()));
         usesFloatingPointData = true; // All sample reads cross the bridge as normalized float.
-        return scratch_.resize(info.channels, chunkFrames) == cydsp::Status::ok;
+        return scratch_.resize(info.channels, chunkFrames) == cyaudio::Status::ok;
     }
 
     bool readSamples(int* const* dest, int destChannels, int offset, juce::int64 first, int count) override {
@@ -267,7 +267,7 @@ public:
             auto block = scratch_.block(n);
             std::size_t read = 0;
             const auto status = reader_.read(static_cast<std::uint64_t>(first) + (done ? done : 0), block, read);
-            if (status != cydsp::Status::ok && status != cydsp::Status::end_of_stream) return false;
+            if (status != cyaudio::Status::ok && status != cyaudio::Status::end_of_stream) return false;
             for (int ch = 0; ch < destChannels; ++ch) {
                 if (!dest[ch]) continue;
                 auto* out = reinterpret_cast<float*>(dest[ch]) + offset + done;
@@ -291,8 +291,8 @@ private:
     };
     InputBuffer bridge_;
     std::shared_ptr<std::istream> stream_;
-    cydsp::AudioFileReader reader_;
-    cydsp::AudioBuffer<float> scratch_;
+    cyaudio::AudioFileReader reader_;
+    cyaudio::AudioBuffer<float> scratch_;
 };
 
 class OutputBuffer final : public std::streambuf {
@@ -332,18 +332,18 @@ private:
     bool failed_ = false;
 };
 
-const char* writerName(cydsp::AudioFileFormat format) {
+const char* writerName(cyaudio::AudioFileFormat format) {
     switch (format) {
-        case cydsp::AudioFileFormat::aiff: return "CyDSP AIFF";
-        case cydsp::AudioFileFormat::flac: return "CyDSP FLAC";
-        case cydsp::AudioFileFormat::oggVorbis: return "CyDSP Vorbis";
-        default: return "CyDSP WAV";
+        case cyaudio::AudioFileFormat::aiff: return "CyAudioCore AIFF";
+        case cyaudio::AudioFileFormat::flac: return "CyAudioCore FLAC";
+        case cyaudio::AudioFileFormat::oggVorbis: return "CyAudioCore Vorbis";
+        default: return "CyAudioCore WAV";
     }
 }
 class Writer final : public juce::AudioFormatWriter {
 public:
     Writer(juce::OutputStream& stream, const juce::AudioFormatWriterOptions& options,
-           cydsp::AudioFileFormat format = cydsp::AudioFileFormat::wav, std::string quality = {})
+           cyaudio::AudioFileFormat format = cyaudio::AudioFileFormat::wav, std::string quality = {})
         : juce::AudioFormatWriter(nullptr, writerName(format), options.getSampleRate(),
               static_cast<unsigned>(options.getNumChannels()), static_cast<unsigned>(options.getBitsPerSample())),
           bridge_(stream), stream_(std::make_shared<std::ostream>(&bridge_)), pointers_(numChannels), zero_(chunkFrames, 0.0f), format_(format), quality_(std::move(quality)) {
@@ -351,24 +351,24 @@ public:
     }
     bool open(const juce::AudioFormatWriterOptions& options) {
         if (options.getNumChannels() <= 0 || options.getNumChannels() > 256) return false;
-        auto encoding = cydsp::AudioEncoding::pcm16;
+        auto encoding = cyaudio::AudioEncoding::pcm16;
         switch (options.getBitsPerSample()) {
-            case 8: encoding = cydsp::AudioEncoding::pcm8; break;
+            case 8: encoding = cyaudio::AudioEncoding::pcm8; break;
             case 16: break;
-            case 24: encoding = cydsp::AudioEncoding::pcm24; break;
+            case 24: encoding = cyaudio::AudioEncoding::pcm24; break;
             case 32: encoding = options.getSampleFormat() == juce::AudioFormatWriterOptions::SampleFormat::integral
-                                   || (format_ != cydsp::AudioFileFormat::wav && options.getSampleFormat() != juce::AudioFormatWriterOptions::SampleFormat::floatingPoint)
-                                   ? cydsp::AudioEncoding::pcm32 : cydsp::AudioEncoding::float32; break;
+                                   || (format_ != cyaudio::AudioFileFormat::wav && options.getSampleFormat() != juce::AudioFormatWriterOptions::SampleFormat::floatingPoint)
+                                   ? cyaudio::AudioEncoding::pcm32 : cyaudio::AudioEncoding::float32; break;
             default: return false;
         }
-        cydsp::AudioFileInfo info;
+        cyaudio::AudioFileInfo info;
         info.sampleRate = options.getSampleRate(); info.channels = numChannels; info.encoding = encoding;
-        if (format_ == cydsp::AudioFileFormat::oggVorbis) info.encoding = cydsp::AudioEncoding::float32;
-        if (format_ == cydsp::AudioFileFormat::wav) {
+        if (format_ == cyaudio::AudioFileFormat::oggVorbis) info.encoding = cyaudio::AudioEncoding::float32;
+        if (format_ == cyaudio::AudioFileFormat::wav) {
             info.formatName = "WAV";
             if (!writeMetadata(options.getMetadataValues(), info)) return false;
         } else if (!options.getMetadataValues().empty()) return false;
-        return writer_.open(stream_, format_, info, quality_, chunkFrames) == cydsp::Status::ok;
+        return writer_.open(stream_, format_, info, quality_, chunkFrames) == cyaudio::Status::ok;
     }
     void takeStream(juce::OutputStream* stream) { output = stream; }
     ~Writer() override { (void) writer_.close(); }
@@ -380,7 +380,7 @@ public:
             const auto count = std::min(chunkFrames, static_cast<std::size_t>(frames - offset));
             for (unsigned ch = 0; ch < numChannels; ++ch)
                 pointers_[ch] = ch < provided ? reinterpret_cast<const float*>(samples[ch]) + offset : zero_.data();
-            if (writer_.write({pointers_.data(), numChannels, count}) != cydsp::Status::ok || bridge_.failed()) return false;
+            if (writer_.write({pointers_.data(), numChannels, count}) != cyaudio::Status::ok || bridge_.failed()) return false;
             offset += static_cast<int>(count);
         }
         return true;
@@ -388,21 +388,21 @@ public:
     bool flush() override {
         const auto status = writer_.flush();
         stream_->flush();
-        return status == cydsp::Status::ok && *stream_ && !bridge_.failed();
+        return status == cyaudio::Status::ok && *stream_ && !bridge_.failed();
     }
 private:
     OutputBuffer bridge_;
     std::shared_ptr<std::ostream> stream_;
     std::vector<const float*> pointers_;
     std::vector<float> zero_;
-    cydsp::AudioFileWriter writer_;
-    cydsp::AudioFileFormat format_;
+    cyaudio::AudioFileWriter writer_;
+    cyaudio::AudioFileFormat format_;
     std::string quality_;
 };
 
 class ReadFormat final : public juce::AudioFormat {
 public:
-    ReadFormat() : juce::AudioFormat("CyDSP", ".wav .bwf .aif .aiff .aifc .caf .flac .ogg .mp3 .m4a .aac .wma") {}
+    ReadFormat() : juce::AudioFormat("CyAudioCore", ".wav .bwf .aif .aiff .aifc .caf .flac .ogg .mp3 .m4a .aac .wma") {}
     juce::Array<int> getPossibleSampleRates() override { return {}; }
     juce::Array<int> getPossibleBitDepths() override { return {8, 16, 24, 32, 64}; }
     bool canDoStereo() override { return true; }
@@ -418,13 +418,13 @@ public:
             const juce::AudioFormatWriterOptions&) override { return {}; }
 };
 } // namespace
-void registerCyDSPReaders(juce::AudioFormatManager& manager) {
+void registerCyAudioCoreReaders(juce::AudioFormatManager& manager) {
     manager.clearFormats();
     manager.registerFormat(new ReadFormat, true);
 }
 std::unique_ptr<juce::AudioFormatWriter> WaveFormat::createWriterFor(
         std::unique_ptr<juce::OutputStream>& stream, const juce::AudioFormatWriterOptions& options) {
-    cydsp::AudioFileInfo metadataCheck;
+    cyaudio::AudioFileInfo metadataCheck;
     metadataCheck.formatName = "WAV";
     if (!writeMetadata(options.getMetadataValues(), metadataCheck)) {
         // A legacy writer cannot interpret the opaque preservation payload.
@@ -439,18 +439,18 @@ std::unique_ptr<juce::AudioFormatWriter> WaveFormat::createWriterFor(
     next->takeStream(stream.release());
     return next;
 }
-FileFormat::FileFormat(cydsp::AudioFileFormat format)
-    : juce::AudioFormat(writerName(format), format == cydsp::AudioFileFormat::aiff ? ".aif .aiff" : format == cydsp::AudioFileFormat::flac ? ".flac" : ".ogg"), format_(format) {}
+FileFormat::FileFormat(cyaudio::AudioFileFormat format)
+    : juce::AudioFormat(writerName(format), format == cyaudio::AudioFileFormat::aiff ? ".aif .aiff" : format == cyaudio::AudioFileFormat::flac ? ".flac" : ".ogg"), format_(format) {}
 juce::Array<int> FileFormat::getPossibleSampleRates() { return {}; }
 juce::Array<int> FileFormat::getPossibleBitDepths() {
     juce::Array<int> result;
-    for (const auto& capabilities : cydsp::audioFileFormats()) if (capabilities.format == format_)
+    for (const auto& capabilities : cyaudio::audioFileFormats()) if (capabilities.format == format_)
         for (const auto encoding : capabilities.writableEncodings) result.addIfNotAlreadyThere(static_cast<int>(bits(encoding)));
     return result;
 }
 juce::StringArray FileFormat::getQualityOptions() {
     juce::StringArray result;
-    for (const auto& capabilities : cydsp::audioFileFormats()) if (capabilities.format == format_)
+    for (const auto& capabilities : cyaudio::audioFileFormats()) if (capabilities.format == format_)
         for (const auto& quality : capabilities.qualityLevels) result.add(juce::String::fromUTF8(quality.c_str()));
     return result;
 }

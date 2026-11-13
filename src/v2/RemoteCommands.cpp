@@ -1,4 +1,4 @@
-#include <cydaw/integration/CyDSPAudioFormats.h>
+#include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include "PluginFiles.h"
 // The control port's commands for CyDAW 2, one function per verb, on the
 // message thread. A port of CyDAW 1's WorkspaceComponentRemote.cpp: the same

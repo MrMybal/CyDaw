@@ -1,9 +1,9 @@
-#include <cydaw/integration/CyDSPAudioFormats.h>
+#include <cydaw/integration/CyAudioCoreAudioFormats.h>
 #include <cydaw/engine/AudioBuffer.h>
-#include <cydsp/io/AudioFile.h>
-#include <cydsp/io/AudioMetadata.h>
-#include <cydsp/io/AudioDeviceManager.h>
-#include <cydsp/midi/MidiEventCollector.h>
+#include <cyaudio/io/AudioFile.h>
+#include <cyaudio/io/AudioMetadata.h>
+#include <cyaudio/io/AudioDeviceManager.h>
+#include <cyaudio/midi/MidiEventCollector.h>
 #include <array>
 #include <cmath>
 #include <iostream>
@@ -59,11 +59,11 @@ juce::MemoryBlock fixture() {
 void readers() {
     const auto bytes = fixture();
     juce::AudioFormatManager manager;
-    cydaw::integration::registerCyDSPReaders(manager);
-    require(manager.getNumKnownFormats() == 1, "CyDSP must be sole sample decoder");
+    cydaw::integration::registerCyAudioCoreReaders(manager);
+    require(manager.getNumKnownFormats() == 1, "CyAudioCore must be sole sample decoder");
     std::unique_ptr<juce::AudioFormatReader> reader(manager.createReaderFor(
         std::make_unique<juce::MemoryInputStream>(bytes, true)));
-    require(reader && reader->getFormatName() == "CyDSP", "CyDSP reader selected");
+    require(reader && reader->getFormatName() == "CyAudioCore", "CyAudioCore reader selected");
     require(reader->numChannels == 2 && reader->lengthInSamples == 10037
             && reader->bitsPerSample == 24, "source shape and encoding preserved");
     require(reader->metadataValues.getValue("CueLabel0Text", {}) == "Door impact", "legacy cue labels preserved");
@@ -95,14 +95,14 @@ void writers() {
         cydaw::integration::WaveFormat format;
         auto writer = format.createWriterFor(output, juce::AudioFormatWriterOptions()
             .withNumChannels(2).withSampleRate(44100).withBitsPerSample(bits));
-        require(writer && !output && writer->getFormatName() == "CyDSP WAV", "CyDSP WAV encoder selected");
+        require(writer && !output && writer->getFormatName() == "CyAudioCore WAV", "CyAudioCore WAV encoder selected");
         juce::AudioBuffer<float> audio(2, 9017);
         for (int n = 0; n < audio.getNumSamples(); ++n) {
             audio.setSample(0, n, .6f * float(std::sin(n * .02)));
             audio.setSample(1, n, -.2f);
         }
         require(writer->writeFromAudioSampleBuffer(audio, 0, audio.getNumSamples()), "multi-chunk WAV export");
-        require(writer->flush(), "CyDSP writer flush");
+        require(writer->flush(), "CyAudioCore writer flush");
         writer.reset();
         juce::AudioFormatManager independent;
         independent.registerBasicFormats();
@@ -126,12 +126,12 @@ void writers() {
 }
 
 void fileWriters() {
-    for (const auto kind : {cydsp::AudioFileFormat::aiff, cydsp::AudioFileFormat::flac, cydsp::AudioFileFormat::oggVorbis}) {
+    for (const auto kind : {cyaudio::AudioFileFormat::aiff, cyaudio::AudioFileFormat::flac, cyaudio::AudioFileFormat::oggVorbis}) {
         cydaw::integration::FileFormat format(kind);
         juce::MemoryBlock bytes;
         std::unique_ptr<juce::OutputStream> output = std::make_unique<juce::MemoryOutputStream>(bytes, false);
         auto writer = format.createWriterFor(output, juce::AudioFormatWriterOptions().withSampleRate(48000).withNumChannels(2).withBitsPerSample(24));
-        require(writer && writer->getFormatName().startsWith("CyDSP") && !output, "CyDSP AIFF/FLAC/Vorbis encoder selected");
+        require(writer && writer->getFormatName().startsWith("CyAudioCore") && !output, "CyAudioCore AIFF/FLAC/Vorbis encoder selected");
         juce::AudioBuffer<float> audio(2, 10037);
         for (int n = 0; n < audio.getNumSamples(); ++n) {
             audio.setSample(0, n, float(std::sin(n * .031) * .7));
@@ -145,12 +145,12 @@ void fileWriters() {
         juce::AudioBuffer<float> restored(2, 10037); require(reader->read(&restored, 0, 10037, 0, true, true), "independent file decode");
         double error = 0;
         for (int c = 0; c < 2; ++c) for (int n = 0; n < 10037; ++n) error += std::pow(restored.getSample(c, n) - audio.getSample(c, n), 2);
-        require(std::sqrt(error / 20074) < (kind == cydsp::AudioFileFormat::oggVorbis ? .035 : .000002), "export amplitude/channel alignment");
+        require(std::sqrt(error / 20074) < (kind == cyaudio::AudioFileFormat::oggVorbis ? .035 : .000002), "export amplitude/channel alignment");
     }
 }
 
 void annotatedWriters() {
-    // A CyDSP writer must produce externally readable labels, notes, regions and
+    // A CyAudioCore writer must produce externally readable labels, notes, regions and
     // inclusive WAV loop endpoints. The independent reader is intentionally JUCE.
     auto options = juce::AudioFormatWriterOptions().withSampleRate(48000).withNumChannels(2).withBitsPerSample(24)
         .withMetadata("NumCuePoints", "2").withMetadata("Cue0Identifier", "7").withMetadata("Cue0Offset", "93")
@@ -166,7 +166,7 @@ void annotatedWriters() {
     std::unique_ptr<juce::OutputStream> output = std::make_unique<juce::MemoryOutputStream>(bytes, false);
     cydaw::integration::WaveFormat format;
     auto writer = format.createWriterFor(output, options);
-    require(writer && writer->getFormatName() == "CyDSP WAV", "annotated WAV must use CyDSP, without writer fallback");
+    require(writer && writer->getFormatName() == "CyAudioCore WAV", "annotated WAV must use CyAudioCore, without writer fallback");
     juce::AudioBuffer<float> audio(2, 512); audio.clear(); audio.setSample(1, 201, .5f);
     require(writer->writeFromAudioSampleBuffer(audio, 0, 512), "annotated samples"); writer.reset();
     juce::AudioFormatManager independent; independent.registerBasicFormats();
@@ -177,24 +177,24 @@ void annotatedWriters() {
     require(v["CueNote0Text"] == "Sync 12" && v["CueRegion0SampleLength"] == "101" && v["CueRegion0Text"] == "Ambience", "notes and regions");
     require(v["Loop0Start"] == "32" && v["Loop0End"] == "127" && v["Loop0Type"] == "1" && v["MidiUnityNote"] == "57", "inclusive sampler loop endpoints");
     require(v["IART"] == "CyDaw test", "INFO tag");
-    juce::AudioFormatManager migrated; cydaw::integration::registerCyDSPReaders(migrated);
+    juce::AudioFormatManager migrated; cydaw::integration::registerCyAudioCoreReaders(migrated);
     std::unique_ptr<juce::AudioFormatReader> typed(migrated.createReaderFor(std::make_unique<juce::MemoryInputStream>(bytes, true)));
     require(typed && typed->metadataValues["Loop0End"] == "127", "public metadata to legacy sampler vocabulary");
-    cydsp::AudioMetadata metadata;
-    require(cydsp::parseAudioMetadata(typed->metadataValues["cydsp.metadata"].toStdString(), metadata) == cydsp::Status::ok, "opaque versioned preservation payload");
+    cyaudio::AudioMetadata metadata;
+    require(cyaudio::parseAudioMetadata(typed->metadataValues["cydsp.metadata"].toStdString(), metadata) == cyaudio::Status::ok, "opaque versioned preservation payload");
     require(metadata.markers.size() == 2 && metadata.loops.size() == 1 && metadata.loops[0].endFrame == 128, "exclusive public loop endpoint");
     juce::MemoryBlock preservedBytes;
     output = std::make_unique<juce::MemoryOutputStream>(preservedBytes, false);
     auto preserved = format.createWriterFor(output, juce::AudioFormatWriterOptions().withSampleRate(48000).withNumChannels(2)
         .withBitsPerSample(24).withMetadata("cydsp.metadata", typed->metadataValues["cydsp.metadata"]));
-    require(preserved && preserved->getFormatName() == "CyDSP WAV", "versioned metadata payload uses CyDSP");
+    require(preserved && preserved->getFormatName() == "CyAudioCore WAV", "versioned metadata payload uses CyAudioCore");
     require(preserved->writeFromAudioSampleBuffer(audio, 0, 512), "preserved metadata samples"); preserved.reset();
     std::unique_ptr<juce::AudioFormatReader> preservedReader(independent.createReaderFor(std::make_unique<juce::MemoryInputStream>(preservedBytes, true)));
     require(preservedReader && preservedReader->metadataValues["CueNote0Text"] == "Sync 12"
             && preservedReader->metadataValues["Loop0End"] == "127", "opaque metadata survives export independently");
     output = std::make_unique<juce::MemoryOutputStream>();
     auto retained = format.createWriterFor(output, juce::AudioFormatWriterOptions().withMetadata("bwav description", "Keep broadcast metadata"));
-    require(retained && retained->getFormatName() != "CyDSP WAV", "unsupported legacy fields retain explicit compatibility writer");
+    require(retained && retained->getFormatName() != "CyAudioCore WAV", "unsupported legacy fields retain explicit compatibility writer");
     output = std::make_unique<juce::MemoryOutputStream>();
     auto* original = output.get();
     require(!format.createWriterFor(output, juce::AudioFormatWriterOptions().withMetadata("cydsp.metadata", "invalid")) && output.get() == original,
@@ -202,18 +202,18 @@ void annotatedWriters() {
 }
 
 void midiClock() {
-    cydsp::MidiEventCollector collector;
-    cydsp::MidiBuffer midi;
-    cydsp::UmpBuffer ump;
-    require(collector.prepare({8, 64}) == cydsp::Status::ok, "collector prepare");
-    require(midi.prepare(8, 64) == cydsp::Status::ok && ump.prepare(8) == cydsp::Status::ok, "event storage");
-    const auto note = cydsp::midiNoteOn(1, 60, 100);
-    require(collector.pushMidi(1000000000, note.bytes()) == cydsp::Status::ok, "queue first event");
-    require(collector.pushMidi(1002000000, note.bytes()) == cydsp::Status::ok, "queue future event");
-    require(collector.collect({1000000000, 100, 48000}, 64, midi, ump) == cydsp::Status::ok, "first block");
+    cyaudio::MidiEventCollector collector;
+    cyaudio::MidiBuffer midi;
+    cyaudio::UmpBuffer ump;
+    require(collector.prepare({8, 64}) == cyaudio::Status::ok, "collector prepare");
+    require(midi.prepare(8, 64) == cyaudio::Status::ok && ump.prepare(8) == cyaudio::Status::ok, "event storage");
+    const auto note = cyaudio::midiNoteOn(1, 60, 100);
+    require(collector.pushMidi(1000000000, note.bytes()) == cyaudio::Status::ok, "queue first event");
+    require(collector.pushMidi(1002000000, note.bytes()) == cyaudio::Status::ok, "queue future event");
+    require(collector.collect({1000000000, 100, 48000}, 64, midi, ump) == cyaudio::Status::ok, "first block");
     require(midi.size() == 1 && midi.event(0).frame == 0, "future event must remain queued");
     midi.reset(); ump.reset();
-    require(collector.collect({1001333333, 164, 48000}, 64, midi, ump) == cydsp::Status::ok, "second block");
+    require(collector.collect({1001333333, 164, 48000}, 64, midi, ump) == cyaudio::Status::ok, "second block");
     require(midi.size() == 1 && midi.event(0).frame >= 31 && midi.event(0).frame <= 32, "MIDI block placement");
 }
 
@@ -222,8 +222,8 @@ void midiClock() {
 int probes(const juce::File& artifactDirectory) {
     const auto data = fixture();
     auto input = std::make_shared<std::istringstream>(std::string(static_cast<const char*>(data.getData()), data.getSize()), std::ios::binary);
-    cydsp::AudioFileReader reader;
-    require(reader.open(input) == cydsp::Status::ok, "probe open");
+    cyaudio::AudioFileReader reader;
+    require(reader.open(input) == cyaudio::Status::ok, "probe open");
     const auto raw = juce::JSON::parse(reader.info()->metadataJson);
     bool typedLabels = false;
     if (const auto* chunks = raw.getArray())
@@ -232,20 +232,20 @@ int probes(const juce::File& artifactDirectory) {
                 && chunk.hasProperty("listType") && chunk.getProperty("listType", {}).toString() == "adtl")
                 typedLabels = true;
     auto encoded = std::make_shared<std::stringstream>(std::ios::in | std::ios::out | std::ios::binary);
-    cydsp::AudioFileWriter writer;
+    cyaudio::AudioFileWriter writer;
     auto info = *reader.info();
-    bool roundtrip = writer.open(encoded, cydsp::AudioFileFormat::wav, info) == cydsp::Status::ok;
-    cydsp::AudioBuffer<float> block;
-    require(block.resize(2, 4096) == cydsp::Status::ok, "probe samples");
+    bool roundtrip = writer.open(encoded, cyaudio::AudioFileFormat::wav, info) == cyaudio::Status::ok;
+    cyaudio::AudioBuffer<float> block;
+    require(block.resize(2, 4096) == cyaudio::Status::ok, "probe samples");
     for (std::uint64_t at = 0; roundtrip && at < info.frames;) {
         const auto count = static_cast<std::size_t>(std::min<std::uint64_t>(4096, info.frames - at));
         std::size_t got = 0;
         const auto status = reader.read(at, block.block(count), got);
-        roundtrip = (status == cydsp::Status::ok || status == cydsp::Status::end_of_stream)
-                    && got == count && writer.write(block.block(count)) == cydsp::Status::ok;
+        roundtrip = (status == cyaudio::Status::ok || status == cyaudio::Status::end_of_stream)
+                    && got == count && writer.write(block.block(count)) == cyaudio::Status::ok;
         at += count;
     }
-    if (roundtrip) roundtrip = writer.close() == cydsp::Status::ok;
+    if (roundtrip) roundtrip = writer.close() == cyaudio::Status::ok;
     juce::AudioFormatManager legacy;
     legacy.registerBasicFormats();
     auto payload = encoded->str();
@@ -267,7 +267,7 @@ int main(int argc, char** argv) {
     try {
         if (argc > 1 && std::string_view(argv[1]) == "--upstream-probes") return probes(argc > 2 ? juce::File(juce::String::fromUTF8(argv[2])) : juce::File());
         storage(); readers(); writers(); fileWriters(); annotatedWriters(); midiClock();
-        std::cout << "CyDSP application integration checks passed\n";
+        std::cout << "CyAudioCore application integration checks passed\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n'; return 1;

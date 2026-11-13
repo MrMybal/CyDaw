@@ -1,0 +1,143 @@
+{
+  "schema": 1,
+  "date": "2026-11-13",
+  "platform": "Windows x64 / MSVC 19.40 / Release",
+  "architecture": "CyDaw -> CyAudioCore -> CyDSP (numerical processing)",
+  "dependencies": [
+    {
+      "name": "CyAudioCore",
+      "role": "application audio services",
+      "base_commit": "bb26e93604d43de2069694b0791bc0bcf5a53ea6",
+      "working_tree_dirty": false,
+      "working_tree_entries": 0,
+      "source_tree_sha256": "629c835b9818142a7887b5301f6ecb1e5ff10fbb10de85fe96dbbedc2040877e",
+      "source_tree_file_count": 774,
+      "hash_scope": [
+        "CMakeLists.txt",
+        "LICENSE",
+        "include/**",
+        "src/**",
+        "cmake/**",
+        "third_party/**"
+      ]
+    },
+    {
+      "name": "CyDSP",
+      "role": "numerical dependency managed by CyAudioCore",
+      "base_commit": "cc18dca043925b75adea481c1c8545a125607e1f",
+      "working_tree_dirty": false,
+      "working_tree_entries": 0,
+      "source_tree_sha256": "64778114f55faf3f96cadbe1e5a38c8e8f20365f11530f1c48e7004a56be3c50",
+      "source_tree_file_count": 240,
+      "hash_scope": [
+        "CMakeLists.txt",
+        "LICENSE",
+        "include/**",
+        "src/**",
+        "cmake/**",
+        "third_party/**"
+      ]
+    }
+  ],
+  "dependency_sources_unchanged_during_validation": true,
+  "dependency_repositories_modified": false,
+  "upstream_patch_applied": false,
+  "checks": [
+    {
+      "name": "core_without_juce",
+      "result": "passed",
+      "tests_passed": 5,
+      "log": "build/cyaudio-core/output/cyaudio-core-tests.xml",
+      "tests": [
+        "cydaw_core_tests",
+        "cydaw_transport_timecode_tests",
+        "cydaw_engine_tests",
+        "cydaw_cyaudio_services_tests",
+        "cydaw_cyaudio_dsp_tests"
+      ]
+    },
+    {
+      "name": "desktop_regressions",
+      "result": "passed",
+      "tests_passed": 10,
+      "log": "build/cyaudio-desktop/output/cyaudio-desktop-tests.xml",
+      "tests": [
+        "cydaw_cyaudio_services_tests",
+        "cydaw_cyaudio_integration_tests",
+        "cydaw_plugin_ipc_tests",
+        "cydaw2_sample_search_check",
+        "cydaw2_editing_check",
+        "cydaw2_mixing_check",
+        "cydaw2_dj_check",
+        "cydaw2_foundry_check",
+        "cydaw2_processing_check",
+        "cydaw2_project_import_check"
+      ]
+    },
+    {
+      "name": "desktop_final_simd",
+      "result": "passed",
+      "tests_passed": 3,
+      "log": "build/cyaudio-desktop/output/cyaudio-desktop-final-tests.xml",
+      "tests": [
+        "cydaw2_mixing_check",
+        "cydaw2_foundry_check",
+        "cydaw2_processing_check"
+      ]
+    },
+    {
+      "name": "native_clap_without_juce",
+      "result": "passed",
+      "tests_passed": 1,
+      "log": "build/cyaudio-native/output/cyaudio-native-clap-tests.xml",
+      "tests": [
+        "cydaw_native_clap"
+      ]
+    },
+    {
+      "name": "native_lv2_without_juce",
+      "result": "passed",
+      "tests_passed": 1,
+      "log": "build/cyaudio-native/output/cyaudio-native-lv2-tests.xml",
+      "tests": [
+        "cydaw_native_lv2"
+      ]
+    },
+    {
+      "name": "clap_in_process_and_worker",
+      "fixture": "build/cyaudio-native/CLAP/Release/CyGraphPresets.clap",
+      "result": "passed",
+      "exit_code": 0,
+      "log": "output/cyaudio-plugin-0-clap.log"
+    },
+    {
+      "name": "lv2_in_process_and_worker",
+      "fixture": "build/cyaudio-native/LV2/Release/CyGraphPresets.lv2",
+      "result": "passed",
+      "exit_code": 0,
+      "log": "output/cyaudio-plugin-1-lv2.log"
+    },
+    {
+      "name": "vst3_in_process_and_worker",
+      "fixture": "build/cyaudio-desktop/CyDAWTestGain_artefacts/Release/VST3/CyDAW Test Gain.vst3",
+      "result": "passed",
+      "exit_code": 0,
+      "log": "output/cyaudio-plugin-2-vst3.log"
+    },
+    {
+      "name": "vst3_in_process_and_worker",
+      "fixture": "build/cyaudio-desktop/CyDAWGraphRuntime_artefacts/Release/VST3/CyDAW Graph Runtime.vst3",
+      "result": "passed",
+      "exit_code": 0,
+      "log": "output/cyaudio-plugin-3-vst3.log"
+    }
+  ],
+  "not_validated": [
+    "physical audio/MIDI/ASIO/JACK",
+    "PortAudio provider runtime",
+    "third-party installed plugins and their native editors",
+    "Linux/macOS/ARM application runtime",
+    "GitHub workflow execution and private-repository credentials",
+    "full desktop without JUCE"
+  ]
+}
