@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 // The displays and large views of Utilitaire, Stéréoscope
 // (UtilityDesign.h computes what they draw). Included by StudioEffectsView.cpp
 // inside its anonymous namespace: it has its helpers (knobCell, segmented,
@@ -666,7 +667,7 @@ bool utilityLarge(const PaneKind kind, const Pane& pane, std::vector<Param>& par
 // The values a card shows as knobs (pane indices).
 std::vector<int> utilityCardFields(const PaneKind kind, std::vector<Param>& parameters, const Pane& pane)
 {
-    juce::ignoreUnused(parameters, pane);
+    cydaw::base::ignoreUnused(parameters, pane);
     if (kind == PaneKind::utilitaire)
         return { utilityd::utilitaireGain, utilityd::utilitairePan, utilityd::utilitaireWidth, utilityd::utilitaireMonoBass };
     if (kind == PaneKind::stereoscope)
@@ -688,12 +689,12 @@ cydaw::base::Text utilityFormat(const cydaw::base::Text& binding, const double v
         if (suffix == "mute")
             return value >= 0.5 ? ui::Ls("Muet", "Muted") : ui::Ls("Joue", "Playing");
         if (suffix == "monoBass")
-            return utilityd::utilitaireMonoBassOn(static_cast<float>(value)) ? cydaw::base::Text(juce::roundToInt(value)) + " Hz"
+            return utilityd::utilitaireMonoBassOn(static_cast<float>(value)) ? cydaw::base::Text(cydaw::base::roundToInt(value)) + " Hz"
                                                                               : ui::Ls("Coupé", "Off");
         if (suffix == "pan") {
             if (std::abs(value) < 0.005)
                 return "C";
-            return cydaw::base::Text(juce::roundToInt(std::abs(value) * 100.0)) + (value < 0.0 ? ui::Ls(" G", " L") : ui::Ls(" D", " R"));
+            return cydaw::base::Text(cydaw::base::roundToInt(std::abs(value) * 100.0)) + (value < 0.0 ? ui::Ls(" G", " L") : ui::Ls(" D", " R"));
         }
         if (suffix == "width")
             return value < 0.005 ? cydaw::base::Text("Mono") : percent(value);

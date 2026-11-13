@@ -1,3 +1,6 @@
+#include <cydaw/base/Platform.h>
+#include <cydaw/audio/Math.h>
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/LegacyPluginState.h>
 #include <cydaw/midi/Devices.h>
 #include <cydaw/midi/LiveInput.h>
@@ -65,12 +68,12 @@ bool isInline(const cydaw::base::Value& module)
 }
 
 // Track colours of a fresh session, as ARGB.
-constexpr juce::uint32 kTrackColours[] = {
+constexpr std::uint32_t kTrackColours[] = {
     0xfff0a43a, 0xff5ab0f0, 0xff52d1a2, 0xffc792ea, 0xffe8765a, 0xff7fd1e8,
     0xffe8c547, 0xff9ccc65, 0xfff06292, 0xff8c9eff, 0xff4dd0b5, 0xffffb74d
 };
 
-juce::uint32 defaultColour(const std::size_t index)
+std::uint32_t defaultColour(const std::size_t index)
 {
     return kTrackColours[index % (sizeof(kTrackColours) / sizeof(kTrackColours[0]))];
 }
@@ -902,7 +905,7 @@ std::optional<std::uint64_t> Studio::addTrackInput(const TrackRef& track, const 
             found = true;
         }
     }
-    const juce::Point<float> at(std::max(0.0f, left), found ? std::min(0.92f, lowest + 0.16f) : 0.3f);
+    const cydaw::base::Point<float> at(std::max(0.0f, left), found ? std::min(0.92f, lowest + 0.16f) : 0.3f);
     const auto id = graph.editorAddNode("graph-audio-input-2", at);
     if (id == 0)
         return std::nullopt;
@@ -2088,7 +2091,7 @@ cydaw::base::Text Studio::trackName(const TrackRef& track) const
     return track.audioIndex < audioTracks_.size() ? audioTracks_[track.audioIndex].name : cydaw::base::Text();
 }
 
-juce::uint32 Studio::trackColour(const TrackRef& track) const
+std::uint32_t Studio::trackColour(const TrackRef& track) const
 {
     if (track.isBus()) {
         const auto bus = engine_.virtualBus(track.bus);
@@ -2125,7 +2128,7 @@ void Studio::setTrackName(const TrackRef& track, const cydaw::base::Text& name)
     dirty_ = true;
 }
 
-void Studio::setTrackColour(const TrackRef& track, const juce::uint32 argb)
+void Studio::setTrackColour(const TrackRef& track, const std::uint32_t argb)
 {
     if (track.master)
         return;
@@ -3007,7 +3010,7 @@ void Studio::giveOwnIdentity(app::GraphDocument& graph, const bool always)
     // A letter, then three letters or digits: about a million codes.
     static constexpr char letters[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     static constexpr char symbols[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    auto& random = juce::Random::getSystemRandom();
+    auto& random = cydaw::base::Random::getSystemRandom();
     std::string code;
     do {
         code = letters[random.nextInt(26)];
@@ -3113,7 +3116,7 @@ cydaw::base::Result Studio::setDeviceChannels(app::GraphDocument& graph, const i
         (void) graph.setGraphMemberType(inKey, Kind::audio, input);
         (void) graph.setGraphMemberType(outKey, Kind::audio, output);
         if (feeding) {
-            juce::Point<float> at { 0.5f, 0.5f };
+            cydaw::base::Point<float> at { 0.5f, 0.5f };
             for (const auto& node : graph.editorNodes())
                 if (node.id == out)
                     at = { std::max(0.02f, node.position.x - 0.16f), node.position.y + 0.12f };
@@ -3554,7 +3557,7 @@ void Studio::simulatorNote(const int noteNumber, const bool on)
 float Studio::simulatorLevelDb()
 {
     const auto peak = engine_.takeSimulationPeak();
-    const auto db = peak > 0.0f ? juce::Decibels::gainToDecibels(peak, -120.0f) : -120.0f;
+    const auto db = peak > 0.0f ? cydaw::audio::Decibels::gainToDecibels(peak, -120.0f) : -120.0f;
     // Rises at once, falls 24 dB a second, however often it is asked.
     const auto now = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
     const auto elapsed = std::clamp(now - simulatorLevelTime_, 0.0, 1.0);
@@ -6229,7 +6232,7 @@ cydaw::base::File Studio::recoveryFile()
 bool Studio::ownsRecovery() const
 {
     if (recoveryLock_ == nullptr) {
-        recoveryLock_ = std::make_unique<juce::InterProcessLock>("CyDAW2-recovery");
+        recoveryLock_ = std::make_unique<cydaw::base::InterProcessLock>("CyDAW2-recovery");
         ownsRecovery_ = recoveryLock_->enter(0);
     }
     return ownsRecovery_;

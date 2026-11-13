@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/FileDialog.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
@@ -38,7 +39,7 @@ void FoundryView::ensureCinema(Tab& t){
     if(made)for(auto& track:next.tracks)if(!track.bus)track.parentId=group;
     if(!wasCinema&&next.frames()<=0)next.span=static_cast<std::int64_t>(60*next.rate);
     t.activeGroup=group;if(!wasCinema||made)t.document->replace(std::move(next));
-    t.videoTextureKey="cinema-video-"+cydaw::base::Text::toHexString(reinterpret_cast<juce::pointer_sized_int>(t.document.get()));
+    t.videoTextureKey="cinema-video-"+cydaw::base::Text::toHexString(reinterpret_cast<std::intptr_t>(t.document.get()));
     syncProcessing(t);
     if(made)for(const auto& track:t.document->session().tracks)if(track.parentId) t.processing->routeInput(track.id,track.parentId);
 }
@@ -199,7 +200,7 @@ void FoundryView::drawCinemaVideo(Tab& t,ImVec2 size){
 cydaw::base::Value FoundryView::cinemaCommand(const cydaw::base::Value& request){
     const auto action=request.getProperty("action",{}).toString();
     if(!tab())newDocument();auto& t=*tab();syncProcessing(t);
-    auto id=[&](const char* key,std::uint64_t fallback){return static_cast<std::uint64_t>(static_cast<juce::int64>(request.getProperty(key,static_cast<juce::int64>(fallback))));};
+    auto id=[&](const char* key,std::uint64_t fallback){return static_cast<std::uint64_t>(static_cast<std::int64_t>(request.getProperty(key,static_cast<std::int64_t>(fallback))));};
     if(action=="video_audio")importCinemaAudio();
     else if(action=="video"){
         if(request.hasProperty("file")&&!openCinemaVideo(cydaw::base::File(request.getProperty("file",{}).toString())))return state_.status;
@@ -265,7 +266,7 @@ void FoundryView::importCinemaAudio(const bool automatic){
     const cydaw::base::File source(fromUtf8(t->document->session().picture.file));
     for(const auto& pending:cinemaAudioTasks_)if(!pending->done&&pending->documentIdentity==t->cinemaIdentity&&pending->source==source)return;
     auto task=std::make_shared<CinemaAudioTask>();task->source=source;task->automatic=automatic;
-    task->target=cydaw::base::File::getSpecialLocation(cydaw::base::File::tempDirectory).getChildFile("CyDAW Cinema").getChildFile(juce::Uuid().toString()+".wav");
+    task->target=cydaw::base::File::getSpecialLocation(cydaw::base::File::tempDirectory).getChildFile("CyDAW Cinema").getChildFile(cydaw::base::Uuid().toString()+".wav");
     task->documentIdentity=t->cinemaIdentity;cinemaAudioTask_=task;cinemaAudioTasks_.push_back(task);
     cinemaAudioWorker_.addJob([task]{
         task->target.getParentDirectory().createDirectory();

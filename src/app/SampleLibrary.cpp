@@ -1,3 +1,6 @@
+#include <cydaw/base/Compression.h>
+#include <cydaw/audio/SampleBuffer.h>
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/Process.h>
 #include <cydaw/base/EventLoop.h>
 #include <cydaw/base/Thread.h>
@@ -11,7 +14,7 @@
 
 #include <cydsp/processors/RealFft.h>
 #include <cydsp/math/Window.h>
-#include <juce_events/juce_events.h>
+
 
 #include <algorithm>
 #include <array>
@@ -124,17 +127,17 @@ bool containsKeyword(const cydaw::base::Text& original, const cydaw::base::Text&
         return lowered.contains(word);
     auto start = 0;
     while (start < original.length()) {
-        while (start < original.length() && !juce::CharacterFunctions::isLetterOrDigit(original[start]))
+        while (start < original.length() && !cydaw::base::CharacterFunctions::isLetterOrDigit(original[start]))
             ++start;
         auto end = start;
-        while (end < original.length() && juce::CharacterFunctions::isLetterOrDigit(original[end])) {
+        while (end < original.length() && cydaw::base::CharacterFunctions::isLetterOrDigit(original[end])) {
             // FloorTom, 808Kick: a capital after a small letter, a letter
             // after a digit, begin a word.
             if (end > start) {
                 const auto previous = original[end - 1];
                 const auto current = original[end];
-                if ((juce::CharacterFunctions::isLowerCase(previous) && juce::CharacterFunctions::isUpperCase(current))
-                    || (juce::CharacterFunctions::isDigit(previous) != juce::CharacterFunctions::isDigit(current)))
+                if ((cydaw::base::CharacterFunctions::isLowerCase(previous) && cydaw::base::CharacterFunctions::isUpperCase(current))
+                    || (cydaw::base::CharacterFunctions::isDigit(previous) != cydaw::base::CharacterFunctions::isDigit(current)))
                     break;
             }
             ++end;
@@ -437,7 +440,7 @@ SampleLibrary::TempoEstimate SampleLibrary::estimateTempo(const double detectedB
     return estimate;
 }
 
-std::vector<float> SampleLibrary::chromaOf(const juce::AudioBuffer<float>& audio,
+std::vector<float> SampleLibrary::chromaOf(const cydaw::audio::SampleBuffer<float>& audio,
                                            const double sampleRate)
 {
     std::vector<float> chroma(12, 0.0f);
@@ -492,7 +495,7 @@ std::vector<float> SampleLibrary::chromaOf(const juce::AudioBuffer<float>& audio
             // or fifth carries most of its energy — says little about the
             // key: the fifth harmonic of every C is an E.
             for (const auto harmonic : { 2, 3, 4, 5 }) {
-                const auto fundamental = juce::roundToInt(static_cast<float>(bin) / harmonic);
+                const auto fundamental = cydaw::base::roundToInt(static_cast<float>(bin) / harmonic);
                 if (fundamental >= lowestBin
                     && frame[static_cast<std::size_t>(fundamental)] >= 0.6f * magnitude) {
                     magnitude *= 0.3f;
@@ -578,7 +581,7 @@ SampleLibrary::KeyEstimate SampleLibrary::estimateKey(const std::vector<float>& 
     if (best < 0.6f || best - second < 0.06f)
         return estimate;
     estimate.key = bestKey;
-    estimate.confidence = juce::jlimit(0.0f, 1.0f, (best - 0.5f) / 0.45f);
+    estimate.confidence = cydaw::base::limit(0.0f, 1.0f, (best - 0.5f) / 0.45f);
     return estimate;
 }
 
@@ -670,30 +673,30 @@ SampleRecord SampleLibrary::analyseFile(const cydaw::base::File& file, const cyd
         record.length = static_cast<double>(reader->lengthInSamples) / reader->sampleRate;
         // The measurements read the whole file up to ten minutes; a longer
         // one is measured on its first two.
-        const auto measured = std::min<juce::int64>(
+        const auto measured = std::min<std::int64_t>(
             reader->lengthInSamples,
-            record.length > 600.0 ? static_cast<juce::int64>(reader->sampleRate * 120.0)
+            record.length > 600.0 ? static_cast<std::int64_t>(reader->sampleRate * 120.0)
                                   : reader->lengthInSamples);
         const auto channels = static_cast<int>(std::min<unsigned>(reader->numChannels, 8));
-        juce::AudioBuffer<float> buffer(channels, 65'536);
+        cydaw::audio::SampleBuffer<float> buffer(channels, 65'536);
         // The first thirty seconds, kept for the chroma the key is read from.
-        const auto keptForChroma = static_cast<int>(std::min<juce::int64>(
-            measured, static_cast<juce::int64>(reader->sampleRate * 30.0)));
-        juce::AudioBuffer<float> forChroma(channels, keptForChroma);
+        const auto keptForChroma = static_cast<int>(std::min<std::int64_t>(
+            measured, static_cast<std::int64_t>(reader->sampleRate * 30.0)));
+        cydaw::audio::SampleBuffer<float> forChroma(channels, keptForChroma);
         forChroma.clear();
         std::vector<float> bins(overviewBins, 0.0f);
         double peak = 0.0;
         double sumSquares = 0.0;
-        juce::int64 position = 0;
+        std::int64_t position = 0;
         while (position < measured) {
-            const auto count = static_cast<int>(std::min<juce::int64>(
+            const auto count = static_cast<int>(std::min<std::int64_t>(
                 buffer.getNumSamples(), measured - position));
             if (!reader->read(&buffer, 0, count, position, true, true))
                 break;
             if (position < keptForChroma)
                 for (auto channel = 0; channel < channels; ++channel)
                     forChroma.copyFrom(channel, static_cast<int>(position), buffer, channel, 0,
-                                       static_cast<int>(std::min<juce::int64>(
+                                       static_cast<int>(std::min<std::int64_t>(
                                            count, keptForChroma - position)));
             for (auto frame = 0; frame < count; ++frame) {
                 auto value = 0.0f;
@@ -702,18 +705,18 @@ SampleRecord SampleLibrary::analyseFile(const cydaw::base::File& file, const cyd
                 peak = std::max(peak, static_cast<double>(value));
                 sumSquares += static_cast<double>(value) * value;
                 const auto bin = static_cast<std::size_t>(
-                    std::min<juce::int64>(overviewBins - 1,
+                    std::min<std::int64_t>(overviewBins - 1,
                                           (position + frame) * overviewBins / measured));
                 bins[bin] = std::max(bins[bin], value);
             }
             position += count;
         }
         record.peakDb = toDb(peak);
-        record.rmsDb = toDb(std::sqrt(sumSquares / static_cast<double>(std::max<juce::int64>(1, measured))));
+        record.rmsDb = toDb(std::sqrt(sumSquares / static_cast<double>(std::max<std::int64_t>(1, measured))));
         record.overview.resize(overviewBins);
         for (std::size_t bin = 0; bin < bins.size(); ++bin)
             record.overview[bin] = static_cast<std::uint8_t>(
-                juce::jlimit(0, 255, juce::roundToInt(bins[bin] * 255.0f)));
+                cydaw::base::limit(0, 255, cydaw::base::roundToInt(bins[bin] * 255.0f)));
         record.analysed = true;
         // The key of tonal sounds; drums and very short hits are left out,
         // and an instrument's notes (their name says it, the map plays it).
@@ -828,7 +831,7 @@ cydaw::base::Value SampleLibrary::serialise(const SampleRecord& record)
     object->setProperty("source", record.source);
     object->setProperty("instrument", record.instrument);
     if (!record.overview.empty())
-        object->setProperty("overview", juce::Base64::toBase64(
+        object->setProperty("overview", cydaw::base::Base64::toBase64(
                                             record.overview.data(), record.overview.size()));
     return value;
 }
@@ -846,8 +849,8 @@ std::optional<SampleRecord> SampleLibrary::restore(const cydaw::base::Value& val
     record.name = file.getFileNameWithoutExtension();
     record.extension = file.getFileExtension().trimCharactersAtStart(".").toLowerCase();
     record.root = object->getProperty("root").toString();
-    record.size = static_cast<juce::int64>(object->getProperty("size"));
-    record.modified = static_cast<juce::int64>(object->getProperty("modified"));
+    record.size = static_cast<std::int64_t>(object->getProperty("size"));
+    record.modified = static_cast<std::int64_t>(object->getProperty("modified"));
     record.sampleRate = static_cast<double>(object->getProperty("sampleRate"));
     record.channels = static_cast<int>(object->getProperty("channels"));
     record.bitDepth = static_cast<int>(object->getProperty("bitDepth"));
@@ -874,8 +877,8 @@ std::optional<SampleRecord> SampleLibrary::restore(const cydaw::base::Value& val
     record.analysed = static_cast<bool>(object->getProperty("analysed"));
     record.source = object->getProperty("source").toString();
     record.instrument = object->getProperty("instrument").toString();
-    juce::MemoryOutputStream decoded;
-    if (juce::Base64::convertFromBase64(decoded, object->getProperty("overview").toString())
+    cydaw::base::MemoryOutputStream decoded;
+    if (cydaw::base::Base64::convertFromBase64(decoded, object->getProperty("overview").toString())
         && decoded.getDataSize() == overviewBins) {
         record.overview.assign(static_cast<const std::uint8_t*>(decoded.getData()),
                                static_cast<const std::uint8_t*>(decoded.getData()) + overviewBins);
@@ -883,7 +886,7 @@ std::optional<SampleRecord> SampleLibrary::restore(const cydaw::base::Value& val
     return record;
 }
 
-void SampleLibrary::write(juce::OutputStream& out, const SampleRecord& record)
+void SampleLibrary::write(cydaw::base::OutputStream& out, const SampleRecord& record)
 {
     // In this order, read back by read(); a field added goes at the end, with
     // the cache's version raised.
@@ -919,7 +922,7 @@ void SampleLibrary::write(juce::OutputStream& out, const SampleRecord& record)
         out.write(record.overview.data(), record.overview.size());
 }
 
-std::optional<SampleRecord> SampleLibrary::read(juce::InputStream& in)
+std::optional<SampleRecord> SampleLibrary::read(cydaw::base::InputStream& in)
 {
     SampleRecord record;
     record.path = in.readString();
@@ -988,7 +991,7 @@ public:
         for (const auto& root : roots_) {
             if (!root.folder.isDirectory())
                 continue;
-            for (const auto& entry : juce::RangedDirectoryIterator(root.folder, true, "*", cydaw::base::File::findFiles)) {
+            for (const auto& entry : cydaw::base::RangedDirectoryIterator(root.folder, true, "*", cydaw::base::File::findFiles)) {
                 if (threadShouldExit())
                     return finish(std::move(present), false);
                 const auto file = entry.getFile();
@@ -1642,7 +1645,7 @@ bool SampleLibrary::setRating(const cydaw::base::Text& path, const int rating)
     auto* record = findMutable(path);
     if (record == nullptr)
         return false;
-    record->rating = juce::jlimit(0, 5, rating);
+    record->rating = cydaw::base::limit(0, 5, rating);
     markDirty();
     notify(false);
     return true;
@@ -1677,7 +1680,7 @@ bool SampleLibrary::setBpm(const cydaw::base::Text& path, const double bpm)
     auto* record = findMutable(path);
     if (record == nullptr)
         return false;
-    record->bpm = bpm > 0.0 ? juce::jlimit(20.0, 400.0, std::round(bpm * 10.0) / 10.0) : 0.0;
+    record->bpm = bpm > 0.0 ? cydaw::base::limit(20.0, 400.0, std::round(bpm * 10.0) / 10.0) : 0.0;
     record->bpmSource = bpm > 0.0 ? "user" : cydaw::base::Text();
     record->bpmConfidence = bpm > 0.0 ? 1.0f : 0.0f;
     record->type = typeFor(record->length, record->name, record->bpm);
@@ -1934,7 +1937,7 @@ void SampleLibrary::timerCallback()
         classifier_.reset();
     if (loaded_ && autoRescanMinutes_ > 0 && !isScanning() && !roots().empty()
         && cydaw::base::Time::currentTimeMillis() - lastScanMs_
-               > static_cast<juce::int64>(autoRescanMinutes_) * 60'000)
+               > static_cast<std::int64_t>(autoRescanMinutes_) * 60'000)
         rescan(false);
 }
 
@@ -2003,8 +2006,8 @@ constexpr int binaryVersion = 2;
 std::vector<SampleRecord> SampleLibrary::readCacheFile(const cydaw::base::File& folder)
 {
     std::vector<SampleRecord> records;
-    if (juce::FileInputStream in(folder.getChildFile(binaryIndexName)); in.openedOk()) {
-        juce::BufferedInputStream buffered(in, 1 << 16);
+    if (cydaw::base::FileInputStream in(folder.getChildFile(binaryIndexName)); in.openedOk()) {
+        auto& buffered = in;
         if (buffered.readInt() == binaryMagic && buffered.readInt() == binaryVersion) {
             const auto count = buffered.readInt();
             records.reserve(static_cast<std::size_t>(std::clamp(count, 0, 1'000'000)));
@@ -2032,7 +2035,7 @@ bool SampleLibrary::writeCacheFile(const cydaw::base::File& folder, const std::v
     const auto target = folder.getChildFile(binaryIndexName);
     const auto temporary = target.getSiblingFile("sample-library.tmp");
     {
-        juce::FileOutputStream out(temporary, 1 << 16);
+        cydaw::base::FileOutputStream out(temporary, 1 << 16);
         if (!out.openedOk())
             return false;
         out.setPosition(0);

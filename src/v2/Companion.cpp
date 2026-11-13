@@ -6,7 +6,6 @@
 
 #include "Locations.h"
 
-#include <juce_data_structures/juce_data_structures.h>
 
 #include <optional>
 #include <thread>

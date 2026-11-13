@@ -110,7 +110,7 @@ bool File::isAChildOf(const File &other) const {
 Text File::getRelativePathFrom(const File &f) const {
   std::error_code e;
   auto p = std::filesystem::relative(path_, f.path_, e);
-  return e ? getFullPathName() : textPath(p);
+  return e || p.empty() ? getFullPathName() : textPath(p);
 }
 Time File::getLastModificationTime() const {
 #if defined(_WIN32)

@@ -1,8 +1,8 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #pragma once
 
-#include <juce_core/juce_core.h>
 
 #include <vector>
 
@@ -25,7 +25,7 @@ struct ImportedMidiClip {
     double lengthBeats { 16.0 };
     bool looping {};
     bool muted {};
-    juce::uint32 colour {};
+    std::uint32_t colour {};
     int launcherScene { -1 };  // -1: arrangement; otherwise the launcher slot
     std::vector<ImportedNote> notes;
 };
@@ -45,7 +45,7 @@ struct ImportedAudioClip {
     float gainDb {};
     bool looping {};
     bool muted {};
-    juce::uint32 colour {};
+    std::uint32_t colour {};
     int launcherScene { -1 };
 };
 
@@ -73,7 +73,7 @@ struct ImportedTrack {
     float pan {};
     bool muted {};
     bool solo {};
-    juce::uint32 colour {};
+    std::uint32_t colour {};
     // The devices and plugins the track carried, by name: not translated,
     // reported.
     cydaw::base::TextList devices;

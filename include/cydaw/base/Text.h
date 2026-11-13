@@ -198,6 +198,12 @@ public:
     out.resize(n);
     return out;
   }
+  static Text fromUTF16(const char16_t* data, std::size_t size) {
+    Text out; for(std::size_t i=0;i<size&&data[i];++i){char32_t c=data[i];if(c>=0xd800&&c<=0xdbff){if(i+1<size&&data[i+1]>=0xdc00&&data[i+1]<=0xdfff)c=0x10000+((c-0xd800)<<10)+(data[++i]-0xdc00);else c=0xfffd;}else if(c>=0xdc00&&c<=0xdfff)c=0xfffd;out+=charToString(c);}return out;
+  }
+  static bool isValidUTF8(const char* data,std::size_t size) {
+    for(std::size_t i=0;i<size;){auto a=uint8(data[i++]);if(a<128)continue;int n=a>=0xc2&&a<=0xdf?1:a>=0xe0&&a<=0xef?2:a>=0xf0&&a<=0xf4?3:-1;if(n<0||i+std::size_t(n)>size)return false;char32_t c=a&((1<<(6-n))-1);for(int k=0;k<n;++k){auto b=uint8(data[i++]);if((b&0xc0)!=0x80)return false;c=(c<<6)|(b&63);}if((n==1&&c<0x80)||(n==2&&c<0x800)||(n==3&&c<0x10000)||c>0x10ffff||(c>=0xd800&&c<=0xdfff))return false;}return true;
+  }
   std::wstring toWideString() const {
     std::wstring out;
     for (int i = 0; i < length(); ++i) {

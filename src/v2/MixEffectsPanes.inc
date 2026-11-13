@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 // The mixing effects' displays and large views: Pression, Fournaise, Écho
 // Bande, Multibande Pro, Velours, Patine, Sonomètre (MixDesign.h computes what
 // they draw). Included by
@@ -33,7 +34,7 @@ double levelOfY(const Box& box, const float y)
 
 cydaw::base::Text hertz(const double hz)
 {
-    return hz >= 1'000.0 ? cydaw::base::Text(hz / 1'000.0, hz >= 10'000.0 ? 0 : 1) + " kHz" : cydaw::base::Text(juce::roundToInt(hz)) + " Hz";
+    return hz >= 1'000.0 ? cydaw::base::Text(hz / 1'000.0, hz >= 10'000.0 ? 0 : 1) + " kHz" : cydaw::base::Text(cydaw::base::roundToInt(hz)) + " Hz";
 }
 
 // The bands' levels in a tapped frame, as the processor splits them.
@@ -51,7 +52,7 @@ std::array<double, mixd::pressionBands> bandLevels(const engine::AudioAnalysisFr
 bool pressionDisplay(std::vector<Param>& parameters, const Pane& pane, const Box& box, const ImU32 colour, const Live& live,
                      const Setter& set, const bool large)
 {
-    juce::ignoreUnused(colour);
+    cydaw::base::ignoreUnused(colour);
     const auto& p = theme::palette();
     auto* list = ImGui::GetWindowDrawList();
     const auto values = studioValues<mixd::pressionParameterCount>(parameters, pane, "pression");
@@ -359,7 +360,7 @@ cydaw::base::Text echoModeName(const int index)
 }
 cydaw::base::Text echoModeHint(const int index)
 {
-    juce::ignoreUnused(index);
+    cydaw::base::ignoreUnused(index);
     return ui::Ls("Les têtes de lecture qui jouent (la 2 et la 3 deux et trois fois plus tard que la 1), et le ressort.",
                   "The playback heads that play (2 and 3 twice and three times as late as 1), and the spring.");
 }
@@ -566,7 +567,7 @@ const char* multibandModeName(const int mode, const bool shortName)
 bool multibandDisplay(std::vector<Param>& parameters, const Pane& pane, const Box& box, const ImU32 colour, const Live& live,
                       const Setter& set, const bool large)
 {
-    juce::ignoreUnused(colour);
+    cydaw::base::ignoreUnused(colour);
     const auto& p = theme::palette();
     auto* list = ImGui::GetWindowDrawList();
     const auto values = studioValues<mixd::multibandParameterCount>(parameters, pane, "multiband-pro");
@@ -899,7 +900,7 @@ const char* patineModuleName(const int module)
 bool patineDisplay(std::vector<Param>& parameters, const Pane& pane, const Box& box, const ImU32 colour, const Live& live,
                    const Setter& set, const bool large)
 {
-    juce::ignoreUnused(colour, live);
+    cydaw::base::ignoreUnused(colour, live);
     const auto& p = theme::palette();
     auto* list = ImGui::GetWindowDrawList();
     const auto values = studioValues<mixd::patineParameterCount>(parameters, pane, "patine");

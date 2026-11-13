@@ -1,3 +1,5 @@
+#include <cydaw/base/Platform.h>
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/Process.h>
 #include <cydaw/base/FileDialog.h>
 #include <cydaw/base/Thread.h>
@@ -211,7 +213,7 @@ struct LibraryWindow::InstrumentRow {
     cydaw::base::File file;
     bool missing {};
     bool model {};
-    juce::int64 missingBytes {};
+    std::int64_t missingBytes {};
     cydaw::base::TextList banks;
 };
 
@@ -281,7 +283,7 @@ private:
         for (const auto& folder : folders) {
             if (!folder.isDirectory())
                 continue;
-            for (const auto& entry : juce::RangedDirectoryIterator(folder, true, "*", cydaw::base::File::findFilesAndDirectories)) {
+            for (const auto& entry : cydaw::base::RangedDirectoryIterator(folder, true, "*", cydaw::base::File::findFilesAndDirectories)) {
                 if (threadShouldExit())
                     return;
                 const auto file = entry.getFile();
@@ -297,13 +299,13 @@ private:
                     auto cache = cydaw::base::File::getSpecialLocation(cydaw::base::File::userApplicationDataDirectory).getChildFile("CyDAW/plugin-catalogue");
                     (void) cache.createDirectory();
                     auto stamp = file.getLastModificationTime().toMilliseconds();
-                    if (file.isDirectory()) for (const auto& child : juce::RangedDirectoryIterator(file, true, "*", cydaw::base::File::findFiles)) stamp = std::max(stamp, child.getFile().getLastModificationTime().toMilliseconds());
+                    if (file.isDirectory()) for (const auto& child : cydaw::base::RangedDirectoryIterator(file, true, "*", cydaw::base::File::findFiles)) stamp = std::max(stamp, child.getFile().getLastModificationTime().toMilliseconds());
                     const auto key = cydaw::base::Text::toHexString(file.getFullPathName().hashCode64());
                     const auto report = cache.getChildFile(key + ".json");
                     auto data = cydaw::base::JSON::parse(report);
-                    if (static_cast<juce::int64>(data.getProperty("stamp", 0)) != stamp) {
+                    if (static_cast<std::int64_t>(data.getProperty("stamp", 0)) != stamp) {
                         const auto launch = app::WindowsPluginBridge::workerLaunchFor(file);
-                        auto command = launch.command; const auto resultFile = cache.getChildFile(key + "-" + juce::Uuid().toString() + ".probe.json");
+                        auto command = launch.command; const auto resultFile = cache.getChildFile(key + "-" + cydaw::base::Uuid().toString() + ".probe.json");
                         (void) resultFile.deleteFile();
                         command.addArray({"--probe-plugin", file.getFullPathName(), "--output", resultFile.getFullPathName()});
                         cydaw::base::ChildProcess process;
@@ -1060,7 +1062,7 @@ void LibraryWindow::drawSamples()
                     if (ImGui::MenuItem(L("Montrer dans l'explorateur", "Show in the file explorer")))
                         cydaw::base::File(item.path).revealToUser();
                     if (ImGui::MenuItem(L("Copier le chemin", "Copy the path")))
-                        juce::SystemClipboard::copyTextToClipboard(item.path);
+                        cydaw::base::SystemClipboard::copyTextToClipboard(item.path);
                     ImGui::EndPopup();
                 }
                 if (ImGui::TableSetColumnIndex(C::colShape) && record != nullptr) {

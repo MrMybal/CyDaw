@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/integration/CyAudioCoreDeviceManager.h>
 #include <cydaw/midi/Devices.h>
 #include <cydaw/midi/LiveInput.h>
@@ -31,7 +32,7 @@ namespace {
     const char* protocolKeys[] = { "midi-clock", "mtc-mmc", "jack", "link" };
     const char* targetKeys[] = { "studio", "foundry", "deck-a", "deck-b", "deck-c", "deck-d", "cinema" };
     struct Packet {
-        std::vector<juce::uint8> bytes;
+        std::vector<std::uint8_t> bytes;
         double time {};
     };
     struct Config {
@@ -109,7 +110,7 @@ namespace {
 
 class TransportSync::Impl final : private cydaw::base::Timer,
                                   private cydaw::midi::InputCallback,
-                                  private juce::HighResolutionTimer {
+                                  private cydaw::base::HighResolutionTimer {
 public:
     Impl(cydaw::base::PropertiesFile& properties, cydaw::integration::DeviceManager& manager, bool saves, Read read, Apply apply)
         : settings(properties)
@@ -206,7 +207,7 @@ public:
             publishOutput(previous, true);
             cydaw::base::Timer::startTimer(10);
             if (config.protocol < 2 && config.send)
-                juce::HighResolutionTimer::startTimer(1);
+                cydaw::base::HighResolutionTimer::startTimer(1);
         }
         draft = config;
         if (saving) {
@@ -227,8 +228,8 @@ public:
         put(v, "connected", connected);
         put(v, "error", error);
         put(v, "info", info);
-        put(v, "rxMessages", static_cast<juce::int64>(rxCount.load()));
-        put(v, "txMessages", static_cast<juce::int64>(txCount.load()));
+        put(v, "rxMessages", static_cast<std::int64_t>(rxCount.load()));
+        put(v, "txMessages", static_cast<std::int64_t>(txCount.load()));
         put(v, "signal", lastSignal > 0 && nowSeconds() - lastSignal < 1);
         put(v, "peers", link ? static_cast<int>(link->numPeers()) : 0);
         put(v, "timing",
@@ -301,7 +302,7 @@ public:
                     int n = static_cast<int>(value);
                     if (n < 0 || n > 255)
                         return "byte out of range";
-                    packet.bytes.push_back(static_cast<juce::uint8>(n));
+                    packet.bytes.push_back(static_cast<std::uint8_t>(n));
                 }
                 receive(packet);
             }
@@ -353,7 +354,7 @@ private:
     std::atomic<std::uint64_t> rxCount {}, txCount {};
     std::mutex ioMutex;
     std::vector<Packet> received;
-    std::deque<std::vector<juce::uint8>> sent;
+    std::deque<std::vector<std::uint8_t>> sent;
     State outputState;
     double outputAt {};
     bool outputReset {};
@@ -379,7 +380,7 @@ private:
     void disconnect()
     {
         cydaw::base::Timer::stopTimer();
-        juce::HighResolutionTimer::stopTimer();
+        cydaw::base::HighResolutionTimer::stopTimer();
         if (registeredInput.isNotEmpty()) {
             midiManager.removeMidiInputDeviceCallback(registeredInput, this);
             if (!inputWasEnabled)
@@ -390,7 +391,7 @@ private:
             if (config.protocol == 0)
                 output->sendMessageNow(cydaw::midi::Message::midiStop());
             else {
-                const juce::uint8 bytes[] = { 0xf0, 0x7f, static_cast<juce::uint8>(config.device), 6, 1, 0xf7 };
+                const std::uint8_t bytes[] = { 0xf0, 0x7f, static_cast<std::uint8_t>(config.device), 6, 1, 0xf7 };
                 output->sendMessageNow(cydaw::midi::Message(bytes, 6, 0));
             }
         }
@@ -422,7 +423,7 @@ private:
         const auto time = stamp > 0 && std::abs(arrived - stamp) < 1 ? stamp : arrived;
         std::lock_guard guard(ioMutex);
         if (received.size() < 4096)
-            received.push_back({ std::vector<juce::uint8>(bytes, bytes + size), time });
+            received.push_back({ std::vector<std::uint8_t>(bytes, bytes + size), time });
     }
     void receive(const Packet&);
     bool acceptDevice(int id) const { return id == 127 || config.device == 127 || config.device == id; }
@@ -432,7 +433,7 @@ private:
     {
         return std::abs(s.seconds - previous.seconds - (previous.playing ? t - previousAt : 0)) > 0.075;
     }
-    void sendBytes(const std::vector<juce::uint8>& bytes)
+    void sendBytes(const std::vector<std::uint8_t>& bytes)
     {
         if (output)
             output->sendMessageNow(cydaw::midi::Message(bytes.data(), static_cast<int>(bytes.size()), 0));
@@ -646,12 +647,12 @@ void TransportSync::Impl::timerCallback()
 void TransportSync::Impl::sendCode(double seconds)
 {
     const auto c = timecode::fromSeconds(seconds, config.rate);
-    sendBytes({ 0xf0, 0x7f, static_cast<juce::uint8>(config.device), 1, 1,
-        static_cast<juce::uint8>(c.hours | (c.rate << 5)), static_cast<juce::uint8>(c.minutes),
-        static_cast<juce::uint8>(c.seconds), static_cast<juce::uint8>(c.frames), 0xf7 });
-    sendBytes({ 0xf0, 0x7f, static_cast<juce::uint8>(config.device), 6, 0x44, 6, 1,
-        static_cast<juce::uint8>(c.hours | (c.rate << 5)), static_cast<juce::uint8>(c.minutes),
-        static_cast<juce::uint8>(c.seconds), static_cast<juce::uint8>(c.frames), 0, 0xf7 });
+    sendBytes({ 0xf0, 0x7f, static_cast<std::uint8_t>(config.device), 1, 1,
+        static_cast<std::uint8_t>(c.hours | (c.rate << 5)), static_cast<std::uint8_t>(c.minutes),
+        static_cast<std::uint8_t>(c.seconds), static_cast<std::uint8_t>(c.frames), 0xf7 });
+    sendBytes({ 0xf0, 0x7f, static_cast<std::uint8_t>(config.device), 6, 0x44, 6, 1,
+        static_cast<std::uint8_t>(c.hours | (c.rate << 5)), static_cast<std::uint8_t>(c.minutes),
+        static_cast<std::uint8_t>(c.seconds), static_cast<std::uint8_t>(c.frames), 0, 0xf7 });
 }
 void TransportSync::Impl::publishOutput(const State& s, bool initial)
 {
@@ -667,18 +668,18 @@ void TransportSync::Impl::publishOutput(const State& s, bool initial)
                 sendBytes({ 0xfc });
             const auto spp = std::clamp(
                 static_cast<int>(std::max(0.0, s.seconds - config.offsetMs / 1000) * s.bpm / 60 * 4), 0, 16383);
-            sendBytes({ 0xf2, static_cast<juce::uint8>(spp & 127), static_cast<juce::uint8>((spp >> 7) & 127) });
+            sendBytes({ 0xf2, static_cast<std::uint8_t>(spp & 127), static_cast<std::uint8_t>((spp >> 7) & 127) });
             if (seek && s.playing && config.play && !changed)
                 sendBytes({ 0xfb });
         }
         if (config.play && (changed || (initial && s.playing)))
-            sendBytes({ static_cast<juce::uint8>(s.playing ? (s.seconds < 0.001 ? 0xfa : 0xfb) : 0xfc) });
+            sendBytes({ static_cast<std::uint8_t>(s.playing ? (s.seconds < 0.001 ? 0xfa : 0xfb) : 0xfc) });
     } else {
         if (config.position && (initial || seek || (changed && s.playing)))
             sendCode(std::max(0.0, s.seconds - config.offsetMs / 1000));
         if (config.play && (changed || (initial && s.playing)))
-            sendBytes({ 0xf0, 0x7f, static_cast<juce::uint8>(config.device), 6,
-                static_cast<juce::uint8>(s.playing ? 2 : 1), 0xf7 });
+            sendBytes({ 0xf0, 0x7f, static_cast<std::uint8_t>(config.device), 6,
+                static_cast<std::uint8_t>(s.playing ? 2 : 1), 0xf7 });
     }
     outputState = s;
     outputAt = t;
@@ -714,7 +715,7 @@ void TransportSync::Impl::hiResTimerCallback()
             outgoingCode = timecode::fromSeconds(
                 std::max(0.0, outputState.seconds + (t - outputAt) - config.offsetMs / 1000), config.rate);
         const auto parts = timecode::nibbles(outgoingCode);
-        sendBytes({ 0xf1, static_cast<juce::uint8>((quarterPiece << 4) | parts[quarterPiece]) });
+        sendBytes({ 0xf1, static_cast<std::uint8_t>((quarterPiece << 4) | parts[quarterPiece]) });
         quarterPiece = (quarterPiece + 1) % 8;
     }
     nextPulse += interval;
@@ -724,7 +725,7 @@ void TransportSync::Impl::connectJack()
     cydaw::base::TextList paths;
     if (config.jackLibrary.isNotEmpty())
         paths.add(config.jackLibrary);
-#if JUCE_WINDOWS
+#if defined(_WIN32)
     else {
         const auto pf = cydaw::base::SystemStats::getEnvironmentVariable("ProgramW6432", "C:/Program Files");
         paths.add(pf + "/JACK2/lib/libjack64.dll");

@@ -1,3 +1,5 @@
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #include "ProjectImport.h"
@@ -62,7 +64,7 @@ cydaw::base::TextList tokenise(const cydaw::base::Text& line)
     cydaw::base::TextList tokens;
     auto pointer = line.getCharPointer();
     while (!pointer.isEmpty()) {
-        while (!pointer.isEmpty() && juce::CharacterFunctions::isWhitespace(*pointer))
+        while (!pointer.isEmpty() && cydaw::base::CharacterFunctions::isWhitespace(*pointer))
             ++pointer;
         if (pointer.isEmpty())
             break;
@@ -75,7 +77,7 @@ cydaw::base::TextList tokenise(const cydaw::base::Text& line)
             if (!pointer.isEmpty())
                 ++pointer;
         } else {
-            while (!pointer.isEmpty() && !juce::CharacterFunctions::isWhitespace(*pointer))
+            while (!pointer.isEmpty() && !cydaw::base::CharacterFunctions::isWhitespace(*pointer))
                 token += *pointer++;
         }
         tokens.add(token);
@@ -112,12 +114,12 @@ std::unique_ptr<Block> parse(const cydaw::base::Text& content)
 }
 
 // PEAKCOL: an OS colour with bit 24 set when it is one (Windows: 0x00BBGGRR).
-juce::uint32 reaperColour(const juce::int64 value)
+std::uint32_t reaperColour(const std::int64_t value)
 {
     if ((value & 0x1000000) == 0)
         return 0;
-    return opaque(static_cast<juce::uint8>(value & 0xff), static_cast<juce::uint8>((value >> 8) & 0xff),
-                  static_cast<juce::uint8>((value >> 16) & 0xff));
+    return opaque(static_cast<std::uint8_t>(value & 0xff), static_cast<std::uint8_t>((value >> 8) & 0xff),
+                  static_cast<std::uint8_t>((value >> 16) & 0xff));
 }
 
 class ReaperReader {
@@ -138,9 +140,9 @@ public:
             return cydaw::base::Result::fail("The Reaper project holds no REAPER_PROJECT block");
         out_.format = "reaper";
         out_.application = "Reaper " + (project->head.size() > 2 ? project->head[2] : cydaw::base::Text());
-        out_.tempo = juce::jlimit(20.0, 960.0, project->number("TEMPO", 1, 120.0));
-        out_.numerator = juce::jlimit(1, 32, static_cast<int>(project->number("TEMPO", 2, 4.0)));
-        out_.denominator = juce::jlimit(1, 32, static_cast<int>(project->number("TEMPO", 3, 4.0)));
+        out_.tempo = cydaw::base::limit(20.0, 960.0, project->number("TEMPO", 1, 120.0));
+        out_.numerator = cydaw::base::limit(1, 32, static_cast<int>(project->number("TEMPO", 2, 4.0)));
+        out_.denominator = cydaw::base::limit(1, 32, static_cast<int>(project->number("TEMPO", 3, 4.0)));
         out_.masterGainDb = linearToDb(project->number("MASTER_VOLUME", 1, 1.0));
         if (const auto* envelope = project->child("TEMPOENVEX"))
             for (const auto& entry : envelope->entries)
@@ -163,10 +165,10 @@ private:
         ImportedTrack track;
         track.name = block.text("NAME");
         track.gainDb = linearToDb(block.number("VOLPAN", 1, 1.0));
-        track.pan = static_cast<float>(juce::jlimit(-1.0, 1.0, block.number("VOLPAN", 2, 0.0)));
+        track.pan = static_cast<float>(cydaw::base::limit(-1.0, 1.0, block.number("VOLPAN", 2, 0.0)));
         track.muted = block.number("MUTESOLO", 1, 0.0) != 0.0;
         track.solo = block.number("MUTESOLO", 2, 0.0) != 0.0;
-        track.colour = reaperColour(static_cast<juce::int64>(block.number("PEAKCOL", 1, 0.0)));
+        track.colour = reaperColour(static_cast<std::int64_t>(block.number("PEAKCOL", 1, 0.0)));
         if (block.number("ISBUS", 1, 0.0) == 1.0)
             out_.warnings.add("Folder \"" + track.name + "\" was flattened: its tracks come in on their own.");
         if (const auto* chain = block.child("FXCHAIN"))
@@ -304,7 +306,7 @@ private:
         clip.gainDb = linearToDb(item.number("VOLPAN", 1, 1.0));
         clip.looping = looping;
         clip.muted = muted;
-        clip.colour = reaperColour(static_cast<juce::int64>(item.number("COLOR", 1, 0.0)));
+        clip.colour = reaperColour(static_cast<std::int64_t>(item.number("COLOR", 1, 0.0)));
         track.audioClips.push_back(std::move(clip));
     }
 

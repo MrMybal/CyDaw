@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/Text.h>
 #include "ModulatorsView.h"
 
@@ -107,7 +108,7 @@ float ModulatorsView::width()
 void ModulatorsView::begin(const TrackRef& track, const std::uint64_t trackKey, app::GraphDocument& graph,
                            const std::vector<app::GraphDocument::EditorNode>& nodes)
 {
-    juce::ignoreUnused(track);
+    cydaw::base::ignoreUnused(track);
     graph_ = &graph;
     trackKey_ = trackKey;
     owners_.clear();

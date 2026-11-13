@@ -26,7 +26,7 @@ jobs:
           token: ${{ secrets.CYDAW_DEPENDENCIES_TOKEN || github.token }}
       - name: Configure Windows worker
         # Only the worker: CyDAW 2 (and its FFmpeg SDK) is not built here.
-        run: cmake --preset desktop-windows-wasapi -DCYDAW_BUILD_V2=OFF
+        run: cmake --preset desktop-windows-wasapi -DCYDAW_BUILD_DESKTOP=OFF
       - name: Build isolated worker
         run: cmake --build build/windows-wasapi --config Release --target CyDAWPluginWorker --parallel 3
       - name: Verify worker protocol
@@ -63,7 +63,7 @@ jobs:
         with:
           name: CyDAW-Windows-PluginWorker
           path: prebuilt/windows-worker
-      - name: Install JUCE and test dependencies
+      - name: Install native audio and test dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \

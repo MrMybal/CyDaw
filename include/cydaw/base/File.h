@@ -66,6 +66,7 @@ public:
     (void)read(&b, 1);
     return b;
   }
+  bool readBool() { return readByte()!=0; }
   int readInt() {
     uint32 n = 0;
     for (unsigned i = 0; i < 4; ++i)
@@ -179,6 +180,7 @@ public:
     std::memcpy(&i, &v, 8);
     return writeInt64(i);
   }
+  bool writeBool(bool v) { const uint8 byte=v?1:0;return write(&byte,1); }
   bool writeFloat(float v) {
     int i;
     std::memcpy(&i, &v, 4);
@@ -541,5 +543,13 @@ struct SystemStats {
   static Text getEnvironmentVariable(const Text &, const Text &fallback = {});
   static Text getOperatingSystemName();
   static int getNumCpus() { return int(std::thread::hardware_concurrency()); }
+};
+class RangedDirectoryIterator {
+public:
+ struct Entry {File file;File getFile()const{return file;}bool isDirectory()const{return file.isDirectory();}bool isHidden()const{return file.isHidden();}int64 getFileSize()const{return file.getSize();}Time getModificationTime()const{return file.getLastModificationTime();}};
+private:std::vector<Entry> entries_;
+public:
+ RangedDirectoryIterator(const File& root,bool recursive,const Text& wildcard="*",int flags=File::findFilesAndDirectories){for(const auto& file:root.findChildFiles(flags,recursive,wildcard))entries_.push_back({file});}
+ auto begin()const{return entries_.begin();}auto end()const{return entries_.end();}
 };
 } // namespace cydaw::base

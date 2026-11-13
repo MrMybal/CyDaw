@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 // The displays and large views of Empreinte, Givre
 // (SpaceDesign.h computes what they draw). Included by StudioEffectsView.cpp
 // inside its anonymous namespace: it has its helpers (knobCell, segmented,
@@ -440,7 +441,7 @@ bool spacefxLarge(const PaneKind kind, const Pane& pane, std::vector<Param>& par
 // The values a card shows as knobs (pane indices).
 std::vector<int> spacefxCardFields(const PaneKind kind, std::vector<Param>& parameters, const Pane& pane)
 {
-    juce::ignoreUnused(parameters, pane);
+    cydaw::base::ignoreUnused(parameters, pane);
     if (kind == PaneKind::empreinte)
         return { spacefxd::empreinteMix, spacefxd::empreintePredelay, spacefxd::empreinteTail, spacefxd::empreinteHighCut };
     if (kind == PaneKind::givre)
@@ -461,10 +462,10 @@ cydaw::base::Text spacefxFormat(const cydaw::base::Text& binding, const double v
         if (suffix == "mix" || suffix == "width" || suffix == "length")
             return percent(value);
         if (suffix == "predelay")
-            return value < 0.5 ? ui::Ls("Aucun", "None") : cydaw::base::Text(juce::roundToInt(value)) + " ms";
+            return value < 0.5 ? ui::Ls("Aucun", "None") : cydaw::base::Text(cydaw::base::roundToInt(value)) + " ms";
         if (suffix == "lowCut")
             return !spacefxd::empreinteLowCutApplied(static_cast<float>(value)) ? ui::Ls("Désactivé", "Off")
-                                                                                 : cydaw::base::Text(juce::roundToInt(value)) + " Hz";
+                                                                                 : cydaw::base::Text(cydaw::base::roundToInt(value)) + " Hz";
         if (suffix == "highCut")
             return !spacefxd::empreinteHighCutApplied(static_cast<float>(value)) ? ui::Ls("Désactivé", "Off")
                                                                                    : cydaw::base::Text(value / 1'000.0, 1) + " kHz";

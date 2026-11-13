@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 // The displays and large views of Résonateurs, Corps, Peigne
 // (ResonanceDesign.h computes what they draw). Included by StudioEffectsView.cpp
 // inside its anonymous namespace: it has its helpers (knobCell, segmented,
@@ -725,7 +726,7 @@ bool resonanceLarge(const PaneKind kind, const Pane& pane, std::vector<Param>& p
 // The values a card shows as knobs (pane indices).
 std::vector<int> resonanceCardFields(const PaneKind kind, std::vector<Param>& parameters, const Pane& pane)
 {
-    juce::ignoreUnused(parameters, pane);
+    cydaw::base::ignoreUnused(parameters, pane);
     switch (kind) {
     case PaneKind::resonateurs:
         return { resonanced::resonateursNote, resonanced::resonateursDecay, resonanced::resonateursColour, resonanced::resonateursMix };

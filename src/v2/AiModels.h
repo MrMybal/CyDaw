@@ -1,7 +1,7 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/File.h>
 #pragma once
 
-#include <juce_core/juce_core.h>
 
 #include <atomic>
 #include <memory>
@@ -54,7 +54,7 @@ struct AiModel {
     cydaw::base::Text baseUrl;
     struct File {
         cydaw::base::Text path;
-        juce::int64 size {};
+        std::int64_t size {};
         cydaw::base::Text sha256;
     };
     std::vector<File> files;
@@ -65,7 +65,7 @@ struct AiModel {
     float similarityHigh { 0.5f };
 
     [[nodiscard]] cydaw::base::Text key() const { return id + "@" + version; }
-    [[nodiscard]] juce::int64 bytes() const;
+    [[nodiscard]] std::int64_t bytes() const;
     // In the interface's language.
     [[nodiscard]] cydaw::base::Text describe() const;
     [[nodiscard]] cydaw::base::Text note() const;
@@ -125,8 +125,8 @@ public:
         cydaw::base::Text id;
         cydaw::base::Text step; // "download", "verify", "copy"
         cydaw::base::Text file;
-        juce::int64 done {};
-        juce::int64 total {};
+        std::int64_t done {};
+        std::int64_t total {};
         double bytesPerSecond {};
         // The last run's end, once: its model, an error, or cancelled.
         cydaw::base::Text error;

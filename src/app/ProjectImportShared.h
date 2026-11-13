@@ -1,10 +1,10 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #pragma once
 
 #include "ProjectImport.h"
 
-#include <juce_core/juce_core.h>
 
 #include <algorithm>
 #include <cmath>
@@ -18,9 +18,9 @@ namespace cydaw::app::project_import::shared {
 // A document read whole from a compressed stream (a gzip'd set, a zip
 // entry), up to a size: a small file can unpack to gigabytes. Empty when
 // it is larger.
-[[nodiscard]] inline cydaw::base::Text readBounded(juce::InputStream& input, const juce::int64 most = 512LL * 1024 * 1024)
+[[nodiscard]] inline cydaw::base::Text readBounded(cydaw::base::InputStream& input, const std::int64_t most = 512LL * 1024 * 1024)
 {
-    juce::MemoryOutputStream read;
+    cydaw::base::MemoryOutputStream read;
     if (read.writeFromInputStream(input, most + 1) > most)
         return {};
     return read.toUTF8();
@@ -29,7 +29,7 @@ namespace cydaw::app::project_import::shared {
 // A linear gain (1 = 0 dB) in decibels, -96 for silence.
 [[nodiscard]] inline float linearToDb(const double gain)
 {
-    return gain > 0.0 ? juce::jlimit(-96.0f, 24.0f, static_cast<float>(20.0 * std::log10(gain))) : -96.0f;
+    return gain > 0.0 ? cydaw::base::limit(-96.0f, 24.0f, static_cast<float>(20.0 * std::log10(gain))) : -96.0f;
 }
 
 // The last part of a path, whichever its separators.
@@ -39,9 +39,9 @@ namespace cydaw::app::project_import::shared {
     return path.contains("/") ? path.fromLastOccurrenceOf("/", false, false) : path;
 }
 
-[[nodiscard]] inline juce::uint32 opaque(const juce::uint8 red, const juce::uint8 green, const juce::uint8 blue)
+[[nodiscard]] inline std::uint32_t opaque(const std::uint8_t red, const std::uint8_t green, const std::uint8_t blue)
 {
-    return 0xff000000u | (static_cast<juce::uint32>(red) << 16) | (static_cast<juce::uint32>(green) << 8) | blue;
+    return 0xff000000u | (static_cast<std::uint32_t>(red) << 16) | (static_cast<std::uint32_t>(green) << 8) | blue;
 }
 
 // The audio file a project names: found where it says, or by its name

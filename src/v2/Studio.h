@@ -1,3 +1,5 @@
+#include <cydaw/base/Platform.h>
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/Properties.h>
 #include <cydaw/base/File.h>
@@ -16,7 +18,6 @@
 #include "TrackModulation.h"
 #include "Processing.h"
 
-#include <juce_data_structures/juce_data_structures.h>
 
 #include <array>
 #include <bitset>
@@ -52,7 +53,7 @@ struct MeterState {
 // level, automated from when it is launched, over its length, looping.
 struct MasterClip {
     cydaw::base::Text name;
-    juce::uint32 colour { 0xffffb84d };
+    std::uint32_t colour { 0xffffb84d };
     double lengthBeats { 16.0 };
     bool looping { true };
     struct Point {
@@ -117,7 +118,7 @@ struct AudioTrackState {
     bool bus {};
     // Empty: the master alone.
     std::vector<TrackOutput> outputs;
-    juce::uint32 colour {};       // 0xAARRGGBB
+    std::uint32_t colour {};       // 0xAARRGGBB
     int audioChannels { 2 };
     int laneHeight { 88 };
     bool automationVisible {};
@@ -177,7 +178,7 @@ struct MidiTrackState {
     std::vector<RackPadState> pads;
     engine::instrument_container::Kind padsKind { engine::instrument_container::Kind::drum };
     std::bitset<app::AudioTrackController::maximumLauncherScenes> launcherStopOff;
-    juce::uint32 colour {};
+    std::uint32_t colour {};
     std::vector<TrackOutput> outputs;
     int laneHeight { 88 };
     bool automationVisible {};
@@ -403,7 +404,7 @@ public:
         bool reading {};     // the file being read and decoded
         float progress {};   // 0..1 (an estimate while reading)
         cydaw::base::Text doing;  // what is being done, for a person to read
-        juce::int64 bytes {};
+        std::int64_t bytes {};
         double seconds {};
         // A project of another software being imported (not a .cydaw).
         bool import {};
@@ -535,9 +536,9 @@ public:
     [[nodiscard]] std::size_t trackCount() const;
     [[nodiscard]] bool isValid(const TrackRef& track) const override;
     [[nodiscard]] cydaw::base::Text trackName(const TrackRef& track) const override;
-    [[nodiscard]] juce::uint32 trackColour(const TrackRef& track) const;
+    [[nodiscard]] std::uint32_t trackColour(const TrackRef& track) const;
     void setTrackName(const TrackRef& track, const cydaw::base::Text& name);
-    void setTrackColour(const TrackRef& track, juce::uint32 argb);
+    void setTrackColour(const TrackRef& track, std::uint32_t argb);
     [[nodiscard]] int laneHeight(const TrackRef& track) const;
     void setLaneHeight(const TrackRef& track, int height);
 
@@ -875,7 +876,7 @@ public:
         // Its samples still to download (Factory ships the maps, not the
         // samples), and the banks they come from.
         int missingFiles {};
-        juce::int64 missingBytes {};
+        std::int64_t missingBytes {};
         cydaw::base::TextList banks;
     };
     [[nodiscard]] std::vector<FactoryInstrument> factoryInstruments() const;
@@ -1466,7 +1467,7 @@ private:
     // the others neither offer, write nor delete it (one closing cleanly
     // would wipe the copy of another that crashes).
     [[nodiscard]] bool ownsRecovery() const;
-    mutable std::unique_ptr<juce::InterProcessLock> recoveryLock_;
+    mutable std::unique_ptr<cydaw::base::InterProcessLock> recoveryLock_;
     mutable bool ownsRecovery_ {};
     // Recording.
     std::optional<TrackRef> recordingTrack_;

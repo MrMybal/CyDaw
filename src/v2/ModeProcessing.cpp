@@ -1,3 +1,5 @@
+#include <cydaw/audio/Math.h>
+#include <cydaw/base/Utilities.h>
 #include <cydaw/audio/Sources.h>
 #include <cydaw/base/File.h>
 #include "JsfxView.h"
@@ -421,7 +423,7 @@ void ModeProcessing::process(const app::ModeInput *inputs, int count, float *lef
             for (int i = 0; i < frames; ++i)
             {
                 const auto level =
-                    juce::Decibels::decibelsToGain(engine::foundry::automationValue(gain->lane, (at + i / rate_) * gain->rate));
+                    cydaw::audio::Decibels::decibelsToGain(engine::foundry::automationValue(gain->lane, (at + i / rate_) * gain->rate));
                 left[i] *= level;
                 right[i] *= level;
             }
@@ -635,10 +637,10 @@ cydaw::base::Value ModeProcessing::serialise() const
     {
         auto t = object();
         const auto key = studio_.routingKey(track);
-        put(t, "key", static_cast<juce::int64>(key));
+        put(t, "key", static_cast<std::int64_t>(key));
         for (const auto &[id, k] : trackKeys_)
             if (k == key)
-                put(t, "inputId", static_cast<juce::int64>(id));
+                put(t, "inputId", static_cast<std::int64_t>(id));
         put(t, "name", studio_.trackName(track));
         put(t, "bus", studio_.isBusTrack(track));
         put(t, "midi", track.midi);
@@ -653,9 +655,9 @@ cydaw::base::Value ModeProcessing::serialise() const
         for (const auto &o : studio_.trackOutputs(track))
         {
             auto v = object();
-            put(v, "destination", static_cast<juce::int64>(o.destination));
+            put(v, "destination", static_cast<std::int64_t>(o.destination));
             put(v, "gain", o.gainDb);
-            put(v, "input", static_cast<juce::int64>(o.input));
+            put(v, "input", static_cast<std::int64_t>(o.input));
             put(v, "pre", o.preFader);
             outputs.add(v);
         }

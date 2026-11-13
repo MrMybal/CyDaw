@@ -1,3 +1,6 @@
+#include <cydaw/audio/SampleBuffer.h>
+#include <cydaw/audio/Math.h>
+#include <cydaw/base/Utilities.h>
 #include <cydaw/audio/Sources.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/TextMap.h>
@@ -11,7 +14,7 @@
 #include <cmath>
 #include <deque>
 
-#if JUCE_WINDOWS
+#if defined(_WIN32)
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
@@ -63,14 +66,14 @@ void djTrackTags(const cydaw::base::File& file, const cydaw::base::TextMap& tags
 
 DjEngine::DecodingThreadScope::DecodingThreadScope()
 {
-#if JUCE_WINDOWS
+#if defined(_WIN32)
     initialised_ = SUCCEEDED(CoInitializeEx(nullptr, COINIT_MULTITHREADED));
 #endif
 }
 
 DjEngine::DecodingThreadScope::~DecodingThreadScope()
 {
-#if JUCE_WINDOWS
+#if defined(_WIN32)
     if (initialised_)
         CoUninitialize();
 #endif
@@ -100,10 +103,10 @@ std::shared_ptr<TrackAudio> DjEngine::decode(cydaw::audio::AudioFormatManager& f
     audio->channels.assign(static_cast<std::size_t>(channels), std::vector<float>(static_cast<std::size_t>(frames)));
     constexpr int chunk = 1 << 16;
     cydaw::audio::SampleBuffer<float> buffer(static_cast<int>(std::max(2u, reader->numChannels)), chunk);
-    for (juce::int64 at = 0; at < frames; at += chunk) {
+    for (std::int64_t at = 0; at < frames; at += chunk) {
         if (cancelled && cancelled())
             return nullptr;
-        const auto n = static_cast<int>(std::min<juce::int64>(chunk, frames - at));
+        const auto n = static_cast<int>(std::min<std::int64_t>(chunk, frames - at));
         buffer.clear();
         if (!reader->read(&buffer, 0, n, at, true, true)) {
             error = cydaw::base::Text::fromUTF8("Lecture impossible");
@@ -476,11 +479,7 @@ bool DjEngine::anyPlaying() const noexcept
 void DjEngine::push(const Command& command)
 {
     const std::scoped_lock lock(pushLock_);
-    const auto scope = fifo_.write(1);
-    if (scope.blockSize1 > 0)
-        commands_[static_cast<std::size_t>(scope.startIndex1)] = command;
-    else if (scope.blockSize2 > 0)
-        commands_[static_cast<std::size_t>(scope.startIndex2)] = command;
+    (void) commands_.tryPush(command);
 }
 
 void DjEngine::setPlaying(const int deck, const bool playing)
@@ -721,18 +720,10 @@ void DjEngine::alignPhase(Deck& deck, const int master)
 
 void DjEngine::runCommands()
 {
-    const auto ready = fifo_.getNumReady();
-    if (ready <= 0)
-        return;
-    const auto scope = fifo_.read(ready);
-    for (int i = 0; i < scope.blockSize1; ++i) {
-        const auto& command = commands_[static_cast<std::size_t>(scope.startIndex1 + i)];
-        runCommand(*decks_[static_cast<std::size_t>(command.deck)], command);
-    }
-    for (int i = 0; i < scope.blockSize2; ++i) {
-        const auto& command = commands_[static_cast<std::size_t>(scope.startIndex2 + i)];
-        runCommand(*decks_[static_cast<std::size_t>(command.deck)], command);
-    }
+    const auto ready=commands_.sizeApprox();
+    Command command;
+    for(std::size_t i=0;i<ready&&commands_.tryPop(command);++i)
+        runCommand(*decks_[static_cast<std::size_t>(command.deck)],command);
 }
 
 void DjEngine::runCommand(Deck& deck, const Command& command)
@@ -875,7 +866,7 @@ void DjEngine::getNextAudioBlock(const cydaw::audio::AudioSourceChannelInfo& out
     const auto shown = shownDecks_.load(std::memory_order_relaxed);
     const auto [leftGain, rightGain] = engine::dj::crossfaderGains(crossfader_.load(std::memory_order_relaxed),
                                                                    crossfaderCurve_.load(std::memory_order_relaxed));
-    const auto masterGain = juce::Decibels::decibelsToGain(masterGainDb_.load(std::memory_order_relaxed), -60.0f);
+    const auto masterGain = cydaw::audio::Decibels::decibelsToGain(masterGainDb_.load(std::memory_order_relaxed), -60.0f);
     const auto cueMode = static_cast<CueMode>(cueMode_.load(std::memory_order_relaxed));
     const auto cueMix = std::clamp(cueMix_.load(std::memory_order_relaxed), 0.0f, 1.0f);
     float masterPeak = 0.0f;
@@ -940,7 +931,7 @@ void DjEngine::getNextAudioBlock(const cydaw::audio::AudioSourceChannelInfo& out
             }
             // The channel.
             engine::dj::StripSettings strip;
-            strip.trim = juce::Decibels::decibelsToGain(deck.trimDb.load(std::memory_order_relaxed));
+            strip.trim = cydaw::audio::Decibels::decibelsToGain(deck.trimDb.load(std::memory_order_relaxed));
             strip.high = deck.killHigh.load(std::memory_order_relaxed) ? 0.0f : engine::dj::eqKnobGain(deck.high.load(std::memory_order_relaxed));
             strip.mid = deck.killMid.load(std::memory_order_relaxed) ? 0.0f : engine::dj::eqKnobGain(deck.mid.load(std::memory_order_relaxed));
             strip.low = deck.killLow.load(std::memory_order_relaxed) ? 0.0f : engine::dj::eqKnobGain(deck.low.load(std::memory_order_relaxed));

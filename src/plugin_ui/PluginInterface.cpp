@@ -233,7 +233,9 @@ struct PluginInterface::Impl {
         surface.onFrame = [this] { frame(); };
         // Tests: a frame written once the window has settled.
         snapshot = cydaw::base::SystemStats::getEnvironmentVariable("CYDAW_PLUGIN_SNAPSHOT", {});
-        owner.addAndMakeVisible(surface);
+        surface.create(nullptr,1100,700);
+        embed.setHWND(surface.nativeHandle());
+        owner.addAndMakeVisible(embed);
     }
 
     // What the plug-in shows: an instrument's own window, the interface
@@ -392,6 +394,7 @@ struct PluginInterface::Impl {
     KickView kick;
     PresetMenu presets;
     InterfaceEditor designed;
+    juce::HWNDComponent embed;
     ImGuiHost surface;
     Shown opened;
     cydaw::base::Text snapshot;
@@ -436,7 +439,7 @@ juce::Point<int> PluginInterface::preferredSize() const
 
 void PluginInterface::resized()
 {
-    impl_->surface.setBounds(getLocalBounds());
+    impl_->embed.setBounds(getLocalBounds());
 }
 
 void PluginInterface::captureNextFrame(const cydaw::base::File& target, std::function<void(bool)> done)

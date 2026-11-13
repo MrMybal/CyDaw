@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/FileDialog.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
@@ -11,7 +12,6 @@
 #include <imgui.h>
 #include <cyui/modules/Images.h>
 
-#include <juce_gui_basics/juce_gui_basics.h>
 
 #include <memory>
 #include <optional>
@@ -75,7 +75,7 @@ private:
     using Clip = engine::foundry::Clip;
 
     struct Tab {
-        juce::Uuid cinemaIdentity;
+        cydaw::base::Uuid cinemaIdentity;
         std::unique_ptr<FoundryDocument> document;
         std::shared_ptr<ModeProcessing> processing;
         const Session* processingSession{};
@@ -236,7 +236,7 @@ private:
     cydaw::base::Value cinemaCommand(const cydaw::base::Value&);
     struct CinemaAudioTask {
         cydaw::base::File source,target;
-        juce::Uuid documentIdentity;
+        cydaw::base::Uuid documentIdentity;
         std::uint64_t group{};
         cydaw::base::Text error;
         std::atomic<bool> done{};
@@ -264,7 +264,7 @@ private:
     float cinemaGestureX_{};
     int cinemaGestureKind_{};
     struct CinemaContainerGesture {
-        Session before; engine::foundry::Track original; juce::Uuid document;
+        Session before; engine::foundry::Track original; cydaw::base::Uuid document;
         float x{}; int kind{}; std::uint64_t destination{};
     };
     std::optional<CinemaContainerGesture> cinemaContainerGesture_;

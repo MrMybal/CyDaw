@@ -1,124 +1,111 @@
-# Intégration CyAudioCore : résultats et travail restant
+# Remplacement de JUCE par CyAudioCore
 
 Date : 13 novembre 2026. Branche `CyDSP-CORE`.
-Architecture : **CyDaw → CyAudioCore → CyDSP numérique**.
-CyAudioCore `bb26e93`, CyDSP `cc18dca` ; empreintes dans le
-[snapshot](reports/CyAudioCoreSnapshot.json). Aucun de ces deux dépôts n'a été modifié.
+Architecture : **CyDaw → CyAudioCore → CyDSP numérique**, interface CyUI/ImGui.
+Révisions : CyAudioCore `bb26e93604d43de2069694b0791bc0bcf5a53ea6`,
+CyDSP `cc18dca043925b75adea481c1c8545a125607e1f`.
+Les deux dépôts de bibliothèque restent inchangés.
 
-## Résultat réel
+## Résultat de compilation
 
-CyAudioCore est maintenant employé par le desktop pour les périphériques audio
-natifs et par son véritable worker VST3. Les codecs, buffers, FFT et opérations
-numériques déjà migrés restent utilisés par les différents modes et plugins
-internes. Ce travail dépasse les seuls tests autonomes des bibliothèques.
+Le desktop Windows complet et le worker de plugins compilent désormais sans
+checkout, includes ni bibliothèques JUCE. Le répertoire neuf
+`build/cyaudio-native-desktop` est configuré avec téléchargement et fixtures JUCE
+désactivés. Le contrôle des 41 projets de dépendances générés confirme cette
+séparation. Le moteur, les sources, les périphériques audio/MIDI et l'hébergement
+de plugins utilisent effectivement les nouveaux chemins dans l'application.
 
-**Le desktop complet nécessite encore JUCE.** Il reste une couche ABI temporaire,
-les sources et une partie du modèle de données, le MIDI et l'hôte LV2. Les exports
-natifs CLAP/LV2 et le moteur commun peuvent déjà être construits sans JUCE.
-Ce résultat valide une partie substantielle de la substitution ; il ne démontre
-pas encore une application complète sans cette dépendance.
+Les anciens widgets et fixtures de comparaison restent dans les sources,
+accessibles uniquement par option explicite ; ils ne sont pas des dépendances
+cachées du produit. Les exports VST3/CLAP/LV2 natifs utilisent leurs SDK officiels.
+L'exécutable garde son nom interne `CyDAW 2.exe` pour les scripts existants.
 
-La compatibilité avec d'anciens projets VST3 n'est pas exigée pour cette reprise,
-conformément à la demande. Le support VST3 actuel fonctionne : les anciennes
-réserves sur ce format ne sont pas une raison de suspendre l'intégration.
+## Périmètre remplacé
 
-## Chemins intégrés et essais
-
-| Élément | Résultat vérifié |
+| Domaine | Implémentation actuelle |
 | --- | --- |
-| Fichiers | Lecteurs et encodeurs CyAudioCore, seek/EOS, WAV/AIFF/FLAC/Vorbis, métadonnées et propriété des flux. Les champs non convertis gardent leur chemin explicite. |
-| DSP interne | Buffers alignés, FFT convolution/stretch/chroma et VectorOps préparées, y compris blocs impairs, padding, canaux absents et copie en place. Source/transport Core → graphe CyDSP → dynamique avec sidechain → mesure testés sans JUCE. |
-| Périphériques desktop | Adaptateur vers `AudioDeviceContext`/`AudioDeviceManager` publics. Les pilotes ASIO/WASAPI/DirectSound JUCE sont désactivés dans les cibles migrées. Test du vrai thread de callback avec le périphérique nul Core : ouverture, deux démarrages/arrêts, horloge, fermeture, rejet d'un canal invalide. |
-| ASIO | Extension appartenant à CyDaw, SDK Steinberg sous l'option GPL v3 et backend ASIO PortAudio. Interface externe Core ; pas d'ajout GPL dans les dépôts MIT. Formats planaires/entrelacés, sélecteurs non consécutifs, sortie seule, clocks, échec de démarrage, stop/abort et absence d'allocation/libération dans le callback vérifiés par injection d'API. |
-| Matériel ASIO | Fireface USB : ouverture à 48 kHz, blocs clients de 64, démarrage/arrêt silencieux de 300 ms ; 224 callbacks / 14336 frames, aucune entrée activée. La latence de sortie déclarée par le backend reste 1069 échantillons ; ce n'est pas une mesure analogique ni la preuve d'une période matérielle de 64. |
-| VST3 en production | Scan, création, ports, paramètres, audio, MIDI, transport, état, éditeur Windows via Core. L'hôte VST3 JUCE est compilé hors du worker. Test Gain et Graph Runtime originaux : processing/état/éditeur ; noms/unités/automation du graphe effectifs. Le protocole IPC v6 de CyDaw est conservé. |
-| Session complète | Script de contrôle de l'application : gain JSFX −6 dB, tempo 60/120, recompilation, diagnostics de syntaxe et maintien de la version valide, CLAP/LV2/VST3, sauvegarde/relecture du projet, génération des exports VST3/CLAP/LV2. Aucun ancien projet requis. |
-| Distribution | Licences/manifests CyAudioCore et CyDSP, SDK GPL, helpers PortAudio et provenance ASIO copiés et installables. Le packager refuse une notice ASIO incomplète quand l'extension est distribuée. |
+| Fenêtre et rendu | Win32, boucle native, D3D11, ImGui et CyUI |
+| Documents et projets | Types applicatifs, nlohmann JSON, pugixml, sauvegarde atomique |
+| Audio et MIDI | CyAudioCore ; ASIO applicatif via PortAudio, WASAPI/DirectSound, ports MIDI Core |
+| Sources et instruments | Transport Core, buffers/vectorisation CyDSP, planification stéréo et cache applicatifs |
+| Fichiers audio | Lecteurs, encodeurs et enregistrement Core, métadonnées historiques préservées |
+| Plugins externes | Hôtes Core VST3, CLAP, LV2, JSFX dans le worker isolé |
+| Paramètres et état | IPC natif, automatismes, transport, sauvegarde, éditeurs Win32 et contrôles génériques |
+| Presets et scripts | Presets LV2 avec Lilv fourni par Core, diagnostics JSFX détaillés avec son ysfx |
+| Synchronisation | MIDI/MTC/MMC, Link et JACK de transport ; OSC/UDP et horloge haute résolution natifs |
+| Services | Fichiers/processus/sockets/threads/temporisations/presse-papiers/dialogues Win32, HTTP WinHTTP et ZIP en flux |
+| Cinéma et aide | FFmpeg partagé, lecteur CyDoc local, langues et ressources conservés |
+| Distribution | Presets/Actions/packaging natifs ; plus de checkout ou notice JUCE obligatoire |
 
-Les [commandes](CyAudioCoreIntegration.md) et
-[l'acceptation structurée](reports/CyAudioCoreAcceptance.json) donnent les preuves
-et leurs limites. Les logs complets contenant des identifiants de matériel
-restent locaux dans `output/`.
+## Problèmes rencontrés et correctifs applicatifs
 
-## Défauts corrigés dans CyDaw pendant l'intégration
+- **Chemins sur deux disques** : `std::filesystem::relative` peut rendre un chemin
+  vide sans erreur entre C: et D:. Cela faisait perdre les références de clips
+  lors du rechargement. Le chemin absolu est conservé dans ce cas ; un test
+  vérifie ce contrat et le roundtrip du projet rythmique passe à nouveau.
+- **Arguments Unicode sous Windows** : les arguments étroits du CRT arrivent
+  dans la page de codes locale. Le worker et les probes lisent désormais la
+  véritable ligne de commande UTF-16 ; l'archive ZIP au nom accentué est testée.
+- **Période WASAPI** : augmenter uniquement la capacité du callback ne suffisait
+  pas. La FIFO nominale Core devait aussi être alignée sur la période négociée,
+  sinon le worker recevait des blocs courts en rafale. Les deux sont alignées.
+- **Libellé DirectSound** : le nom du périphérique principal est en ACP sur ce
+  poste français. Le point d'entrée Windows normalise ce cas vers UTF-8.
+- **Réglages de périphérique** : les véritables attributs XML historiques sont
+  conservés ; la sélection physique n'est pas confondue avec les canaux denses.
+- **État VST3** : ne pas enfiler inutilement des paramètres avant la sauvegarde
+  Core, sinon celle-ci peut répondre `would_block`. Le codec historique est
+  borné et distinct du base64 standard.
+- **Tests** : le contrôle du cache attendait encore un ancien JSON alors que le
+  cache binaire `CYSL` existe déjà. Le test attend l'écriture asynchrone du vrai
+  format. Les banques optionnelles absentes sont annoncées comme telles ; les
+  tests synthétiques restent obligatoires et le mode strict exige les samples.
 
-1. **Réveil IPC Windows trop lent.** La boucle GUI temporisée retardait les blocs.
-   Le worker est maintenant réveillé directement par un événement natif ; le
-   callback ne l'attend pas. Les éditeurs continuent de recevoir leurs messages.
-2. **Bloc tardif joué sans effet.** Un worker actif pouvait laisser passer le bloc
-   courant brut, en violation de sa latence et du gain de l'effet. Il émet
-   maintenant du silence sur dépassement ; le bypass de sécurité après arrêt ou
-   crash reste explicite. Le premier bloc silencieux est couvert par test IPC.
-3. **Tempo modifié sur le mauvais thread.** Les valeurs DSP sont locales au thread
-   pour isoler les instances exportées. Le setter UI seul ne les publiait pas au
-   rendu. Le master publie maintenant son tempo/état par des atomiques au début
-   du callback. Le script dépendant du tempo passe dans l'application réelle.
-4. **Deux runtimes EEL dans le worker.** L'ancien archive ysfx et le runtime Core
-   exposaient les mêmes symboles VM. Le worker ne lie plus que le runtime Core ;
-   l'adaptateur JSFX utilise ses headers publics identiques.
+## Évolutions souhaitables dans CyAudioCore/CyDSP
 
-## Ce qui reste à porter dans l'application
+Aucun changement des bibliothèques privées n'a été fait pour contourner ces points.
 
-### APP-001 — Retirer la couche ABI et les objets JUCE
+| Priorité | Besoin observé | Adaptation actuelle / amélioration proposée |
+| --- | --- | --- |
+| P1 | Différencier période physique, quantum client et capacité maximale | Alignement dans le driver applicatif ; exposer/documenter séparément ces valeurs et leur relation à la FIFO |
+| P2 | Garantir UTF-8 pour les noms DirectSound | Conversion ACP ciblée dans CyDaw ; normalisation à faire dans le provider |
+| P2 | Découvrir et charger les presets LV2 via l'API publique | Lilv du même runtime Core ; ajouter catalogue/chargement de presets sans dépendre du layout de ses en-têtes privés |
+| P2 | Retourner les diagnostics JSFX structurés | Même runtime ysfx pour source/ligne/message ; ajouter ces informations à l'API publique |
+| P2 | Planifier des voix stéréo personnalisées | Ordonnanceur applicatif conservé ; le callback générique de synthèse Core est mono |
+| P2 | Mettre en cache une source rendue arbitraire | Cache applicatif de pages ; la source de lecture anticipée Core attend un chemin de fichier |
+| P2 | API de programmes générique entre formats | Adaptation LV2 et paramètre CLAP Preset ; documenter les capacités par format |
 
-Les adaptateurs `AudioIODevice`, `AudioPluginInstance` et les fenêtres de plugins
-conservent encore des types JUCE, même quand le travail natif passe par Core.
-`AudioSourcePlayer`, mixer/transport/read-ahead, synthés et recorder historiques
-restent aussi utilisés. Les remplacer par les contrats sources/transport/record
-Core est du travail CyDaw ; leur présence ne prouve pas un manque de la bibliothèque.
-Conserver les tests d'édition, boucles, lancement, compensation et rendu lors des
-remplacements, ainsi que l'arrêt/join hors callback.
+Ces adaptations n'utilisent pas JUCE. Elles ne justifient plus de conserver
+l'ancien framework dans le produit.
 
-Les données String/var/ValueTree/XML, fichiers/processus et certaines fenêtres
-restent à porter vers les utilitaires de l'application et CyUI. CyAudioCore
-n'est pas une bibliothèque générale d'interface ou de sérialisation de projets.
-L'audit lexical n'est pas une mesure du code exécuté ni un pourcentage de migration.
+## Validation
 
-### APP-002 — MIDI, CLAP/LV2/JSFX et exports VST3
+Build complet natif réussi : `output/cyaudio-strict-verified-build.log`.
+Les tests autonomes couvrent les services réellement employés, le moteur,
+les fichiers audio, les voix/MIDI, les périphériques, le transport et l'IPC.
+La campagne finale des scénarios applicatifs et des exports est en cours ;
+les résultats définitifs seront ajoutés après leur exécution.
 
-L'énumération, les entrées/sorties MIDI, le collecteur et TransportSync utilisent
-encore JUCE. Les contrats MIDI publics Core sont disponibles ; il faut raccorder
-les identités, la collecte, les timestamps et les préférences côté application.
+Les profils de test sont isolés ; les tests ne doivent pas enregistrer des
+réglages dans le profil de travail de l'utilisateur. Les tests de samples
+installés accèdent à la banque existante en lecture uniquement.
 
-Le worker emploie encore l'hôte LV2 JUCE et les adaptateurs CLAP/JSFX existants.
-Leurs scénarios de production passent, et les quatre hôtes Core passent séparément ;
-la bascule de tous ces chemins n'est donc pas revendiquée. Préserver les diagnostics
-JSFX et les presets LV2 lors du raccordement. Les exports VST3 historiques
-conservent aussi leur couche JUCE, contrairement aux exports natifs CLAP/LV2.
+## Limites d'acceptation matérielle et de plateforme
 
-### CORE-001 — Programmes/unités : capacité publique à compléter
+La cible validée est Windows x64. Cela ne constitue pas une validation du
+desktop Linux/macOS, dont la fenêtre/dialogues/éditeurs natifs demandent un
+portage spécifique. Les exports de plugins et le moteur portable sont distincts.
 
-L'API actuelle ne fournit pas de liste/choix générique de programmes/unités VST3
-ni de presets LV2 équivalente à celle exposée par le desktop. Le nouvel adaptateur
-VST3 propose donc le programme Default ; les états et paramètres sont pris en
-charge. Cette limite ne bloque ni l'hébergement VST3 de base ni les essais demandés,
-et n'est pas présentée comme une exigence sur les anciens projets.
-Pour conserver toutes les commandes de presets lors de la bascule LV2, prévoir un
-contrat public stable et ses tests de rappel/automation.
+Un démarrage/arrêt silencieux réel Fireface ASIO et des callbacks WASAPI ont été
+vérifiés. Cela ne mesure pas la latence analogique et ne remplace pas des essais
+microphone, MIDI physique, hotplug/reconnexion ou l'écoute des sorties. Les
+plugins tiers installés demandent encore leur propre matrice d'interopérabilité.
+VST2 n'est pas annoncé : Core ne fournit pas ce provider. La compatibilité avec
+d'anciens projets VST3 n'était pas exigée, mais un lecteur d'état borné conserve
+les cas historiques pris en charge.
 
-### APP-003 — États et fenêtres : terminer les contrats de bord
+## Reproduire
 
-Les commandes actuelles d'édition de graphe utilisant l'enveloppe XML sont
-converties en état Core borné. Les sauvegardes simples testées passent. Un état
-Core peut retourner `would_block` tant qu'une édition UI attend le traitement ;
-il reste à renforcer le protocole de snapshot/retry pour ces éditions et tester
-le cas d'une sauvegarde immédiate pendant un geste, sans traiter un échec comme
-un état vide réussi. C'est une intégration de lifecycle, pas une absence VST3.
-
-DPI, focus, clavier, resize et fermeture demandent encore des essais interactifs
-avec des plugins tiers. Le chemin d'éditeur intégré a été testé avec nos fixtures.
-Le reconnect/hotplug natif n'est pas activé automatiquement dans l'adaptateur ;
-la sélection de périphérique reste explicite. Aucun repli silencieux ASIO→WASAPI.
-
-## Limites des essais
-
-Windows x64/MSVC Release. Lecture de session testée avec les haut-parleurs coupés ;
-sonde ASIO matérielle uniquement en sortie silencieuse. Pas de validation de
-capture/micro, de latence analogique, de reconnexion matérielle, de JACK, de
-macOS/Linux/ARM ou d'un parc de plugins tiers. Les API et adaptateurs sur les
-autres plateformes ne sont pas déclarés validés par une compilation Windows.
-
-Les dépendances CI sont épinglées. Les jobs privés nécessitent un secret de lecture
-`CYDAW_DEPENDENCIES_TOKEN`. Aucun workflow distant, push ni publication n'a été lancé
-pour cette reprise. Les anciens rapports monolithiques restent archivés ; leurs
-anciens défauts VST3 corrigés ne sont pas réutilisés comme blocages actuels.
+Voir [les commandes de build](CyAudioCoreIntegration.md). La voie de production
+ne doit pas activer `CYDAW_BUILD_LEGACY_JUCE_TESTS`. Aucune publication ni push
+n'est déclenché par cette intégration locale.

@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/Text.h>
 #include "ComputerKeyboard.h"
 
@@ -7,7 +8,7 @@
 
 #include <algorithm>
 
-#if JUCE_WINDOWS
+#if defined(_WIN32)
  #ifndef WIN32_LEAN_AND_MEAN
   #define WIN32_LEAN_AND_MEAN
  #endif
@@ -59,12 +60,12 @@ ImGuiKey keyOfCharacter(const char character)
 // the Windows backend reads them.
 ImGuiKey keyOfPlace(const Place& place, std::string& label)
 {
-#if JUCE_WINDOWS
+#if defined(_WIN32)
     const auto layout = GetKeyboardLayout(0);
     const auto code = MapVirtualKeyExW(static_cast<UINT>(place.scancode), MAPVK_VSC_TO_VK, layout);
     const auto typed = MapVirtualKeyExW(code, MAPVK_VK_TO_CHAR, layout) & 0x7fffu;
     if (typed != 0)
-        label = cydaw::base::Text::charToString(static_cast<juce::juce_wchar>(typed)).toUpperCase().toStdString();
+        label = cydaw::base::Text::charToString(static_cast<char32_t>(typed)).toUpperCase().toStdString();
     if (code >= 'A' && code <= 'Z')
         return static_cast<ImGuiKey>(ImGuiKey_A + static_cast<int>(code - 'A'));
     if (code >= '0' && code <= '9')

@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/Text.h>
 #include "ClipEditorView.h"
 
@@ -567,7 +568,7 @@ void ClipEditorView::drawNoteBar(const TrackRef& track, const MidiClip& clip)
     ImGui::DragFloat("##velocityRandom", &velocityRandom_, 0.25f, 0.0f, 127.0f, "%.0f");
     ImGui::SameLine(0.0f, dp(2.0f));
     if (ImGui::SmallButton(L("Hasard vél.", "Random vel."))) {
-        auto& random = juce::Random::getSystemRandom();
+        auto& random = cydaw::base::Random::getSystemRandom();
         const auto amount = velocityRandom_ / 127.0f;
         apply([&random, amount](MidiNote& note, std::size_t) { note.velocity += (random.nextFloat() * 2.0f - 1.0f) * amount; });
     }
@@ -577,7 +578,7 @@ void ClipEditorView::drawNoteBar(const TrackRef& track, const MidiClip& clip)
     ImGui::DragFloat("##timingRandom", &timingRandom_, 0.25f, 0.0f, 200.0f, "%.0f ms");
     ImGui::SameLine(0.0f, dp(2.0f));
     if (ImGui::SmallButton(L("Hasard temps", "Random time"))) {
-        auto& random = juce::Random::getSystemRandom();
+        auto& random = cydaw::base::Random::getSystemRandom();
         const auto beats = timingRandom_ / 1'000.0 / (60.0 / std::max(1.0, engine.tempo()));
         apply([&random, beats](MidiNote& note, std::size_t) { note.startBeats += (random.nextDouble() * 2.0 - 1.0) * beats; });
     }
@@ -2376,7 +2377,7 @@ void ClipEditorView::applyShape(const TrackRef& track, const MidiClip& clip, con
                 step = 1.0 / (4.0 * rate);
             for (auto time = onset; time <= seconds + 1.0e-9; time += step) {
                 const auto depthNow = depth * std::min(1.0, (time - onset) / rise);
-                add.push_back({ at(time), static_cast<float>(depthNow * std::sin(2.0 * juce::MathConstants<double>::pi * rate * (time - onset))) });
+                add.push_back({ at(time), static_cast<float>(depthNow * std::sin(2.0 * cydaw::base::MathConstants<double>::pi * rate * (time - onset))) });
             }
             break;
         }

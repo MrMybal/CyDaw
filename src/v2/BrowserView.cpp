@@ -1,3 +1,5 @@
+#include <cydaw/base/Platform.h>
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/FileDialog.h>
 #include <cydaw/base/EventLoop.h>
 #include <cydaw/base/File.h>
@@ -252,7 +254,7 @@ void BrowserView::drawSampleTree(const float height)
                     if (categoryOpen) {
                         for (const auto& group : category.children) {
                             const auto [ignored, groupClicked] = line(group, filterCategory_ == category.key && filterGroup_ == group.key, true);
-                            juce::ignoreUnused(ignored);
+                            cydaw::base::ignoreUnused(ignored);
                             if (groupClicked)
                                 choose(family.key, category.key, group.key);
                         }
@@ -277,7 +279,7 @@ void BrowserView::drawSampleTree(const float height)
                 if (open) {
                     for (const auto& source : kind.children) {
                         const auto [ignored, sourceClicked] = line(source, filterSource_ == source.key, true);
-                        juce::ignoreUnused(ignored);
+                        cydaw::base::ignoreUnused(ignored);
                         if (sourceClicked) {
                             filterSource_ = filterSource_ == source.key ? cydaw::base::Text() : source.key;
                             dirty_ = true;
@@ -366,7 +368,7 @@ void BrowserView::drawSampleMenu(const app::SampleRecord& record)
     if (ImGui::MenuItem(L("Montrer dans l'explorateur", "Show in the file explorer")))
         record.file().revealToUser();
     if (ImGui::MenuItem(L("Copier le chemin", "Copy the path")))
-        juce::SystemClipboard::copyTextToClipboard(record.path);
+        cydaw::base::SystemClipboard::copyTextToClipboard(record.path);
 }
 
 void BrowserView::drawSamples()

@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #include "RoutingUi.h"
@@ -361,7 +362,7 @@ void LauncherView::draw()
                 const ImVec2 min(origin.x + column * (cellWidth + gap), y);
                 const ImVec2 max(min.x + cellWidth, y + cellHeight);
                 cydaw::base::Text name;
-                juce::uint32 colour {};
+                std::uint32_t colour {};
                 auto exists = false;
                 auto progress = 0.0f;
                 std::uint64_t midiClip {};

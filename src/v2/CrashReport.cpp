@@ -3,9 +3,8 @@
 
 #include "CrashReport.h"
 
-#include <juce_core/juce_core.h>
 
-#if JUCE_WINDOWS
+#if defined(_WIN32)
  #ifndef WIN32_LEAN_AND_MEAN
   #define WIN32_LEAN_AND_MEAN
  #endif
@@ -21,7 +20,7 @@
 
 namespace cydaw::v2 {
 
-#if JUCE_WINDOWS
+#if defined(_WIN32)
 namespace {
 
 LONG WINAPI writeCrashReport(EXCEPTION_POINTERS* exception)

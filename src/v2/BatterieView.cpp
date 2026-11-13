@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/File.h>
 #include "BatterieView.h"
 
@@ -99,7 +100,7 @@ void BatterieView::set(const int index, const float newValue)
     if (clamped == value(index))
         return;
     card_.values[static_cast<std::size_t>(index)] = clamped;
-    const auto binding = "node." + cydaw::base::Text(static_cast<juce::int64>(card_.nodeId)) + ".batterie." + cydaw::base::Text(drum::parameter(index).key);
+    const auto binding = "node." + cydaw::base::Text(static_cast<std::int64_t>(card_.nodeId)) + ".batterie." + cydaw::base::Text(drum::parameter(index).key);
     (void) card_.graph->editorSetParameter(binding, clamped);
     state_.focused = Panel::devices;
 }
@@ -122,7 +123,7 @@ bool BatterieView::knob(const int index, const char* label, const float diameter
     const auto origin = ImGui::GetCursorScreenPos();
     bool changed {};
     {
-        const ui::LearnParameterScope learn("node." + cydaw::base::Text(static_cast<juce::int64>(card_.nodeId)) + ".batterie."
+        const ui::LearnParameterScope learn("node." + cydaw::base::Text(static_cast<std::int64_t>(card_.nodeId)) + ".batterie."
                                                 + cydaw::base::Text(parameter.key),
                                             cydaw::base::Text::fromUTF8(label), studio_.learnPrefix(card_.track), studio_.trackName(card_.track));
         changed = ui::knob("##knob", &normalised, 0.0f, 1.0f, defaultNormalised, style);
@@ -137,7 +138,7 @@ bool BatterieView::knob(const int index, const char* label, const float diameter
         ImGui::TextDisabled("%s", name.toRawUTF8());
         if (ImGui::MenuItem(L("Valeur par défaut", "Default value")))
             set(index, parameter.defaultValue);
-        const auto binding = "node." + cydaw::base::Text(static_cast<juce::int64>(card_.nodeId)) + ".batterie." + cydaw::base::Text(parameter.key);
+        const auto binding = "node." + cydaw::base::Text(static_cast<std::int64_t>(card_.nodeId)) + ".batterie." + cydaw::base::Text(parameter.key);
         if (studio_.isValid(card_.track) && studio_.canAutomate(card_.track, binding)) {
             const auto automated = !studio_.lanePoints(card_.track, binding).empty();
             if (ImGui::MenuItem(automated ? L("Afficher l'automation", "Show the automation")

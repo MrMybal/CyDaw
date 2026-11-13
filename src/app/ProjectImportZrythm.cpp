@@ -1,3 +1,5 @@
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/File.h>
 #include "ProjectImport.h"
 #include "ProjectImportShared.h"
@@ -33,10 +35,10 @@ public:
         if (!file_.loadFileAsData(bytes))
             return cydaw::base::Result::fail("The file could not be opened: " + file_.getFullPathName());
         cydaw::base::Text text;
-        const auto* data = static_cast<const juce::uint8*>(bytes.getData());
+        const auto* data = static_cast<const std::uint8_t*>(bytes.getData());
         if (bytes.getSize() >= 4 && data[0] == 0x28 && data[1] == 0xb5 && data[2] == 0x2f && data[3] == 0xfd) {
             // zstd: frame by frame into memory.
-            juce::MemoryOutputStream plain;
+            cydaw::base::MemoryOutputStream plain;
             auto* stream = ZSTD_createDStream();
             if (stream == nullptr)
                 return cydaw::base::Result::fail("No zstd decoder");
@@ -83,10 +85,10 @@ public:
         // The tempo first: every position depends on it.
         for (const auto& track : *tracks)
             if (static_cast<int>(track.getProperty("type", -1)) == tempo) {
-                out_.tempo = juce::jlimit(20.0, 999.0, control(track.getProperty("bpmPort", {}), 120.0));
-                out_.numerator = juce::jlimit(1, 32, static_cast<int>(control(track.getProperty("beatsPerBarPort", {}), 4.0)));
+                out_.tempo = cydaw::base::limit(20.0, 999.0, control(track.getProperty("bpmPort", {}), 120.0));
+                out_.numerator = cydaw::base::limit(1, 32, static_cast<int>(control(track.getProperty("beatsPerBarPort", {}), 4.0)));
                 const auto unit = static_cast<int>(control(track.getProperty("beatUnitPort", {}), 1.0));
-                out_.denominator = 2 << juce::jlimit(0, 3, unit);
+                out_.denominator = 2 << cydaw::base::limit(0, 3, unit);
             }
         for (const auto& track : *tracks)
             readTrack(track);
@@ -101,12 +103,12 @@ private:
 
     static double ticks(const cydaw::base::Value& position) { return static_cast<double>(position.getProperty("ticks", 0.0)); }
 
-    static juce::uint32 colourOf(const cydaw::base::Value& colour)
+    static std::uint32_t colourOf(const cydaw::base::Value& colour)
     {
         if (!colour.isObject())
             return 0;
         const auto channel = [&](const char* name) {
-            return static_cast<juce::uint8>(juce::jlimit(0.0, 255.0, static_cast<double>(colour.getProperty(name, 0.0)) * 255.0));
+            return static_cast<std::uint8_t>(cydaw::base::limit(0.0, 255.0, static_cast<double>(colour.getProperty(name, 0.0)) * 255.0));
         };
         return opaque(channel("red"), channel("green"), channel("blue"));
     }
@@ -141,7 +143,7 @@ private:
         const auto channel = element.getProperty("channel", {});
         const auto fader = channel.getProperty("fader", {});
         track.gainDb = linearToDb(control(fader.getProperty("amp", {}), 1.0));
-        track.pan = static_cast<float>(juce::jlimit(-1.0, 1.0, control(fader.getProperty("balance", {}), 0.5) * 2.0 - 1.0));
+        track.pan = static_cast<float>(cydaw::base::limit(-1.0, 1.0, control(fader.getProperty("balance", {}), 0.5) * 2.0 - 1.0));
         track.muted = control(fader.getProperty("mute", {}), 0.0) > 0.5;
         track.solo = control(fader.getProperty("solo", {}), 0.0) > 0.5;
         if (const auto instrumentPlugin = channel.getProperty("instrument", {}); instrumentPlugin.isObject()) {
@@ -193,8 +195,8 @@ private:
                     const auto from = ticks(noteBase.getProperty("pos", {}));
                     const auto to = ticks(noteBase.getProperty("endPos", {}));
                     const auto velocity = static_cast<int>(note.getProperty("velocity", {}).getProperty("velocity", 90));
-                    content.push_back({ juce::jlimit(0, 127, static_cast<int>(note.getProperty("value", 60))), from / ticksPerBeat,
-                                        std::max(1.0e-3, (to - from) / ticksPerBeat), juce::jlimit(1, 127, velocity) / 127.0f });
+                    content.push_back({ cydaw::base::limit(0, 127, static_cast<int>(note.getProperty("value", 60))), from / ticksPerBeat,
+                                        std::max(1.0e-3, (to - from) / ticksPerBeat), cydaw::base::limit(1, 127, velocity) / 127.0f });
                 }
             // From the clip's start, its loop (loop start to loop end)
             // repeated over the region.

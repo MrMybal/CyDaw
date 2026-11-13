@@ -1,9 +1,8 @@
 #include <cydaw/base/File.h>
 #include "SystemLoad.h"
 
-#include <juce_core/juce_core.h>
 
-#if JUCE_WINDOWS
+#if defined(_WIN32)
  #ifndef NOMINMAX
   #define NOMINMAX
  #endif
@@ -22,7 +21,7 @@ Reading read()
 {
     static Reading last;
     static double readAt = -1.0e9;
-#if JUCE_WINDOWS
+#if defined(_WIN32)
     static unsigned long long lastBusy {};
     static unsigned long long lastWall {};
 #endif
@@ -30,7 +29,7 @@ Reading read()
     if (now - readAt < 0.5)
         return last;
     readAt = now;
-#if JUCE_WINDOWS
+#if defined(_WIN32)
     const auto ticks = [](const FILETIME& time) {
         return (static_cast<unsigned long long>(time.dwHighDateTime) << 32) | time.dwLowDateTime;
     };

@@ -1,10 +1,10 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/File.h>
 #pragma once
 
 #include "Studio.h"
 #include "Vst3Build.h"
 
-#include <juce_core/juce_core.h>
 
 #include <optional>
 
@@ -55,14 +55,14 @@ public:
     virtual void browseSamples(const cydaw::base::Text& query, bool semantic, const cydaw::base::Text& family, const cydaw::base::Text& category,
                                const cydaw::base::Text& source)
     {
-        juce::ignoreUnused(query, semantic, family, category, source);
+        cydaw::base::ignoreUnused(query, semantic, family, category, source);
     }
     // library_window: the library's big window shown, set, and asked what it
     // shows; library_perf: the sample catalog's speed measured on as many
     // sounds as asked. Null when there is no interface.
     virtual cydaw::base::Value library(const cydaw::base::Text& command, const cydaw::base::Value& request)
     {
-        juce::ignoreUnused(command, request);
+        cydaw::base::ignoreUnused(command, request);
         return {};
     }
     // computer_keyboard: the computer's keys as a MIDI keyboard, read or set
@@ -73,7 +73,7 @@ public:
     // changes its colours ("#RRGGBB" by palette name).
     virtual cydaw::base::Value themes(const cydaw::base::Value& request)
     {
-        juce::ignoreUnused(request);
+        cydaw::base::ignoreUnused(request);
         return {};
     }
     // dj: the Mix DJ mode's decks, mixer and collection; foundry: the
@@ -90,24 +90,24 @@ public:
     virtual cydaw::base::Value controllers(const cydaw::base::Value&) { return {}; }
     virtual cydaw::base::Value dj(const cydaw::base::Value& request)
     {
-        juce::ignoreUnused(request);
+        cydaw::base::ignoreUnused(request);
         return {};
     }
     virtual cydaw::base::Value foundry(const cydaw::base::Value& request)
     {
-        juce::ignoreUnused(request);
+        cydaw::base::ignoreUnused(request);
         return {};
     }
     // app_mode: the whole window's mode (studio, dj, foundry, workshop), put
     // on when named; the one on ("" when the name is none of them).
     virtual cydaw::base::Text appMode(const cydaw::base::Text& mode)
     {
-        juce::ignoreUnused(mode);
+        cydaw::base::ignoreUnused(mode);
         return {};
     }
     virtual cydaw::base::Value midiInputs(const cydaw::base::Text& command, const cydaw::base::Value& request)
     {
-        juce::ignoreUnused(command, request);
+        cydaw::base::ignoreUnused(command, request);
         return {};
     }
     // ui_input: mouse events played into the interface, one per frame, in

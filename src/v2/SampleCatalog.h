@@ -5,7 +5,6 @@
 
 #include "SampleLibrary.h"
 
-#include <juce_events/juce_events.h>
 
 #include <array>
 #include <atomic>

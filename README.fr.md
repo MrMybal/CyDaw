@@ -22,8 +22,8 @@
 
 > **Branche CyDSP-CORE :** l'intégration audio utilise désormais **CyAudioCore**,
 > qui gère **CyDSP** en interne pour le calcul DSP, y compris les plugins internes/exportés.
-> L’audio natif et l’hôte VST3 de production passent par CyAudioCore. JUCE reste
-> dans l’ABI, les sources/MIDI et certains adaptateurs. Voir le
+> Le desktop Windows et le worker isolé compilent sans JUCE. CyAudioCore assure
+> l’audio/MIDI, les fichiers et l’hébergement VST3/CLAP/LV2/JSFX ; CyUI assure l’interface. Voir le
 > [guide de compilation](docs/CyAudioCoreIntegration.md) et le
 > [rapport actuel](docs/CyAudioCoreIntegrationReport.fr.md).
 
@@ -100,7 +100,7 @@ L’archive publiée de l’application est **Windows 10/11 x64 · Alpha 1**. Le
 <details>
 <summary><strong>Compilation Windows depuis les sources</strong></summary>
 
-Prérequis : **Visual Studio 2022** avec outils C++/SDK Windows, **CMake 3.24+**, **Git/Git LFS**, **Python 3.11+** et **Node.js 22+/npm** pour la documentation. CMake récupère les révisions fixées de JUCE 8.0.15 et CyUI ; l’accès au dépôt CyUI est requis s’il est restreint. Préparer le SDK partagé FFmpeg séparément. NASM active la génération native de code EEL2 ; sans lui, ysfx utilise son interpréteur portable.
+Prérequis : **Visual Studio 2022** avec outils C++/SDK Windows, **CMake 3.24+**, **Git/Git LFS**, **Python 3.11+** et **Node.js 22+/npm** pour la documentation. CMake récupère la révision fixée de CyUI ; CyAudioCore gère sa dépendance CyDSP. l’accès au dépôt CyUI est requis s’il est restreint. Préparer le SDK partagé FFmpeg séparément. NASM active la génération native de code EEL2 ; sans lui, ysfx utilise son interpréteur portable.
 
 ```powershell
 git lfs install
@@ -133,12 +133,12 @@ CyDaw est distribué sous la [GNU Affero General Public License v3](LICENSE) (AG
 
 | Bibliothèque · sources | Licence · texte | Utilisation / périmètre |
 | --- | --- | --- |
-| [JUCE 8.0.15](https://github.com/juce-framework/JUCE/tree/8.0.15) | [AGPLv3 / licence commerciale](https://github.com/juce-framework/JUCE/blob/8.0.15/LICENSE.md) | Entrées/sorties audio, codecs et hébergement de plugins ; ce projet utilise la voie AGPL. Les notices des composants JUCE s’appliquent aussi. |
+| [CyAudioCore](https://github.com/MrMybal/CyAudioCore) / [CyDSP](https://github.com/MrMybal/CyDSP) | MIT pour les sources originales ; les composants tiers gardent leurs conditions | Audio/MIDI, codecs, sources, hôtes de plugins et calcul DSP interne. L’intégration du SDK ASIO reste dans l’application. |
 | [Dear ImGui](https://github.com/ocornut/imgui) | [MIT](third_party/imgui/LICENSE.txt) | Interface native ; les composants stb incorporés conservent leurs notices. |
 | [CyUI](https://github.com/MrMybal/CyUI) | [MIT](https://github.com/MrMybal/CyUI/blob/8367401fe45fc22bfed5e227cb3de343177f676b/LICENSE) | Contrôles d’interface et vues audio partagés. L’accès aux sources dépend des permissions du dépôt. |
 | [CyUI editor components](https://github.com/MrMybal/CyUI) | [MIT et conditions permissives des composants](https://github.com/MrMybal/CyUI/blob/8367401fe45fc22bfed5e227cb3de343177f676b/THIRD_PARTY_NOTICES.md) | ImGuiColorTextEdit, Lexilla, en-têtes Scintilla et données de langages SciTE ; notices dans Licenses/CyUI. |
 | [CLAP](https://github.com/free-audio/clap) | [MIT](third_party/clap/LICENSE) | API d’hébergement dans le worker et export natif CLAP. |
-| [LV2](https://lv2plug.in/) | [ISC](third_party/lv2/COPYING) | API/métadonnées d’export natif ; la pile d’hébergement LV2 de JUCE comporte d’autres notices. |
+| [LV2](https://lv2plug.in/) | [ISC](third_party/lv2/COPYING) | API/métadonnées d’export natif ; CyAudioCore fournit le moteur d’hébergement LV2 et ses notices. |
 | [ysfx](https://github.com/jpcima/ysfx) | [Apache-2.0](third_party/ysfx/LICENSE) | Compilation/exécution JSFX dans le worker isolé. |
 | [WDL](https://www.cockos.com/wdl/) | [Conditions de type zlib](third_party/ysfx/thirdparty/WDL/LICENSE.txt) | EEL2 et LICE utilisés par ysfx. |
 | [stb](https://github.com/nothings/stb) / [dr_libs](https://github.com/mackron/dr_libs) | [Domaine public ou MIT](third_party/ysfx/thirdparty/stb/LICENSE) ; [domaine public ou MIT-0](third_party/ysfx/thirdparty/dr_libs/LICENSE) | Fonctions image/audio de JSFX. |
@@ -150,7 +150,7 @@ CyDaw est distribué sous la [GNU Affero General Public License v3](LICENSE) (AG
 | [Pugl](https://github.com/lv2/pugl) | [ISC](third_party/pugl/COPYING) | Éditeurs natifs Linux X11/OpenGL ; dépendance d’export, pas une application Linux publiée. |
 | [CyDoc 0.1.0](https://github.com/MrMybal/CyDoc) | [MIT](https://github.com/MrMybal/CyDoc/blob/6ddf9a582defb2f11fbb3f992afef6f98dcadc93/LICENSE) | Lecteur HTML hors ligne ; Node.js, marked, Prism et esbuild servent à générer la documentation. |
 
-Ce tableau indexe les principaux composants ; il ne remplace pas leurs notices transitives. Conserver `LICENSE`, `JUCE_LICENSE.md` et le dossier `Licenses/` de l’archive, notamment `Licenses/CyUI`, `Licenses/FFmpeg` et `Licenses/PluginFormats`. Les polices et codecs conservent aussi leurs notices. Les dépendances facultatives et outils de compilation ne changent pas la licence de CyDaw. Voir les [dépendances des formats](third_party/PLUGIN_FORMAT_DEPENDENCIES.md), celles du [transport](third_party/TRANSPORT_DEPENDENCIES.md) et les [conditions de FFmpeg](third_party/FFMPEG.md).
+Ce tableau indexe les principaux composants ; il ne remplace pas leurs notices transitives. Conserver `LICENSE` et le dossier `Licenses/` de l’archive, notamment `Licenses/CyUI`, `Licenses/FFmpeg` et `Licenses/PluginFormats`. Les polices et codecs conservent aussi leurs notices. Les dépendances facultatives et outils de compilation ne changent pas la licence de CyDaw. Voir les [dépendances des formats](third_party/PLUGIN_FORMAT_DEPENDENCIES.md), celles du [transport](third_party/TRANSPORT_DEPENDENCIES.md) et les [conditions de FFmpeg](third_party/FFMPEG.md).
 
 ## Références et liens
 

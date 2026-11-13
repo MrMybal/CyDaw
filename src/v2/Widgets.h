@@ -1,8 +1,9 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/Text.h>
 #pragma once
 
 #include <cyui/Core.h>
-#include <juce_core/juce_core.h>
+
 
 #include <cstdint>
 #include <string>
@@ -282,7 +283,7 @@ void centredText(ImDrawList* list, ImVec2 min, ImVec2 max, ImU32 colour, const c
 // A centred title and message filling the rest of a panel.
 void emptyState(const char* title, const char* message);
 // A size for people: "6,2 Go", "312 Mo" ("6.2 GB", "312 MB").
-[[nodiscard]] cydaw::base::Text sizeText(juce::int64 bytes);
+[[nodiscard]] cydaw::base::Text sizeText(std::int64_t bytes);
 // Text clipped to a width with an ellipsis.
 void clippedText(ImDrawList* list, ImVec2 position, float maxWidth, ImU32 colour, const char* text);
 

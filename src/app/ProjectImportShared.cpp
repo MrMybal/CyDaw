@@ -1,3 +1,5 @@
+#include <cydaw/audio/SampleBuffer.h>
+#include <cydaw/base/Utilities.h>
 #include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
@@ -5,7 +7,6 @@
 #include "ProjectImport.h"
 #include "ProjectImportShared.h"
 
-#include <juce_audio_formats/juce_audio_formats.h>
 
 #include <mutex>
 
@@ -72,9 +73,9 @@ cydaw::base::File joinChannels(const cydaw::base::File& left, const cydaw::base:
     if (writer == nullptr)
         return left;
     (void) stream.release();
-    juce::AudioBuffer<float> block(2, 65'536);
-    for (juce::int64 at = 0; at < length; at += block.getNumSamples()) {
-        const auto count = static_cast<int>(std::min<juce::int64>(block.getNumSamples(), length - at));
+    cydaw::audio::SampleBuffer<float> block(2, 65'536);
+    for (std::int64_t at = 0; at < length; at += block.getNumSamples()) {
+        const auto count = static_cast<int>(std::min<std::int64_t>(block.getNumSamples(), length - at));
         block.clear();
         auto* channels = block.getArrayOfWritePointers();
         (void) leftReader->read(&channels[0], 1, at, count);

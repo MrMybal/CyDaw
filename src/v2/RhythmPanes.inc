@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 // The displays and large views of Grains, Saccade, Boucleur
 // (RhythmDesign.h computes what they draw). Included by StudioEffectsView.cpp
 // inside its anonymous namespace: it has its helpers (knobCell, segmented,
@@ -650,7 +651,7 @@ bool rhythmLarge(const PaneKind kind, const Pane& pane, std::vector<Param>& para
 // The values a card shows as knobs (pane indices).
 std::vector<int> rhythmCardFields(const PaneKind kind, std::vector<Param>& parameters, const Pane& pane)
 {
-    juce::ignoreUnused(parameters, pane);
+    cydaw::base::ignoreUnused(parameters, pane);
     using namespace rhythmd;
     switch (kind) {
     case PaneKind::grains: return { grainsTime, grainsPitch, grainsSpray, grainsMix };
@@ -664,7 +665,7 @@ std::vector<int> rhythmCardFields(const PaneKind kind, std::vector<Param>& param
 cydaw::base::Text rhythmFormat(const cydaw::base::Text& binding, const double value)
 {
     using namespace rhythmd;
-    const auto whole16 = [](const double v) { return cydaw::base::Text(juce::roundToInt(v)) + "/16"; };
+    const auto whole16 = [](const double v) { return cydaw::base::Text(cydaw::base::roundToInt(v)) + "/16"; };
     const auto semitones = [](const double v) {
         const auto rounded = std::round(v * 10.0) / 10.0;
         return (rounded > 0.0 ? "+" : "") + cydaw::base::Text(rounded, std::abs(rounded - std::round(rounded)) < 1.0e-6 ? 0 : 1) + " st";

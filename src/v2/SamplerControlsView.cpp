@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/Text.h>
 #include "SamplerControlsView.h"
 
@@ -161,7 +162,7 @@ void draw(Studio& studio, UiState& state, const TrackRef& track, app::GraphDocum
         ImGui::TextDisabled("%s", L("Cet instrument n'a ni contrôle ni articulation.", "This instrument has no control and no articulation."));
         return;
     }
-    const auto prefix = "node." + cydaw::base::Text(static_cast<juce::int64>(nodeId)) + ".sampler.";
+    const auto prefix = "node." + cydaw::base::Text(static_cast<std::int64_t>(nodeId)) + ".sampler.";
     const auto set = [&](const cydaw::base::Text& suffix, const double value) {
         (void) graph.editorSetParameter(prefix + suffix, value);
         state.focused = Panel::devices;

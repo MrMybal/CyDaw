@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/Text.h>
 #include "ContextMenus.h"
 
@@ -78,7 +79,7 @@ void ContextMenus::draw()
     renameDialog();
 }
 
-void ContextMenus::colourMenu(const std::function<void(juce::uint32)>& apply)
+void ContextMenus::colourMenu(const std::function<void(std::uint32_t)>& apply)
 {
     if (!ImGui::BeginMenu(L("Couleur", "Colour")))
         return;
@@ -113,7 +114,7 @@ void ContextMenus::trackMenu(const TrackRef& track)
         renameTrack_ = track;
         askRename(studio_.trackName(track));
     }
-    colourMenu([this, track](const juce::uint32 colour) { studio_.setTrackColour(track, colour); });
+    colourMenu([this, track](const std::uint32_t colour) { studio_.setTrackColour(track, colour); });
     auto mix = studio_.trackMix(track);
     if (ImGui::MenuItem(L("Muet", "Mute"), "M", mix.muted)) {
         mix.muted = !mix.muted;
@@ -312,7 +313,7 @@ void ContextMenus::slotMenu(const TrackRef& owner, const int scene)
             renameClip_ = clipId;
             askRename(clip->name);
         }
-        colourMenu([&engine, this, track, clipId](const juce::uint32 colour) {
+        colourMenu([&engine, this, track, clipId](const std::uint32_t colour) {
             (void) engine.setMidiClipPresentation(track.midiId, clipId, {}, colour);
             studio_.markDirty();
         });

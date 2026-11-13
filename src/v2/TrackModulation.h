@@ -3,7 +3,6 @@
 
 #include <cydaw/engine/NativeDspGraph.h>
 
-#include <juce_core/juce_core.h>
 
 #include <optional>
 #include <vector>

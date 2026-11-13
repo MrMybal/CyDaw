@@ -195,4 +195,19 @@ bool ThreadPool::removeAllJobs(bool interrupt, int milliseconds) {
   return done_.wait_for(lock, std::chrono::milliseconds(milliseconds),
                         [this] { return entries_.empty(); });
 }
+struct HighResolutionTimer::Runner final:Thread {
+ HighResolutionTimer& owner;std::atomic<int> period{1};
+ explicit Runner(HighResolutionTimer& timer):Thread("CyDaw control clock"),owner(timer){}
+ void run()override{using Clock=std::chrono::steady_clock;auto next=Clock::now();while(!threadShouldExit()){
+  next+=std::chrono::milliseconds(period.load());
+  while(!threadShouldExit()&&Clock::now()<next){const auto left=std::chrono::duration_cast<std::chrono::milliseconds>(next-Clock::now()).count();wait(int(std::clamp<std::int64_t>(left,1,1000)));}
+  if(threadShouldExit())break;try{owner.hiResTimerCallback();}catch(...){signalThreadShouldExit();}
+  if(Clock::now()-next>std::chrono::milliseconds(period.load()*4))next=Clock::now();
+ }}
+};
+HighResolutionTimer::HighResolutionTimer():runner_(std::make_unique<Runner>(*this)){}
+HighResolutionTimer::~HighResolutionTimer(){stopTimer();}
+void HighResolutionTimer::startTimer(int milliseconds){stopTimer();runner_->period=std::clamp(milliseconds,1,60000);runner_->startThread(Thread::Priority::high);}
+void HighResolutionTimer::stopTimer(){runner_->signalThreadShouldExit();runner_->notify();if(Thread::getCurrentThread()!=runner_.get())runner_->stopThread(-1);}
+bool HighResolutionTimer::isTimerRunning()const{return runner_->isThreadRunning();}
 } // namespace cydaw::base

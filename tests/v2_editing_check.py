@@ -399,7 +399,10 @@ def main() -> int:
             process.wait(timeout=30)
         except Exception:  # noqa: BLE001
             process.kill()
-        shutil.rmtree(scratch, ignore_errors=True)
+        if failures:
+            print(f"Failure evidence preserved at {scratch}", flush=True)
+        else:
+            shutil.rmtree(scratch, ignore_errors=True)
     print("FAILED: " + "; ".join(failures) if failures else "All editing checks passed")
     return 1 if failures else 0
 

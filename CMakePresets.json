@@ -19,14 +19,15 @@
     },
     {
       "name": "desktop",
-      "displayName": "CyDAW desktop with JUCE",
+      "displayName": "CyDaw native desktop (CyAudioCore + CyUI)",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/desktop",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "CYDAW_BUILD_DESKTOP": "ON",
-        "CYDAW_FETCH_JUCE": "ON",
-        "CYDAW_BUILD_TESTS": "ON"
+        "CYDAW_FETCH_JUCE": "OFF",
+        "CYDAW_BUILD_TESTS": "ON",
+        "CYDAW_BUILD_LEGACY_JUCE_TESTS": "OFF"
       }
     },
     {
@@ -41,7 +42,7 @@
     },
     {
       "name": "desktop-windows-wasapi",
-      "displayName": "CyDAW Windows x64 — WASAPI",
+      "displayName": "CyDAW Windows x64 \u2014 WASAPI",
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
@@ -52,15 +53,16 @@
       "binaryDir": "${sourceDir}/build/windows-wasapi",
       "cacheVariables": {
         "CYDAW_BUILD_DESKTOP": "ON",
-        "CYDAW_FETCH_JUCE": "ON",
+        "CYDAW_FETCH_JUCE": "OFF",
         "CYDAW_BUILD_TESTS": "ON",
         "CYDAW_ENABLE_ASIO": "OFF",
-        "CYDAW_ENABLE_JACK": "OFF"
+        "CYDAW_ENABLE_JACK": "OFF",
+        "CYDAW_BUILD_LEGACY_JUCE_TESTS": "OFF"
       }
     },
     {
       "name": "desktop-windows-asio",
-      "displayName": "CyDAW Windows x64 — ASIO + WASAPI",
+      "displayName": "CyDAW Windows x64 \u2014 ASIO + WASAPI",
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
@@ -71,15 +73,16 @@
       "binaryDir": "${sourceDir}/build/windows-asio",
       "cacheVariables": {
         "CYDAW_BUILD_DESKTOP": "ON",
-        "CYDAW_FETCH_JUCE": "ON",
+        "CYDAW_FETCH_JUCE": "OFF",
         "CYDAW_BUILD_TESTS": "ON",
         "CYDAW_ENABLE_ASIO": "ON",
-        "CYDAW_ENABLE_JACK": "OFF"
+        "CYDAW_ENABLE_JACK": "OFF",
+        "CYDAW_BUILD_LEGACY_JUCE_TESTS": "OFF"
       }
     },
     {
       "name": "desktop-linux",
-      "displayName": "CyDAW Linux — ALSA + JACK",
+      "displayName": "CyDAW Linux \u2014 ALSA + JACK",
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
@@ -90,15 +93,16 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "CYDAW_BUILD_DESKTOP": "ON",
-        "CYDAW_FETCH_JUCE": "ON",
+        "CYDAW_FETCH_JUCE": "OFF",
         "CYDAW_BUILD_TESTS": "ON",
         "CYDAW_ENABLE_ASIO": "OFF",
-        "CYDAW_ENABLE_JACK": "ON"
+        "CYDAW_ENABLE_JACK": "ON",
+        "CYDAW_BUILD_LEGACY_JUCE_TESTS": "OFF"
       }
     },
     {
       "name": "desktop-macos",
-      "displayName": "CyDAW macOS — CoreAudio + JACK optionnel",
+      "displayName": "CyDAW macOS \u2014 CoreAudio + JACK optionnel",
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
@@ -109,10 +113,11 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "CYDAW_BUILD_DESKTOP": "ON",
-        "CYDAW_FETCH_JUCE": "ON",
+        "CYDAW_FETCH_JUCE": "OFF",
         "CYDAW_BUILD_TESTS": "ON",
         "CYDAW_ENABLE_ASIO": "OFF",
-        "CYDAW_ENABLE_JACK": "ON"
+        "CYDAW_ENABLE_JACK": "ON",
+        "CYDAW_BUILD_LEGACY_JUCE_TESTS": "OFF"
       }
     },
     {
@@ -165,7 +170,7 @@
     },
     {
       "name": "cyaudio-desktop",
-      "displayName": "CyAudioCore audio integration (JUCE desktop services retained)",
+      "displayName": "CyAudioCore native desktop, no JUCE",
       "inherits": "desktop-windows-wasapi",
       "binaryDir": "${sourceDir}/build/cyaudio-desktop",
       "cacheVariables": {

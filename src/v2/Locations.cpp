@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #include "Locations.h"
@@ -31,7 +32,7 @@ std::atomic<bool>& saving()
 
 cydaw::base::File localData()
 {
-   #if JUCE_WINDOWS
+   #if defined(_WIN32)
     return cydaw::base::File::getSpecialLocation(cydaw::base::File::windowsLocalAppData).getChildFile("CyDAW");
    #else
     return cydaw::base::File::getSpecialLocation(cydaw::base::File::userApplicationDataDirectory).getChildFile("CyDAW");
@@ -288,7 +289,7 @@ void Move::run()
     struct Copy {
         cydaw::base::File source;
         cydaw::base::File target;
-        juce::int64 size {};
+        std::int64_t size {};
     };
     std::vector<Copy> copies;
     cydaw::base::Array<cydaw::base::File> sources;
@@ -302,7 +303,7 @@ void Move::run()
         }
         sources.add(item);
         if (item.isDirectory()) {
-            for (const auto& entry : juce::RangedDirectoryIterator(item, true, "*", cydaw::base::File::findFiles))
+            for (const auto& entry : cydaw::base::RangedDirectoryIterator(item, true, "*", cydaw::base::File::findFiles))
                 copies.push_back({ entry.getFile(), target.getChildFile(entry.getFile().getRelativePathFrom(item)),
                                    entry.getFileSize() });
         } else {
@@ -365,7 +366,7 @@ void Move::run()
     for (const auto& source : sources)
         if (source.isDirectory()) {
             cydaw::base::Array<cydaw::base::File> folders;
-            for (const auto& entry : juce::RangedDirectoryIterator(source, true, "*", cydaw::base::File::findDirectories))
+            for (const auto& entry : cydaw::base::RangedDirectoryIterator(source, true, "*", cydaw::base::File::findDirectories))
                 folders.add(entry.getFile());
             std::sort(folders.begin(), folders.end(), [](const cydaw::base::File& a, const cydaw::base::File& b) {
                 return a.getFullPathName().length() > b.getFullPathName().length();

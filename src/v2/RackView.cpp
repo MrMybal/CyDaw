@@ -9,7 +9,6 @@
 
 #include <cydaw/engine/SynthFamily.h>
 
-#include <juce_gui_basics/juce_gui_basics.h>
 
 #include <algorithm>
 #include <cmath>

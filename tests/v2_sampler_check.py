@@ -327,6 +327,9 @@ def scenario(scratch: Path) -> None:
         if key not in instruments:
             check(False, f"{key} is a factory instrument")
             continue
+        if instruments[key].get("missingFiles", 0) > 0 and os.environ.get("CYDAW_REQUIRE_FACTORY_SAMPLES") != "1":
+            print(f"skip optional factory bank {key}: {instruments[key]['missingFiles']} samples are not installed", flush=True)
+            continue
         added = need({"cmd": "add_factory_instrument", "key": key}, key)
         status = need({"cmd": "sampler_status", "track": added["track"], "wait": 60}, key + " status")
         check(status.get("ready") == status.get("zones") and status.get("failed") == 0,
@@ -341,6 +344,9 @@ def scenario(scratch: Path) -> None:
     for key in ("upright-honky-tonk", "felt-piano"):
         if key not in instruments:
             check(False, f"{key} is a factory instrument")
+            continue
+        if instruments[key].get("missingFiles", 0) > 0 and os.environ.get("CYDAW_REQUIRE_FACTORY_SAMPLES") != "1":
+            print(f"skip optional factory bank {key}: {instruments[key]['missingFiles']} samples are not installed", flush=True)
             continue
         added = need({"cmd": "add_factory_instrument", "key": key}, key)
         status = need({"cmd": "sampler_status", "track": added["track"], "wait": 60}, key + " status")

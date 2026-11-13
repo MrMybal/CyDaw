@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/Text.h>
 #include "DeviceVisuals.h"
 
@@ -415,7 +416,7 @@ cydaw::base::Text noteName(const float hz)
 
 cydaw::base::Text hertzText(const float hz)
 {
-    return hz >= 1'000.0f ? cydaw::base::Text(hz / 1'000.0f, hz >= 10'000.0f ? 1 : 2) + " kHz" : cydaw::base::Text(juce::roundToInt(hz)) + " Hz";
+    return hz >= 1'000.0f ? cydaw::base::Text(hz / 1'000.0f, hz >= 10'000.0f ? 1 : 2) + " kHz" : cydaw::base::Text(cydaw::base::roundToInt(hz)) + " Hz";
 }
 
 bool spectrometerPlot(const Plot& plot, std::vector<Param>& parameters, const Pane& pane, const ImU32 colour, const Live& live,
@@ -453,7 +454,7 @@ bool spectrometerPlot(const Plot& plot, std::vector<Param>& parameters, const Pa
         const auto y = yOfDb(curvePlot, db, ceilingDb, floorDb);
         list->AddLine(ImVec2(curvePlot.min.x, y), ImVec2(curvePlot.max.x, y), db == 0.0f ? p.gridStrong : p.grid);
         smallText(list, ImVec2(curvePlot.min.x + dp(2.0f), y - ImGui::GetFontSize() * 0.66f), p.textFaint,
-                  cydaw::base::Text(juce::roundToInt(db)).toRawUTF8(), 0.62f);
+                  cydaw::base::Text(cydaw::base::roundToInt(db)).toRawUTF8(), 0.62f);
     }
     std::vector<ImVec2> levels;
     std::vector<ImVec2> peaks;
@@ -508,7 +509,7 @@ bool spectrometerPlot(const Plot& plot, std::vector<Param>& parameters, const Pa
             }
         }
     }
-    const auto seconds = cydaw::base::Text(juce::roundToInt(settings.historySeconds)) + " s";
+    const auto seconds = cydaw::base::Text(cydaw::base::roundToInt(settings.historySeconds)) + " s";
     smallText(list, ImVec2(fallPlot.max.x - smallTextSize(seconds.toRawUTF8(), 0.62f).x - dp(3.0f), fallPlot.max.y - ImGui::GetFontSize() * 0.72f),
               theme::alpha(p.text, 0.7f), seconds.toRawUTF8(), 0.62f);
 
@@ -3422,7 +3423,7 @@ namespace {
 // them all.
 cydaw::base::Text fixed(const double value, const int decimals)
 {
-    return decimals <= 0 ? cydaw::base::Text(juce::roundToInt(value)) : cydaw::base::Text(value, decimals);
+    return decimals <= 0 ? cydaw::base::Text(cydaw::base::roundToInt(value)) : cydaw::base::Text(value, decimals);
 }
 
 } // namespace
@@ -3501,7 +3502,7 @@ cydaw::base::Text formatValue(const Param& parameter, const double value)
     if (unit == "Q")
         return "Q " + cydaw::base::Text(value, 2);
     if (unit.isEmpty() && parameter.minimum >= 0.0 && parameter.maximum <= 1.0 + 1.0e-9 && parameter.maximum > 0.0)
-        return cydaw::base::Text(juce::roundToInt(value * 100.0)) + " %";
+        return cydaw::base::Text(cydaw::base::roundToInt(value * 100.0)) + " %";
     if (unit.isNotEmpty())
         return cydaw::base::Text(value, 2) + " " + unit;
     return cydaw::base::Text(value, 2);

@@ -4,7 +4,6 @@
 #include <cydaw/base/Text.h>
 #pragma once
 
-#include <juce_audio_devices/juce_audio_devices.h>
 
 #include <cstdint>
 #include <string>

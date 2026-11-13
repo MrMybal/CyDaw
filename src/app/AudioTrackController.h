@@ -1,3 +1,5 @@
+#include <cydaw/audio/SampleBuffer.h>
+#include <cydaw/base/Utilities.h>
 #include <cydaw/integration/CyAudioCoreDeviceManager.h>
 #include <cydaw/midi/Devices.h>
 #include <cydaw/midi/LiveInput.h>
@@ -26,7 +28,6 @@
 #include <cydaw/realtime/RtPublisher.h>
 #include <cydaw/realtime/SpscRing.h>
 
-#include <juce_audio_utils/juce_audio_utils.h>
 #include <functional>
 
 #include <algorithm>
@@ -2399,7 +2400,7 @@ private:
         double sourceSeconds {};
         std::uint64_t generation {};
         std::shared_ptr<const LoopAuditionSource::Loop> loop;
-        juce::uint32 checked {};
+        std::uint32_t checked {};
     } tempoPreview_;
     [[nodiscard]] cydaw::base::Result startTempoPreview(const cydaw::base::File& file, double startSeconds, const SamplePreviewTempo& tempo);
     std::unique_ptr<PlaybackTrack> clipPreviewTrack_;

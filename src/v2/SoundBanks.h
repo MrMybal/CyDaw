@@ -1,9 +1,9 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #pragma once
 
-#include <juce_core/juce_core.h>
-#include <juce_events/juce_events.h>
+
 
 #include <atomic>
 #include <deque>
@@ -62,11 +62,11 @@ public:
         double rate { 48'000.0 };
         cydaw::base::File list;
         int count {};
-        juce::int64 bytes {};
+        std::int64_t bytes {};
     };
     struct BankFile {
         cydaw::base::Text path;
-        juce::int64 size {};
+        std::int64_t size {};
         bool lfs {};
         // A generated bank's: how the file is made.
         cydaw::base::Value recipe;
@@ -82,7 +82,7 @@ public:
     // size, and the "bank:" files no list knows.
     struct Missing {
         std::vector<Wanted> files;
-        juce::int64 bytes {};
+        std::int64_t bytes {};
         cydaw::base::TextList banks;
         cydaw::base::TextList unknown;
         // A bank still being counted: what is missing of it is not said yet.
@@ -107,7 +107,7 @@ public:
     // until it is), again after each download.
     struct OnDisk {
         int count {};
-        juce::int64 bytes {};
+        std::int64_t bytes {};
     };
     [[nodiscard]] std::optional<OnDisk> onDisk(const cydaw::base::Text& id);
     // Everything counted again (the folder moved, files put there by hand).
@@ -141,8 +141,8 @@ public:
         int total {};
         int failed {};
         int queued {};
-        juce::int64 bytesDone {};
-        juce::int64 bytesTotal {};
+        std::int64_t bytesDone {};
+        std::int64_t bytesTotal {};
         double bytesPerSecond {};
         cydaw::base::Text error;
         // Made here, not downloaded.
@@ -172,8 +172,8 @@ private:
         int total {};
         int done {};
         int failed {};
-        juce::int64 bytesTotal {};
-        juce::int64 bytesDone {};
+        std::int64_t bytesTotal {};
+        std::int64_t bytesDone {};
         double started {};
         bool cancelled {};
         cydaw::base::Text error;
@@ -197,7 +197,7 @@ private:
     std::set<cydaw::base::Text> counting_;
     std::atomic<int> countGeneration_ {};
     struct MapFiles {
-        juce::int64 stamp {};
+        std::int64_t stamp {};
         std::vector<cydaw::base::Text> paths;
         int generation { -1 };
         Missing missing;
@@ -206,7 +206,7 @@ private:
     // What the preloading thread read: each map's "bank:" paths and the stamp
     // they were read at; the maps it still has to read.
     struct Preloaded {
-        juce::int64 stamp {};
+        std::int64_t stamp {};
         std::vector<cydaw::base::Text> paths;
     };
     std::mutex preloadLock_;

@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/FileDialog.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
@@ -74,7 +75,7 @@ const char* descriptionOf(const Location location)
 }
 
 // The free space where a folder is (or would be).
-juce::int64 freeSpace(cydaw::base::File folder)
+std::int64_t freeSpace(cydaw::base::File folder)
 {
     while (!folder.isDirectory() && folder.getParentDirectory() != folder)
         folder = folder.getParentDirectory();

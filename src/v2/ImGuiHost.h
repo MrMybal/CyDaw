@@ -3,13 +3,12 @@
 #include <cydaw/base/Text.h>
 #pragma once
 
-#include <juce_gui_extra/juce_gui_extra.h>
+#include <cydaw/base/Geometry.h>
 
 #include <functional>
 #include <memory>
 
-// A JUCE component showing a Dear ImGui interface. On Windows it embeds a
-// native child window rendered with Direct3D 11; everything — input, the
+// A native child window showing Dear ImGui with Direct3D 11. Everything — input, the
 // interface code, the rendering — runs on the message thread, paced by the
 // display's vertical blank, so the interface can call the engine directly.
 //
@@ -18,10 +17,10 @@
 
 namespace cydaw::v2 {
 
-class ImGuiHost final : public juce::Component {
+class ImGuiHost final {
 public:
     ImGuiHost();
-    ~ImGuiHost() override;
+    ~ImGuiHost();
 
     // Builds the interface; called between ImGui::NewFrame() and Render().
     std::function<void()> onFrame;
@@ -59,10 +58,11 @@ public:
     [[nodiscard]] unsigned long long updateTexture(const cydaw::base::Text& key,const cydaw::base::Image& image);
     void releaseTexture(const cydaw::base::Text& key);
 
-    void resized() override;
-    void parentHierarchyChanged() override;
-    void visibilityChanged() override;
-    void focusGained(FocusChangeType) override;
+    // The caller owns the parent window. This object owns its native child.
+    void create(void* parent, int width, int height);
+    void setBounds(cydaw::base::Rectangle<int> bounds);
+    [[nodiscard]] void* nativeHandle() const noexcept;
+    void poll();
 
     struct Native;
 
@@ -72,17 +72,9 @@ private:
     void frame();
 
     std::unique_ptr<Native> native_;
-    juce::HWNDComponent embed_;
-    double lastVBlankMs_ {};
-    juce::VBlankAttachment vblank_;
-    // Frames when no vertical blank comes (a window on no screen, a host
-    // that has none to give): a timer paces them instead.
-    struct Fallback final : juce::Timer {
-        explicit Fallback(ImGuiHost& owner) : host(owner) {}
-        void timerCallback() override;
-        ImGuiHost& host;
-    };
-    Fallback fallback_ { *this };
+    void* parent_{};
+    cydaw::base::Rectangle<int> bounds_{0, 0, 1600, 960};
+    double refreshHz_{60};
     int wakeFrames_ { 30 };
     bool animating_ {};
     double lastFrameSeconds_ {};
@@ -91,11 +83,5 @@ private:
 
     friend struct NativeAccess;
 };
-
-// An automated session's window (--hidden): kept off every screen, without a
-// taskbar button, never made the active window, so it never comes in front of
-// what the person is doing. It renders as any other (snapshots, input sent
-// through the control port). Called once the window is on the desktop.
-void keepInBackground(juce::Component& window);
 
 } // namespace cydaw::v2

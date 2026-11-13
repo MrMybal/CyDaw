@@ -222,22 +222,7 @@ NativePluginEditor::NativePluginEditor(NativeHostedPlugin &plugin)
     InitCommonControlsEx(&controls);
     SetWindowLongPtrW(p.window, GWL_STYLE,
                       GetWindowLongPtrW(p.window, GWL_STYLE) | WS_VSCROLL);
-    for (auto *parameter : plugin.parameters_) {
-      auto name = parameter->getName(128);
-      p.labels.push_back(CreateWindowExW(
-          0, L"STATIC", name.toWideCharPointer(), WS_CHILD | WS_VISIBLE, 0, 0,
-          1, 1, p.window, nullptr, c.hInstance, nullptr));
-      auto slider =
-          CreateWindowExW(0, TRACKBAR_CLASSW, L"",
-                          WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_NOTICKS, 0,
-                          0, 1, 1, p.window, nullptr, c.hInstance, nullptr);
-      SendMessageW(slider, TBM_SETRANGE, TRUE, MAKELPARAM(0, 10000));
-      EnableWindow(slider, !parameter->info.readOnly);
-      p.sliders.push_back(slider);
-      p.values.push_back(
-          CreateWindowExW(0, L"STATIC", L"", WS_CHILD | WS_VISIBLE, 0, 0, 1, 1,
-                          p.window, nullptr, c.hInstance, nullptr));
-    }
+    refreshParameters();
     resize(760, 480);
     p.layout();
     SetTimer(p.window, 1, 50, nullptr);
@@ -256,6 +241,32 @@ NativePluginEditor::~NativePluginEditor() {
   p.plugin.editor_ = nullptr;
   if (p.window)
     DestroyWindow(p.window);
+#endif
+}
+void NativePluginEditor::refreshParameters(){
+#if defined(_WIN32)
+ auto& p=*impl_;if(p.native)return;
+ for(auto window:p.sliders)DestroyWindow(window);
+ for(auto window:p.labels)DestroyWindow(window);
+ for(auto window:p.values)DestroyWindow(window);
+ p.sliders.clear();p.labels.clear();p.values.clear();p.scroll=0;
+    for (auto *parameter : p.plugin.parameters_) {
+      auto name = parameter->getName(128);
+      p.labels.push_back(CreateWindowExW(
+          0, L"STATIC", name.toWideCharPointer(), WS_CHILD | WS_VISIBLE, 0, 0,
+          1, 1, p.window, nullptr, GetModuleHandleW(nullptr), nullptr));
+      auto slider =
+          CreateWindowExW(0, TRACKBAR_CLASSW, L"",
+                          WS_CHILD | WS_VISIBLE | WS_TABSTOP | TBS_NOTICKS, 0,
+                          0, 1, 1, p.window, nullptr, GetModuleHandleW(nullptr), nullptr);
+      SendMessageW(slider, TBM_SETRANGE, TRUE, MAKELPARAM(0, 10000));
+      EnableWindow(slider, !parameter->info.readOnly);
+      p.sliders.push_back(slider);
+      p.values.push_back(
+          CreateWindowExW(0, L"STATIC", L"", WS_CHILD | WS_VISIBLE, 0, 0, 1, 1,
+                          p.window, nullptr, GetModuleHandleW(nullptr), nullptr));
+    }
+ p.layout();p.updateValues();
 #endif
 }
 bool NativePluginEditor::nativeInterface() const { return impl_->native; }

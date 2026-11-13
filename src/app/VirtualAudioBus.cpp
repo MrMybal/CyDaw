@@ -1,3 +1,7 @@
+#include <cydaw/audio/SampleBuffer.h>
+#include <cydaw/audio/Denormals.h>
+#include <cydaw/audio/Math.h>
+#include <cydaw/base/Utilities.h>
 #include <cydaw/midi/Devices.h>
 #include <cydaw/midi/LiveInput.h>
 #include <cydaw/audio/Devices.h>
@@ -19,14 +23,14 @@ VirtualAudioBus normaliseBus(VirtualAudioBus bus)
     if (bus.name.isEmpty())
         bus.name = bus.direction == VirtualBusDirection::input
             ? "Input" : "Output";
-    bus.channels = juce::jlimit(1, VirtualAudioBus::maximumChannels, bus.channels);
+    bus.channels = cydaw::base::limit(1, VirtualAudioBus::maximumChannels, bus.channels);
     bus.physicalChannelA = std::max(0, bus.physicalChannelA);
     bus.physicalChannelB = std::max(0, bus.physicalChannelB);
     bus.destinationChannelA = std::max(0, bus.destinationChannelA);
     bus.destinationChannelB = std::max(0, bus.destinationChannelB);
     for (auto& channel : bus.moreChannels)
         channel = std::max(0, channel);
-    bus.gainDb = juce::jlimit(-60.0f, 24.0f, bus.gainDb);
+    bus.gainDb = cydaw::base::limit(-60.0f, 24.0f, bus.gainDb);
     return bus;
 }
 
@@ -365,14 +369,14 @@ void VirtualBusRouter::applyBusLevel(
     const VirtualAudioBus& bus, float* const* channels,
     const int numSamples) noexcept
 {
-    const auto gain = bus.muted ? 0.0f : juce::Decibels::decibelsToGain(bus.gainDb, -90.0f);
+    const auto gain = bus.muted ? 0.0f : cydaw::audio::Decibels::decibelsToGain(bus.gainDb, -90.0f);
     for (auto channel = 0; channel < bus.channels; ++channel) {
         if (channels[channel] == nullptr)
             continue;
         if (gain == 0.0f)
-            juce::FloatVectorOperations::clear(channels[channel], numSamples);
+            cydaw::audio::VectorMath::clear(channels[channel], numSamples);
         else if (gain != 1.0f)
-            juce::FloatVectorOperations::multiply(channels[channel], gain, numSamples);
+            cydaw::audio::VectorMath::multiply(channels[channel], gain, numSamples);
     }
 }
 
@@ -389,7 +393,7 @@ void VirtualBusRouter::publishMeter(const std::size_t slot,
     for (auto channel = 0; channel < channelCount; ++channel) {
         if (channels[channel] == nullptr)
             continue;
-        const auto range = juce::FloatVectorOperations::findMinAndMax(channels[channel], numSamples);
+        const auto range = cydaw::audio::VectorMath::findMinAndMax(channels[channel], numSamples);
         const auto peak = std::max(std::abs(range.getStart()), std::abs(range.getEnd()));
         const auto side = cydaw::engine::speakerSide(cydaw::engine::speakerRole(channelCount, channel));
         if (side <= 0)
@@ -407,7 +411,7 @@ void VirtualBusRouter::getNextAudioBlock(
     // The whole session renders under this call: denormals flushed to zero for
     // all of it (a reverb's or a resonator's tail decaying in silence would
     // otherwise keep the processor busy on numbers too small to hear).
-    const juce::ScopedNoDenormals noDenormals;
+    const cydaw::audio::ScopedNoDenormals noDenormals;
     if (bufferToFill.buffer == nullptr || bufferToFill.numSamples <= 0)
         return;
     if (bufferToFill.numSamples > sourceBuffer_.getNumSamples()) {
@@ -434,12 +438,12 @@ void VirtualBusRouter::getNextAudioBlock(
         const auto& bus = entry.bus;
         if (bus.direction != VirtualBusDirection::output)
             continue;
-        const auto channels = juce::jlimit(1, VirtualAudioBus::maximumChannels, bus.channels);
+        const auto channels = cydaw::base::limit(1, VirtualAudioBus::maximumChannels, bus.channels);
         std::array<float*, maximumChannels> lanes {};
         for (auto channel = 0; channel < channels; ++channel)
             lanes[static_cast<std::size_t>(channel)] = inputBusBuffer_.getWritePointer(channel);
         for (auto channel = 0; channel < channels; ++channel)
-            juce::FloatVectorOperations::clear(lanes[static_cast<std::size_t>(channel)], count);
+            cydaw::audio::VectorMath::clear(lanes[static_cast<std::size_t>(channel)], count);
         // The master in the bus's format (a mono output folds it, a quad one
         // keeps it to the front), then what tracks send it directly.
         if (bus.carriesMaster)
@@ -449,7 +453,7 @@ void VirtualBusRouter::getNextAudioBlock(
             if (directOutputs_ != nullptr)
                 if (const auto* direct = directOutputs_->directOutput(bus.id, count, beforeEffects))
                     for (auto channel = 0; channel < std::min(channels, direct->getNumChannels()); ++channel)
-                        juce::FloatVectorOperations::add(lanes[static_cast<std::size_t>(channel)],
+                        cydaw::audio::VectorMath::add(lanes[static_cast<std::size_t>(channel)],
                                                          direct->getReadPointer(channel), count);
         };
         // Through its effects: the master and the tracks sent before them;
@@ -480,7 +484,7 @@ void VirtualBusRouter::renderInputBus(
 {
     if (outputs == nullptr || numSamples <= 0)
         return;
-    const auto channels = juce::jlimit(1, VirtualAudioBus::maximumChannels, bus.channels);
+    const auto channels = cydaw::base::limit(1, VirtualAudioBus::maximumChannels, bus.channels);
     for (auto channel = 0; channel < channels; ++channel) {
         auto* output = outputs[channel];
         if (output == nullptr)
@@ -488,9 +492,9 @@ void VirtualBusRouter::renderInputBus(
         const auto device = bus.deviceChannel(channel);
         if (inputChannelData != nullptr && device >= 0 && device < numInputChannels
             && inputChannelData[device] != nullptr)
-            juce::FloatVectorOperations::copy(output, inputChannelData[device], numSamples);
+            cydaw::audio::VectorMath::copy(output, inputChannelData[device], numSamples);
         else
-            juce::FloatVectorOperations::clear(output, numSamples);
+            cydaw::audio::VectorMath::clear(output, numSamples);
     }
     applyBusLevel(bus, outputs, numSamples);
 }
@@ -507,7 +511,7 @@ void VirtualBusRouter::renderInputBus(
     std::array<float*, 2> outputs { outputA, pair.channels > 1 ? outputB : nullptr };
     renderInputBus(pair, inputChannelData, numInputChannels, outputs.data(), numSamples);
     if (outputB != nullptr && pair.channels == 1)
-        juce::FloatVectorOperations::clear(outputB, numSamples);
+        cydaw::audio::VectorMath::clear(outputB, numSamples);
 }
 
 void VirtualBusRouter::audioDeviceIOCallbackWithContext(
@@ -518,7 +522,7 @@ void VirtualBusRouter::audioDeviceIOCallbackWithContext(
 {
     for (int channel = 0; channel < numOutputChannels; ++channel)
         if (outputChannelData != nullptr && outputChannelData[channel] != nullptr)
-            juce::FloatVectorOperations::clear(
+            cydaw::audio::VectorMath::clear(
                 outputChannelData[channel], numSamples);
     inputSamples_ = 0;
     inputIds_.fill(0);
@@ -535,7 +539,7 @@ void VirtualBusRouter::audioDeviceIOCallbackWithContext(
         const auto& bus = entry.bus;
         if (bus.direction != VirtualBusDirection::input)
             continue;
-        const auto channels = juce::jlimit(1, VirtualAudioBus::maximumChannels, bus.channels);
+        const auto channels = cydaw::base::limit(1, VirtualAudioBus::maximumChannels, bus.channels);
         auto& before = inputsBefore_[slot];
         auto& after = inputsAfter_[slot];
         if (before.getNumSamples() < numSamples || after.getNumSamples() < numSamples)
@@ -545,7 +549,7 @@ void VirtualBusRouter::audioDeviceIOCallbackWithContext(
             lanes[static_cast<std::size_t>(channel)] = after.getWritePointer(channel);
         renderInputBus(bus, inputChannelData, numInputChannels, lanes.data(), numSamples);
         for (auto channel = 0; channel < channels; ++channel)
-            juce::FloatVectorOperations::copy(before.getWritePointer(channel), lanes[static_cast<std::size_t>(channel)],
+            cydaw::audio::VectorMath::copy(before.getWritePointer(channel), lanes[static_cast<std::size_t>(channel)],
                                               numSamples);
         if (entry.graph != nullptr) {
             cydaw::audio::SampleBuffer<float> view(lanes.data(), channels, numSamples);

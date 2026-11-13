@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 // The displays and large views of Harmonie, Justesse
 // (PitchDesign.h computes what they draw). Included by StudioEffectsView.cpp
 // inside its anonymous namespace: it has its helpers (knobCell, segmented,
@@ -22,7 +23,7 @@ cydaw::base::Text pitchNoteText(const int note)
 // A whole number with its sign and unit: "+12 st", "-5 ct", "0 st".
 cydaw::base::Text pitchSignedText(const double value, const char* unit)
 {
-    const auto rounded = juce::roundToInt(value);
+    const auto rounded = cydaw::base::roundToInt(value);
     return (rounded > 0 ? cydaw::base::Text("+") : cydaw::base::Text()) + cydaw::base::Text(rounded) + unit;
 }
 
@@ -159,7 +160,7 @@ bool harmonieDisplay(std::vector<Param>& parameters, const Pane& pane, const Box
     cydaw::base::Text heard;
     if (heardHz > 0.0f)
         heard = pitchNoteText(static_cast<int>(std::lround(pitchfxd::pitchNoteOfHz(heardHz))))
-                + (large ? "  " + cydaw::base::Text(juce::roundToInt(heardHz)) + " Hz" : cydaw::base::Text());
+                + (large ? "  " + cydaw::base::Text(cydaw::base::roundToInt(heardHz)) + " Hz" : cydaw::base::Text());
     else if (large)
         heard = modeIndex == pitchfxd::harmonieModeVoice ? ui::Ls("Entrée (pas de hauteur)", "Input (no pitch)") : ui::Ls("Entrée", "Input");
     if (heard.isNotEmpty()) {
@@ -199,7 +200,7 @@ bool harmonieDisplay(std::vector<Param>& parameters, const Pane& pane, const Box
     }
     // The echo after the voices.
     if (large && value(pitchfxd::harmonieDelay) >= 0.5f) {
-        const auto echo = ui::Ls("Écho ", "Echo ") + cydaw::base::Text(juce::roundToInt(value(pitchfxd::harmonieDelay))) + " ms  "
+        const auto echo = ui::Ls("Écho ", "Echo ") + cydaw::base::Text(cydaw::base::roundToInt(value(pitchfxd::harmonieDelay))) + " ms  "
                           + ui::Ls("retour ", "feedback ") + percent(value(pitchfxd::harmonieFeedback));
         text(list, ImVec2(xOfPan(-1.0) + dp(16.0f), ruler.max.y - ImGui::GetFontSize() * 0.62f - dp(2.0f)), p.textFaint, echo.toRawUTF8(),
              0.58f);
@@ -492,7 +493,7 @@ bool pitchLarge(const PaneKind kind, const Pane& pane, std::vector<Param>& param
 // The values a card shows as knobs (pane indices).
 std::vector<int> pitchCardFields(const PaneKind kind, std::vector<Param>& parameters, const Pane& pane)
 {
-    juce::ignoreUnused(parameters, pane);
+    cydaw::base::ignoreUnused(parameters, pane);
     if (kind == PaneKind::harmonie)
         return { pitchfxd::harmonieShiftA, pitchfxd::harmonieShiftB, pitchfxd::harmonieLevelB, pitchfxd::harmonieDry };
     if (kind == PaneKind::justesse)
@@ -516,9 +517,9 @@ cydaw::base::Text pitchFormat(const cydaw::base::Text& binding, const double val
         if (suffix == "feedback")
             return percent(value);
         if (suffix == "delay")
-            return value < 0.5 ? off() : cydaw::base::Text(juce::roundToInt(value)) + " ms";
+            return value < 0.5 ? off() : cydaw::base::Text(cydaw::base::roundToInt(value)) + " ms";
         if (suffix == "panA" || suffix == "panB") {
-            const auto amount = juce::roundToInt(std::abs(value) * 100.0);
+            const auto amount = cydaw::base::roundToInt(std::abs(value) * 100.0);
             if (amount == 0)
                 return ui::Ls("Centre", "Centre");
             return (value < 0.0 ? ui::Ls("G ", "L ") : ui::Ls("D ", "R ")) + cydaw::base::Text(amount);
@@ -530,7 +531,7 @@ cydaw::base::Text pitchFormat(const cydaw::base::Text& binding, const double val
     if (binding.contains("justesse.")) {
         const auto suffix = binding.fromLastOccurrenceOf("justesse.", false, false);
         if (suffix == "speed")
-            return value < 0.5 ? cydaw::base::Text("Robot") : cydaw::base::Text(juce::roundToInt(value)) + " ms";
+            return value < 0.5 ? cydaw::base::Text("Robot") : cydaw::base::Text(cydaw::base::roundToInt(value)) + " ms";
         if (suffix == "amount" || suffix == "mix" || suffix == "sensitivity")
             return percent(value);
         if (suffix == "humanize")
@@ -542,7 +543,7 @@ cydaw::base::Text pitchFormat(const cydaw::base::Text& binding, const double val
         if (suffix == "scale")
             return justesseScaleName(whole(static_cast<float>(value), pitchfxd::justesseScaleCount));
         if (suffix == "lowPitch" || suffix == "highPitch")
-            return cydaw::base::Text(juce::roundToInt(value)) + " Hz  "
+            return cydaw::base::Text(cydaw::base::roundToInt(value)) + " Hz  "
                    + pitchNoteText(static_cast<int>(std::lround(pitchfxd::pitchNoteOfHz(std::max(1.0, value)))));
         return {};
     }

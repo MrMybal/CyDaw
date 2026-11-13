@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 // The MIDI effects' displays and large views (Arpège, Accords, Gamme, Écho de
 // notes, Aléa, Durée, Séquenceur, Roulement). Included by
 // StudioEffectsView.cpp inside its anonymous namespace. What they draw comes
@@ -225,7 +226,7 @@ bool accordsDisplay(std::vector<Param>& parameters, const Pane& pane, const Box&
         names << (index > 0 ? " " : "") << midiNoteName(notes[static_cast<std::size_t>(index)]);
     const auto strum = v[midid::accordsStrum];
     if (strum > 0.5f)
-        names << (ui::french() ? "   égrené " : "   strummed ") << cydaw::base::Text(juce::roundToInt(strum)) << " ms";
+        names << (ui::french() ? "   égrené " : "   strummed ") << cydaw::base::Text(cydaw::base::roundToInt(strum)) << " ms";
     const auto type = whole(v[midid::accordsChord], 12);
     const auto left = chooserLeft(box, chordName(type), large);
     if (large)
@@ -308,7 +309,7 @@ bool echoNotesDisplay(std::vector<Param>& parameters, const Pane& pane, const Bo
                 velocity, repeat == 0 ? p.text : colour);
         velocity *= 1.0f - decay;
     }
-    const auto label = (division != nullptr ? cydaw::base::Text(std::string(division->name)) : cydaw::base::Text(juce::roundToInt(values[midid::echoNotesTime])) + " ms")
+    const auto label = (division != nullptr ? cydaw::base::Text(std::string(division->name)) : cydaw::base::Text(cydaw::base::roundToInt(values[midid::echoNotesTime])) + " ms")
                        + cydaw::base::Text::fromUTF8("  \xc3\x97") + cydaw::base::Text(repeats);
     infoLabel(list, box, label.toRawUTF8(), large);
     return false;
@@ -347,7 +348,7 @@ bool aleaDisplay(std::vector<Param>& parameters, const Pane& pane, const Box& bo
         }
     }
     char label[96];
-    std::snprintf(label, sizeof(label), "%s %d %%", ui::french() ? "joue" : "plays", juce::roundToInt(chance * 100.0f));
+    std::snprintf(label, sizeof(label), "%s %d %%", ui::french() ? "joue" : "plays", cydaw::base::roundToInt(chance * 100.0f));
     infoLabel(list, box, label, large);
     return false;
 }
@@ -598,7 +599,7 @@ bool midifxLarge(const PaneKind kind, const Pane& pane, std::vector<Param>& para
 
 std::vector<int> midifxCardFields(const PaneKind kind, std::vector<Param>& parameters, const Pane& pane)
 {
-    juce::ignoreUnused(parameters, pane);
+    cydaw::base::ignoreUnused(parameters, pane);
     switch (kind) {
     case PaneKind::arpege: return { midid::arpegeRate, midid::arpegeOctaves, midid::arpegeGate, midid::arpegeSwing };
     case PaneKind::accords: return { midid::accordsInversion, midid::accordsStrum, midid::accordsVelocity };

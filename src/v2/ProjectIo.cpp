@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/LegacyPluginState.h>
 #include <cydaw/base/File.h>
 #include "Studio.h"
@@ -1411,7 +1412,7 @@ std::optional<std::size_t> restoreAudioTrack(Studio& studio, const SavedAudioTra
         else
             state.name = "Audio " + cydaw::base::Text(static_cast<int>(trackIndex + 1));
         if (saved.colour != 0)
-            state.colour = static_cast<juce::uint32>(saved.colour);
+            state.colour = static_cast<std::uint32_t>(saved.colour);
         state.audioChannels = cydaw::base::limit(1, 8, saved.channels > 0 ? saved.channels : 2);
         // Its format before its clips: their decks are made in it once.
         if (state.audioChannels != engine.trackChannelCount(trackIndex))
@@ -2223,7 +2224,7 @@ bool DocumentLoad::next()
                         continue;
                     MasterClip clip;
                     clip.name = entry.getProperty("name", cydaw::base::Text()).toString();
-                    clip.colour = static_cast<juce::uint32>(static_cast<std::int64_t>(entry.getProperty("colour", static_cast<std::int64_t>(0xffffb84d))));
+                    clip.colour = static_cast<std::uint32_t>(static_cast<std::int64_t>(entry.getProperty("colour", static_cast<std::int64_t>(0xffffb84d))));
                     clip.lengthBeats = std::clamp(static_cast<double>(entry.getProperty("lengthBeats", 16.0)), 0.25, 4'096.0);
                     clip.looping = static_cast<bool>(entry.getProperty("looping", true));
                     if (const auto* lanes = entry.getProperty("lanes", cydaw::base::Value()).getArray())

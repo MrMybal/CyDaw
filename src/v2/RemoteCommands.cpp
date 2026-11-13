@@ -1,3 +1,5 @@
+#include <cydaw/audio/Math.h>
+#include <cydaw/base/Utilities.h>
 #include <cydaw/midi/Devices.h>
 #include <cydaw/midi/LiveInput.h>
 #include <cydaw/audio/Devices.h>
@@ -84,7 +86,7 @@ cydaw::base::Value fail(const cydaw::base::Text& message)
 // doubles.
 cydaw::base::Value idOf(const std::uint64_t id)
 {
-    return cydaw::base::Text(static_cast<juce::int64>(id));
+    return cydaw::base::Text(static_cast<std::int64_t>(id));
 }
 
 std::uint64_t idFrom(const cydaw::base::Value& value)
@@ -117,9 +119,9 @@ double numberOf(const cydaw::base::Value& value, const char* name, const double 
     return field.isVoid() ? fallback : static_cast<double>(field);
 }
 
-cydaw::base::Text colourText(const juce::uint32 argb)
+cydaw::base::Text colourText(const std::uint32_t argb)
 {
-    return "#" + juce::Colour(argb).toDisplayString(false);
+    return "#" + cydaw::base::Colour(argb).toDisplayString(false);
 }
 
 std::uint32_t colourFrom(const cydaw::base::Text& text)
@@ -131,7 +133,7 @@ std::uint32_t colourFrom(const cydaw::base::Text& text)
 }
 
 // A PNG's size, read from its header (IHDR follows the signature).
-juce::Point<int> pngSize(const cydaw::base::File& file)
+cydaw::base::Point<int> pngSize(const cydaw::base::File& file)
 {
     cydaw::base::FileInputStream stream(file);
     std::array<std::uint8_t, 24> header {};
@@ -500,7 +502,7 @@ private:
                 const auto matches = wanted.isEmpty()
                                          ? bus.direction == app::VirtualBusDirection::output
                                          : bus.name.equalsIgnoreCase(wanted.toRawUTF8())
-                                               || cydaw::base::Text(static_cast<juce::int64>(bus.id)) == wanted;
+                                               || cydaw::base::Text(static_cast<std::int64_t>(bus.id)) == wanted;
                 if (matches)
                     return RemoteTrack { false, 0, 0, 0, true, bus.id };
             }
@@ -684,7 +686,7 @@ private:
         if (const auto* list = state.getProperty("nodes", cydaw::base::Value()).getArray())
             for (const auto& node : *list) {
                 auto entry = object();
-                set(entry, "id", static_cast<int>(static_cast<juce::int64>(node.getProperty("id", 0))));
+                set(entry, "id", static_cast<int>(static_cast<std::int64_t>(node.getProperty("id", 0))));
                 set(entry, "type", node.getProperty("type", cydaw::base::Value()).toString());
                 set(entry, "title", node.getProperty("title", cydaw::base::Value()).toString());
                 cydaw::base::Array<cydaw::base::Value> parameters;
@@ -700,10 +702,10 @@ private:
                 set(entry, "parameters", parameters);
                 // A device made of a graph: open_device edits its inside.
                 if (const auto module = target.graph().editorModuleOf(
-                        static_cast<std::uint64_t>(static_cast<juce::int64>(node.getProperty("id", 0)))))
+                        static_cast<std::uint64_t>(static_cast<std::int64_t>(node.getProperty("id", 0)))))
                     set(entry, "graphDevice", true);
                 // A designed interface: device_window opens it.
-                if (const auto card = cardById.find(static_cast<std::uint64_t>(static_cast<juce::int64>(node.getProperty("id", 0))));
+                if (const auto card = cardById.find(static_cast<std::uint64_t>(static_cast<std::int64_t>(node.getProperty("id", 0))));
                     card != cardById.end()) {
                     // The name its card shows, in the interface's language.
                     set(entry, "name", card->second->title);
@@ -735,8 +737,8 @@ private:
         cydaw::base::Array<cydaw::base::Value> bypasses;
         for (const auto& bypass : target.graph().nativeDspGraph().bypasses) {
             cydaw::base::Array<cydaw::base::Value> pair;
-            pair.add(static_cast<juce::int64>(bypass.node));
-            pair.add(static_cast<juce::int64>(bypass.from));
+            pair.add(static_cast<std::int64_t>(bypass.node));
+            pair.add(static_cast<std::int64_t>(bypass.from));
             bypasses.add(pair);
         }
         set(result, "bypasses", bypasses);
@@ -764,7 +766,7 @@ private:
                                               const cydaw::base::Text& suffix)
     {
         const auto id = graph.lastNodeIdOfType(typeKey);
-        return id == 0 ? cydaw::base::Text() : "node." + cydaw::base::Text(static_cast<juce::int64>(id)) + "." + suffix;
+        return id == 0 ? cydaw::base::Text() : "node." + cydaw::base::Text(static_cast<std::int64_t>(id)) + "." + suffix;
     }
 
     // The graph whose catalogue answers list_devices and describe_node_type:
@@ -947,7 +949,7 @@ private:
                     if (spec.hasProperty("shape"))
                         point.curve = static_cast<Studio::AutomationCurve>(engine::clampedCurveShape(static_cast<int>(spec.getProperty("shape", 0))));
                     if (spec.hasProperty("bend"))
-                        point.curveAmount = juce::jlimit(-1.0f, 1.0f, static_cast<float>(static_cast<double>(spec.getProperty("bend", 0.0))));
+                        point.curveAmount = cydaw::base::limit(-1.0f, 1.0f, static_cast<float>(static_cast<double>(spec.getProperty("bend", 0.0))));
                     if (const auto* handles = spec.getProperty("handles", cydaw::base::Value()).getArray(); handles != nullptr && handles->size() >= 4)
                         point.handles = { static_cast<float>(static_cast<double>((*handles)[0])), static_cast<float>(static_cast<double>((*handles)[1])),
                                           static_cast<float>(static_cast<double>((*handles)[2])), static_cast<float>(static_cast<double>((*handles)[3])) };
@@ -1227,7 +1229,7 @@ cydaw::base::Value Commands::run()
                 if (!node.boundary) {
                     devices.add(node.typeKey);
                     auto card = object();
-                    set(card, "id", static_cast<juce::int64>(node.id));
+                    set(card, "id", static_cast<std::int64_t>(node.id));
                     set(card, "type", node.typeKey);
                     cards.add(card);
                 }
@@ -1281,7 +1283,7 @@ cydaw::base::Value Commands::run()
                                   || app::SampleStore::instance().waitUntilReady(*plan->sampler, 60'000);
         constexpr auto rate = 48'000.0;
         constexpr auto block = 512;
-        const auto samples = static_cast<int>(juce::jlimit(0.05, 30.0, number("seconds", 1.0)) * rate);
+        const auto samples = static_cast<int>(cydaw::base::limit(0.05, 30.0, number("seconds", 1.0)) * rate);
         app::GraphPolySynthRenderer renderer;
         renderer.prepare(rate);
         renderer.setPlan(*plan);
@@ -1301,21 +1303,21 @@ cydaw::base::Value Commands::run()
         if (const auto* list = request_.getProperty("notes", {}).getArray())
             for (const auto& item : *list)
                 if (const auto* fields = item.getArray(); fields != nullptr && fields->size() >= 3) {
-                    Hit hit { juce::jlimit(0, 127, static_cast<int>((*fields)[0])),
-                              static_cast<float>(juce::jlimit(0.0, 1.0, static_cast<double>((*fields)[1]))),
-                              static_cast<int>(juce::jmax(0.0, static_cast<double>((*fields)[2])) * rate) };
+                    Hit hit { cydaw::base::limit(0, 127, static_cast<int>((*fields)[0])),
+                              static_cast<float>(cydaw::base::limit(0.0, 1.0, static_cast<double>((*fields)[1]))),
+                              static_cast<int>(cydaw::base::maximum(0.0, static_cast<double>((*fields)[2])) * rate) };
                     if (fields->size() >= 4)
-                        hit.off = hit.at + static_cast<int>(juce::jmax(0.0, static_cast<double>((*fields)[3])) * rate);
+                        hit.off = hit.at + static_cast<int>(cydaw::base::maximum(0.0, static_cast<double>((*fields)[3])) * rate);
                     hits.push_back(hit);
                 }
         if (hits.empty())
-            hits.push_back({ juce::jlimit(0, 127, static_cast<int>(number("note", 69.0))), static_cast<float>(number("velocity", 0.8)), 0 });
+            hits.push_back({ cydaw::base::limit(0, 127, static_cast<int>(number("note", 69.0))), static_cast<float>(number("velocity", 0.8)), 0 });
         std::vector<std::array<int, 3>> moves;
         if (const auto* list = request_.getProperty("controllers", {}).getArray())
             for (const auto& item : *list)
                 if (const auto* fields = item.getArray(); fields != nullptr && fields->size() >= 3)
-                    moves.push_back({ juce::jlimit(0, 127, static_cast<int>((*fields)[0])), juce::jlimit(0, 127, static_cast<int>((*fields)[1])),
-                                      static_cast<int>(juce::jmax(0.0, static_cast<double>((*fields)[2])) * rate) });
+                    moves.push_back({ cydaw::base::limit(0, 127, static_cast<int>((*fields)[0])), cydaw::base::limit(0, 127, static_cast<int>((*fields)[1])),
+                                      static_cast<int>(cydaw::base::maximum(0.0, static_cast<double>((*fields)[2])) * rate) });
         // Faster than real time: a lane waits for frames still on the disk.
         const cydaw::base::ScopedValueSetter<bool> mayWait(engine::samplerMayWait, true);
         for (auto start = 0; start < samples; start += block) {
@@ -1361,14 +1363,14 @@ cydaw::base::Value Commands::run()
         // The last half second: a held note still sounding (a loop) or not.
         const auto tail = std::min(samples, static_cast<int>(rate * 0.5));
         set(result, "tailRms", audio.getRMSLevel(0, samples - tail, tail));
-        set(result, "peakDb", juce::Decibels::gainToDecibels(audio.getMagnitude(0, 0, samples), -120.0f));
+        set(result, "peakDb", cydaw::audio::Decibels::gainToDecibels(audio.getMagnitude(0, 0, samples), -120.0f));
         // Its level every 50 ms (dB RMS): what happens over time.
         cydaw::base::Array<cydaw::base::Value> windows;
         const auto window = static_cast<int>(rate * 0.05);
         for (auto at = 0; at + window <= samples; at += window)
-            windows.add(juce::Decibels::gainToDecibels(audio.getRMSLevel(0, at, window), -120.0f));
+            windows.add(cydaw::audio::Decibels::gainToDecibels(audio.getRMSLevel(0, at, window), -120.0f));
         set(result, "windowsDb", windows);
-        set(result, "stateBytes", static_cast<juce::int64>(cydaw::base::JSON::toString(state, true).getNumBytesAsUTF8()));
+        set(result, "stateBytes", static_cast<std::int64_t>(cydaw::base::JSON::toString(state, true).getNumBytesAsUTF8()));
         return ok(result);
     }
     if (command == "track_modulation") {
@@ -1448,7 +1450,7 @@ cydaw::base::Value Commands::run()
         auto* slot = studio_.graphFor(track->ref());
         if (slot == nullptr)
             return fail("that track has no graph");
-        auto nodeId = static_cast<std::uint64_t>(static_cast<juce::int64>(request_.getProperty("nodeId", 0)));
+        auto nodeId = static_cast<std::uint64_t>(static_cast<std::int64_t>(request_.getProperty("nodeId", 0)));
         if (nodeId == 0)
             for (const auto& node : slot->graph().editorNodes())
                 if (node.typeKey == "cab-sim" || node.typeKey == "empreinte") {
@@ -1465,11 +1467,11 @@ cydaw::base::Value Commands::run()
             (void) studio_.clearCabImpulse(track->ref(), nodeId);
         }
         auto result = object();
-        set(result, "nodeId", static_cast<juce::int64>(nodeId));
+        set(result, "nodeId", static_cast<std::int64_t>(nodeId));
         if (const auto response = slot->graph().nodeImpulse(nodeId)) {
             set(result, "name", cydaw::base::Text(response->name));
             set(result, "channels", static_cast<int>(response->channels.size()));
-            set(result, "frames", static_cast<juce::int64>(response->length()));
+            set(result, "frames", static_cast<std::int64_t>(response->length()));
             set(result, "sampleRate", response->sampleRate);
         }
         return ok(result);
@@ -1484,7 +1486,7 @@ cydaw::base::Value Commands::run()
         auto* slot = studio_.graphFor(track->ref());
         if (slot == nullptr)
             return fail("that track has no graph");
-        auto nodeId = static_cast<std::uint64_t>(static_cast<juce::int64>(request_.getProperty("nodeId", 0)));
+        auto nodeId = static_cast<std::uint64_t>(static_cast<std::int64_t>(request_.getProperty("nodeId", 0)));
         if (nodeId == 0)
             for (const auto& node : slot->graph().editorNodes())
                 if (studio_.hasSidechain(track->ref(), node.id)) {
@@ -1504,12 +1506,12 @@ cydaw::base::Value Commands::run()
                 return fail(set.getErrorMessage());
         }
         auto result = object();
-        set(result, "nodeId", static_cast<juce::int64>(nodeId));
+        set(result, "nodeId", static_cast<std::int64_t>(nodeId));
         if (const auto source = studio_.sidechainSource(track->ref(), nodeId)) {
             set(result, "source", studio_.trackName(*source));
             for (const auto& output : studio_.trackOutputs(*source))
                 if (output.destination == studio_.routingKey(track->ref()) && output.input != 0)
-                    set(result, "input", static_cast<juce::int64>(output.input));
+                    set(result, "input", static_cast<std::int64_t>(output.input));
         }
         return ok(result);
     }
@@ -1548,12 +1550,12 @@ cydaw::base::Value Commands::run()
         chain.prepare(rate, block, 2);
         if (const auto compiled = chain.setGraph(*native); compiled.failed())
             return fail("the chain does not compile: " + compiled.getErrorMessage());
-        const auto hz = juce::jlimit(20.0, 20'000.0, number("hz", 220.0));
-        const auto amplitude = juce::jlimit(0.0, 1.0, number("amplitude", 0.3));
+        const auto hz = cydaw::base::limit(20.0, 20'000.0, number("hz", 220.0));
+        const auto amplitude = cydaw::base::limit(0.0, 1.0, number("amplitude", 0.3));
         // "clicks": a click of `amplitude` every quarter of a second instead
         // of the sine (transients, for a Replacer).
         const auto clicks = text("signal").trim() == "clicks";
-        const auto samples = static_cast<int>(juce::jlimit(0.1, 10.0, number("seconds", 1.0)) * rate);
+        const auto samples = static_cast<int>(cydaw::base::limit(0.1, 10.0, number("seconds", 1.0)) * rate);
         std::vector<float> out;
         out.reserve(static_cast<std::size_t>(samples));
         cydaw::audio::SampleBuffer<float> buffer(2, block);
@@ -1562,7 +1564,7 @@ cydaw::base::Value Commands::run()
             for (auto i = 0; i < count; ++i) {
                 const auto value = clicks ? ((start + i) % static_cast<int>(rate / 4.0) < 4 ? static_cast<float>(amplitude) : 0.0f)
                                           : static_cast<float>(
-                                                amplitude * std::sin(2.0 * juce::MathConstants<double>::pi * hz * (start + i) / rate));
+                                                amplitude * std::sin(2.0 * cydaw::base::MathConstants<double>::pi * hz * (start + i) / rate));
                 buffer.setSample(0, i, value);
                 buffer.setSample(1, i, value);
             }
@@ -1572,7 +1574,7 @@ cydaw::base::Value Commands::run()
         // Past the first tenth of a second: what it settles to.
         const auto from = static_cast<std::size_t>(rate * 0.1);
         const auto level = [&](const double frequency) {
-            const auto omega = 2.0 * juce::MathConstants<double>::pi * frequency / rate;
+            const auto omega = 2.0 * cydaw::base::MathConstants<double>::pi * frequency / rate;
             const auto coefficient = 2.0 * std::cos(omega);
             double previous {};
             double before {};
@@ -1594,7 +1596,7 @@ cydaw::base::Value Commands::run()
         auto result = object();
         set(result, "inputDb", 20.0 * std::log10(amplitude / std::sqrt(2.0) + 1.0e-12));
         set(result, "outputDb", 10.0 * std::log10(energy / static_cast<double>(std::max<std::size_t>(1, out.size() - from)) + 1.0e-20));
-        set(result, "peakDb", juce::Decibels::gainToDecibels(peak, -120.0f));
+        set(result, "peakDb", cydaw::audio::Decibels::gainToDecibels(peak, -120.0f));
         const auto fundamental = level(hz);
         set(result, "fundamentalDb", fundamental);
         set(result, "secondDb", level(hz * 2.0) - fundamental);
@@ -1622,7 +1624,7 @@ cydaw::base::Value Commands::run()
         const auto zone = model->zones.front();
         const auto note = number("note", static_cast<double>(zone.rootNote));
         const auto velocity = number("velocity", static_cast<double>(zone.velocity));
-        const auto samples = static_cast<int>(juce::jlimit(0.01, 60.0, number("seconds", 2.0)) * rate);
+        const auto samples = static_cast<int>(cydaw::base::limit(0.01, 60.0, number("seconds", 2.0)) * rate);
         const auto held = has("held") ? static_cast<int>(number("held", 1.0) * rate) : samples;
         auto voice = std::make_unique<cydaw::engine::SoundModelVoice>();
         voice->prepare(rate);
@@ -1655,7 +1657,7 @@ cydaw::base::Value Commands::run()
         writer.reset();
         auto result = object();
         set(result, "out", out.getFullPathName());
-        set(result, "peakDb", juce::Decibels::gainToDecibels(audio.getMagnitude(0, 0, samples), -120.0f));
+        set(result, "peakDb", cydaw::audio::Decibels::gainToDecibels(audio.getMagnitude(0, 0, samples), -120.0f));
         set(result, "endedAt", ended >= 0 ? ended / rate : -1.0);
         set(result, "description", app::describeSoundModel(*model));
         return ok(result);
@@ -1702,7 +1704,7 @@ cydaw::base::Value Commands::run()
                     const auto spec = hardware.toString().trim();
                     for (const auto& bus : engine_.virtualBuses())
                         if (bus.direction == app::VirtualBusDirection::output
-                            && (bus.name.equalsIgnoreCase(spec.toRawUTF8()) || cydaw::base::Text(static_cast<juce::int64>(bus.id)) == spec))
+                            && (bus.name.equalsIgnoreCase(spec.toRawUTF8()) || cydaw::base::Text(static_cast<std::int64_t>(bus.id)) == spec))
                             output.hardware = bus.id;
                     if (output.hardware == 0)
                         return fail("no output bus \"" + spec + "\"; list_buses lists them");
@@ -1789,7 +1791,7 @@ cydaw::base::Value Commands::run()
         const auto nodes = graph.editorNodes();
         const auto node = std::find_if(nodes.begin(), nodes.end(), [nodeId](const auto& item) { return item.id == nodeId; });
         if (node == nodes.end())
-            return fail("no card " + cydaw::base::Text(static_cast<juce::int64>(nodeId)) + " on that track");
+            return fail("no card " + cydaw::base::Text(static_cast<std::int64_t>(nodeId)) + " on that track");
         const auto filter = text("filter").trim();
         std::vector<std::pair<std::uint64_t, const app::GraphDocument::EditorParameter*>> order;
         for (const auto& parameter : node->parameters)
@@ -2003,8 +2005,7 @@ cydaw::base::Value Commands::onPing() const
     auto result = object();
     set(result, "app", "CyDAW");
     set(result, "interface", "CyDAW 2");
-    if (auto* application = juce::JUCEApplicationBase::getInstance())
-        set(result, "version", application->getApplicationVersion());
+    set(result, "version", CYDAW_APPLICATION_VERSION);
     return ok(result);
 }
 
@@ -2200,7 +2201,7 @@ cydaw::base::Value Commands::onSetView()
         const auto spec = text("bus").trim();
         std::uint64_t busId = 0;
         for (const auto& bus : engine_.virtualBuses())
-            if (bus.name.equalsIgnoreCase(spec.toRawUTF8()) || cydaw::base::Text(static_cast<juce::int64>(bus.id)) == spec)
+            if (bus.name.equalsIgnoreCase(spec.toRawUTF8()) || cydaw::base::Text(static_cast<std::int64_t>(bus.id)) == spec)
                 busId = bus.id;
         if (busId == 0)
             return fail("no bus \"" + spec + "\"; list_buses lists them");
@@ -2307,7 +2308,7 @@ cydaw::base::Value Commands::onTransport()
 
 cydaw::base::Value Commands::onSetTempo()
 {
-    const auto bpm = juce::jlimit(20.0, 300.0, number("bpm", engine_.tempo()));
+    const auto bpm = cydaw::base::limit(20.0, 300.0, number("bpm", engine_.tempo()));
     engine_.setTempo(bpm);
     // The metre: {"numerator": 5, "denominator": 4}.
     if (has("numerator") || has("denominator"))
@@ -2343,7 +2344,7 @@ cydaw::base::Value Commands::onSetMasterGain()
 {
     // {gainDb, muted}: the master's fader, and its mute (a probe that must stay
     // silent whatever a project restores).
-    const auto gainDb = juce::jlimit(-60.0, 12.0, number("gainDb", engine_.masterGainDb()));
+    const auto gainDb = cydaw::base::limit(-60.0, 12.0, number("gainDb", engine_.masterGainDb()));
     engine_.setMasterGain(static_cast<float>(gainDb));
     if (has("muted"))
         engine_.setMasterMuted(flag("muted", false));
@@ -2404,8 +2405,8 @@ cydaw::base::Value Commands::onSetTrack()
     auto muted = current.muted;
     auto solo = current.solo;
     if (has("gainDb") || has("pan")) {
-        gainDb = static_cast<float>(juce::jlimit(-60.0, 12.0, number("gainDb", current.gainDb)));
-        pan = static_cast<float>(juce::jlimit(-1.0, 1.0, number("pan", current.pan)));
+        gainDb = static_cast<float>(cydaw::base::limit(-60.0, 12.0, number("gainDb", current.gainDb)));
+        pan = static_cast<float>(cydaw::base::limit(-1.0, 1.0, number("pan", current.pan)));
     }
     if (has("muted"))
         muted = flag("muted", current.muted);
@@ -2438,7 +2439,7 @@ cydaw::base::Value Commands::onSetTrack()
         const auto spec = text("inputBus").trim();
         std::uint64_t busId = 0;
         for (const auto& bus : engine_.virtualBuses())
-            if (bus.name.equalsIgnoreCase(spec.toRawUTF8()) || cydaw::base::Text(static_cast<juce::int64>(bus.id)) == spec)
+            if (bus.name.equalsIgnoreCase(spec.toRawUTF8()) || cydaw::base::Text(static_cast<std::int64_t>(bus.id)) == spec)
                 busId = bus.id;
         if (busId == 0 || !engine_.setTrackInputBus(track->index, busId))
             return fail("no input bus \"" + spec + "\"; status lists the buses");
@@ -2690,7 +2691,7 @@ cydaw::base::Value Commands::onNotes()
             continue;
         const auto noteId = engine_.addMidiNote(track->id, clip->id, pitch, std::max(0.0, numberOf(note, "start", 0.0)),
                                                 std::max(0.01, numberOf(note, "length", 1.0)),
-                                                static_cast<float>(juce::jlimit(0.01, 1.0, numberOf(note, "velocity", 0.8))));
+                                                static_cast<float>(cydaw::base::limit(0.01, 1.0, numberOf(note, "velocity", 0.8))));
         if (noteId == 0)
             continue;
         ++added;
@@ -2783,10 +2784,10 @@ cydaw::base::Value Commands::onEditNotes()
                     if (note.id == noteId
                         && engine_.updateMidiNote(
                             track->id, clip.id, noteId,
-                            juce::jlimit(0, 127, static_cast<int>(numberOf(change, "note", note.noteNumber))),
+                            cydaw::base::limit(0, 127, static_cast<int>(numberOf(change, "note", note.noteNumber))),
                             std::max(0.0, numberOf(change, "start", note.startBeats)),
                             std::max(0.01, numberOf(change, "length", note.durationBeats)),
-                            static_cast<float>(juce::jlimit(0.01, 1.0, numberOf(change, "velocity", note.velocity))))) {
+                            static_cast<float>(cydaw::base::limit(0.01, 1.0, numberOf(change, "velocity", note.velocity))))) {
                         ++touched;
                         // An expression given replaces the note's ([]: none).
                         if (change.hasProperty("pitch") || change.hasProperty("gain"))
@@ -3072,7 +3073,7 @@ cydaw::base::Value Commands::onSampler()
         auto result = object();
         set(result, "track", studio_.trackName(track));
         const auto card = studio_.samplerCardOf(track);
-        set(result, "nodeId", static_cast<juce::int64>(card));
+        set(result, "nodeId", static_cast<std::int64_t>(card));
         if (const auto* slot = studio_.graphFor(track))
             set(result, "description", app::describeSamplerMap(slot->graph().nodeSamplerJson(card)));
         return result;
@@ -3179,7 +3180,7 @@ cydaw::base::Value Commands::onSampler()
     if (auto error = trackOrFail(track); !error.isVoid())
         return error;
     const auto ref = track->ref();
-    const auto card = has("nodeId") ? static_cast<std::uint64_t>(static_cast<juce::int64>(request_.getProperty("nodeId", 0)))
+    const auto card = has("nodeId") ? static_cast<std::uint64_t>(static_cast<std::int64_t>(request_.getProperty("nodeId", 0)))
                                     : studio_.samplerCardOf(ref);
     const auto* slot = studio_.graphFor(ref);
     if (slot == nullptr || card == 0)
@@ -3193,7 +3194,7 @@ cydaw::base::Value Commands::onSampler()
                 return fail(error);
         }
         auto result = object();
-        set(result, "nodeId", static_cast<juce::int64>(card));
+        set(result, "nodeId", static_cast<std::int64_t>(card));
         set(result, "map", slot->graph().nodeSamplerJson(card));
         set(result, "description", app::describeSamplerMap(slot->graph().nodeSamplerJson(card)));
         return ok(result);
@@ -3205,7 +3206,7 @@ cydaw::base::Value Commands::onSampler()
         auto* editable = studio_.graphFor(ref);
         if (map == nullptr || editable == nullptr)
             return fail("the sampler card holds no map");
-        const auto prefix = "node." + cydaw::base::Text(static_cast<juce::int64>(card)) + ".sampler.";
+        const auto prefix = "node." + cydaw::base::Text(static_cast<std::int64_t>(card)) + ".sampler.";
         cydaw::base::Array<cydaw::base::Value> problems;
         if (const auto* given = request_.getProperty("set", {}).getDynamicObject())
             for (const auto& [name, value] : given->getProperties()) {
@@ -3217,7 +3218,7 @@ cydaw::base::Value Commands::onSampler()
             }
         const auto values = slot->graph().editorSamplerControls(card);
         auto result = object();
-        set(result, "nodeId", static_cast<juce::int64>(card));
+        set(result, "nodeId", static_cast<std::int64_t>(card));
         cydaw::base::Array<cydaw::base::Value> controls;
         for (const auto& control : map->controls) {
             const auto number = static_cast<std::size_t>(std::clamp(control.controller, 0, 127));
@@ -3268,7 +3269,7 @@ cydaw::base::Value Commands::onSampler()
     auto ready = 0;
     auto failed = 0;
     auto deferred = 0;
-    juce::int64 frames {};
+    std::int64_t frames {};
     for (const auto& zone : map->zones) {
         if (zone.sample != nullptr && zone.sample->ready.load()) {
             ++ready;
@@ -3299,19 +3300,19 @@ cydaw::base::Value Commands::onSampler()
     // Read from the disk: this map's long recordings (their heads in memory),
     // every track's: the rings playing now, the frames missed, rings refused.
     auto streamedZones = 0;
-    juce::int64 heldBytes {};
+    std::int64_t heldBytes {};
     for (const auto& zone : map->zones)
         if (zone.sample != nullptr && zone.sample->ready.load() && zone.sample->streamed) {
             ++streamedZones;
-            heldBytes += static_cast<juce::int64>(zone.sample->pcm.size() * sizeof(std::int16_t));
+            heldBytes += static_cast<std::int64_t>(zone.sample->pcm.size() * sizeof(std::int16_t));
         }
     auto& streams = engine::SampleStreams::instance();
     set(result, "streamedZones", streamedZones);
     set(result, "streamedHeadMegabytes", static_cast<double>(heldBytes) / 1.0e6);
     set(result, "storeStreamed", stats.streamed);
     set(result, "streamsBusy", streams.busy());
-    set(result, "streamUnderruns", static_cast<juce::int64>(streams.underruns.load()));
-    set(result, "streamsRefused", static_cast<juce::int64>(streams.refused.load()));
+    set(result, "streamUnderruns", static_cast<std::int64_t>(streams.underruns.load()));
+    set(result, "streamsRefused", static_cast<std::int64_t>(streams.refused.load()));
     return ok(result);
 }
 
@@ -3414,7 +3415,7 @@ cydaw::base::Value Commands::onPrism()
     if (slot == nullptr)
         return fail("that track has no graph");
     auto& graph = slot->graph();
-    std::uint64_t nodeId = has("nodeId") ? static_cast<std::uint64_t>(static_cast<juce::int64>(request_.getProperty("nodeId", 0))) : 0;
+    std::uint64_t nodeId = has("nodeId") ? static_cast<std::uint64_t>(static_cast<std::int64_t>(request_.getProperty("nodeId", 0))) : 0;
     if (nodeId == 0)
         for (const auto& node : graph.editorNodes())
             if (node.typeKey == "prism-synth") {
@@ -3441,7 +3442,7 @@ cydaw::base::Value Commands::onPrism()
                                               "pitchBend", "macro1",  "macro2",     "macro3",    "macro4", "random" };
     static_assert(sizeof(sourceKeys) / sizeof(sourceKeys[0]) == static_cast<std::size_t>(prism::Source::count));
     const auto bindingOf = [nodeId](const int index) {
-        return "node." + cydaw::base::Text(static_cast<juce::int64>(nodeId)) + ".prism." + cydaw::base::Text(prism::parameter(index).key);
+        return "node." + cydaw::base::Text(static_cast<std::int64_t>(nodeId)) + ".prism." + cydaw::base::Text(prism::parameter(index).key);
     };
     const auto current = [&graph, nodeId] { return *graph.editorPrismValues(nodeId); };
     cydaw::base::TextList problems;
@@ -3494,7 +3495,7 @@ cydaw::base::Value Commands::onPrism()
             (void) graph.editorSetParameter(bindingOf(index), prism::clampValue(index, static_cast<float>(number)));
         }
     auto result = object();
-    set(result, "nodeId", static_cast<juce::int64>(nodeId));
+    set(result, "nodeId", static_cast<std::int64_t>(nodeId));
     auto values = object();
     const auto now = current();
     for (int index = 0; index < prism::parameterCount; ++index)
@@ -3544,7 +3545,7 @@ cydaw::base::Value Commands::onKick()
     if (slot == nullptr)
         return fail("that track has no graph");
     auto& graph = slot->graph();
-    std::uint64_t nodeId = has("nodeId") ? static_cast<std::uint64_t>(static_cast<juce::int64>(request_.getProperty("nodeId", 0))) : 0;
+    std::uint64_t nodeId = has("nodeId") ? static_cast<std::uint64_t>(static_cast<std::int64_t>(request_.getProperty("nodeId", 0))) : 0;
     if (nodeId == 0)
         for (const auto& node : graph.editorNodes())
             if (node.typeKey == "kick-synth") {
@@ -3554,7 +3555,7 @@ cydaw::base::Value Commands::onKick()
     if (!graph.editorKickValues(nodeId))
         return fail("no Kick card on that track");
     const auto bindingOf = [nodeId](const int index) {
-        return "node." + cydaw::base::Text(static_cast<juce::int64>(nodeId)) + ".kick." + cydaw::base::Text(kick::parameter(index).key);
+        return "node." + cydaw::base::Text(static_cast<std::int64_t>(nodeId)) + ".kick." + cydaw::base::Text(kick::parameter(index).key);
     };
     const auto current = [&graph, nodeId] { return *graph.editorKickValues(nodeId); };
     cydaw::base::TextList problems;
@@ -3593,7 +3594,7 @@ cydaw::base::Value Commands::onKick()
             (void) graph.editorSetParameter(bindingOf(index), kick::clampValue(index, static_cast<float>(number)));
         }
     auto result = object();
-    set(result, "nodeId", static_cast<juce::int64>(nodeId));
+    set(result, "nodeId", static_cast<std::int64_t>(nodeId));
     auto values = object();
     const auto now = current();
     for (int index = 0; index < kick::parameterCount; ++index)
@@ -3632,7 +3633,7 @@ cydaw::base::Value Commands::onSynth()
     const auto wanted = has("model") ? synth::modelForPrefix(text("model").trim().toLowerCase().toStdString()) : synth::Model::none;
     if (has("model") && wanted == synth::Model::none)
         return fail("no synth model \"" + text("model") + "\"");
-    std::uint64_t nodeId = has("nodeId") ? static_cast<std::uint64_t>(static_cast<juce::int64>(request_.getProperty("nodeId", 0))) : 0;
+    std::uint64_t nodeId = has("nodeId") ? static_cast<std::uint64_t>(static_cast<std::int64_t>(request_.getProperty("nodeId", 0))) : 0;
     if (nodeId == 0)
         for (const auto& node : graph.editorNodes()) {
             const auto model = synth::modelForType(node.typeKey.toStdString());
@@ -3647,7 +3648,7 @@ cydaw::base::Value Commands::onSynth()
     const auto model = found->first;
     const auto& info = synth::info(model);
     const auto bindingOf = [nodeId, &info, model](const int index) {
-        return "node." + cydaw::base::Text(static_cast<juce::int64>(nodeId)) + "." + cydaw::base::Text(info.prefix) + "."
+        return "node." + cydaw::base::Text(static_cast<std::int64_t>(nodeId)) + "." + cydaw::base::Text(info.prefix) + "."
                + cydaw::base::Text(synth::parameter(model, index).key);
     };
     const auto current = [&graph, nodeId] { return graph.editorSynthValues(nodeId)->second; };
@@ -3689,7 +3690,7 @@ cydaw::base::Value Commands::onSynth()
             (void) graph.editorSetParameter(bindingOf(index), synth::clampValue(model, index, static_cast<float>(number)));
         }
     auto result = object();
-    set(result, "nodeId", static_cast<juce::int64>(nodeId));
+    set(result, "nodeId", static_cast<std::int64_t>(nodeId));
     set(result, "model", cydaw::base::Text(info.prefix));
     auto values = object();
     const auto now = current();
@@ -3763,7 +3764,7 @@ cydaw::base::Value Commands::onBatterie()
     if (slot == nullptr)
         return fail("that track has no graph");
     auto& graph = slot->graph();
-    std::uint64_t nodeId = has("nodeId") ? static_cast<std::uint64_t>(static_cast<juce::int64>(request_.getProperty("nodeId", 0))) : 0;
+    std::uint64_t nodeId = has("nodeId") ? static_cast<std::uint64_t>(static_cast<std::int64_t>(request_.getProperty("nodeId", 0))) : 0;
     if (nodeId == 0)
         for (const auto& node : graph.editorNodes())
             if (node.typeKey == "batterie") {
@@ -3773,7 +3774,7 @@ cydaw::base::Value Commands::onBatterie()
     if (!graph.editorDrumValues(nodeId))
         return fail("no Batterie card on that track");
     const auto bindingOf = [nodeId](const int index) {
-        return "node." + cydaw::base::Text(static_cast<juce::int64>(nodeId)) + ".batterie." + cydaw::base::Text(drum::parameter(index).key);
+        return "node." + cydaw::base::Text(static_cast<std::int64_t>(nodeId)) + ".batterie." + cydaw::base::Text(drum::parameter(index).key);
     };
     cydaw::base::TextList problems;
     // A kit: by its number, its name or its instrument's key.
@@ -3814,7 +3815,7 @@ cydaw::base::Value Commands::onBatterie()
         }
     (void) studio_.publishGraph(track->ref(), true);
     auto result = object();
-    set(result, "nodeId", static_cast<juce::int64>(nodeId));
+    set(result, "nodeId", static_cast<std::int64_t>(nodeId));
     const auto now = *graph.editorDrumValues(nodeId);
     auto values = object();
     for (int index = 0; index < drum::valueCount; ++index)
@@ -3882,7 +3883,7 @@ cydaw::base::Value Commands::onPresets()
     PresetMenuCapture capture;
     PresetMenuApply apply;
     if (has("nodeId")) {
-        const auto nodeId = static_cast<std::uint64_t>(static_cast<juce::int64>(request_.getProperty("nodeId", 0)));
+        const auto nodeId = static_cast<std::uint64_t>(static_cast<std::int64_t>(request_.getProperty("nodeId", 0)));
         holder = studio_.devicePresetHolder(ref, nodeId);
         capture = [this, ref, nodeId] { return studio_.devicePresetState(ref, nodeId); };
         apply = [this, ref, nodeId](const cydaw::base::Value& state, cydaw::base::Text& error) {
@@ -4131,8 +4132,8 @@ cydaw::base::Value Commands::onProcessing()
         }
         auto result = object();
         const auto report = [&](const proc::AudioResult& rendered, const double rate, const std::int64_t before) {
-            set(result, "framesBefore", static_cast<juce::int64>(before));
-            set(result, "framesAfter", static_cast<juce::int64>(rendered.channels.empty() ? 0 : rendered.channels.front().size()));
+            set(result, "framesBefore", static_cast<std::int64_t>(before));
+            set(result, "framesAfter", static_cast<std::int64_t>(rendered.channels.empty() ? 0 : rendered.channels.front().size()));
             set(result, "tailSeconds", static_cast<double>(rendered.tailFrames) / rate);
             set(result, "endless", rendered.endless);
             set(result, "channels", static_cast<int>(rendered.channels.size()));
@@ -4417,7 +4418,7 @@ cydaw::base::Value Commands::onGraphDevices()
         std::vector<std::uint64_t> ids;
         if (const auto* list = request_.getProperty("nodeIds", cydaw::base::Value()).getArray())
             for (const auto& id : *list)
-                ids.push_back(static_cast<std::uint64_t>(static_cast<juce::int64>(id)));
+                ids.push_back(static_cast<std::uint64_t>(static_cast<std::int64_t>(id)));
         cydaw::base::Text error;
         const auto card = studio_.createDeviceFromSelection(*target->slot, ids, text("name").trim(), error);
         if (card == 0)
@@ -4451,7 +4452,7 @@ cydaw::base::Value Commands::workshopStatus()
     cydaw::base::Array<cydaw::base::Value> tabs;
     for (const auto& tab : studio_.workshopTabs()) {
         auto entry = object();
-        set(entry, "id", static_cast<juce::int64>(tab.id));
+        set(entry, "id", static_cast<std::int64_t>(tab.id));
         set(entry, "name", tab.name);
         set(entry, "instrument", tab.instrument);
         set(entry, "unsaved", tab.unsaved);
@@ -4459,7 +4460,7 @@ cydaw::base::Value Commands::workshopStatus()
         tabs.add(entry);
     }
     set(result, "tabs", tabs);
-    set(result, "activeTab", static_cast<juce::int64>(studio_.activeWorkshopTab()));
+    set(result, "activeTab", static_cast<std::int64_t>(studio_.activeWorkshopTab()));
     {
         const auto& settings = studio_.simulatorSettings();
         auto simulator = object();
@@ -4573,7 +4574,7 @@ cydaw::base::Value Commands::onWorkshop()
         const auto id = static_cast<std::uint64_t>(number("id", 0.0));
         const auto tabs = studio_.workshopTabs();
         if (id != 0 && std::none_of(tabs.begin(), tabs.end(), [id](const auto& tab) { return tab.id == id; }))
-            return fail("no tab " + cydaw::base::Text(static_cast<juce::int64>(id)) + "; workshop status lists them");
+            return fail("no tab " + cydaw::base::Text(static_cast<std::int64_t>(id)) + "; workshop status lists them");
         if (action == "tab")
             studio_.selectWorkshopTab(id);
         else
@@ -4614,7 +4615,7 @@ cydaw::base::Value Commands::onWorkshop()
         if (has("root"))
             settings.rootNote = static_cast<int>(number("root", settings.rootNote));
         if (has("velocity"))
-            settings.velocity = static_cast<float>(juce::jlimit(0.01, 1.0, number("velocity", settings.velocity)));
+            settings.velocity = static_cast<float>(cydaw::base::limit(0.01, 1.0, number("velocity", settings.velocity)));
         if (has("output"))
             settings.outputDb = static_cast<float>(number("output", settings.outputDb));
         if (const auto applied = studio_.setSimulatorSettings(settings); applied.failed())
@@ -4707,7 +4708,7 @@ cydaw::base::Value Commands::onWorkshop()
         const auto result=graph.editorPromoteValue(static_cast<std::uint64_t>(number("nodeId",0)),
             static_cast<std::uint64_t>(number("portId",0)),text("binding"),mode=="input",created);
         if(result.failed())return fail(result.getErrorMessage());
-        auto answer=object();set(answer,"nodeId",static_cast<juce::int64>(created));set(answer,"state",graph.serialise());
+        auto answer=object();set(answer,"nodeId",static_cast<std::int64_t>(created));set(answer,"state",graph.serialise());
         return ok(answer);
     }
     if(action=="remove_boundary") {
@@ -5055,7 +5056,7 @@ cydaw::base::Value Commands::onModulator()
     const auto bindingOf = [this]() -> cydaw::base::Text {
         auto binding = text("binding").trim();
         if (binding.isEmpty() && has("nodeId"))
-            binding = "node." + cydaw::base::Text(static_cast<juce::int64>(number("nodeId", 0.0))) + "." + text("parameter").trim();
+            binding = "node." + cydaw::base::Text(static_cast<std::int64_t>(number("nodeId", 0.0))) + "." + text("parameter").trim();
         return binding;
     };
     const auto describe = [&](const std::uint64_t modulator) {
@@ -5063,8 +5064,8 @@ cydaw::base::Value Commands::onModulator()
         // As the graph is now (it may have just been made).
         const auto now = graph.editorNodes();
         const auto found = std::find_if(now.begin(), now.end(), [modulator](const auto& item) { return item.id == modulator; });
-        set(entry, "id", static_cast<juce::int64>(modulator));
-        set(entry, "owner", static_cast<juce::int64>(graph.editorModulatorOwner(modulator)));
+        set(entry, "id", static_cast<std::int64_t>(modulator));
+        set(entry, "owner", static_cast<std::int64_t>(graph.editorModulatorOwner(modulator)));
         if (found != now.end()) {
             set(entry, "type", found->typeKey);
             set(entry, "name", found->title);
@@ -5083,7 +5084,7 @@ cydaw::base::Value Commands::onModulator()
             if (modulation.source == modulator) {
                 auto move = object();
                 set(move, "binding", modulation.binding);
-                set(move, "nodeId", static_cast<juce::int64>(modulation.node));
+                set(move, "nodeId", static_cast<std::int64_t>(modulation.node));
                 set(move, "amount", modulation.amount);
                 set(move, "mode", modulation.mode == 1 ? "modulate" : "set");
                 moves.add(move);
@@ -5109,7 +5110,7 @@ cydaw::base::Value Commands::onModulator()
                         "math, follower");
         const auto made = graph.editorAddModulator(nodeId, type);
         if (made == 0)
-            return fail("no card " + cydaw::base::Text(static_cast<juce::int64>(nodeId)) + " to add it to");
+            return fail("no card " + cydaw::base::Text(static_cast<std::int64_t>(nodeId)) + " to add it to");
         commitGraph(*target, true);
         (void) ui_.showModulators(*target->track, nodeId, true, made);
         return ok(describe(made));
@@ -5129,7 +5130,7 @@ cydaw::base::Value Commands::onModulator()
         return ok(result);
     }
     if (!isModulator(id) && !(action == "arm" && id == 0))
-        return fail("no modulator " + cydaw::base::Text(static_cast<juce::int64>(id)) + " on that track; list gives them");
+        return fail("no modulator " + cydaw::base::Text(static_cast<std::int64_t>(id)) + " on that track; list gives them");
     if (action == "set") {
         const auto found = std::find_if(nodes.begin(), nodes.end(), [id](const auto& item) { return item.id == id; });
         const auto* effect = engine::effectForType(found->typeKey.toStdString());
@@ -5161,7 +5162,7 @@ cydaw::base::Value Commands::onModulator()
                     }
                     value = index;
                 }
-                const auto binding = "node." + cydaw::base::Text(static_cast<juce::int64>(id)) + "." + cydaw::base::Text(std::string(setting->suffix));
+                const auto binding = "node." + cydaw::base::Text(static_cast<std::int64_t>(id)) + "." + cydaw::base::Text(std::string(setting->suffix));
                 if (!graph.editorSetParameter(binding, value))
                     problems.add("\"" + key + "\" was refused");
             }
@@ -5227,9 +5228,9 @@ cydaw::base::Value Commands::onContainer()
         if (!container)
             return entry;
         const auto nodes = graph.editorNodes();
-        set(entry, "head", static_cast<juce::int64>(container->head));
-        set(entry, "end", static_cast<juce::int64>(container->end));
-        set(entry, "blend", static_cast<juce::int64>(container->blend));
+        set(entry, "head", static_cast<std::int64_t>(container->head));
+        set(entry, "end", static_cast<std::int64_t>(container->end));
+        set(entry, "blend", static_cast<std::int64_t>(container->blend));
         set(entry, "postBranch", container->postBranch);
         set(entry, "type", container->typeKey);
         cydaw::base::Array<cydaw::base::Value> branches;
@@ -5237,7 +5238,7 @@ cydaw::base::Value Commands::onContainer()
             cydaw::base::Array<cydaw::base::Value> listed;
             for (const auto card : cards) {
                 auto item = object();
-                set(item, "id", static_cast<juce::int64>(card));
+                set(item, "id", static_cast<std::int64_t>(card));
                 if (const auto found = std::find_if(nodes.begin(), nodes.end(), [card](const auto& node) { return node.id == card; });
                     found != nodes.end()) {
                     set(item, "type", found->typeKey);
@@ -5293,7 +5294,7 @@ cydaw::base::Value Commands::onContainer()
         return done(head, true);
     }
     if (!graph.editorIsContainer(head))
-        return fail("no container " + cydaw::base::Text(static_cast<juce::int64>(head)) + " on that track; list gives them");
+        return fail("no container " + cydaw::base::Text(static_cast<std::int64_t>(head)) + " on that track; list gives them");
     if (action == "add_branch") {
         if (!graph.editorAddBranch(head))
             return fail("this container takes no more branches");
@@ -5367,9 +5368,9 @@ cydaw::base::Value Commands::onNodes()
         return ok(description);
     }
     if (command_ == "add_node") {
-        const auto position = has("x") && has("y") ? juce::Point<float>(static_cast<float>(number("x", 0.5)),
+        const auto position = has("x") && has("y") ? cydaw::base::Point<float>(static_cast<float>(number("x", 0.5)),
                                                                         static_cast<float>(number("y", 0.5)))
-                                                   : juce::Point<float>(-1'000.0f, -1'000.0f);
+                                                   : cydaw::base::Point<float>(-1'000.0f, -1'000.0f);
         const auto id = graph.addNodeForRemote(text("key").trim(), position);
         if (id == 0)
             return fail("no node type \"" + text("key") + "\"; list_devices gives the keys");
@@ -5426,9 +5427,9 @@ cydaw::base::Value Commands::onNodes()
         return ok(graphSummary(*target));
     }
     if (command_ == "set_node") {
-        std::optional<juce::Point<float>> position;
+        std::optional<cydaw::base::Point<float>> position;
         if (has("x") && has("y"))
-            position = juce::Point<float>(static_cast<float>(number("x", 0.0)), static_cast<float>(number("y", 0.0)));
+            position = cydaw::base::Point<float>(static_cast<float>(number("x", 0.0)), static_cast<float>(number("y", 0.0)));
         if (!graph.setNodePresentationForRemote(nodeId, text("title"), position))
             return fail("no card with that id");
         // Folded to its title in the device panel and the graph.
@@ -5441,7 +5442,7 @@ cydaw::base::Value Commands::onNodes()
         return ok(graph.describeNodeForRemote(nodeId));
     }
     if (command_ == "set_node_parameter") {
-        const auto key = "node." + cydaw::base::Text(static_cast<juce::int64>(nodeId)) + "." + text("parameter").trim();
+        const auto key = "node." + cydaw::base::Text(static_cast<std::int64_t>(nodeId)) + "." + text("parameter").trim();
         if (!has("value") || !graph.setGraphInterfaceParameter(key, number("value", 0.0)))
             return fail("no parameter \"" + text("parameter") + "\" on that card; describe_node_type lists them");
         commitGraph(*target, false);
@@ -5857,7 +5858,7 @@ cydaw::base::Value Commands::onEditAudioClip()
                 auto all = engine_.audioClipEvents(index, clipId);
                 for (auto& item : all)
                     if (item.id == eventId)
-                        item.pitchSemitones = juce::jlimit(-48.0, 48.0, number("pitch", 0.0));
+                        item.pitchSemitones = cydaw::base::limit(-48.0, 48.0, number("pitch", 0.0));
                 if (const auto done = engine_.replaceAudioClipEvents(index, clipId, std::move(all)); done.failed())
                     return fail(done.getErrorMessage());
             }
@@ -6090,7 +6091,7 @@ cydaw::base::Value Commands::onAutomation()
             std::vector<std::pair<std::uint64_t, cydaw::base::Value>> shaped;
             for (const auto& point : *points) {
                 const auto id = studio_.addLanePoint(ref, key, std::max(0.0, numberOf(point, "time", 0.0)),
-                                                     static_cast<float>(juce::jlimit(low, high, numberOf(point, "value", parameter->value))));
+                                                     static_cast<float>(cydaw::base::limit(low, high, numberOf(point, "value", parameter->value))));
                 if (id != 0) {
                     ++added;
                     if (numberOf(point, "curve", 0.0) != 0.0)
@@ -6143,10 +6144,10 @@ cydaw::base::Value Commands::onAutomation()
             if (pluginTarget) {
                 id = engine_.addPluginAutomationPoint(
                     track->index, pluginTarget->first, pluginTarget->second, pluginParameterName, time,
-                    static_cast<float>(juce::jlimit(0.0, 1.0, numberOf(point, "value", 0.0))));
+                    static_cast<float>(cydaw::base::limit(0.0, 1.0, numberOf(point, "value", 0.0))));
             } else {
                 id = studio_.addAutomationPoint(
-                    ref, time, static_cast<float>(juce::jlimit(-60.0, 12.0, numberOf(point, "valueDb", 0.0))));
+                    ref, time, static_cast<float>(cydaw::base::limit(-60.0, 12.0, numberOf(point, "valueDb", 0.0))));
             }
             if (id != 0)
                 ++added;
@@ -6632,7 +6633,7 @@ cydaw::base::Value Commands::onPlugins()
                     parameterIndex = parameter.index;
         if (!parameterIndex)
             return fail("no parameter \"" + spec.toString() + "\"; list_plugin_parameters gives them");
-        const auto value = static_cast<float>(juce::jlimit(0.0, 1.0, number("value", 0.0)));
+        const auto value = static_cast<float>(cydaw::base::limit(0.0, 1.0, number("value", 0.0)));
         if (const auto applied = engine_.setTrackPluginParameter(index, pluginIndex, *parameterIndex, value);
             applied.failed())
             return fail(applied.getErrorMessage());
@@ -6688,7 +6689,7 @@ cydaw::base::Value Commands::onBuses()
 {
     const auto find = [this](const cydaw::base::Text& spec) -> std::optional<app::VirtualAudioBus> {
         for (const auto& bus : engine_.virtualBuses())
-            if (bus.name.equalsIgnoreCase(spec.trim()) || cydaw::base::Text(static_cast<juce::int64>(bus.id)) == spec.trim())
+            if (bus.name.equalsIgnoreCase(spec.trim()) || cydaw::base::Text(static_cast<std::int64_t>(bus.id)) == spec.trim())
                 return bus;
         return std::nullopt;
     };
@@ -6716,14 +6717,14 @@ cydaw::base::Value Commands::onBuses()
         if (has("name") && text("name").trim().isNotEmpty())
             updated.name = text("name").trim();
         if (has("channels"))
-            updated.channels = juce::jlimit(1, app::VirtualAudioBus::maximumChannels, static_cast<int>(number("channels", 2.0)));
+            updated.channels = cydaw::base::limit(1, app::VirtualAudioBus::maximumChannels, static_cast<int>(number("channels", 2.0)));
         if (has("format"))
             if (const auto channels = cydaw::engine::layoutChannels(text("format").trim().toLowerCase().toStdString()); channels > 0)
                 updated.channels = channels;
         // The sound card's channels, one per bus channel (from 0).
         if (const auto* list = request_.getProperty("deviceChannels", cydaw::base::Value()).getArray()) {
             if (!has("channels") && !has("format"))
-                updated.channels = juce::jlimit(1, app::VirtualAudioBus::maximumChannels, list->size());
+                updated.channels = cydaw::base::limit(1, app::VirtualAudioBus::maximumChannels, list->size());
             for (int channel = 0; channel < std::min(list->size(), app::VirtualAudioBus::maximumChannels); ++channel)
                 updated.setDeviceChannel(channel, std::max(0, static_cast<int>((*list)[channel])));
         }
@@ -6738,7 +6739,7 @@ cydaw::base::Value Commands::onBuses()
         if (has("destinationB"))
             updated.destinationChannelB = std::max(0, static_cast<int>(number("destinationB", 1.0)));
         if (has("gainDb"))
-            updated.gainDb = static_cast<float>(juce::jlimit(-60.0, 12.0, number("gainDb", 0.0)));
+            updated.gainDb = static_cast<float>(cydaw::base::limit(-60.0, 12.0, number("gainDb", 0.0)));
         if (has("muted"))
             updated.muted = flag("muted", false);
         if (has("monitor"))
@@ -6949,7 +6950,7 @@ cydaw::base::Value Commands::onSamples()
         set(engineValue, "gpu", engine.gpu);
         set(engineValue, "error", engine.error);
         set(result, "engine", engineValue);
-        juce::ignoreUnused(models);
+        cydaw::base::ignoreUnused(models);
         return result;
     };
     const auto modelsOf = [&models, &semantic] {
@@ -7159,7 +7160,7 @@ cydaw::base::Value Commands::onSamples()
             if (!cydaw::base::File(path).existsAsFile())
                 return fail("no file at " + path);
             if (has("gainDb"))
-                engine_.setSamplePreviewGainDb(static_cast<float>(juce::jlimit(-60.0, 6.0, number("gainDb", -6.0))));
+                engine_.setSamplePreviewGainDb(static_cast<float>(cydaw::base::limit(-60.0, 6.0, number("gainDb", -6.0))));
             // atTempo: a loop with a tempo at the project's (as the library's switch).
             if (const auto started = studio_.auditionSample(path, std::max(0.0, number("start", 0.0)), flag("atTempo", false));
                 started.failed())

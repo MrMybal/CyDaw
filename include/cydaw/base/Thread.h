@@ -103,6 +103,14 @@ public:
     }
   }
 };
+// Dedicated control clock. Unlike Timer it does not depend on UI dispatch.
+class HighResolutionTimer {
+ struct Runner;std::unique_ptr<Runner> runner_;
+public:
+ HighResolutionTimer();virtual ~HighResolutionTimer();
+ void startTimer(int milliseconds);void stopTimer();bool isTimerRunning()const;
+ virtual void hiResTimerCallback()=0;
+};
 class ThreadPoolJob {
   Text name_;
   std::atomic<bool> exit_{false};

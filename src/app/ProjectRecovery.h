@@ -2,7 +2,7 @@
 #include <cydaw/base/Text.h>
 #pragma once
 #include <cydaw/document/ProjectRecovery.h>
-#include <juce_core/juce_core.h>
+
 namespace cydaw::app {
 class ProjectRecovery {
     static base::File nativeFile(const cydaw::base::File& f){return base::File(base::Text(f.getFullPathName().toStdString()));}

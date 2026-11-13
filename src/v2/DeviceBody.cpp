@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/File.h>
 #include "DeviceBody.h"
 
@@ -114,7 +115,7 @@ void drawDeviceBody(DeviceBody& body, int& pane, DeviceHost& host, UiState& stat
     const CardFileScope cardFile(host, state, track, graph, node.id, node.typeKey);
     if (pane == -2) {
         ImGui::SetCursorScreenPos(origin);
-        designed.drawPlayed(("designed" + cydaw::base::Text(static_cast<juce::int64>(node.id))).toRawUTF8(), body.interface, size,
+        designed.drawPlayed(("designed" + cydaw::base::Text(static_cast<std::int64_t>(node.id))).toRawUTF8(), body.interface, size,
                             [&graph](const cydaw::base::Text& key, const double value) { (void) graph.editorSetParameter(key, value); }, &graph.editorAnalysis());
     } else if (pane < 0) {
         auto chosen = -1;

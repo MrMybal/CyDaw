@@ -1,3 +1,5 @@
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #include "ProjectImport.h"
@@ -87,7 +89,7 @@ struct Note {
 
 struct Pattern {
     cydaw::base::Text name;
-    juce::uint32 colour {};
+    std::uint32_t colour {};
     std::vector<Note> notes;
 };
 
@@ -106,18 +108,18 @@ struct Arrangement {
     std::vector<Item> items;
 };
 
-juce::uint32 readU32(const juce::uint8* at)
+std::uint32_t readU32(const std::uint8_t* at)
 {
-    return static_cast<juce::uint32>(at[0]) | (static_cast<juce::uint32>(at[1]) << 8) | (static_cast<juce::uint32>(at[2]) << 16)
-           | (static_cast<juce::uint32>(at[3]) << 24);
+    return static_cast<std::uint32_t>(at[0]) | (static_cast<std::uint32_t>(at[1]) << 8) | (static_cast<std::uint32_t>(at[2]) << 16)
+           | (static_cast<std::uint32_t>(at[3]) << 24);
 }
 
-int readU16(const juce::uint8* at)
+int readU16(const std::uint8_t* at)
 {
     return static_cast<int>(at[0]) | (static_cast<int>(at[1]) << 8);
 }
 
-float readF32(const juce::uint8* at)
+float readF32(const std::uint8_t* at)
 {
     const auto bits = readU32(at);
     float value {};
@@ -127,16 +129,16 @@ float readF32(const juce::uint8* at)
 
 // FL 11.5 and later write their text in UTF-16 (little-endian), earlier
 // ones in single bytes; told apart by the zero bytes.
-cydaw::base::Text textOf(const juce::uint8* data, const std::size_t size)
+cydaw::base::Text textOf(const std::uint8_t* data, const std::size_t size)
 {
     auto zeros = 0;
     for (std::size_t index = 1; index < size; index += 2)
         zeros += data[index] == 0 ? 1 : 0;
     cydaw::base::Text text;
     if (size >= 2 && zeros * 2 >= static_cast<int>(size / 2)) {
-        std::vector<juce::juce_wchar> characters;
+        std::vector<char32_t> characters;
         for (std::size_t index = 0; index + 1 < size; index += 2) {
-            const auto unit = static_cast<juce::juce_wchar>(readU16(data + index));
+            const auto unit = static_cast<char32_t>(readU16(data + index));
             if (unit == 0)
                 break;
             characters.push_back(unit);
@@ -159,7 +161,7 @@ public:
         cydaw::base::MemoryBlock bytes;
         if (!file_.loadFileAsData(bytes))
             return cydaw::base::Result::fail("The file could not be opened: " + file_.getFullPathName());
-        const auto* data = static_cast<const juce::uint8*>(bytes.getData());
+        const auto* data = static_cast<const std::uint8_t*>(bytes.getData());
         const auto size = bytes.getSize();
         if (size < 22 || std::memcmp(data, "FLhd", 4) != 0)
             return cydaw::base::Result::fail("Not an FL Studio project: " + file_.getFileName());
@@ -185,7 +187,7 @@ public:
             } else if (event < 128) {
                 if (at + 2 > end)
                     break;
-                onNumber(event, static_cast<juce::uint32>(readU16(data + at)));
+                onNumber(event, static_cast<std::uint32_t>(readU16(data + at)));
                 at += 2;
             } else if (event < 192) {
                 if (at + 4 > end)
@@ -215,19 +217,19 @@ public:
 private:
     enum class Context { project, channel, pattern, arrangement, mixer };
 
-    void onNumber(const int event, const juce::uint32 value)
+    void onNumber(const int event, const std::uint32_t value)
     {
         switch (event) {
-        case id::tempo: out_.tempo = juce::jlimit(10.0, 999.0, value / 1'000.0); return;
+        case id::tempo: out_.tempo = cydaw::base::limit(10.0, 999.0, value / 1'000.0); return;
         case id::tempoCoarse:
             if (!fineTempo_)
-                out_.tempo = juce::jlimit(10.0, 999.0, static_cast<double>(value));
+                out_.tempo = cydaw::base::limit(10.0, 999.0, static_cast<double>(value));
             return;
         case id::tempoFine:
             fineTempo_ = true;
             return;
-        case id::timeSignatureNumerator: out_.numerator = juce::jlimit(1, 32, static_cast<int>(value)); return;
-        case id::timeSignatureBeat: out_.denominator = juce::jlimit(1, 32, static_cast<int>(value)); return;
+        case id::timeSignatureNumerator: out_.numerator = cydaw::base::limit(1, 32, static_cast<int>(value)); return;
+        case id::timeSignatureBeat: out_.denominator = cydaw::base::limit(1, 32, static_cast<int>(value)); return;
         case id::channelNew:
             context_ = Context::channel;
             channel_ = static_cast<int>(value);
@@ -258,7 +260,7 @@ private:
         }
     }
 
-    void onData(const int event, const juce::uint8* data, const std::size_t size)
+    void onData(const int event, const std::uint8_t* data, const std::size_t size)
     {
         switch (event) {
         case id::version:
@@ -310,7 +312,7 @@ private:
             if (size >= 8) {
                 const auto pan = static_cast<int>(readU32(data));
                 const auto volume = static_cast<int>(readU32(data + 4));
-                channel.pan = juce::jlimit(-1.0f, 1.0f, (static_cast<float>(pan) - 6'400.0f) / 6'400.0f);
+                channel.pan = cydaw::base::limit(-1.0f, 1.0f, (static_cast<float>(pan) - 6'400.0f) / 6'400.0f);
                 channel.gainDb = linearToDb(volume / 10'000.0);
             }
             return;
@@ -321,7 +323,7 @@ private:
 
     // A hosted plug-in's wrapper: a kind, then records (id, 64-bit length,
     // bytes): 54 its name, 55 its file, 56 its maker.
-    static void readWrapper(Channel& channel, const juce::uint8* data, const std::size_t size)
+    static void readWrapper(Channel& channel, const std::uint8_t* data, const std::size_t size)
     {
         if (size < 4)
             return;
@@ -346,7 +348,7 @@ private:
         }
     }
 
-    void readPlaylist(const juce::uint8* data, const std::size_t size)
+    void readPlaylist(const std::uint8_t* data, const std::size_t size)
     {
         // 32 bytes an item before FL 21, 60 since.
         const auto major = version_.upToFirstOccurrenceOf(".", false, false).getIntValue();

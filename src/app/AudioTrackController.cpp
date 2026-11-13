@@ -1,3 +1,7 @@
+#include <cassert>
+#include <cydaw/audio/SampleBuffer.h>
+#include <cydaw/audio/Math.h>
+#include <cydaw/base/Utilities.h>
 #include <cydaw/integration/CyAudioCoreDeviceManager.h>
 #include <cydaw/midi/Devices.h>
 #include <cydaw/midi/LiveInput.h>
@@ -1022,11 +1026,11 @@ void GainPanAudioSource::getNextAudioBlock(const cydaw::audio::AudioSourceChanne
     if (!processNativeDspGraph(bufferToFill)) {
         const auto driveDb = driveDb_.load(std::memory_order_relaxed);
         const auto cutoff = filterCutoffHz_.load(std::memory_order_relaxed);
-        const auto driveGain = juce::Decibels::decibelsToGain(driveDb);
+        const auto driveGain = cydaw::audio::Decibels::decibelsToGain(driveDb);
         const auto driveNormalisation = driveDb > 0.001f ? 1.0f / std::tanh(driveGain) : 1.0f;
         const auto shouldFilter = cutoff < static_cast<float>(sampleRate_ * 0.45);
         const auto filterAmount = shouldFilter
-                                      ? static_cast<float>(1.0 - std::exp(-juce::MathConstants<double>::twoPi
+                                      ? static_cast<float>(1.0 - std::exp(-cydaw::base::MathConstants<double>::twoPi
                                                                           * cutoff / sampleRate_))
                                       : 1.0f;
 
@@ -1133,7 +1137,7 @@ void GainPanAudioSource::getNextAudioBlock(const cydaw::audio::AudioSourceChanne
             // A curve swinging past its points stays in the lane's range.
             const auto automationDb = cydaw::base::limit(-60.0f, 12.0f, static_cast<float>(laneValueAt(*automation, time, &pointIndex)));
 
-            const auto automationGain = juce::Decibels::decibelsToGain(automationDb, -60.0f);
+            const auto automationGain = cydaw::audio::Decibels::decibelsToGain(automationDb, -60.0f);
             for (int channel = 0; channel < channels; ++channel)
                 bufferToFill.buffer->getWritePointer(channel, bufferToFill.startSample)[sample]
                     *= channelGains[static_cast<std::size_t>(std::min(channel, static_cast<int>(channelGains.size()) - 1))]
@@ -1288,7 +1292,7 @@ void InputRecorder::audioDeviceIOCallbackWithContext(const float* const* inputCh
     // a recorder callback must explicitly contribute silence.
     for (int channel = 0; channel < numOutputChannels; ++channel)
         if (outputChannelData != nullptr && outputChannelData[channel] != nullptr)
-            juce::FloatVectorOperations::clear(outputChannelData[channel], numSamples);
+            cydaw::audio::VectorMath::clear(outputChannelData[channel], numSamples);
 
     if (numInputChannels <= 0 || inputChannelData == nullptr)
         return;
@@ -1499,7 +1503,7 @@ TrackMixer::TrackMixer()
 
 void TrackMixer::addInputSource(cydaw::audio::AudioSource* source, const bool deleteWhenRemoved)
 {
-    jassert(!deleteWhenRemoved);
+    assert(!deleteWhenRemoved);
     cydaw::base::ignoreUnused(deleteWhenRemoved);
     if (source == nullptr)
         return;
@@ -1660,7 +1664,7 @@ void TrackMixer::getNextAudioBlock(const cydaw::audio::AudioSourceChannelInfo& o
                               const float gain, const float pan) {
         if (fromChannels == toChannels && (fromChannels != 1 || pan == 0.0f)) {
             for (auto channel = 0; channel < toChannels; ++channel)
-                juce::FloatVectorOperations::addWithMultiply(into[channel], from[channel], gain, count);
+                cydaw::audio::VectorMath::addWithMultiply(into[channel], from[channel], gain, count);
             return;
         }
         cydaw::engine::convertChannels(cydaw::engine::channelConversion(fromChannels, toChannels), from, into, count, gain,
@@ -2065,7 +2069,7 @@ void applySoundLanes(cydaw::audio::SampleBuffer<float>& buffer, const int channe
         auto left = 1.0f;
         auto right = 1.0f;
         if (volumePoints != nullptr) {
-            const auto gain = juce::Decibels::decibelsToGain(
+            const auto gain = cydaw::audio::Decibels::decibelsToGain(
                 cydaw::base::limit(-60.0f, 12.0f, static_cast<float>(laneValueAt(*volumePoints, seconds, &volumeHint))), -60.0f);
             left *= gain;
             right *= gain;
@@ -2350,7 +2354,7 @@ public:
     {
         for (int channel = 0; channel < destinationChannelCount; ++channel)
             if (destinationSamples[channel] != nullptr)
-                juce::zeromem(destinationSamples[channel] + destinationOffset,
+                std::memset(destinationSamples[channel] + destinationOffset, 0,
                               static_cast<std::size_t>(sampleCount)
                                   * sizeof(int));
         return true;
@@ -3118,7 +3122,7 @@ private:
                             arrangementScratch_.getWritePointer(channel)[sample] *= safeGain;
                     }
                 }
-                const auto eventGain = juce::Decibels::decibelsToGain(
+                const auto eventGain = cydaw::audio::Decibels::decibelsToGain(
                     region->clip.eventGainDb, -60.0f);
                 if (std::abs(eventGain - 1.0f) > 0.000001f)
                     for (int channel = 0; channel < channelCount; ++channel)
@@ -3130,7 +3134,7 @@ private:
                             = static_cast<double>(relativePosition + sample)
                               / sampleRate_;
                         const auto automationGain
-                            = juce::Decibels::decibelsToGain(
+                            = cydaw::audio::Decibels::decibelsToGain(
                                 automationValueAt(region->clip.automation,
                                                   localSeconds),
                                 -60.0f);
@@ -3450,7 +3454,7 @@ void ClipAudioSource::renderLauncherPlan(
                             *= safeGain;
                 }
             }
-            const auto eventGain = juce::Decibels::decibelsToGain(
+            const auto eventGain = cydaw::audio::Decibels::decibelsToGain(
                 region->clip.eventGainDb, -60.0f);
             if (std::abs(eventGain - 1.0f) > 0.000001f)
                 for (auto channel = 0; channel < channels; ++channel)
@@ -3462,7 +3466,7 @@ void ClipAudioSource::renderLauncherPlan(
                         = static_cast<double>(relative + sample)
                           / sampleRate_;
                     const auto automationGain
-                        = juce::Decibels::decibelsToGain(
+                        = cydaw::audio::Decibels::decibelsToGain(
                             automationValueAt(region->clip.automation,
                                               localSeconds),
                             -60.0f);
@@ -4694,7 +4698,7 @@ struct AudioTrackController::MidiSynthEngine final : public cydaw::audio::AudioS
 
                 auto segment = remaining;
                 const auto playbackEnd = shouldLoop ? loopEnd : sessionEnd;
-                const auto samplesToEnd = juce::jmax(
+                const auto samplesToEnd = cydaw::base::maximum(
                     1, static_cast<int>(std::ceil(
                            (playbackEnd - position) * rate)));
                 segment = std::min(segment, samplesToEnd);
@@ -5758,7 +5762,7 @@ void AudioTrackController::setSimulationSideSource(const SimulationSideSource so
 void AudioTrackController::setSimulationSource(const SimulationSource source, const float levelDb, const float toneHz) noexcept
 {
     simulation_->source.store(static_cast<int>(source), std::memory_order_relaxed);
-    simulation_->sourceGain.store(juce::Decibels::decibelsToGain(cydaw::base::limit(-60.0f, 6.0f, levelDb), -60.0f),
+    simulation_->sourceGain.store(cydaw::audio::Decibels::decibelsToGain(cydaw::base::limit(-60.0f, 6.0f, levelDb), -60.0f),
                                   std::memory_order_relaxed);
     simulation_->toneHz.store(cydaw::base::limit(20.0f, 20'000.0f, toneHz), std::memory_order_relaxed);
 }
@@ -6049,7 +6053,7 @@ void AudioTrackController::simulationNoteOff(const int noteNumber)
 
 void AudioTrackController::setSimulationOutputGainDb(const float gainDb) noexcept
 {
-    simulation_->outputGain.store(juce::Decibels::decibelsToGain(cydaw::base::limit(-60.0f, 12.0f, gainDb), -60.0f),
+    simulation_->outputGain.store(cydaw::audio::Decibels::decibelsToGain(cydaw::base::limit(-60.0f, 12.0f, gainDb), -60.0f),
                                   std::memory_order_relaxed);
 }
 
@@ -6102,7 +6106,7 @@ cydaw::base::Result AudioTrackController::selfTestNoteExpression()
 
     // The energy of a frequency in a mono run of samples.
     const auto energyAt = [](const std::vector<float>& samples, const double frequency) {
-        const auto omega = 2.0 * juce::MathConstants<double>::pi * frequency / 48'000.0;
+        const auto omega = 2.0 * cydaw::base::MathConstants<double>::pi * frequency / 48'000.0;
         const auto coefficient = 2.0 * std::cos(omega);
         double previous {};
         double before {};
@@ -6210,7 +6214,7 @@ cydaw::base::Result AudioTrackController::selfTestLegatoVoicing()
     const auto energyAt = [](const std::vector<float>& samples, const double frequency, const double from, const double to) {
         const auto first = static_cast<std::size_t>(from * rate);
         const auto last = std::min(samples.size(), static_cast<std::size_t>(to * rate));
-        const auto omega = 2.0 * juce::MathConstants<double>::pi * frequency / rate;
+        const auto omega = 2.0 * cydaw::base::MathConstants<double>::pi * frequency / rate;
         const auto coefficient = 2.0 * std::cos(omega);
         double previous {};
         double before {};
@@ -6546,7 +6550,7 @@ void LoopAuditionSource::getNextAudioBlock(const cydaw::audio::AudioSourceChanne
                     phase_ = ((loop->startFrame % frames) + frames) % frames;
                 }
             }
-            const auto gain = juce::Decibels::decibelsToGain(gainDb_.load(std::memory_order_relaxed));
+            const auto gain = cydaw::audio::Decibels::decibelsToGain(gainDb_.load(std::memory_order_relaxed));
             const auto& rendered = *loop->channels;
             const auto channels = static_cast<int>(rendered.size());
             for (int channel = 0; channel < info.buffer->getNumChannels(); ++channel) {
@@ -6760,10 +6764,10 @@ cydaw::base::Result AudioTrackController::startSamplePreview(
     samplePreviewReader_ = std::move(source);
     samplePreviewTransport_.setSource(samplePreviewReader_.get(), 32'768,
                                       &readAheadThread_, sourceSampleRate);
-    samplePreviewTransport_.setGain(juce::Decibels::decibelsToGain(
+    samplePreviewTransport_.setGain(cydaw::audio::Decibels::decibelsToGain(
         samplePreviewGainDb_.load(std::memory_order_relaxed)));
     samplePreviewTransport_.setPosition(cydaw::base::limit(
-        0.0, juce::jmax(0.0, sourceLengthSeconds - 0.001), startSeconds));
+        0.0, cydaw::base::maximum(0.0, sourceLengthSeconds - 0.001), startSeconds));
     samplePreviewTransport_.start();
     return cydaw::base::Result::ok();
 }
@@ -6902,7 +6906,7 @@ void AudioTrackController::setSamplePreviewGainDb(const float gainDb) noexcept
     const auto value = cydaw::base::limit(-48.0f, 6.0f, gainDb);
     samplePreviewGainDb_.store(value, std::memory_order_relaxed);
     samplePreviewTransport_.setGain(
-        juce::Decibels::decibelsToGain(value));
+        cydaw::audio::Decibels::decibelsToGain(value));
 }
 
 float AudioTrackController::samplePreviewGainDb() const noexcept
@@ -8377,7 +8381,7 @@ void AudioTrackController::setMasterGain(const float gainDb) noexcept
 {
     const auto value = cydaw::base::limit(-60.0f, 12.0f, gainDb);
     masterGainDb_.store(value, std::memory_order_release);
-    masterOutput_.setGain(masterMuted_.load(std::memory_order_acquire) ? 0.0f : juce::Decibels::decibelsToGain(value));
+    masterOutput_.setGain(masterMuted_.load(std::memory_order_acquire) ? 0.0f : cydaw::audio::Decibels::decibelsToGain(value));
 }
 
 void AudioTrackController::setMasterMuted(const bool muted) noexcept
@@ -8860,7 +8864,7 @@ cydaw::base::Result AudioTrackController::selfTestAudioTakeRendering(
         for (int sample = 0; sample < renderedSamples; ++sample)
             correlation += static_cast<double>(rendered.getSample(0, sample))
                            * std::sin(
-                               juce::MathConstants<double>::twoPi
+                               cydaw::base::MathConstants<double>::twoPi
                                * frequency * static_cast<double>(sample)
                                / outputSampleRate);
         return std::abs(correlation);
@@ -8916,7 +8920,7 @@ cydaw::base::Result AudioTrackController::selfTestStretchRendering(
         auto result = 0.0;
         for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
             result += static_cast<double>(buffer.getSample(0, sample))
-                      * std::sin(juce::MathConstants<double>::twoPi
+                      * std::sin(cydaw::base::MathConstants<double>::twoPi
                                  * frequency * static_cast<double>(sample)
                                  / outputSampleRate);
         return std::abs(result);
@@ -11399,7 +11403,7 @@ cydaw::base::Result AudioTrackController::analyseAudioRangeGain(
     if (peak <= 1.0e-7f)
         return cydaw::base::Result::fail(tr("error.normalizeSilent"));
 
-    const auto measuredDb = juce::Decibels::gainToDecibels(peak, -120.0f);
+    const auto measuredDb = cydaw::audio::Decibels::gainToDecibels(peak, -120.0f);
     gainDb = cydaw::base::limit(-60.0f, 12.0f,
                           cydaw::base::limit(-12.0f, 0.0f, targetPeakDb)
                               - measuredDb);
@@ -11685,7 +11689,7 @@ cydaw::base::Result AudioTrackController::renderAudioEdit(
     std::vector<double> dcOffsets(static_cast<std::size_t>(channelCount), 0.0);
     auto renderedGain = 1.0f;
     if (request.operation == AudioEditOperation::amplify) {
-        renderedGain = juce::Decibels::decibelsToGain(
+        renderedGain = cydaw::audio::Decibels::decibelsToGain(
             cydaw::base::limit(-60.0f, 24.0f, request.levelDb), -60.0f);
     } else if (request.operation == AudioEditOperation::normalisePeak
                || request.operation == AudioEditOperation::removeDcOffset) {
@@ -11726,9 +11730,9 @@ cydaw::base::Result AudioTrackController::renderAudioEdit(
                 return cydaw::base::Result::fail(tr("error.normalizeSilent"));
             const auto targetDb = cydaw::base::limit(-24.0f, 0.0f,
                                                 request.levelDb);
-            const auto measuredDb = juce::Decibels::gainToDecibels(
+            const auto measuredDb = cydaw::audio::Decibels::gainToDecibels(
                 peak, -120.0f);
-            renderedGain = juce::Decibels::decibelsToGain(
+            renderedGain = cydaw::audio::Decibels::decibelsToGain(
                 cydaw::base::limit(-60.0f, 24.0f, targetDb - measuredDb), -60.0f);
         } else {
             for (auto& offset : dcOffsets)
@@ -11814,7 +11818,7 @@ cydaw::base::Result AudioTrackController::renderAudioEdit(
                     const auto amount = selectionPosition / fadeDenominator;
                     const auto rising = request.operation == AudioEditOperation::fadeIn ? amount : 1.0 - amount;
                     // The shape: straight, equal power, slow start, fast start.
-                    const auto shaped = request.curve == FadeCurve::equalPower ? std::sin(rising * juce::MathConstants<double>::halfPi)
+                    const auto shaped = request.curve == FadeCurve::equalPower ? std::sin(rising * cydaw::base::MathConstants<double>::halfPi)
                                         : request.curve == FadeCurve::slowStart ? rising * rising
                                         : request.curve == FadeCurve::fastStart ? 1.0 - (1.0 - rising) * (1.0 - rising)
                                                                                 : rising;
@@ -11946,9 +11950,9 @@ cydaw::base::Result AudioTrackController::renderAudioSplice(
                 const auto at = start + i;
                 auto gain = 1.0f;
                 if (fadeInAtStart && at - from < fade)
-                    gain *= std::sin(static_cast<float>(at - from) / static_cast<float>(fade) * juce::MathConstants<float>::halfPi);
+                    gain *= std::sin(static_cast<float>(at - from) / static_cast<float>(fade) * cydaw::base::MathConstants<float>::halfPi);
                 if (fadeOutAtEnd && to - at <= fade)
-                    gain *= std::sin(static_cast<float>(to - at - 1) / static_cast<float>(fade) * juce::MathConstants<float>::halfPi);
+                    gain *= std::sin(static_cast<float>(to - at - 1) / static_cast<float>(fade) * cydaw::base::MathConstants<float>::halfPi);
                 if (gain < 1.0f)
                     for (int channel = 0; channel < channels; ++channel)
                         buffer.setSample(channel, i, buffer.getSample(channel, i) * gain);
@@ -11985,7 +11989,7 @@ cydaw::base::Result AudioTrackController::renderAudioSplice(
             // The pasted sound faded at both ends.
             const auto count = pasted.getNumSamples();
             for (int i = 0; i < std::min(fade, count); ++i) {
-                const auto gain = std::sin(static_cast<float>(i) / static_cast<float>(fade) * juce::MathConstants<float>::halfPi);
+                const auto gain = std::sin(static_cast<float>(i) / static_cast<float>(fade) * cydaw::base::MathConstants<float>::halfPi);
                 for (int channel = 0; channel < channels; ++channel) {
                     pasted.setSample(channel, i, pasted.getSample(channel, i) * gain);
                     pasted.setSample(channel, count - 1 - i, pasted.getSample(channel, count - 1 - i) * gain);
@@ -14200,7 +14204,7 @@ void AudioTrackController::setMidiTrackRackPadMix(const std::uint64_t trackId, c
     if (slot == nullptr)
         return;
     slot->playAs.store(mix.playAs, std::memory_order_relaxed);
-    slot->gain.store(juce::Decibels::decibelsToGain(mix.gainDb, -96.0f), std::memory_order_relaxed);
+    slot->gain.store(cydaw::audio::Decibels::decibelsToGain(mix.gainDb, -96.0f), std::memory_order_relaxed);
     slot->pan.store(cydaw::base::limit(-1.0f, 1.0f, mix.pan), std::memory_order_relaxed);
     slot->muted.store(mix.muted, std::memory_order_relaxed);
     slot->solo.store(mix.solo, std::memory_order_relaxed);
@@ -16758,13 +16762,13 @@ void AudioTrackController::refreshTrackGains() noexcept
     };
     for (auto& track : tracks_) {
         const auto audible = !track->muted && (!anySolo || track->solo || soloReached(&track->latencySource));
-        const auto gain = audible ? juce::Decibels::decibelsToGain(track->gainDb, -60.0f) : 0.0f;
+        const auto gain = audible ? cydaw::audio::Decibels::decibelsToGain(track->gainDb, -60.0f) : 0.0f;
         track->gainPanSource.setGain(gain);
         track->gainPanSource.setSendsAudible(audible);
     }
     for (auto& track : midiTracks_) {
         const auto audible = !track->muted && (!anySolo || track->solo || soloReached(&track->latencySource));
-        const auto gain = audible ? juce::Decibels::decibelsToGain(track->gainDb, -60.0f) : 0.0f;
+        const auto gain = audible ? cydaw::audio::Decibels::decibelsToGain(track->gainDb, -60.0f) : 0.0f;
         track->gainPanSource.setGain(gain);
         track->gainPanSource.setSendsAudible(audible);
         track->gainPanSource.setPan(track->pan);
@@ -17269,7 +17273,7 @@ cydaw::base::Result AudioTrackController::rebuildRouting()
         if (!from)
             continue;
         for (const auto& out : entry.outputs) {
-            const auto gain = juce::Decibels::decibelsToGain(cydaw::base::limit(-60.0f, 12.0f, out.gainDb), -60.0f);
+            const auto gain = cydaw::audio::Decibels::decibelsToGain(cydaw::base::limit(-60.0f, 12.0f, out.gainDb), -60.0f);
             if (out.hardwareBus != 0) {
                 // A bus removed since: that output went with it.
                 if (const auto bus = virtualBusRouter_.bus(out.hardwareBus); bus && bus->direction == VirtualBusDirection::output)

@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/File.h>
 #include "InterfaceEditor.h"
 #include "CustomInterface.h"
@@ -86,7 +87,7 @@ void InterfaceEditor::drawLayers(GraphSlot &slot)
         }
         ImGui::SameLine();
         const auto name =
-            it->label.isNotEmpty() ? it->label : cydaw::base::Text("#") + cydaw::base::Text(static_cast<juce::int64>(it->id));
+            it->label.isNotEmpty() ? it->label : cydaw::base::Text("#") + cydaw::base::Text(static_cast<std::int64_t>(it->id));
         if (ImGui::Selectable(name.toRawUTF8(), selection_.contains(it->id) || selected_ == it->id))
         {
             selected_ = it->id;
@@ -166,7 +167,7 @@ void InterfaceEditor::drawLayers(GraphSlot &slot)
         }
         if (ImGui::SmallButton(L("Grouper", "Group")))
         {
-            const auto group = "group-" + cydaw::base::Text(static_cast<juce::int64>(interface_.nextControlId++));
+            const auto group = "group-" + cydaw::base::Text(static_cast<std::int64_t>(interface_.nextControlId++));
             for (auto &c : interface_.controls)
                 if (selection_.contains(c.id))
                     setDesign(c, "group", group);
@@ -198,7 +199,7 @@ bool InterfaceEditor::addInstrumentInterface(GraphSlot& slot,std::uint64_t nodeI
         Control c;c.id=interface_.nextControlId++;c.kind=Kind::nativePanel;c.label=cydaw::base::Text(p.title);c.extraParameterBindings=bindings;
         c.design=new cydaw::base::Object;auto* d=c.design.getDynamicObject();
         d->setProperty("instrumentType",node->typeKey);d->setProperty("instrumentPanel",cydaw::base::Text(p.id));d->setProperty("instrumentCompact",deviceLayout_);d->setProperty("instrumentKeys",keys);
-        const auto color=ImGui::ColorConvertU32ToFloat4(p.colour);d->setProperty("accent",juce::Colour::fromFloatRGBA(color.x,color.y,color.z,color.w).toString());
+        const auto color=ImGui::ColorConvertU32ToFloat4(p.colour);d->setProperty("accent",cydaw::base::Colour::fromFloatRGBA(color.x,color.y,color.z,color.w).toString());
         if(whole) {
             float total=0,before=0;for(const auto& sibling:panels)if(sibling.page==p.page && sibling.row==p.row){if(sibling.id==p.id)before=total;total+=sibling.weight;}
             c.x=.02f+.96f*before/std::max(.1f,total);c.width=.96f*p.weight/std::max(.1f,total)-.008f;
@@ -227,7 +228,7 @@ bool InterfaceEditor::addInstrumentSection(GraphSlot& slot,const cydaw::base::Te
     c.x=.05f;c.y=.08f;c.width=.65f;c.height=.75f;c.design=new cydaw::base::Object;
     auto* d=c.design.getDynamicObject();d->setProperty("instrumentType",type);d->setProperty("instrumentPanel",panelId);
     d->setProperty("instrumentCompact",deviceLayout_);d->setProperty("instrumentKeys",cydaw::base::Array<cydaw::base::Value>{});
-    const auto color=ImGui::ColorConvertU32ToFloat4(spec->colour);d->setProperty("accent",juce::Colour::fromFloatRGBA(color.x,color.y,color.z,color.w).toString());
+    const auto color=ImGui::ColorConvertU32ToFloat4(spec->colour);d->setProperty("accent",cydaw::base::Colour::fromFloatRGBA(color.x,color.y,color.z,color.w).toString());
     if(page_.isNotEmpty())d->setProperty("page",page_);
     interface_.controls.push_back(c);selected_=c.id;selection_={c.id};
     return push(slot,true);
@@ -329,7 +330,7 @@ ImU32 InterfaceEditor::surfaceColour(const char* key, ImU32 fallback) const
 {
     const auto value=interface_.windowDesign.getProperty(key,{}).toString();
     if(value.isEmpty())return fallback;
-    const auto c=juce::Colour::fromString(value);
+    const auto c=cydaw::base::Colour::fromString(value);
     return ImGui::ColorConvertFloat4ToU32({c.getFloatRed(),c.getFloatGreen(),c.getFloatBlue(),c.getFloatAlpha()});
 }
 
@@ -364,7 +365,7 @@ void InterfaceEditor::drawWindowProperties(GraphSlot& slot)
         const char* label=cydaw::base::Text(key)=="background"?L("Fond","Background"):cydaw::base::Text(key)=="accent"?L("Accent","Accent"):L("Texte","Text");
         if(ImGui::ColorEdit4(label,rgba,ImGuiColorEditFlags_NoInputs)) {
             auto design=interface_.windowDesign.isObject()?interface_.windowDesign.clone():cydaw::base::Value(new cydaw::base::Object);
-            design.getDynamicObject()->setProperty(key,juce::Colour::fromFloatRGBA(rgba[0],rgba[1],rgba[2],rgba[3]).toString());
+            design.getDynamicObject()->setProperty(key,cydaw::base::Colour::fromFloatRGBA(rgba[0],rgba[1],rgba[2],rgba[3]).toString());
             interface_.windowDesign=design;push(slot,false);
         }
         if(ImGui::IsItemDeactivatedAfterEdit())push(slot,true);
@@ -458,12 +459,12 @@ void InterfaceEditor::styleProperties(GraphSlot &slot, Control &control)
         auto rgba = ImGui::ColorConvertU32ToFloat4(fallback);
         if (text.isNotEmpty())
         {
-            const auto c = juce::Colour::fromString(text);
+            const auto c = cydaw::base::Colour::fromString(text);
             rgba = {c.getFloatRed(), c.getFloatGreen(), c.getFloatBlue(), c.getFloatAlpha()};
         }
         if (ImGui::ColorEdit4(id, &rgba.x, ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_NoInputs))
         {
-            setDesign(control, key, juce::Colour::fromFloatRGBA(rgba.x, rgba.y, rgba.z, rgba.w).toString());
+            setDesign(control, key, cydaw::base::Colour::fromFloatRGBA(rgba.x, rgba.y, rgba.z, rgba.w).toString());
             push(slot, false);
         }
         if (ImGui::IsItemDeactivatedAfterEdit())

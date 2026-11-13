@@ -8,7 +8,6 @@
 
 #include <imgui.h>
 
-#include <juce_gui_basics/juce_gui_basics.h>
 
 #include <functional>
 #include <memory>

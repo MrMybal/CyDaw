@@ -62,9 +62,11 @@ def package(build, output, alpha=False, juce_source=None):
     for file in required:
         if not file.is_file():
             raise FileNotFoundError('Missing runtime file: ' + str(file))
-    juce_licence = Path(juce_source) / 'LICENSE.md' if juce_source else ROOT / 'third_party/JUCE/LICENSE.md'
-    if not juce_licence.is_file():
-        raise FileNotFoundError('JUCE notice missing; supply --juce-source')
+    # Only explicitly requested historical fixture builds carry a JUCE notice.
+    # Production CyDaw has no JUCE runtime or checkout requirement.
+    juce_licence = Path(juce_source) / 'LICENSE.md' if juce_source else None
+    if juce_licence is not None and not juce_licence.is_file():
+        raise FileNotFoundError('Requested historical JUCE notice is missing')
     # An incomplete offline manual must never silently ship in a release.
     spec = importlib.util.spec_from_file_location('cydaw_manual_validate',
         Path(__file__).resolve().parents[1] / '.CyDocBuild/tools/validate.py')
@@ -93,7 +95,8 @@ def package(build, output, alpha=False, juce_source=None):
             shutil.copytree(factory, stage / 'Factory', ignore=shutil.ignore_patterns('*.flac', '*.wav'))
         shutil.copy2(ROOT / 'LICENSE', stage / 'LICENSE')
         shutil.copy2(ROOT / 'README.md', stage / 'README.md')
-        shutil.copy2(juce_licence, stage / 'JUCE_LICENSE.md')
+        if juce_licence is not None:
+            shutil.copy2(juce_licence, stage / 'JUCE_LICENSE.md')
         for notice in (ROOT / 'third_party/imgui/LICENSE.txt', ROOT / 'third_party/zstd/LICENSE'):
             if notice.is_file():
                 destination = stage / 'Licenses' / notice.parent.name

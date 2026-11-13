@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/Text.h>
 #include "CurveEditor.h"
 #include <cyui/modules/Plots.h>
@@ -830,7 +831,7 @@ bool Editor::drawBar(std::vector<Point>& points, const Lane& lane, const double 
     ImGui::DragFloat("##random", &randomAmount_, 0.005f, 0.0f, 1.0f, "%.2f", ImGuiSliderFlags_None);
     ImGui::SameLine(0.0f, dp(2.0f));
     if (ImGui::SmallButton(L("Hasard", "Random"))) {
-        auto& random = juce::Random::getSystemRandom();
+        auto& random = cydaw::base::Random::getSystemRandom();
         for (auto* point : picked)
             point->value = valueOf(lane, partOf(lane, point->value) + (random.nextDouble() * 2.0 - 1.0) * randomAmount_);
         changed = true;

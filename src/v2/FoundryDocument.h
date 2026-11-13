@@ -3,7 +3,6 @@
 
 #include <cydaw/engine/FoundrySession.h>
 
-#include <juce_audio_formats/juce_audio_formats.h>
 
 #include <memory>
 #include <vector>

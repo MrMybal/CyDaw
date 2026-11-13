@@ -513,8 +513,17 @@ def main():
                                      rating=4, tags=["test", "punchy"], bpm=124)
                 if not edited["favourite"] or edited["rating"] != 4 or edited["bpm"] != 124:
                     failures.append("set_sample: %s" % edited)
-                if not os.path.isfile(os.path.join(cache, "sample-library.json")):
-                    failures.append("no sample-library.json in the chosen cache")
+                binary_cache = os.path.join(cache, "sample-library.bin")
+                for _ in range(100):
+                    if os.path.isfile(binary_cache):
+                        break
+                    time.sleep(0.05)
+                if not os.path.isfile(binary_cache):
+                    failures.append("no sample-library.bin in the chosen cache")
+                else:
+                    with open(binary_cache, "rb") as stored:
+                        if stored.read(4) != b"CYSL":
+                            failures.append("sample cache binary header is invalid")
             if found:
                 selected = client.tool("select_sample", path=found[0]["path"])
                 if selected["name"] != found[0]["name"]:

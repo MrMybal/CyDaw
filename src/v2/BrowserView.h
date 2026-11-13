@@ -8,7 +8,7 @@
 #include "UiState.h"
 
 #include <imgui.h>
-#include <juce_gui_basics/juce_gui_basics.h>
+
 
 #include <map>
 #include <memory>

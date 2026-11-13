@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/Text.h>
 #include "DeviceEditorView.h"
 
@@ -24,11 +25,11 @@ DeviceEditorView::~DeviceEditorView() = default;
 
 std::string DeviceEditorView::windowId(const TrackRef& track, const std::uint64_t nodeId)
 {
-    const auto kind = track.isBus()   ? "b" + cydaw::base::Text(static_cast<juce::int64>(track.bus))
+    const auto kind = track.isBus()   ? "b" + cydaw::base::Text(static_cast<std::int64_t>(track.bus))
                       : track.master  ? cydaw::base::Text("m")
-                      : track.midi    ? "i" + cydaw::base::Text(static_cast<juce::int64>(track.midiId))
-                                      : "a" + cydaw::base::Text(static_cast<juce::int64>(track.audioIndex));
-    return ("###device-" + kind + "-" + cydaw::base::Text(static_cast<juce::int64>(nodeId))).toStdString();
+                      : track.midi    ? "i" + cydaw::base::Text(static_cast<std::int64_t>(track.midiId))
+                                      : "a" + cydaw::base::Text(static_cast<std::int64_t>(track.audioIndex));
+    return ("###device-" + kind + "-" + cydaw::base::Text(static_cast<std::int64_t>(nodeId))).toStdString();
 }
 
 void DeviceEditorView::draw()
@@ -110,7 +111,7 @@ bool DeviceEditorView::drawWindow(ExpandedPane& expanded, const int order)
                     continue;
                 const auto low = std::min(target.minimum, target.maximum);
                 const auto high = std::max(target.minimum, target.maximum);
-                const auto value = juce::jlimit(low, high, target.base + output * target.amount * (target.maximum - target.minimum));
+                const auto value = cydaw::base::limit(low, high, target.base + output * target.amount * (target.maximum - target.minimum));
                 modulated[target.binding] = static_cast<float>(value);
             }
         }

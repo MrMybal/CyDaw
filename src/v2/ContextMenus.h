@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/Text.h>
 #pragma once
 
@@ -23,7 +24,7 @@ public:
 private:
     void trackMenu(const TrackRef& track);
     void slotMenu(const TrackRef& track, int scene);
-    void colourMenu(const std::function<void(juce::uint32)>& apply);
+    void colourMenu(const std::function<void(std::uint32_t)>& apply);
     void renameDialog();
     void askRename(const cydaw::base::Text& current);
 

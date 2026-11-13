@@ -6,8 +6,8 @@
 #include <cydaw/base/File.h>
 #pragma once
 #include <functional>
-#include <juce_audio_devices/juce_audio_devices.h>
-#include <juce_data_structures/juce_data_structures.h>
+
+
 #include <memory>
 namespace cydaw::v2 {
 // Transport only: no audio device is opened or changed. Callbacks run on the message thread.

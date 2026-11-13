@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/Process.h>
 #include <cydaw/base/FileDialog.h>
 #include <cydaw/base/Thread.h>
@@ -210,7 +211,7 @@ void JsfxView::compile(bool apply, bool insert)
         error_ = true;
         return;
     }
-    auto source = folder.getChildFile(".cydaw-jsfx-" + juce::Uuid().toString() + ".jsfx");
+    auto source = folder.getChildFile(".cydaw-jsfx-" + cydaw::base::Uuid().toString() + ".jsfx");
     if (!source.replaceWithText(cydaw::base::Text::fromUTF8(code_.data())))
     {
         status_ = "Cannot write compiler source";

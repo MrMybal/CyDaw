@@ -215,56 +215,33 @@ cydaw::base::Text withoutDirection(const cydaw::base::Text& name)
 
 // ---- OSC -----------------------------------------------------------------------------------
 
-struct Controllers::Impl::OscPort final : juce::OSCReceiver::Listener<juce::OSCReceiver::RealtimeCallback> {
-    OscPort(Impl& owner, std::string device) : owner_(owner), device_(std::move(device)) {}
-    ~OscPort() override
-    {
-        // The receiver's thread stopped first: it may be calling the listeners.
-        receiver.disconnect();
-        receiver.removeListener(this);
-        sender.disconnect();
-    }
-    void oscMessageReceived(const juce::OSCMessage& message) override { take(message); }
-    void oscBundleReceived(const juce::OSCBundle& bundle) override { takeBundle(bundle, 0); }
-    // Bundles in bundles, to a depth (a packet can nest thousands).
-    void takeBundle(const juce::OSCBundle& bundle, const int depth)
-    {
-        if (depth > 16)
-            return;
-        for (const auto& element : bundle) {
-            if (element.isMessage())
-                take(element.getMessage());
-            else if (element.isBundle())
-                takeBundle(element.getBundle(), depth + 1);
-        }
-    }
+struct Controllers::Impl::OscPort final {
+    OscPort(Impl& owner, std::string device)
+        :receiver([this](const control::osc::Message& message){take(message);}),owner_(owner),device_(std::move(device)){}
+    ~OscPort(){receiver.disconnect();sender.disconnect();}
     // Each number its own address; none: a press and its let go.
-    void take(const juce::OSCMessage& message)
+    void take(const control::osc::Message& message)
     {
-        const auto address = message.getAddressPattern().toString().toStdString();
+        const auto& address = message.address;
         auto index = 0;
-        for (const auto& argument : message) {
+        for (const auto& argument : message.arguments) {
             // A controller sends a few numbers per address, not thousands.
             if (index >= 64)
                 break;
-            std::optional<double> value;
-            if (argument.isFloat32())
-                value = argument.getFloat32();
-            else if (argument.isInt32())
-                value = argument.getInt32();
+            const auto value = argument;
             if (!value)
                 continue;
             owner_.post({ Incoming::Kind::message, device_, { index == 0 ? address : address + "#" + std::to_string(index), *value } });
             ++index;
         }
-        if (message.isEmpty()) {
+        if (message.arguments.empty()) {
             owner_.post({ Incoming::Kind::message, device_, { address, 1.0 } });
             owner_.post({ Incoming::Kind::message, device_, { address, 0.0 } });
         }
     }
 
-    juce::OSCReceiver receiver;
-    juce::OSCSender sender;
+    control::osc::Receiver receiver;
+    control::osc::Sender sender;
     bool listening {};
     bool sending {};
 
@@ -496,9 +473,7 @@ void Controllers::Impl::applyRaw(RawDevice& device)
         auto port = std::make_unique<OscPort>(*this, device.id);
         if (device.listenPort > 0) {
             port->listening = port->receiver.connect(device.listenPort);
-            if (port->listening)
-                port->receiver.addListener(port.get());
-            else
+            if (!port->listening)
                 device.error = ui::Ls("Le port ", "Port ") + cydaw::base::Text(device.listenPort)
                                + ui::Ls(" est déjà pris.", " is already taken.");
         }
@@ -614,11 +589,7 @@ void Controllers::Impl::send(const std::string_view id, const control::RawMessag
         // A second number ("#1") is not said back on its own.
         if (message.address.empty() || message.address[0] != '/' || message.address.find('#') != std::string::npos)
             return;
-        try {
-            (void) device->osc->sender.send(juce::OSCAddressPattern(cydaw::base::Text(message.address)), static_cast<float>(message.value));
-        } catch (const juce::OSCFormatError&) {
-            return;
-        }
+        (void) device->osc->sender.send(message.address,static_cast<float>(message.value));
     } else if (device->kind == RawKind::plugin) {
         if (pluginThread == nullptr || device->plugin < 0)
             return;

@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/FileDialog.h>
 #include <cydaw/base/File.h>
 #include "RoutingUi.h"
@@ -54,7 +55,7 @@ bool wholeVoiceType(const cydaw::base::Text& typeKey)
 }
 constexpr float kCell = 54.0f;
 
-ImU32 toImColour(const juce::Colour colour)
+ImU32 toImColour(const cydaw::base::Colour colour)
 {
     return IM_COL32(colour.getRed(), colour.getGreen(), colour.getBlue(), colour.getAlpha());
 }
@@ -457,7 +458,7 @@ void DevicesView::draw()
             const auto low = std::min(target.minimum, target.maximum);
             const auto high = std::max(target.minimum, target.maximum);
             const auto range = target.maximum - target.minimum;
-            const auto value = juce::jlimit(low, high, target.base + output * target.amount * range);
+            const auto value = cydaw::base::limit(low, high, target.base + output * target.amount * range);
             modulated[target.binding] = static_cast<float>(value);
         }
     }
@@ -1190,7 +1191,7 @@ void DevicesView::drawCard(Strip& strip, const app::GraphDocument::EditorNode& c
         }
         if (designed) {
             ImGui::SetCursorScreenPos(ImVec2(x, origin.y + bodyTop));
-            const auto playedId = "designed" + cydaw::base::Text(static_cast<juce::int64>(node->id));
+            const auto playedId = "designed" + cydaw::base::Text(static_cast<std::int64_t>(node->id));
             designed_->drawPlayed(playedId.toRawUTF8(), *designed, ImVec2(designedWidth, bodyHeight - dp(4.0f)),
                                   [&graph, this](const cydaw::base::Text& key, const double value) {
                                       (void) graph.editorSetParameter(key, value);
@@ -1464,7 +1465,7 @@ void DevicesView::drawContainerPanel(Strip& strip, const app::GraphDocument::Edi
             if (ImGui::IsItemHovered() || ImGui::IsItemActive())
                 ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
             if (ImGui::IsItemActive())
-                set(parameter->binding, juce::jlimit(parameter->minimum, parameter->maximum, hzOf(ImGui::GetIO().MousePos.x)));
+                set(parameter->binding, cydaw::base::limit(parameter->minimum, parameter->maximum, hzOf(ImGui::GetIO().MousePos.x)));
             if (ImGui::IsItemHovered())
                 ImGui::SetTooltip("%s: %.0f Hz", parameter->label.toRawUTF8(), parameter->value);
             ImGui::PopID();
@@ -1722,7 +1723,7 @@ void DevicesView::drawContainerPanel(Strip& strip, const app::GraphDocument::Edi
         ImGui::TextDisabled("%s", "Its devices follow it, in its frame; Mix blends them with the sound that came in.");
         ImGui::PopTextWrapPos();
     }
-    juce::ignoreUnused(top);
+    cydaw::base::ignoreUnused(top);
     ImGui::PopFont();
     ImGui::SetCursorScreenPos(at);
     ImGui::Dummy(ImVec2(size.x, 1.0f));
@@ -2205,7 +2206,7 @@ void DevicesView::drawParameterMenu()
 DevicesView::PluginParameters& DevicesView::pluginParameters(const std::size_t trackIndex, const std::size_t pluginIndex,
                                                              const cydaw::base::File& file, const bool refresh)
 {
-    const auto key = cydaw::base::Text(static_cast<juce::int64>(trackIndex)) + ":" + cydaw::base::Text(static_cast<juce::int64>(pluginIndex))
+    const auto key = cydaw::base::Text(static_cast<std::int64_t>(trackIndex)) + ":" + cydaw::base::Text(static_cast<std::int64_t>(pluginIndex))
                      + ":" + file.getFullPathName();
     auto& entry = pluginParameters_[key];
     const auto now = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;

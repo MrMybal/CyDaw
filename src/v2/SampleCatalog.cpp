@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/EventLoop.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
@@ -165,7 +166,7 @@ std::string SampleCatalog::fold(const cydaw::base::Text& text)
             out.push_back(static_cast<char>(c >= 'A' && c <= 'Z' ? c + 32 : c));
             continue;
         }
-        c = juce::CharacterFunctions::toLowerCase(c);
+        c = cydaw::base::CharacterFunctions::toLowerCase(c);
         switch (c) {
         case 0xe0: case 0xe1: case 0xe2: case 0xe3: case 0xe4: case 0xe5: out.push_back('a'); continue;
         case 0xe7: out.push_back('c'); continue;
@@ -179,11 +180,7 @@ std::string SampleCatalog::fold(const cydaw::base::Text& text)
         default: break;
         }
         // Anything else as its UTF-8 bytes.
-        char bytes[8] {};
-        juce::CharPointer_UTF8 writer(bytes);
-        writer.write(c);
-        writer.writeNull();
-        out += bytes;
+        out += cydaw::base::Text::charToString(c).toStdString();
     }
     return out;
 }
@@ -332,7 +329,7 @@ std::shared_ptr<SampleCatalog::Data> SampleCatalog::build(Extract extract, const
         item.bank = raw.bank;
         item.lengthText = durationText(raw.length);
         if (raw.bpm > 0.0f)
-            item.bpmText = cydaw::base::Text(juce::roundToInt(raw.bpm));
+            item.bpmText = cydaw::base::Text(cydaw::base::roundToInt(raw.bpm));
         if (raw.rate > 0.0f)
             item.rateText = cydaw::base::Text(raw.rate / 1000.0f, raw.rate == std::floor(raw.rate / 1000.0f) * 1000.0f ? 0 : 1);
 

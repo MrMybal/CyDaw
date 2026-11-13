@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/audio/SampleBuffer.h>
 #include <cydaw/base/TextMap.h>
 #include <cydaw/integration/AudioFiles.h>
@@ -21,7 +22,7 @@ using engine::foundry::Track;
 namespace {
 
 // Hours of a sound in memory would not fit: this many frames at most.
-constexpr juce::int64 largestFile = static_cast<juce::int64>(48'000) * 60 * 60 * 3;
+constexpr std::int64_t largestFile = static_cast<std::int64_t>(48'000) * 60 * 60 * 3;
 
 int intOf(const cydaw::base::TextMap& values, const cydaw::base::Text& key, const int fallback = 0)
 {
@@ -74,15 +75,15 @@ std::shared_ptr<const engine::foundry::Sound> FoundryDocument::readSound(const c
     const auto channels = static_cast<int>(std::clamp<unsigned>(reader->numChannels, 1u, static_cast<unsigned>(engine::foundry::maximumChannels)));
     std::vector<std::vector<float>> data;
     try {
-        data.assign(static_cast<std::size_t>(channels), std::vector<float>(static_cast<std::size_t>(std::max<juce::int64>(0, frames))));
+        data.assign(static_cast<std::size_t>(channels), std::vector<float>(static_cast<std::size_t>(std::max<std::int64_t>(0, frames))));
     } catch (const std::bad_alloc&) {
         error = ui::Ls("Pas assez de mémoire pour ", "Not enough memory for ") + file.getFileName();
         return nullptr;
     }
     constexpr int chunk = 1 << 16;
     cydaw::audio::SampleBuffer<float> buffer(static_cast<int>(std::max(1u, reader->numChannels)), chunk);
-    for (juce::int64 at = 0; at < frames; at += chunk) {
-        const auto n = static_cast<int>(std::min<juce::int64>(chunk, frames - at));
+    for (std::int64_t at = 0; at < frames; at += chunk) {
+        const auto n = static_cast<int>(std::min<std::int64_t>(chunk, frames - at));
         buffer.clear();
         if (!reader->read(&buffer, 0, n, at, true, true)) {
             error = ui::Ls("Lecture impossible : ", "Cannot read: ") + file.getFileName();
@@ -433,7 +434,7 @@ cydaw::base::Result FoundryDocument::saveSession(const cydaw::base::File& file)
     cydaw::base::Array<cydaw::base::Value> tracks;
     for (const auto& track : session.tracks) {
         auto* entry = new cydaw::base::Object();
-        entry->setProperty("id",static_cast<juce::int64>(track.id));
+        entry->setProperty("id",static_cast<std::int64_t>(track.id));
         entry->setProperty("name", fromUtf8(track.name));
         entry->setProperty("gainDb", track.gainDb);
         entry->setProperty("pan", track.pan);
@@ -442,13 +443,13 @@ cydaw::base::Result FoundryDocument::saveSession(const cydaw::base::File& file)
         entry->setProperty("midi",track.midi);
         entry->setProperty("bus",track.bus);
         entry->setProperty("virtualGroup",track.virtualGroup);
-        entry->setProperty("parentId",static_cast<juce::int64>(track.parentId));
+        entry->setProperty("parentId",static_cast<std::int64_t>(track.parentId));
         entry->setProperty("containerStart",track.containerStart);entry->setProperty("containerLength",track.containerLength);
         entry->setProperty("automation",foundry_json::automation(track.automation));
         cydaw::base::Array<cydaw::base::Value> clips;
         for (const auto& clip : track.clips) {
             auto* item = new cydaw::base::Object();
-            item->setProperty("id",static_cast<juce::int64>(clip.id));
+            item->setProperty("id",static_cast<std::int64_t>(clip.id));
             item->setProperty("notes",foundry_json::notes(clip.notes));
             item->setProperty("name", fromUtf8(clip.name));
             item->setProperty("start", clip.start);
@@ -467,7 +468,7 @@ cydaw::base::Result FoundryDocument::saveSession(const cydaw::base::File& file)
                 if (name.isEmpty()) {
                     if (!folder.createDirectory())
                         return cydaw::base::Result::fail(ui::Ls("Dossier impossible à créer : ", "Cannot make the folder: ") + folder.getFullPathName());
-                    name = folder.getFileName() + "/clip-" + cydaw::base::Text(static_cast<juce::int64>(clip.id)) + ".wav";
+                    name = folder.getFileName() + "/clip-" + cydaw::base::Text(static_cast<std::int64_t>(clip.id)) + ".wav";
                     if (const auto result = writeSound(*clip.sound, file.getSiblingFile(name), 32); result.failed())
                         return result;
                 }
@@ -515,7 +516,7 @@ std::unique_ptr<FoundryDocument> FoundryDocument::openSession(const cydaw::base:
     session.picture.fps=std::clamp(number(picture,"fps",25),1.0,240.0);
     session.rate = number(document, "rate", 48'000.0);
     session.tempo=std::clamp(number(document,"tempo",120),20.0,400.0);
-    session.span=static_cast<juce::int64>(document.getProperty("span",0));
+    session.span=static_cast<std::int64_t>(document.getProperty("span",0));
     session.masterAutomation=foundry_json::automation(document.getProperty("masterAutomation",{}));
     std::map<cydaw::base::Text, std::shared_ptr<const Sound>> read;
     if (const auto* tracks = document.getProperty("tracks", cydaw::base::Value()).getArray())

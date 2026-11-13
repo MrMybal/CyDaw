@@ -1,3 +1,4 @@
+#include <cydaw/base/Url.h>
 #include <cydaw/base/Utilities.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
@@ -642,7 +643,7 @@ bool SoundBanks::fetch(const Wanted& wanted, const int generation, cydaw::base::
             cydaw::base::Thread::sleep(1'000 * attempt);
         auto status = 0;
         const auto url = urlOf(*bank, wanted.file, lfs);
-        auto stream = juce::URL(url).createInputStream(juce::URL::InputStreamOptions(juce::URL::ParameterHandling::inAddress)
+        auto stream = cydaw::base::Url(url).createInputStream(cydaw::base::Url::InputStreamOptions(cydaw::base::Url::ParameterHandling::inAddress)
                                                            .withConnectionTimeoutMs(30'000)
                                                            .withNumRedirectsToFollow(5)
                                                            .withStatusCode(&status));
@@ -660,22 +661,22 @@ bool SoundBanks::fetch(const Wanted& wanted, const int generation, cydaw::base::
                 error = "cannot write " + partial.getFullPathName();
                 return false;
             }
-            juce::HeapBlock<char> buffer(1 << 16);
+            std::vector<char> buffer(1 << 16);
             for (;;) {
                 if (stopped()) {
                     out.flush();
                     break;
                 }
-                const auto read = stream->read(buffer.get(), 1 << 16);
+                const auto read = stream->read(buffer.data(), 1 << 16);
                 if (read <= 0)
                     break;
-                if (!out.write(buffer.get(), static_cast<std::size_t>(read))) {
+                if (!out.write(buffer.data(), static_cast<std::size_t>(read))) {
                     error = "cannot write " + partial.getFullPathName();
                     break;
                 }
                 written += read;
                 if (wanted.file.sha256.isNotEmpty())
-                    hash.add(buffer.get(), static_cast<std::size_t>(read));
+                    hash.add(buffer.data(), static_cast<std::size_t>(read));
                 addBytes(read);
             }
         }

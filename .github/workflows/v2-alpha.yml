@@ -69,7 +69,6 @@ jobs:
         run: >-
           python tools/package_v2_test.py --alpha
           --build-dir build/windows-wasapi/CyDAW2_artefacts/Release
-          --juce-source build/windows-wasapi/_deps/juce-src
           --output artifacts/v2-alpha
       - uses: actions/upload-artifact@v4
         with:

@@ -3,7 +3,6 @@
 
 #include "StudioTypes.h"
 
-#include <juce_core/juce_core.h>
 
 #include <optional>
 #include <string>

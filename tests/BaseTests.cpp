@@ -14,6 +14,10 @@ void require(bool pass, const char *text) {
 }
 int main() {
   try {
+#ifdef _WIN32
+    auto crossVolume=File("D:/CyDaw-test/clip.wav").getRelativePathFrom(File("C:/CyDaw-test/project"));
+    require(crossVolume==File("D:/CyDaw-test/clip.wav").getFullPathName(),"cross-volume project assets retain absolute paths");
+#endif
     Image pixels(2,2);pixels.setPixelAt(0,0,Colour::fromRGBA(255,0,0,128));pixels.setPixelAt(1,0,Colour::fromRGBA(0,255,0,255));
     MemoryOutputStream png;require(pixels.writePng(png),"native PNG encoding");
     auto image=Image::decode(png.getData(),png.getDataSize());

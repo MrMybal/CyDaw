@@ -1,3 +1,6 @@
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/Compression.h>
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Xml.h>
 #include <cydaw/base/Text.h>
@@ -33,8 +36,8 @@ public:
             cydaw::base::MemoryBlock bytes;
             if (!file_.loadFileAsData(bytes) || bytes.getSize() < 6)
                 return cydaw::base::Result::fail("The file could not be opened: " + file_.getFullPathName());
-            juce::MemoryInputStream compressed(static_cast<const char*>(bytes.getData()) + 4, bytes.getSize() - 4, false);
-            juce::GZIPDecompressorInputStream unzipped(&compressed, false, juce::GZIPDecompressorInputStream::zlibFormat);
+            cydaw::base::MemoryInputStream compressed(static_cast<const char*>(bytes.getData()) + 4, bytes.getSize() - 4, false);
+            cydaw::base::InflateStream unzipped(&compressed, false, cydaw::base::InflateStream::zlibFormat);
             document = cydaw::base::XmlDocument::parse(readBounded(unzipped));
         } else {
             document = cydaw::base::XmlDocument::parse(file_);
@@ -44,9 +47,9 @@ public:
         out_.format = "lmms";
         out_.application = "LMMS " + document->getStringAttribute("creatorversion");
         if (const auto* head = document->getChildByName("head")) {
-            out_.tempo = juce::jlimit(10.0, 999.0, head->getDoubleAttribute("bpm", 140.0));
-            out_.numerator = juce::jlimit(1, 32, head->getIntAttribute("timesig_numerator", 4));
-            out_.denominator = juce::jlimit(1, 32, head->getIntAttribute("timesig_denominator", 4));
+            out_.tempo = cydaw::base::limit(10.0, 999.0, head->getDoubleAttribute("bpm", 140.0));
+            out_.numerator = cydaw::base::limit(1, 32, head->getIntAttribute("timesig_numerator", 4));
+            out_.denominator = cydaw::base::limit(1, 32, head->getIntAttribute("timesig_denominator", 4));
             out_.masterGainDb = linearToDb(head->getDoubleAttribute("mastervol", 100.0) / 100.0);
         }
         const auto* song = document->getChildByName("song");
@@ -87,7 +90,7 @@ private:
         const auto* instrumentTrack = element.getChildByName("instrumenttrack");
         if (instrumentTrack != nullptr) {
             track.gainDb = linearToDb(instrumentTrack->getDoubleAttribute("vol", 100.0) / 100.0);
-            track.pan = static_cast<float>(juce::jlimit(-1.0, 1.0, instrumentTrack->getDoubleAttribute("pan", 0.0) / 100.0));
+            track.pan = static_cast<float>(cydaw::base::limit(-1.0, 1.0, instrumentTrack->getDoubleAttribute("pan", 0.0) / 100.0));
             if (const auto* instrument = instrumentTrack->getChildByName("instrument"))
                 track.chain.push_back(deviceOf(*instrument));
             if (const auto* chain = instrumentTrack->getChildByName("fxchain"))
@@ -141,9 +144,9 @@ private:
         for (const auto* note : pattern.getChildWithTagNameIterator("note")) {
             // A step's note has a negative length: as long as a step.
             const auto length = note->getDoubleAttribute("len", 48.0);
-            notes.push_back({ juce::jlimit(0, 127, note->getIntAttribute("key", 57) + 12), beats(note->getDoubleAttribute("pos")),
+            notes.push_back({ cydaw::base::limit(0, 127, note->getIntAttribute("key", 57) + 12), beats(note->getDoubleAttribute("pos")),
                               std::max(1.0e-3, beats(length > 0.0 ? length : 12.0)),
-                              static_cast<float>(juce::jlimit(0.05, 1.0, note->getDoubleAttribute("vol", 100.0) / 125.0)) });
+                              static_cast<float>(cydaw::base::limit(0.05, 1.0, note->getDoubleAttribute("vol", 100.0) / 125.0)) });
         }
         return notes;
     }
@@ -271,7 +274,7 @@ private:
         track.solo = element.getBoolAttribute("solo", false);
         if (const auto* settings = element.getChildByName("sampletrack")) {
             track.gainDb = linearToDb(settings->getDoubleAttribute("vol", 100.0) / 100.0);
-            track.pan = static_cast<float>(juce::jlimit(-1.0, 1.0, settings->getDoubleAttribute("pan", 0.0) / 100.0));
+            track.pan = static_cast<float>(cydaw::base::limit(-1.0, 1.0, settings->getDoubleAttribute("pan", 0.0) / 100.0));
             if (const auto* chain = settings->getChildByName("fxchain"))
                 readEffects(*chain, track);
         }

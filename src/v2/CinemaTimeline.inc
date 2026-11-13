@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/File.h>
 // Arrangement-style Cinema timeline. Bus rows share one ruler and scale.
 void FoundryView::fitCinemaContainers(Session& session) const {
@@ -207,7 +208,7 @@ void FoundryView::drawCinemaTracks(Tab& t,ImVec2 size){
     grid(draw,background.y,background.y+rowsHeight+ImGui::GetScrollY(),false);
     std::vector<std::uint64_t> buses;for(const auto& track:s.tracks)if(track.bus)buses.push_back(track.id);
     if(std::any_of(s.tracks.begin(),s.tracks.end(),[](const auto& tr){return !tr.bus&&!tr.parentId;}))buses.push_back(0);
-    const auto queue=[&](const char* action,const char* op,std::uint64_t id){auto* object=new cydaw::base::Object();object->setProperty("action",action);object->setProperty("op",op);object->setProperty("id",static_cast<juce::int64>(id));cinemaPending_=cydaw::base::Value(object);};
+    const auto queue=[&](const char* action,const char* op,std::uint64_t id){auto* object=new cydaw::base::Object();object->setProperty("action",action);object->setProperty("op",op);object->setProperty("id",static_cast<std::int64_t>(id));cinemaPending_=cydaw::base::Value(object);};
     const auto trackMix=[&](std::uint64_t id,bool mute,bool solo){auto next=t.document->session();const auto index=next.trackIndex(id);if(index<0)return;next.tracks[index].mute=mute;next.tracks[index].solo=solo;edit(t,std::move(next),ui::Ls("Réglages de piste","Track settings"));};
     for(const auto busId:buses){
         const auto busIndex=s.trackIndex(busId);const auto name=busIndex>=0?fromUtf8(s.tracks[busIndex].name):ui::Ls("Vers le master","To master");

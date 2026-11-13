@@ -1,10 +1,11 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/Process.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #pragma once
 #include "CustomInterfaceABI.h"
-#include <juce_core/juce_core.h>
+
 #include <atomic>
 #include <map>
 #include <mutex>
@@ -34,7 +35,7 @@ class CustomInterface final
             hash ^= static_cast<unsigned char>(c);
             hash *= 1099511628211ull;
         }
-        return cydaw::base::Text::toHexString(static_cast<juce::int64>(hash)) + "-" + cydaw::base::Text(IMGUI_VERSION_NUM) + "-" +
+        return cydaw::base::Text::toHexString(static_cast<std::int64_t>(hash)) + "-" + cydaw::base::Text(IMGUI_VERSION_NUM) + "-" +
                cydaw::base::Text(sizeof(CyInterfaceContext)) + "-u8";
     }
     static std::shared_ptr<Job> job(const cydaw::base::Text &source)

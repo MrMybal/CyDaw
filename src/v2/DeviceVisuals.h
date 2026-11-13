@@ -4,7 +4,7 @@
 #include "SignalAnalysis.h"
 
 #include <imgui.h>
-#include <juce_core/juce_core.h>
+
 
 #include <functional>
 #include <map>

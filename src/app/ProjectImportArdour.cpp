@@ -1,3 +1,5 @@
+#include <cydaw/base/Utilities.h>
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Xml.h>
 #include <cydaw/base/Text.h>
@@ -79,13 +81,13 @@ private:
             const auto noteType = tempo->getDoubleAttribute("note-type", 4.0);
             if (noteType > 0.0)
                 bpm *= 4.0 / noteType;
-            out_.tempo = juce::jlimit(20.0, 999.0, bpm);
+            out_.tempo = cydaw::base::limit(20.0, 999.0, bpm);
         }
         if (tempos > 1)
             out_.warnings.add("The tempo changes along the session: CyDAW keeps " + cydaw::base::Text(out_.tempo, 2) + " BPM.");
         if (meter != nullptr) {
-            out_.numerator = juce::jlimit(1, 32, static_cast<int>(meter->getDoubleAttribute("divisions-per-bar", 4.0)));
-            out_.denominator = juce::jlimit(
+            out_.numerator = cydaw::base::limit(1, 32, static_cast<int>(meter->getDoubleAttribute("divisions-per-bar", 4.0)));
+            out_.denominator = cydaw::base::limit(
                 1, 32, static_cast<int>(meter->getDoubleAttribute("note-value", meter->getDoubleAttribute("note-type", 4.0))));
         }
     }
@@ -140,17 +142,17 @@ private:
         if (gain != nullptr)
             track.gainDb = linearToDb(gain->getDoubleAttribute("value", 1.0));
         if (const auto* pan = controllable(route, "pan-azimuth"))
-            track.pan = static_cast<float>(juce::jlimit(-1.0, 1.0, pan->getDoubleAttribute("value", 0.5) * 2.0 - 1.0));
+            track.pan = static_cast<float>(cydaw::base::limit(-1.0, 1.0, pan->getDoubleAttribute("value", 0.5) * 2.0 - 1.0));
         if (const auto* mute = controllable(route, "mute"))
             track.muted = mute->getDoubleAttribute("value", 0.0) > 0.5;
         if (const auto* solo = controllable(route, "solo"))
             track.solo = solo->getDoubleAttribute("value", 0.0) > 0.5 || solo->getBoolAttribute("self-solo", false);
         if (presentation != nullptr && presentation->hasAttribute("color")) {
-            const auto colour = static_cast<juce::uint32>(presentation->getStringAttribute("color").getLargeIntValue());
+            const auto colour = static_cast<std::uint32_t>(presentation->getStringAttribute("color").getLargeIntValue());
             // RGBA.
             if (colour != 0)
-                track.colour = opaque(static_cast<juce::uint8>(colour >> 24), static_cast<juce::uint8>(colour >> 16),
-                                      static_cast<juce::uint8>(colour >> 8));
+                track.colour = opaque(static_cast<std::uint8_t>(colour >> 24), static_cast<std::uint8_t>(colour >> 16),
+                                      static_cast<std::uint8_t>(colour >> 8));
         }
         if (flags.contains("AudioBus") || flags.contains("MidiBus"))
             out_.warnings.add("Bus \"" + track.name + "\" came in as a track without clips; its sends were left out.");

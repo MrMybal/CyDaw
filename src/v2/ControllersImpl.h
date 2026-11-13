@@ -15,8 +15,7 @@
 #include <cydaw/control/Control.h>
 #include <cydaw/control/ControlPluginABI.h>
 
-#include <juce_audio_devices/juce_audio_devices.h>
-#include <juce_osc/juce_osc.h>
+#include <cydaw/control/Osc.h>
 
 #include <deque>
 #include <map>

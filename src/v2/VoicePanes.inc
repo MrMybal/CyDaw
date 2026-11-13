@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 // The displays and large views of Vocodeur, Dé-Esseur, Accordeur
 // (VoiceDesign.h computes what they draw). Included by StudioEffectsView.cpp
 // inside its anonymous namespace: it has its helpers (knobCell, segmented,
@@ -675,7 +676,7 @@ bool voiceLarge(const PaneKind kind, const Pane& pane, std::vector<Param>& param
 // The values a card shows as knobs (pane indices).
 std::vector<int> voiceCardFields(const PaneKind kind, std::vector<Param>& parameters, const Pane& pane)
 {
-    juce::ignoreUnused(parameters, pane);
+    cydaw::base::ignoreUnused(parameters, pane);
     if (kind == PaneKind::vocoder)
         return { voiced::vocoderMix, voiced::vocoderFormant, voiced::vocoderRelease, voiced::vocoderUnvoiced };
     if (kind == PaneKind::deEsser)
@@ -711,7 +712,7 @@ cydaw::base::Text voiceFormat(const cydaw::base::Text& binding, const double val
     if (is("vocoder.bandwidth"))
         return cydaw::base::Text::fromUTF8("\xc3\x97") + cydaw::base::Text(value, 2);
     if (is("vocoder.gate"))
-        return value <= -89.5 ? ui::Ls("Coupée", "Off") : cydaw::base::Text(juce::roundToInt(value)) + " dB";
+        return value <= -89.5 ? ui::Ls("Coupée", "Off") : cydaw::base::Text(cydaw::base::roundToInt(value)) + " dB";
     if (is("deesser.mode"))
         return deEsserModeName(whole(static_cast<float>(value), voiced::deEsserModeCount));
     if (is("deesser.detectorType"))

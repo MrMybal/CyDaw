@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 // The suites' displays and large views: Tranche and Finition (SuiteDesign.h
 // computes what they draw), with their assistants. Included by
 // StudioEffectsView.cpp inside its anonymous namespace, after
@@ -373,7 +374,7 @@ cydaw::base::Text trancheSuggest(std::vector<Param>& parameters, const Pane& pan
     put(suited::trancheCompOn, 1.0);
     cydaw::base::TextList done;
     if (lowCut > 10.5)
-        done.add(cydaw::base::Text::fromUTF8(ui::french() ? "coupe-bas " : "low cut ") + cydaw::base::Text(juce::roundToInt(lowCut)) + " Hz");
+        done.add(cydaw::base::Text::fromUTF8(ui::french() ? "coupe-bas " : "low cut ") + cydaw::base::Text(cydaw::base::roundToInt(lowCut)) + " Hz");
     const auto describe = [&done](const char* french, const char* english, const double db) {
         if (std::abs(db) > 0.05)
             done.add(cydaw::base::Text::fromUTF8(ui::french() ? french : english) + " " + (db > 0.0 ? "+" : "") + cydaw::base::Text(db, 1) + " dB");
@@ -381,13 +382,13 @@ cydaw::base::Text trancheSuggest(std::vector<Param>& parameters, const Pane& pan
     describe("graves", "lows", lowShelf);
     describe("aigus", "highs", highShelf);
     if (cutFor(mids) < -0.05)
-        done.add(cydaw::base::Text::fromUTF8(ui::french() ? "cloche " : "bell ") + cydaw::base::Text(juce::roundToInt(kOctaveHz[static_cast<std::size_t>(mids)]))
+        done.add(cydaw::base::Text::fromUTF8(ui::french() ? "cloche " : "bell ") + cydaw::base::Text(cydaw::base::roundToInt(kOctaveHz[static_cast<std::size_t>(mids)]))
                  + " Hz " + cydaw::base::Text(cutFor(mids), 1) + " dB");
     if (cutFor(presence) < -0.05)
         done.add(cydaw::base::Text::fromUTF8(ui::french() ? "cloche " : "bell ")
-                 + cydaw::base::Text(juce::roundToInt(kOctaveHz[static_cast<std::size_t>(presence)])) + " Hz " + cydaw::base::Text(cutFor(presence), 1)
+                 + cydaw::base::Text(cydaw::base::roundToInt(kOctaveHz[static_cast<std::size_t>(presence)])) + " Hz " + cydaw::base::Text(cutFor(presence), 1)
                  + " dB");
-    done.add(cydaw::base::Text::fromUTF8(ui::french() ? "compresseur à " : "compressor at ") + cydaw::base::Text(juce::roundToInt(threshold)) + " dB");
+    done.add(cydaw::base::Text::fromUTF8(ui::french() ? "compresseur à " : "compressor at ") + cydaw::base::Text(cydaw::base::roundToInt(threshold)) + " dB");
     return cydaw::base::Text::fromUTF8(ui::french() ? "Réglé : " : "Set: ") + done.joinIntoString(", ") + ".";
 }
 
@@ -486,7 +487,7 @@ bool trancheLarge(const Pane& pane, std::vector<Param>& parameters, const ImVec2
                                  ImVec2(x + dp(2.0f), y + dp(22.0f) + knobHeight(small) + dp(4.0f)), width - dp(4.0f), dp(18.0f), stage.tint, set);
         x += width + dp(6.0f);
     }
-    juce::ignoreUnused(p);
+    cydaw::base::ignoreUnused(p);
     return changed;
 }
 

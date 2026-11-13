@@ -1,3 +1,5 @@
+#include <cydaw/audio/Math.h>
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/FileDialog.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
@@ -581,7 +583,7 @@ void WorkshopView::drawTabs()
         for (const auto& tab : tabs) {
             auto open = true;
             // Not saved: ImGui's dot in place of the cross.
-            const auto label = tab.name + "###tab" + cydaw::base::Text(static_cast<juce::int64>(tab.id));
+            const auto label = tab.name + "###tab" + cydaw::base::Text(static_cast<std::int64_t>(tab.id));
             ImGui::PushStyleColor(ImGuiCol_Text, theme::vec(tab.instrument ? p.midi : p.text));
             const auto flags = (forced && tab.id == active ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None)
                                | (tab.unsaved ? ImGuiTabItemFlags_UnsavedDocument : ImGuiTabItemFlags_None);
@@ -791,7 +793,7 @@ void WorkshopView::drawSimulator()
     ui::tooltip(L("Volume de la simulation (le master s'applique aussi)", "The simulation's volume (the master applies too)"));
     ImGui::SameLine();
     const auto level = studio_.simulatorLevelDb();
-    const auto gain = juce::Decibels::decibelsToGain(level, -120.0f);
+    const auto gain = cydaw::audio::Decibels::decibelsToGain(level, -120.0f);
     const auto meterAt = ImGui::GetCursorScreenPos();
     ImGui::SetCursorScreenPos(ImVec2(meterAt.x, meterAt.y + ImGui::GetFrameHeight() * 0.2f));
     ui::meter("##simMeter", ImVec2(dp(96.0f), ImGui::GetFrameHeight() * 0.6f), gain, gain, gain * 0.7f, gain * 0.7f, false);

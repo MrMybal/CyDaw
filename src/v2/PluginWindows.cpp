@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/File.h>
 #include "PluginWindows.h"
 
@@ -23,12 +24,12 @@ PluginWindows::~PluginWindows() = default;
 
 std::string PluginWindows::windowId(const PluginWindow& window)
 {
-    const auto id = cydaw::base::Text(window.track.isBus() ? "b" + cydaw::base::Text(static_cast<juce::int64>(window.track.bus))
+    const auto id = cydaw::base::Text(window.track.isBus() ? "b" + cydaw::base::Text(static_cast<std::int64_t>(window.track.bus))
                                  : window.track.master ? "m"
                                  : window.track.midi   ? "i"
                                                        : "a")
-                    + cydaw::base::Text(static_cast<juce::int64>(window.track.midi ? window.track.midiId : window.track.audioIndex)) + "-"
-                    + cydaw::base::Text(static_cast<juce::int64>(window.nodeId));
+                    + cydaw::base::Text(static_cast<std::int64_t>(window.track.midi ? window.track.midiId : window.track.audioIndex)) + "-"
+                    + cydaw::base::Text(static_cast<std::int64_t>(window.nodeId));
     return ("###plugin" + id).toStdString();
 }
 
@@ -64,12 +65,12 @@ void PluginWindows::draw()
             name = studio_.trackName(window.track);
         const auto width = interface.windowWidth != 0 ? static_cast<float>(interface.windowWidth) : 720.0f;
         const auto height = interface.windowHeight != 0 ? static_cast<float>(interface.windowHeight) : 420.0f;
-        const auto id = cydaw::base::Text(window.track.isBus() ? "b" + cydaw::base::Text(static_cast<juce::int64>(window.track.bus))
+        const auto id = cydaw::base::Text(window.track.isBus() ? "b" + cydaw::base::Text(static_cast<std::int64_t>(window.track.bus))
                                      : window.track.master ? "m"
                                      : window.track.midi   ? "i"
                                                            : "a")
-                        + cydaw::base::Text(static_cast<juce::int64>(window.track.midi ? window.track.midiId : window.track.audioIndex)) + "-"
-                        + cydaw::base::Text(static_cast<juce::int64>(window.nodeId));
+                        + cydaw::base::Text(static_cast<std::int64_t>(window.track.midi ? window.track.midiId : window.track.audioIndex)) + "-"
+                        + cydaw::base::Text(static_cast<std::int64_t>(window.nodeId));
         const auto windowKey = windowId(window) + state_.deviceWindowNamespace;
         const auto title = name + "  —  " + studio_.trackName(window.track) + cydaw::base::Text(windowKey);
         ui::beforeDetachable(windowKey.c_str());

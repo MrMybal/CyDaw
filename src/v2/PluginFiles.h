@@ -1,7 +1,7 @@
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #pragma once
-#include <juce_core/juce_core.h>
+
 namespace cydaw::v2::plugin_files
 {
 inline cydaw::base::File scripts()
@@ -12,7 +12,7 @@ inline cydaw::base::Array<cydaw::base::File> folders()
 {
     cydaw::base::Array<cydaw::base::File> result;
     auto user = cydaw::base::File::getSpecialLocation(cydaw::base::File::userApplicationDataDirectory);
-#if JUCE_WINDOWS
+#if defined(_WIN32)
     auto common = cydaw::base::File::getSpecialLocation(cydaw::base::File::windowsProgramFilesCommon);
     const auto localPath=cydaw::base::SystemStats::getEnvironmentVariable("LOCALAPPDATA",{});
     if(cydaw::base::File::isAbsolutePath(localPath))for(auto format:{"VST3","CLAP"})result.add(cydaw::base::File(localPath).getChildFile("Programs/Common").getChildFile(format));
@@ -23,7 +23,7 @@ inline cydaw::base::Array<cydaw::base::File> folders()
     }
     result.add(user.getChildFile("LV2"));
     result.add(user.getChildFile("CLAP"));
-#elif JUCE_MAC
+#elif defined(__APPLE__)
     for (auto format : {"VST3", "CLAP", "LV2"})
     {
         result.add(cydaw::base::File("/Library/Audio/Plug-Ins").getChildFile(format));
@@ -42,7 +42,7 @@ inline cydaw::base::Array<cydaw::base::File> folders()
 #endif
     for (auto name : {"CLAP_PATH", "LV2_PATH"})
         for (auto path : cydaw::base::TextList::fromTokens(cydaw::base::SystemStats::getEnvironmentVariable(name, {}),
-#if JUCE_WINDOWS
+#if defined(_WIN32)
                                                        ";",
 #else
                                                        ":",

@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/File.h>
@@ -261,7 +262,7 @@ void DjLibrary::scan()
         const cydaw::base::File folder(root);
         if (!folder.isDirectory())
             continue;
-        for (const auto& entry : juce::RangedDirectoryIterator(folder, true, "*", cydaw::base::File::findFiles)) {
+        for (const auto& entry : cydaw::base::RangedDirectoryIterator(folder, true, "*", cydaw::base::File::findFiles)) {
             if (threadShouldExit() || static_cast<int>(found.size()) >= maximumScannedFiles)
                 break;
             if (isAudioFile(entry.getFile()))
@@ -429,10 +430,10 @@ void DjLibrary::fromJson(const cydaw::base::Value& document)
             if (const auto* cues = item.getProperty("hotCues", cydaw::base::Value()).getArray())
                 for (int i = 0; i < std::min(8, cues->size()); ++i)
                     track.hotCues[static_cast<std::size_t>(i)] = static_cast<double>((*cues)[i]);
-            track.size = static_cast<juce::int64>(number(item, "size"));
-            track.modified = static_cast<juce::int64>(number(item, "modified"));
+            track.size = static_cast<std::int64_t>(number(item, "size"));
+            track.modified = static_cast<std::int64_t>(number(item, "modified"));
             track.plays = static_cast<int>(number(item, "plays"));
-            track.lastPlayed = static_cast<juce::int64>(number(item, "lastPlayed"));
+            track.lastPlayed = static_cast<std::int64_t>(number(item, "lastPlayed"));
             if (track.file != cydaw::base::File())
                 tracks_.push_back(std::move(track));
         }

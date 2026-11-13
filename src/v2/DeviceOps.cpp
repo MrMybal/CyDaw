@@ -11,7 +11,6 @@
 #include <cydaw/engine/Convolver.h>
 #include <cydaw/engine/WavetableShape.h>
 
-#include <juce_audio_formats/juce_audio_formats.h>
 
 #include <algorithm>
 #include <cmath>

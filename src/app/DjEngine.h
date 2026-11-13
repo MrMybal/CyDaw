@@ -1,3 +1,4 @@
+#include <cydaw/realtime/SpscRing.h>
 #include <cydaw/audio/Sources.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/TextMap.h>
@@ -10,8 +11,7 @@
 
 #include <cydaw/engine/DjMix.h>
 
-#include <juce_audio_formats/juce_audio_formats.h>
-#include <juce_audio_utils/juce_audio_utils.h>
+
 
 #include <array>
 #include <atomic>
@@ -231,8 +231,7 @@ private:
     void freeRetired();
 
     std::array<std::unique_ptr<Deck>, deckCount> decks_;
-    juce::AbstractFifo fifo_ { 256 };
-    std::array<Command, 256> commands_ {};
+    realtime::SpscRing<Command,256> commands_;
     std::mutex pushLock_;
     mutable std::mutex stateLock_;
     std::unique_ptr<Loader> loader_;

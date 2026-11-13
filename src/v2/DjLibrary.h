@@ -1,9 +1,9 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/File.h>
 #pragma once
 
-#include <juce_audio_formats/juce_audio_formats.h>
 
 #include <array>
 #include <atomic>
@@ -38,10 +38,10 @@ struct DjTrack {
     cydaw::base::Text error;  // why it could not be read
     double cuePoint {};
     std::array<double, 8> hotCues {};
-    juce::int64 size {};
-    juce::int64 modified {};
+    std::int64_t size {};
+    std::int64_t modified {};
     int plays {};
-    juce::int64 lastPlayed {};
+    std::int64_t lastPlayed {};
 
     DjTrack() { hotCues.fill(-1.0); }
 };

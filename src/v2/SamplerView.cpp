@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/FileDialog.h>
 #include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/File.h>
@@ -11,7 +12,7 @@
 #include "Widgets.h"
 
 #include <imgui_internal.h>
-#include <juce_audio_formats/juce_audio_formats.h>
+
 
 #include <algorithm>
 #include <cmath>
@@ -52,7 +53,7 @@ std::pair<int, int> pairOf(const cydaw::base::Value& zone, const char* key, cons
     return fallback;
 }
 
-void setPair(cydaw::base::Value& zone, const char* key, const juce::int64 first, const juce::int64 second)
+void setPair(cydaw::base::Value& zone, const char* key, const std::int64_t first, const std::int64_t second)
 {
     cydaw::base::Array<cydaw::base::Value> list;
     list.add(first);
@@ -655,7 +656,7 @@ void SamplerView::drawWaveform(const Target& target, cydaw::base::Value& json, c
         for (int column = 0; column < columns && reader != nullptr; ++column) {
             const auto from = data->frames * column / columns;
             const auto to = std::max(from + 1, data->frames * (column + 1) / columns);
-            juce::Range<float> levels[2];
+            cydaw::base::Range<float> levels[2];
             reader->readMaxLevels(from, to - from, levels, 1);
             peaks.low[static_cast<std::size_t>(column)] = levels[0].getStart();
             peaks.high[static_cast<std::size_t>(column)] = levels[0].getEnd();
@@ -686,14 +687,14 @@ void SamplerView::drawWaveform(const Target& target, cydaw::base::Value& json, c
     auto& item = zones->getReference(zone);
     const auto frames = static_cast<double>(data->frames);
     const auto xOf = [&](const double frame) { return at.x + static_cast<float>(frame / frames) * size.x; };
-    const auto start = static_cast<double>(static_cast<juce::int64>(item.getProperty("start", 0)));
-    auto finish = static_cast<double>(static_cast<juce::int64>(item.getProperty("end", -1)));
+    const auto start = static_cast<double>(static_cast<std::int64_t>(item.getProperty("start", 0)));
+    auto finish = static_cast<double>(static_cast<std::int64_t>(item.getProperty("end", -1)));
     if (finish < 0.0)
         finish = frames;
     const auto* loop = item.getProperty("loop", {}).getArray();
-    const auto hasLoop = loop != nullptr && loop->size() == 2 && static_cast<juce::int64>((*loop)[0]) >= 0;
-    const auto loopStart = hasLoop ? static_cast<double>(static_cast<juce::int64>((*loop)[0])) : -1.0;
-    const auto loopEnd = hasLoop ? static_cast<double>(static_cast<juce::int64>((*loop)[1])) : -1.0;
+    const auto hasLoop = loop != nullptr && loop->size() == 2 && static_cast<std::int64_t>((*loop)[0]) >= 0;
+    const auto loopStart = hasLoop ? static_cast<double>(static_cast<std::int64_t>((*loop)[0])) : -1.0;
+    const auto loopEnd = hasLoop ? static_cast<double>(static_cast<std::int64_t>((*loop)[1])) : -1.0;
     if (hasLoop)
         list->AddRectFilled(ImVec2(xOf(loopStart), at.y), ImVec2(xOf(loopEnd), end.y), (p.accent & 0x00ffffffu) | 0x30000000u);
     const std::array<double, 4> markers { start, finish, loopStart, loopEnd };
@@ -713,12 +714,12 @@ void SamplerView::drawWaveform(const Target& target, cydaw::base::Value& json, c
             }
     }
     if (ImGui::IsItemActive() && draggedMarker_ >= 0) {
-        const auto frame = static_cast<juce::int64>(std::clamp((ImGui::GetIO().MousePos.x - at.x) / size.x, 0.0f, 1.0f) * frames);
+        const auto frame = static_cast<std::int64_t>(std::clamp((ImGui::GetIO().MousePos.x - at.x) / size.x, 0.0f, 1.0f) * frames);
         switch (draggedMarker_) {
-        case 0: setValue(item, "start", std::min<juce::int64>(frame, static_cast<juce::int64>(finish) - 1)); break;
-        case 1: setValue(item, "end", std::max<juce::int64>(frame, static_cast<juce::int64>(start) + 1)); break;
-        case 2: setPair(item, "loop", std::min<juce::int64>(frame, static_cast<juce::int64>(loopEnd) - 2), static_cast<juce::int64>(loopEnd)); break;
-        case 3: setPair(item, "loop", static_cast<juce::int64>(loopStart), std::max<juce::int64>(frame, static_cast<juce::int64>(loopStart) + 2)); break;
+        case 0: setValue(item, "start", std::min<std::int64_t>(frame, static_cast<std::int64_t>(finish) - 1)); break;
+        case 1: setValue(item, "end", std::max<std::int64_t>(frame, static_cast<std::int64_t>(start) + 1)); break;
+        case 2: setPair(item, "loop", std::min<std::int64_t>(frame, static_cast<std::int64_t>(loopEnd) - 2), static_cast<std::int64_t>(loopEnd)); break;
+        case 3: setPair(item, "loop", static_cast<std::int64_t>(loopStart), std::max<std::int64_t>(frame, static_cast<std::int64_t>(loopStart) + 2)); break;
         default: break;
         }
         editing = true;
@@ -733,7 +734,7 @@ void SamplerView::drawWaveform(const Target& target, cydaw::base::Value& json, c
         auto& edit = zonesOf(edited)->getReference(zone);
         if (looped) {
             // The middle third to begin with, a crossfade of 50 ms.
-            setPair(edit, "loop", static_cast<juce::int64>(frames * 0.4), static_cast<juce::int64>(frames * 0.8));
+            setPair(edit, "loop", static_cast<std::int64_t>(frames * 0.4), static_cast<std::int64_t>(frames * 0.8));
             setValue(edit, "loopCrossfade", static_cast<int>(data->sampleRate * 0.05));
         } else if (auto* object = edit.getDynamicObject()) {
             object->removeProperty("loop");

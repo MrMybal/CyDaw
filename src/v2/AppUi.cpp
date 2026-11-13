@@ -1,3 +1,5 @@
+#include <cydaw/base/Url.h>
+#include <cydaw/base/Utilities.h>
 #include <cydaw/midi/Devices.h>
 #include <cydaw/midi/LiveInput.h>
 #include <cydaw/audio/Devices.h>
@@ -1976,7 +1978,7 @@ void AppUi::drawAudioDevice()
         std::vector<std::string> rateNames;
         auto currentRate = 0;
         for (auto index = 0; index < rates.size(); ++index) {
-            rateNames.push_back(cydaw::base::Text(juce::roundToInt(rates[index])).toStdString() + " Hz");
+            rateNames.push_back(cydaw::base::Text(cydaw::base::roundToInt(rates[index])).toStdString() + " Hz");
             if (std::abs(rates[index] - device->getCurrentSampleRate()) < 1.0)
                 currentRate = index;
         }
@@ -2179,7 +2181,7 @@ void AppUi::drawCompanionWindow()
                     ImGui::SameLine();
                     const auto url = package.getProperty("url", {}).toString();
                     if (ImGui::SmallButton(L("Lire", "Read")))
-                        (void) juce::URL(url).launchInDefaultBrowser();
+                        (void) cydaw::base::Url(url).launchInDefaultBrowser();
                     ui::tooltip(url.toRawUTF8());
                     ImGui::PopID();
                 }
@@ -2218,7 +2220,7 @@ void AppUi::drawCompanionWindow()
         companionInfoAsked_ = false;
     ImGui::EndDisabled();
     if (ImGui::SmallButton(L("Pas de Python ? python.org", "No Python? python.org")))
-        (void) juce::URL("https://www.python.org/downloads/windows/").launchInDefaultBrowser();
+        (void) cydaw::base::Url("https://www.python.org/downloads/windows/").launchInDefaultBrowser();
     ui::tooltip(L("Installez Python 3.10 ou plus récent, puis « Installer » sur la base.", "Install Python 3.10 or newer, then \"Install\" the base."));
 
     // What it is doing.
@@ -2517,7 +2519,7 @@ cydaw::base::Text AppUi::injectInput(const cydaw::base::Value& events)
         }
         scriptedMouse_ = true;
         scriptedEvent_ = event;
-        const auto frames = type == "wait" ? juce::jlimit(1, 600, static_cast<int>(event.getProperty("frames", 1))) : 1;
+        const auto frames = type == "wait" ? cydaw::base::limit(1, 600, static_cast<int>(event.getProperty("frames", 1))) : 1;
         for (auto frame = 0; frame < frames; ++frame)
             host_.renderNow();
     }
@@ -2550,7 +2552,7 @@ void AppUi::applyScriptedInput()
     io.AddMousePosEvent(viewport->Pos.x + scriptedX_, viewport->Pos.y + scriptedY_);
     io.AddMouseViewportEvent(viewport->ID);
     const auto type = event.getProperty("type", cydaw::base::Value()).toString();
-    const auto button = juce::jlimit(0, 2, static_cast<int>(event.getProperty("button", 0)));
+    const auto button = cydaw::base::limit(0, 2, static_cast<int>(event.getProperty("button", 0)));
     if (type == "down")
         io.AddMouseButtonEvent(button, true);
     else if (type == "up")
@@ -2657,10 +2659,7 @@ void AppUi::tracksChanged()
 void AppUi::requestQuit()
 {
     // After the answer has gone out.
-    cydaw::base::Timer::callAfterDelay(300, [] {
-        if (juce::JUCEApplicationBase::getInstance() != nullptr)
-            juce::JUCEApplicationBase::quit();
-    });
+    cydaw::base::Timer::callAfterDelay(300, [callback = onQuitNow] { if (callback) callback(); });
 }
 
 void AppUi::selectSample(const cydaw::base::File& file)
@@ -2685,7 +2684,7 @@ cydaw::base::Value AppUi::library(const cydaw::base::Text& command, const cydaw:
     if (command == "library_perf") {
         // The catalog built over as many sounds as asked, then queried the
         // ways the window does.
-        const auto count = juce::jlimit(1, 1'000'000, static_cast<int>(request.getProperty("items", 50'000)));
+        const auto count = cydaw::base::limit(1, 1'000'000, static_cast<int>(request.getProperty("items", 50'000)));
         const auto started = cydaw::base::Time::getMillisecondCounterHiRes();
         const auto data = catalog_->synthetic(count);
         result->setProperty("items", static_cast<int>(data->items.size()));

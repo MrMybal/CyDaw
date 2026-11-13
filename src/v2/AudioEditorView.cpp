@@ -1,3 +1,5 @@
+#include <cydaw/audio/Math.h>
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/FileDialog.h>
 #include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/File.h>
@@ -1359,7 +1361,7 @@ void AudioEditorView::drawEvents(const TrackRef& track, const AudioClip& clip, c
                 host_.wake(2);
             const auto channels = std::clamp(thumbnail->getNumChannels(), 1, 2);
             const auto laneHeight = (waveBottom - waveTop) / static_cast<float>(channels);
-            const auto gain = std::min(2.0f, juce::Decibels::decibelsToGain(event.gainDb));
+            const auto gain = std::min(2.0f, cydaw::audio::Decibels::decibelsToGain(event.gainDb));
             for (int channel = 0; channel < channels; ++channel) {
                 const auto centre = waveTop + laneHeight * (static_cast<float>(channel) + 0.5f);
                 const auto half = laneHeight * 0.46f;
@@ -1964,7 +1966,7 @@ cydaw::base::Text AudioEditorView::editorKey(const cydaw::base::Text& name, cons
     if (!isSoundLane(name))
         return name;
     const auto* sound = soundTarget(events);
-    return name + "@" + cydaw::base::Text(static_cast<juce::int64>(sound != nullptr ? sound->id : 0));
+    return name + "@" + cydaw::base::Text(static_cast<std::int64_t>(sound != nullptr ? sound->id : 0));
 }
 
 cydaw::base::Text AudioEditorView::laneLabel(const std::vector<Studio::MasterLaneChoice>& choices, const cydaw::base::Text& name)
@@ -2563,7 +2565,7 @@ void AudioEditorView::drawDetails(const TrackRef& track, const AudioClip& clip, 
     ImGui::PopFont();
     const auto& format = formatOf(event.sourceFile);
     if (format.rate > 0.0)
-        ImGui::TextColored(theme::vec(p.textDim), "%d Hz  \xc2\xb7  %s  \xc2\xb7  %d bits  \xc2\xb7  %.3f s", juce::roundToInt(format.rate),
+        ImGui::TextColored(theme::vec(p.textDim), "%d Hz  \xc2\xb7  %s  \xc2\xb7  %d bits  \xc2\xb7  %.3f s", cydaw::base::roundToInt(format.rate),
                            format.channels == 1   ? L("mono", "mono")
                            : format.channels == 2 ? L("stéréo", "stereo")
                                                   : (cydaw::base::Text(format.channels) + ui::Ls(" canaux", " channels")).toRawUTF8(),

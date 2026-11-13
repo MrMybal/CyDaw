@@ -1,9 +1,9 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #pragma once
 
-#include <juce_core/juce_core.h>
 
 #include <array>
 #include <atomic>
@@ -92,8 +92,8 @@ public:
     ~Move() override;
 
     struct Progress {
-        juce::int64 done {};
-        juce::int64 total {};
+        std::int64_t done {};
+        std::int64_t total {};
         cydaw::base::Text current;
         bool finished {};
         bool cancelled {};

@@ -58,21 +58,27 @@ bool NativeHostedPlugin::load(const base::File &file, const base::Text &id,
       error = failure(status);
     return false;
   }
-  const auto &d = *plugin_.description();
+  description.pluginFormatName=formatName;
+  description.fileOrIdentifier=file.getFullPathName();
+  try { refreshDescription(); } catch(const std::exception& e){error=e.what();return false;}
+  if(format==PluginFormat::lv2)loadLv2Programs(file);
+  return true;
+}
+void NativeHostedPlugin::refreshDescription(){
+  const auto &d=*plugin_.description();
   description.name = base::Text(d.plugin.name);
   description.descriptiveName = base::Text(d.plugin.id);
   description.manufacturerName = base::Text(d.plugin.vendor);
   description.version = base::Text(d.plugin.version);
-  description.pluginFormatName = formatName;
-  description.fileOrIdentifier = file.getFullPathName();
+  description.numInputChannels=description.numOutputChannels=0;
+  parameters_.clear();controls_.clear();preset_=-1;
   for (const auto &p : d.inputs)
     description.numInputChannels += int(p.channels);
   for (const auto &p : d.outputs)
     description.numOutputChannels += int(p.channels);
   if (description.numInputChannels > 256 ||
       description.numOutputChannels > 256) {
-    error = "Plugin exceeds 256 channels";
-    return false;
+    throw std::runtime_error("Plugin exceeds 256 channels");
   }
   description.isInstrument =
       description.numInputChannels == 0 && !d.noteInputs.empty();
@@ -92,10 +98,8 @@ bool NativeHostedPlugin::load(const base::File &file, const base::Text &id,
     parameters_.add(p.get());
     controls_.push_back(std::move(p));
   }
-  if (format == PluginFormat::lv2)
-    loadLv2Programs(file);
-  return true;
 }
+
 void NativeHostedPlugin::syncValues() {
   for (auto *p : parameters_) {
     if (const auto *d = plugin_.description())
@@ -315,14 +319,27 @@ std::unique_ptr<NativePluginEditor> NativeHostedPlugin::createEditor() {
   return hasEditor() ? std::make_unique<NativePluginEditor>(*this) : nullptr;
 }
 void NativeHostedPlugin::pump() {
+  // The worker serializes this main-thread handoff with audio processing.
+  // Core reports requests; the host must perform the deactivate/refresh/restart.
   std::uint32_t flags{};
-  if (plugin_.pumpMainThread(flags) == Status::ok) {
-    requests_ |= flags;
-    latency_ = int(plugin_.timing().latencyFrames);
-    if (editor_ && (flags & pluginEditorClosed))
-      editor_->closeRequested();
+  if(plugin_.pumpMainThread(flags)!=Status::ok)return;
+  if(flags&(pluginRestart|pluginParametersChanged|pluginPortsChanged)){
+    const bool resume=prepared_;const auto options=options_;
+    releaseResources();
+    const auto status=plugin_.refresh();
+    if(status!=Status::ok)throw std::runtime_error(failure(status).toStdString());
+    refreshDescription();
+    if(editor_)editor_->refreshParameters();
+    if(resume)prepareToPlay(options.sampleRate,int(options.maximumFrames));
+  }
+  latency_=int(plugin_.timing().latencyFrames);
+  if(editor_){
+    if(flags&pluginEditorClosed)editor_->closeRequested();
+    else if(flags&pluginEditorShow)editor_->setVisible(true);
+    else if(flags&pluginEditorHide)editor_->setVisible(false);
   }
 }
+
 int NativeHostedPlugin::getNumPrograms() const {
   if (!programs_.empty())
     return int(programs_.size());

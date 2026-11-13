@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/Text.h>
 #include "StudioEffectsView.h"
 
@@ -376,7 +377,7 @@ DragState& dragState(std::vector<Param>& parameters, const Pane& pane)
 
 cydaw::base::Text percent(const double value)
 {
-    return cydaw::base::Text(juce::roundToInt(value * 100.0)) + " %";
+    return cydaw::base::Text(cydaw::base::roundToInt(value * 100.0)) + " %";
 }
 
 // ---- Réverbe Pro ------------------------------------------------------------------------------
@@ -1388,7 +1389,7 @@ bool filterDisplay(std::vector<Param>& parameters, const Pane& pane, const Box& 
         std::snprintf(label, sizeof(label), "%d", unit + 1);
         handleDot(list, centre, isHot ? theme::brighter(unitColour, 0.2f) : unitColour, isHot, label);
         if (state.active == unit || (state.active < 0 && hot == unit)) {
-            const auto hz = view.cutoff < 1'000.0 ? cydaw::base::Text(juce::roundToInt(view.cutoff)) + " Hz"
+            const auto hz = view.cutoff < 1'000.0 ? cydaw::base::Text(cydaw::base::roundToInt(view.cutoff)) + " Hz"
                                                   : cydaw::base::Text(view.cutoff / 1'000.0, 2) + " kHz";
             const auto info = cydaw::base::Text::fromUTF8(typeName(view.type, false)) + "  " + hz + "  Q "
                               + cydaw::base::Text(pro::filterQ(view.resonance), 2);
@@ -3090,7 +3091,7 @@ cydaw::base::Text studioFormat(const Param& parameter, const double value)
         return shown;
     const auto knob = [](const double v) { return cydaw::base::Text(v, 1); };
     const auto off = [](const char* french, const char* english) { return ui::Ls(french, english); };
-    const auto degrees = [](const double v) { return cydaw::base::Text(juce::roundToInt(v)) + cydaw::base::Text::fromUTF8("\xc2\xb0"); };
+    const auto degrees = [](const double v) { return cydaw::base::Text(cydaw::base::roundToInt(v)) + cydaw::base::Text::fromUTF8("\xc2\xb0"); };
     const auto centimetres = [](const double v) { return cydaw::base::Text(v, v < 10.0 ? 1 : 0) + " cm"; };
     if (binding.contains(".amp.") || binding.startsWith("amp.")) {
         const auto suffix = binding.fromLastOccurrenceOf("amp.", false, false);
@@ -3111,7 +3112,7 @@ cydaw::base::Text studioFormat(const Param& parameter, const double value)
         if (suffix == "sag" || suffix == "mix" || suffix == "pedalDrive" || suffix == "pedalTone")
             return percent(value);
         if (suffix == "tight")
-            return value <= 20.5 ? off("Désactivé", "Off") : cydaw::base::Text(juce::roundToInt(value)) + " Hz";
+            return value <= 20.5 ? off("Désactivé", "Off") : cydaw::base::Text(cydaw::base::roundToInt(value)) + " Hz";
         if (suffix == "gate")
             return value <= -89.5 ? off("Désactivé", "Off") : cydaw::base::Text(value, 0) + " dB";
         return {};
@@ -3131,11 +3132,11 @@ cydaw::base::Text studioFormat(const Param& parameter, const double value)
         if (suffix == "angleA" || suffix == "angleB")
             return degrees(value);
         if (suffix == "blend")
-            return "A " + cydaw::base::Text(juce::roundToInt((1.0 - value) * 100.0)) + " / B " + cydaw::base::Text(juce::roundToInt(value * 100.0));
+            return "A " + cydaw::base::Text(cydaw::base::roundToInt((1.0 - value) * 100.0)) + " / B " + cydaw::base::Text(cydaw::base::roundToInt(value * 100.0));
         if (suffix == "room" || suffix == "resonance" || suffix == "mix")
             return percent(value);
         if (suffix == "lowCut")
-            return value <= 20.5 ? off("Désactivé", "Off") : cydaw::base::Text(juce::roundToInt(value)) + " Hz";
+            return value <= 20.5 ? off("Désactivé", "Off") : cydaw::base::Text(cydaw::base::roundToInt(value)) + " Hz";
         if (suffix == "highCut")
             return value >= 19'900.0 ? off("Désactivé", "Off") : cydaw::base::Text(value / 1'000.0, 1) + " kHz";
         return {};
@@ -3160,7 +3161,7 @@ cydaw::base::Text studioFormat(const Param& parameter, const double value)
         if (suffix == "noise")
             return value <= -89.5 ? off("Du micro", "Its own") : cydaw::base::Text(value, 0) + " dB";
         if (suffix == "lowCut")
-            return value <= 20.5 ? off("Désactivé", "Off") : cydaw::base::Text(juce::roundToInt(value)) + " Hz";
+            return value <= 20.5 ? off("Désactivé", "Off") : cydaw::base::Text(cydaw::base::roundToInt(value)) + " Hz";
         if (suffix == "highCut")
             return value >= 19'900.0 ? off("Désactivé", "Off") : cydaw::base::Text(value / 1'000.0, 1) + " kHz";
         return {};
@@ -3176,7 +3177,7 @@ cydaw::base::Text studioFormat(const Param& parameter, const double value)
         if (suffix.endsWith("Threshold"))
             return cydaw::base::Text(value, 1) + " dB";
         if (suffix.startsWith("cross"))
-            return value >= 1'000.0 ? cydaw::base::Text(value / 1'000.0, 2) + " kHz" : cydaw::base::Text(juce::roundToInt(value)) + " Hz";
+            return value >= 1'000.0 ? cydaw::base::Text(value / 1'000.0, 2) + " kHz" : cydaw::base::Text(cydaw::base::roundToInt(value)) + " Hz";
         return {};
     }
     if (binding.contains("fournaise.")) {
@@ -3195,7 +3196,7 @@ cydaw::base::Text studioFormat(const Param& parameter, const double value)
         if (suffix == "mix")
             return percent(value);
         if (suffix == "lowCut")
-            return value <= 20.5 ? off("Désactivé", "Off") : cydaw::base::Text(juce::roundToInt(value)) + " Hz";
+            return value <= 20.5 ? off("Désactivé", "Off") : cydaw::base::Text(cydaw::base::roundToInt(value)) + " Hz";
         if (suffix == "highCut")
             return value >= 19'900.0 ? off("Désactivé", "Off") : cydaw::base::Text(value / 1'000.0, 1) + " kHz";
         return {};
@@ -3212,7 +3213,7 @@ cydaw::base::Text studioFormat(const Param& parameter, const double value)
             || suffix == "width")
             return percent(value);
         if (suffix == "time")
-            return cydaw::base::Text(juce::roundToInt(value)) + " ms";
+            return cydaw::base::Text(cydaw::base::roundToInt(value)) + " ms";
         return {};
     }
     if (binding.contains("multiband.")) {
@@ -3220,7 +3221,7 @@ cydaw::base::Text studioFormat(const Param& parameter, const double value)
         if (suffix == "amount" || suffix == "link")
             return percent(value);
         if (suffix.startsWith("cross"))
-            return value >= 1'000.0 ? cydaw::base::Text(value / 1'000.0, 2) + " kHz" : cydaw::base::Text(juce::roundToInt(value)) + " Hz";
+            return value >= 1'000.0 ? cydaw::base::Text(value / 1'000.0, 2) + " kHz" : cydaw::base::Text(cydaw::base::roundToInt(value)) + " Hz";
         if (suffix.endsWith("Mode"))
             return cydaw::base::Text::fromUTF8(multibandModeName(whole(static_cast<float>(value), engine::mix::multibandModeCount), false));
         if (suffix.endsWith("Ratio"))
@@ -3238,7 +3239,7 @@ cydaw::base::Text studioFormat(const Param& parameter, const double value)
         if (suffix == "delta")
             return onOff(value);
         if (suffix.startsWith("focus"))
-            return value >= 1'000.0 ? cydaw::base::Text(value / 1'000.0, 1) + " kHz" : cydaw::base::Text(juce::roundToInt(value)) + " Hz";
+            return value >= 1'000.0 ? cydaw::base::Text(value / 1'000.0, 1) + " kHz" : cydaw::base::Text(cydaw::base::roundToInt(value)) + " Hz";
         return {};
     }
     if (binding.contains("patine.")) {
@@ -3274,7 +3275,7 @@ cydaw::base::Text studioFormat(const Param& parameter, const double value)
         if (suffix == "decay")
             return cydaw::base::Text(value, value < 10.0 ? 2 : 1) + " s";
         if (suffix == "lowCut")
-            return value <= 10.5 ? off("Désactivé", "Off") : cydaw::base::Text(juce::roundToInt(value)) + " Hz";
+            return value <= 10.5 ? off("Désactivé", "Off") : cydaw::base::Text(cydaw::base::roundToInt(value)) + " Hz";
         if (suffix == "highCut" || suffix == "damping")
             return value >= 19'900.0 ? off("Désactivé", "Off") : cydaw::base::Text(value / 1'000.0, 1) + " kHz";
         return {};
@@ -3286,13 +3287,13 @@ cydaw::base::Text studioFormat(const Param& parameter, const double value)
         if (suffix == "exciterStyle")
             return pick(value, { L("Lampe", "Valve"), L("Bande", "Tape"), "Transistor" });
         if (suffix == "attack" || suffix == "sustain")
-            return (value > 0.0 ? "+" : "") + cydaw::base::Text(juce::roundToInt(value * 100.0)) + " %";
+            return (value > 0.0 ? "+" : "") + cydaw::base::Text(cydaw::base::roundToInt(value * 100.0)) + " %";
         if (suffix == "excite" || suffix == "width" || suffix == "mix")
             return percent(value);
         if (suffix == "compRatio")
             return cydaw::base::Text(value, value < 10.0 ? 1 : 0) + ":1";
         if (suffix == "lowCut")
-            return value <= 10.5 ? off("Désactivé", "Off") : cydaw::base::Text(juce::roundToInt(value)) + " Hz";
+            return value <= 10.5 ? off("Désactivé", "Off") : cydaw::base::Text(cydaw::base::roundToInt(value)) + " Hz";
         if (suffix == "highCut")
             return value >= 19'900.0 ? off("Désactivé", "Off") : cydaw::base::Text(value / 1'000.0, 1) + " kHz";
         return {};
@@ -3308,7 +3309,7 @@ cydaw::base::Text studioFormat(const Param& parameter, const double value)
         if (suffix == "ratio")
             return cydaw::base::Text(value, 1) + ":1";
         if (suffix == "lowCut")
-            return value <= 10.5 ? off("Désactivé", "Off") : cydaw::base::Text(juce::roundToInt(value)) + " Hz";
+            return value <= 10.5 ? off("Désactivé", "Off") : cydaw::base::Text(cydaw::base::roundToInt(value)) + " Hz";
         return {};
     }
     if (binding.contains("sonometre.")) {
@@ -3316,7 +3317,7 @@ cydaw::base::Text studioFormat(const Param& parameter, const double value)
         if (suffix == "target")
             return targetName(whole(static_cast<float>(value), engine::mix::loudnessTargetCount));
         if (suffix == "history")
-            return value >= 60.0 ? cydaw::base::Text(value / 60.0, 1) + " min" : cydaw::base::Text(juce::roundToInt(value)) + " s";
+            return value >= 60.0 ? cydaw::base::Text(value / 60.0, 1) + " min" : cydaw::base::Text(cydaw::base::roundToInt(value)) + " s";
         return {};
     }
     if (binding.contains("comppro.")) {
@@ -3329,7 +3330,7 @@ cydaw::base::Text studioFormat(const Param& parameter, const double value)
         if (is(parameter, "comppro.range"))
             return value >= 59.95 ? ui::Ls("Illimitée", "Unlimited") : cydaw::base::Text(value, 1) + " dB";
         if (is(parameter, "comppro.link"))
-            return cydaw::base::Text(juce::roundToInt(value * 100.0)) + " %";
+            return cydaw::base::Text(cydaw::base::roundToInt(value * 100.0)) + " %";
         if (is(parameter, "comppro.sidechainLow"))
             return value >= 19'500.0 ? ui::Ls("Désactivé", "Off") : cydaw::base::Text(value / 1'000.0, 1) + " kHz";
         return {};
@@ -3347,7 +3348,7 @@ cydaw::base::Text studioFormat(const Param& parameter, const double value)
         if (is(parameter, "revpro.freeze"))
             return onOff(value);
         if (is(parameter, "revpro.lowCut"))
-            return value <= 10.5 ? ui::Ls("Désactivé", "Off") : cydaw::base::Text(juce::roundToInt(value)) + " Hz";
+            return value <= 10.5 ? ui::Ls("Désactivé", "Off") : cydaw::base::Text(cydaw::base::roundToInt(value)) + " Hz";
         if (is(parameter, "revpro.highCut"))
             return value >= 19'900.0 ? ui::Ls("Désactivé", "Off") : cydaw::base::Text(value / 1'000.0, 1) + " kHz";
         if (is(parameter, "revpro.ducking"))
@@ -3395,7 +3396,7 @@ cydaw::base::Text studioFormat(const Param& parameter, const double value)
             return ui::Ls("Libre", "Free");
         }
         if (suffix.endsWith("Stereo"))
-            return cydaw::base::Text(juce::roundToInt(value * 360.0)) + cydaw::base::Text::fromUTF8("\xc2\xb0");
+            return cydaw::base::Text(cydaw::base::roundToInt(value * 360.0)) + cydaw::base::Text::fromUTF8("\xc2\xb0");
         if (suffix.endsWith("Source"))
             return pick(value, { "\xe2\x80\x94", "LFO 1", "LFO 2", L("Suiveur", "Follower") });
         if (suffix.endsWith("Destination"))

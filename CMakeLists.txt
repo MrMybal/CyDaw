@@ -20,9 +20,10 @@ target_compile_definitions(cydaw_zstd PRIVATE ZSTD_DISABLE_ASM=1 ZSTD_LEGACY_SUP
 set_target_properties(cydaw_zstd PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 option(CYDAW_BUILD_TESTS "Build the dependency-free core tests" ON)
-option(CYDAW_BUILD_DESKTOP "Build the JUCE desktop shell" ON)
+option(CYDAW_BUILD_DESKTOP "Build CyDaw with native CyAudioCore audio and CyUI interface" ON)
+option(CYDAW_BUILD_LEGACY_JUCE_TESTS "Build historical JUCE comparison fixtures (not production)" OFF)
 option(CYDAW_BUILD_GRAPH_RUNTIME_PLUGIN
-       "Build the editable CyDAW Graph Runtime VST3" ON)
+       "Build historical JUCE Graph Runtime test fixture" OFF)
 option(CYDAW_FETCH_JUCE "Download the pinned JUCE release during configure" OFF)
 set(cydaw_asio_default OFF)
 if(WIN32 AND CYDAW_BUILD_DESKTOP)
@@ -119,41 +120,26 @@ message(STATUS
 
 function(cydaw_configure_audio_backends target_name)
     cydaw_copy_audio_notices(${target_name} "$<TARGET_FILE_DIR:${target_name}>/Licenses")
-    target_compile_definitions(${target_name} PRIVATE
-        JUCE_ASIO=0
-        JUCE_WASAPI=0
-        JUCE_DIRECTSOUND=0
-        CYDAW_WITH_ASIO=$<BOOL:${CYDAW_ASIO_AVAILABLE}>
-        CYDAW_CORE_AUDIO_DEVICES=1
-        JUCE_JACK=$<BOOL:${CYDAW_JACK_AVAILABLE}>
-    )
+    target_compile_definitions(${target_name} PRIVATE CYDAW_WITH_ASIO=$<BOOL:${CYDAW_ASIO_AVAILABLE}> CYDAW_CORE_AUDIO_DEVICES=1)
     target_link_libraries(${target_name} PRIVATE cydaw_native_device_ports)
     if(CYDAW_JACK_AVAILABLE)
         target_include_directories(${target_name} PRIVATE "${CYDAW_JACK_INCLUDE_DIR}")
     endif()
 endfunction()
-
 function(cydaw_configure_plugin_formats target_name)
-    set(cydaw_juce_vst3_host 1)
-    if(target_name STREQUAL "CyDAWPluginWorker")
-        # The production worker uses CyAudioCore's VST3 SDK host exclusively.
-        set(cydaw_juce_vst3_host 0)
-    endif()
-    target_compile_definitions(${target_name} PRIVATE
-        CYDAW_CORE_PLUGIN_HOST=1
-        JUCE_PLUGINHOST_VST3=${cydaw_juce_vst3_host}
-        JUCE_PLUGINHOST_LV2=1
-        JUCE_PLUGINHOST_VST=$<BOOL:${CYDAW_VST2_AVAILABLE}>
-    )
+    target_compile_definitions(${target_name} PRIVATE CYDAW_CORE_PLUGIN_HOST=1)
 endfunction()
 
 add_library(cydaw_miniz STATIC third_party/miniz/miniz.c third_party/miniz/miniz_tdef.c third_party/miniz/miniz_tinfl.c third_party/miniz/miniz_zip.c)
 target_include_directories(cydaw_miniz PRIVATE third_party/miniz)
 set_target_properties(cydaw_miniz PROPERTIES POSITION_INDEPENDENT_CODE ON)
-add_library(cydaw_base STATIC src/base/Socket.cpp src/base/Process.cpp src/base/FileDialog.cpp src/base/EventLoop.cpp src/base/Image.cpp src/base/Value.cpp src/base/Compression.cpp src/base/Thread.cpp src/base/File.cpp src/base/Xml.cpp src/base/Properties.cpp third_party/pugixml/pugixml.cpp)
+add_library(cydaw_base STATIC src/base/Platform.cpp src/base/Url.cpp src/base/Zip.cpp src/base/Socket.cpp src/base/Process.cpp src/base/FileDialog.cpp src/base/EventLoop.cpp src/base/Image.cpp src/base/Value.cpp src/base/Compression.cpp src/base/Thread.cpp src/base/File.cpp src/base/Xml.cpp src/base/Properties.cpp third_party/pugixml/pugixml.cpp)
 target_include_directories(cydaw_base PUBLIC include PRIVATE third_party)
 target_compile_features(cydaw_base PUBLIC cxx_std_20)
 target_link_libraries(cydaw_base PRIVATE cydaw_miniz ${CMAKE_DL_LIBS})
+if(WIN32)
+ target_link_libraries(cydaw_base PRIVATE winhttp shell32 user32)
+endif()
 include(cmake/Translations.cmake)
 add_library(cydaw_localization STATIC src/app/Localization.cpp)
 target_link_libraries(cydaw_localization PUBLIC cydaw_base CyDAWTranslations)
@@ -180,6 +166,7 @@ if(MSVC)
 endif()
 
 add_library(cydaw_core STATIC
+    src/control/Osc.cpp
     src/integration/StandardMidiFile.cpp
     src/integration/LiveMidiInput.cpp
     src/app/ProjectRecovery.cpp
@@ -407,6 +394,17 @@ if(CYDAW_BUILD_TESTS)
 endif()
 
 if(CYDAW_BUILD_TESTS)
+    add_executable(cydaw_native_osc_tests tests/NativeOscTests.cpp)
+    target_link_libraries(cydaw_native_osc_tests PRIVATE CyDAW::Core)
+    add_test(NAME cydaw_native_osc_tests COMMAND cydaw_native_osc_tests)
+    cydaw_configure_test(cydaw_native_osc_tests 30)
+    if(WIN32)
+        add_executable(cydaw_native_plugin_window_probe tests/NativePluginWindowProbe.cpp)
+        target_link_libraries(cydaw_native_plugin_window_probe PRIVATE cydaw_plugin_host ole32)
+        if(MSVC)
+            target_compile_options(cydaw_native_plugin_window_probe PRIVATE /utf-8 /EHsc)
+        endif()
+    endif()
     add_executable(cydaw_native_plugin_ipc_tests tests/PluginIpcTests.cpp src/v2/HiddenDesktop.cpp)
     target_link_libraries(cydaw_native_plugin_ipc_tests PRIVATE cydaw_plugin_client)
     add_executable(cydaw_native_hosted_plugin_tests tests/NativeHostedPluginTests.cpp)
@@ -479,13 +477,25 @@ if(CYDAW_BUILD_TESTS)
     target_link_libraries(cydaw_audio_files_tests PRIVATE cydaw_audio_files)
     add_test(NAME cydaw_audio_files_tests COMMAND cydaw_audio_files_tests)
     cydaw_configure_test(cydaw_audio_files_tests 60)
+    if(WIN32)
+        find_package(Python3 COMPONENTS Interpreter QUIET)
+        if(Python3_Interpreter_FOUND)
+            add_executable(cydaw_native_platform_tests tests/NativePlatformTests.cpp)
+            target_link_libraries(cydaw_native_platform_tests PRIVATE cydaw_base)
+            if(MSVC)
+                target_compile_options(cydaw_native_platform_tests PRIVATE /utf-8 /EHsc)
+            endif()
+            add_test(NAME cydaw_native_platform_tests COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/native_platform_check.py" "$<TARGET_FILE:cydaw_native_platform_tests>")
+            cydaw_configure_test(cydaw_native_platform_tests 60)
+        endif()
+    endif()
     add_executable(cydaw_base_tests tests/BaseTests.cpp)
     target_link_libraries(cydaw_base_tests PRIVATE CyDAW::Core)
     add_test(NAME cydaw_base_tests COMMAND cydaw_base_tests)
     cydaw_configure_test(cydaw_base_tests 60)
 endif()
 
-if(CYDAW_BUILD_DESKTOP)
+if(CYDAW_BUILD_DESKTOP AND CYDAW_BUILD_LEGACY_JUCE_TESTS)
     if(CYDAW_JUCE_SOURCE_DIR)
         add_subdirectory("${CYDAW_JUCE_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/JUCE")
     elseif(CYDAW_FETCH_JUCE)
@@ -881,19 +891,49 @@ if(CYDAW_BUILD_DESKTOP)
             endif()
         endif()
 
+
+        if(EXISTS "${JUCE_SOURCE_DIR}/LICENSE.md")
+            install(FILES "${JUCE_SOURCE_DIR}/LICENSE.md"
+                    DESTINATION . RENAME JUCE_LICENSE.md COMPONENT CyDAWRuntime)
+        endif()
+        if(CYDAW_ASIO_AVAILABLE
+           AND EXISTS "${JUCE_SOURCE_DIR}/modules/juce_audio_devices/native/asio/LICENSE.txt")
+            install(FILES
+                    "${JUCE_SOURCE_DIR}/modules/juce_audio_devices/native/asio/LICENSE.txt"
+                    DESTINATION . RENAME ASIO_SDK_LICENSE.txt COMPONENT CyDAWRuntime)
+        endif()
+    else()
+        message(STATUS
+            "JUCE was not provided: building the CyDAW core only. "
+            "Set CYDAW_JUCE_SOURCE_DIR or CYDAW_FETCH_JUCE=ON for the desktop shell.")
+    endif()
+endif()
+
+
+if(CYDAW_BUILD_DESKTOP AND WIN32)
+    if(NOT TARGET cydaw_imgui)
+        add_library(cydaw_imgui STATIC
+            third_party/imgui/imgui.cpp third_party/imgui/imgui_draw.cpp
+            third_party/imgui/imgui_tables.cpp third_party/imgui/imgui_widgets.cpp
+            third_party/imgui/imgui_demo.cpp third_party/imgui/backends/imgui_impl_win32.cpp
+            third_party/imgui/backends/imgui_impl_dx11.cpp)
+        target_include_directories(cydaw_imgui PUBLIC third_party/imgui)
+        target_compile_features(cydaw_imgui PUBLIC cxx_std_17)
+        target_link_libraries(cydaw_imgui PUBLIC d3d11 dxgi dwmapi d3dcompiler)
+    endif()
+    if(NOT TARGET CyUI::Core)
+        include("${CMAKE_CURRENT_SOURCE_DIR}/src/v2/CyUI.cmake")
+    endif()
         # CyDAW 2: a new interface in Dear ImGui (docking branch, third_party/imgui)
         # over the same engine, rendered with Direct3D 11 on the message thread.
         # src/v2 holds it.
         option(CYDAW_BUILD_V2 "Build CyDAW 2, the Dear ImGui interface" ON)
         if(WIN32 AND CYDAW_BUILD_V2)
-            juce_add_gui_app(CyDAW2
-                PRODUCT_NAME "CyDAW 2"
-                VERSION "${PROJECT_VERSION}"
-                BUILD_VERSION "${PROJECT_VERSION}"
-                # The logo: the executable's icon, its window's and the taskbar's.
-                ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/resources/branding/cydaw-logo-512.png"
-                ICON_SMALL "${CMAKE_CURRENT_SOURCE_DIR}/resources/branding/cydaw-icon-small.png"
-            )
+            add_executable(CyDAW2 WIN32)
+            set_target_properties(CyDAW2 PROPERTIES OUTPUT_NAME "CyDAW 2"
+                RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/CyDAW2_artefacts/$<CONFIG>")
+            include(cmake/NativeDesktopResources.cmake)
+            cydaw_native_desktop_resources(CyDAW2)
             # Header-only Link transport (no audio sharing) and JACK's dynamically loaded control API.
             include("${CMAKE_CURRENT_SOURCE_DIR}/third_party/ableton-link/AbletonLinkConfig.cmake")
             target_link_libraries(CyDAW2 PRIVATE Ableton::Link ws2_32 iphlpapi)
@@ -901,23 +941,10 @@ if(CYDAW_BUILD_DESKTOP)
             target_compile_definitions(CyDAW2 PRIVATE ASIO_STANDALONE)
             target_include_directories(CyDAW2 PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/third_party/jack-transport/include")
             # The logo inside the interface (menu bar, About, opening a project).
-            juce_add_binary_data(CyDAW2Branding
-                HEADER_NAME CyDAWBranding.h
-                NAMESPACE cydaw::branding
-                SOURCES
-                    resources/branding/cydaw-logo-512.png
-            )
-            get_target_property(CYDAW2_JUCE_INFO_FILE CyDAW2 JUCE_INFO_FILE)
-            get_target_property(CYDAW2_JUCE_GENERATED_DIR
-                                CyDAW2 JUCE_GENERATED_SOURCES_DIRECTORY)
-            add_custom_command(
-                OUTPUT "${CYDAW2_JUCE_GENERATED_DIR}/CyDAW2_resources.rc"
-                APPEND
-                DEPENDS "${CYDAW2_JUCE_INFO_FILE}")
             target_link_libraries(CyDAW2 PRIVATE cydaw_zstd)
             # The Processing mode runs JSFX (ysfx) and note scripts (its EEL2) offline.
-            target_link_libraries(CyDAW2 PRIVATE ysfx::ysfx)
-            target_include_directories(CyDAW2 PRIVATE third_party/ysfx/thirdparty/WDL/source)
+            target_link_libraries(CyDAW2 PRIVATE CyAudioCore::Plugins)
+            target_include_directories(CyDAW2 PRIVATE "${CYDAW_CYAUDIOCORE_SOURCE_DIR}/third_party/ysfx/include" "${CYDAW_CYAUDIOCORE_SOURCE_DIR}/third_party/ysfx/thirdparty/WDL/source")
             target_sources(CyDAW2 PRIVATE
                 src/v2/HelpDocumentation.cpp
                 src/v2/HelpDocumentation.h
@@ -1105,17 +1132,12 @@ if(CYDAW_BUILD_DESKTOP)
                 src/app/ProjectImportMidi.cpp
                 src/app/RemoteControlServer.cpp
                 src/app/GraphPolySynthRenderer.cpp
-                src/app/GraphManagerComponent.cpp
-                src/app/GraphPluginExportComponent.cpp
-                src/app/CyDawLookAndFeel.cpp
             )
             target_include_directories(CyDAW2 PRIVATE src/app src/v2)
             target_compile_features(CyDAW2 PRIVATE cxx_std_20)
             target_compile_definitions(CyDAW2 PRIVATE
-                JUCE_APPLICATION_NAME_STRING="$<TARGET_PROPERTY:CyDAW2,JUCE_PRODUCT_NAME>"
-                JUCE_APPLICATION_VERSION_STRING="${PROJECT_VERSION}"
-                JUCE_USE_CURL=0
-                JUCE_WEB_BROWSER=0
+                CYDAW_APPLICATION_NAME="CyDaw"
+                CYDAW_APPLICATION_VERSION="${PROJECT_VERSION}"
             )
             cydaw_configure_plugin_formats(CyDAW2)
             cydaw_configure_audio_backends(CyDAW2)
@@ -1123,8 +1145,7 @@ if(CYDAW_BUILD_DESKTOP)
                 add_executable(cydaw_help_tests tests/HelpDocumentationTests.cpp src/v2/HelpDocumentation.cpp)
                 target_include_directories(cydaw_help_tests PRIVATE src/v2)
                 target_compile_features(cydaw_help_tests PRIVATE cxx_std_20)
-                target_compile_definitions(cydaw_help_tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
-                target_link_libraries(cydaw_help_tests PRIVATE juce::juce_core)
+                target_link_libraries(cydaw_help_tests PRIVATE cydaw_base)
                 if(MSVC)
                     target_compile_options(cydaw_help_tests PRIVATE /utf-8 /EHsc)
                 endif()
@@ -1146,38 +1167,65 @@ if(CYDAW_BUILD_DESKTOP)
                     src/v2/Theme.cpp src/v2/ThemeRuntime.cpp src/v2/Widgets.cpp)
                 target_include_directories(cydaw_cyui_tests PRIVATE src/v2)
                 target_compile_features(cydaw_cyui_tests PRIVATE cxx_std_20)
-                target_compile_definitions(cydaw_cyui_tests PRIVATE JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
-                target_link_libraries(cydaw_cyui_tests PRIVATE CyUI::Core CyUI::Audio CyUI::AudioViews
-                    CyUI::Nodes CyUI::CodeEditor CyUI::Images CyUI::Inspector juce::juce_core)
+
+                target_link_libraries(cydaw_cyui_tests PRIVATE CyUI::Core CyUI::Audio CyUI::AudioViews CyUI::Nodes CyUI::CodeEditor CyUI::Images CyUI::Inspector cydaw_base)
                 if(MSVC)
                     target_compile_options(cydaw_cyui_tests PRIVATE /utf-8 /EHsc)
                 endif()
                 add_test(NAME cydaw_cyui_tests COMMAND cydaw_cyui_tests)
                 cydaw_configure_test(cydaw_cyui_tests 60)
             endif()
+            if(CYDAW_BUILD_TESTS AND Python3_Interpreter_FOUND AND MSVC AND NOT CYDAW_BUILD_LEGACY_JUCE_TESTS)
+                add_test(NAME cydaw_no_juce_production_graph COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/no_juce_build_check.py" "${CMAKE_BINARY_DIR}")
+                cydaw_configure_test(cydaw_no_juce_production_graph 30)
+            endif()
+            if(CYDAW_BUILD_TESTS AND Python3_Interpreter_FOUND)
+                add_library(cydaw_transport_jack_fixture SHARED tests/TransportJackFixture.cpp)
+                set_target_properties(cydaw_transport_jack_fixture PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
+                target_include_directories(cydaw_transport_jack_fixture PRIVATE third_party/jack-transport/include)
+                target_compile_features(cydaw_transport_jack_fixture PRIVATE cxx_std_20)
+                add_test(NAME cydaw2_transport_sync_check COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/run_silent_session.py"
+                    --exe "$<TARGET_FILE:CyDAW2>" --port 48084 --peer-port 48085 "${CMAKE_CURRENT_SOURCE_DIR}/tests/v2_transport_sync_check.py"
+                    --port 48084 --peer-port 48085 --output "${CMAKE_BINARY_DIR}/transport-check")
+                add_test(NAME cydaw2_transport_jack_check COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/run_silent_session.py"
+                    --exe "$<TARGET_FILE:CyDAW2>" --port 48086 "${CMAKE_CURRENT_SOURCE_DIR}/tests/v2_transport_jack_check.py"
+                    --port 48086 --library "$<TARGET_FILE:cydaw_transport_jack_fixture>")
+                set_tests_properties(cydaw2_transport_sync_check cydaw2_transport_jack_check PROPERTIES TIMEOUT 360)
+                execute_process(COMMAND "${Python3_EXECUTABLE}" -c "import PIL,imageio_ffmpeg;print(imageio_ffmpeg.get_ffmpeg_exe())"
+                    RESULT_VARIABLE native_video_test_deps OUTPUT_VARIABLE native_video_test_ffmpeg OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+                if(native_video_test_deps EQUAL 0)
+                    foreach(check layout codecs)
+                        add_test(NAME cydaw2_cinema_${check}_check COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/v2_cinema_${check}_check.py"
+                            --exe "$<TARGET_FILE:CyDAW2>" --output "${CMAKE_BINARY_DIR}/cinema-${check}-check")
+                        set_tests_properties(cydaw2_cinema_${check}_check PROPERTIES TIMEOUT 360)
+                    endforeach()
+                    add_test(NAME cydaw2_cinema_check COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/run_silent_session.py"
+                        --exe "$<TARGET_FILE:CyDAW2>" --port 48087 "${CMAKE_CURRENT_SOURCE_DIR}/tests/v2_cinema_check.py"
+                        --port 48087 --output "${CMAKE_BINARY_DIR}/cinema-check" --ffmpeg "${native_video_test_ffmpeg}")
+                    set_tests_properties(cydaw2_cinema_check PROPERTIES TIMEOUT 360)
+                endif()
+            endif()
             include(cmake/CyDoc.cmake)
             cydaw_add_documentation(CyDAW2)
             cydaw_copy_cyui_notices(CyDAW2)
-            cydaw_use_precompiled_header(CyDAW2)
+            if(CYDAW_ENABLE_PCH)
+                target_precompile_headers(CyDAW2 PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/app/CyDawPrecompiled.h")
+            endif()
+            if(MSVC)
+                target_compile_options(CyDAW2 PRIVATE /utf-8 /EHsc /bigobj /MP4)
+            endif()
+            if(CYDAW_ENABLE_LTO)
+                set_property(TARGET CyDAW2 PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+            endif()
             target_link_libraries(CyDAW2 PRIVATE
                 cydaw_audio_sources
                 CyDAW::Core
                 cydaw_localization
                 cydaw_assets
                 cydaw_graph_document
-                CyDAW2Branding
                 CyUI::Core CyUI::Audio CyUI::AudioViews CyUI::Nodes
                 CyUI::CodeEditor CyUI::Images CyUI::Inspector
                 cydaw_imgui
-                juce::juce_audio_devices
-                juce::juce_audio_formats
-                juce::juce_audio_processors
-                juce::juce_audio_utils
-                juce::juce_gui_extra
-                juce::juce_osc
-                juce::juce_recommended_config_flags
-                ${CYDAW_LTO_FLAGS}
-                juce::juce_recommended_warning_flags
             )
             if(TARGET CyDAWPluginWorker)
                 add_dependencies(CyDAW2 CyDAWPluginWorker)
@@ -1557,19 +1605,5 @@ if(CYDAW_BUILD_DESKTOP)
                     RENAME CyDAWPluginWorker.exe
                     COMPONENT CyDAWRuntime)
         endif()
-        if(EXISTS "${JUCE_SOURCE_DIR}/LICENSE.md")
-            install(FILES "${JUCE_SOURCE_DIR}/LICENSE.md"
-                    DESTINATION . RENAME JUCE_LICENSE.md COMPONENT CyDAWRuntime)
-        endif()
-        if(CYDAW_ASIO_AVAILABLE
-           AND EXISTS "${JUCE_SOURCE_DIR}/modules/juce_audio_devices/native/asio/LICENSE.txt")
-            install(FILES
-                    "${JUCE_SOURCE_DIR}/modules/juce_audio_devices/native/asio/LICENSE.txt"
-                    DESTINATION . RENAME ASIO_SDK_LICENSE.txt COMPONENT CyDAWRuntime)
-        endif()
-    else()
-        message(STATUS
-            "JUCE was not provided: building the CyDAW core only. "
-            "Set CYDAW_JUCE_SOURCE_DIR or CYDAW_FETCH_JUCE=ON for the desktop shell.")
-    endif()
+
 endif()

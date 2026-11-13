@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/audio/SampleBuffer.h>
 #include <cydaw/base/FileDialog.h>
 #include <cydaw/base/File.h>
@@ -1225,7 +1226,7 @@ void FoundryView::drawTabs()
     for (int i = 0; i < static_cast<int>(tabs_.size()); ++i) {
         const auto& document = *tabs_[static_cast<std::size_t>(i)].document;
         auto open = true;
-        const auto label = document.name() + "###foundryTab" + cydaw::base::Text(static_cast<juce::int64>(reinterpret_cast<juce::pointer_sized_int>(&document)));
+        const auto label = document.name() + "###foundryTab" + cydaw::base::Text(static_cast<std::int64_t>(reinterpret_cast<std::intptr_t>(&document)));
         const auto flags = forcing && i == current_ ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
         if (ImGui::BeginTabItem(label.toRawUTF8(), &open, flags | (document.dirty() ? ImGuiTabItemFlags_UnsavedDocument : 0))) {
             shownIndex = i;
@@ -1629,7 +1630,7 @@ void FoundryView::drawTrackHeader(Tab& tab, const int index, const ImVec2 origin
     ImGui::SetCursorScreenPos(ImVec2(x - dp(6.0f) + half, knobs));
     changed = ui::knob("##pan", &pan, -1.0f, 1.0f, 0.0f, style) || changed;
     ui::tooltip(L("Panoramique (double-clic : au centre)", "Pan (double click: centred)"));
-    const auto percent = juce::roundToInt(std::abs(pan) * 100.0f);
+    const auto percent = cydaw::base::roundToInt(std::abs(pan) * 100.0f);
     valueBeside(x - dp(6.0f) + half, percent == 0 ? cydaw::base::Text("C")
                                      : cydaw::base::Text(pan < 0.0f ? L("G ", "L ") : L("D ", "R ")) + cydaw::base::Text(percent));
     if (changed)
@@ -2216,7 +2217,7 @@ void FoundryView::drawStatus(Tab& tab)
     } else {
         text << ui::Ls("Curseur ", "Cursor ") << timeText(tab.cursor, rate);
     }
-    text << "     " << cydaw::base::Text(juce::roundToInt(rate)) << " Hz  ·  " << cydaw::base::Text(static_cast<int>(session.tracks.size()))
+    text << "     " << cydaw::base::Text(cydaw::base::roundToInt(rate)) << " Hz  ·  " << cydaw::base::Text(static_cast<int>(session.tracks.size()))
          << ui::Ls(" pistes", " tracks") << "  ·  " << timeText(session.frames(), rate);
     if (playingTab_ == current_)
         text << "     " << ui::Ls("Lecture ", "Playing ") << timeText(static_cast<std::int64_t>(this->player().position()), rate);
@@ -2346,7 +2347,7 @@ void FoundryView::drawProcesses(Tab& tab)
     }
     case processRate: {
         static constexpr int rates[] { 8'000, 11'025, 16'000, 22'050, 32'000, 44'100, 48'000, 88'200, 96'000, 176'400, 192'000 };
-        ImGui::TextColored(theme::vec(p.textFaint), "%s %d Hz", L("Maintenant :", "Now:"), juce::roundToInt(session.rate));
+        ImGui::TextColored(theme::vec(p.textFaint), "%s %d Hz", L("Maintenant :", "Now:"), cydaw::base::roundToInt(session.rate));
         ImGui::SetNextItemWidth(-1.0f);
         if (ImGui::BeginCombo("##rate", (cydaw::base::Text(newRate_) + " Hz").toRawUTF8())) {
             for (const auto rate : rates)
@@ -2627,7 +2628,7 @@ cydaw::base::Value FoundryView::tabJson(const Tab& tab) const
     picture->setProperty("start",session.picture.start);picture->setProperty("sourceIn",session.picture.sourceIn);
     picture->setProperty("duration",session.picture.duration);picture->setProperty("fps",session.picture.fps);
     item->setProperty("picture",cydaw::base::Value(picture));
-    item->setProperty("activeGroup",static_cast<juce::int64>(tab.activeGroup));
+    item->setProperty("activeGroup",static_cast<std::int64_t>(tab.activeGroup));
     if(cinema_){cydaw::base::Array<cydaw::base::Value> panes;for(const auto& pane:cinemaDropTargets_){auto* p=new cydaw::base::Object();p->setProperty("track",pane.track);
         p->setProperty("x",pane.min.x-ImGui::GetMainViewport()->Pos.x);p->setProperty("y",pane.min.y-ImGui::GetMainViewport()->Pos.y);p->setProperty("width",pane.max.x-pane.min.x);p->setProperty("height",pane.max.y-pane.min.y);p->setProperty("timelineX",pane.timelineX-ImGui::GetMainViewport()->Pos.x);p->setProperty("timelineWidth",pane.timelineWidth);panes.add(cydaw::base::Value(p));}
         item->setProperty("panes",panes);item->setProperty("viewStart",tab.viewStart/session.rate);item->setProperty("viewSeconds",tab.cinemaVisibleSeconds);
@@ -2636,24 +2637,24 @@ cydaw::base::Value FoundryView::tabJson(const Tab& tab) const
         for(const auto* id:{"###cinemaTimeline","###cinemaPreview","###cinemaTools","###cinemaDetails"}){
             const auto* w=ImGui::FindWindowByID(ImHashStr(id));if(!w||!w->WasActive)continue;
             auto* v=new cydaw::base::Object();v->setProperty("id",id);v->setProperty("x",w->Pos.x-ImGui::GetMainViewport()->Pos.x);v->setProperty("y",w->Pos.y-ImGui::GetMainViewport()->Pos.y);
-            v->setProperty("width",w->Size.x);v->setProperty("height",w->Size.y);v->setProperty("dock",static_cast<juce::int64>(w->DockId));windows.add(cydaw::base::Value(v));
+            v->setProperty("width",w->Size.x);v->setProperty("height",w->Size.y);v->setProperty("dock",static_cast<std::int64_t>(w->DockId));windows.add(cydaw::base::Value(v));
         }item->setProperty("windows",windows);
         item->setProperty("imguiErrorCount",GImGui->ErrorCountCurrentFrame);
         item->setProperty("imguiErrorLog",cydaw::base::Text(GImGui->DebugLogBuf.c_str()));
-        cydaw::base::Array<cydaw::base::Value> thumbnailFrames;for(const auto& [frame,thumbnail]:tab.thumbnails)thumbnailFrames.add(static_cast<juce::int64>(frame));
+        cydaw::base::Array<cydaw::base::Value> thumbnailFrames;for(const auto& [frame,thumbnail]:tab.thumbnails)thumbnailFrames.add(static_cast<std::int64_t>(frame));
         item->setProperty("thumbnailFrames",thumbnailFrames);
         auto* navigator=new cydaw::base::Object();navigator->setProperty("x",cinemaNavigatorMin_.x-ImGui::GetMainViewport()->Pos.x);navigator->setProperty("y",cinemaNavigatorMin_.y-ImGui::GetMainViewport()->Pos.y);
         navigator->setProperty("width",cinemaNavigatorMax_.x-cinemaNavigatorMin_.x);navigator->setProperty("height",cinemaNavigatorMax_.y-cinemaNavigatorMin_.y);item->setProperty("navigatorBounds",cydaw::base::Value(navigator));
         item->setProperty("followPaused",cinemaFollowPaused_);
         item->setProperty("filmstrip",tab.cinemaFilmstrip);item->setProperty("thumbnailCount",static_cast<int>(tab.thumbnails.size()));
         auto* strip=new cydaw::base::Object();strip->setProperty("x",cinemaStripMin_.x-ImGui::GetMainViewport()->Pos.x);strip->setProperty("y",cinemaStripMin_.y-ImGui::GetMainViewport()->Pos.y);strip->setProperty("width",cinemaStripMax_.x-cinemaStripMin_.x);strip->setProperty("height",cinemaStripMax_.y-cinemaStripMin_.y);item->setProperty("filmstripBounds",cydaw::base::Value(strip));item->setProperty("toolsPanel",tab.processing?tab.processing->selectedPanel():0);
-        cydaw::base::Array<cydaw::base::Value> buses;for(const auto& bus:cinemaBusTargets_){auto* b=new cydaw::base::Object();b->setProperty("id",static_cast<juce::int64>(bus.id));b->setProperty("x",bus.min.x-ImGui::GetMainViewport()->Pos.x);b->setProperty("y",bus.min.y-ImGui::GetMainViewport()->Pos.y);b->setProperty("width",bus.max.x-bus.min.x);b->setProperty("height",bus.max.y-bus.min.y);buses.add(cydaw::base::Value(b));}item->setProperty("buses",buses);
-        cydaw::base::Array<cydaw::base::Value> list;for(const auto& row:cinemaListTargets_){auto* r=new cydaw::base::Object();r->setProperty("id",static_cast<juce::int64>(row.id));r->setProperty("x",row.min.x-ImGui::GetMainViewport()->Pos.x);r->setProperty("y",row.min.y-ImGui::GetMainViewport()->Pos.y);r->setProperty("width",row.max.x-row.min.x);r->setProperty("height",row.max.y-row.min.y);list.add(cydaw::base::Value(r));}item->setProperty("subtrackFocusButtons",list);}
+        cydaw::base::Array<cydaw::base::Value> buses;for(const auto& bus:cinemaBusTargets_){auto* b=new cydaw::base::Object();b->setProperty("id",static_cast<std::int64_t>(bus.id));b->setProperty("x",bus.min.x-ImGui::GetMainViewport()->Pos.x);b->setProperty("y",bus.min.y-ImGui::GetMainViewport()->Pos.y);b->setProperty("width",bus.max.x-bus.min.x);b->setProperty("height",bus.max.y-bus.min.y);buses.add(cydaw::base::Value(b));}item->setProperty("buses",buses);
+        cydaw::base::Array<cydaw::base::Value> list;for(const auto& row:cinemaListTargets_){auto* r=new cydaw::base::Object();r->setProperty("id",static_cast<std::int64_t>(row.id));r->setProperty("x",row.min.x-ImGui::GetMainViewport()->Pos.x);r->setProperty("y",row.min.y-ImGui::GetMainViewport()->Pos.y);r->setProperty("width",row.max.x-row.min.x);r->setProperty("height",row.max.y-row.min.y);list.add(cydaw::base::Value(r));}item->setProperty("subtrackFocusButtons",list);}
 
     if(tab.video){const auto video=tab.video->snapshot();auto* decoder=new cydaw::base::Object();
         decoder->setProperty("backend",video.backend);decoder->setProperty("codec",video.codec);decoder->setProperty("error",video.error);decoder->setProperty("loading",video.loading);decoder->setProperty("width",video.width);
         decoder->setProperty("height",video.height);decoder->setProperty("duration",video.duration);decoder->setProperty("fps",video.fps);
-        decoder->setProperty("time",video.time);decoder->setProperty("revision",static_cast<juce::int64>(video.revision));item->setProperty("decoder",cydaw::base::Value(decoder));}
+        decoder->setProperty("time",video.time);decoder->setProperty("revision",static_cast<std::int64_t>(video.revision));item->setProperty("decoder",cydaw::base::Value(decoder));}
 
     item->setProperty("masterAutomation",foundry_json::automation(session.masterAutomation));
     item->setProperty("seconds", session.rate > 0.0 ? static_cast<double>(session.frames()) / session.rate : 0.0);
@@ -2663,7 +2664,7 @@ cydaw::base::Value FoundryView::tabJson(const Tab& tab) const
     item->setProperty("selectionEnd", tab.selectionEnd);
     item->setProperty("cursor", tab.cursor);
     item->setProperty("mask", static_cast<int>(tab.mask & 0b11u));
-    item->setProperty("clip", static_cast<juce::int64>(tab.clip));
+    item->setProperty("clip", static_cast<std::int64_t>(tab.clip));
     item->setProperty("undo", tab.document->undoLabel());
     item->setProperty("redo", tab.document->redoLabel());
     cydaw::base::Array<cydaw::base::Value> pickedTracks;
@@ -2678,10 +2679,10 @@ cydaw::base::Value FoundryView::tabJson(const Tab& tab) const
     cydaw::base::Array<cydaw::base::Value> tracks;
     for (const auto& track : session.tracks) {
         auto* entry = new cydaw::base::Object();
-        entry->setProperty("id",static_cast<juce::int64>(track.id));
+        entry->setProperty("id",static_cast<std::int64_t>(track.id));
         entry->setProperty("midi",track.midi);
         entry->setProperty("bus",track.bus);
-        entry->setProperty("virtualGroup",track.virtualGroup);entry->setProperty("parentId",static_cast<juce::int64>(track.parentId));
+        entry->setProperty("virtualGroup",track.virtualGroup);entry->setProperty("parentId",static_cast<std::int64_t>(track.parentId));
         entry->setProperty("containerStart",track.containerStart);entry->setProperty("containerLength",track.containerLength);
         entry->setProperty("automation",foundry_json::automation(track.automation));
         entry->setProperty("name", fromUtf8(track.name));
@@ -2692,7 +2693,7 @@ cydaw::base::Value FoundryView::tabJson(const Tab& tab) const
         cydaw::base::Array<cydaw::base::Value> clips;
         for (const auto& clip : track.clips) {
             auto* c = new cydaw::base::Object();
-            c->setProperty("id", static_cast<juce::int64>(clip.id));
+            c->setProperty("id", static_cast<std::int64_t>(clip.id));
             c->setProperty("notes",foundry_json::notes(clip.notes));
             c->setProperty("name", fromUtf8(clip.name));
             c->setProperty("start", clip.start);
@@ -2779,7 +2780,7 @@ cydaw::base::Value FoundryView::command(const cydaw::base::Value& request)
     } else if(action=="notes") {
         if((error=needTab()).isEmpty()) {
             auto next=tab->document->session();int t{},c{};
-            const auto id=static_cast<std::uint64_t>(static_cast<juce::int64>(request.getProperty("id",static_cast<juce::int64>(tab->clip))));
+            const auto id=static_cast<std::uint64_t>(static_cast<std::int64_t>(request.getProperty("id",static_cast<std::int64_t>(tab->clip))));
             if(!next.findClip(id,t,c)||!next.tracks[t].midi)error="no MIDI clip";
             else {next.tracks[t].clips[c].notes=foundry_json::notes(request.getProperty("notes",{}),next);edit(*tab,std::move(next),"MIDI notes");}
         }
@@ -2790,7 +2791,7 @@ cydaw::base::Value FoundryView::command(const cydaw::base::Value& request)
             else {auto lanes=foundry_json::automation(request.getProperty("lanes",{}));if(index<0)next.masterAutomation=std::move(lanes);else next.tracks[index].automation=std::move(lanes);edit(*tab,std::move(next),"Automation");}
         }
     } else if(action=="reverse_clip") {
-        if((error=needTab()).isEmpty()){tab->clip=static_cast<juce::int64>(request.getProperty("id",static_cast<juce::int64>(tab->clip)));reverseClip(*tab);}
+        if((error=needTab()).isEmpty()){tab->clip=static_cast<std::int64_t>(request.getProperty("id",static_cast<std::int64_t>(tab->clip)));reverseClip(*tab);}
     } else if (action == "remove_track") {
         if ((error = needTab()).isEmpty())
             edit(*tab, engine::foundry::withoutTrack(tab->document->session(), trackOf("track", 0)), "Remove the track");
@@ -2818,7 +2819,7 @@ cydaw::base::Value FoundryView::command(const cydaw::base::Value& request)
             auto next = tab->document->session();
             int track = -1;
             int index = -1;
-            if (!next.findClip(static_cast<std::uint64_t>(static_cast<juce::int64>(request.getProperty("id", 0))), track, index)) {
+            if (!next.findClip(static_cast<std::uint64_t>(static_cast<std::int64_t>(request.getProperty("id", 0))), track, index)) {
                 error = "no clip with that id";
             } else {
                 auto clip = next.tracks[static_cast<std::size_t>(track)].clips[static_cast<std::size_t>(index)];

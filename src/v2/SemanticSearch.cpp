@@ -1,3 +1,5 @@
+#include <cydsp/processors/Resampler.h>
+#include <cydaw/base/Utilities.h>
 #include <cydaw/audio/SampleBuffer.h>
 #include <cydaw/base/Socket.h>
 #include <cydaw/base/Process.h>
@@ -11,8 +13,7 @@
 #include "Locations.h"
 #include "Widgets.h"
 
-#include <juce_audio_formats/juce_audio_formats.h>
-#include <juce_audio_basics/juce_audio_basics.h>
+
 
 #include <algorithm>
 #include <cmath>
@@ -143,18 +144,18 @@ bool decodeWindows(const cydaw::base::File& file, const double rate, const doubl
         return false;
     const auto sourceRate = reader->sampleRate;
     const auto length = reader->lengthInSamples;
-    const auto window = static_cast<juce::int64>(windowSeconds * sourceRate);
-    std::vector<juce::int64> starts;
+    const auto window = static_cast<std::int64_t>(windowSeconds * sourceRate);
+    std::vector<std::int64_t> starts;
     if (static_cast<double>(length) <= static_cast<double>(window) * 1.15) {
         starts.push_back(0);
     } else {
-        const auto count = std::min<juce::int64>(maxWindows, (length + window - 1) / window);
-        for (juce::int64 index = 0; index < count; ++index)
+        const auto count = std::min<std::int64_t>(maxWindows, (length + window - 1) / window);
+        for (std::int64_t index = 0; index < count; ++index)
             starts.push_back(count > 1 ? index * (length - window) / (count - 1) : 0);
     }
     const auto channels = static_cast<int>(std::min<unsigned>(reader->numChannels, 2));
     for (const auto start : starts) {
-        const auto count = static_cast<int>(std::min<juce::int64>(window, length - start));
+        const auto count = static_cast<int>(std::min<std::int64_t>(window, length - start));
         if (count <= 0)
             continue;
         cydaw::audio::SampleBuffer<float> buffer(std::max(1, channels), count);
@@ -174,8 +175,23 @@ bool decodeWindows(const cydaw::base::File& file, const double rate, const doubl
         const auto ratio = sourceRate / rate;
         const auto produced = std::max(1, static_cast<int>(std::floor(static_cast<double>(count) / ratio)) - 4);
         std::vector<float> resampled(static_cast<std::size_t>(produced));
-        juce::LagrangeInterpolator interpolator;
-        interpolator.process(ratio, mono.data(), resampled.data(), produced);
+        cydsp::Resampler<float> interpolator;
+        cydsp::ResampleSpec spec;
+        spec.inputRate=static_cast<std::uint32_t>(std::lround(sourceRate));
+        spec.outputRate=static_cast<std::uint32_t>(std::lround(rate));
+        spec.channels=1;spec.maxInputFrames=mono.size();spec.maxOutputFrames=resampled.size();
+        if(interpolator.prepare(spec)!=cydsp::Status::ok)return false;
+        std::size_t consumed=0,written=0;
+        while(written<resampled.size()) {
+            const float* input=mono.data()+consumed;float* output=resampled.data()+written;
+            auto result=consumed<mono.size()
+                ?interpolator.process({&input,1,mono.size()-consumed},{&output,1,resampled.size()-written})
+                :interpolator.finish({&output,1,resampled.size()-written});
+            if(result.status!=cydsp::Status::ok)return false;
+            consumed+=result.inputConsumed;written+=result.outputProduced;
+            if(!result.inputConsumed&&!result.outputProduced)break;
+        }
+        resampled.resize(written);
         out.push_back(std::move(resampled));
     }
     return !out.empty();
@@ -351,7 +367,7 @@ private:
 
     cydaw::base::ChildProcess process_;
     cydaw::base::StreamingSocket socket_;
-    const cydaw::base::Text token_ { juce::Uuid().toString() };
+    const cydaw::base::Text token_ { cydaw::base::Uuid().toString() };
     std::mutex requestMutex_;
     mutable std::mutex outputMutex_;
     cydaw::base::Text lastError_;
@@ -400,7 +416,7 @@ public:
             sizes_.push_back(size);
             modified_.push_back(modified);
             for (const auto half : halves)
-                data_.push_back(fromHalf(juce::ByteOrder::swapIfBigEndian(half)));
+                data_.push_back(fromHalf(cydaw::base::ByteOrder::swapIfBigEndian(half)));
         }
         return true;
     }
@@ -429,7 +445,7 @@ public:
                 buffered.writeInt64(modified_[row]);
                 for (auto i = 0; i < dimension_; ++i)
                     halves[static_cast<std::size_t>(i)]
-                        = juce::ByteOrder::swapIfBigEndian(toHalf(data_[row * static_cast<std::size_t>(dimension_) + static_cast<std::size_t>(i)]));
+                        = cydaw::base::ByteOrder::swapIfBigEndian(toHalf(data_[row * static_cast<std::size_t>(dimension_) + static_cast<std::size_t>(i)]));
                 buffered.write(halves.data(), halves.size() * sizeof(std::uint16_t));
             }
             out.flush();
@@ -439,7 +455,7 @@ public:
         return temporary.moveFileTo(file);
     }
 
-    [[nodiscard]] bool fresh(const cydaw::base::Text& path, const juce::int64 size, const juce::int64 modified) const
+    [[nodiscard]] bool fresh(const cydaw::base::Text& path, const std::int64_t size, const std::int64_t modified) const
     {
         const std::shared_lock lock(mutex_);
         const auto found = rows_.find(path);
@@ -447,7 +463,7 @@ public:
                && modified_[static_cast<std::size_t>(found->second)] == modified;
     }
 
-    void put(const cydaw::base::Text& path, const juce::int64 size, const juce::int64 modified, const float* vector)
+    void put(const cydaw::base::Text& path, const std::int64_t size, const std::int64_t modified, const float* vector)
     {
         const std::unique_lock lock(mutex_);
         auto row = 0;
@@ -472,7 +488,7 @@ public:
     {
         const std::unique_lock lock(mutex_);
         std::vector<cydaw::base::Text> keptPaths;
-        std::vector<juce::int64> keptSizes, keptModified;
+        std::vector<std::int64_t> keptSizes, keptModified;
         std::vector<float> keptData;
         for (std::size_t row = 0; row < paths_.size(); ++row)
             if (paths.contains(paths_[row])) {
@@ -540,8 +556,8 @@ private:
     const int dimension_;
     mutable std::shared_mutex mutex_;
     std::vector<cydaw::base::Text> paths_;
-    std::vector<juce::int64> sizes_;
-    std::vector<juce::int64> modified_;
+    std::vector<std::int64_t> sizes_;
+    std::vector<std::int64_t> modified_;
     std::vector<float> data_;
     std::map<cydaw::base::Text, int> rows_;
     std::atomic<int> generation_ {};
@@ -553,8 +569,8 @@ class SemanticSearch::Indexer final : public cydaw::base::Thread {
 public:
     struct Item {
         cydaw::base::Text path;
-        juce::int64 size {};
-        juce::int64 modified {};
+        std::int64_t size {};
+        std::int64_t modified {};
         double length {};
     };
 
@@ -630,7 +646,7 @@ public:
                     finish("cannot write " + audioFile.getFullPathName());
                     return;
                 }
-                juce::int64 offset {};
+                std::int64_t offset {};
                 for (std::size_t slot = 0; slot < batch.size(); ++slot) {
                     if (ok[slot] == 0) {
                         failed_.fetch_add(1);
@@ -640,9 +656,9 @@ public:
                         (void) out.write(window.data(), window.size() * sizeof(float));
                         cydaw::base::Array<cydaw::base::Value> item;
                         item.add(offset);
-                        item.add(static_cast<juce::int64>(window.size()));
+                        item.add(static_cast<std::int64_t>(window.size()));
                         windows.add(item);
-                        offset += static_cast<juce::int64>(window.size());
+                        offset += static_cast<std::int64_t>(window.size());
                     }
                     owners.emplace_back(slot, static_cast<int>(decoded[slot].size()));
                 }
@@ -1335,7 +1351,7 @@ SemanticSearch::Answer SemanticSearch::run(const Query& query)
     answer.span = span;
     const auto pool = query.similarTo.isNotEmpty() ? query.limit : query.limit * candidatesFactor;
     for (const auto& [path, similarity] : current->nearest(vector, pool, query.similarTo))
-        answer.hits.push_back({ path, similarity, juce::jlimit(0.0f, 100.0f, (similarity - low) / span * 100.0f) });
+        answer.hits.push_back({ path, similarity, cydaw::base::limit(0.0f, 100.0f, (similarity - low) / span * 100.0f) });
     answer.limit = query.limit;
     return answer;
 }
@@ -1376,7 +1392,7 @@ void SemanticSearch::rerank(Answer& answer, app::SampleLibrary& library, const i
                 ++found;
         if (found > 0) {
             hit.similarity += wordsLift * static_cast<float>(found) / static_cast<float>(english.size());
-            hit.score = juce::jlimit(0.0f, 100.0f, (hit.similarity - answer.low) / answer.span * 100.0f);
+            hit.score = cydaw::base::limit(0.0f, 100.0f, (hit.similarity - answer.low) / answer.span * 100.0f);
         }
     }
     std::stable_sort(answer.hits.begin(), answer.hits.end(), [](const Hit& a, const Hit& b) { return a.similarity > b.similarity; });
@@ -1441,13 +1457,13 @@ std::optional<SemanticSearch::Answer> SemanticSearch::takeAnswer(const int owner
 
 SemanticSearch::Answer SemanticSearch::searchNow(const cydaw::base::Text& text, const int limit, const int timeoutMs)
 {
-    juce::ignoreUnused(timeoutMs);
+    cydaw::base::ignoreUnused(timeoutMs);
     return run({ nextQuery_++, text.trim(), {}, std::max(1, limit) });
 }
 
 SemanticSearch::Answer SemanticSearch::similarNow(const cydaw::base::Text& path, const int limit, const int timeoutMs)
 {
-    juce::ignoreUnused(timeoutMs);
+    cydaw::base::ignoreUnused(timeoutMs);
     return run({ nextQuery_++, {}, path, std::max(1, limit) });
 }
 

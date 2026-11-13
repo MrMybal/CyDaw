@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/audio/SampleBuffer.h>
 #include <cydaw/integration/AudioFiles.h>
 #include <cydaw/base/File.h>
@@ -490,7 +491,7 @@ Prepared prepare(const Processing& processing, const Values& values)
         for (const auto& knob : step.published) {
             auto* request = new cydaw::base::Object();
             request->setProperty("op", "parameter");
-            request->setProperty("inputId", static_cast<juce::int64>(chainInput));
+            request->setProperty("inputId", static_cast<std::int64_t>(chainInput));
             request->setProperty("binding", knob.binding);
             request->setProperty("value", valueOf(values, static_cast<int>(i), step, knob.binding, 0.5 * (knob.minimum + knob.maximum)));
             (void) mixer.command(cydaw::base::Value(request));
@@ -686,17 +687,17 @@ cydaw::base::Result readAudioFile(const cydaw::base::File& file, engine::repair:
         || reader->sampleRate > 384'000.0)
         return cydaw::base::Result::fail(ui::Ls("Fichier son illisible : ", "Unreadable sound file: ") + file.getFileName());
     // The header's word for its length is not trusted further than 30 minutes.
-    if (reader->lengthInSamples > static_cast<juce::int64>(reader->sampleRate * 60.0 * 30.0))
+    if (reader->lengthInSamples > static_cast<std::int64_t>(reader->sampleRate * 60.0 * 30.0))
         return cydaw::base::Result::fail(ui::Ls("Son trop long (30 minutes au plus)", "Sound too long (30 minutes at most)"));
-    const auto frames = static_cast<juce::int64>(reader->lengthInSamples);
+    const auto frames = static_cast<std::int64_t>(reader->lengthInSamples);
     const auto count = static_cast<int>(std::clamp(reader->numChannels, 1u, 2u));
     try {
         channels.assign(static_cast<std::size_t>(count), std::vector<float>(static_cast<std::size_t>(frames)));
         // Read in pieces: the whole sound is held once, not twice.
         constexpr int piece = 65'536;
         cydaw::audio::SampleBuffer<float> buffer(count, piece);
-        for (juce::int64 at = 0; at < frames; at += piece) {
-            const auto n = static_cast<int>(std::min<juce::int64>(piece, frames - at));
+        for (std::int64_t at = 0; at < frames; at += piece) {
+            const auto n = static_cast<int>(std::min<std::int64_t>(piece, frames - at));
             reader->read(&buffer, 0, n, at, true, count > 1);
             for (int c = 0; c < count; ++c)
                 std::copy_n(buffer.getReadPointer(c), n, channels[static_cast<std::size_t>(c)].begin() + at);

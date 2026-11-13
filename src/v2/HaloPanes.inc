@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 // Halo's display and large view (HaloDesign.h computes what they draw).
 // Included by StudioEffectsView.cpp inside its anonymous namespace.
 
@@ -22,7 +23,7 @@ cydaw::base::Text haloModeHint(const int index)
 bool haloDisplay(std::vector<Param>& parameters, const Pane& pane, const Box& box, const ImU32 colour, const Live& live, const Setter& set,
                  const bool large)
 {
-    juce::ignoreUnused(live);
+    cydaw::base::ignoreUnused(live);
     const auto& p = theme::palette();
     auto* list = ImGui::GetWindowDrawList();
     const auto values = studioValues<halod::haloParameterCount>(parameters, pane, "halo");

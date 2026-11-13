@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/FileDialog.h>
 #include <cydaw/base/File.h>
 #include "ProcessingView.h"
@@ -1099,7 +1100,7 @@ void ProcessingView::drawTrial()
     ImGui::SetNextItemWidth(dp(360.0f));
     if (ImGui::BeginCombo("##trialClip", current.toRawUTF8())) {
         for (const auto& choice : choices)
-            if (ImGui::Selectable((choice.label + "##" + cydaw::base::Text(static_cast<juce::int64>(choice.id))).toRawUTF8(),
+            if (ImGui::Selectable((choice.label + "##" + cydaw::base::Text(static_cast<std::int64_t>(choice.id))).toRawUTF8(),
                                   midiTrial_.hasClip() && midiTrial_.clipId() == choice.id)) {
                 midiTrial_.setProcessing(edited_);
                 midiTrial_.setClip(choice.track, choice.id);
@@ -1473,8 +1474,8 @@ cydaw::base::Value ProcessingView::command(const cydaw::base::Value& request)
     result->setProperty("trialSound", trial_.soundName());
     result->setProperty("rendering", trial_.rendering());
     if (const auto* done = trial_.result()) {
-        result->setProperty("trialFrames", done->ok ? static_cast<juce::int64>(done->channels.front().size()) : juce::int64 {});
-        result->setProperty("trialTail", static_cast<juce::int64>(done->tailFrames));
+        result->setProperty("trialFrames", done->ok ? static_cast<std::int64_t>(done->channels.front().size()) : std::int64_t {});
+        result->setProperty("trialTail", static_cast<std::int64_t>(done->tailFrames));
         result->setProperty("trialError", done->error);
     }
     result->setProperty("applyOpen", applyOpen_ || applyRequested_);

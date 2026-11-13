@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 // The displays and large views of Pompe, Décaleur, Anneau, Rotor
 // (MotionDesign.h computes what they draw). Included by StudioEffectsView.cpp
 // inside its anonymous namespace: it has its helpers (knobCell, segmented,
@@ -78,7 +79,7 @@ cydaw::base::Text motionCycleText(const float sync, const float rate)
 
 cydaw::base::Text motionDegrees(const double turns)
 {
-    return cydaw::base::Text(juce::roundToInt(turns * 360.0)) + cydaw::base::Text::fromUTF8("\xc2\xb0");
+    return cydaw::base::Text(cydaw::base::roundToInt(turns * 360.0)) + cydaw::base::Text::fromUTF8("\xc2\xb0");
 }
 
 // The processor's readings, when they are fresh and complete.
@@ -688,7 +689,7 @@ bool motionLarge(const PaneKind kind, const Pane& pane, std::vector<Param>& para
 // The values a card shows as knobs (pane indices).
 std::vector<int> motionCardFields(const PaneKind kind, std::vector<Param>& parameters, const Pane& pane)
 {
-    juce::ignoreUnused(parameters, pane);
+    cydaw::base::ignoreUnused(parameters, pane);
     switch (kind) {
     case PaneKind::pompe: return { motiond::pompeDepth, motiond::pompeCurve, motiond::pompeHold, motiond::pompeMix };
     case PaneKind::decaleur: return { motiond::decaleurShift, motiond::decaleurFine, motiond::decaleurFeedback, motiond::decaleurMix };

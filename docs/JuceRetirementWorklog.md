@@ -224,3 +224,22 @@ WASAPI validation exposed a second boundary detail: Core reports the physical pe
 Native host tests pass for exact JSFX 60/120 BPM behavior, state roundtrip, historical bounded six-bit state decoding, and actual LV2 preset selection/state changes. The existing IPC test now runs without JUCE: process passthrough, worker crash/bypass, first-response silence, live parameter mailbox, state/parameter restore, and editor show/hide passed against the actual VST3 gain fixture. Audio Probe enumeration/self-test passed (Windows Audio/shared/exclusive/low-latency, DirectSound; 2 MIDI inputs and 3 outputs). Direct worker validation passed for VST3 graph state/parameter automation and CLAP/LV2/JSFX processing/state/editor creation. The unchanged four-format application scenario passed before the client switch at output/cyaudio-native-worker-runtime/005aa151ee794791934ff79064959124 and, after native client buffers/file streams, on a fresh profile at output/cyaudio-native-client-runtime/0ae0fede854a47c284012d50ec59b391. It covers JSFX edit/reload/diagnostics/tempo, CLAP/LV2/VST3, presets, project save/reopen, and generation of all three export projects.
 
 Remaining objective: retire the desktop window/event-loop and miscellaneous platform/helper services, configure/build the actual desktop without any JUCE target/checkout, and run final application/export checks. This worker checkpoint does not mark the full migration complete.
+
+
+Native desktop checkpoint: the complete production executable now builds in the
+fresh build/cyaudio-native-desktop tree without JUCE configuration, headers or
+libraries. Native main window/EventLoop/D3D surface, UDP/OSC/high-resolution
+transport clock, remaining primitive/file/platform services, streaming WinHTTP
+and ZIP imports are connected. Default presets and packaging no longer fetch
+or require JUCE. Historical comparison fixtures are explicitly opt-in. The
+41-project generated production dependency graph passes the no-JUCE check.
+Full regression acceptance remains in progress; do not stop at this build milestone.
+
+The first full suite exposed a cross-volume native File relative-path bug,
+now fixed with an absolute-path fallback and a regression test. The previously
+failing rhythmic project roundtrip, Unicode ZIP/HTTP/native platform tests,
+base tests and production no-JUCE graph checks all pass after the fix. Optional
+factory banks are reported as absent in isolated profiles, rather than silently
+weakening synthetic sampler assertions; a separate strict installed-bank run
+is required. Windows worker/probe argv parsing now preserves Unicode with the
+native UTF-16 command line. Final runtime/export acceptance is the next step.

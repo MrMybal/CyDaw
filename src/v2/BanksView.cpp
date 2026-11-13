@@ -1,3 +1,5 @@
+#include <cydaw/base/Url.h>
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/Text.h>
 #include "BanksView.h"
 
@@ -41,7 +43,7 @@ void BanksView::drawProgress()
                               : 0.0f;
     auto overlay = ui::sizeText(progress.bytesDone) + " / " + ui::sizeText(progress.bytesTotal);
     if (progress.bytesPerSecond > 0.0)
-        overlay << "  \xc2\xb7  " << ui::sizeText(static_cast<juce::int64>(progress.bytesPerSecond)) << "/s";
+        overlay << "  \xc2\xb7  " << ui::sizeText(static_cast<std::int64_t>(progress.bytesPerSecond)) << "/s";
     ImGui::ProgressBar(std::clamp(fraction, 0.0f, 1.0f), ImVec2(-dp(110.0f), 0.0f), overlay.toRawUTF8());
     ImGui::SameLine();
     if (ImGui::Button(L("Annuler", "Cancel"), ImVec2(-1.0f, 0.0f)))
@@ -79,7 +81,7 @@ void BanksView::drawDetails(const SoundBanks::Bank& bank)
             ui::tooltip(link.toRawUTF8());
         }
         if (ImGui::IsItemClicked())
-            (void) juce::URL(link).launchInDefaultBrowser();
+            (void) cydaw::base::Url(link).launchInDefaultBrowser();
     };
     row(L("Auteur", "Author"), bank.author);
     row(L("Licence", "Licence"), bank.licence, bank.licenceUrl);
@@ -186,7 +188,7 @@ void BanksView::draw()
             if (disk.has_value() && !complete) {
                 const auto generated = bank.generator.isNotEmpty();
                 const auto label = (generated ? ui::Ls("Générer ", "Generate ") : ui::Ls("Télécharger ", "Download "))
-                                   + ui::sizeText(std::max<juce::int64>(0, bank.bytes - disk->bytes));
+                                   + ui::sizeText(std::max<std::int64_t>(0, bank.bytes - disk->bytes));
                 if (ImGui::SmallButton(label.toRawUTF8())) {
                     const auto missing = banks.missingOfBank(bank.id);
                     if (missing.empty())

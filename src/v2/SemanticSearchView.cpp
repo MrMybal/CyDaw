@@ -1,3 +1,5 @@
+#include <cydaw/base/Url.h>
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/FileDialog.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
@@ -31,7 +33,7 @@ void link(const cydaw::base::Text& text, const cydaw::base::Text& url)
         ui::tooltip(url.toRawUTF8());
     }
     if (ImGui::IsItemClicked() && url.isNotEmpty())
-        (void) juce::URL(url).launchInDefaultBrowser();
+        (void) cydaw::base::Url(url).launchInDefaultBrowser();
 }
 
 void heading(const char* text)
@@ -196,7 +198,7 @@ void SemanticSearchView::drawModels()
         const auto fraction = progress.total > 0 ? static_cast<float>(static_cast<double>(progress.done) / static_cast<double>(progress.total)) : 0.0f;
         auto overlay = ui::sizeText(progress.done) + " / " + ui::sizeText(progress.total);
         if (progress.bytesPerSecond > 0.0)
-            overlay << "  \xc2\xb7  " << ui::sizeText(static_cast<juce::int64>(progress.bytesPerSecond)) << "/s";
+            overlay << "  \xc2\xb7  " << ui::sizeText(static_cast<std::int64_t>(progress.bytesPerSecond)) << "/s";
         const auto step = progress.step == "verify" ? ui::Ls("Vérification ", "Checking ")
                           : progress.step == "copy" ? ui::Ls("Copie ", "Copying ")
                                                     : ui::Ls("Téléchargement ", "Downloading ");

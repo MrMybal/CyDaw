@@ -6,7 +6,7 @@
 
 #include "Locations.h"
 
-#if JUCE_WINDOWS
+#if defined(_WIN32)
  #ifndef NOMINMAX
   #define NOMINMAX
  #endif
@@ -27,17 +27,17 @@ namespace {
 cydaw::base::Text fromConsole(const char* data, const int size)
 {
     cydaw::base::Text text;
-    if (juce::CharPointer_UTF8::isValidString(data, size)) {
+    if (cydaw::base::Text::isValidUTF8(data, size)) {
         text = cydaw::base::Text::fromUTF8(data, size);
     } else {
-#if JUCE_WINDOWS
+#if defined(_WIN32)
         const auto wide = MultiByteToWideChar(CP_OEMCP, 0, data, size, nullptr, 0);
         std::wstring converted(static_cast<std::size_t>(std::max(0, wide)), L'\0');
         if (wide > 0)
             MultiByteToWideChar(CP_OEMCP, 0, data, size, converted.data(), wide);
         text = cydaw::base::Text(converted.c_str());
 #else
-        text = cydaw::base::Text(juce::CharPointer_ASCII(data), static_cast<size_t>(size));
+        text = cydaw::base::Text::fromUTF8(data,size);
 #endif
     }
     cydaw::base::Text clean;

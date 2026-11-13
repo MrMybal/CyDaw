@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/File.h>
 #include "InterfaceEditor.h"
 #include "InstrumentPanels.h"
@@ -371,7 +372,7 @@ void InterfaceEditor::drawControl(ImDrawList* list, const Control& control, cons
     auto p = theme::palette();
     const auto color=[&](const char* key,ImU32 fallback) {
         const auto value=control.design.getProperty(key,interface_.windowDesign.getProperty(key,{})).toString();if(value.isEmpty())return fallback;
-        const auto c=juce::Colour::fromString(value);
+        const auto c=cydaw::base::Colour::fromString(value);
         return ImGui::ColorConvertFloat4ToU32({c.getFloatRed(),c.getFloatGreen(),c.getFloatBlue(),c.getFloatAlpha()});
     };
     p.accent=color("accent",p.accent);p.bg1=color("background",p.bg1);p.text=color("text",p.text);p.textDim=color("text",p.textDim);
@@ -588,7 +589,7 @@ void InterfaceEditor::drawControl(ImDrawList* list, const Control& control, cons
         for(const auto& binding:control.extraParameterBindings) if(const auto* p=parameter(binding))
             parameters.push_back({p->key,p->label,p->unit,p->minimum,p->maximum,p->value,p->defaultValue});
         visual::Pane pane;
-        pane.kind=static_cast<visual::PaneKind>(juce::jlimit(0,static_cast<int>(visual::PaneKind::roulement),static_cast<int>(control.design.getProperty("pane",0))));
+        pane.kind=static_cast<visual::PaneKind>(cydaw::base::limit(0,static_cast<int>(visual::PaneKind::roulement),static_cast<int>(control.design.getProperty("pane",0))));
         pane.variant=static_cast<int>(control.design.getProperty("variant",0));
         if(const auto* indices=control.design.getProperty("indices",{}).getArray())for(const auto& i:*indices)pane.parameters.push_back(static_cast<int>(i));
         visual::Live live;live.afterFrame=analysis_;live.beforeFrame=analysis_;live.running=analysis_&&analysis_->sequence>0;

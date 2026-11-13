@@ -1,3 +1,5 @@
+#include <cydaw/audio/Math.h>
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/Text.h>
 #include "MidiDevices.h"
 #include "RoutingUi.h"
@@ -607,7 +609,7 @@ void channelMeters(const Studio& studio, const TrackRef& track, const ImVec2 siz
         list->AddRectFilled(min, max, p.bg0, dp(1.0f));
         list->AddRect(min, max, p.line, dp(1.0f), 1.0f);
         const auto peak = meter.channelPeak[static_cast<std::size_t>(std::min(channel, 7))];
-        const auto level = ui::meterPosition(juce::Decibels::gainToDecibels(peak, -100.0f));
+        const auto level = ui::meterPosition(cydaw::audio::Decibels::gainToDecibels(peak, -100.0f));
         if (level > 0.0f) {
             const auto colour = level > 0.92f ? p.meterHigh : level > 0.72f ? p.meterMid : p.meterLow;
             list->AddRectFilled(ImVec2(min.x, max.y - (max.y - min.y) * level), max, colour, dp(1.0f));

@@ -8,7 +8,6 @@
 
 #include <cydaw/engine/FoundrySession.h>
 
-#include <juce_gui_basics/juce_gui_basics.h>
 
 #include <atomic>
 #include <memory>

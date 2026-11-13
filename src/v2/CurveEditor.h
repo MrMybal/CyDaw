@@ -3,7 +3,6 @@
 
 #include <cydaw/engine/AutomationCurve.h>
 
-#include <juce_core/juce_core.h>
 
 #include <imgui.h>
 

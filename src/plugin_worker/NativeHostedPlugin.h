@@ -62,6 +62,7 @@ public:
   void toFront(bool);
   void resize(unsigned, unsigned);
   void closeRequested();
+  void refreshParameters();
 };
 class NativeHostedPlugin {
   friend class NativeParameter;
@@ -79,7 +80,7 @@ class NativeHostedPlugin {
   int latency_{}, preset_ = -1;
   const cyaudio::PluginTransport *transport_{};
   NativePluginEditor *editor_{};
-  std::uint32_t requests_{};
+  void refreshDescription();
   struct Program {
     base::Text name;
     std::vector<std::uint8_t> state;

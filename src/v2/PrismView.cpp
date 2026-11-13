@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/FileDialog.h>
 #include <cydaw/base/File.h>
 #include "PrismView.h"
@@ -117,7 +118,7 @@ bool PrismView::bind(const TrackRef& track, app::GraphDocument& graph, const std
     card_.live = studio_.voiceLive(track, card_.heard);
     // As it plays: the lanes at the playhead, then the voice's modulations.
     card_.played = card_.values;
-    const auto prefix = "node." + cydaw::base::Text(static_cast<juce::int64>(nodeId)) + ".prism.";
+    const auto prefix = "node." + cydaw::base::Text(static_cast<std::int64_t>(nodeId)) + ".prism.";
     for (const auto& binding : studio_.automatedParameters(track))
         if (binding.startsWith(prefix))
             if (const auto index = prism::parameterIndex(binding.substring(prefix.length()).toStdString()); index >= 0)
@@ -177,7 +178,7 @@ void PrismView::set(const int index, const float newValue)
         return;
     const auto clamped = prism::clampValue(index, newValue);
     card_.values[static_cast<std::size_t>(index)] = clamped;
-    const auto binding = "node." + cydaw::base::Text(static_cast<juce::int64>(card_.nodeId)) + ".prism."
+    const auto binding = "node." + cydaw::base::Text(static_cast<std::int64_t>(card_.nodeId)) + ".prism."
                          + cydaw::base::Text(prism::parameter(index).key);
     (void) card_.graph->editorSetParameter(binding, clamped);
     state_.focused = Panel::devices;
@@ -257,7 +258,7 @@ void PrismView::modulationMenu(const int index)
     if (ImGui::MenuItem(L("Valeur par défaut", "Default value")))
         set(index, prism::parameter(index).defaultValue);
     // A lane in the arrangement, as any card's knob.
-    const auto binding = "node." + cydaw::base::Text(static_cast<juce::int64>(card_.nodeId)) + ".prism."
+    const auto binding = "node." + cydaw::base::Text(static_cast<std::int64_t>(card_.nodeId)) + ".prism."
                          + cydaw::base::Text(prism::parameter(index).key);
     if (studio_.isValid(card_.track) && studio_.canAutomate(card_.track, binding)) {
         const auto automated = studio_.hasLane(card_.track, binding);
@@ -331,7 +332,7 @@ bool PrismView::knob(const int index, const char* label, const float diameter)
     const auto origin = ImGui::GetCursorScreenPos();
     bool changed {};
     {
-        const ui::LearnParameterScope learn("node." + cydaw::base::Text(static_cast<juce::int64>(card_.nodeId)) + ".prism."
+        const ui::LearnParameterScope learn("node." + cydaw::base::Text(static_cast<std::int64_t>(card_.nodeId)) + ".prism."
                                                 + cydaw::base::Text(parameter.key),
                                             cydaw::base::Text::fromUTF8(label), studio_.learnPrefix(card_.track), studio_.trackName(card_.track));
         changed = ui::knob("##knob", &normalised, 0.0f, 1.0f, defaultNormalised, style);
@@ -745,7 +746,7 @@ void PrismView::editDrawnLfo(const int lfo, const ImVec2 origin, const ImVec2 si
         if (ImGui::MenuItem(L("Pompe (sidechain)", "Pump (sidechain)")))
             fill([](const double x, int) { return 2.0 * std::min(1.0, x * 4.0) * std::min(1.0, x * 4.0) - 1.0; });
         if (ImGui::MenuItem(L("Aléatoire", "Random"))) {
-            auto random = juce::Random::getSystemRandom();
+            auto random = cydaw::base::Random::getSystemRandom();
             fill([&random](double, int) { return random.nextDouble() * 2.0 - 1.0; });
         }
         ImGui::Separator();

@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/Text.h>
 #pragma once
 
@@ -123,8 +124,8 @@ private:
     [[nodiscard]] ImVec2 worldToScreen(ImVec2 world) const;
     [[nodiscard]] ImVec2 screenToWorld(ImVec2 screen) const;
     [[nodiscard]] float scale() const;
-    [[nodiscard]] static ImVec2 fractionToWorld(juce::Point<float> fraction);
-    [[nodiscard]] static juce::Point<float> worldToFraction(ImVec2 world);
+    [[nodiscard]] static ImVec2 fractionToWorld(cydaw::base::Point<float> fraction);
+    [[nodiscard]] static cydaw::base::Point<float> worldToFraction(ImVec2 world);
     [[nodiscard]] static ImU32 kindColour(int kind);
 
     Studio& studio_;

@@ -1,135 +1,91 @@
 # CyAudioCore integration — CyDSP-CORE
 
-CyDaw integrates **CyAudioCore**, which manages **CyDSP** internally as its
-numerical dependency. Service APIs are `cyaudio`; numerical processors remain
-`cydsp`. The application does not add a second independent audio framework or
-copy either library into its tree.
+CyDaw's production Windows desktop and isolated plugin worker configure and
+build without JUCE. CyAudioCore owns the CyDSP numerical dependency. The DAW
+uses `cyaudio` service APIs and `cydsp` processors, including internal/exported
+instruments and effects. Neither sibling repository is modified by this port.
 
-Validated source revisions:
+Validated dependency revisions: CyAudioCore `bb26e93604d43de2069694b0791bc0bcf5a53ea6`,
+CyDSP `cc18dca043925b75adea481c1c8545a125607e1f`. The earlier source snapshot remains
+at [CyAudioCoreSnapshot.json](reports/CyAudioCoreSnapshot.json). See the
+[current French integration/issue report](CyAudioCoreIntegrationReport.fr.md).
+Historical checkpoint reports in this repository describe their dated state;
+they are not the current production dependency boundary.
 
-- CyAudioCore: `bb26e93604d43de2069694b0791bc0bcf5a53ea6`.
-- Its numerical dependency CyDSP: `cc18dca043925b75adea481c1c8545a125607e1f`.
+## Production architecture
 
-The [snapshot](reports/CyAudioCoreSnapshot.json) records source hashes, including
-private/vendored compilation inputs. Both checkouts were clean. The previous
-monolithic CyDSP reports are archived; their VST3 blockers are fixed upstream.
-See the [current French report](CyAudioCoreIntegrationReport.fr.md) for the precise
-boundary: **the complete desktop still contains JUCE**.
+- The Win32 main window, message loop and D3D11 ImGui surface are native. CyUI
+  supplies controls, audio views, nodes, source editing, images and inspector UI.
+- The application owns documents, UTF-8 text, JSON/XML, files/streams, timers,
+  threads, TCP/UDP/OSC, processes, clipboard, file dialogs, HTTP streams and ZIP
+  readers. These are original OS/standard-library adapters, not JUCE source or
+  a renamed JUCE namespace. nlohmann JSON, pugixml, miniz and stb keep their notices.
+- DeviceManager uses Core audio/MIDI drivers; physical channel masks remain
+  distinct from dense client channel indices. The callback publishes Core host
+  clock anchors. Source transport uses Core; rendered-source paging and the
+  stereo voice scheduler are application adapters around numerical/Core services.
+- Audio readers/writers, samples and recording use Core. Metadata intentionally
+  preserves existing `cydsp.format`/`cydsp.metadata` keys and project vocabulary.
+- Aligned sample storage, vector operations, FFTs, resampling and numerical DSP
+  use CyDSP through CyAudioCore. Existing musical processors retain their sound
+  and parameter identities. New SDK algorithms are not automatically new UI nodes.
+- The ordinary `CyDAWPluginWorker` executable directly hosts VST3, CLAP, LV2 and
+  JSFX through Core. The parent uses native shared-memory/wake IPC. Per-instance
+  isolation, automation, transport, state, Windows editors and generic controls
+  remain. Historical project state has an independent bounded compatibility codec.
+- LV2 preset discovery uses the Core-bundled Lilv runtime. Detailed JSFX syntax
+  diagnostics use the same Core-bundled ysfx runtime. These workarounds should
+  become public Core APIs; they do not add a second VM or host implementation.
+- Generated native VST3/CLAP/LV2 exports use their official format SDKs and the
+  shared engine/CyUI renderer. No production target loads JUCE during CMake.
+- Video/filmstrip/audio extraction stays with the existing shared FFmpeg SDK.
+  The local CyDoc reader, translations, media and build/export pipeline remain.
 
-## Dependency ownership
+## Windows builds
 
-`cmake/CyAudioCore.cmake` supplies `CYAUDIOCORE_CYDSP_SOURCE_DIR` and adds only
-CyAudioCore. CyAudioCore adds/links its numerical dependency. The DAW's shared
-engine links `CyAudioCore::Core`; file, device and plugin adapters link the
-corresponding CyAudioCore targets. Native internal plugin exports consume the
-same engine and transitive numerical headers without JUCE. Static archives only
-pull referenced objects; numerical consumers do not link the plugin-host SDKs.
-
-Default source directories are sibling `../CyAudioCore` and `../CyDSP`. Override
-`CYDAW_CYAUDIOCORE_SOURCE_DIR` and `CYDAW_CYDSP_SOURCE_DIR` as needed. Environment
-variables of those names supply defaults for clean CI configurations. A missing
-or obsolete public API fails configuration explicitly. Upstream tests are opt-in
-and disabled here; the integration has its own acceptance tests. Do not enable
-global fast-math/AVX flags: CyDSP owns its per-kernel ISA dispatch.
-
-The desktop now opens native audio devices through CyAudioCore. A temporary
-`juce::AudioIODevice` adapter preserves the application's callback/preferences
-boundary; it does not call JUCE's native audio drivers. Windows ASIO/WASAPI/
-DirectSound JUCE backends are disabled in these targets. MIDI and the historical
-source graph still use JUCE and remain separate migration work.
-
-Windows desktop builds enable `CYDAW_ENABLE_ASIO` by default. CyDaw extends the
-CyAudioCore PortAudio build with its own GPL-v3 ASIO SDK integration and supplies
-an external public `cyaudio::AudioDeviceDriver`; neither MIT repository is edited.
-`CYDAW_ENABLE_ASIO=OFF` keeps an SDK-free build. Standalone numerical/native
-exports default to desktop OFF and do not acquire this ASIO dependency.
-Provenance, exact source hashes, original per-file notices and the full GPL text
-are under `third_party/asio-*` and copied with the application.
-
-## Production paths
-
-- Default audio readers and WAV/AIFF/FLAC/Vorbis encoders use CyAudioCore. The
-  application boundary is `CyAudioCoreAudioFormats`, including Fonderie/Cinema.
-- Versioned WAV markers, labels, notes, regions, sampler loops and RIFF INFO tags
-  retain the application's metadata vocabulary. The `cydsp.format` and
-  `cydsp.metadata` keys intentionally remain stable. Extra historical metadata
-  retains the explicit legacy parser/writer where conversion is not implemented.
-- Aligned engine storage, convolution/stretch FFTs and chroma analysis use CyDSP.
-  Engine copy/fill/summing now also use prepared VectorOps dispatch. These same
-  routines ship in internal VST3/CLAP/LV2 processors.
-- Existing musical processors and project parameters retain their algorithms.
-  The new multibus graph, external sidechain dynamics and meters are available
-  through the numerical dependency and validated in composition with CyAudioCore
-  sources. Availability does not imply every new processor has a DAW UI node.
-- The production v6 worker now uses CyAudioCore for VST3 scan/creation, ports,
-  processing, parameters, transport, state and native Windows editors. Its JUCE
-  VST3 host is compiled out. JUCE plugin-instance/editor types remain temporary
-  application ABI adapters. Current graph commands' XML payloads are translated
-  at that boundary; historical VST3 projects are not an acceptance requirement.
-- The production CLAP/JSFX adapters and LV2 JUCE host remain in place. A single
-  Core-provided ysfx/EEL runtime is linked into the worker, avoiding duplicate VM
-  symbols. Core's independent hosts for all four formats also pass their tests.
-- Windows worker IPC uses a non-waiting wake signal from the callback rather
-  than coarse GUI polling. An active worker missing its pipeline deadline emits
-  silence; a stopped/crashed worker retains the explicit safety bypass.
-- Session tempo/play state are published on the actual render thread, retaining
-  per-instance TLS isolation in numerical plugins.
-- Build outputs and runtime/native-plugin packages carry both libraries' original
-  licenses, manifests and third-party notices. The packager checks their presence.
-
-## Build and tests (Windows x64 / VS2022)
+Requirements are in the README. Default sibling locations are `../CyAudioCore`
+and `../CyDSP`; override `CYDAW_CYAUDIOCORE_SOURCE_DIR` and
+`CYDAW_CYDSP_SOURCE_DIR`. Corresponding environment variables supply clean-build
+CI defaults. No implicit fetch of another audio-library revision occurs.
 
 ```powershell
-cmake --preset cyaudio-core
-cmake --build --preset cyaudio-core --parallel 8
-ctest --preset cyaudio-core
-
-cmake --preset cyaudio-desktop -DCYDAW_JUCE_SOURCE_DIR=build/desktop/_deps/juce-src -DFETCHCONTENT_SOURCE_DIR_CYUI=D:/_Project/CyImgui_Interface
-cmake --build --preset cyaudio-desktop --target CyDAW2 CyDAWPluginWorker CyDAWGraphRuntime_VST3 CyDAWTestGain_VST3 cydaw_cyaudio_integration_tests cydaw_cyaudio_services_tests cydaw_asio_tests cydaw_cyaudio_device_tests cydaw_plugin_ipc_tests --parallel 6
-ctest --test-dir build/cyaudio-desktop -C Release -R '^cydaw_(cyaudio_integration_tests|cyaudio_services_tests|asio_tests|cyaudio_device_tests|plugin_ipc_tests)$|^cydaw2_(dj|foundry|processing|editing|sample_search|mixing|project_import)_check$' --output-on-failure
+cmake --preset cyaudio-desktop
+cmake --build --preset cyaudio-desktop --parallel 6
+ctest --preset cyaudio-desktop --output-on-failure
 ```
 
-Adjust local JUCE/CyUI paths, or use the existing pinned fetch setup. Former
-`cydsp-core` / `cydsp-desktop` presets remain compatible entry points but now use
-the split libraries. Test target names use `cyaudio`.
+For an existing local CyUI checkout add
+`-DFETCHCONTENT_SOURCE_DIR_CYUI=D:/_Project/CyImgui_Interface` at configure.
+`CYDAW_ENABLE_ASIO=ON` enables CyDaw's application-side GPL ASIO driver using
+PortAudio. Its provenance, original notices and corresponding sources stay
+outside the MIT siblings and travel with builds/packages. `OFF` gives an
+SDK-free WASAPI/DirectSound build. Never enable global fast-math/AVX flags;
+CyDSP owns its per-kernel ISA dispatch.
 
-```powershell
-python tools/audit_cydsp_integration.py --output output/cyaudio-inventory.json
-build/cyaudio-core/Release/cydaw_cyaudio_services_tests.exe --plugin vst3 "path/to/our-plugin.vst3"
-build/cyaudio-core/Release/cydaw_cyaudio_services_tests.exe --plugin clap "path/to/our-plugin.clap"
-build/cyaudio-core/Release/cydaw_cyaudio_services_tests.exe --plugin lv2 "path/to/our-plugin.lv2"
-```
+`CYDAW_BUILD_LEGACY_JUCE_TESTS=ON` explicitly opts into historical comparison
+fixtures. That option is OFF by default and those fixtures are not production
+runtime dependencies. `CYDAW_FETCH_JUCE` is OFF in native presets. A fresh
+Windows build's generated dependency graph is checked by
+`tests/no_juce_build_check.py` for actual includes and libraries.
 
-The service executable handles the intentionally unchanged upstream
-`--cydsp-worker` command. Persistent signatures such as `CyDSP.VST3State1` and
-`CyJSFX` are unchanged upstream; renaming a project/namespace must not rewrite
-saved binary identifiers. The original sparse-slider JSFX fixture also checks
-exact event offsets and state round trips.
+## Validation and distribution
 
-## CI and distribution
+Run automated desktop scenarios with isolated `APPDATA`/`LOCALAPPDATA`, recovery
+disabled, and silent output. Some optional factory-instrument tests need installed
+banks; `CYDAW_BANKS_DIR` can point at an existing read-only sample bank for those
+instrument-only checks. Do not run bank-installation tests against a personal
+bank directory. Tests synthesize their other audio assets locally.
 
-The native/alpha workflows check out the two tested source revisions using the
-local `audio-dependencies` action. For private dependencies the repository needs
-`CYDAW_DEPENDENCIES_TOKEN` with read access to both repositories; otherwise the
-job token can read public dependencies only. No new workflow run or publication
-is performed by this local integration. No credentials persist in dependency
-checkouts; `.dependencies` is ignored. Documentation-only jobs do not need these
-sources. `cmake --install --component CyDAWRuntime` also installs both notices.
+The native/alpha workflows check out tested dependencies using
+`.github/actions/audio-dependencies`; private access requires
+`CYDAW_DEPENDENCIES_TOKEN`. Local integration does not push or publish anything.
+Packaging no longer requires a JUCE checkout/notice. It still verifies offline
+CyDoc resources, FFmpeg runtimes/corresponding sources and all native dependency
+notices. An explicitly supplied historical `--juce-source` remains optional.
 
-[Acceptance evidence](reports/CyAudioCoreAcceptance.json) distinguishes execution
-from inspection. A real Fireface ASIO output-only silent start/stop was verified;
-this does not measure analog latency or validate recording/hotplug. Linux/macOS,
-installed third-party plugins and native editor interoperability still require
-platform/device-specific validation.
-
-Additional application acceptance (isolated profile, speakers silenced):
-
-```powershell
-python tests/v2_plugin_formats_check.py --exe "build/cyaudio-desktop/CyDAW2_artefacts/Release/CyDAW 2.exe" --output output/cyaudio-formats --port 47965 --vst3 "build/cyaudio-desktop/CyDAWGraphRuntime_artefacts/Release/VST3/CyDAW Graph Runtime.vst3"
-build/cyaudio-desktop/CyDAWAudioProbe_artefacts/Release/CyDAWAudioProbe.exe --open-type ASIO --open-device Fireface --sample-rate 48000 --block-size 64 --output-only --run-silent-ms 300
-```
-
-Use `--clap`/`--lv2` with built original fixtures for their production-host checks.
-The hardware probe is opt-in; substitute an installed device name. Its default
-mode only enumerates. `--run-silent-ms` starts the selected stream, writes zeros
-and stops it; `--output-only` leaves all inputs disabled.
+The application executable remains `CyDAW 2.exe` internally for existing scripts;
+its user-facing product name is CyDaw. Runtime files stay beside the executable.
+Linux/macOS desktop UI, physical latency, microphone recording, MIDI hardware
+hotplug and installed third-party plugin interoperability require separate
+platform/device acceptance. A compiled Windows desktop is not a claim that those
+hardware combinations have all been exercised.

@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/Text.h>
 #include "InspectorView.h"
 #include "ControlTargets.h"
@@ -496,7 +497,7 @@ void InspectorView::drawModulation(const TrackRef& track)
     visual::Live live;
     live.running = studio_.modulationActive(track);
     live.hasControl = live.running;
-    live.control = static_cast<float>(juce::jlimit(-1.0, 1.0, studio_.modulationOutput(track)));
+    live.control = static_cast<float>(cydaw::base::limit(-1.0, 1.0, studio_.modulationOutput(track)));
     const visual::Pane pane { visual::PaneKind::lfo, { 0, 1, 2, 3 }, 0 };
     const auto width = ImGui::GetContentRegionAvail().x;
     const auto height = std::max(dp(96.0f), std::min(width * 0.62f, dp(150.0f)));

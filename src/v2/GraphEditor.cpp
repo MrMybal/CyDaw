@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/Text.h>
 #include "GraphEditor.h"
 
@@ -117,7 +118,7 @@ CabledSockets cabledSockets(const Connections& connections)
     return cabled;
 }
 
-ImU32 toImColour(const juce::Colour colour)
+ImU32 toImColour(const cydaw::base::Colour colour)
 {
     return IM_COL32(colour.getRed(), colour.getGreen(), colour.getBlue(), colour.getAlpha());
 }
@@ -221,12 +222,12 @@ ImVec2 GraphEditor::screenToWorld(ImVec2 screen) const
     return ImVec2(float(world.x), float(world.y));
 }
 
-ImVec2 GraphEditor::fractionToWorld(const juce::Point<float> fraction)
+ImVec2 GraphEditor::fractionToWorld(const cydaw::base::Point<float> fraction)
 {
     return ImVec2(fraction.x * kWorldX, fraction.y * kWorldY);
 }
 
-juce::Point<float> GraphEditor::worldToFraction(const ImVec2 world)
+cydaw::base::Point<float> GraphEditor::worldToFraction(const ImVec2 world)
 {
     return { world.x / kWorldX, world.y / kWorldY };
 }
@@ -389,7 +390,7 @@ void GraphEditor::addBoundary(GraphSlot& slot, const cydaw::base::Text& typeKey,
             found = true;
         }
     }
-    const juce::Point<float> at(input ? std::max(0.0f, left - (found ? 0.0f : 0.12f)) : std::min(0.95f, right + (found ? 0.0f : 0.12f)),
+    const cydaw::base::Point<float> at(input ? std::max(0.0f, left - (found ? 0.0f : 0.12f)) : std::min(0.95f, right + (found ? 0.0f : 0.12f)),
                                 found ? std::min(0.92f, lowest + 0.16f) : 0.3f);
     if (const auto id = graph.editorAddNode(typeKey, at); id != 0)
         selection_ = { id };
@@ -760,7 +761,7 @@ void GraphEditor::drawCanvas(GraphSlot& slot, const std::optional<TrackRef>& tra
     const auto& p = theme::palette();
     auto& graph = slot.graph();
     auto& io = ImGui::GetIO();
-    juce::ignoreUnused(track);
+    cydaw::base::ignoreUnused(track);
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
     ImGui::PushStyleColor(ImGuiCol_ChildBg, p.bg0);
@@ -1240,7 +1241,7 @@ void GraphEditor::drawWires(ImDrawList* list, const std::vector<EditorConnection
         if (hovered && connection.kind == 2 && connection.drivesParameter) {
             const auto what = connection.mode == 1
                                   ? ui::Ls("Module le bouton autour de sa valeur, profondeur ", "Modulates the knob around its value, depth ")
-                                        + cydaw::base::Text(juce::roundToInt(connection.amount * 100.0f)) + " %"
+                                        + cydaw::base::Text(cydaw::base::roundToInt(connection.amount * 100.0f)) + " %"
                                   : ui::Ls("Règle la valeur du bouton", "Sets the knob's value");
             ImGui::SetTooltip("%s\n%s", what.toRawUTF8(),
                               L("Clic droit : régler ou moduler, profondeur. Alt+clic : couper",
@@ -1530,7 +1531,7 @@ void GraphEditor::drawComments(app::GraphDocument& graph, ImDrawList* list)
         ImGui::PushFont(theme::boldFont(), ui::currentFontBase() * std::clamp(view_->zoom, 0.6f, 1.6f));
         list->AddText(ImVec2(min.x + 8.0f * s, min.y + 6.0f * s), theme::alpha(colour, 0.95f), comment.title.toRawUTF8());
         ImGui::PopFont();
-        juce::ignoreUnused(p);
+        cydaw::base::ignoreUnused(p);
     }
 }
 
@@ -1735,7 +1736,7 @@ void GraphEditor::openSearch(const ImVec2 screenPosition, std::optional<PendingW
 void GraphEditor::searchPopup(GraphSlot& slot, const std::optional<TrackRef>& track)
 {
     const auto& p = theme::palette();
-    juce::ignoreUnused(track);
+    cydaw::base::ignoreUnused(track);
     ImGui::SetNextWindowPos(searchScreen_, ImGuiCond_Appearing);
     ImGui::SetNextWindowSize(ImVec2(dp(360.0f), dp(440.0f)), ImGuiCond_Appearing);
     if (!ImGui::BeginPopup("##nodeSearch"))
@@ -1818,7 +1819,7 @@ void GraphEditor::searchPopup(GraphSlot& slot, const std::optional<TrackRef>& tr
 
     auto describe = count > 0 ? candidates[static_cast<std::size_t>(searchHighlight_)].type : nullptr;
     const auto footer = ImGui::GetFontSize() * 3.2f;
-    juce::ignoreUnused(footer);
+    cydaw::base::ignoreUnused(footer);
     ImGui::BeginChild("##results", ImVec2(dp(344.0f), dp(330.0f)), ImGuiChildFlags_None);
     // Nothing typed: the tree of nodes, to walk; typed: the ranked list.
     if (query.isEmpty() && count > 0) {

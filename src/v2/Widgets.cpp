@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/File.h>
 #include "Widgets.h"
 
@@ -780,16 +781,16 @@ void centredText(ImDrawList* list, ImVec2 min, ImVec2 max, ImU32 colour, const c
 { cyui::centredText(list, min, max, colour, text); }
 
 
-cydaw::base::Text sizeText(const juce::int64 bytes)
+cydaw::base::Text sizeText(const std::int64_t bytes)
 {
     const auto value = static_cast<double>(bytes);
     cydaw::base::Text text;
     if (value >= 1e9)
         text = cydaw::base::Text(value / 1e9, 1) + L(" Go", " GB");
     else if (value >= 1e6)
-        text = cydaw::base::Text(juce::roundToInt(value / 1e6)) + L(" Mo", " MB");
+        text = cydaw::base::Text(cydaw::base::roundToInt(value / 1e6)) + L(" Mo", " MB");
     else if (value >= 1e3)
-        text = cydaw::base::Text(juce::roundToInt(value / 1e3)) + L(" Ko", " kB");
+        text = cydaw::base::Text(cydaw::base::roundToInt(value / 1e3)) + L(" Ko", " kB");
     else
         text = cydaw::base::Text(bytes) + L(" o", " B");
     return french() ? text.replaceCharacter('.', ',') : text;

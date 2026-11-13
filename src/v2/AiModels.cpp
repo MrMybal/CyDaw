@@ -1,3 +1,5 @@
+#include <cydaw/base/Url.h>
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/TextMap.h>
 #include <cydaw/base/File.h>
@@ -133,7 +135,7 @@ cydaw::base::Text Sha256::hex()
     length_ = savedLength;
     cydaw::base::Text out;
     for (const auto word : state_)
-        out << cydaw::base::Text::toHexString(static_cast<juce::int64>(word)).paddedLeft('0', 8);
+        out << cydaw::base::Text::toHexString(static_cast<std::int64_t>(word)).paddedLeft('0', 8);
     return out.toLowerCase();
 }
 
@@ -143,23 +145,23 @@ cydaw::base::Text Sha256::ofFile(const cydaw::base::File& file, const std::atomi
     if (!in.openedOk())
         return {};
     Sha256 hash;
-    juce::HeapBlock<char> buffer(1 << 20);
+    std::vector<char> buffer(1 << 20);
     for (;;) {
         if (stop != nullptr && stop->load())
             return {};
-        const auto read = in.read(buffer.get(), 1 << 20);
+        const auto read = in.read(buffer.data(), 1 << 20);
         if (read <= 0)
             break;
-        hash.add(buffer.get(), static_cast<std::size_t>(read));
+        hash.add(buffer.data(), static_cast<std::size_t>(read));
     }
     return hash.hex();
 }
 
 // ---- The catalogue ---------------------------------------------------------------------------
 
-juce::int64 AiModel::bytes() const
+std::int64_t AiModel::bytes() const
 {
-    juce::int64 total {};
+    std::int64_t total {};
     for (const auto& file : files)
         total += file.size;
     return total;
@@ -235,7 +237,7 @@ void AiModels::loadCatalogue()
             if (const auto* files = item.getProperty("files", {}).getArray())
                 for (const auto& file : *files)
                     model.files.push_back({ file.getProperty("path", {}).toString(),
-                                            static_cast<juce::int64>(file.getProperty("size", 0)),
+                                            static_cast<std::int64_t>(file.getProperty("size", 0)),
                                             file.getProperty("sha256", {}).toString().toLowerCase() });
             model.dimension = static_cast<int>(item.getProperty("dimension", 512));
             model.sampleRate = static_cast<double>(item.getProperty("sampleRate", 48'000.0));
@@ -324,13 +326,13 @@ private:
         owner_.progress_.file = file;
     }
 
-    void addDone(const juce::int64 bytes)
+    void addDone(const std::int64_t bytes)
     {
         const std::scoped_lock lock(owner_.mutex_);
         owner_.progress_.done += bytes;
         const auto elapsed = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001 - started_;
         if (elapsed > 0.5)
-            owner_.progress_.bytesPerSecond = static_cast<double>(transferred_ += std::max<juce::int64>(0, bytes)) / elapsed;
+            owner_.progress_.bytesPerSecond = static_cast<double>(transferred_ += std::max<std::int64_t>(0, bytes)) / elapsed;
     }
 
     bool install(cydaw::base::Text& error)
@@ -457,7 +459,7 @@ private:
             error = "cannot make " + partial.getParentDirectory().getFullPathName();
             return false;
         }
-        const auto url = model_.baseUrl + juce::URL::addEscapeChars(file.path, false).replace("%2F", "/").replace("%2f", "/");
+        const auto url = model_.baseUrl + cydaw::base::Url::addEscapeChars(file.path, false).replace("%2F", "/").replace("%2f", "/");
         for (auto attempt = 0; attempt < 4; ++attempt) {
             if (stop_)
                 return false;
@@ -471,17 +473,17 @@ private:
             }
             step("download", file.path);
             auto status = 0;
-            juce::StringPairArray headers;
-            const auto options = juce::URL::InputStreamOptions(juce::URL::ParameterHandling::inAddress)
+            cydaw::base::TextMap headers;
+            const auto options = cydaw::base::Url::InputStreamOptions(cydaw::base::Url::ParameterHandling::inAddress)
                                      .withConnectionTimeoutMs(30'000)
                                      .withNumRedirectsToFollow(8)
                                      .withStatusCode(&status)
                                      .withResponseHeaders(&headers);
-            std::unique_ptr<juce::InputStream> stream;
+            std::unique_ptr<cydaw::base::InputStream> stream;
             if (have > 0 && have < file.size)
-                stream = juce::URL(url).createInputStream(options.withExtraHeaders("Range: bytes=" + cydaw::base::Text(have) + "-"));
+                stream = cydaw::base::Url(url).createInputStream(options.withExtraHeaders("Range: bytes=" + cydaw::base::Text(have) + "-"));
             else if (have != file.size)
-                stream = juce::URL(url).createInputStream(options);
+                stream = cydaw::base::Url(url).createInputStream(options);
             if (have != file.size) {
                 if (stream == nullptr || status >= 400) {
                     error = file.path + ": HTTP " + cydaw::base::Text(status) + " (" + model_.host + ")";
@@ -503,17 +505,17 @@ private:
                     out.truncate();
                 }
                 addDone(have);
-                juce::HeapBlock<char> buffer(1 << 16);
+                std::vector<char> buffer(1 << 16);
                 auto written = have;
                 while (!stop_) {
-                    const auto read = stream->read(buffer.get(), 1 << 16);
+                    const auto read = stream->read(buffer.data(), 1 << 16);
                     if (read <= 0)
                         break;
                     if (written + read > file.size) {
                         error = file.path + ": more than " + cydaw::base::Text(file.size) + " bytes";
                         break;
                     }
-                    if (!out.write(buffer.get(), static_cast<std::size_t>(read))) {
+                    if (!out.write(buffer.data(), static_cast<std::size_t>(read))) {
                         error = "cannot write " + partial.getFullPathName();
                         break;
                     }
@@ -562,7 +564,7 @@ private:
     bool accepted_ {};
     std::atomic<bool> stop_ {};
     double started_ { cydaw::base::Time::getMillisecondCounterHiRes() * 0.001 };
-    juce::int64 transferred_ {};
+    std::int64_t transferred_ {};
 };
 
 bool AiModels::start(const cydaw::base::Text& id, const bool licenceAccepted, const cydaw::base::File& from, cydaw::base::Text& error)

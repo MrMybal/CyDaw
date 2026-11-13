@@ -1,10 +1,12 @@
+#include <cydaw/audio/SampleBuffer.h>
+#include <cydaw/base/Listeners.h>
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/EventLoop.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/Properties.h>
 #include <cydaw/base/File.h>
 #pragma once
 
-#include <juce_audio_utils/juce_audio_utils.h>
 
 #include <atomic>
 #include <functional>
@@ -24,8 +26,8 @@ struct SampleRecord {
     cydaw::base::Text name;
     cydaw::base::Text extension;
     cydaw::base::Text root;
-    juce::int64 size {};
-    juce::int64 modified {};
+    std::int64_t size {};
+    std::int64_t modified {};
     double sampleRate {};
     int channels {};
     int bitDepth {};
@@ -238,7 +240,7 @@ public:
         float confidence {};
     };
     [[nodiscard]] static KeyEstimate estimateKey(const std::vector<float>& chroma);
-    [[nodiscard]] static std::vector<float> chromaOf(const juce::AudioBuffer<float>& audio,
+    [[nodiscard]] static std::vector<float> chromaOf(const cydaw::audio::SampleBuffer<float>& audio,
                                                      double sampleRate);
     [[nodiscard]] static double bpmFromName(const cydaw::base::Text& name);
     [[nodiscard]] static cydaw::base::Text typeFor(double lengthSeconds, const cydaw::base::Text& name,
@@ -255,8 +257,8 @@ public:
     [[nodiscard]] static cydaw::base::Value serialise(const SampleRecord& record);
     [[nodiscard]] static std::optional<SampleRecord> restore(const cydaw::base::Value& value);
     // The cache's binary form (sample-library.bin).
-    static void write(juce::OutputStream& out, const SampleRecord& record);
-    [[nodiscard]] static std::optional<SampleRecord> read(juce::InputStream& in);
+    static void write(cydaw::base::OutputStream& out, const SampleRecord& record);
+    [[nodiscard]] static std::optional<SampleRecord> read(cydaw::base::InputStream& in);
 
 private:
     class Scanner;
@@ -322,13 +324,13 @@ private:
     std::map<cydaw::base::Text, std::size_t> index_;
     std::unique_ptr<Scanner> scanner_;
     std::unique_ptr<Classifier> classifier_;
-    juce::ListenerList<Listener> listeners_;
+    cydaw::base::ListenerList<Listener> listeners_;
     bool dirty_ {};
     // A rescan asked for while one runs — a folder added mid-scan — is
     // owed, and starts when the running one ends.
     bool pendingRescan_ {};
     bool pendingFull_ {};
-    juce::int64 lastScanMs_ {};
+    std::int64_t lastScanMs_ {};
     cydaw::base::Text classifierMessage_;
     std::atomic<int> found_ {};
     std::atomic<int> analysed_ {};

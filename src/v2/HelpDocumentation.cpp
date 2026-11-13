@@ -1,3 +1,4 @@
+#include <cydaw/base/Url.h>
 #include <cydaw/base/TextMap.h>
 #include <cydaw/base/File.h>
 #include "HelpDocumentation.h"
@@ -36,11 +37,11 @@ bool HelpDocumentation::canonical(cydaw::base::Text& id, cydaw::base::Text& anch
     }
     return page(id) != nullptr;
 }
-cydaw::base::Text HelpDocumentation::encode(const cydaw::base::Text& value) { return juce::URL::addEscapeChars(value, true); }
+cydaw::base::Text HelpDocumentation::encode(const cydaw::base::Text& value) { return cydaw::base::Url::addEscapeChars(value, true); }
 cydaw::base::Text HelpDocumentation::link(cydaw::base::Text id, cydaw::base::Text anchor, cydaw::base::Text locale, const cydaw::base::TextMap& state) {
     if (!load()) return {};
     if (locale != "en" && locale != "fr") { error_ = "Help locale: en or fr"; return {}; }
-    const auto base = juce::URL(directory_.getChildFile("Documentation.html")).toString(true);
+    const auto base = cydaw::base::Url(directory_.getChildFile("Documentation.html")).toString(true);
     if (id.isEmpty()) return base; // The reader chooses its home page and saved locale.
     if (id.length() > 256 || anchor.length() > 256 || !canonical(id, anchor)) { error_ = "Unknown help page"; return {}; }
     const auto* target = page(id);
@@ -73,8 +74,8 @@ cydaw::base::Text HelpDocumentation::follow(const cydaw::base::Text& target, cyd
     if (text.startsWith("#/")) {
         const auto pieces = cydaw::base::TextList::fromTokens(text.substring(2).upToFirstOccurrenceOf("?", false, false), "/", "");
         if (pieces.size() < 2 || pieces.size() > 3) { error_ = "Invalid help route"; return {}; }
-        locale = juce::URL::removeEscapeChars(pieces[0]);
-        text = juce::URL::removeEscapeChars(pieces[1]) + (pieces.size() == 3 ? "#" + juce::URL::removeEscapeChars(pieces[2]) : "")
+        locale = cydaw::base::Url::removeEscapeChars(pieces[0]);
+        text = cydaw::base::Url::removeEscapeChars(pieces[1]) + (pieces.size() == 3 ? "#" + cydaw::base::Url::removeEscapeChars(pieces[2]) : "")
              + (text.containsChar('?') ? "?" + text.fromFirstOccurrenceOf("?", false, false) : "");
     } else if (text.startsWithChar('#')) text = page_ + text;
     const auto query = text.containsChar('?') ? text.fromFirstOccurrenceOf("?", false, false) : cydaw::base::Text();
@@ -83,7 +84,7 @@ cydaw::base::Text HelpDocumentation::follow(const cydaw::base::Text& target, cyd
     auto anchor = text.containsChar('#') ? text.fromFirstOccurrenceOf("#", false, false) : cydaw::base::Text();
     cydaw::base::TextMap state;
     for (const auto& item : cydaw::base::TextList::fromTokens(query, "&", "")) if (item.containsChar('='))
-        state.set(juce::URL::removeEscapeChars(item.upToFirstOccurrenceOf("=", false, false)),juce::URL::removeEscapeChars(item.fromFirstOccurrenceOf("=", false, false)));
+        state.set(cydaw::base::Url::removeEscapeChars(item.upToFirstOccurrenceOf("=", false, false)),cydaw::base::Url::removeEscapeChars(item.fromFirstOccurrenceOf("=", false, false)));
     return link(id, anchor, locale, state);
 }
 cydaw::base::Value HelpDocumentation::command(const cydaw::base::Value& request, bool allowBrowser) {
@@ -101,10 +102,10 @@ cydaw::base::Value HelpDocumentation::command(const cydaw::base::Value& request,
         if (lastUrl_.isEmpty()) return error_;
         if (lastUrl_.contains("#/")) {
             const auto route = cydaw::base::TextList::fromTokens(lastUrl_.fromFirstOccurrenceOf("#/", false, false).upToFirstOccurrenceOf("?", false, false), "/", "");
-            if (route.size() >= 2) { locale_ = juce::URL::removeEscapeChars(route[0]); page_ = juce::URL::removeEscapeChars(route[1]); anchor_ = route.size() > 2 ? cydaw::base::Text(juce::URL::removeEscapeChars(route[2])) : cydaw::base::Text(); }
+            if (route.size() >= 2) { locale_ = cydaw::base::Url::removeEscapeChars(route[0]); page_ = cydaw::base::Url::removeEscapeChars(route[1]); anchor_ = route.size() > 2 ? cydaw::base::Text(cydaw::base::Url::removeEscapeChars(route[2])) : cydaw::base::Text(); }
         }
         ++requests_; launchSuppressed_ = !allowBrowser || !bool(request.getProperty("launch", true));
-        launched_ = !launchSuppressed_ && juce::URL(lastUrl_).launchInDefaultBrowser();
+        launched_ = !launchSuppressed_ && cydaw::base::Url(lastUrl_).launchInDefaultBrowser();
         if (!launchSuppressed_ && !launched_) return "Cannot open the local CyDoc reader in the default browser";
     } else if (action != "status") return "CyDoc owns search/history/closing. Help actions: status, open, navigate, follow";
     if (!load()) return error_;

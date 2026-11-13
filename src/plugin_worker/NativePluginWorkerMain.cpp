@@ -1,3 +1,4 @@
+#include <cydaw/base/Platform.h>
 #include "NativeHostedPlugin.h"
 #include <cydaw/audio/Denormals.h>
 #include <cydaw/base/EventLoop.h>
@@ -1032,9 +1033,8 @@ int main(const int argc, char *argv[]) {
     }
   } com;
 #endif
-  cydaw::base::TextList arguments;
-  for (int index = 1; index < argc; ++index)
-    arguments.add(cydaw::base::Text::fromUTF8(argv[index]));
+  auto arguments=cydaw::base::commandLineArguments(argc,argv);
+  if(!arguments.isEmpty())arguments.remove(0);
 
   if (arguments.contains("--self-test") ||
       arguments.contains("--worker-handshake"))

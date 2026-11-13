@@ -1,3 +1,4 @@
+#include <cydaw/audio/Math.h>
 #include <cydaw/audio/Sources.h>
 #pragma once
 #include "ModeProcessor.h"
@@ -5,7 +6,6 @@
 
 #include <cydaw/engine/FoundrySession.h>
 
-#include <juce_audio_basics/juce_audio_basics.h>
 
 #include <array>
 #include <atomic>
@@ -39,7 +39,7 @@ public:
     [[nodiscard]] bool playing() const noexcept { return playing_.load(std::memory_order_acquire); }
     // Where it plays, in the session's frames.
     [[nodiscard]] double position() const noexcept { return position_.load(std::memory_order_relaxed); }
-    void setGainDb(float db) noexcept { gain_.store(juce::Decibels::decibelsToGain(db, -60.0f), std::memory_order_relaxed); }
+    void setGainDb(float db) noexcept { gain_.store(cydaw::audio::Decibels::decibelsToGain(db, -60.0f), std::memory_order_relaxed); }
     // The highest level of a side (0, 1) since the last look.
     [[nodiscard]] float takePeak(int side) noexcept;
 

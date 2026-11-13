@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #include "ArrangementView.h"
@@ -1537,7 +1538,7 @@ void ArrangementView::duplicateSelection()
         }
     }
     (void) engine.endArrangementEditBatch();
-    juce::ignoreUnused(spb);
+    cydaw::base::ignoreUnused(spb);
     if (!copies.empty())
         state_.selectedClips = copies;
     studio_.markDirty();
@@ -1794,7 +1795,7 @@ const std::vector<app::IsolatedPluginHost::ParameterSnapshot>&
 ArrangementView::pluginParameters(const std::size_t trackIndex, const std::size_t plugin, const bool refresh) const
 {
     const auto plugins = studio_.engine().trackPlugins(trackIndex);
-    const auto key = cydaw::base::Text(static_cast<juce::int64>(trackIndex)) + ":" + cydaw::base::Text(static_cast<juce::int64>(plugin)) + ":"
+    const auto key = cydaw::base::Text(static_cast<std::int64_t>(trackIndex)) + ":" + cydaw::base::Text(static_cast<std::int64_t>(plugin)) + ":"
                      + (plugin < plugins.size() ? plugins[plugin].file.getFullPathName() : cydaw::base::Text());
     auto& entry = pluginParameters_[key];
     const auto now = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
@@ -1858,8 +1859,8 @@ cydaw::base::Text ArrangementView::formatLaneValue(const float value, const Lane
 cydaw::base::Text ArrangementView::curveKey(const TrackRef& track, const cydaw::base::Text& lane)
 {
     const auto owner = track.master ? cydaw::base::Text("master")
-                       : track.midi ? "midi" + cydaw::base::Text(static_cast<juce::int64>(track.midiId))
-                                    : "audio" + cydaw::base::Text(static_cast<juce::int64>(track.audioIndex));
+                       : track.midi ? "midi" + cydaw::base::Text(static_cast<std::int64_t>(track.midiId))
+                                    : "audio" + cydaw::base::Text(static_cast<std::int64_t>(track.audioIndex));
     return owner + "|" + lane;
 }
 

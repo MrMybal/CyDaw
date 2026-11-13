@@ -22,4 +22,14 @@ public:
   int write(const void *source, int size);
   int getBoundPort() const;
 };
+// Datagram boundaries are retained; a read never joins separate packets.
+class DatagramSocket {
+ std::atomic<std::intptr_t> socket_{-1};
+public:
+ ~DatagramSocket(){close();}
+ DatagramSocket()=default;DatagramSocket(const DatagramSocket&)=delete;
+ bool bind(int port,const Text& address={});bool connect(const Text& host,int port);
+ void close();int read(void*,int maximum,int timeoutMs=100);int write(const void*,int size);
+ int getBoundPort()const;
+};
 } // namespace cydaw::base

@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/File.h>
 #include "SynthView.h"
 #include "InstrumentPanels.h"
@@ -125,7 +126,7 @@ bool SynthView::bind(const TrackRef& track, app::GraphDocument& graph, const std
     card_.live = studio_.voiceLive(track, card_.heard);
     // As it plays: the lanes at the playhead, then the voice's modulations.
     card_.played = card_.values;
-    const auto prefix = "node." + cydaw::base::Text(static_cast<juce::int64>(nodeId)) + "." + cydaw::base::Text(synth::info(card_.model).prefix) + ".";
+    const auto prefix = "node." + cydaw::base::Text(static_cast<std::int64_t>(nodeId)) + "." + cydaw::base::Text(synth::info(card_.model).prefix) + ".";
     for (const auto& binding : studio_.automatedParameters(track))
         if (binding.startsWith(prefix))
             if (const auto index = synth::parameterIndex(card_.model, binding.substring(prefix.length()).toStdString()); index >= 0)
@@ -165,7 +166,7 @@ float SynthView::valueOf(const char* key) const
 
 cydaw::base::Text SynthView::bindingOf(const int index) const
 {
-    return "node." + cydaw::base::Text(static_cast<juce::int64>(card_.nodeId)) + "." + cydaw::base::Text(synth::info(card_.model).prefix) + "."
+    return "node." + cydaw::base::Text(static_cast<std::int64_t>(card_.nodeId)) + "." + cydaw::base::Text(synth::info(card_.model).prefix) + "."
            + cydaw::base::Text(synth::parameter(card_.model, index).key);
 }
 
