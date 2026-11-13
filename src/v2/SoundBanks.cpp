@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #include "SoundBanks.h"
@@ -56,9 +57,9 @@ bool isLicenceOrReadme(const cydaw::base::Text& path)
 
 // A WAV as a generated bank writes it: 16-bit PCM, mono, a 44-byte header,
 // so its size is known before it is made (44 + 2 a frame).
-juce::MemoryBlock wavOf(const std::vector<float>& samples, const int rate)
+cydaw::base::MemoryBlock wavOf(const std::vector<float>& samples, const int rate)
 {
-    juce::MemoryOutputStream out;
+    cydaw::base::MemoryOutputStream out;
     const auto dataBytes = static_cast<int>(samples.size() * 2);
     out.write("RIFF", 4);
     out.writeInt(36 + dataBytes);
@@ -139,7 +140,7 @@ void SoundBanks::loadRegistry()
             bank.commit = item.getProperty("commit", {}).toString();
             bank.baseUrl = item.getProperty("baseUrl", {}).toString();
             bank.generator = item.getProperty("generator", {}).toString();
-            bank.rate = juce::jlimit(8'000.0, 192'000.0, static_cast<double>(item.getProperty("rate", 48'000.0)));
+            bank.rate = cydaw::base::limit(8'000.0, 192'000.0, static_cast<double>(item.getProperty("rate", 48'000.0)));
             // In the interface's language ({"fr": …, "en": …}), else English.
             if (const auto description = item.getProperty("description", {}); description.isObject())
                 bank.description = description.getProperty(cydaw::base::Identifier(ui::language()),
@@ -148,7 +149,7 @@ void SoundBanks::loadRegistry()
                 bank.description = description.toString();
             bank.list = file.getParentDirectory().getChildFile(item.getProperty("list", {}).toString());
             bank.count = static_cast<int>(item.getProperty("count", 0));
-            bank.bytes = static_cast<juce::int64>(item.getProperty("bytes", 0));
+            bank.bytes = static_cast<std::int64_t>(item.getProperty("bytes", 0));
             // A bank is downloaded into a folder of its name: nothing that
             // could leave the banks' folder.
             if (bank.id.isNotEmpty() && bank.id.containsOnly("abcdefghijklmnopqrstuvwxyz0123456789-_.")
@@ -213,7 +214,7 @@ SoundBanks::PreloadedList SoundBanks::readList(const cydaw::base::File& listFile
             if (const auto* fields = item.getArray(); fields != nullptr && fields->size() >= 2) {
                 BankFile file;
                 file.path = (*fields)[0].toString();
-                file.size = static_cast<juce::int64>((*fields)[1]);
+                file.size = static_cast<std::int64_t>((*fields)[1]);
                 file.lfs = fields->size() > 2 && static_cast<int>((*fields)[2]) != 0;
                 if (fields->size() > 3)
                     file.recipe = (*fields)[3];
@@ -607,7 +608,7 @@ cydaw::base::Text SoundBanks::urlOf(const Bank& bank, const BankFile& file, cons
 bool SoundBanks::fetch(const Wanted& wanted, const int generation, cydaw::base::Text& error)
 {
     const auto stopped = [this, generation] { return generation != generation_.load(); };
-    const auto addBytes = [this, generation](const juce::int64 bytes) {
+    const auto addBytes = [this, generation](const std::int64_t bytes) {
         const std::scoped_lock lock(mutex_);
         if (!jobs_.empty() && generation == generation_.load())
             jobs_.front().bytesDone += bytes;
@@ -649,12 +650,12 @@ bool SoundBanks::fetch(const Wanted& wanted, const int generation, cydaw::base::
             error = wanted.bank + "/" + wanted.file.path + ": HTTP " + cydaw::base::Text(status);
             continue;
         }
-        juce::int64 written {};
+        std::int64_t written {};
         // Hashed as it comes, when the list gives the file's hash.
         Sha256 hash;
         {
             (void) partial.deleteFile();
-            juce::FileOutputStream out(partial);
+            cydaw::base::FileOutputStream out(partial);
             if (!out.openedOk()) {
                 error = "cannot write " + partial.getFullPathName();
                 return false;
@@ -712,7 +713,7 @@ bool SoundBanks::generate(const Bank& bank, const Wanted& wanted, const int gene
 {
     const auto& recipe = wanted.file.recipe;
     const auto name = wanted.bank + "/" + wanted.file.path;
-    juce::MemoryBlock bytes;
+    cydaw::base::MemoryBlock bytes;
     if (recipe.hasProperty("text")) {
         const auto text = recipe.getProperty("text", {}).toString();
         bytes.append(text.toRawUTF8(), text.getNumBytesAsUTF8());
@@ -722,7 +723,7 @@ bool SoundBanks::generate(const Bank& bank, const Wanted& wanted, const int gene
         if (const auto* values = recipe.getProperty("values", {}).getDynamicObject())
             for (const auto& property : values->getProperties())
                 drum.values.emplace_back(property.name.toString().toStdString(), static_cast<double>(property.value));
-        drum.seed = static_cast<std::uint32_t>(static_cast<juce::int64>(recipe.getProperty("seed", 1)));
+        drum.seed = static_cast<std::uint32_t>(static_cast<std::int64_t>(recipe.getProperty("seed", 1)));
         drum.seconds = static_cast<double>(recipe.getProperty("seconds", 0.0));
         drum.gainDb = static_cast<double>(recipe.getProperty("gainDb", 0.0));
         const auto samples = engine::drums::render(drum, bank.rate);
@@ -736,8 +737,8 @@ bool SoundBanks::generate(const Bank& bank, const Wanted& wanted, const int gene
         return false;
     }
     // What the list says it is: else this version makes another sound.
-    if (wanted.file.size > 0 && static_cast<juce::int64>(bytes.getSize()) != wanted.file.size) {
-        error = name + ": made " + cydaw::base::Text(static_cast<juce::int64>(bytes.getSize())) + " bytes of "
+    if (wanted.file.size > 0 && static_cast<std::int64_t>(bytes.getSize()) != wanted.file.size) {
+        error = name + ": made " + cydaw::base::Text(static_cast<std::int64_t>(bytes.getSize())) + " bytes of "
                 + cydaw::base::Text(wanted.file.size);
         return false;
     }
@@ -758,7 +759,7 @@ bool SoundBanks::generate(const Bank& bank, const Wanted& wanted, const int gene
     }
     const std::scoped_lock lock(mutex_);
     if (!jobs_.empty() && generation == generation_.load())
-        jobs_.front().bytesDone += static_cast<juce::int64>(bytes.getSize());
+        jobs_.front().bytesDone += static_cast<std::int64_t>(bytes.getSize());
     return true;
 }
 

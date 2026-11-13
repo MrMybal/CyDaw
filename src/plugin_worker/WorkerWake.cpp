@@ -1,6 +1,8 @@
 #include <cydaw/plugins/WorkerWake.h>
 #if defined(_WIN32)
+#ifndef NOMINMAX
 #define NOMINMAX
+#endif
 #include <windows.h>
 #endif
 namespace cydaw::plugins {
@@ -28,8 +30,7 @@ void WorkerWake::signal() const noexcept {
 }
 void WorkerWake::waitAndDispatch() const noexcept {
 #if defined(_WIN32)
-  // The timed JUCE dispatch loop sleeps in coarse increments. Wake audio
-  // independently while still servicing native editor/main-thread messages.
+  // Audio wakeups and native editor messages share one bounded wait.
   MSG message;
   for (unsigned n = 0;
        n < 64 && PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE); ++n) {

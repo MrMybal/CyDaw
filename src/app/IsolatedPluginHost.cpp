@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/audio/Sources.h>
 #include <cydaw/base/Process.h>
 #include <cydaw/base/Thread.h>
@@ -8,7 +9,7 @@
 #include <cstring>
 #include <thread>
 
-#if JUCE_WINDOWS
+#if defined(_WIN32)
 extern "C" __declspec(dllimport) unsigned long __stdcall GetCurrentProcessId();
 #else
 #include <unistd.h>
@@ -23,10 +24,10 @@ std::atomic<int> sessionDenominator { 4 };
 // This process: its workers end when it is gone (a crash leaves none behind).
 cydaw::base::Text processId()
 {
-#if JUCE_WINDOWS
-    return cydaw::base::Text(static_cast<juce::int64>(GetCurrentProcessId()));
+#if defined(_WIN32)
+    return cydaw::base::Text(static_cast<std::int64_t>(GetCurrentProcessId()));
 #else
-    return cydaw::base::Text(static_cast<juce::int64>(getpid()));
+    return cydaw::base::Text(static_cast<std::int64_t>(getpid()));
 #endif
 }
 } // namespace
@@ -98,7 +99,7 @@ cydaw::base::Result IsolatedPluginHost::startWorker(PluginWorkerLaunch launch,
     {
         auto output = sharedFile_.createOutputStream();
         if (output == nullptr || !output->setPosition(0) || output->truncate().failed()
-            || !output->setPosition(static_cast<juce::int64>(sizeof(cydaw::plugins::SharedPluginAudio) - 1))
+            || !output->setPosition(static_cast<std::int64_t>(sizeof(cydaw::plugins::SharedPluginAudio) - 1))
             || !output->writeByte(0)) {
             sharedFile_.deleteFile();
             return cydaw::base::Result::fail("Cannot create the plugin shared-memory file");
@@ -188,7 +189,7 @@ cydaw::base::Result IsolatedPluginHost::startWorker(PluginWorkerLaunch launch,
     lastHeartbeat_ = 0;
     heartbeatSince_ = cydaw::base::Time::getMillisecondCounterHiRes() * 0.001;
     active_.store(shared, std::memory_order_release);
-    juce::MemoryBlock initialState;
+    cydaw::base::MemoryBlock initialState;
     (void) getState(initialState);
     return cydaw::base::Result::ok();
 }
@@ -262,7 +263,7 @@ void IsolatedPluginHost::pollWorkerHealth()
         // restarted worker gets back, what an autosave writes) follows.
         if (stateStaleSince_ > 0.0 && cydaw::base::Time::getMillisecondCounterHiRes() * 0.001 - stateStaleSince_ > 0.4) {
             stateStaleSince_ = 0.0;
-            juce::MemoryBlock fresh;
+            cydaw::base::MemoryBlock fresh;
             (void) getState(fresh);
         }
         return;
@@ -321,7 +322,7 @@ cydaw::base::Result IsolatedPluginHost::sendCommand(const cydaw::plugins::Shared
     return cydaw::base::Result::fail("Plugin control command timed out");
 }
 
-cydaw::base::Result IsolatedPluginHost::getState(juce::MemoryBlock& destination)
+cydaw::base::Result IsolatedPluginHost::getState(cydaw::base::MemoryBlock& destination)
 {
     const auto result = sendCommand(cydaw::plugins::SharedPluginCommand::getState);
     auto* shared = active_.load(std::memory_order_acquire);
@@ -339,7 +340,7 @@ cydaw::base::Result IsolatedPluginHost::getState(juce::MemoryBlock& destination)
 }
 
 cydaw::base::Result IsolatedPluginHost::getCachedState(
-    juce::MemoryBlock& destination) const
+    cydaw::base::MemoryBlock& destination) const
 {
     if (cachedState_.isEmpty())
         return cydaw::base::Result::fail("No cached plugin state is available");
@@ -353,7 +354,7 @@ bool IsolatedPluginHost::controlBusy(cydaw::plugins::SharedPluginAudio& shared) 
            != cydaw::plugins::sharedAtomic(shared.commandResponseSequence).load(std::memory_order_acquire);
 }
 
-cydaw::base::Result IsolatedPluginHost::setState(const juce::MemoryBlock& state)
+cydaw::base::Result IsolatedPluginHost::setState(const cydaw::base::MemoryBlock& state)
 {
     auto* shared = active_.load(std::memory_order_acquire);
     if (shared == nullptr)
@@ -412,7 +413,7 @@ cydaw::base::Result IsolatedPluginHost::getPrograms(cydaw::base::TextList& names
         names.add(text.substring(start, end < 0 ? text.length() : end));
         start = end < 0 ? text.length() : end + 1;
     }
-    current = count > 0 ? juce::jlimit(0, count - 1, static_cast<int>(shared->commandParameterIndex)) : -1;
+    current = count > 0 ? cydaw::base::limit(0, count - 1, static_cast<int>(shared->commandParameterIndex)) : -1;
     return cydaw::base::Result::ok();
 }
 
@@ -428,7 +429,7 @@ cydaw::base::Result IsolatedPluginHost::setProgram(const int index)
     shared->commandParameterIndex = static_cast<std::uint32_t>(index);
     const auto result = sendCommand(cydaw::plugins::SharedPluginCommand::setProgram);
     if (result.wasOk()) {
-        juce::MemoryBlock state;
+        cydaw::base::MemoryBlock state;
         (void) getState(state);
     }
     return result;
@@ -443,7 +444,7 @@ cydaw::base::Result IsolatedPluginHost::setParameter(const std::uint32_t index,
     if (controlBusy(*shared))
         return cydaw::base::Result::fail("Plugin control channel is busy");
     shared->commandParameterIndex = index;
-    shared->commandParameterValue = juce::jlimit(0.0f, 1.0f, normalisedValue);
+    shared->commandParameterValue = cydaw::base::limit(0.0f, 1.0f, normalisedValue);
     const auto result = sendCommand(cydaw::plugins::SharedPluginCommand::setParameter);
     // The state is read again once the knob rests: a drag sends dozens of
     // values, and a big plug-in's state takes a while to write.
@@ -463,7 +464,7 @@ void IsolatedPluginHost::publishRealtimeParameters(const RealtimeParameterValue*
     for (std::size_t valueIndex = 0; valueIndex < count; ++valueIndex)
         pendingRealtimeParameters_[valueIndex] = {
             values[valueIndex].index,
-            juce::jlimit(0.0f, 1.0f, values[valueIndex].value)
+            cydaw::base::limit(0.0f, 1.0f, values[valueIndex].value)
         };
     pendingRealtimeParameterCount_ = count;
 }

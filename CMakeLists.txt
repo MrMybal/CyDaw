@@ -271,13 +271,38 @@ else()
     target_compile_options(cydaw_core PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
+add_library(cydaw_plugin_host STATIC src/plugin_worker/NativeHostedPlugin.cpp src/plugin_worker/NativePluginEditor.cpp src/plugin_worker/NativeLv2Programs.cpp src/plugin_worker/NativeScriptDiagnostics.cpp)
+target_link_libraries(cydaw_plugin_host PUBLIC CyDAW::Core CyAudioCore::Plugins)
+target_include_directories(cydaw_plugin_host PUBLIC src/plugin_worker)
+target_include_directories(cydaw_plugin_host SYSTEM PRIVATE "${CYDAW_CYAUDIOCORE_SOURCE_DIR}/third_party/ysfx/include" "${CYDAW_CYAUDIOCORE_SOURCE_DIR}/third_party/lilv/include" "${CYDAW_CYAUDIOCORE_SOURCE_DIR}/third_party/lv2/include")
+target_compile_definitions(cydaw_plugin_host PRIVATE LILV_STATIC)
+target_compile_features(cydaw_plugin_host PUBLIC cxx_std_20)
+add_executable(CyDAWPluginWorker src/plugin_worker/NativePluginWorkerMain.cpp src/plugin_worker/WorkerWake.cpp)
+target_link_libraries(CyDAWPluginWorker PRIVATE cydaw_plugin_host)
+set_target_properties(CyDAWPluginWorker PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/CyDAWPluginWorker_artefacts/$<CONFIG>")
+if(WIN32)
+    target_link_libraries(cydaw_plugin_host PRIVATE winmm comctl32 ole32)
+    target_compile_definitions(cydaw_plugin_host PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+    target_compile_definitions(CyDAWPluginWorker PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+endif()
+if(MSVC)
+    target_compile_options(cydaw_plugin_host PRIVATE /utf-8 /EHsc)
+    target_compile_options(CyDAWPluginWorker PRIVATE /utf-8 /EHsc)
+endif()
+add_library(cydaw_plugin_client STATIC src/app/IsolatedPluginHost.cpp src/app/WindowsPluginBridge.cpp src/plugin_worker/WorkerWake.cpp)
+target_link_libraries(cydaw_plugin_client PUBLIC CyDAW::Core)
+target_include_directories(cydaw_plugin_client PUBLIC src/app)
+target_compile_features(cydaw_plugin_client PUBLIC cxx_std_20)
+if(MSVC)
+    target_compile_options(cydaw_plugin_client PRIVATE /utf-8 /EHsc)
+endif()
 add_library(cydaw_native_device_ports STATIC src/integration/NativeCoreDevices.cpp src/integration/DeviceManager.cpp src/integration/MidiDevices.cpp)
 target_link_libraries(cydaw_native_device_ports PUBLIC CyDAW::Core CyAudioCore::Devices)
 target_compile_features(cydaw_native_device_ports PUBLIC cxx_std_20)
+target_compile_definitions(cydaw_native_device_ports PUBLIC CYDAW_WITH_ASIO=$<BOOL:${CYDAW_ASIO_AVAILABLE}>)
 if(WIN32 AND CYDAW_ENABLE_ASIO)
     target_sources(cydaw_native_device_ports PRIVATE src/integration/NativeAsioDevice.cpp)
     target_link_libraries(cydaw_native_device_ports PRIVATE cydaw_asio)
-    target_compile_definitions(cydaw_native_device_ports PUBLIC CYDAW_WITH_ASIO=1)
 endif()
 if(MSVC)
     target_compile_options(cydaw_native_device_ports PRIVATE /utf-8)
@@ -312,6 +337,13 @@ if(MSVC)
     target_compile_options(cydaw_graph_document PRIVATE /utf-8 /bigobj)
 endif()
 
+add_executable(CyDAWAudioProbe src/audio_probe/AudioBackendProbeMain.cpp)
+target_link_libraries(CyDAWAudioProbe PRIVATE cydaw_native_device_ports)
+target_compile_features(CyDAWAudioProbe PRIVATE cxx_std_20)
+if(MSVC)
+    target_compile_options(CyDAWAudioProbe PRIVATE /utf-8 /EHsc)
+endif()
+target_compile_definitions(CyDAWAudioProbe PRIVATE CYDAW_WITH_JACK=$<BOOL:${CYDAW_JACK_AVAILABLE}>)
 if(CYDAW_BUILD_TESTS)
     enable_testing()
     add_executable(cydaw_core_tests tests/CoreTests.cpp)
@@ -375,6 +407,12 @@ if(CYDAW_BUILD_TESTS)
 endif()
 
 if(CYDAW_BUILD_TESTS)
+    add_executable(cydaw_native_plugin_ipc_tests tests/PluginIpcTests.cpp src/v2/HiddenDesktop.cpp)
+    target_link_libraries(cydaw_native_plugin_ipc_tests PRIVATE cydaw_plugin_client)
+    add_executable(cydaw_native_hosted_plugin_tests tests/NativeHostedPluginTests.cpp)
+    target_link_libraries(cydaw_native_hosted_plugin_tests PRIVATE cydaw_plugin_host)
+    add_test(NAME cydaw_native_hosted_plugin_tests COMMAND cydaw_native_hosted_plugin_tests)
+    cydaw_configure_test(cydaw_native_hosted_plugin_tests 30)
     add_executable(cydaw_native_device_manager_tests tests/NativeDeviceManagerTests.cpp)
     target_link_libraries(cydaw_native_device_manager_tests PRIVATE cydaw_native_device_ports)
     add_test(NAME cydaw_native_device_manager_tests COMMAND cydaw_native_device_manager_tests)
@@ -765,50 +803,6 @@ if(CYDAW_BUILD_DESKTOP)
             )
         endif()
 
-        juce_add_console_app(CyDAWAudioProbe
-            PRODUCT_NAME "CyDAW Audio Probe"
-            VERSION "${PROJECT_VERSION}"
-            BUILD_VERSION "${PROJECT_VERSION}")
-        if(WIN32)
-            get_target_property(CYDAW_AUDIO_PROBE_INFO_FILE CyDAWAudioProbe JUCE_INFO_FILE)
-            get_target_property(CYDAW_AUDIO_PROBE_GENERATED_DIR
-                                CyDAWAudioProbe JUCE_GENERATED_SOURCES_DIRECTORY)
-            add_custom_command(
-                OUTPUT "${CYDAW_AUDIO_PROBE_GENERATED_DIR}/CyDAWAudioProbe_resources.rc"
-                APPEND
-                DEPENDS "${CYDAW_AUDIO_PROBE_INFO_FILE}")
-        endif()
-        target_sources(CyDAWAudioProbe PRIVATE src/audio_probe/AudioBackendProbeMain.cpp)
-        target_compile_features(CyDAWAudioProbe PRIVATE cxx_std_20)
-        target_compile_definitions(CyDAWAudioProbe PRIVATE
-            JUCE_USE_CURL=0
-            JUCE_WEB_BROWSER=0
-        )
-        cydaw_configure_audio_backends(CyDAWAudioProbe)
-        target_link_libraries(CyDAWAudioProbe PRIVATE
-            juce::juce_audio_devices
-            juce::juce_gui_basics
-            juce::juce_recommended_config_flags
-            juce::juce_recommended_warning_flags
-        )
-        if(CYDAW_BUILD_TESTS)
-            add_test(NAME cydaw_audio_backend_probe COMMAND CyDAWAudioProbe --self-test)
-            cydaw_configure_test(cydaw_audio_backend_probe 60)
-        endif()
-
-        juce_add_console_app(CyDAWPluginWorker
-            PRODUCT_NAME "CyDAW Plugin Worker"
-            VERSION "${PROJECT_VERSION}"
-            BUILD_VERSION "${PROJECT_VERSION}")
-        if(WIN32)
-            get_target_property(CYDAW_PLUGIN_WORKER_INFO_FILE CyDAWPluginWorker JUCE_INFO_FILE)
-            get_target_property(CYDAW_PLUGIN_WORKER_GENERATED_DIR
-                                CyDAWPluginWorker JUCE_GENERATED_SOURCES_DIRECTORY)
-            add_custom_command(
-                OUTPUT "${CYDAW_PLUGIN_WORKER_GENERATED_DIR}/CyDAWPluginWorker_resources.rc"
-                APPEND
-                DEPENDS "${CYDAW_PLUGIN_WORKER_INFO_FILE}")
-        endif()
         set(YSFX_PLUGIN OFF CACHE BOOL "" FORCE)
         set(YSFX_TESTS OFF CACHE BOOL "" FORCE)
         set(YSFX_SKIP_CHECKSUM ON CACHE BOOL "" FORCE)
@@ -821,30 +815,6 @@ if(CYDAW_BUILD_DESKTOP)
             set(YSFX_PORTABLE ON CACHE BOOL "EEL interpreter fallback without NASM" FORCE)
         endif()
         add_subdirectory(third_party/ysfx EXCLUDE_FROM_ALL)
-        target_sources(CyDAWPluginWorker PRIVATE src/plugin_worker/PluginWorkerMain.cpp
-                src/plugin_worker/WorkerWake.cpp
-            src/plugin_worker/ExtraPluginFormats.cpp src/plugin_worker/ClapInstance.cpp src/plugin_worker/JsfxInstance.cpp
-            src/plugin_worker/CyAudioCorePluginFormat.cpp)
-        target_include_directories(CyDAWPluginWorker PRIVATE third_party/clap/include)
-        # One ysfx/EEL runtime per worker. Core embeds its portable runtime;
-        # linking the old JIT archive too mixes VM symbols and breaks scripts.
-        target_include_directories(CyDAWPluginWorker PRIVATE third_party/ysfx/include)
-        target_link_libraries(CyDAWPluginWorker PRIVATE CyAudioCore::Plugins juce::juce_gui_extra)
-        target_compile_features(CyDAWPluginWorker PRIVATE cxx_std_20)
-        target_compile_definitions(CyDAWPluginWorker PRIVATE
-            NOMINMAX WIN32_LEAN_AND_MEAN
-            JUCE_USE_CURL=0
-            JUCE_WEB_BROWSER=0
-            JUCE_MODAL_LOOPS_PERMITTED=1
-        )
-        cydaw_configure_plugin_formats(CyDAWPluginWorker)
-        target_link_libraries(CyDAWPluginWorker PRIVATE
-            CyDAW::Core
-            juce::juce_audio_processors
-            juce::juce_gui_basics
-            juce::juce_recommended_config_flags
-            juce::juce_recommended_warning_flags
-        )
         if(CYDAW_BUILD_TESTS)
             add_test(NAME cydaw_plugin_worker_self_test
                      COMMAND CyDAWPluginWorker --self-test)

@@ -78,7 +78,7 @@ public:
 
     // The channels its delay keeps (its track's format), taken at the next
     // prepare: set while it is out of the mixer.
-    void setChannelCount(int channels) noexcept { channelCount_ = juce::jlimit(1, maximumChannelCount, channels); }
+    void setChannelCount(int channels) noexcept { channelCount_ = cydaw::base::limit(1, maximumChannelCount, channels); }
     void setDelaySamples(int delaySamples) noexcept;
     void requestReset() noexcept;
     [[nodiscard]] int delaySamples() const noexcept;
@@ -259,12 +259,12 @@ public:
     // others start again (their state kept). Whether one did.
     bool followDevice(double sampleRate, int blockSize, int channels);
     [[nodiscard]] cydaw::base::Result getPluginState(std::size_t pluginIndex,
-                                              juce::MemoryBlock& destination);
+                                              cydaw::base::MemoryBlock& destination);
     [[nodiscard]] cydaw::base::Result getCachedPluginState(
         std::size_t pluginIndex,
-        juce::MemoryBlock& destination) const;
+        cydaw::base::MemoryBlock& destination) const;
     [[nodiscard]] cydaw::base::Result setPluginState(std::size_t pluginIndex,
-                                              const juce::MemoryBlock& state);
+                                              const cydaw::base::MemoryBlock& state);
     [[nodiscard]] cydaw::base::Result showPluginEditor(std::size_t pluginIndex);
     [[nodiscard]] cydaw::base::Result refreshPluginParameters(
         std::size_t pluginIndex,
@@ -482,8 +482,8 @@ private:
     std::atomic<int> inputChannelCount_ {};
     std::atomic<int> recordingChannelCount_ {};
     std::atomic<int> droppedBlocks_ {};
-    std::atomic<juce::int64> samplesUntilStart_ {};
-    std::atomic<juce::int64> samplesUntilStop_ { -1 };
+    std::atomic<std::int64_t> samplesUntilStart_ {};
+    std::atomic<std::int64_t> samplesUntilStop_ { -1 };
     std::atomic<bool> started_ {};
     std::atomic<bool> stopPending_ {};
     std::atomic<bool> recordingComplete_ {};
@@ -617,9 +617,9 @@ private:
     std::atomic<double> clock_ {};
     std::atomic<bool> clockRunning_ {};
     std::atomic<double> tempo_ { 120.0 };
-    std::atomic<juce::int64> targetSamples_ {};
-    std::atomic<juce::int64> capturedSamples_ {};
-    std::atomic<juce::int64> skipSamples_ {};
+    std::atomic<std::int64_t> targetSamples_ {};
+    std::atomic<std::int64_t> capturedSamples_ {};
+    std::atomic<std::int64_t> skipSamples_ {};
     std::atomic<bool> captureComplete_ {};
     std::atomic<int> droppedBlocks_ {};
     std::unique_ptr<cydaw::realtime::SpscRing<
@@ -1546,14 +1546,14 @@ public:
     void pollPluginWorkers();
     [[nodiscard]] cydaw::base::Result getTrackPluginState(std::size_t index,
                                                    std::size_t pluginIndex,
-                                                   juce::MemoryBlock& destination);
+                                                   cydaw::base::MemoryBlock& destination);
     [[nodiscard]] cydaw::base::Result getCachedTrackPluginState(
         std::size_t index,
         std::size_t pluginIndex,
-        juce::MemoryBlock& destination) const;
+        cydaw::base::MemoryBlock& destination) const;
     [[nodiscard]] cydaw::base::Result setTrackPluginState(std::size_t index,
                                                    std::size_t pluginIndex,
-                                                   const juce::MemoryBlock& state);
+                                                   const cydaw::base::MemoryBlock& state);
     [[nodiscard]] cydaw::base::Result showTrackPluginEditor(std::size_t index,
                                                      std::size_t pluginIndex);
     [[nodiscard]] cydaw::base::Result refreshTrackPluginParameters(

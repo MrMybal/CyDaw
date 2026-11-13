@@ -21,7 +21,7 @@ namespace cydaw::v2::device_ops {
 
 cydaw::base::Text parameterKeyOf(const cydaw::base::Text& binding, const std::uint64_t nodeId)
 {
-    const auto prefix = "node." + cydaw::base::Text(static_cast<juce::int64>(nodeId)) + ".";
+    const auto prefix = "node." + cydaw::base::Text(static_cast<std::int64_t>(nodeId)) + ".";
     return binding.startsWith(prefix) ? binding.substring(prefix.length()) : binding;
 }
 
@@ -131,7 +131,7 @@ bool applyPreset(app::GraphDocument& graph, const std::uint64_t nodeId, const cy
     // place: those the preset sets, the others where the map starts them.
     if (graph.editorSamplerControls(nodeId))
         if (const auto* knobs = state.getProperty("parameters", {}).getDynamicObject()) {
-            const auto prefix = "node." + cydaw::base::Text(static_cast<juce::int64>(nodeId)) + ".sampler.cc";
+            const auto prefix = "node." + cydaw::base::Text(static_cast<std::int64_t>(nodeId)) + ".sampler.cc";
             for (int number = 0; number < 128; ++number) {
                 const auto key = cydaw::base::Identifier("sampler.cc" + cydaw::base::Text(number));
                 (void) graph.editorSetParameter(prefix + cydaw::base::Text(number),
@@ -143,7 +143,7 @@ bool applyPreset(app::GraphDocument& graph, const std::uint64_t nodeId, const cy
     // sound stays: its third oscillator, its spectral morphs).
     if (node->typeKey == "prism-synth")
         if (const auto* knobs = state.getProperty("parameters", {}).getDynamicObject()) {
-            const auto prefix = "node." + cydaw::base::Text(static_cast<juce::int64>(nodeId)) + ".prism.";
+            const auto prefix = "node." + cydaw::base::Text(static_cast<std::int64_t>(nodeId)) + ".prism.";
             for (int index = 0; index < engine::prism::parameterCount; ++index) {
                 const auto& setting = engine::prism::parameter(index);
                 const auto key = cydaw::base::Identifier("prism." + cydaw::base::Text(setting.key));
@@ -170,10 +170,10 @@ namespace {
 // ("<!>2048 …"), 0 without one.
 int declaredCycleLength(const cydaw::base::File& file)
 {
-    juce::FileInputStream input(file);
+    cydaw::base::FileInputStream input(file);
     if (!input.openedOk())
         return 0;
-    juce::MemoryBlock head;
+    cydaw::base::MemoryBlock head;
     (void) input.readIntoMemoryBlock(head, 1 << 16);
     const auto* bytes = static_cast<const char*>(head.getData());
     const auto size = static_cast<int>(head.getSize());
@@ -270,7 +270,7 @@ bool importPrismTable(app::GraphDocument& graph, const std::uint64_t nodeId, con
         return false;
     }
     // Four million samples at most: a minute and a half, far more than a table.
-    const auto length = static_cast<int>(std::min<juce::int64>(reader->lengthInSamples, 1 << 22));
+    const auto length = static_cast<int>(std::min<std::int64_t>(reader->lengthInSamples, 1 << 22));
     const auto channels = std::clamp(static_cast<int>(reader->numChannels), 1, 8);
     cydaw::audio::SampleBuffer<float> buffer(channels, length);
     (void) reader->read(&buffer, 0, length, 0, true, channels > 1);
@@ -356,8 +356,8 @@ bool loadImpulse(app::GraphDocument& graph, const std::uint64_t nodeId, const cy
     for (const auto& node : graph.editorNodes())
         if (node.id == nodeId)
             room = node.typeKey == "empreinte";
-    const auto most = std::min(static_cast<juce::int64>(std::ceil(reader->sampleRate * (room ? 8.0 : 2.0))),
-                               static_cast<juce::int64>(engine::maximumImpulseSamples) * 4);
+    const auto most = std::min(static_cast<std::int64_t>(std::ceil(reader->sampleRate * (room ? 8.0 : 2.0))),
+                               static_cast<std::int64_t>(engine::maximumImpulseSamples) * 4);
     const auto length = static_cast<int>(std::min(reader->lengthInSamples, most));
     const auto channels = std::min(2, static_cast<int>(reader->numChannels));
     cydaw::audio::SampleBuffer<float> buffer(static_cast<int>(reader->numChannels), length);

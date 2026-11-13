@@ -8,6 +8,7 @@ void require(bool okay, const char *message) {
 }
 struct Silence final : audio::DeviceCallback {
   std::atomic<unsigned> blocks{}, prepared{}, stopped{}, contextual{};
+  std::atomic<int> minimumFrames{1048576}, maximumFrames{};
   base::WaitableEvent arrived;
   void audioDeviceAboutToStart(audio::Device *device) override {
     if (device && device->getCurrentSampleRate() > 0)
@@ -23,6 +24,8 @@ struct Silence final : audio::DeviceCallback {
     if (context.native && context.native->clockValid && context.hostTimeNs &&
         *context.hostTimeNs == context.native->clock.monotonicNanoseconds)
       ++contextual;
+    minimumFrames = std::min(minimumFrames.load(), frames);
+    maximumFrames = std::max(maximumFrames.load(), frames);
     ++blocks;
     arrived.signal();
   }
@@ -71,7 +74,11 @@ int main(int argc, char **argv) {
     device->start(&silence);
     require(silence.arrived.wait(2000),
             "Core null stream renders native callbacks");
+    base::Thread::sleep(30);
     device->stop();
+    require(silence.minimumFrames == device->getCurrentBufferSizeSamples() &&
+                silence.maximumFrames == device->getCurrentBufferSizeSamples(),
+            "negotiated native client block remains consistent");
     const auto count = silence.blocks.load();
     base::Thread::sleep(10);
     require(

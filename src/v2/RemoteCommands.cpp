@@ -133,7 +133,7 @@ std::uint32_t colourFrom(const cydaw::base::Text& text)
 // A PNG's size, read from its header (IHDR follows the signature).
 juce::Point<int> pngSize(const cydaw::base::File& file)
 {
-    juce::FileInputStream stream(file);
+    cydaw::base::FileInputStream stream(file);
     std::array<std::uint8_t, 24> header {};
     if (!stream.openedOk() || stream.read(header.data(), static_cast<int>(header.size())) != static_cast<int>(header.size()))
         return {};
@@ -247,6 +247,7 @@ private:
                 set(pluginEntry, "file", info.plugins[plugin].file.getFullPathName());
                 set(pluginEntry, "running", info.plugins[plugin].running);
                 set(pluginEntry, "latencySamples", info.plugins[plugin].latencySamples);
+                set(pluginEntry, "missedBlocks", static_cast<std::int64_t>(info.plugins[plugin].missedBlocks));
                 plugins.add(pluginEntry);
             }
             set(entry, "plugins", plugins);

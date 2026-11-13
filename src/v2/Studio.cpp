@@ -1,3 +1,4 @@
+#include <cydaw/base/LegacyPluginState.h>
 #include <cydaw/midi/Devices.h>
 #include <cydaw/midi/LiveInput.h>
 #include <cydaw/audio/Devices.h>
@@ -221,7 +222,7 @@ struct Studio::Opening {
     cydaw::base::File file;
     std::shared_ptr<Read> read;
     double started {};
-    juce::int64 bytes {};
+    std::int64_t bytes {};
     // An import: the project read on its thread, then made in steps.
     struct ImportRead {
         std::atomic<bool> done {};
@@ -641,7 +642,7 @@ cydaw::base::Result Studio::setTrackChannels(const TrackRef& track, const int ch
         const auto [in, out] = audioEnds(graph);
         for (const auto node : { in, out })
             if (node != 0)
-                (void) graph.setGraphMemberType("node." + cydaw::base::Text(static_cast<juce::int64>(node)),
+                (void) graph.setGraphMemberType("node." + cydaw::base::Text(static_cast<std::int64_t>(node)),
                                                 cydaw::engine::PortKind::audio, count);
         (void) publishGraph(track, true);
     }
@@ -767,7 +768,7 @@ cydaw::base::Result Studio::setTrackOutputs(const TrackRef& track, std::vector<T
     if (stored == nullptr || !isValid(track))
         return cydaw::base::Result::fail(ui::Ls("Piste introuvable", "No such track"));
     for (auto& output : outputs) {
-        output.gainDb = juce::jlimit(-60.0f, 12.0f, output.gainDb);
+        output.gainDb = cydaw::base::limit(-60.0f, 12.0f, output.gainDb);
         if (output.hardware != 0) {
             const auto bus = engine_.virtualBus(output.hardware);
             if (!bus || bus->direction != app::VirtualBusDirection::output)
@@ -1149,7 +1150,7 @@ cydaw::base::Result Studio::publishGraph(const TrackRef& track, const bool struc
         result = engine_.updateTrackNativeDspParameters(track.audioIndex, native);
         if (result.failed())
             result = engine_.setTrackNativeDspGraph(track.audioIndex, native);
-        juce::ignoreUnused(structural);
+        cydaw::base::ignoreUnused(structural);
         graph.setDspCompilationStatus(result, native.nodes.size());
     } else if (track.pad >= 0) {
         // A pad of a rack: its instrument and its effects, played by its key.
@@ -1295,7 +1296,7 @@ cydaw::base::Result Studio::setReplacerInstrument(const TrackRef& owner, const s
         return cydaw::base::Result::fail(ui::Ls("Piste introuvable", "No such track"));
     const auto container = ownerSlot->graph().editorContainer(head);
     if (!container || container->typeKey != "replacer")
-        return cydaw::base::Result::fail("no Replacer " + cydaw::base::Text(static_cast<juce::int64>(head)) + " on that track");
+        return cydaw::base::Result::fail("no Replacer " + cydaw::base::Text(static_cast<std::int64_t>(head)) + " on that track");
     auto* slot = replacerSlotFor(owner, head, true);
     if (slot == nullptr) {
         ReplacerSlot made;
@@ -1323,7 +1324,7 @@ cydaw::base::Result Studio::setReplacerInstrument(const TrackRef& owner, const s
     if (const auto* effect = engine::effectForType("replacer"))
         if (const auto* generator = engine::effectParameter(*effect, "generator"))
             (void) ownerSlot->graph().editorSetParameter(
-                "node." + cydaw::base::Text(static_cast<juce::int64>(head)) + "." + cydaw::base::Text(std::string(generator->suffix)),
+                "node." + cydaw::base::Text(static_cast<std::int64_t>(head)) + "." + cydaw::base::Text(std::string(generator->suffix)),
                 engine::container::instrumentGenerator);
     dirty_ = true;
     return publishGraph(ref, true);
@@ -1530,7 +1531,7 @@ int Studio::setSynthSettings(const TrackRef& track, const std::vector<std::pair<
         const auto model = synth::modelForType(node.typeKey.toStdString());
         if (model == synth::Model::none)
             continue;
-        const auto prefix = "node." + cydaw::base::Text(static_cast<juce::int64>(node.id)) + "." + cydaw::base::Text(synth::info(model).prefix) + ".";
+        const auto prefix = "node." + cydaw::base::Text(static_cast<std::int64_t>(node.id)) + "." + cydaw::base::Text(synth::info(model).prefix) + ".";
         auto set = 0;
         for (const auto& [key, value] : settings)
             if (const auto index = synth::parameterIndex(model, key); index >= 0)
@@ -2152,7 +2153,7 @@ void Studio::setLaneHeight(const TrackRef& track, const int height)
 {
     if (track.master)
         return;
-    const auto clamped = juce::jlimit(40, 420, height);
+    const auto clamped = cydaw::base::limit(40, 420, height);
     if (track.midi) {
         if (const auto found = midiTracks_.find(track.midiId); found != midiTracks_.end())
             found->second.laneHeight = clamped;
@@ -2287,7 +2288,7 @@ const ParameterLanes* Studio::lanesOf(const TrackRef& track) const
 
 cydaw::base::Text Studio::pluginLaneName(const std::size_t plugin, const std::uint32_t parameter)
 {
-    return "plugin:" + cydaw::base::Text(static_cast<int>(plugin)) + ":" + cydaw::base::Text(static_cast<juce::int64>(parameter));
+    return "plugin:" + cydaw::base::Text(static_cast<int>(plugin)) + ":" + cydaw::base::Text(static_cast<std::int64_t>(parameter));
 }
 
 bool Studio::parsePluginLane(const cydaw::base::Text& lane, std::size_t& plugin, std::uint32_t& parameter)
@@ -2321,7 +2322,7 @@ cydaw::base::Text Studio::pluginParameterName(const TrackRef& track, const cydaw
         for (const auto& item : engine_.pluginAutomationLanes(track.audioIndex))
             if (item.pluginIndex == plugin && item.parameterIndex == parameter && item.parameterName.isNotEmpty())
                 return item.parameterName;
-        return "#" + cydaw::base::Text(static_cast<juce::int64>(parameter) + 1);
+        return "#" + cydaw::base::Text(static_cast<std::int64_t>(parameter) + 1);
     }
     return {};
 }
@@ -2595,7 +2596,7 @@ cydaw::base::Text Studio::nativeBinding(const GraphSlot* slot, const cydaw::base
 {
     if (slot != nullptr)
         if (const auto inner = slot->graph().editorNativeNodeFor(binding))
-            return "node." + cydaw::base::Text(static_cast<juce::int64>(inner->first)) + "." + inner->second;
+            return "node." + cydaw::base::Text(static_cast<std::int64_t>(inner->first)) + "." + inner->second;
     return binding;
 }
 
@@ -3054,8 +3055,8 @@ cydaw::base::Result Studio::setDeviceChannels(app::GraphDocument& graph, const i
     if (in == 0 || out == 0 || graph.editorAudioChannels(out, 0, true) == 0)
         return cydaw::base::Result::fail(ui::Ls("Ce périphérique n'a pas d'entrée et de sortie audio à régler",
                                          "This device has no audio input and output to set"));
-    const auto inKey = "node." + cydaw::base::Text(static_cast<juce::int64>(in));
-    const auto outKey = "node." + cydaw::base::Text(static_cast<juce::int64>(out));
+    const auto inKey = "node." + cydaw::base::Text(static_cast<std::int64_t>(in));
+    const auto outKey = "node." + cydaw::base::Text(static_cast<std::int64_t>(out));
     const auto widths = [&graph, in = in, out = out] {
         return std::make_pair(graph.editorAudioChannels(in, 0, false), graph.editorAudioChannels(out, 0, true));
     };
@@ -3659,7 +3660,7 @@ void Studio::publishSimulation(const bool force)
     auto result = sameDevice ? engine_.updateSimulationParameters(chain) : cydaw::base::Result::fail("new device");
     if (result.failed()) {
         const auto [input, output] = audioEnds(graph);
-        juce::ignoreUnused(input);
+        cydaw::base::ignoreUnused(input);
         const auto mono = output != 0 && graph.editorAudioChannels(output, 0, true) == 1;
         (void) engine_.setSimulationEffect(chain, mono);
     }
@@ -3736,7 +3737,7 @@ cydaw::base::Result Studio::matchSynth(const cydaw::base::File& file, const cyda
     std::unique_ptr<cydaw::audio::AudioFormatReader> reader(formats.createReaderFor(file));
     if (reader == nullptr || reader->sampleRate <= 0.0 || reader->lengthInSamples <= 0)
         return cydaw::base::Result::fail(ui::Ls("Fichier audio illisible : ", "Unreadable audio file: ") + file.getFileName());
-    const auto length = static_cast<int>(std::min<juce::int64>(reader->lengthInSamples, static_cast<juce::int64>(reader->sampleRate * 6.0)));
+    const auto length = static_cast<int>(std::min<std::int64_t>(reader->lengthInSamples, static_cast<std::int64_t>(reader->sampleRate * 6.0)));
     cydaw::audio::SampleBuffer<float> buffer(static_cast<int>(std::max(1u, reader->numChannels)), length);
     reader->read(&buffer, 0, length, 0, true, true);
     std::vector<float> mono(static_cast<std::size_t>(length), 0.0f);
@@ -3963,15 +3964,15 @@ std::optional<TrackRef> Studio::buildReadablePatch(const cydaw::base::Value& jso
     };
     const auto sustainDb = number("sustainDb", -120.0);
     const std::map<cydaw::base::Text, double> settings {
-        { "wavetable.position", lastLoud > 0 ? juce::jlimit(0.0, 1.0, static_cast<double>(peakFrame) / lastLoud) : 0.0 },
+        { "wavetable.position", lastLoud > 0 ? cydaw::base::limit(0.0, 1.0, static_cast<double>(peakFrame) / lastLoud) : 0.0 },
         { "wavetable.detune", 0.0 },
         { "wavetable.level", 0.4 },
         { "wavetable.frequency", static_cast<double>(zone.f0) },
-        { "envelope.attack", juce::jlimit(1.0, 5'000.0, number("attackSeconds", 0.005) * 1'000.0) },
-        { "envelope.decay", juce::jlimit(1.0, 5'000.0, number("decaySeconds", 0.3) * 1'000.0) },
-        { "envelope.sustain", sustainDb <= -100.0 ? 0.0 : juce::jlimit(0.0, 1.0, std::pow(10.0, sustainDb / 20.0)) },
-        { "envelope.release", juce::jlimit(5.0, 5'000.0, number("releaseSeconds", 0.3) * 1'000.0) },
-        { "voiceFilter.cutoff", juce::jlimit(200.0, 18'000.0, number("cutoffHz", 9'000.0) * 2.0) },
+        { "envelope.attack", cydaw::base::limit(1.0, 5'000.0, number("attackSeconds", 0.005) * 1'000.0) },
+        { "envelope.decay", cydaw::base::limit(1.0, 5'000.0, number("decaySeconds", 0.3) * 1'000.0) },
+        { "envelope.sustain", sustainDb <= -100.0 ? 0.0 : cydaw::base::limit(0.0, 1.0, std::pow(10.0, sustainDb / 20.0)) },
+        { "envelope.release", cydaw::base::limit(5.0, 5'000.0, number("releaseSeconds", 0.3) * 1'000.0) },
+        { "voiceFilter.cutoff", cydaw::base::limit(200.0, 18'000.0, number("cutoffHz", 9'000.0) * 2.0) },
     };
     for (const auto& node : graph.editorNodes())
         for (const auto& parameter : node.parameters)
@@ -4652,8 +4653,8 @@ std::optional<Studio::PresetHolder> Studio::devicePresetHolder(const TrackRef& t
     // Asked for by every card the device panel draws: its type alone.
     if (const auto typeKey = slot->graph().editorNodeTypeKey(nodeId); typeKey.isNotEmpty())
         return PresetHolder { "device", typeKey,
-                              cydaw::base::Text(static_cast<juce::int64>(routingKey(track))) + "/device/"
-                                  + cydaw::base::Text(static_cast<juce::int64>(nodeId)) };
+                              cydaw::base::Text(static_cast<std::int64_t>(routingKey(track))) + "/device/"
+                                  + cydaw::base::Text(static_cast<std::int64_t>(nodeId)) };
     return std::nullopt;
 }
 
@@ -4665,7 +4666,7 @@ std::optional<Studio::PresetHolder> Studio::pluginPresetHolder(const TrackRef& t
     if (pluginIndex < 0 || pluginIndex >= static_cast<int>(plugins.size()))
         return std::nullopt;
     return PresetHolder { "plugin", plugins[static_cast<std::size_t>(pluginIndex)].name,
-                          cydaw::base::Text(static_cast<juce::int64>(routingKey(track))) + "/plugin/" + cydaw::base::Text(pluginIndex) };
+                          cydaw::base::Text(static_cast<std::int64_t>(routingKey(track))) + "/plugin/" + cydaw::base::Text(pluginIndex) };
 }
 
 std::optional<Studio::PresetHolder> Studio::chainPresetHolder(const TrackRef& track) const
@@ -4673,7 +4674,7 @@ std::optional<Studio::PresetHolder> Studio::chainPresetHolder(const TrackRef& tr
     if (graphFor(track) == nullptr)
         return std::nullopt;
     const auto role = track.isBus() ? "bus" : track.master ? "master" : track.midi ? "instrument" : "audio";
-    return PresetHolder { "chain", role, cydaw::base::Text(static_cast<juce::int64>(routingKey(track))) + "/chain" };
+    return PresetHolder { "chain", role, cydaw::base::Text(static_cast<std::int64_t>(routingKey(track))) + "/chain" };
 }
 
 cydaw::base::Value Studio::devicePresetState(const TrackRef& track, const std::uint64_t nodeId) const
@@ -4803,7 +4804,7 @@ cydaw::base::Text movedPluginBinding(const cydaw::base::Text& binding, const std
     const auto plugin = static_cast<std::size_t>(rest.upToFirstOccurrenceOf(":", false, false).getLargeIntValue());
     if (plugin != from)
         return binding;
-    return to ? "plugin:" + cydaw::base::Text(static_cast<juce::int64>(*to)) + ":" + rest.fromFirstOccurrenceOf(":", false, false)
+    return to ? "plugin:" + cydaw::base::Text(static_cast<std::int64_t>(*to)) + ":" + rest.fromFirstOccurrenceOf(":", false, false)
               : cydaw::base::Text();
 }
 } // namespace
@@ -4869,7 +4870,7 @@ cydaw::base::Value Studio::pluginPresetState(const TrackRef& track, const int pl
     const auto holder = pluginPresetHolder(track, pluginIndex);
     if (!holder)
         return {};
-    juce::MemoryBlock block;
+    cydaw::base::MemoryBlock block;
     if (engine_.getTrackPluginState(track.audioIndex, static_cast<std::size_t>(pluginIndex), block).failed()
         && engine_.getCachedTrackPluginState(track.audioIndex, static_cast<std::size_t>(pluginIndex), block).failed())
         return {};
@@ -4892,8 +4893,8 @@ bool Studio::applyPluginPreset(const TrackRef& track, const int pluginIndex, con
         error = ui::Ls("Ce préréglage est celui d'un autre plug-in : ", "This preset is another plug-in's: ") + plugin;
         return false;
     }
-    juce::MemoryBlock block;
-    if (!block.fromBase64Encoding(state.getProperty("state", {}).toString())) {
+    cydaw::base::MemoryBlock block;
+    if (!cydaw::base::decodeLegacyStateBytes(state.getProperty("state", {}).toString(), block)) {
         error = ui::Ls("Préréglage illisible", "Unreadable preset");
         return false;
     }
@@ -5248,7 +5249,7 @@ bool Studio::setBatterieKit(const TrackRef& track, const std::uint64_t nodeId, i
     if (!setSamplerMap(track, nodeId, json, true, error))
         return false;
     if (auto* slot = graphFor(track)) {
-        const auto prefix = "node." + cydaw::base::Text(static_cast<juce::int64>(nodeId)) + ".";
+        const auto prefix = "node." + cydaw::base::Text(static_cast<std::int64_t>(nodeId)) + ".";
         (void) slot->graph().editorSetParameter(prefix + "batterie.kit.kit", static_cast<double>(kit));
         // Another kit has other microphones: none of the last kit's stays on
         // the card, each starts where the new kit's map puts it.
@@ -5785,7 +5786,7 @@ bool Studio::moveTrack(const TrackRef& track, const int delta)
     if (key == 0 || found == trackOrder_.end())
         return false;
     const auto from = static_cast<int>(std::distance(trackOrder_.begin(), found));
-    const auto to = juce::jlimit(0, static_cast<int>(trackOrder_.size()) - 1, from + delta);
+    const auto to = cydaw::base::limit(0, static_cast<int>(trackOrder_.size()) - 1, from + delta);
     if (to == from)
         return false;
     trackOrder_.erase(trackOrder_.begin() + from);
@@ -6652,7 +6653,7 @@ void Studio::setModulationAssignment(const TrackRef& track, const cydaw::base::T
                 state.pluginModulationSent.erase(binding);
             }
             assignment.enabled = enabled;
-            assignment.amount = juce::jlimit(-1.0, 1.0, amount);
+            assignment.amount = cydaw::base::limit(-1.0, 1.0, amount);
         }
     state.modulationAssignments = modulation::writeAssignments(assignments);
     if (enabled && state.modulationGraph.getDynamicObject() == nullptr && state.modulationSlot == nullptr)
@@ -6756,10 +6757,10 @@ void Studio::setModulationLfo(const TrackRef& track, const modulation::LfoSettin
         if (binding.isNotEmpty() && std::abs(now - wanted) > 1.0e-9)
             (void) graph.editorSetParameter(binding, wanted);
     };
-    setting(card->rate, card->rateValue, juce::jlimit(0.01, 40.0, settings.rate));
-    setting(card->depth, card->depthValue, juce::jlimit(0.0, 1.0, settings.depth));
-    setting(card->offset, card->offsetValue, juce::jlimit(-1.0, 1.0, settings.offset));
-    setting(card->shape, card->shapeValue, static_cast<double>(juce::jlimit(0, 3, settings.shape)));
+    setting(card->rate, card->rateValue, cydaw::base::limit(0.01, 40.0, settings.rate));
+    setting(card->depth, card->depthValue, cydaw::base::limit(0.0, 1.0, settings.depth));
+    setting(card->offset, card->offsetValue, cydaw::base::limit(-1.0, 1.0, settings.offset));
+    setting(card->shape, card->shapeValue, static_cast<double>(cydaw::base::limit(0, 3, settings.shape)));
 }
 
 double Studio::modulationOutput(const TrackRef& track) const
@@ -6784,7 +6785,7 @@ void Studio::modulateNativeGraph(AudioTrackState& state, cydaw::engine::NativeDs
         if (!assignment.enabled || assignment.binding.startsWith("plugin:"))
             continue;
         const auto range = assignment.maximum - assignment.minimum;
-        const auto value = juce::jlimit(std::min(assignment.minimum, assignment.maximum),
+        const auto value = cydaw::base::limit(std::min(assignment.minimum, assignment.maximum),
                                         std::max(assignment.minimum, assignment.maximum),
                                         assignment.base + state.modulationOutput * assignment.amount * range);
         (void) modulation::applyToNativeGraph(graph, nativeBinding(state.graph.get(), assignment.binding), value);
@@ -6826,12 +6827,12 @@ void Studio::applyTrackModulations()
         // The value graph's cards say what it is now (every node type a
         // modulation graph has, a device's own settings included).
         auto* values = modulationGraphFor(TrackRef { false, index, 0 });
-        const auto output = values != nullptr ? juce::jlimit(-4.0, 4.0, values->graph().evaluateValueOutput(time))
+        const auto output = values != nullptr ? cydaw::base::limit(-4.0, 4.0, values->graph().evaluateValueOutput(time))
                                               : modulation::evaluate(state.modulationGraph, time);
         auto changed = false;
         for (const auto& assignment : assignments) {
             const auto range = assignment.maximum - assignment.minimum;
-            const auto value = juce::jlimit(std::min(assignment.minimum, assignment.maximum),
+            const auto value = cydaw::base::limit(std::min(assignment.minimum, assignment.maximum),
                                             std::max(assignment.minimum, assignment.maximum),
                                             assignment.base + (assignment.enabled ? output * assignment.amount * range : 0.0));
             // A hosted plug-in's parameter: sent to its process when it moved.
@@ -7396,7 +7397,7 @@ cydaw::base::Result Studio::readAudioClipSound(const TrackRef& track, const std:
     std::unique_ptr<cydaw::audio::AudioFormatReader> reader(formats.createReaderFor(clip->sourceFile));
     if (reader == nullptr || reader->lengthInSamples <= 0)
         return cydaw::base::Result::fail(ui::Ls("Fichier illisible : ", "Unreadable file: ") + clip->sourceFile.getFileName());
-    if (reader->lengthInSamples > static_cast<juce::int64>(reader->sampleRate * 60.0 * 30.0))
+    if (reader->lengthInSamples > static_cast<std::int64_t>(reader->sampleRate * 60.0 * 30.0))
         return cydaw::base::Result::fail(ui::Ls("Son trop long (30 minutes au plus)", "Sound too long (30 minutes at most)"));
     const auto frames = static_cast<int>(reader->lengthInSamples);
     const auto count = static_cast<int>(std::clamp(reader->numChannels, 1u, 2u));

@@ -371,10 +371,11 @@ public:
 
     bool load(const cydaw::base::File& file)
     {
-        juce::FileInputStream in(file);
+        cydaw::base::FileInputStream in(file);
         if (!in.openedOk())
             return false;
-        juce::BufferedInputStream buffered(in, 1 << 16);
+        // FileInputStream already uses the standard library buffered file stream.
+        auto& buffered = in;
         char magic[6] {};
         if (buffered.read(magic, 6) != 6 || std::memcmp(magic, "CYVEC1", 6) != 0)
             return false;
@@ -409,7 +410,7 @@ public:
         (void) file.getParentDirectory().createDirectory();
         const auto temporary = file.getSiblingFile(file.getFileName() + ".tmp");
         {
-            juce::FileOutputStream out(temporary, 1 << 16);
+            cydaw::base::FileOutputStream out(temporary, 1 << 16);
             if (!out.openedOk())
                 return false;
             out.setPosition(0);
@@ -624,7 +625,7 @@ public:
             std::vector<std::pair<std::size_t, int>> owners; // (slot, windows)
             {
                 (void) audioFile.deleteFile();
-                juce::FileOutputStream out(audioFile);
+                cydaw::base::FileOutputStream out(audioFile);
                 if (!out.openedOk()) {
                     finish("cannot write " + audioFile.getFullPathName());
                     return;

@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #include "WindowsPluginBridge.h"
@@ -142,14 +143,14 @@ PluginWorkerLaunch WindowsPluginBridge::planWorkerLaunch(
 
 PluginWorkerLaunch WindowsPluginBridge::workerLaunchFor(const cydaw::base::File& pluginFile)
 {
-#if JUCE_LINUX
+#if defined(__linux__)
     const auto windowsVst3 = isWindowsVst3Bundle(pluginFile)
                              && !isLinuxVst3Bundle(pluginFile);
     const auto windowsVst2 = isWindowsVst2Binary(pluginFile)
                              && !isLinuxVst2Binary(pluginFile);
     return planWorkerLaunch(windowsVst3 || windowsVst2, discoverToolchain());
 #else
-    juce::ignoreUnused(pluginFile);
+    cydaw::base::ignoreUnused(pluginFile);
 #endif
     return planWorkerLaunch(false, discoverToolchain());
 }
@@ -157,7 +158,7 @@ PluginWorkerLaunch WindowsPluginBridge::workerLaunchFor(const cydaw::base::File&
 WindowsPluginBridgeStatus WindowsPluginBridge::inspect()
 {
     WindowsPluginBridgeStatus status;
-#if JUCE_LINUX
+#if defined(__linux__)
     status.linuxHost = true;
 #endif
     const auto toolchain = discoverToolchain();
@@ -200,7 +201,7 @@ cydaw::base::File WindowsPluginBridge::findExecutable(const cydaw::base::Text& n
         return direct;
 
     const auto path = cydaw::base::SystemStats::getEnvironmentVariable("PATH", {});
-#if JUCE_WINDOWS
+#if defined(_WIN32)
     const auto separator = ";";
 #else
     const auto separator = ":";
@@ -218,7 +219,7 @@ cydaw::base::File WindowsPluginBridge::nativeWorkerFile()
 {
     return cydaw::base::File::getSpecialLocation(cydaw::base::File::currentExecutableFile)
         .getSiblingFile(
-#if JUCE_WINDOWS
+#if defined(_WIN32)
             "CyDAWPluginWorker.exe"
 #else
             "CyDAWPluginWorker"

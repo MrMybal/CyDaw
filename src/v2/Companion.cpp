@@ -69,7 +69,7 @@ public:
         cydaw::base::Value done;
         // A byte at a time: JUCE's read waits until the whole request is
         // filled, and a line of progress is short.
-        juce::MemoryBlock bytes;
+        cydaw::base::MemoryBlock bytes;
         while (!threadShouldExit()) {
             char byte {};
             if (process_.readProcessOutput(&byte, 1) <= 0) {

@@ -133,6 +133,9 @@ public:
       if (permitted(inputCaps) && permitted(outputCaps))
         sizes.add(n);
     }
+    if (opened)
+      sizes.addIfNotAlreadyThere(getCurrentBufferSizeSamples());
+    sizes.sort();
     return sizes;
   }
   int getDefaultBufferSize() override { return 256; }
@@ -166,6 +169,19 @@ public:
     if (opened) {
       (void)device.description(stream);
       device.close();
+      // Shared OS devices may negotiate a larger physical period (WASAPI,
+      // commonly 480 frames at 48 kHz). Prepare clients for that actual
+      // callback bound instead of splitting it into unequal 256/224 chunks.
+      // An isolated one-block pipeline requires consistent device blocks.
+      for (const auto *direction : {&stream.input, &stream.output})
+        if (direction->periodKnown && direction->periodFrames <= 1048576)
+          config.maxCallbackFrames = std::max(
+              config.maxCallbackFrames, std::size_t(direction->periodFrames));
+      // Miniaudio also has its own nominal callback FIFO. Change its client
+      // period as well; increasing only the adapter capacity leaves bursts
+      // of smaller callbacks inside one physical period.
+      config.periodFrames =
+          static_cast<std::uint32_t>(config.maxCallbackFrames);
     }
     return lastError;
   }
@@ -205,7 +221,7 @@ public:
   bool isPlaying() override { return callback && manager.running(); }
   cydaw::base::Text getLastError() override { return lastError; }
   int getCurrentBufferSizeSamples() override {
-    return int(config.periodFrames);
+    return int(config.maxCallbackFrames);
   }
   double getCurrentSampleRate() override {
     return stream.sampleRate ? stream.sampleRate : config.sampleRate;

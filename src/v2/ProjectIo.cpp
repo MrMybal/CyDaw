@@ -1,3 +1,4 @@
+#include <cydaw/base/LegacyPluginState.h>
 #include <cydaw/base/File.h>
 #include "Studio.h"
 
@@ -179,12 +180,12 @@ float toFloat(const cydaw::base::Value& value)
 
 std::uint32_t colourOf(const cydaw::base::Object& object)
 {
-    return static_cast<std::uint32_t>(static_cast<juce::int64>(object.getProperty(keys::colour)));
+    return static_cast<std::uint32_t>(static_cast<std::int64_t>(object.getProperty(keys::colour)));
 }
 
 std::uint64_t idOf(const cydaw::base::Value& value)
 {
-    return static_cast<std::uint64_t>(static_cast<juce::int64>(value));
+    return static_cast<std::uint64_t>(static_cast<std::int64_t>(value));
 }
 
 Engine::AutomationCurve curveOf(const cydaw::base::Object& point)
@@ -353,12 +354,12 @@ cydaw::base::Value outputsToVar(Studio& studio, const TrackRef& track)
             value->setProperty("preFader", true);
         // The destination's input: its graph node, kept with the graph.
         if (output.input != 0)
-            value->setProperty("input", static_cast<juce::int64>(output.input));
+            value->setProperty("input", static_cast<std::int64_t>(output.input));
         if (output.hardware != 0) {
             // A virtual output of the software, by its id and its name (the
             // software keeps them, not the project: another machine finds it
             // by name).
-            value->setProperty("hardware", static_cast<juce::int64>(output.hardware));
+            value->setProperty("hardware", static_cast<std::int64_t>(output.hardware));
             if (const auto bus = studio.engine().virtualBus(output.hardware))
                 value->setProperty("hardwareName", bus->name);
             if (output.hardwareAfterEffects)
@@ -427,11 +428,11 @@ BusIds mapProjectBuses(const Studio& studio, const cydaw::base::Object& root)
     BusIds ids;
     if (const auto* buses = root.getProperty(keys::virtualBuses).getArray())
         for (const auto& value : *buses) {
-            const auto id = static_cast<std::uint64_t>(std::max<juce::int64>(0, static_cast<juce::int64>(value.getProperty(keys::id, 0))));
+            const auto id = static_cast<std::uint64_t>(std::max<std::int64_t>(0, static_cast<std::int64_t>(value.getProperty(keys::id, 0))));
             if (id == 0)
                 continue;
             const auto direction = static_cast<app::VirtualBusDirection>(
-                juce::jlimit(0, 1, static_cast<int>(value.getProperty(keys::direction, 0))));
+                cydaw::base::limit(0, 1, static_cast<int>(value.getProperty(keys::direction, 0))));
             ids[id] = softwareBus(studio, {}, id, value.getProperty(keys::name, cydaw::base::Value()).toString(), direction);
         }
     return ids;
@@ -485,7 +486,7 @@ cydaw::base::Value localAssignments(Studio& studio, const cydaw::base::Value& sa
                     track = TrackRef { false, static_cast<std::size_t>(position), 0 };
                 if (!track)
                     continue;
-                parts.set(1, cydaw::base::Text(static_cast<juce::int64>(studio.routingKey(*track))));
+                parts.set(1, cydaw::base::Text(static_cast<std::int64_t>(studio.routingKey(*track))));
             }
             auto copy = cydaw::base::Value(item.getDynamicObject() != nullptr ? item.getDynamicObject()->clone().release() : new cydaw::base::Object());
             copy.getDynamicObject()->setProperty("target", parts.joinIntoString("/"));
@@ -514,7 +515,7 @@ void restoreRouting(Studio& studio, const cydaw::base::Object& root, const BusId
         std::vector<TrackOutput> outputs;
         if (const auto* list = saved.getProperty("outputs", cydaw::base::Value()).getArray())
             for (const auto& item : *list)
-                if (const auto hardware = static_cast<juce::int64>(item.getProperty("hardware", 0)); hardware > 0) {
+                if (const auto hardware = static_cast<std::int64_t>(item.getProperty("hardware", 0)); hardware > 0) {
                     TrackOutput output;
                     output.hardware = softwareBus(studio, busIds, static_cast<std::uint64_t>(hardware),
                                                   item.getProperty("hardwareName", cydaw::base::Value()).toString(),
@@ -529,7 +530,7 @@ void restoreRouting(Studio& studio, const cydaw::base::Object& root, const BusId
                     TrackOutput output;
                     output.destination = *key;
                     output.gainDb = static_cast<float>(static_cast<double>(item.getProperty("gainDb", 0.0)));
-                    output.input = *key != 0 ? static_cast<std::uint64_t>(static_cast<juce::int64>(item.getProperty("input", 0))) : 0;
+                    output.input = *key != 0 ? static_cast<std::uint64_t>(static_cast<std::int64_t>(item.getProperty("input", 0))) : 0;
                     output.preFader = static_cast<bool>(item.getProperty("preFader", false));
                     outputs.push_back(output);
                 }
@@ -758,7 +759,7 @@ cydaw::base::Value stretchMarkersToVar(const std::vector<Engine::StretchMarker>&
     for (const auto& marker : markers) {
         auto value = makeObject();
         if (withIds)
-            value->setProperty(keys::id, static_cast<juce::int64>(marker.id));
+            value->setProperty(keys::id, static_cast<std::int64_t>(marker.id));
         value->setProperty(keys::source, marker.sourceSeconds);
         value->setProperty(keys::timeline, marker.timelineSeconds);
         values.add(cydaw::base::Value(value.get()));
@@ -771,13 +772,13 @@ cydaw::base::Value eventsToVar(const std::vector<Engine::AudioEvent>& events, co
     cydaw::base::Array<cydaw::base::Value> values;
     for (const auto& event : events) {
         auto value = makeObject();
-        value->setProperty(keys::id, static_cast<juce::int64>(event.id));
+        value->setProperty(keys::id, static_cast<std::int64_t>(event.id));
         value->setProperty(keys::name, event.name);
         value->setProperty(keys::start, event.startSeconds);
         value->setProperty(keys::offset, event.sourceOffsetSeconds);
         value->setProperty(keys::duration, event.durationSeconds);
         value->setProperty(keys::sourceDuration, event.sourceDurationSeconds);
-        value->setProperty(keys::colour, static_cast<juce::int64>(event.colour));
+        value->setProperty(keys::colour, static_cast<std::int64_t>(event.colour));
         value->setProperty(keys::source, projectAssetPath(event.sourceFile, projectFile));
         value->setProperty(keys::fadeIn, event.fadeInSeconds);
         value->setProperty(keys::fadeOut, event.fadeOutSeconds);
@@ -817,9 +818,9 @@ cydaw::base::Value audioClipToVar(const Engine::AudioClip& clip, const cydaw::ba
         value->setProperty(keys::clipLanes, clipLanesToVar(clip.lanes));
     value->setProperty(keys::fadeIn, clip.fadeInSeconds);
     value->setProperty(keys::fadeOut, clip.fadeOutSeconds);
-    value->setProperty(keys::colour, static_cast<juce::int64>(clip.colour));
+    value->setProperty(keys::colour, static_cast<std::int64_t>(clip.colour));
     value->setProperty(keys::source, projectAssetPath(clip.sourceFile, projectFile));
-    value->setProperty(keys::activeTake, static_cast<juce::int64>(clip.activeTakeIndex));
+    value->setProperty(keys::activeTake, static_cast<std::int64_t>(clip.activeTakeIndex));
     cydaw::base::Array<cydaw::base::Value> takes;
     for (const auto& take : clip.takes) {
         auto takeValue = makeObject();
@@ -839,7 +840,7 @@ cydaw::base::Value audioClipToVar(const Engine::AudioClip& clip, const cydaw::ba
             auto partValue = makeObject();
             partValue->setProperty(keys::start, part.startSeconds);
             partValue->setProperty("end", part.endSeconds);
-            partValue->setProperty("take", static_cast<juce::int64>(part.take));
+            partValue->setProperty("take", static_cast<std::int64_t>(part.take));
             comp.add(cydaw::base::Value(partValue.get()));
         }
         value->setProperty("comp", comp);
@@ -857,7 +858,7 @@ cydaw::base::Value audioClipToVar(const Engine::AudioClip& clip, const cydaw::ba
             versions.add(cydaw::base::Value(versionValue.get()));
         }
         value->setProperty("versions", versions);
-        value->setProperty("version", static_cast<juce::int64>(clip.version));
+        value->setProperty("version", static_cast<std::int64_t>(clip.version));
     }
     return cydaw::base::Value(value.get());
 }
@@ -871,7 +872,7 @@ cydaw::base::Value launcherClipToVar(const Engine::LauncherClip& clip, const cyd
     value->setProperty(keys::offset, clip.sourceOffsetSeconds);
     value->setProperty(keys::duration, clip.durationSeconds);
     value->setProperty(keys::loop, clip.looping);
-    value->setProperty(keys::colour, static_cast<juce::int64>(clip.colour));
+    value->setProperty(keys::colour, static_cast<std::int64_t>(clip.colour));
     value->setProperty(keys::playStart, clip.playStartSeconds);
     value->setProperty(keys::playEnd, clip.playEndSeconds);
     value->setProperty(keys::loopStart, clip.loopStartSeconds);
@@ -892,7 +893,7 @@ cydaw::base::Value pluginsToVar(Engine& engine, const std::size_t trackIndex, co
     for (std::size_t pluginIndex = 0; pluginIndex < info.plugins.size(); ++pluginIndex) {
         auto value = makeObject();
         value->setProperty(keys::file, projectAssetPath(info.plugins[pluginIndex].file, projectFile));
-        juce::MemoryBlock pluginState;
+        cydaw::base::MemoryBlock pluginState;
         const auto stateResult = refreshPluginState
                                      ? engine.getTrackPluginState(trackIndex, pluginIndex, pluginState)
                                      : engine.getCachedTrackPluginState(trackIndex, pluginIndex, pluginState);
@@ -903,7 +904,7 @@ cydaw::base::Value pluginsToVar(Engine& engine, const std::size_t trackIndex, co
             if (lane.pluginIndex != pluginIndex)
                 continue;
             auto laneValue = makeObject();
-            laneValue->setProperty(keys::parameter, static_cast<juce::int64>(lane.parameterIndex));
+            laneValue->setProperty(keys::parameter, static_cast<std::int64_t>(lane.parameterIndex));
             laneValue->setProperty(keys::name, lane.parameterName);
             cydaw::base::Array<cydaw::base::Value> points;
             points.ensureStorageAllocated(static_cast<int>(lane.points.size()));
@@ -1031,7 +1032,7 @@ bool readEvents(const cydaw::base::Array<cydaw::base::Value>& saved, const cydaw
         restored.sourceTempoBpm = number(*event, keys::sourceTempo);
         restored.gainDb = event->hasProperty(keys::gainDb) ? toFloat(event->getProperty(keys::gainDb)) : 0.0f;
         restored.stretchMode = static_cast<Engine::StretchMode>(
-            juce::jlimit(0, Engine::stretchModeCount - 1, static_cast<int>(event->getProperty(keys::stretchMode))));
+            cydaw::base::limit(0, Engine::stretchModeCount - 1, static_cast<int>(event->getProperty(keys::stretchMode))));
         restored.pitchSemitones = numberOr(*event, "pitch", 0.0);
         restored.lanes = readClipLanes(*event);
         if (const auto* markers = event->getProperty(keys::stretchMarkers).getArray())
@@ -1075,7 +1076,7 @@ cydaw::base::Value readLauncherActions(const cydaw::base::Value& saved)
     struct Action {
         double time {};
         int type {};
-        juce::int64 track {};
+        std::int64_t track {};
         int scene {};
     };
     std::vector<Action> actions;
@@ -1083,8 +1084,8 @@ cydaw::base::Value readLauncherActions(const cydaw::base::Value& saved)
         for (const auto& value : *values)
             if (const auto* action = value.getDynamicObject())
                 actions.push_back({ std::max(0.0, number(*action, keys::time)),
-                                    juce::jlimit(0, 2, static_cast<int>(action->getProperty(keys::type))),
-                                    std::max<juce::int64>(0, static_cast<juce::int64>(action->getProperty(keys::track))),
+                                    cydaw::base::limit(0, 2, static_cast<int>(action->getProperty(keys::type))),
+                                    std::max<std::int64_t>(0, static_cast<std::int64_t>(action->getProperty(keys::track))),
                                     static_cast<int>(action->getProperty(keys::scene)) });
     std::stable_sort(actions.begin(), actions.end(),
                      [](const Action& first, const Action& second) { return first.time < second.time; });
@@ -1119,7 +1120,7 @@ void restoreAudioClip(Engine& engine, const std::size_t trackIndex, const cydaw:
     if (clipId != 0) {
         (void) engine.updateAudioClip(trackIndex, clipId, startSeconds, offsetSeconds, durationSeconds, fadeInSeconds,
                                       fadeOutSeconds, numberOr(clip, keys::sourceDuration, durationSeconds));
-        const auto stretchMode = juce::jlimit(0, Engine::stretchModeCount - 1, clip.hasProperty(keys::stretchMode)
+        const auto stretchMode = cydaw::base::limit(0, Engine::stretchModeCount - 1, clip.hasProperty(keys::stretchMode)
                                                         ? static_cast<int>(clip.getProperty(keys::stretchMode))
                                                         : 0);
         (void) engine.setAudioClipStretchSettings(trackIndex, clipId, numberOr(clip, keys::sourceTempo, 0.0),
@@ -1151,9 +1152,9 @@ void restoreAudioClip(Engine& engine, const std::size_t trackIndex, const cydaw:
             takes.push_back({ take->getProperty(keys::name).toString(), takeFile, 0.0, numberOr(*take, "shift", 0.0) });
         }
         if (allTakesAvailable && !takes.empty()) {
-            const auto activeTake = static_cast<std::size_t>(juce::jlimit<juce::int64>(
-                0, static_cast<juce::int64>(takes.size() - 1),
-                static_cast<juce::int64>(clip.getProperty(keys::activeTake))));
+            const auto activeTake = static_cast<std::size_t>(cydaw::base::limit<std::int64_t>(
+                0, static_cast<std::int64_t>(takes.size() - 1),
+                static_cast<std::int64_t>(clip.getProperty(keys::activeTake))));
             if (const auto replaced = engine.replaceAudioTakes(trackIndex, clipId, std::move(takes), activeTake);
                 replaced.failed())
                 warn(warnings, "Audio takes could not be restored: " + replaced.getErrorMessage());
@@ -1168,7 +1169,7 @@ void restoreAudioClip(Engine& engine, const std::size_t trackIndex, const cydaw:
         for (const auto& part : *comp)
             if (const auto* object = part.getDynamicObject())
                 parts.push_back({ number(*object, keys::start), numberOr(*object, "end", 0.0),
-                                  static_cast<std::size_t>(std::max<juce::int64>(0, static_cast<juce::int64>(object->getProperty("take")))) });
+                                  static_cast<std::size_t>(std::max<std::int64_t>(0, static_cast<std::int64_t>(object->getProperty("take")))) });
         (void) engine.setAudioClipComp(trackIndex, clipId, std::move(parts));
     }
     if (const auto* versions = clip.getProperty("versions").getArray()) {
@@ -1183,7 +1184,7 @@ void restoreAudioClip(Engine& engine, const std::size_t trackIndex, const cydaw:
                                     numberOr(*object, "sourceLength", 0.0) });
             }
         engine.restoreAudioClipHistory(trackIndex, clipId, std::move(history),
-                                       static_cast<std::size_t>(std::max<juce::int64>(0, static_cast<juce::int64>(clip.getProperty("version")))));
+                                       static_cast<std::size_t>(std::max<std::int64_t>(0, static_cast<std::int64_t>(clip.getProperty("version")))));
     }
 
     // A clip whose sounds were all removed stays empty, not its source again.
@@ -1234,8 +1235,8 @@ void restorePlugin(Engine& engine, const std::size_t trackIndex, const cydaw::ba
         return;
     }
     if (stateBase64.isNotEmpty()) {
-        juce::MemoryBlock pluginState;
-        if (pluginState.fromBase64Encoding(stateBase64))
+        cydaw::base::MemoryBlock pluginState;
+        if (cydaw::base::decodeLegacyStateBytes(stateBase64, pluginState))
             if (const auto restored = engine.setTrackPluginState(trackIndex, pluginIndex, pluginState);
                 restored.failed())
                 warn(warnings, "Plugin state could not be restored (" + pluginFile.getFileName()
@@ -1248,7 +1249,7 @@ void restorePlugin(Engine& engine, const std::size_t trackIndex, const cydaw::ba
         const auto* lane = laneValue.getDynamicObject();
         if (lane == nullptr)
             continue;
-        const auto parameterIndex = static_cast<std::uint32_t>(static_cast<juce::int64>(lane->getProperty(keys::parameter)));
+        const auto parameterIndex = static_cast<std::uint32_t>(static_cast<std::int64_t>(lane->getProperty(keys::parameter)));
         const auto parameterName = lane->getProperty(keys::name).toString();
         const auto* points = lane->getProperty(keys::points).getArray();
         if (points == nullptr)
@@ -1314,7 +1315,7 @@ void restoreLauncherClip(Engine& engine, const std::size_t trackIndex, const cyd
 struct SavedAudioTrack {
     cydaw::base::Text audioPath;
     cydaw::base::Text name;
-    juce::int64 colour {};
+    std::int64_t colour {};
     int channels { 2 };
     float gainDb {};
     float pan {};
@@ -1344,7 +1345,7 @@ SavedAudioTrack readSavedTrack(const cydaw::base::Object& track)
     SavedAudioTrack saved;
     saved.audioPath = track.getProperty(keys::audioFile).toString();
     saved.name = track.getProperty(keys::name).toString();
-    saved.colour = static_cast<juce::int64>(track.getProperty(keys::colour));
+    saved.colour = static_cast<std::int64_t>(track.getProperty(keys::colour));
     saved.channels = track.hasProperty(keys::audioChannels) ? static_cast<int>(track.getProperty(keys::audioChannels)) : 2;
     saved.gainDb = toFloat(track.getProperty(keys::gainDb));
     saved.pan = toFloat(track.getProperty(keys::pan));
@@ -1411,7 +1412,7 @@ std::optional<std::size_t> restoreAudioTrack(Studio& studio, const SavedAudioTra
             state.name = "Audio " + cydaw::base::Text(static_cast<int>(trackIndex + 1));
         if (saved.colour != 0)
             state.colour = static_cast<juce::uint32>(saved.colour);
-        state.audioChannels = juce::jlimit(1, 8, saved.channels > 0 ? saved.channels : 2);
+        state.audioChannels = cydaw::base::limit(1, 8, saved.channels > 0 ? saved.channels : 2);
         // Its format before its clips: their decks are made in it once.
         if (state.audioChannels != engine.trackChannelCount(trackIndex))
             if (const auto formatted = engine.setTrackChannelCount(trackIndex, state.audioChannels); formatted.failed())
@@ -1504,13 +1505,13 @@ std::vector<app::VirtualAudioBus> readBuses(Studio& studio, const cydaw::base::V
             if (saved == nullptr)
                 continue;
             app::VirtualAudioBus bus;
-            bus.id = static_cast<std::uint64_t>(std::max<juce::int64>(0, static_cast<juce::int64>(saved->getProperty(keys::id))));
+            bus.id = static_cast<std::uint64_t>(std::max<std::int64_t>(0, static_cast<std::int64_t>(saved->getProperty(keys::id))));
             if (bus.id == 0)
                 continue;
             bus.name = saved->getProperty(keys::name).toString();
             bus.direction = static_cast<app::VirtualBusDirection>(
-                juce::jlimit(0, 1, static_cast<int>(saved->getProperty(keys::direction))));
-            bus.channels = juce::jlimit(1, app::VirtualAudioBus::maximumChannels, static_cast<int>(saved->getProperty(keys::channels)));
+                cydaw::base::limit(0, 1, static_cast<int>(saved->getProperty(keys::direction))));
+            bus.channels = cydaw::base::limit(1, app::VirtualAudioBus::maximumChannels, static_cast<int>(saved->getProperty(keys::channels)));
             if (const auto* more = saved->getProperty("moreChannels").getArray())
                 for (int index = 0; index < std::min(more->size(), static_cast<int>(bus.moreChannels.size())); ++index)
                     bus.moreChannels[static_cast<std::size_t>(index)] = std::max(0, static_cast<int>((*more)[index]));
@@ -1519,7 +1520,7 @@ std::vector<app::VirtualAudioBus> readBuses(Studio& studio, const cydaw::base::V
             bus.physicalChannelB = std::max(0, static_cast<int>(saved->getProperty(keys::physicalB)));
             bus.destinationChannelA = std::max(0, static_cast<int>(saved->getProperty(keys::destinationA)));
             bus.destinationChannelB = std::max(0, static_cast<int>(saved->getProperty(keys::destinationB)));
-            bus.gainDb = juce::jlimit(-60.0f, 24.0f, toFloat(saved->getProperty(keys::gainDb)));
+            bus.gainDb = cydaw::base::limit(-60.0f, 24.0f, toFloat(saved->getProperty(keys::gainDb)));
             bus.muted = static_cast<bool>(saved->getProperty(keys::muted));
             bus.monitor = static_cast<bool>(saved->getProperty(keys::monitor));
             bus.exposeToSystem = static_cast<bool>(saved->getProperty(keys::exposeToSystem));
@@ -1543,7 +1544,7 @@ cydaw::base::Value busesToVar(Studio& studio, const std::map<std::uint64_t, cyda
     cydaw::base::Array<cydaw::base::Value> buses;
     for (const auto& bus : engine.virtualBuses()) {
         auto value = makeObject();
-        value->setProperty(keys::id, static_cast<juce::int64>(bus.id));
+        value->setProperty(keys::id, static_cast<std::int64_t>(bus.id));
         value->setProperty(keys::name, bus.name);
         value->setProperty(keys::direction, static_cast<int>(bus.direction));
         value->setProperty(keys::channels, bus.channels);
@@ -1655,7 +1656,7 @@ std::uint64_t restoreMidiTrack(Studio& studio, const cydaw::base::Object& saved,
     if (const auto savedColour = colourOf(saved); savedColour != 0)
         state.colour = savedColour;
     if (saved.hasProperty(keys::laneHeight))
-        state.laneHeight = juce::jlimit(40, 420, static_cast<int>(saved.getProperty(keys::laneHeight)));
+        state.laneHeight = cydaw::base::limit(40, 420, static_cast<int>(saved.getProperty(keys::laneHeight)));
     state.automationVisible = static_cast<bool>(saved.getProperty(keys::automationVisible));
     readParameterLanes(saved, state.parameterLanes);
     if (const auto pads = saved.getProperty("rackPads"); pads.isArray())
@@ -1698,9 +1699,9 @@ void restoreInterfaceState(Studio& studio, const cydaw::base::Object& root)
     const auto integerOr = [&root](const cydaw::base::Identifier& property, const int fallback) {
         return root.hasProperty(property) ? static_cast<int>(root.getProperty(property)) : fallback;
     };
-    ui.setProperty(keys::arrangementSnapMode, juce::jlimit(1, 5, integerOr(keys::arrangementSnapMode, 4)));
-    ui.setProperty(keys::arrangementSnapType, juce::jlimit(1, 3, integerOr(keys::arrangementSnapType, 1)));
-    ui.setProperty(keys::arrangementTool, juce::jlimit(1, 5, integerOr(keys::arrangementTool, 1)));
+    ui.setProperty(keys::arrangementSnapMode, cydaw::base::limit(1, 5, integerOr(keys::arrangementSnapMode, 4)));
+    ui.setProperty(keys::arrangementSnapType, cydaw::base::limit(1, 3, integerOr(keys::arrangementSnapType, 1)));
+    ui.setProperty(keys::arrangementTool, cydaw::base::limit(1, 5, integerOr(keys::arrangementTool, 1)));
     ui.setProperty(keys::launcherActionReplay, root.hasProperty(keys::launcherActionReplay)
                                                    && static_cast<bool>(root.getProperty(keys::launcherActionReplay)));
     ui.setProperty(keys::launcherActions, readLauncherActions(root.getProperty(keys::launcherActions)));
@@ -1776,7 +1777,7 @@ cydaw::base::Value buildDocument(Studio& studio, const cydaw::base::File& projec
         track->setProperty(keys::name, state != nullptr && state->name.isNotEmpty()
                                            ? state->name
                                            : "Audio " + cydaw::base::Text(static_cast<int>(index + 1)));
-        track->setProperty(keys::colour, static_cast<juce::int64>(
+        track->setProperty(keys::colour, static_cast<std::int64_t>(
                                              state != nullptr ? state->colour
                                                               : studio.trackColour(TrackRef { false, index, 0 })));
         track->setProperty(keys::audioChannels, state != nullptr ? state->audioChannels : 2);
@@ -1785,7 +1786,7 @@ cydaw::base::Value buildDocument(Studio& studio, const cydaw::base::File& projec
         track->setProperty(keys::mute, info.muted);
         track->setProperty(keys::solo, info.solo);
         track->setProperty(keys::armed, info.armed);
-        track->setProperty(keys::inputBusId, static_cast<juce::int64>(info.inputBusId));
+        track->setProperty(keys::inputBusId, static_cast<std::int64_t>(info.inputBusId));
         if (const auto bus = engine.virtualBus(info.inputBusId))
             track->setProperty("inputBusName", bus->name);
         if (!engine.trackMixState(index).inputAfterEffects)
@@ -1870,7 +1871,7 @@ cydaw::base::Value buildDocument(Studio& studio, const cydaw::base::File& projec
                 track->setProperty("midiOutput", output);
         }
         // CyDAW 2's own keys; CyDAW 1 ignores them.
-        track->setProperty(keys::colour, static_cast<juce::int64>(
+        track->setProperty(keys::colour, static_cast<std::int64_t>(
                                              state != nullptr ? state->colour
                                                               : studio.trackColour(TrackRef { true, 0, info.id })));
         track->setProperty(keys::laneHeight, state != nullptr ? state->laneHeight : 88);
@@ -1898,7 +1899,7 @@ cydaw::base::Value buildDocument(Studio& studio, const cydaw::base::File& projec
             clip->setProperty(keys::playEndBeats, clipInfo.playEndBeats);
             clip->setProperty(keys::loopStartBeats, clipInfo.loopStartBeats);
             clip->setProperty(keys::loopEndBeats, clipInfo.loopEndBeats);
-            clip->setProperty(keys::colour, static_cast<juce::int64>(clipInfo.colour));
+            clip->setProperty(keys::colour, static_cast<std::int64_t>(clipInfo.colour));
             if (clipInfo.launcherScene >= 0)
                 clip->setProperty(keys::launcherScene, clipInfo.launcherScene);
             clip->setProperty(keys::notes, midiNotesToVar(clipInfo.notes));
@@ -1992,7 +1993,7 @@ cydaw::base::Value buildDocument(Studio& studio, const cydaw::base::File& projec
             auto* entry = new cydaw::base::Object();
             entry->setProperty("scene", scene);
             entry->setProperty("name", clip.name);
-            entry->setProperty("colour", static_cast<juce::int64>(clip.colour));
+            entry->setProperty("colour", static_cast<std::int64_t>(clip.colour));
             entry->setProperty("lengthBeats", clip.lengthBeats);
             entry->setProperty("looping", clip.looping);
             cydaw::base::Array<cydaw::base::Value> lanes;
@@ -2062,7 +2063,7 @@ void restoreAudioEntry(Studio& studio, const cydaw::base::Object& track, const c
         return;
     if (track.hasProperty(keys::inputBusId)) {
         const auto saved = static_cast<std::uint64_t>(
-            std::max<juce::int64>(0, static_cast<juce::int64>(track.getProperty(keys::inputBusId))));
+            std::max<std::int64_t>(0, static_cast<std::int64_t>(track.getProperty(keys::inputBusId))));
         const auto bus = softwareBus(studio, busIds, saved, track.getProperty("inputBusName").toString(),
                                      app::VirtualBusDirection::input);
         if (bus != 0)
@@ -2076,7 +2077,7 @@ void restoreAudioEntry(Studio& studio, const cydaw::base::Object& track, const c
     auto& state = studio.audioStates()[*index];
     state.automationVisible = static_cast<bool>(track.getProperty(keys::automationVisible));
     state.laneHeight = track.hasProperty(keys::laneHeight)
-                           ? juce::jlimit(40, 420, static_cast<int>(track.getProperty(keys::laneHeight)))
+                           ? cydaw::base::limit(40, 420, static_cast<int>(track.getProperty(keys::laneHeight)))
                            : state.automationVisible ? 172 : 88;
 }
 
@@ -2136,7 +2137,7 @@ DocumentLoad::~DocumentLoad() = default;
 float DocumentLoad::progress() const noexcept
 {
     return state_->stage == State::Stage::done ? 1.0f
-                                               : juce::jlimit(0.0f, 1.0f, static_cast<float>(state_->finished)
+                                               : cydaw::base::limit(0.0f, 1.0f, static_cast<float>(state_->finished)
                                                                               / static_cast<float>(std::max(1, state_->total)));
 }
 
@@ -2210,7 +2211,7 @@ bool DocumentLoad::next()
         engine.setLaunchQuantization(
             root.hasProperty(keys::launchQuantization)
                 ? static_cast<Engine::LaunchQuantization>(
-                      juce::jlimit(0, 4, static_cast<int>(root.getProperty(keys::launchQuantization))))
+                      cydaw::base::limit(0, 4, static_cast<int>(root.getProperty(keys::launchQuantization))))
                 : Engine::LaunchQuantization::oneBar);
         // The master's launcher clips.
         {
@@ -2222,7 +2223,7 @@ bool DocumentLoad::next()
                         continue;
                     MasterClip clip;
                     clip.name = entry.getProperty("name", cydaw::base::Text()).toString();
-                    clip.colour = static_cast<juce::uint32>(static_cast<juce::int64>(entry.getProperty("colour", static_cast<juce::int64>(0xffffb84d))));
+                    clip.colour = static_cast<juce::uint32>(static_cast<std::int64_t>(entry.getProperty("colour", static_cast<std::int64_t>(0xffffb84d))));
                     clip.lengthBeats = std::clamp(static_cast<double>(entry.getProperty("lengthBeats", 16.0)), 0.25, 4'096.0);
                     clip.looping = static_cast<bool>(entry.getProperty("looping", true));
                     if (const auto* lanes = entry.getProperty("lanes", cydaw::base::Value()).getArray())

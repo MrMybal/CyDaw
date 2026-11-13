@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include <cydaw/audio/Sources.h>
 #include <cydaw/base/Process.h>
 #include <cydaw/base/File.h>
@@ -8,8 +9,6 @@
 
 #include <cydaw/plugins/PluginIsolation.h>
 
-#include <juce_audio_basics/juce_audio_basics.h>
-#include <juce_core/juce_core.h>
 
 #include <cydaw/plugins/WorkerWake.h>
 #include <atomic>
@@ -59,10 +58,10 @@ public:
     void stop();
     void pollWorkerHealth();
     void terminateWorkerForTest();
-    [[nodiscard]] cydaw::base::Result getState(juce::MemoryBlock& destination);
+    [[nodiscard]] cydaw::base::Result getState(cydaw::base::MemoryBlock& destination);
     [[nodiscard]] cydaw::base::Result getCachedState(
-        juce::MemoryBlock& destination) const;
-    [[nodiscard]] cydaw::base::Result setState(const juce::MemoryBlock& state);
+        cydaw::base::MemoryBlock& destination) const;
+    [[nodiscard]] cydaw::base::Result setState(const cydaw::base::MemoryBlock& state);
     [[nodiscard]] cydaw::base::Result refreshParameters(std::vector<ParameterSnapshot>& destination);
     [[nodiscard]] cydaw::base::Result setParameter(std::uint32_t index, float normalisedValue);
     // The plug-in's own programs (its factory presets, as a host lists them)
@@ -120,7 +119,7 @@ private:
     std::uint64_t submittedAtCallback_ {};
     std::uint64_t nextCommandSequence_ { 1 };
     std::atomic<int> pipelineLatencySamples_ {};
-    juce::MemoryBlock cachedState_;
+    cydaw::base::MemoryBlock cachedState_;
     // A parameter set since the state was last read: read again once the
     // gesture rests (pollWorkerHealth), not at every notch.
     double stateStaleSince_ {};
@@ -137,7 +136,8 @@ private:
     std::uint64_t lastHeartbeat_ {};
     double heartbeatSince_ {};
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(IsolatedPluginHost)
+    IsolatedPluginHost(const IsolatedPluginHost&) = delete;
+    IsolatedPluginHost& operator=(const IsolatedPluginHost&) = delete;
 };
 
 } // namespace cydaw::app

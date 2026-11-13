@@ -163,7 +163,7 @@ cydaw::base::Result CinemaVideo::extractAudio(const cydaw::base::File& source,co
     if(opened.failed())return opened;
     if(input.index<0)return cydaw::base::Result::ok();
     if(hasAudio)*hasAudio=true;
-    juce::FileOutputStream out(wav);if(out.failedToOpen())return out.getStatus();
+    cydaw::base::FileOutputStream out(wav);if(out.failedToOpen())return out.getStatus();
     out.write("RIFF",4);out.writeInt(0);out.write("WAVEfmt ",8);out.writeInt(16);out.writeShort(1);out.writeShort(2);
     out.writeInt(48000);out.writeInt(192000);out.writeShort(4);out.writeShort(16);out.write("data",4);out.writeInt(0);
     SwrContext* converter=nullptr;AVChannelLayout sourceLayout{};

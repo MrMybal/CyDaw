@@ -1,3 +1,4 @@
+#include <cydaw/base/Utilities.h>
 #include "IsolatedPluginHost.h"
 
 #include <algorithm>
@@ -19,8 +20,8 @@ int main(const int argc, char* argv[])
         std::cerr << "FAILED: worker or isolated test-plugin argument is missing\n";
         return 1;
     }
-    const juce::File worker(juce::String::fromUTF8(argv[1]));
-    const juce::File pluginBinary(juce::String::fromUTF8(argv[2]));
+    const cydaw::base::File worker(cydaw::base::Text::fromUTF8(argv[1]));
+    const cydaw::base::File pluginBinary(cydaw::base::Text::fromUTF8(argv[2]));
     auto pluginBundle = pluginBinary;
     if (pluginBinary.getParentDirectory().getFileName().containsIgnoreCase("x86_64"))
         pluginBundle = pluginBinary.getParentDirectory().getParentDirectory().getParentDirectory();
@@ -33,7 +34,7 @@ int main(const int argc, char* argv[])
     passed = expect(started.wasOk(), "start isolated passthrough worker") && passed;
     passed = expect(host.isRunning(), "worker reports running") && passed;
 
-    juce::AudioBuffer<float> buffer(2, 64);
+    cydaw::audio::SampleBuffer<float> buffer(2, 64);
     auto received = false;
     for (int attempt = 0; attempt < 100 && !received; ++attempt) {
         buffer.clear();
@@ -42,7 +43,7 @@ int main(const int argc, char* argv[])
                 buffer.setSample(channel, sample, 0.25f);
         received = host.processBlock(buffer, 0, buffer.getNumSamples());
         if (!received)
-            juce::Thread::sleep(2);
+            cydaw::base::Thread::sleep(2);
     }
     passed = expect(received, "receive processed block from worker") && passed;
     if (received) {
@@ -55,7 +56,7 @@ int main(const int argc, char* argv[])
 
     host.terminateWorkerForTest();
     for (int attempt = 0; attempt < 100 && host.isRunning(); ++attempt) {
-        juce::Thread::sleep(2);
+        cydaw::base::Thread::sleep(2);
         host.pollWorkerHealth();
     }
     passed = expect(!host.isRunning(), "worker crash activates bypass") && passed;
@@ -69,8 +70,8 @@ int main(const int argc, char* argv[])
                     "stopped worker returns safety bypass") && passed;
     passed = expect(!host.isRunning(), "worker stops cleanly") && passed;
 
-#if JUCE_WINDOWS && !JUCE_PLUGINHOST_VST
-    const auto disabledVst2Plugin = juce::File::getSpecialLocation(juce::File::tempDirectory)
+#if defined(_WIN32) && !JUCE_PLUGINHOST_VST
+    const auto disabledVst2Plugin = cydaw::base::File::getSpecialLocation(cydaw::base::File::tempDirectory)
                                         .getNonexistentChildFile("cydaw-disabled-vst2", ".dll", false);
     {
         auto output = disabledVst2Plugin.createOutputStream();
@@ -111,10 +112,10 @@ int main(const int argc, char* argv[])
     passed = expect(gainParameter != parameters.end()
                         && std::abs(gainParameter->value - 0.5f) < 0.001f,
                     "plugin parameter metadata and value") && passed;
-    juce::MemoryBlock initialState;
+    cydaw::base::MemoryBlock initialState;
     passed = expect(vstHost.getState(initialState).wasOk() && !initialState.isEmpty(),
                     "retrieve plugin binary state") && passed;
-    juce::MemoryBlock cachedState;
+    cydaw::base::MemoryBlock cachedState;
     passed = expect(vstHost.getCachedState(cachedState).wasOk()
                         && cachedState == initialState,
                     "reuse plugin state for non-blocking project autosave")
@@ -135,7 +136,7 @@ int main(const int argc, char* argv[])
                 buffer.setSample(channel, sample, 0.4f);
         vstReceived = vstHost.processBlock(buffer, 0, buffer.getNumSamples());
         if (!vstReceived)
-            juce::Thread::sleep(2);
+            cydaw::base::Thread::sleep(2);
     }
     passed = expect(vstReceived, "receive audio processed by plugin worker") && passed;
     if (vstReceived)
@@ -153,7 +154,7 @@ int main(const int argc, char* argv[])
         if (vstHost.processBlock(buffer, 0, buffer.getNumSamples()))
             automatedBlockReceived = std::abs(buffer.getSample(0, 12) - 0.3f) < 0.00001f;
         if (!automatedBlockReceived)
-            juce::Thread::sleep(2);
+            cydaw::base::Thread::sleep(2);
     }
     passed = expect(automatedBlockReceived,
                     "non-blocking realtime parameter mailbox reaches plugin worker") && passed;

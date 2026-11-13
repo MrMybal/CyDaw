@@ -139,7 +139,7 @@ cydaw::base::Text Sha256::hex()
 
 cydaw::base::Text Sha256::ofFile(const cydaw::base::File& file, const std::atomic<bool>* stop)
 {
-    juce::FileInputStream in(file);
+    cydaw::base::FileInputStream in(file);
     if (!in.openedOk())
         return {};
     Sha256 hash;
@@ -493,7 +493,7 @@ private:
                 const auto resumed = status == 206 && have > 0;
                 if (!resumed)
                     have = 0;
-                juce::FileOutputStream out(partial);
+                cydaw::base::FileOutputStream out(partial);
                 if (!out.openedOk()) {
                     error = "cannot write " + partial.getFullPathName();
                     return false;
