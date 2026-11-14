@@ -1,4 +1,7 @@
+#include "SynthParts.h"
 #include <cydaw/engine/PrismSynth.h>
+#include <cydsp/processors/ComplexFft.h>
+#include <stdexcept>
 
 #include <algorithm>
 #include <cmath>
@@ -341,32 +344,13 @@ const Built& built()
 
 void fft(std::vector<std::complex<double>>& data, const bool inverse)
 {
-    const auto size = data.size();
-    for (std::size_t i = 1, j = 0; i < size; ++i) {
-        auto bit = size >> 1;
-        for (; (j & bit) != 0; bit >>= 1)
-            j ^= bit;
-        j ^= bit;
-        if (i < j)
-            std::swap(data[i], data[j]);
-    }
-    for (std::size_t length = 2; length <= size; length <<= 1) {
-        const auto angle = (inverse ? twoPi : -twoPi) / static_cast<double>(length);
-        const std::complex<double> step(std::cos(angle), std::sin(angle));
-        for (std::size_t start = 0; start < size; start += length) {
-            std::complex<double> w(1.0, 0.0);
-            for (std::size_t k = 0; k < length / 2; ++k) {
-                const auto even = data[start + k];
-                const auto odd = data[start + k + length / 2] * w;
-                data[start + k] = even + odd;
-                data[start + k + length / 2] = even - odd;
-                w *= step;
-            }
-        }
-    }
-    if (inverse)
-        for (auto& value : data)
-            value /= static_cast<double>(size);
+    // These transforms build assets / run offline restoration, outside audio.
+    // Retain one SDK plan per worker rather than rebuilding twiddles per frame.
+    thread_local cydsp::ComplexFft<double> plan;
+    if (plan.size() != data.size() && plan.prepare(data.size()) != cydsp::Status::ok)
+        throw std::runtime_error("FFT preparation");
+    if (plan.process(data, data, inverse ? cydsp::FftDirection::inverse : cydsp::FftDirection::forward) != cydsp::Status::ok)
+        throw std::runtime_error("FFT transform");
 }
 
 constexpr int frameLength = Wavetable::frameLength;
@@ -575,19 +559,6 @@ inline void panGains(const double pan, double& left, double& right) noexcept
     const auto angle = (std::clamp(pan, -1.0, 1.0) + 1.0) * std::numbers::pi * 0.25;
     left = std::cos(angle) * std::numbers::sqrt2;
     right = std::sin(angle) * std::numbers::sqrt2;
-}
-
-inline double polyBlep(const double t, const double dt) noexcept
-{
-    if (t < dt) {
-        const auto x = t / dt;
-        return x + x - x * x - 1.0;
-    }
-    if (t > 1.0 - dt) {
-        const auto x = (t - 1.0) / dt;
-        return x * x + x + x + 1.0;
-    }
-    return 0.0;
 }
 
 struct Envelope {
@@ -976,6 +947,7 @@ TablesRef resolveTables(const PrismValues& values, const TablesRef& own)
 // ---- The voice ---------------------------------------------------------------------------------
 
 struct Voice::State {
+    synth::detail::parts::PhaseWaveforms waveforms;
     static constexpr int maximumUnison = 16;
     static constexpr int blockLength = 32;
 
@@ -1788,14 +1760,12 @@ bool Voice::render(const PrismValues& values, const Tables& tables, const Contex
                 switch (subWave) {
                 case 0: sample = std::sin(twoPi * t); break;
                 case 1: sample = 1.0 - 4.0 * std::abs(t - 0.5); break;
-                case 2: sample = 2.0 * t - 1.0 - polyBlep(t, subIncrement); break;
+                case 2:
+                    sample = s.waveforms(0, t, subIncrement, .5);
+                    break;
                 default: {
                     const auto width = subWave == 3 ? 0.5 : subWave == 4 ? 0.25 : 0.1;
-                    sample = t < width ? 1.0 : -1.0;
-                    sample += polyBlep(t, subIncrement);
-                    auto shifted = t + 1.0 - width;
-                    shifted -= std::floor(shifted);
-                    sample -= polyBlep(shifted, subIncrement);
+                    sample = s.waveforms.pulse(t, subIncrement, width);
                     break;
                 }
                 }

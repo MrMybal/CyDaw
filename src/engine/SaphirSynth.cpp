@@ -1,3 +1,6 @@
+#include <complex>
+#include <cydsp/processors/ComplexFft.h>
+#include <stdexcept>
 // Saphir: a four-operator FM synthesiser of the synth family. Four operators
 // (A, B, C, D), each one of twelve waves made of harmonics (a sine, two sines
 // of fewer bits, a half and a rectified sine, a triangle, a soft saw and a
@@ -193,24 +196,24 @@ struct Harmonics {
 
 // A shape measured over one period: its first harmonics. `sines` holds
 // sin(2 pi k / analysisSize).
-Harmonics measure(const std::vector<double>& shape, const std::vector<double>& sines)
+Harmonics measure(const std::vector<double>& shape)
 {
+    cydsp::ComplexFft<double> fft;
+    if (fft.prepare(analysisSize) != cydsp::Status::ok)
+        throw std::runtime_error("Saphir FFT preparation");
+    std::vector<std::complex<double>> bins(shape.begin(), shape.end());
+    if (fft.process(bins, bins, cydsp::FftDirection::forward) != cydsp::Status::ok)
+        throw std::runtime_error("Saphir harmonic analysis");
     Harmonics result;
-    for (std::size_t n = 1; n <= static_cast<std::size_t>(harmonicMost); ++n) {
-        auto c = 0.0;
-        auto s = 0.0;
-        for (std::size_t k = 0; k < static_cast<std::size_t>(analysisSize); ++k) {
-            const auto at = (n * k) & analysisMask;
-            s += shape[k] * sines[at];
-            c += shape[k] * sines[(at + static_cast<std::size_t>(analysisSize / 4)) & analysisMask];
-        }
-        result.cosine[n] = 2.0 * c / static_cast<double>(analysisSize);
-        result.sine[n] = 2.0 * s / static_cast<double>(analysisSize);
+    for (std::size_t n = 1; n <= harmonicMost; ++n)
+    {
+        result.cosine[n] = 2 * bins[n].real() / analysisSize;
+        result.sine[n] = -2 * bins[n].imag() / analysisSize;
     }
     return result;
 }
 
-Harmonics harmonicsOf(const int wave, const std::vector<double>& sines)
+Harmonics harmonicsOf(const int wave)
 {
     Harmonics result;
     // A rounded top: the soft saw and the soft square.
@@ -235,7 +238,7 @@ Harmonics harmonicsOf(const int wave, const std::vector<double>& sines)
             default: shape[k] = std::abs(s); break;
             }
         }
-        return measure(shape, sines);
+        return measure(shape);
     }
     case 5:
         for (int n = 1; n <= harmonicMost; n += 2)
@@ -314,7 +317,7 @@ struct Waves {
         constexpr auto stride = static_cast<std::size_t>(analysisSize / waveSize);
         constexpr auto quarter = static_cast<std::size_t>(analysisSize / 4);
         for (int wave = 0; wave < waveCount; ++wave) {
-            const auto made = harmonicsOf(wave, sines);
+            const auto made = harmonicsOf(wave);
             auto scale = 1.0;
             for (int level = 0; level < waveLevels; ++level) {
                 const auto kept = static_cast<std::size_t>(harmonicMost >> level);

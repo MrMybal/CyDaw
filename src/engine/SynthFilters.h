@@ -7,6 +7,7 @@
 // control step. Internal to the engine.
 
 #include "SynthParts.h"
+#include <cydaw/engine/DspHistory.h>
 
 #include <algorithm>
 #include <array>
@@ -33,7 +34,7 @@ public:
     // The comb's delay: its lowest note (40 Hz) at this rate. Off the audio thread.
     void prepare(const double rate)
     {
-        comb_.assign(static_cast<std::size_t>(std::ceil(std::max(1.0, rate) / 40.0)) + 4, 0.0f);
+        comb_.prepare(1, static_cast<std::size_t>(std::ceil(std::max(1.0, rate) / 40.0)) + 4);
         write_ = 0;
     }
 
@@ -42,11 +43,11 @@ public:
         main_.reset();
         for (auto& formant : vowel_)
             formant.reset();
-        std::fill(comb_.begin(), comb_.end(), 0.0f);
+        comb_.reset();
         combLow_ = 0.0;
     }
 
-    [[nodiscard]] std::size_t combSize() const noexcept { return comb_.size(); }
+    [[nodiscard]] std::size_t combSize() const noexcept { return comb_.capacity(); }
 
     [[nodiscard]] static Coefficients coefficients(const int kind, const double cutoff, const double resonance, const double rate,
                                                    const std::size_t combSize) noexcept
@@ -89,18 +90,14 @@ public:
         case comb: {
             // A comb tuned to the cutoff: its feedback rings at it and its
             // harmonics, darkened a little each time round.
-            const auto size = comb_.size();
+            const auto size = comb_.capacity();
             if (size < 4)
                 return x;
-            auto readAt = static_cast<double>(write_) - c.delay;
-            while (readAt < 0.0)
-                readAt += static_cast<double>(size);
-            const auto lower = static_cast<std::size_t>(readAt) % size;
-            const auto fraction = readAt - std::floor(readAt);
-            const auto delayed = static_cast<double>(comb_[lower]) * (1.0 - fraction) + static_cast<double>(comb_[(lower + 1) % size]) * fraction;
+            const auto delayed = comb_.read(0, std::max(0., c.delay - 1));
             combLow_ += (delayed - combLow_) * 0.6;
             const auto y = std::tanh(x + c.feedback * combLow_);
-            comb_[write_] = static_cast<float>(y);
+            const double rounded = static_cast<float>(y);
+            comb_.push({&rounded, 1});
             write_ = (write_ + 1) % size;
             return y * (1.0 - 0.6 * c.feedback);
         }
@@ -122,7 +119,7 @@ public:
 private:
     parts::Filter main_;
     std::array<parts::Filter, 3> vowel_ {};
-    std::vector<float> comb_;
+    DspHistory<double> comb_;
     std::size_t write_ {};
     double combLow_ {};
 };

@@ -1,5 +1,7 @@
 # Comparatif actuel JUCE / CyAudioCore — moteur audio
 
+Suite de cette campagne : [instruments, effets et projets mixtes](CyDSPCompleteReuse.fr.md), avec trois états comparés et les limites précises des adaptateurs SDK.
+
 Campagne du 14 novembre 2026 après les mises à jour CyAudioCore, CyDSP et CyUI,
 base applicative `c488d41`, branche `CyDSP-CORE`. Les mesures précédentes restent
 conservées. Ce tableau compare le **moteur avec le dessin désactivé**, pas les FPS

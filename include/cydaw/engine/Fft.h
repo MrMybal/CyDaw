@@ -1,77 +1,55 @@
 #pragma once
-
+#include <cassert>
 #include <complex>
 #include <cstddef>
-#include <cstdint>
-#include <numbers>
-#include <utility>
-#include <vector>
+#include <cydsp/processors/ComplexFft.h>
+#include <new>
+#include <stdexcept>
 
 namespace cydaw::engine {
-
-// A radix-2 complex FFT of one size: its twiddles and bit-reversed order made
-// once (prepare, off the audio thread), then forward and inverse in place,
-// nothing allocated. The inverse is scaled: forward then inverse gives the
-// data back.
+// Host size rounding/lifecycle; CyDSP owns the prepared FFT and all transforms.
 class Fft {
 public:
-    void prepare(const std::size_t size)
-    {
-        size_ = 1;
-        bits_ = 0;
-        while (size_ < size) {
-            size_ <<= 1;
-            ++bits_;
-        }
-        twiddles_.resize(size_ / 2);
-        for (std::size_t k = 0; k < size_ / 2; ++k)
-            twiddles_[k] = std::polar(1.0f, static_cast<float>(-2.0 * std::numbers::pi * static_cast<double>(k) / static_cast<double>(size_)));
-        reversed_.resize(size_);
-        for (std::size_t i = 0; i < size_; ++i) {
-            std::uint32_t r = 0;
-            for (unsigned b = 0; b < bits_; ++b)
-                if ((i >> b) & 1u)
-                    r |= 1u << (bits_ - 1 - b);
-            reversed_[i] = r;
-        }
-    }
-    [[nodiscard]] std::size_t size() const noexcept { return size_; }
-
-    void forward(std::complex<float>* data) const noexcept { transform(data, false); }
-    void inverse(std::complex<float>* data) const noexcept
-    {
-        transform(data, true);
-        const auto scale = 1.0f / static_cast<float>(size_);
-        for (std::size_t i = 0; i < size_; ++i)
-            data[i] *= scale;
-    }
+  Fft() = default;
+  Fft(const Fft& other)
+  {
+      if (other.fft_.size())
+          prepare(other.size());
+  }
+  Fft& operator=(const Fft& other)
+  {
+      if (this != &other)
+          prepare(other.size());
+      return *this;
+  }
+  Fft(Fft&&) noexcept = default;
+  Fft& operator=(Fft&&) noexcept = default;
+  void prepare(std::size_t requested)
+  {
+      if (requested > (std::size_t(1) << 24))
+          throw std::length_error("FFT size");
+      std::size_t size = 1;
+      while (size < requested)
+          size <<= 1;
+      const auto status = fft_.prepare(size);
+      if (status == cydsp::Status::allocation_failed)
+          throw std::bad_alloc();
+      if (status != cydsp::Status::ok)
+          throw std::invalid_argument("FFT preparation");
+  }
+  [[nodiscard]] std::size_t size() const noexcept { return fft_.size() ? fft_.size() : 1; }
+  void forward(std::complex<float>* data) const noexcept { transform(data, cydsp::FftDirection::forward); }
+  void inverse(std::complex<float>* data) const noexcept { transform(data, cydsp::FftDirection::inverse); }
 
 private:
-    void transform(std::complex<float>* data, const bool inverse) const noexcept
-    {
-        for (std::size_t i = 0; i < size_; ++i)
-            if (i < reversed_[i])
-                std::swap(data[i], data[reversed_[i]]);
-        for (std::size_t length = 2; length <= size_; length <<= 1) {
-            const auto half = length / 2;
-            const auto step = size_ / length;
-            for (std::size_t start = 0; start < size_; start += length)
-                for (std::size_t k = 0; k < half; ++k) {
-                    auto w = twiddles_[k * step];
-                    if (inverse)
-                        w = std::conj(w);
-                    const auto even = data[start + k];
-                    const auto odd = data[start + k + half] * w;
-                    data[start + k] = even + odd;
-                    data[start + k + half] = even - odd;
-                }
-        }
-    }
-
-    std::size_t size_ { 1 };
-    unsigned bits_ {};
-    std::vector<std::complex<float>> twiddles_;
-    std::vector<std::uint32_t> reversed_;
+  void transform(std::complex<float>* data, cydsp::FftDirection direction) const noexcept
+  {
+      if (!fft_.size())
+          return; // historical unprepared size-one identity
+      const auto status = fft_.process({data, fft_.size()}, {data, fft_.size()}, direction);
+      assert(status == cydsp::Status::ok);
+      (void)status;
+  }
+  cydsp::ComplexFft<float> fft_;
 };
-
 } // namespace cydaw::engine

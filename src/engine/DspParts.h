@@ -1,13 +1,19 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <numbers>
 #include <vector>
 
+#include <cydaw/audio/SampleBuffer.h>
 #include <cydaw/engine/BiquadDesign.h>
+#include <cydaw/engine/DspHistory.h>
+#include <cydsp/math/DspMath.h>
+#include <cydsp/math/Window.h>
+#include <limits>
 
 // The small parts the native effects' processors are made of (MixEffects.cpp,
 // SuiteEffects.cpp): biquads and one-poles with their states, a delay line
@@ -19,15 +25,9 @@ namespace cydaw::engine::dsp {
 inline constexpr double kPi = std::numbers::pi;
 inline constexpr std::size_t kChannels = 8;
 
-inline double dbToGain(const double db) noexcept
-{
-    return std::pow(10.0, db / 20.0);
-}
+inline double dbToGain(const double db) noexcept { return cydsp::decibelsToGain(db, -std::numeric_limits<double>::infinity()); }
 
-inline double gainToDb(const double gain) noexcept
-{
-    return 20.0 * std::log10(std::max(gain, 1.0e-12));
-}
+inline double gainToDb(const double gain) noexcept { return cydsp::gainToDecibels(std::max(gain, 1.0e-12), -240.0); }
 
 // The coefficient of a one-pole smoother of that many milliseconds.
 inline double smoothing(const double milliseconds, const double rate) noexcept
@@ -40,6 +40,7 @@ inline int choice(const float value, const int count) noexcept
     return std::clamp(static_cast<int>(std::lround(value)), 0, count - 1);
 }
 
+// Fused feedback/sample path: retain until CyDSP exposes a prepared sample API.
 struct Biquad {
     BiquadCoefficients c;
     double z1 {};
@@ -73,49 +74,25 @@ struct OnePole {
 // A delay line read between samples (linear).
 class Delay {
 public:
-    void prepare(const std::size_t samples)
-    {
-        std::size_t size = 1;
-        while (size < samples + 4)
-            size <<= 1;
-        buffer_.assign(size, 0.0);
-        mask_ = size - 1;
-        write_ = 0;
-    }
-    void reset() noexcept { std::fill(buffer_.begin(), buffer_.end(), 0.0); }
-    void push(const double x) noexcept
-    {
-        buffer_[write_] = x;
-        write_ = (write_ + 1) & mask_;
-    }
-    // The sample pushed `delay` samples before the last one.
-    [[nodiscard]] double read(const double delay) const noexcept
-    {
-        const auto position = static_cast<double>(write_) - 1.0 - std::clamp(delay, 0.0, static_cast<double>(mask_ - 2));
-        const auto whole = std::floor(position);
-        const auto t = position - whole;
-        const auto index = static_cast<std::int64_t>(whole);
-        const auto a = buffer_[static_cast<std::size_t>(index) & mask_];
-        const auto b = buffer_[static_cast<std::size_t>(index + 1) & mask_];
-        return a + (b - a) * t;
-    }
+  void prepare(std::size_t samples)
+  {
+      std::size_t size = 1;
+      while (size < samples + 4)
+          size <<= 1;
+      history_.prepare(1, size);
+  }
+  void reset() noexcept { history_.reset(); }
+  void push(double x) noexcept { history_.push({&x, 1}); }
+  [[nodiscard]] double read(double delay) const noexcept
+  {
+      if (!history_.capacity())
+          return 0;
+      return history_.read(0, std::clamp(delay, 0.0, double(history_.capacity() - 3)));
+  }
 
 private:
-    std::vector<double> buffer_;
-    std::size_t mask_ {};
-    std::size_t write_ {};
+  DspHistory<double> history_;
 };
-
-inline double besselI0(const double x) noexcept
-{
-    auto sum = 1.0;
-    auto term = 1.0;
-    for (int k = 1; k < 32; ++k) {
-        term *= (x / (2.0 * k)) * (x / (2.0 * k));
-        sum += term;
-    }
-    return sum;
-}
 
 // Up and down by 2 or 4: a linear-phase windowed-sinc filter of 16 taps a
 // factor and one, so the way there and back delays the sound 16 samples
@@ -125,17 +102,24 @@ public:
     void prepare(const int factor)
     {
         factor_ = std::max(1, factor);
+        if (factor_ > 16)
+            throw std::invalid_argument("Oversampling factor");
         taps_ = 16 * factor_ + 1;
         coefficients_.assign(static_cast<std::size_t>(taps_), 0.0);
         const auto cutoff = 0.45 / static_cast<double>(factor_);
         const auto middle = (taps_ - 1) * 0.5;
-        constexpr auto beta = 7.0;
+        cydsp::WindowParameters windowOptions;
+        windowOptions.type = cydsp::WindowType::kaiser;
+        windowOptions.beta = 7;
+        std::vector<double> windowValues(static_cast<std::size_t>(taps_));
+        const auto status = cydsp::makeWindow(windowOptions, windowValues);
+        if (status != cydsp::Status::ok)
+            throw std::invalid_argument("Kaiser window");
         auto sum = 0.0;
         for (int n = 0; n < taps_; ++n) {
             const auto t = n - middle;
             const auto sinc = t == 0.0 ? 2.0 * cutoff : std::sin(2.0 * kPi * cutoff * t) / (kPi * t);
-            const auto ratio = 2.0 * n / (taps_ - 1) - 1.0;
-            const auto window = besselI0(beta * std::sqrt(std::max(0.0, 1.0 - ratio * ratio))) / besselI0(beta);
+            const auto window = windowValues[static_cast<std::size_t>(n)];
             coefficients_[static_cast<std::size_t>(n)] = sinc * window;
             sum += sinc * window;
         }
@@ -143,12 +127,20 @@ public:
             c /= sum;
         upHistory_.assign(static_cast<std::size_t>((taps_ + factor_ - 1) / factor_ + 1), 0.0);
         downHistory_.assign(static_cast<std::size_t>(taps_), 0.0);
+        for (int phase = 0; phase < factor_; ++phase)
+        {
+            auto& taps = polyphase_[static_cast<std::size_t>(phase)];
+            taps.assign(upHistory_.size(), 0.0);
+            for (int k = 0, j = phase; j < taps_; ++k, j += factor_)
+                taps[static_cast<std::size_t>(k)] = coefficients_[static_cast<std::size_t>(j)];
+        }
     }
     void reset() noexcept
     {
         std::fill(upHistory_.begin(), upHistory_.end(), 0.0);
         std::fill(downHistory_.begin(), downHistory_.end(), 0.0);
     }
+    [[nodiscard]] int factor() const noexcept { return factor_; }
     [[nodiscard]] int latency() const noexcept { return factor_ > 1 ? 16 : 0; }
     void up(const double x, double* out) noexcept
     {
@@ -160,8 +152,9 @@ public:
         upHistory_[0] = x;
         for (int phase = 0; phase < factor_; ++phase) {
             auto sum = 0.0;
-            for (int k = 0, j = phase; j < taps_; ++k, j += factor_)
-                sum += coefficients_[static_cast<std::size_t>(j)] * upHistory_[static_cast<std::size_t>(k)];
+            const auto status = audio::preparedBufferVectorOps().dot(polyphase_[static_cast<std::size_t>(phase)], upHistory_, sum);
+            assert(status == cydsp::Status::ok);
+            (void)status;
             out[phase] = sum * factor_;
         }
     }
@@ -174,14 +167,16 @@ public:
             downHistory_[0] = in[phase];
         }
         auto sum = 0.0;
-        for (int n = 0; n < taps_; ++n)
-            sum += coefficients_[static_cast<std::size_t>(n)] * downHistory_[static_cast<std::size_t>(n)];
+        const auto status = audio::preparedBufferVectorOps().dot(coefficients_, downHistory_, sum);
+        assert(status == cydsp::Status::ok);
+        (void)status;
         return sum;
     }
 
 private:
     int factor_ { 1 };
     int taps_ { 1 };
+    std::array<std::vector<double>, 16> polyphase_;
     std::vector<double> coefficients_;
     std::vector<double> upHistory_;
     std::vector<double> downHistory_;

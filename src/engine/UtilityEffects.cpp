@@ -38,6 +38,13 @@ struct SincKernels {
         constexpr auto beta = 6.0;
         for (int half = 2; half <= kSincHalfMost; ++half) {
             const auto width = static_cast<std::size_t>(2 * half);
+            const int middle = half * kSincPhases;
+            std::vector<double> windowValues(static_cast<std::size_t>(2 * middle + 1));
+            cydsp::WindowParameters options;
+            options.type = cydsp::WindowType::kaiser;
+            options.beta = beta;
+            if (cydsp::makeWindow(options, windowValues) != cydsp::Status::ok)
+                throw std::invalid_argument("Sinc window");
             auto& table = taps[static_cast<std::size_t>(half)];
             table.assign(static_cast<std::size_t>(kSincPhases + 1) * width, 0.0f);
             for (int phase = 0; phase <= kSincPhases; ++phase) {
@@ -47,8 +54,7 @@ struct SincKernels {
                 for (int k = -half + 1; k <= half; ++k) {
                     const auto x = offset - static_cast<double>(k);
                     const auto sinc = std::abs(x) < 1.0e-12 ? 1.0 : std::sin(kPi * x) / (kPi * x);
-                    const auto ratio = x / static_cast<double>(half);
-                    const auto window = besselI0(beta * std::sqrt(std::max(0.0, 1.0 - ratio * ratio))) / besselI0(beta);
+                    const auto window = windowValues[static_cast<std::size_t>(middle + phase - k * kSincPhases)];
                     row[static_cast<std::size_t>(k + half - 1)] = sinc * window;
                     sum += sinc * window;
                 }
@@ -372,8 +378,8 @@ private:
     const SincKernels* kernels_ {};
     std::array<AlignmentLine, kChannels> lines_;
     std::array<OnePole, kChannels> dc_ {};
-    std::array<Biquad, 2> sideHigh_ {};
-    Biquad middlePass_ {};
+    std::array<Biquad, 2> sideHigh_{};
+    Biquad middlePass_{};
     float designedBass_ { -1.0f };
     double modeStep_ {};
     double bassStep_ {};
@@ -568,7 +574,7 @@ private:
     int countdown_ {};
     std::size_t pairIndex_ {};
     // Per side, per band (low, middle, high), its sections.
-    std::array<std::array<std::array<Biquad, 4>, 3>, 2> bands_ {};
+    std::array<std::array<std::array<Biquad, 4>, 3>, 2> bands_{};
     Sums sums_ {};
     std::array<std::atomic<float>, utility::stereoscopeReadingPairs> figures_ {};
     std::array<std::atomic<float>, 2 * utility::stereoscopePairCount> pairs_ {};

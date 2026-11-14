@@ -309,8 +309,8 @@ public:
 
 private:
     struct Band {
-        std::array<Biquad, 2> mod {};
-        std::array<Biquad, 2> car {};
+        std::array<Biquad, 2> mod{};
+        std::array<Biquad, 2> car{};
         double modMean {};
         double modPower {};
         // The voice's power is first averaged over about a period of the band.
@@ -404,8 +404,8 @@ private:
     int activeBands_ {};
     double widthMakeup_ { 1.0 };
     std::array<float, designedCount> designed_ {};
-    std::array<Biquad, 2> sibilance_ {};
-    std::array<Biquad, 2> hiss_ {};
+    std::array<Biquad, 2> sibilance_{};
+    std::array<Biquad, 2> hiss_{};
     PitchTracker tracker_;
     std::array<Saw, 2> saws_ {};
     Noise noise_ {};
@@ -566,8 +566,8 @@ public:
 
 private:
     struct State {
-        std::array<Biquad, 2> detector {};
-        Biquad dynamic {};
+        std::array<Biquad, 2> detector{};
+        Biquad dynamic{};
         double envelope {};
         double reduction {};
         // The reduction the dynamic filter was last designed for.

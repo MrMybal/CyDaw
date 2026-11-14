@@ -181,16 +181,13 @@ Shaping shapingFor(const int wave, const double shape, const double dt) noexcept
 }
 
 // A pulse from 0 to 1 over the start of the period (its edges smoothed).
-double raisedPulse(const double t, const double dt, const double width) noexcept
+double raisedPulse(const PhaseWaveforms& oscillator, const double t, const double dt, const double width) noexcept
 {
-    auto end = t - width;
-    if (end < 0.0)
-        end += 1.0;
-    return (t < width ? 1.0 : 0.0) + 0.5 * polyBlep(t, dt) - 0.5 * polyBlep(end, dt);
+    return .5 * (oscillator.pulse(t, dt, width) + 1);
 }
 
 // One sample of a wave at phase t (0..1), dt its step.
-double waveAt(const Shaping& s, const double t, const double dt) noexcept
+double waveAt(const PhaseWaveforms& oscillator, const Shaping& s, const double t, const double dt) noexcept
 {
     switch (s.wave) {
     case waveSine: {
@@ -209,14 +206,14 @@ double waveAt(const Shaping& s, const double t, const double dt) noexcept
     }
     case waveSaturated: return softTanh(s.a * std::sin(2.0 * kPi * t)) * s.b;
     case waveSaw: {
-        const auto one = 2.0 * t - 1.0 - polyBlep(t, dt);
+        const auto one = oscillator(0, t, dt, .5);
         if (s.a <= 0.0)
             return one;
         // A second saw a little ahead: their sum hollows as they part.
         auto ahead = t + s.a;
         if (ahead >= 1.0)
             ahead -= 1.0;
-        const auto two = 2.0 * ahead - 1.0 - polyBlep(ahead, dt);
+        const auto two = oscillator(0, ahead, dt, .5);
         return 0.5 * (one + two) * s.b;
     }
     case wavePulse: return oscillator(1, t, dt, s.a);
@@ -225,7 +222,7 @@ double waveAt(const Shaping& s, const double t, const double dt) noexcept
         auto half = t + 0.5;
         if (half >= 1.0)
             half -= 1.0;
-        return raisedPulse(t, dt, s.a) - raisedPulse(half, dt, s.a);
+        return raisedPulse(oscillator, t, dt, s.a) - raisedPulse(oscillator, half, dt, s.a);
     }
     }
 }
@@ -633,8 +630,8 @@ public:
                 std::array<double, 2> dry {};
                 for (int index = 0; index < copies; ++index) {
                     auto& copy = copies_[static_cast<std::size_t>(index)];
-                    const auto one = waveAt(copy.shaping[0], copy.phase[0], copy.increment[0]) * firstLevel;
-                    const auto two = waveAt(copy.shaping[1], copy.phase[1], copy.increment[1]) * secondLevel;
+                    const auto one = waveAt(oscillator, copy.shaping[0], copy.phase[0], copy.increment[0]) * firstLevel;
+                    const auto two = waveAt(oscillator, copy.shaping[1], copy.phase[1], copy.increment[1]) * secondLevel;
                     const auto filtered = one * firstThrough + two * secondThrough;
                     const auto direct = one + two - filtered;
                     wet[0] += filtered * copy.left;
@@ -730,6 +727,7 @@ std::unique_ptr<Engine> makeDerive()
 
 std::vector<float> derivePicture(const Values& values, const std::string_view part, const int points)
 {
+    const PhaseWaveforms oscillator;
     // One oscillator over two of its periods, its wave as its shape makes it.
     const auto which = part == "osc1" ? 0 : part == "osc2" ? 1 : -1;
     if (which < 0 || points < 2)
@@ -748,7 +746,7 @@ std::vector<float> derivePicture(const Values& values, const std::string_view pa
     std::vector<float> result(static_cast<std::size_t>(points));
     for (int at = 0; at < points; ++at) {
         const auto phase = 2.0 * static_cast<double>(at) / static_cast<double>(points - 1);
-        result[static_cast<std::size_t>(at)] = static_cast<float>(waveAt(shaping, phase - std::floor(phase), dt));
+        result[static_cast<std::size_t>(at)] = static_cast<float>(waveAt(oscillator, shaping, phase - std::floor(phase), dt));
     }
     return result;
 }

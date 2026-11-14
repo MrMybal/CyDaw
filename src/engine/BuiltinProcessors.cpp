@@ -129,6 +129,9 @@ void SineOscillatorProcessor::prepare(const ProcessSpec& spec)
     if (std::isfinite(spec.sampleRate) && spec.sampleRate > 0.0)
         sampleRate_ = spec.sampleRate;
     reset();
+    const auto status = oscillator_.prepare({sampleRate_, spec.maximumBlockSize, spec.channelCount});
+    if (status != cydsp::Status::ok)
+        throw std::invalid_argument("Oscillator preparation");
 }
 
 void SineOscillatorProcessor::reset() noexcept
@@ -147,12 +150,17 @@ void SineOscillatorProcessor::process(const AudioBlockView,
         waveform_.load(std::memory_order_relaxed)));
     const auto level = level_.load(std::memory_order_relaxed);
 
+    oscillator_.reset(phase_);
+    oscillator_.setWaveform(waveform == 1 ? cydsp::Waveform::triangle : cydsp::Waveform::sine);
+    const auto status = oscillator_.setFrequency(frequencyHz);
+    assert(status == cydsp::Status::ok);
+    (void)status;
+
     for (std::uint32_t frame = 0; frame < output.frameCount; ++frame) {
         float sample {};
         switch (waveform) {
         case 1:
-            sample = static_cast<float>(1.0 - 4.0
-                * std::abs(phase_ - 0.5));
+            sample = static_cast<float>(oscillator_.next());
             break;
         case 2:
             sample = static_cast<float>(2.0 * phase_ - 1.0);
@@ -164,8 +172,7 @@ void SineOscillatorProcessor::process(const AudioBlockView,
             sample = phase_ < 0.25 ? 1.0f : -1.0f;
             break;
         default:
-            sample = static_cast<float>(
-                std::sin(phase_ * 2.0 * std::numbers::pi));
+            sample = static_cast<float>(oscillator_.next());
             break;
         }
         sample *= level;

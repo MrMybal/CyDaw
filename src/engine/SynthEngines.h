@@ -1,5 +1,6 @@
 #pragma once
 
+#include "SynthParts.h"
 #include <cydaw/engine/SynthFamily.h>
 
 #include <algorithm>
@@ -38,14 +39,15 @@ public:
         = 0;
 
 protected:
-    // A setting its own modulations moved to `value` (its knob says
-    // `knob`): shown there, or as its knob when they did not move it.
-    void show(const int index, const double value, const double knob) noexcept
-    {
-        if (live_ != nullptr && index >= 0 && static_cast<std::size_t>(index) < VoiceLive::valueCount)
-            live_->values[static_cast<std::size_t>(index)] = std::abs(value - knob) > 1.0e-6 * std::max(1.0, std::abs(knob))
-                                                                 ? static_cast<float>(value)
-                                                                 : std::numeric_limits<float>::quiet_NaN();
+  parts::PhaseWaveforms oscillator;
+  // A setting its own modulations moved to `value` (its knob says
+  // `knob`): shown there, or as its knob when they did not move it.
+  void show(const int index, const double value, const double knob) noexcept
+  {
+      if (live_ != nullptr && index >= 0 && static_cast<std::size_t>(index) < VoiceLive::valueCount)
+          live_->values[static_cast<std::size_t>(index)] = std::abs(value - knob) > 1.0e-6 * std::max(1.0, std::abs(knob))
+                                                               ? static_cast<float>(value)
+                                                               : std::numeric_limits<float>::quiet_NaN();
     }
     void showLfo(const std::size_t index, const double value, const double phase) noexcept
     {

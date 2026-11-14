@@ -1,5 +1,7 @@
 # Réutilisation numérique CyDSP dans CyDaw
 
+Suite de cette campagne : [instruments, effets et projets mixtes](CyDSPCompleteReuse.fr.md), avec trois états comparés et les limites précises des adaptateurs SDK.
+
 Campagne du 14 novembre 2026, branche `CyDSP-CORE`, base applicative `8ebfc00`.
 Cette campagne remplace des calculs numériques applicatifs ; elle ne se limite
 pas aux services audio auparavant fournis par JUCE.

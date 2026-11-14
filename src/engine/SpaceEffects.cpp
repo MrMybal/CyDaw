@@ -415,12 +415,18 @@ std::vector<float> resampled(const std::vector<float>& source, const double rati
     constexpr int resolution = 256;
     constexpr auto beta = 8.0;
     std::vector<double> table(static_cast<std::size_t>(crossings * resolution + 2), 0.0);
-    const auto norm = besselI0(beta);
+    constexpr int middle = crossings * resolution;
+    std::vector<double> window(2 * middle + 1);
+    cydsp::WindowParameters options;
+    options.type = cydsp::WindowType::kaiser;
+    options.beta = beta;
+    if (cydsp::makeWindow(options, window) != cydsp::Status::ok)
+        throw std::invalid_argument("Sinc window");
     for (std::size_t i = 0; i < table.size(); ++i) {
         const auto u = static_cast<double>(i) / resolution;
         const auto sinc = u < 1.0e-12 ? 1.0 : std::sin(kPi * u) / (kPi * u);
         const auto r = u / crossings;
-        table[i] = r < 1.0 ? sinc * besselI0(beta * std::sqrt(1.0 - r * r)) / norm : 0.0;
+        table[i] = r < 1.0 ? sinc * window[static_cast<std::size_t>(middle) + i] : 0.0;
     }
     const auto reach = crossings / cutoff;
     const auto last = static_cast<std::ptrdiff_t>(source.size()) - 1;

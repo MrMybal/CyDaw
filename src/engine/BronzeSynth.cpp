@@ -1,3 +1,4 @@
+#include <cydaw/engine/DspHistory.h>
 // Bronze: a physical-modelling instrument of the synth family, objects that
 // are struck, rubbed or blown, and the way they ring. Two exciters: a mallet
 // (its hardness, a touch of coloured noise where it lands) and a noise with
@@ -337,9 +338,7 @@ public:
         const auto needed = static_cast<std::size_t>(std::ceil(std::max(1.0, rate) / lowestGuideHz)) + 16;
         while (size < needed)
             size *= 2;
-        line_.assign(size, 0.0f);
-        mask_ = static_cast<int>(size) - 1;
-        write_ = 0;
+        line_.prepare(1, size);
         type_ = -1;
     }
 
@@ -387,7 +386,7 @@ public:
     {
         re_.fill(0.0);
         im_.fill(0.0);
-        std::fill(line_.begin(), line_.end(), 0.0f);
+        line_.reset();
         lossState_ = 0.0;
         allpassIn_.fill(0.0);
         allpassOut_.fill(0.0);
@@ -525,7 +524,7 @@ private:
         hit_ = hit;
         left_ = left;
         right_ = right;
-        ready_ = line_.size() >= 64;
+        ready_ = line_.capacity() >= 64;
         if (!ready_)
             return;
         // A pipe closed at one end: its reflections of opposite signs, its
@@ -535,7 +534,7 @@ private:
         const auto trips = pipe ? 2.0 : 1.0;
         sign_ = pipe ? -1.0 : 1.0;
         combSign_ = pipe ? 1.0 : -1.0;
-        const auto most = static_cast<double>(line_.size()) - 8.0;
+        const auto most = static_cast<double>(line_.capacity()) - 8.0;
         period_ = std::clamp(rate_ / (trips * std::max(1.0, hz_)), 4.0, most);
         const auto fundamental = rate_ / (trips * period_);
         const auto w = 2.0 * kPi * fundamental / rate_;
@@ -649,37 +648,17 @@ private:
     // (four points, Lagrange: it never adds energy in a loop).
     [[nodiscard]] double readCubic(const double delay) const noexcept
     {
-        const auto whole = static_cast<int>(delay);
-        const auto f = delay - static_cast<double>(whole);
-        const auto at = write_ - whole;
-        const auto* line = line_.data();
-        const auto before = static_cast<double>(line[(at + 1) & mask_]);
-        const auto x0 = static_cast<double>(line[at & mask_]);
-        const auto x1 = static_cast<double>(line[(at - 1) & mask_]);
-        const auto x2 = static_cast<double>(line[(at - 2) & mask_]);
-        const auto c0 = -f * (f - 1.0) * (f - 2.0) / 6.0;
-        const auto c1 = (f + 1.0) * (f - 1.0) * (f - 2.0) / 2.0;
-        const auto c2 = -(f + 1.0) * f * (f - 2.0) / 2.0;
-        const auto c3 = (f + 1.0) * f * (f - 1.0) / 6.0;
-        return c0 * before + c1 * x0 + c2 * x1 + c3 * x2;
+        return line_.read(0, delay - 1, cydsp::HistoryInterpolation::lagrange3);
     }
 
-    // What the line held `delay` ago (0: what was just written), between two samples.
-    [[nodiscard]] double tap(const double delay) const noexcept
-    {
-        const auto whole = static_cast<int>(delay);
-        const auto f = delay - static_cast<double>(whole);
-        const auto a = static_cast<double>(line_[static_cast<std::size_t>((write_ - whole) & mask_)]);
-        const auto b = static_cast<double>(line_[static_cast<std::size_t>((write_ - whole - 1) & mask_)]);
-        return a + (b - a) * f;
-    }
+    // Age zero is the value just written; loop reads happen before push.
+    [[nodiscard]] double tap(double delay) const noexcept { return line_.read(0, delay); }
 
     void processGuide(const double* strike, const double* drive, double* outLeft, double* outRight, const int count) noexcept
     {
         // The delay eased to its new length across the block: a pitch that
         // moves slides, it does not click.
         const auto slide = (delayTarget_ - delay_) / static_cast<double>(std::max(1, count));
-        auto* line = line_.data();
         for (int i = 0; i < count; ++i) {
             delay_ += slide;
             // What comes back round: delayed, its losses, its stiffness, its ends' reflections.
@@ -697,12 +676,12 @@ private:
             const auto in = strike[i] * strikeGain_ + drive[i] * driveGain_;
             brightState_ += brightCoefficient_ * (in - brightState_);
             const auto y = sign_ * back + brightState_ + 1.0e-18;
-            line[write_] = static_cast<float>(y);
+            const double rounded = static_cast<float>(y);
+            line_.push({&rounded, 1});
             // Struck at one place, heard at two: their combs.
             const auto struck = tap(hitTap_);
             outLeft[i] += level_ * (y + combSign_ * (struck + tap(leftTap_)) + tap(hitLeftTap_));
             outRight[i] += level_ * (y + combSign_ * (struck + tap(rightTap_)) + tap(hitRightTap_));
-            write_ = (write_ + 1) & mask_;
         }
         // What fades out of the filters kept clear of the denormals.
         const auto flush = [](double& state) {
@@ -751,9 +730,7 @@ private:
     std::array<double, modeSlots> re_ {};
     std::array<double, modeSlots> im_ {};
     // The waveguide.
-    std::vector<float> line_;
-    int mask_ {};
-    int write_ {};
+    DspHistory<double> line_;
     bool ready_ {};
     double period_ { 8.0 };
     double delay_ { 8.0 };

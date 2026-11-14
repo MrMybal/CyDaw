@@ -8,45 +8,59 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cassert>
 #include <cmath>
 #include <cstdint>
+#include <cydsp/processors/Generators.h>
 #include <numbers>
 
 namespace cydaw::engine::synth::detail::parts {
 
 inline constexpr double kPi = std::numbers::pi;
 
-inline double polyBlep(double t, const double dt) noexcept
+// Each voice/control renderer owns its evaluator. The host retains externally
+// modulated phase; CyDSP evaluates the actual anti-aliased waveform. Normalized
+// rate 1 makes frequency equal to cycles/sample. No shared/TLS state or allocation.
+class PhaseWaveforms
 {
-    if (t < dt) {
-        t /= dt;
-        return t + t - t * t - 1.0;
+  public:
+    PhaseWaveforms() noexcept
+    {
+        const auto s = processor_.prepare({1, 1, 1});
+        assert(s == cydsp::Status::ok);
+        (void)s;
     }
-    if (t > 1.0 - dt) {
-        t = (t - 1.0) / dt;
-        return t * t + t + t + 1.0;
+    double operator()(int wave, double phase, double increment, double width) const noexcept
+    {
+        if (wave == 1)
+        {
+            auto shifted = phase - width;
+            if (shifted < 0)
+                shifted += 1;
+            return sample(cydsp::Waveform::saw, shifted, increment) - sample(cydsp::Waveform::saw, phase, increment);
+        }
+        const auto shape = wave == 0 ? cydsp::Waveform::saw : wave == 2 ? cydsp::Waveform::triangle : cydsp::Waveform::sine;
+        const auto value = sample(shape, phase, increment);
+        return wave == 2 ? -value : value; // preserve CyDaw triangle polarity
     }
-    return 0.0;
-}
+    double pulse(double phase, double increment, double width) const noexcept
+    {
+        return (*this)(1, phase, increment, width) + (2 * width - 1);
+    }
 
-inline double oscillator(const int wave, const double t, const double dt, const double width) noexcept
-{
-    switch (wave) {
-    case 0: return 2.0 * t - 1.0 - polyBlep(t, dt);
-    case 1: {
-        auto value = t < width ? 1.0 : -1.0;
-        value += polyBlep(t, dt);
-        auto shifted = t - width;
-        if (shifted < 0.0)
-            shifted += 1.0;
-        value -= polyBlep(shifted, dt);
-        // Its average kept at nothing whatever the width.
-        return value - (2.0 * width - 1.0);
+  private:
+    double sample(cydsp::Waveform wave, double phase, double increment) const noexcept
+    {
+        const auto status = processor_.setFrequency(increment);
+        assert(status == cydsp::Status::ok);
+        if (status != cydsp::Status::ok)
+            return 0;
+        processor_.setWaveform(wave);
+        processor_.reset(phase);
+        return processor_.next();
     }
-    case 2: return 4.0 * std::abs(t - 0.5) - 1.0;
-    default: return std::sin(2.0 * kPi * t);
-    }
-}
+    mutable cydsp::Oscillator<double> processor_;
+};
 
 inline double lfoWave(const int shape, const double phase, const double held) noexcept
 {
