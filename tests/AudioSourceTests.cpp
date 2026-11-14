@@ -86,6 +86,34 @@ int main() {
       require(samples.getSample(0, 0) == 13 && samples.getSample(0, 3) == 16 &&
                   samples.getSample(0, 4) == 0,
               "background cache preserves end-of-source silence");
+      // Exercise the unchanged-window path only after every page is ready.
+      buffered.setNextReadPosition(0);
+      require(buffered.waitForReady(8192), "complete cache window prefills");
+      buffered.setLooping(true);
+      require(buffered.waitForReady(8192),
+              "loop changes invalidate even an unchanged complete window");
+      buffered.getNextAudioBlock({&samples, 0, 24});
+      for (int i = 0; i < 24; ++i)
+        require(samples.getSample(0, i) == float(i % 16 + 1),
+                "loop refresh replaces previously cached EOF silence");
+      for (const auto position : {20000, 0, 16384, 1020, 90000, 0}) {
+        buffered.setNextReadPosition(position);
+        require(buffered.waitForReady(24), "seek across evicted pages refills");
+        buffered.getNextAudioBlock({&samples, 0, 24});
+        for (int ch = 0; ch < 2; ++ch)
+          for (int i = 0; i < 24; ++i)
+            require(samples.getSample(ch, i) == float((position + i) % 16 + 1),
+                    "cache preserves exact PCM across seeks and page edges");
+      }
+      buffered.setNextReadPosition(0);
+      require(buffered.waitForReady(8192), "seek back restores a full window");
+      buffered.setLooping(false);
+      require(buffered.waitForReady(8192), "disabling loop invalidates full window");
+      buffered.getNextAudioBlock({&samples, 0, 24});
+      for (int i = 0; i < 24; ++i)
+        require(samples.getSample(0, i) == (i < 16 ? float(i + 1) : 0.f),
+                "loop disable restores exact EOF silence");
+      require(buffered.underruns() == 0, "prepared cache reads never underrun");
       buffered.releaseResources();
       require(bufferedInput.prepared == 0,
               "background worker releases source before owner destruction");

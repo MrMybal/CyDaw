@@ -59,17 +59,26 @@ struct BufferingAudioSource::Native {
     int frames{}, channels{};
     std::atomic<std::int64_t> position{};
     std::atomic<std::uint64_t> misses{};
+    // The scheduler owns this marker; control invalidation holds Task::lifetime.
+    std::int64_t readyFirst = std::numeric_limits<std::int64_t>::min();
     bool fillOne() override {
       const auto wanted =
           std::max<std::int64_t>(0, position.load(std::memory_order_acquire));
       const auto first = wanted / frames * frames;
+      // A complete unchanged window needs no page ownership traffic. Readers
+      // do not mutate page contents; seeks and loop changes invalidate this.
+      if (first == readyFirst)
+        return false;
+      bool allReady = true;
       for (std::size_t ahead = 0; ahead < pages.size(); ++ahead) {
         const auto target = first + std::int64_t(ahead) * frames;
         auto &page = *pages[std::size_t(target / frames) % pages.size()];
         int free = 0;
         if (!page.access.compare_exchange_strong(free, -1,
-                                                 std::memory_order_acquire))
+                                                 std::memory_order_acquire)) {
+          allReady = false;
           continue;
+        }
         if (page.first == target) {
           page.access.store(0, std::memory_order_release);
           continue;
@@ -80,6 +89,8 @@ struct BufferingAudioSource::Native {
         page.access.store(0, std::memory_order_release);
         return true;
       }
+      if (allReady)
+        readyFirst = first;
       return false;
     }
     bool ready(std::int64_t at, int count) const {
@@ -183,6 +194,7 @@ void BufferingAudioSource::setLooping(bool loop) {
   n.source->setLooping(loop);
   if (n.cache) {
     std::lock_guard guard(n.cache->lifetime);
+    n.cache->readyFirst = std::numeric_limits<std::int64_t>::min();
     for (const auto &page : n.cache->pages) {
       int free = 0;
       if (page->access.compare_exchange_strong(free, -1,
