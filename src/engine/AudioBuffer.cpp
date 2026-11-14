@@ -8,8 +8,7 @@
 #include <utility>
 #include <cydsp/math/VectorOps.h>
 
-namespace cydaw::engine {
-
+namespace cydaw::audio {
 namespace {
 // Resolve SIMD before rendering; shared by the DAW and exported internal plugins.
 const cydsp::VectorOps audioOps = [] {
@@ -20,6 +19,10 @@ const cydsp::VectorOps audioOps = [] {
     return result;
 }();
 }
+const cydsp::VectorOps& preparedBufferVectorOps() noexcept { return audioOps; }
+}
+namespace cydaw::engine {
+namespace { const auto& audioOps = audio::preparedBufferVectorOps(); }
 
 float* AudioBlockView::channel(const std::uint32_t index) const noexcept
 {

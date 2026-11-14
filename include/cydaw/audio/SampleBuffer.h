@@ -6,6 +6,8 @@
 #include <cydsp/core/AudioBuffer.h>
 #include <cydsp/math/VectorOps.h>
 namespace cydaw::audio {
+// Shared with engine buffers; selected before rendering, no per-view CPU probing.
+const cydsp::VectorOps& preparedBufferVectorOps() noexcept;
 // Application planar-buffer vocabulary over CyDSP's aligned ownership. A
 // borrowed view stores its channel pointers inline and allocates nothing,
 // including when rebased to a smaller callback. setSize belongs to
@@ -13,7 +15,7 @@ namespace cydaw::audio {
 template <class T> class SampleBuffer {
   static constexpr int maximumChannels = 64;
   cydsp::AudioBuffer<T> storage_;
-  cydsp::VectorOps ops_;
+  cydsp::VectorOps ops_ { preparedBufferVectorOps() };
   std::array<T *, maximumChannels> pointers_{};
   std::array<const T *, maximumChannels> readers_{};
   int channels_{}, frames_{}, capacityChannels_{}, capacityFrames_{};
@@ -40,6 +42,7 @@ public:
   }
   SampleBuffer(SampleBuffer &&) = default;
   SampleBuffer &operator=(SampleBuffer &&) = default;
+  cydsp::CpuBackend vectorBackend() const noexcept { return ops_.backend(); }
   int getNumChannels() const noexcept { return channels_; }
   int getNumSamples() const noexcept { return frames_; }
   T *getWritePointer(int channel, int first = 0) noexcept {

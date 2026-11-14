@@ -9,6 +9,10 @@ void require(bool okay, const char *message) {
 int main() {
   try {
     SampleBuffer<float> owned(2, 256);
+    cydsp::VectorOps selected;
+    require(cydsp::VectorOps::create(cydsp::CpuBackend::automatic, selected) == cydsp::Status::ok,
+            "automatic vector backend resolves outside rendering");
+    require(owned.vectorBackend() == selected.backend(), "owned buffers use prepared automatic SIMD");
     require(reinterpret_cast<std::uintptr_t>(owned.getWritePointer(0)) % 64 ==
                 0,
             "CyDSP sample storage is aligned");
@@ -17,6 +21,7 @@ int main() {
         owned.setSample(ch, i, float(ch + 1));
     auto *original = owned.getWritePointer(0);
     SampleBuffer<float> view(owned.getArrayOfWritePointers(), 2, 32, 64);
+    require(view.vectorBackend() == selected.backend(), "borrowed views reuse the prepared SIMD table");
     view.applyGain(.5f);
     require(owned.getSample(0, 31) == 1 && owned.getSample(0, 32) == .5f &&
                 owned.getSample(0, 95) == .5f && owned.getSample(0, 96) == 1,

@@ -1,0 +1,1565 @@
+{
+  "date": "2026-11-14",
+  "applicationBase": "8ebfc00",
+  "branch": "CyDSP-CORE",
+  "dependencies": {
+    "CyAudioCore": {
+      "revision": "1a68279dfa9bf228bfc6ed4c6c11dd4952c1a075",
+      "currentHead": "1a68279dfa9bf228bfc6ed4c6c11dd4952c1a075",
+      "currentStatus": "",
+      "archiveSha256": "6ede38f8448f4a77a05a48d8cba727789fcfdb126319ea80d4ccb3955d756943",
+      "verifiedSourceTreeSha256": "8324e76bf0bbbcc752f0c6ef895ab6a8437f9610478238c3b7ac3d8f813be983",
+      "verifiedFiles": 868
+    },
+    "CyDSP": {
+      "revision": "ea56508ad3e26d790e491140b7f18a95e4411d5d",
+      "currentHead": "ea56508ad3e26d790e491140b7f18a95e4411d5d",
+      "currentStatus": "",
+      "archiveSha256": "dad9abb3d8df831cc37462f380b92bf82c27bb722f3caffe73bbde887107d4aa",
+      "verifiedSourceTreeSha256": "c4ebcd912148689f005997f463590c2f5b477c15287b180672142fbc398b6f11",
+      "verifiedFiles": 342
+    }
+  },
+  "build": {
+    "directory": "build/cydsp-numerical",
+    "compiler": "MSVC 19.40.33807 x64",
+    "configuration": "Release",
+    "applicationFlags": "/O2 /Ob2 /MD /fp:precise; LTO OFF",
+    "sdkFlags": "/O2 /MD /fp:strict; ISA-specific kernels; automatic dispatch",
+    "sourceTreeSha256": "97b63c1ff5db966dfdaeadece5d58ba68e0a3e2c02492a7b33b385d34589a20e",
+    "sourceFileCount": 529,
+    "artifacts": {
+      "desktop": {
+        "path": "build/cydsp-numerical/CyDAW2_artefacts/Release/CyDAW 2.exe",
+        "sha256": "2e42c79422680e6c5353962341e11701e159467959d49c10a94c092e46b571e2",
+        "bytes": 20273664
+      },
+      "worker": {
+        "path": "build/cydsp-numerical/CyDAW2_artefacts/Release/CyDAWPluginWorker.exe",
+        "sha256": "9b7339e7340e0579ae1bd2c78f1db0bd21080559750c34dc9e23331e267b75e0",
+        "bytes": 1654272
+      },
+      "probe": {
+        "path": "build/cydsp-numerical/Release/cydaw_dsp_reuse_tests.exe",
+        "sha256": "c0d176551ce9390b4a7230dae4b265b74c9c3d347a47650a6ca36c45e23fcf15",
+        "bytes": 1426944
+      },
+      "core": {
+        "path": "build/cydsp-numerical/Release/cydaw_core.lib",
+        "sha256": "5fffa06e06862fe09d9605e4926218f3b21a4570817919e34e1b611242fbab25",
+        "bytes": 22899620
+      }
+    }
+  },
+  "baselineDefinitions": {
+    "initial": "8ebfc00 production DSP code, new SDKs; initial effects-only harness",
+    "convolutionBefore": "new SDKs, old convolution sums; generic polynomial interpolation also present in ReverbPro; only convolution used for its before/after comparison",
+    "compressorBefore": "all retained substitutions except the base compressor; Dynamics migration not yet applied",
+    "integrated": "retained code and updated SDKs; aligned-allocation guard enabled"
+  },
+  "measuredChanges": {
+    "compressor": {
+      "before": "compressorBefore",
+      "beforeUs": 17.3002,
+      "afterUs": 10.7556,
+      "changePercent": -37.82962046681541
+    },
+    "convolver": {
+      "before": "convolutionBefore",
+      "beforeUs": 76.5727,
+      "afterUs": 44.5672,
+      "changePercent": -41.79753358572964
+    },
+    "reverb": {
+      "before": "initial",
+      "beforeUs": 513.2,
+      "afterUs": 534.324,
+      "changePercent": 4.116134060794985
+    },
+    "eq": {
+      "before": "initial",
+      "beforeUs": 8.04346,
+      "afterUs": 8.00527,
+      "changePercent": -0.4747956725090985
+    }
+  },
+  "pcmComparison": {
+    "effects": {
+      "samples": 5873728,
+      "maxAbs": 1.4901161193847656e-08,
+      "rmsError": 6.874496960717476e-12,
+      "nonFinite": 0
+    },
+    "convolution": {
+      "samples": 32768,
+      "maxAbs": 5.960464477539063e-08,
+      "rmsError": 1.4075115141501356e-08,
+      "nonFinite": 0
+    },
+    "compressor": {
+      "samples": 262144,
+      "maxAbs": 4.76837158203125e-07,
+      "rmsError": 8.716787028713433e-08,
+      "nonFinite": 0
+    }
+  },
+  "benchmark": {
+    "protocol": "offline, deterministic input, 48 kHz, fresh processes, alternating order, excluded warmup; elapsed processing time, not hardware CPU/xruns",
+    "platform": "Windows-10-10.0.19044-SP0",
+    "processor": "AMD64 Family 25 Model 97 Stepping 2, AuthenticAMD",
+    "hashes": {
+      "initial": "4e78bbac05987a43715d002670913494b9be1258b491fc65ee99ae061ae9235a",
+      "convolutionBefore": "21ce48c69c7fc59154068a1cabf9173e30a8ce0c0288340cfdd201a7f76b5b09",
+      "compressorBefore": "f59de2ebdc53a4776e483af21a5c4b4d17871f437456a685ead66cb555de47cf",
+      "integrated": "c0d176551ce9390b4a7230dae4b265b74c9c3d347a47650a6ca36c45e23fcf15"
+    },
+    "runs": [
+      {
+        "round": 1,
+        "variant": "initial",
+        "command": [
+          "D:\\_Project\\CyDAW_Project\\output\\cydsp-numerical\\2026-11-14\\baseline.exe",
+          "--bench"
+        ],
+        "stdout": "reverb,64,32.1655\neq,64,0.521973\nreverb,256,127.193\neq,256,2.06436\nreverb,1024,508.489\neq,1024,8.00957\n",
+        "stderr": "",
+        "measurements": [
+          {
+            "kernel": "reverb",
+            "frames": 64,
+            "microseconds": 32.1655
+          },
+          {
+            "kernel": "eq",
+            "frames": 64,
+            "microseconds": 0.521973
+          },
+          {
+            "kernel": "reverb",
+            "frames": 256,
+            "microseconds": 127.193
+          },
+          {
+            "kernel": "eq",
+            "frames": 256,
+            "microseconds": 2.06436
+          },
+          {
+            "kernel": "reverb",
+            "frames": 1024,
+            "microseconds": 508.489
+          },
+          {
+            "kernel": "eq",
+            "frames": 1024,
+            "microseconds": 8.00957
+          }
+        ]
+      },
+      {
+        "round": 1,
+        "variant": "convolutionBefore",
+        "command": [
+          "D:\\_Project\\CyDAW_Project\\output\\cydsp-numerical\\2026-11-14\\primitives.exe",
+          "--bench"
+        ],
+        "stdout": "reverb,64,36.4586\neq,64,0.518652\nreverb,256,145.724\neq,256,2.01523\nreverb,1024,583.405\neq,1024,8.00615\nconvolver,1024,76.3863\n",
+        "stderr": "",
+        "measurements": [
+          {
+            "kernel": "reverb",
+            "frames": 64,
+            "microseconds": 36.4586
+          },
+          {
+            "kernel": "eq",
+            "frames": 64,
+            "microseconds": 0.518652
+          },
+          {
+            "kernel": "reverb",
+            "frames": 256,
+            "microseconds": 145.724
+          },
+          {
+            "kernel": "eq",
+            "frames": 256,
+            "microseconds": 2.01523
+          },
+          {
+            "kernel": "reverb",
+            "frames": 1024,
+            "microseconds": 583.405
+          },
+          {
+            "kernel": "eq",
+            "frames": 1024,
+            "microseconds": 8.00615
+          },
+          {
+            "kernel": "convolver",
+            "frames": 1024,
+            "microseconds": 76.3863
+          }
+        ]
+      },
+      {
+        "round": 1,
+        "variant": "compressorBefore",
+        "command": [
+          "D:\\_Project\\CyDAW_Project\\output\\cydsp-numerical\\2026-11-14\\compressor-before.exe",
+          "--bench"
+        ],
+        "stdout": "reverb,64,33.0024\neq,64,0.520508\nreverb,256,132.75\neq,256,2.02041\nreverb,1024,533.247\neq,1024,8.05215\nconvolver,1024,45.2641\ncompressor,1024,17.2518\n",
+        "stderr": "",
+        "measurements": [
+          {
+            "kernel": "reverb",
+            "frames": 64,
+            "microseconds": 33.0024
+          },
+          {
+            "kernel": "eq",
+            "frames": 64,
+            "microseconds": 0.520508
+          },
+          {
+            "kernel": "reverb",
+            "frames": 256,
+            "microseconds": 132.75
+          },
+          {
+            "kernel": "eq",
+            "frames": 256,
+            "microseconds": 2.02041
+          },
+          {
+            "kernel": "reverb",
+            "frames": 1024,
+            "microseconds": 533.247
+          },
+          {
+            "kernel": "eq",
+            "frames": 1024,
+            "microseconds": 8.05215
+          },
+          {
+            "kernel": "convolver",
+            "frames": 1024,
+            "microseconds": 45.2641
+          },
+          {
+            "kernel": "compressor",
+            "frames": 1024,
+            "microseconds": 17.2518
+          }
+        ]
+      },
+      {
+        "round": 1,
+        "variant": "integrated",
+        "command": [
+          "D:\\_Project\\CyDAW_Project\\output\\cydsp-numerical\\2026-11-14\\selected-final.exe",
+          "--bench"
+        ],
+        "stdout": "reverb,64,33.0624\neq,64,0.522266\nreverb,256,133.221\neq,256,2.01582\nreverb,1024,533.584\neq,1024,8.00527\nconvolver,1024,44.5672\ncompressor,1024,10.9481\n",
+        "stderr": "",
+        "measurements": [
+          {
+            "kernel": "reverb",
+            "frames": 64,
+            "microseconds": 33.0624
+          },
+          {
+            "kernel": "eq",
+            "frames": 64,
+            "microseconds": 0.522266
+          },
+          {
+            "kernel": "reverb",
+            "frames": 256,
+            "microseconds": 133.221
+          },
+          {
+            "kernel": "eq",
+            "frames": 256,
+            "microseconds": 2.01582
+          },
+          {
+            "kernel": "reverb",
+            "frames": 1024,
+            "microseconds": 533.584
+          },
+          {
+            "kernel": "eq",
+            "frames": 1024,
+            "microseconds": 8.00527
+          },
+          {
+            "kernel": "convolver",
+            "frames": 1024,
+            "microseconds": 44.5672
+          },
+          {
+            "kernel": "compressor",
+            "frames": 1024,
+            "microseconds": 10.9481
+          }
+        ]
+      },
+      {
+        "round": 2,
+        "variant": "integrated",
+        "command": [
+          "D:\\_Project\\CyDAW_Project\\output\\cydsp-numerical\\2026-11-14\\selected-final.exe",
+          "--bench"
+        ],
+        "stdout": "reverb,64,33.078\neq,64,0.527441\nreverb,256,132.732\neq,256,2.01494\nreverb,1024,532.894\neq,1024,7.99883\nconvolver,1024,44.307\ncompressor,1024,10.73\n",
+        "stderr": "",
+        "measurements": [
+          {
+            "kernel": "reverb",
+            "frames": 64,
+            "microseconds": 33.078
+          },
+          {
+            "kernel": "eq",
+            "frames": 64,
+            "microseconds": 0.527441
+          },
+          {
+            "kernel": "reverb",
+            "frames": 256,
+            "microseconds": 132.732
+          },
+          {
+            "kernel": "eq",
+            "frames": 256,
+            "microseconds": 2.01494
+          },
+          {
+            "kernel": "reverb",
+            "frames": 1024,
+            "microseconds": 532.894
+          },
+          {
+            "kernel": "eq",
+            "frames": 1024,
+            "microseconds": 7.99883
+          },
+          {
+            "kernel": "convolver",
+            "frames": 1024,
+            "microseconds": 44.307
+          },
+          {
+            "kernel": "compressor",
+            "frames": 1024,
+            "microseconds": 10.73
+          }
+        ]
+      },
+      {
+        "round": 2,
+        "variant": "compressorBefore",
+        "command": [
+          "D:\\_Project\\CyDAW_Project\\output\\cydsp-numerical\\2026-11-14\\compressor-before.exe",
+          "--bench"
+        ],
+        "stdout": "reverb,64,33.0856\neq,64,0.519434\nreverb,256,133.567\neq,256,2.01514\nreverb,1024,535.839\neq,1024,8.04414\nconvolver,1024,45.2262\ncompressor,1024,17.2509\n",
+        "stderr": "",
+        "measurements": [
+          {
+            "kernel": "reverb",
+            "frames": 64,
+            "microseconds": 33.0856
+          },
+          {
+            "kernel": "eq",
+            "frames": 64,
+            "microseconds": 0.519434
+          },
+          {
+            "kernel": "reverb",
+            "frames": 256,
+            "microseconds": 133.567
+          },
+          {
+            "kernel": "eq",
+            "frames": 256,
+            "microseconds": 2.01514
+          },
+          {
+            "kernel": "reverb",
+            "frames": 1024,
+            "microseconds": 535.839
+          },
+          {
+            "kernel": "eq",
+            "frames": 1024,
+            "microseconds": 8.04414
+          },
+          {
+            "kernel": "convolver",
+            "frames": 1024,
+            "microseconds": 45.2262
+          },
+          {
+            "kernel": "compressor",
+            "frames": 1024,
+            "microseconds": 17.2509
+          }
+        ]
+      },
+      {
+        "round": 2,
+        "variant": "convolutionBefore",
+        "command": [
+          "D:\\_Project\\CyDAW_Project\\output\\cydsp-numerical\\2026-11-14\\primitives.exe",
+          "--bench"
+        ],
+        "stdout": "reverb,64,36.3118\neq,64,0.523047\nreverb,256,146.201\neq,256,2.01963\nreverb,1024,583.589\neq,1024,8.0334\nconvolver,1024,76.1324\n",
+        "stderr": "",
+        "measurements": [
+          {
+            "kernel": "reverb",
+            "frames": 64,
+            "microseconds": 36.3118
+          },
+          {
+            "kernel": "eq",
+            "frames": 64,
+            "microseconds": 0.523047
+          },
+          {
+            "kernel": "reverb",
+            "frames": 256,
+            "microseconds": 146.201
+          },
+          {
+            "kernel": "eq",
+            "frames": 256,
+            "microseconds": 2.01963
+          },
+          {
+            "kernel": "reverb",
+            "frames": 1024,
+            "microseconds": 583.589
+          },
+          {
+            "kernel": "eq",
+            "frames": 1024,
+            "microseconds": 8.0334
+          },
+          {
+            "kernel": "convolver",
+            "frames": 1024,
+            "microseconds": 76.1324
+          }
+        ]
+      },
+      {
+        "round": 2,
+        "variant": "initial",
+        "command": [
+          "D:\\_Project\\CyDAW_Project\\output\\cydsp-numerical\\2026-11-14\\baseline.exe",
+          "--bench"
+        ],
+        "stdout": "reverb,64,31.6077\neq,64,0.534668\nreverb,256,129.03\neq,256,2.03291\nreverb,1024,513.311\neq,1024,8.27852\n",
+        "stderr": "",
+        "measurements": [
+          {
+            "kernel": "reverb",
+            "frames": 64,
+            "microseconds": 31.6077
+          },
+          {
+            "kernel": "eq",
+            "frames": 64,
+            "microseconds": 0.534668
+          },
+          {
+            "kernel": "reverb",
+            "frames": 256,
+            "microseconds": 129.03
+          },
+          {
+            "kernel": "eq",
+            "frames": 256,
+            "microseconds": 2.03291
+          },
+          {
+            "kernel": "reverb",
+            "frames": 1024,
+            "microseconds": 513.311
+          },
+          {
+            "kernel": "eq",
+            "frames": 1024,
+            "microseconds": 8.27852
+          }
+        ]
+      },
+      {
+        "round": 3,
+        "variant": "initial",
+        "command": [
+          "D:\\_Project\\CyDAW_Project\\output\\cydsp-numerical\\2026-11-14\\baseline.exe",
+          "--bench"
+        ],
+        "stdout": "reverb,64,31.7037\neq,64,0.518945\nreverb,256,128.646\neq,256,2.01777\nreverb,1024,512.626\neq,1024,8.04346\n",
+        "stderr": "",
+        "measurements": [
+          {
+            "kernel": "reverb",
+            "frames": 64,
+            "microseconds": 31.7037
+          },
+          {
+            "kernel": "eq",
+            "frames": 64,
+            "microseconds": 0.518945
+          },
+          {
+            "kernel": "reverb",
+            "frames": 256,
+            "microseconds": 128.646
+          },
+          {
+            "kernel": "eq",
+            "frames": 256,
+            "microseconds": 2.01777
+          },
+          {
+            "kernel": "reverb",
+            "frames": 1024,
+            "microseconds": 512.626
+          },
+          {
+            "kernel": "eq",
+            "frames": 1024,
+            "microseconds": 8.04346
+          }
+        ]
+      },
+      {
+        "round": 3,
+        "variant": "convolutionBefore",
+        "command": [
+          "D:\\_Project\\CyDAW_Project\\output\\cydsp-numerical\\2026-11-14\\primitives.exe",
+          "--bench"
+        ],
+        "stdout": "reverb,64,36.4484\neq,64,0.520996\nreverb,256,146.522\neq,256,2.01807\nreverb,1024,588.809\neq,1024,8.00303\nconvolver,1024,77.2047\n",
+        "stderr": "",
+        "measurements": [
+          {
+            "kernel": "reverb",
+            "frames": 64,
+            "microseconds": 36.4484
+          },
+          {
+            "kernel": "eq",
+            "frames": 64,
+            "microseconds": 0.520996
+          },
+          {
+            "kernel": "reverb",
+            "frames": 256,
+            "microseconds": 146.522
+          },
+          {
+            "kernel": "eq",
+            "frames": 256,
+            "microseconds": 2.01807
+          },
+          {
+            "kernel": "reverb",
+            "frames": 1024,
+            "microseconds": 588.809
+          },
+          {
+            "kernel": "eq",
+            "frames": 1024,
+            "microseconds": 8.00303
+          },
+          {
+            "kernel": "convolver",
+            "frames": 1024,
+            "microseconds": 77.2047
+          }
+        ]
+      },
+      {
+        "round": 3,
+        "variant": "compressorBefore",
+        "command": [
+          "D:\\_Project\\CyDAW_Project\\output\\cydsp-numerical\\2026-11-14\\compressor-before.exe",
+          "--bench"
+        ],
+        "stdout": "reverb,64,33.1094\neq,64,0.519336\nreverb,256,134.118\neq,256,2.02275\nreverb,1024,538.551\neq,1024,8.01592\nconvolver,1024,44.6828\ncompressor,1024,17.3002\n",
+        "stderr": "",
+        "measurements": [
+          {
+            "kernel": "reverb",
+            "frames": 64,
+            "microseconds": 33.1094
+          },
+          {
+            "kernel": "eq",
+            "frames": 64,
+            "microseconds": 0.519336
+          },
+          {
+            "kernel": "reverb",
+            "frames": 256,
+            "microseconds": 134.118
+          },
+          {
+            "kernel": "eq",
+            "frames": 256,
+            "microseconds": 2.02275
+          },
+          {
+            "kernel": "reverb",
+            "frames": 1024,
+            "microseconds": 538.551
+          },
+          {
+            "kernel": "eq",
+            "frames": 1024,
+            "microseconds": 8.01592
+          },
+          {
+            "kernel": "convolver",
+            "frames": 1024,
+            "microseconds": 44.6828
+          },
+          {
+            "kernel": "compressor",
+            "frames": 1024,
+            "microseconds": 17.3002
+          }
+        ]
+      },
+      {
+        "round": 3,
+        "variant": "integrated",
+        "command": [
+          "D:\\_Project\\CyDAW_Project\\output\\cydsp-numerical\\2026-11-14\\selected-final.exe",
+          "--bench"
+        ],
+        "stdout": "reverb,64,33.2999\neq,64,0.527246\nreverb,256,137.714\neq,256,2.01348\nreverb,1024,535.363\neq,1024,8.01318\nconvolver,1024,45.293\ncompressor,1024,10.7556\n",
+        "stderr": "",
+        "measurements": [
+          {
+            "kernel": "reverb",
+            "frames": 64,
+            "microseconds": 33.2999
+          },
+          {
+            "kernel": "eq",
+            "frames": 64,
+            "microseconds": 0.527246
+          },
+          {
+            "kernel": "reverb",
+            "frames": 256,
+            "microseconds": 137.714
+          },
+          {
+            "kernel": "eq",
+            "frames": 256,
+            "microseconds": 2.01348
+          },
+          {
+            "kernel": "reverb",
+            "frames": 1024,
+            "microseconds": 535.363
+          },
+          {
+            "kernel": "eq",
+            "frames": 1024,
+            "microseconds": 8.01318
+          },
+          {
+            "kernel": "convolver",
+            "frames": 1024,
+            "microseconds": 45.293
+          },
+          {
+            "kernel": "compressor",
+            "frames": 1024,
+            "microseconds": 10.7556
+          }
+        ]
+      },
+      {
+        "round": 4,
+        "variant": "integrated",
+        "command": [
+          "D:\\_Project\\CyDAW_Project\\output\\cydsp-numerical\\2026-11-14\\selected-final.exe",
+          "--bench"
+        ],
+        "stdout": "reverb,64,33.2075\neq,64,0.683105\nreverb,256,133.525\neq,256,2.57285\nreverb,1024,536.589\neq,1024,10.4159\nconvolver,1024,45.5949\ncompressor,1024,10.8528\n",
+        "stderr": "",
+        "measurements": [
+          {
+            "kernel": "reverb",
+            "frames": 64,
+            "microseconds": 33.2075
+          },
+          {
+            "kernel": "eq",
+            "frames": 64,
+            "microseconds": 0.683105
+          },
+          {
+            "kernel": "reverb",
+            "frames": 256,
+            "microseconds": 133.525
+          },
+          {
+            "kernel": "eq",
+            "frames": 256,
+            "microseconds": 2.57285
+          },
+          {
+            "kernel": "reverb",
+            "frames": 1024,
+            "microseconds": 536.589
+          },
+          {
+            "kernel": "eq",
+            "frames": 1024,
+            "microseconds": 10.4159
+          },
+          {
+            "kernel": "convolver",
+            "frames": 1024,
+            "microseconds": 45.5949
+          },
+          {
+            "kernel": "compressor",
+            "frames": 1024,
+            "microseconds": 10.8528
+          }
+        ]
+      },
+      {
+        "round": 4,
+        "variant": "compressorBefore",
+        "command": [
+          "D:\\_Project\\CyDAW_Project\\output\\cydsp-numerical\\2026-11-14\\compressor-before.exe",
+          "--bench"
+        ],
+        "stdout": "reverb,64,33.3886\neq,64,0.519434\nreverb,256,133.705\neq,256,2.04102\nreverb,1024,538.689\neq,1024,8.12949\nconvolver,1024,45.3371\ncompressor,1024,17.337\n",
+        "stderr": "",
+        "measurements": [
+          {
+            "kernel": "reverb",
+            "frames": 64,
+            "microseconds": 33.3886
+          },
+          {
+            "kernel": "eq",
+            "frames": 64,
+            "microseconds": 0.519434
+          },
+          {
+            "kernel": "reverb",
+            "frames": 256,
+            "microseconds": 133.705
+          },
+          {
+            "kernel": "eq",
+            "frames": 256,
+            "microseconds": 2.04102
+          },
+          {
+            "kernel": "reverb",
+            "frames": 1024,
+            "microseconds": 538.689
+          },
+          {
+            "kernel": "eq",
+            "frames": 1024,
+            "microseconds": 8.12949
+          },
+          {
+            "kernel": "convolver",
+            "frames": 1024,
+            "microseconds": 45.3371
+          },
+          {
+            "kernel": "compressor",
+            "frames": 1024,
+            "microseconds": 17.337
+          }
+        ]
+      },
+      {
+        "round": 4,
+        "variant": "convolutionBefore",
+        "command": [
+          "D:\\_Project\\CyDAW_Project\\output\\cydsp-numerical\\2026-11-14\\primitives.exe",
+          "--bench"
+        ],
+        "stdout": "reverb,64,37.7752\neq,64,0.523438\nreverb,256,147.308\neq,256,2.0168\nreverb,1024,584.414\neq,1024,8.03223\nconvolver,1024,76.5727\n",
+        "stderr": "",
+        "measurements": [
+          {
+            "kernel": "reverb",
+            "frames": 64,
+            "microseconds": 37.7752
+          },
+          {
+            "kernel": "eq",
+            "frames": 64,
+            "microseconds": 0.523438
+          },
+          {
+            "kernel": "reverb",
+            "frames": 256,
+            "microseconds": 147.308
+          },
+          {
+            "kernel": "eq",
+            "frames": 256,
+            "microseconds": 2.0168
+          },
+          {
+            "kernel": "reverb",
+            "frames": 1024,
+            "microseconds": 584.414
+          },
+          {
+            "kernel": "eq",
+            "frames": 1024,
+            "microseconds": 8.03223
+          },
+          {
+            "kernel": "convolver",
+            "frames": 1024,
+            "microseconds": 76.5727
+          }
+        ]
+      },
+      {
+        "round": 4,
+        "variant": "initial",
+        "command": [
+          "D:\\_Project\\CyDAW_Project\\output\\cydsp-numerical\\2026-11-14\\baseline.exe",
+          "--bench"
+        ],
+        "stdout": "reverb,64,31.7163\neq,64,0.520801\nreverb,256,127.647\neq,256,2.02031\nreverb,1024,513.2\neq,1024,8.01406\n",
+        "stderr": "",
+        "measurements": [
+          {
+            "kernel": "reverb",
+            "frames": 64,
+            "microseconds": 31.7163
+          },
+          {
+            "kernel": "eq",
+            "frames": 64,
+            "microseconds": 0.520801
+          },
+          {
+            "kernel": "reverb",
+            "frames": 256,
+            "microseconds": 127.647
+          },
+          {
+            "kernel": "eq",
+            "frames": 256,
+            "microseconds": 2.02031
+          },
+          {
+            "kernel": "reverb",
+            "frames": 1024,
+            "microseconds": 513.2
+          },
+          {
+            "kernel": "eq",
+            "frames": 1024,
+            "microseconds": 8.01406
+          }
+        ]
+      },
+      {
+        "round": 5,
+        "variant": "initial",
+        "command": [
+          "D:\\_Project\\CyDAW_Project\\output\\cydsp-numerical\\2026-11-14\\baseline.exe",
+          "--bench"
+        ],
+        "stdout": "reverb,64,32.0745\neq,64,0.519141\nreverb,256,130.035\neq,256,2.02031\nreverb,1024,518.718\neq,1024,8.05449\n",
+        "stderr": "",
+        "measurements": [
+          {
+            "kernel": "reverb",
+            "frames": 64,
+            "microseconds": 32.0745
+          },
+          {
+            "kernel": "eq",
+            "frames": 64,
+            "microseconds": 0.519141
+          },
+          {
+            "kernel": "reverb",
+            "frames": 256,
+            "microseconds": 130.035
+          },
+          {
+            "kernel": "eq",
+            "frames": 256,
+            "microseconds": 2.02031
+          },
+          {
+            "kernel": "reverb",
+            "frames": 1024,
+            "microseconds": 518.718
+          },
+          {
+            "kernel": "eq",
+            "frames": 1024,
+            "microseconds": 8.05449
+          }
+        ]
+      },
+      {
+        "round": 5,
+        "variant": "convolutionBefore",
+        "command": [
+          "D:\\_Project\\CyDAW_Project\\output\\cydsp-numerical\\2026-11-14\\primitives.exe",
+          "--bench"
+        ],
+        "stdout": "reverb,64,37.5076\neq,64,0.529687\nreverb,256,146.039\neq,256,2.02695\nreverb,1024,587.612\neq,1024,8.00205\nconvolver,1024,77.366\n",
+        "stderr": "",
+        "measurements": [
+          {
+            "kernel": "reverb",
+            "frames": 64,
+            "microseconds": 37.5076
+          },
+          {
+            "kernel": "eq",
+            "frames": 64,
+            "microseconds": 0.529687
+          },
+          {
+            "kernel": "reverb",
+            "frames": 256,
+            "microseconds": 146.039
+          },
+          {
+            "kernel": "eq",
+            "frames": 256,
+            "microseconds": 2.02695
+          },
+          {
+            "kernel": "reverb",
+            "frames": 1024,
+            "microseconds": 587.612
+          },
+          {
+            "kernel": "eq",
+            "frames": 1024,
+            "microseconds": 8.00205
+          },
+          {
+            "kernel": "convolver",
+            "frames": 1024,
+            "microseconds": 77.366
+          }
+        ]
+      },
+      {
+        "round": 5,
+        "variant": "compressorBefore",
+        "command": [
+          "D:\\_Project\\CyDAW_Project\\output\\cydsp-numerical\\2026-11-14\\compressor-before.exe",
+          "--bench"
+        ],
+        "stdout": "reverb,64,33.1313\neq,64,0.524219\nreverb,256,137.944\neq,256,2.02041\nreverb,1024,540.446\neq,1024,7.99834\nconvolver,1024,44.9242\ncompressor,1024,17.461\n",
+        "stderr": "",
+        "measurements": [
+          {
+            "kernel": "reverb",
+            "frames": 64,
+            "microseconds": 33.1313
+          },
+          {
+            "kernel": "eq",
+            "frames": 64,
+            "microseconds": 0.524219
+          },
+          {
+            "kernel": "reverb",
+            "frames": 256,
+            "microseconds": 137.944
+          },
+          {
+            "kernel": "eq",
+            "frames": 256,
+            "microseconds": 2.02041
+          },
+          {
+            "kernel": "reverb",
+            "frames": 1024,
+            "microseconds": 540.446
+          },
+          {
+            "kernel": "eq",
+            "frames": 1024,
+            "microseconds": 7.99834
+          },
+          {
+            "kernel": "convolver",
+            "frames": 1024,
+            "microseconds": 44.9242
+          },
+          {
+            "kernel": "compressor",
+            "frames": 1024,
+            "microseconds": 17.461
+          }
+        ]
+      },
+      {
+        "round": 5,
+        "variant": "integrated",
+        "command": [
+          "D:\\_Project\\CyDAW_Project\\output\\cydsp-numerical\\2026-11-14\\selected-final.exe",
+          "--bench"
+        ],
+        "stdout": "reverb,64,39.3954\neq,64,0.579395\nreverb,256,139.325\neq,256,2.02139\nreverb,1024,534.324\neq,1024,8.00254\nconvolver,1024,44.3277\ncompressor,1024,10.7254\n",
+        "stderr": "",
+        "measurements": [
+          {
+            "kernel": "reverb",
+            "frames": 64,
+            "microseconds": 39.3954
+          },
+          {
+            "kernel": "eq",
+            "frames": 64,
+            "microseconds": 0.579395
+          },
+          {
+            "kernel": "reverb",
+            "frames": 256,
+            "microseconds": 139.325
+          },
+          {
+            "kernel": "eq",
+            "frames": 256,
+            "microseconds": 2.02139
+          },
+          {
+            "kernel": "reverb",
+            "frames": 1024,
+            "microseconds": 534.324
+          },
+          {
+            "kernel": "eq",
+            "frames": 1024,
+            "microseconds": 8.00254
+          },
+          {
+            "kernel": "convolver",
+            "frames": 1024,
+            "microseconds": 44.3277
+          },
+          {
+            "kernel": "compressor",
+            "frames": 1024,
+            "microseconds": 10.7254
+          }
+        ]
+      }
+    ],
+    "summary": {
+      "initial": {
+        "eq/64": {
+          "medianUs": 0.520801,
+          "minUs": 0.518945,
+          "maxUs": 0.534668,
+          "rawUs": [
+            0.521973,
+            0.534668,
+            0.518945,
+            0.520801,
+            0.519141
+          ]
+        },
+        "eq/256": {
+          "medianUs": 2.02031,
+          "minUs": 2.01777,
+          "maxUs": 2.06436,
+          "rawUs": [
+            2.06436,
+            2.03291,
+            2.01777,
+            2.02031,
+            2.02031
+          ]
+        },
+        "eq/1024": {
+          "medianUs": 8.04346,
+          "minUs": 8.00957,
+          "maxUs": 8.27852,
+          "rawUs": [
+            8.00957,
+            8.27852,
+            8.04346,
+            8.01406,
+            8.05449
+          ]
+        },
+        "reverb/64": {
+          "medianUs": 31.7163,
+          "minUs": 31.6077,
+          "maxUs": 32.1655,
+          "rawUs": [
+            32.1655,
+            31.6077,
+            31.7037,
+            31.7163,
+            32.0745
+          ]
+        },
+        "reverb/256": {
+          "medianUs": 128.646,
+          "minUs": 127.193,
+          "maxUs": 130.035,
+          "rawUs": [
+            127.193,
+            129.03,
+            128.646,
+            127.647,
+            130.035
+          ]
+        },
+        "reverb/1024": {
+          "medianUs": 513.2,
+          "minUs": 508.489,
+          "maxUs": 518.718,
+          "rawUs": [
+            508.489,
+            513.311,
+            512.626,
+            513.2,
+            518.718
+          ]
+        }
+      },
+      "convolutionBefore": {
+        "convolver/1024": {
+          "medianUs": 76.5727,
+          "minUs": 76.1324,
+          "maxUs": 77.366,
+          "rawUs": [
+            76.3863,
+            76.1324,
+            77.2047,
+            76.5727,
+            77.366
+          ]
+        },
+        "eq/64": {
+          "medianUs": 0.523047,
+          "minUs": 0.518652,
+          "maxUs": 0.529687,
+          "rawUs": [
+            0.518652,
+            0.523047,
+            0.520996,
+            0.523438,
+            0.529687
+          ]
+        },
+        "eq/256": {
+          "medianUs": 2.01807,
+          "minUs": 2.01523,
+          "maxUs": 2.02695,
+          "rawUs": [
+            2.01523,
+            2.01963,
+            2.01807,
+            2.0168,
+            2.02695
+          ]
+        },
+        "eq/1024": {
+          "medianUs": 8.00615,
+          "minUs": 8.00205,
+          "maxUs": 8.0334,
+          "rawUs": [
+            8.00615,
+            8.0334,
+            8.00303,
+            8.03223,
+            8.00205
+          ]
+        },
+        "reverb/64": {
+          "medianUs": 36.4586,
+          "minUs": 36.3118,
+          "maxUs": 37.7752,
+          "rawUs": [
+            36.4586,
+            36.3118,
+            36.4484,
+            37.7752,
+            37.5076
+          ]
+        },
+        "reverb/256": {
+          "medianUs": 146.201,
+          "minUs": 145.724,
+          "maxUs": 147.308,
+          "rawUs": [
+            145.724,
+            146.201,
+            146.522,
+            147.308,
+            146.039
+          ]
+        },
+        "reverb/1024": {
+          "medianUs": 584.414,
+          "minUs": 583.405,
+          "maxUs": 588.809,
+          "rawUs": [
+            583.405,
+            583.589,
+            588.809,
+            584.414,
+            587.612
+          ]
+        }
+      },
+      "compressorBefore": {
+        "compressor/1024": {
+          "medianUs": 17.3002,
+          "minUs": 17.2509,
+          "maxUs": 17.461,
+          "rawUs": [
+            17.2518,
+            17.2509,
+            17.3002,
+            17.337,
+            17.461
+          ]
+        },
+        "convolver/1024": {
+          "medianUs": 45.2262,
+          "minUs": 44.6828,
+          "maxUs": 45.3371,
+          "rawUs": [
+            45.2641,
+            45.2262,
+            44.6828,
+            45.3371,
+            44.9242
+          ]
+        },
+        "eq/64": {
+          "medianUs": 0.519434,
+          "minUs": 0.519336,
+          "maxUs": 0.524219,
+          "rawUs": [
+            0.520508,
+            0.519434,
+            0.519336,
+            0.519434,
+            0.524219
+          ]
+        },
+        "eq/256": {
+          "medianUs": 2.02041,
+          "minUs": 2.01514,
+          "maxUs": 2.04102,
+          "rawUs": [
+            2.02041,
+            2.01514,
+            2.02275,
+            2.04102,
+            2.02041
+          ]
+        },
+        "eq/1024": {
+          "medianUs": 8.04414,
+          "minUs": 7.99834,
+          "maxUs": 8.12949,
+          "rawUs": [
+            8.05215,
+            8.04414,
+            8.01592,
+            8.12949,
+            7.99834
+          ]
+        },
+        "reverb/64": {
+          "medianUs": 33.1094,
+          "minUs": 33.0024,
+          "maxUs": 33.3886,
+          "rawUs": [
+            33.0024,
+            33.0856,
+            33.1094,
+            33.3886,
+            33.1313
+          ]
+        },
+        "reverb/256": {
+          "medianUs": 133.705,
+          "minUs": 132.75,
+          "maxUs": 137.944,
+          "rawUs": [
+            132.75,
+            133.567,
+            134.118,
+            133.705,
+            137.944
+          ]
+        },
+        "reverb/1024": {
+          "medianUs": 538.551,
+          "minUs": 533.247,
+          "maxUs": 540.446,
+          "rawUs": [
+            533.247,
+            535.839,
+            538.551,
+            538.689,
+            540.446
+          ]
+        }
+      },
+      "integrated": {
+        "compressor/1024": {
+          "medianUs": 10.7556,
+          "minUs": 10.7254,
+          "maxUs": 10.9481,
+          "rawUs": [
+            10.9481,
+            10.73,
+            10.7556,
+            10.8528,
+            10.7254
+          ]
+        },
+        "convolver/1024": {
+          "medianUs": 44.5672,
+          "minUs": 44.307,
+          "maxUs": 45.5949,
+          "rawUs": [
+            44.5672,
+            44.307,
+            45.293,
+            45.5949,
+            44.3277
+          ]
+        },
+        "eq/64": {
+          "medianUs": 0.527441,
+          "minUs": 0.522266,
+          "maxUs": 0.683105,
+          "rawUs": [
+            0.522266,
+            0.527441,
+            0.527246,
+            0.683105,
+            0.579395
+          ]
+        },
+        "eq/256": {
+          "medianUs": 2.01582,
+          "minUs": 2.01348,
+          "maxUs": 2.57285,
+          "rawUs": [
+            2.01582,
+            2.01494,
+            2.01348,
+            2.57285,
+            2.02139
+          ]
+        },
+        "eq/1024": {
+          "medianUs": 8.00527,
+          "minUs": 7.99883,
+          "maxUs": 10.4159,
+          "rawUs": [
+            8.00527,
+            7.99883,
+            8.01318,
+            10.4159,
+            8.00254
+          ]
+        },
+        "reverb/64": {
+          "medianUs": 33.2075,
+          "minUs": 33.0624,
+          "maxUs": 39.3954,
+          "rawUs": [
+            33.0624,
+            33.078,
+            33.2999,
+            33.2075,
+            39.3954
+          ]
+        },
+        "reverb/256": {
+          "medianUs": 133.525,
+          "minUs": 132.732,
+          "maxUs": 139.325,
+          "rawUs": [
+            133.221,
+            132.732,
+            137.714,
+            133.525,
+            139.325
+          ]
+        },
+        "reverb/1024": {
+          "medianUs": 534.324,
+          "minUs": 532.894,
+          "maxUs": 536.589,
+          "rawUs": [
+            533.584,
+            532.894,
+            535.363,
+            536.589,
+            534.324
+          ]
+        }
+      }
+    }
+  },
+  "validation": {
+    "ctest": {
+      "name": "(empty)",
+      "tests": "121",
+      "failures": "0",
+      "disabled": "0",
+      "skipped": "0",
+      "hostname": "",
+      "time": "474",
+      "timestamp": "2026-11-14T03:00:28"
+    },
+    "fullSuiteLog": "output/cydsp-numerical/2026-11-14/ctest.log",
+    "guardRetest": "Internal ctest changing into directory: D:/_Project/CyDAW_Project/build/cydsp-numerical\nTest project D:/_Project/CyDAW_Project/build/cydsp-numerical\n    Start 4: cydaw_dsp_reuse_tests\n1/1 Test #4: cydaw_dsp_reuse_tests ............   Passed    1.17 sec\n\n100% tests passed, 0 tests failed out of 1\n\nTotal Test time (real) =   1.18 sec\n",
+    "noJuceGraph": true,
+    "physicalAudioPerformance": false,
+    "listening": false,
+    "linuxMacOS": false,
+    "newPluginExportBinaries": false
+  },
+  "experiments": {
+    "fdnBanks": [
+      {
+        "round": 0,
+        "variant": "baseline",
+        "csv": "reverb,64,31.6319\neq,64,0.525293\nreverb,256,127.805\neq,256,2.01904\nreverb,1024,508.228\neq,1024,8.396\n"
+      },
+      {
+        "round": 0,
+        "variant": "banks",
+        "csv": "reverb,64,48.6919\neq,64,0.524219\nreverb,256,194.701\neq,256,2.01797\nreverb,1024,783.745\neq,1024,8.01348\n"
+      },
+      {
+        "round": 1,
+        "variant": "banks",
+        "csv": "reverb,64,48.1074\neq,64,0.521875\nreverb,256,194.193\neq,256,2.01855\nreverb,1024,799.146\neq,1024,8.00186\n"
+      },
+      {
+        "round": 1,
+        "variant": "baseline",
+        "csv": "reverb,64,32.4813\neq,64,0.519629\nreverb,256,127.329\neq,256,2.02012\nreverb,1024,509.992\neq,1024,8.00381\n"
+      },
+      {
+        "round": 2,
+        "variant": "baseline",
+        "csv": "reverb,64,31.6272\neq,64,0.519336\nreverb,256,127.255\neq,256,2.02705\nreverb,1024,508.667\neq,1024,8.0542\n"
+      },
+      {
+        "round": 2,
+        "variant": "banks",
+        "csv": "reverb,64,48.3517\neq,64,0.523926\nreverb,256,195.805\neq,256,2.01826\nreverb,1024,783.054\neq,1024,8.06201\n"
+      }
+    ],
+    "blockFilters": [
+      {
+        "round": 0,
+        "variant": "baseline",
+        "csv": "reverb,64,31.5811\neq,64,0.519434\nreverb,256,127.133\neq,256,2.025\nreverb,1024,509.639\neq,1024,8.00469\n"
+      },
+      {
+        "round": 0,
+        "variant": "blocks",
+        "csv": "reverb,64,33.9416\neq,64,0.934277\nreverb,256,136.625\neq,256,3.45049\nreverb,1024,550.368\neq,1024,13.551\n"
+      },
+      {
+        "round": 1,
+        "variant": "blocks",
+        "csv": "reverb,64,33.9005\neq,64,0.931543\nreverb,256,136.842\neq,256,3.44912\nreverb,1024,550.623\neq,1024,13.547\n"
+      },
+      {
+        "round": 1,
+        "variant": "baseline",
+        "csv": "reverb,64,31.5961\neq,64,0.520605\nreverb,256,127.364\neq,256,2.01973\nreverb,1024,509.449\neq,1024,8.05645\n"
+      },
+      {
+        "round": 2,
+        "variant": "baseline",
+        "csv": "reverb,64,31.5897\neq,64,0.51875\nreverb,256,127.466\neq,256,2.02236\nreverb,1024,508.858\neq,1024,8.09766\n"
+      },
+      {
+        "round": 2,
+        "variant": "blocks",
+        "csv": "reverb,64,33.8862\neq,64,0.932715\nreverb,256,136.396\neq,256,3.45059\nreverb,1024,549.841\neq,1024,13.5983\n"
+      }
+    ],
+    "primitiveIsolation": [
+      {
+        "variant": "gains",
+        "round": 0,
+        "csv": "reverb,64,31.4848\neq,64,0.52666\nreverb,256,126.605\neq,256,2.02168\nreverb,1024,520.595\neq,1024,8.02354\nconvolver,1024,43.9484\n"
+      },
+      {
+        "variant": "gains",
+        "round": 1,
+        "csv": "reverb,64,31.5278\neq,64,0.519727\nreverb,256,126.595\neq,256,2.01699\nreverb,1024,511.981\neq,1024,8.27705\nconvolver,1024,45.3387\n"
+      },
+      {
+        "variant": "gains-polynomial",
+        "round": 0,
+        "csv": "reverb,64,35.5759\neq,64,0.521582\nreverb,256,142.566\neq,256,2.02832\nreverb,1024,557.655\neq,1024,8.00908\nconvolver,1024,45.2672\n"
+      },
+      {
+        "variant": "gains-polynomial",
+        "round": 1,
+        "csv": "reverb,64,34.6202\neq,64,0.520703\nreverb,256,139.169\neq,256,2.01797\nreverb,1024,559.007\neq,1024,8.00576\nconvolver,1024,45.5145\n"
+      },
+      {
+        "variant": "gains-hadamard",
+        "round": 0,
+        "csv": "reverb,64,33.4181\neq,64,0.519531\nreverb,256,133.81\neq,256,2.01631\nreverb,1024,532.235\neq,1024,8.00762\nconvolver,1024,47.0164\n"
+      },
+      {
+        "variant": "gains-hadamard",
+        "round": 1,
+        "csv": "reverb,64,33.2131\neq,64,0.519824\nreverb,256,132.984\neq,256,2.01602\nreverb,1024,534.026\neq,1024,8.23262\nconvolver,1024,47.3371\n"
+      }
+    ]
+  },
+  "remaining": [
+    "Cinema-to-Studio DC component and CUE ASIO findings remain open",
+    "ReverbPro sample-recursive filters/delays and musical topology remain application code",
+    "SDK Hadamard reuse has a measured local whole-ReverbPro cost; not a speedup",
+    "No new whole-process JUCE/ASIO performance equivalence claim"
+  ]
+}

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cydsp/processors/Biquad.h>
+
 #include <algorithm>
 #include <cmath>
 #include <complex>
@@ -28,13 +30,7 @@ inline constexpr int eqBandTypeCount = 8;
 inline constexpr int eqSlopeCount = 4;
 inline constexpr int eqMaximumStages = 4;
 
-struct BiquadCoefficients {
-    double b0 { 1.0 };
-    double b1 {};
-    double b2 {};
-    double a1 {};
-    double a2 {};
-};
+using BiquadCoefficients = cydsp::BiquadCoefficients;
 
 // How many sections a band runs.
 [[nodiscard]] inline int eqBandStages(const EqBandType type, const int slope) noexcept
@@ -63,6 +59,8 @@ inline double butterworthQ(const int order, const int section) noexcept
     return 1.0 / (2.0 * std::cos(angle));
 }
 
+// CyDSP shelves take slope <= 1, while this resonant design takes Q up to 40.
+// Preserve that response until the SDK exposes the same Q-based contract.
 inline BiquadCoefficients shelf(const double frequency, const double gainDb, const double q, const bool high,
                                 const double rate) noexcept
 {
@@ -90,16 +88,12 @@ inline BiquadCoefficients shelf(const double frequency, const double gainDb, con
     using namespace biquad_detail;
     const auto rate = std::max(1'000.0, sampleRate);
     const auto frequency = std::clamp(frequencyHz, 10.0, rate * 0.49);
-    const auto w0 = 2.0 * std::numbers::pi * frequency / rate;
-    const auto cosine = std::cos(w0);
-    const auto sine = std::sin(w0);
+    BiquadCoefficients result;
     const auto quality = std::clamp(q, 0.05, 40.0);
     switch (type) {
-    case EqBandType::bell: {
-        const auto a = std::pow(10.0, gainDb / 40.0);
-        const auto alpha = sine / (2.0 * quality);
-        return normalise(1.0 + alpha * a, -2.0 * cosine, 1.0 - alpha * a, 1.0 + alpha / a, -2.0 * cosine, 1.0 - alpha / a);
-    }
+    case EqBandType::bell:
+        (void) cydsp::designPeakingBiquad(rate, frequency, quality, gainDb, result);
+        return result;
     case EqBandType::lowShelf: return shelf(frequency, gainDb, quality, false, rate);
     case EqBandType::highShelf: return shelf(frequency, gainDb, quality, true, rate);
     case EqBandType::tilt:
@@ -113,18 +107,15 @@ inline BiquadCoefficients shelf(const double frequency, const double gainDb, con
         auto sectionQ = butterworthQ(stages * 2, stage);
         if (stage == stages - 1)
             sectionQ *= quality * std::numbers::sqrt2;
-        const auto alpha = sine / (2.0 * std::max(0.05, sectionQ));
-        if (type == EqBandType::lowCut)
-            return normalise((1.0 + cosine) * 0.5, -(1.0 + cosine), (1.0 + cosine) * 0.5, 1.0 + alpha, -2.0 * cosine, 1.0 - alpha);
-        return normalise((1.0 - cosine) * 0.5, 1.0 - cosine, (1.0 - cosine) * 0.5, 1.0 + alpha, -2.0 * cosine, 1.0 - alpha);
+        (void) cydsp::designBiquad(type == EqBandType::lowCut ? cydsp::BiquadType::highPass : cydsp::BiquadType::lowPass,
+                                   rate, frequency, std::max(0.05, sectionQ), result);
+        return result;
     }
-    case EqBandType::notch: {
-        const auto alpha = sine / (2.0 * quality);
-        return normalise(1.0, -2.0 * cosine, 1.0, 1.0 + alpha, -2.0 * cosine, 1.0 - alpha);
-    }
+    case EqBandType::notch:
     case EqBandType::bandPass: {
-        const auto alpha = sine / (2.0 * quality);
-        return normalise(alpha, 0.0, -alpha, 1.0 + alpha, -2.0 * cosine, 1.0 - alpha);
+        (void) cydsp::designBiquad(type == EqBandType::notch ? cydsp::BiquadType::notch : cydsp::BiquadType::bandPass,
+                                   rate, frequency, quality, result);
+        return result;
     }
     }
     return {};

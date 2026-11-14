@@ -74,8 +74,11 @@ std::vector<std::vector<float>> impulseAtRate(const ImpulseResponse& response, c
 void Convolver::prepare(const std::vector<float>& response)
 {
     constexpr auto size = 2 * block;
+    if (cydsp::VectorOps::create(cydsp::CpuBackend::automatic, ops_) != cydsp::Status::ok)
+        throw std::runtime_error("CyDSP convolution backend preparation failed");
     head_.assign(block, 0.0f);
     std::copy_n(response.begin(), std::min(block, response.size()), head_.begin());
+    std::reverse(head_.begin(), head_.end());
     history_.assign(2 * block, 0.0f);
     historyAt_ = 0;
     if (fft_.prepare(size) != cydsp::Status::ok)
@@ -118,8 +121,9 @@ float Convolver::process(const float input) noexcept
     history_[historyAt_ + block] = input;
     const auto* newest = history_.data() + historyAt_ + block;
     auto sum = 0.0f;
-    for (std::size_t tap = 0; tap < block; ++tap)
-        sum += head_[tap] * newest[-static_cast<std::ptrdiff_t>(tap)];
+    // Chronological input and reversed taps give the same causal FIR. CyDSP
+    // owns the vector kernel and its reduction order (small FP differences).
+    (void) ops_.dot(std::span<const float>(head_), std::span<const float>(newest + 1 - block, block), sum);
     const auto output = sum + tail_[at_];
     frame_[block + at_] = input;
     if (++at_ == block) {
@@ -143,8 +147,7 @@ void Convolver::runBlock() noexcept
         for (std::size_t m = 0; m < count; ++m) {
             const auto& input = spectra_[(newest_ + m) % count];
             const auto& filter = partitions_[m];
-            for (std::size_t k = 0; k <= block; ++k)
-                sum_[k] += input[k] * filter[k];
+            (void) ops_.complexMultiplyAccumulate(input, filter, sum_);
         }
         // Back to time: the conjugate's forward transform, conjugated.
         for (std::size_t k = 0; k <= block; ++k)

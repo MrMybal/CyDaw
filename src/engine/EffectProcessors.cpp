@@ -3,6 +3,7 @@
 
 #include <cydaw/engine/AudioBuffer.h>
 #include <cydaw/engine/BiquadDesign.h>
+#include <cydsp/processors/Biquad.h>
 #include <cydaw/engine/ProEffects.h>
 
 #include <algorithm>
@@ -637,39 +638,16 @@ private:
     void design() noexcept
     {
         const auto shelf = [this](const float frequency, const float gainDb, const bool high) {
-            const auto a = std::pow(10.0, gainDb / 40.0);
-            const auto w0 = 2.0 * std::numbers::pi * std::min<double>(frequency, sampleRate_ * 0.45) / sampleRate_;
-            const auto cosine = std::cos(w0);
-            const auto alpha = std::sin(w0) / 2.0 * std::sqrt(2.0);
-            const auto root = 2.0 * std::sqrt(a) * alpha;
-            double b0, b1, b2, a0, a1, a2;
-            if (!high) {
-                b0 = a * ((a + 1.0) - (a - 1.0) * cosine + root);
-                b1 = 2.0 * a * ((a - 1.0) - (a + 1.0) * cosine);
-                b2 = a * ((a + 1.0) - (a - 1.0) * cosine - root);
-                a0 = (a + 1.0) + (a - 1.0) * cosine + root;
-                a1 = -2.0 * ((a - 1.0) + (a + 1.0) * cosine);
-                a2 = (a + 1.0) + (a - 1.0) * cosine - root;
-            } else {
-                b0 = a * ((a + 1.0) + (a - 1.0) * cosine + root);
-                b1 = -2.0 * a * ((a - 1.0) + (a + 1.0) * cosine);
-                b2 = a * ((a + 1.0) + (a - 1.0) * cosine - root);
-                a0 = (a + 1.0) - (a - 1.0) * cosine + root;
-                a1 = 2.0 * ((a - 1.0) - (a + 1.0) * cosine);
-                a2 = (a + 1.0) - (a - 1.0) * cosine - root;
-            }
-            return Biquad { static_cast<float>(b0 / a0), static_cast<float>(b1 / a0), static_cast<float>(b2 / a0),
-                            static_cast<float>(a1 / a0), static_cast<float>(a2 / a0) };
+            cydsp::BiquadCoefficients c;
+            (void) cydsp::designShelfBiquad(high, sampleRate_, std::min<double>(frequency, sampleRate_ * 0.45), 1.0, gainDb, c);
+            return Biquad {static_cast<float>(c.b0), static_cast<float>(c.b1), static_cast<float>(c.b2),
+                           static_cast<float>(c.a1), static_cast<float>(c.a2)};
         };
         const auto bell = [this](const float frequency, const float gainDb, const float q) {
-            const auto a = std::pow(10.0, gainDb / 40.0);
-            const auto w0 = 2.0 * std::numbers::pi * std::min<double>(frequency, sampleRate_ * 0.45) / sampleRate_;
-            const auto cosine = std::cos(w0);
-            const auto alpha = std::sin(w0) / (2.0 * q);
-            const auto a0 = 1.0 + alpha / a;
-            return Biquad { static_cast<float>((1.0 + alpha * a) / a0), static_cast<float>(-2.0 * cosine / a0),
-                            static_cast<float>((1.0 - alpha * a) / a0), static_cast<float>(-2.0 * cosine / a0),
-                            static_cast<float>((1.0 - alpha / a) / a0) };
+            cydsp::BiquadCoefficients c;
+            (void) cydsp::designPeakingBiquad(sampleRate_, std::min<double>(frequency, sampleRate_ * 0.45), q, gainDb, c);
+            return Biquad {static_cast<float>(c.b0), static_cast<float>(c.b1), static_cast<float>(c.b2),
+                           static_cast<float>(c.a1), static_cast<float>(c.a2)};
         };
         const auto low = designed_[3];
         const auto high = std::max(designed_[4], low * 1.5f);

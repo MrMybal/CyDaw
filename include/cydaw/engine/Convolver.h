@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include <cydsp/processors/ComplexFft.h>
+#include <cydsp/math/VectorOps.h>
 
 // Convolution with an impulse response (a cabinet's, a room's), as loaded
 // from a file: no latency, nothing allocated once prepared.
@@ -48,7 +49,7 @@ public:
 private:
     void runBlock() noexcept;
 
-    std::vector<float> head_;          // the first `block` taps
+    std::vector<float> head_;          // first taps reversed for a forward SIMD dot
     std::vector<float> history_;       // the last inputs, twice over (no wrap)
     std::size_t historyAt_ {};
     std::vector<std::vector<std::complex<float>>> partitions_; // the rest, by block, as spectra
@@ -60,6 +61,7 @@ private:
     std::vector<float> tail_;          // the rest's output for this block
     std::size_t at_ {};
     cydsp::ComplexFft<float> fft_;
+    cydsp::VectorOps ops_; // resolved only by prepare(), never process()
 };
 
 } // namespace cydaw::engine

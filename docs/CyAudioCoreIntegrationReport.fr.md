@@ -1,5 +1,8 @@
 # Remplacement de JUCE par CyAudioCore
 
+État historique ; les mises à jour et substitutions numériques du 14 novembre sont
+décrites dans [la nouvelle campagne](CyDSPNumericalReuse.fr.md).
+
 Date : 13 novembre 2026. Branche `CyDSP-CORE`.
 Architecture : **CyDaw → CyAudioCore → CyDSP numérique**, interface CyUI/ImGui.
 Révisions : CyAudioCore `bb26e93604d43de2069694b0791bc0bcf5a53ea6`,

@@ -5,15 +5,17 @@ build without JUCE. CyAudioCore owns the CyDSP numerical dependency. The DAW
 uses `cyaudio` service APIs and `cydsp` processors, including internal/exported
 instruments and effects. Neither sibling repository is modified by this port.
 
-Validated dependency revisions: CyAudioCore `bb26e93604d43de2069694b0791bc0bcf5a53ea6`,
-CyDSP `fda6bd30c5b622795cc08e8bd2750188a6c5a0c0`. This CyDSP revision changes only docs/report tooling
-from the previous pin; the compiled-source hash is identical. The
-[final source snapshot](reports/JuceRetirementSourceSnapshot.json) records clean
-sibling trees and their hashes. The earlier source snapshot remains
-at [CyAudioCoreSnapshot.json](reports/CyAudioCoreSnapshot.json). See the
-[current French integration/issue report](CyAudioCoreIntegrationReport.fr.md).
-Historical checkpoint reports in this repository describe their dated state;
-they are not the current production dependency boundary.
+Current dependency revisions: CyAudioCore `1a68279dfa9bf228bfc6ed4c6c11dd4952c1a075`,
+CyDSP `ea56508ad3e26d790e491140b7f18a95e4411d5d` (0.2.0). The
+[14 November numerical integration campaign](CyDSPNumericalReuse.fr.md) rebuilds
+both libraries, desktop and worker from immutable source snapshots and records
+its numerical/RT tests and actual kernel costs. It migrates the base compressor,
+convolution sums, shared vector dispatch and coefficient/mixing operations.
+
+The earlier [JUCE retirement snapshot](reports/JuceRetirementSourceSnapshot.json)
+and [13 November integration report](CyAudioCoreIntegrationReport.fr.md) describe
+their dated revisions and acceptance results. They are preserved as historical
+evidence, not substituted for testing this newer build.
 
 ## Production architecture
 

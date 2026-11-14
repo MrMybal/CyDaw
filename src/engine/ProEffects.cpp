@@ -5,6 +5,9 @@
 #include <cydaw/engine/AudioBuffer.h>
 #include <cydaw/engine/ProEffectsDesign.h>
 
+#include <cydsp/math/DspMath.h>
+#include <cydsp/processors/Diffusion.h>
+#include <cassert>
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -21,12 +24,12 @@ constexpr double kPi = std::numbers::pi;
 
 double dbToGain(const double db) noexcept
 {
-    return std::pow(10.0, db / 20.0);
+    return cydsp::decibelsToGain(db, -std::numeric_limits<double>::infinity());
 }
 
 double gainToDb(const double gain) noexcept
 {
-    return 20.0 * std::log10(std::max(gain, 1.0e-12));
+    return cydsp::gainToDecibels(std::max(gain, 1.0e-12), -240.0);
 }
 
 // The coefficient of a one-pole smoother of that many milliseconds.
@@ -311,16 +314,9 @@ private:
     // every other.
     static void hadamard(std::array<double, pro::reverbLines>& v) noexcept
     {
-        for (std::size_t span = 1; span < v.size(); span <<= 1)
-            for (std::size_t start = 0; start < v.size(); start += span << 1)
-                for (std::size_t i = start; i < start + span; ++i) {
-                    const auto a = v[i];
-                    const auto b = v[i + span];
-                    v[i] = a + b;
-                    v[i + span] = a - b;
-                }
-        for (auto& value : v)
-            value *= 0.25;
+        const auto status = cydsp::orthogonalMix<double>(v, v);
+        assert(status == cydsp::Status::ok);
+        (void) status;
     }
 
     void designIfChanged(const double space, const double decay, const double brightness) noexcept
@@ -352,6 +348,9 @@ private:
     double rate_ { 48'000.0 };
     std::array<FractionalDelay, pro::reverbLines> lines_;
     std::array<pro::ReverbLoop, pro::reverbLines> loops_ {};
+    // The SDK block bank was measured at +54% in this sample-recursive FDN.
+    // Keep its kernel until a prepared sample-bank API is available; coefficient
+    // design and orthogonal mixing already use public CyDSP APIs.
     std::array<std::array<BiquadState, 3>, pro::reverbLines> loopStates_ {};
     std::array<double, pro::reverbLines> lengths_ {};
     std::array<double, pro::reverbLines> phase_ {};
