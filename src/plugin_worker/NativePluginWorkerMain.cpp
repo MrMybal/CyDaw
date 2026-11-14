@@ -1,9 +1,10 @@
-#include <cydaw/base/Platform.h>
 #include "NativeHostedPlugin.h"
+#include <cyaudio/plugins/PluginWorker.h>
 #include <cydaw/audio/Denormals.h>
 #include <cydaw/base/EventLoop.h>
 #include <cydaw/base/File.h>
 #include <cydaw/base/LegacyPluginState.h>
+#include <cydaw/base/Platform.h>
 #include <cydaw/base/Process.h>
 #include <cydaw/base/Utilities.h>
 #include <cydaw/plugins/PluginIsolation.h>
@@ -775,6 +776,7 @@ int runRealtimeWorker(const cydaw::base::File &pluginFile,
     std::uint64_t appliedAutomationSequence{};
     auto shutdown = cydaw::plugins::sharedAtomic(shared->shutdownRequested);
 
+    bool audioPending = false;
     while (shutdown.load(std::memory_order_acquire) == 0) {
       if (instance)
         instance->pump();
@@ -801,58 +803,74 @@ int runRealtimeWorker(const cydaw::base::File &pluginFile,
           return 15;
         }
 
-        buffer.clear();
-        for (int channel = 0; channel < inputs; ++channel)
-          for (int frame = 0; frame < frames; ++frame)
-            buffer.setSample(channel, frame,
-                             shared->input[cydaw::plugins::sharedAudioIndex(
-                                 static_cast<std::uint32_t>(channel),
-                                 static_cast<std::uint32_t>(frame))]);
-        midi.clear();
-        if (instance != nullptr) {
-          const auto automationSequence =
-              automationRequest.load(std::memory_order_acquire);
-          if (automationSequence != appliedAutomationSequence) {
-            const auto &parameters = instance->getParameters();
-            const auto count =
-                std::min(shared->automationCount,
-                         cydaw::plugins::maximumSharedAutomationParameters);
-            for (std::uint32_t automationIndex = 0; automationIndex < count;
-                 ++automationIndex) {
-              const auto &automation = shared->automation[automationIndex];
-              if (automation.index <
-                  static_cast<std::uint32_t>(parameters.size()))
-                parameters[static_cast<int>(automation.index)]->setValue(
-                    cydaw::base::limit(0.0f, 1.0f, automation.value));
+        if (!audioPending) {
+          buffer.clear();
+          for (int channel = 0; channel < inputs; ++channel)
+            for (int frame = 0; frame < frames; ++frame)
+              buffer.setSample(channel, frame,
+                               shared->input[cydaw::plugins::sharedAudioIndex(
+                                   static_cast<std::uint32_t>(channel),
+                                   static_cast<std::uint32_t>(frame))]);
+          midi.clear();
+          if (instance != nullptr) {
+            const auto automationSequence =
+                automationRequest.load(std::memory_order_acquire);
+            if (automationSequence != appliedAutomationSequence) {
+              const auto &parameters = instance->getParameters();
+              const auto count =
+                  std::min(shared->automationCount,
+                           cydaw::plugins::maximumSharedAutomationParameters);
+              for (std::uint32_t automationIndex = 0; automationIndex < count;
+                   ++automationIndex) {
+                const auto &automation = shared->automation[automationIndex];
+                if (automation.index <
+                    static_cast<std::uint32_t>(parameters.size()))
+                  parameters[static_cast<int>(automation.index)]->setValue(
+                      cydaw::base::limit(0.0f, 1.0f, automation.value));
+              }
+              appliedAutomationSequence = automationSequence;
             }
-            appliedAutomationSequence = automationSequence;
+            cydaw::audio::ScopedNoDenormals noDenormals;
+            playHead.update(*shared, sampleRate);
+            cydaw::audio::SampleBuffer<float> block(
+                buffer.getArrayOfWritePointers(), buffer.getNumChannels(),
+                frames);
+            instance->submitBlock(block, midi);
+            audioPending = true;
+            cydaw::plugins::sharedAtomic(shared->latencySamples)
+                .store(static_cast<std::uint32_t>(
+                           std::max(0, instance->getLatencySamples())),
+                       std::memory_order_release);
           }
-          cydaw::audio::ScopedNoDenormals noDenormals;
-          playHead.update(*shared, sampleRate);
+        }
+        bool completed = !audioPending;
+        if (audioPending) {
           cydaw::audio::SampleBuffer<float> block(
               buffer.getArrayOfWritePointers(), buffer.getNumChannels(),
               frames);
-          instance->processBlock(block, midi);
-          cydaw::plugins::sharedAtomic(shared->latencySamples)
-              .store(static_cast<std::uint32_t>(
-                         std::max(0, instance->getLatencySamples())),
-                     std::memory_order_release);
+          completed =
+              instance->collectBlock(block, midi) == cyaudio::Status::ok;
+          if (completed)
+            audioPending = false;
         }
-        for (int channel = 0; channel < outputs; ++channel)
-          for (int frame = 0; frame < frames; ++frame)
-            shared->output[cydaw::plugins::sharedAudioIndex(
-                static_cast<std::uint32_t>(channel),
-                static_cast<std::uint32_t>(frame))] =
-                buffer.getSample(channel, frame);
-        shared->outputFrameCount = static_cast<std::uint32_t>(frames);
-        heartbeat.fetch_add(1, std::memory_order_relaxed);
-        response.store(requested, std::memory_order_release);
-        didWork = true;
+        if (completed) {
+          for (int channel = 0; channel < outputs; ++channel)
+            for (int frame = 0; frame < frames; ++frame)
+              shared->output[cydaw::plugins::sharedAudioIndex(
+                  static_cast<std::uint32_t>(channel),
+                  static_cast<std::uint32_t>(frame))] =
+                  buffer.getSample(channel, frame);
+          shared->outputFrameCount = static_cast<std::uint32_t>(frames);
+          heartbeat.fetch_add(1, std::memory_order_relaxed);
+          response.store(requested, std::memory_order_release);
+          didWork = true;
+        }
       }
 
       const auto commandSequence =
           commandRequest.load(std::memory_order_acquire);
-      if (commandSequence != commandResponse.load(std::memory_order_relaxed)) {
+      if (!audioPending &&
+          commandSequence != commandResponse.load(std::memory_order_relaxed)) {
         shared->commandResult = 0;
         shared->commandStatus[0] = '\0';
         try {
@@ -1024,6 +1042,8 @@ int runRealtimeWorker(const cydaw::base::File &pluginFile,
 } // namespace
 
 int main(const int argc, char *argv[]) {
+  if (argc == 3 && std::string_view(argv[1]) == "--cydsp-worker")
+    return cyaudio::runPluginWorker(argv[2]);
 #if defined(_WIN32)
   struct ComScope {
     HRESULT result = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
@@ -1033,8 +1053,9 @@ int main(const int argc, char *argv[]) {
     }
   } com;
 #endif
-  auto arguments=cydaw::base::commandLineArguments(argc,argv);
-  if(!arguments.isEmpty())arguments.remove(0);
+  auto arguments = cydaw::base::commandLineArguments(argc, argv);
+  if (!arguments.isEmpty())
+    arguments.remove(0);
 
   if (arguments.contains("--self-test") ||
       arguments.contains("--worker-handshake"))

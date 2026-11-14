@@ -109,7 +109,11 @@ struct PluginAudio {
     }
 };
 void host(PluginFormat format, const std::filesystem::path& path, bool jsfxFixture, const std::filesystem::path& executable) {
-    std::unique_ptr<PluginProvider> provider; check(createPluginProvider(format, provider), "create provider");
+    PluginIsolationOptions isolation; isolation.workerExecutable = executable;
+    isolation.scheduling = PluginScheduling::sameCycle;
+    std::unique_ptr<PluginProvider> provider; check(createPluginProvider(format, provider, isolation), "create provider");
+    auto* preserved = provider.get();
+    require(createPluginProvider(format, provider) == Status::invalid_argument && provider.get() == preserved, "missing worker rejected without replacing provider");
     std::vector<PluginDescriptor> descriptors; check(provider->scan(path, descriptors), "explicit module scan"); require(!descriptors.empty(), "module descriptors");
     PluginInstance instance; check(provider->create(path, descriptors[0].id, {}, instance), "plugin create");
     const auto description = *instance.description(); require(!description.outputs.empty(), "plugin audio outputs");
@@ -117,7 +121,14 @@ void host(PluginFormat format, const std::filesystem::path& path, bool jsfxFixtu
     if (jsfxFixture) { PluginEvent event; event.kind = PluginEventKind::parameterValue; event.id = 6; event.value = .75; event.frame = 32; check(in.add(event), "sample automation"); }
     PluginPrepareOptions prepare; prepare.maximumFrames = 64; check(instance.activate(prepare), "plugin activate"); check(instance.start(), "plugin start");
     PluginProcess<float> process {audio.inputs, audio.outputs, 64, &in, &out};
-    check(instance.process(process), "plugin process");
+    require(instance.isolated(), "built-in provider isolates foreign plugin");
+    std::uint64_t ticket{}; check(instance.submit(process, ticket), "plugin submit");
+    auto status = Status::would_block;
+    for (unsigned attempt = 0; attempt < 500 && status == Status::would_block; ++attempt) {
+        status = instance.collect(process, ticket);
+        if (status == Status::would_block) std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    check(status, "same-cycle plugin collect");
     if (jsfxFixture) for (std::size_t i = 0; i < 64; ++i) require(std::abs(audio.outputs[0].channel(0)[i] - (i < 32 ? .25f : .375f)) < 1e-6, "JSFX exact-offset automation");
     check(instance.stop(), "plugin stop"); check(instance.deactivate(), "plugin deactivate");
     std::vector<std::uint8_t> state; check(instance.saveState(state), "plugin save state"); require(!state.empty(), "state payload");

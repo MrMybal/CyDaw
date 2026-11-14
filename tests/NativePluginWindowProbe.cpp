@@ -1,4 +1,5 @@
 #include <cydaw/base/Platform.h>
+#include <cyaudio/plugins/PluginWorker.h>
 #include "../src/plugin_worker/NativeHostedPlugin.h"
 #include <cmath>
 #include <cydaw/base/EventLoop.h>
@@ -10,6 +11,8 @@
 #include <objbase.h>
 // clang-format on
 int main(int argc, char **argv) {
+  if (argc == 3 && std::string_view(argv[1]) == "--cydsp-worker")
+    return cyaudio::runPluginWorker(argv[2]);
   auto arguments=cydaw::base::commandLineArguments(argc,argv);
   if (arguments.size() < 6)
     return 2;

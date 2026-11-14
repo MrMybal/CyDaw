@@ -5,8 +5,9 @@ build without JUCE. CyAudioCore owns the CyDSP numerical dependency. The DAW
 uses `cyaudio` service APIs and `cydsp` processors, including internal/exported
 instruments and effects. Neither sibling repository is modified by this port.
 
-Current dependency revisions: CyAudioCore `1a68279dfa9bf228bfc6ed4c6c11dd4952c1a075`,
-CyDSP `ea56508ad3e26d790e491140b7f18a95e4411d5d` (0.2.0). The
+Current dependency revisions: CyAudioCore `4e5710999acbd88ab3d1ce87f4101ec73abe54b6`,
+CyDSP `0d67c6a60749ef241a87bc3592fa63c61998a5e2` (0.3.2). See the
+[15 November SDK update campaign](CyAudioCore032Update.fr.md) for this build. The earlier
 [14 November numerical integration campaign](CyDSPNumericalReuse.fr.md) rebuilds
 both libraries, desktop and worker from immutable source snapshots and records
 its numerical/RT tests and actual kernel costs. It migrates the base compressor,
@@ -34,10 +35,14 @@ evidence, not substituted for testing this newer build.
 - Aligned sample storage, vector operations, FFTs, resampling and numerical DSP
   use CyDSP through CyAudioCore. Existing musical processors retain their sound
   and parameter identities. New SDK algorithms are not automatically new UI nodes.
-- The ordinary `CyDAWPluginWorker` executable directly hosts VST3, CLAP, LV2 and
-  JSFX through Core. The parent uses native shared-memory/wake IPC. Per-instance
-  isolation, automation, transport, state, Windows editors and generic controls
-  remain. Historical project state has an independent bounded compatibility codec.
+- `CyDAWPluginWorker` bridges the existing parent shared-memory/wake IPC to
+  Core's mandatory isolated VST3/CLAP/LV2/JSFX provider. Its `--cydsp-worker`
+  entry point also runs the SDK child. This currently means two child processes
+  per plugin, with a single outer pipeline block: SDK `sameCycle` uses nonblocking
+  submit/collect in the bridge event loop. No wait is added to the device callback.
+  Reconfiguration is deferred while a ticket is outstanding. Historical project
+  state keeps its independent bounded compatibility codec. The remaining IPC
+  duplication and its measured cost are documented in the update campaign.
 - LV2 preset discovery uses the Core-bundled Lilv runtime. Detailed JSFX syntax
   diagnostics use the same Core-bundled ysfx runtime. These workarounds should
   become public Core APIs; they do not add a second VM or host implementation.
@@ -77,7 +82,7 @@ Windows build's generated dependency graph is checked by
 
 ## Validation and distribution
 
-Final Windows acceptance passed: the 119-case native suite has no failures;
+The historical 13 November retirement acceptance passed: its 119-case native suite has no failures;
 its optional Batterie skip was separately exercised with the installed bank.
 The strict sampler/Batterie checks, actual Fireface ASIO four-format application
 session, native CLAP/LV2/VST3 exports, 47 official VST3 validator tests, five plugin

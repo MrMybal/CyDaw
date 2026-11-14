@@ -1,13 +1,24 @@
 #include "NativeHostedPlugin.h"
+#include <chrono>
 #include <cstring>
 #include <cydaw/base/LegacyPluginState.h>
 #include <filesystem>
 #include <stdexcept>
+#include <thread>
 namespace cydaw::plugins {
 using namespace cyaudio;
 namespace {
 std::filesystem::path pathFor(const base::File &file) {
   return std::filesystem::u8path(file.getFullPathName().toStdString());
+}
+PluginIsolationOptions isolationOptions() {
+  PluginIsolationOptions options;
+  options.workerExecutable = pathFor(
+      base::File::getSpecialLocation(base::File::currentExecutableFile));
+  options.scheduling = PluginScheduling::sameCycle;
+  options.maximumChannelsPerDirection = 64;
+  options.maximumPayloadBytes = 256 * 1024;
+  return options;
 }
 base::Text failure(Status status) {
   return "CyAudioCore plugin: status " + base::Text(int(status));
@@ -28,7 +39,7 @@ NativeHostedPlugin::~NativeHostedPlugin() { releaseResources(); }
 bool NativeHostedPlugin::load(const base::File &file, const base::Text &id,
                               PluginFormat format, const base::Text &formatName,
                               base::Text &error) {
-  auto status = createPluginProvider(format, provider_);
+  auto status = createPluginProvider(format, provider_, isolationOptions());
   PluginHostCallbacks host;
   host.context = this;
   host.resizeEditor = [](void *context, PluginEditorSize size) noexcept {
@@ -58,27 +69,35 @@ bool NativeHostedPlugin::load(const base::File &file, const base::Text &id,
       error = failure(status);
     return false;
   }
-  description.pluginFormatName=formatName;
-  description.fileOrIdentifier=file.getFullPathName();
-  try { refreshDescription(); } catch(const std::exception& e){error=e.what();return false;}
-  if(format==PluginFormat::lv2)loadLv2Programs(file);
+  description.pluginFormatName = formatName;
+  description.fileOrIdentifier = file.getFullPathName();
+  try {
+    refreshDescription();
+  } catch (const std::exception &e) {
+    error = e.what();
+    return false;
+  }
+  if (format == PluginFormat::lv2)
+    loadLv2Programs(file);
   return true;
 }
-void NativeHostedPlugin::refreshDescription(){
-  const auto &d=*plugin_.description();
+void NativeHostedPlugin::refreshDescription() {
+  const auto &d = *plugin_.description();
   description.name = base::Text(d.plugin.name);
   description.descriptiveName = base::Text(d.plugin.id);
   description.manufacturerName = base::Text(d.plugin.vendor);
   description.version = base::Text(d.plugin.version);
-  description.numInputChannels=description.numOutputChannels=0;
-  parameters_.clear();controls_.clear();preset_=-1;
+  description.numInputChannels = description.numOutputChannels = 0;
+  parameters_.clear();
+  controls_.clear();
+  preset_ = -1;
   for (const auto &p : d.inputs)
     description.numInputChannels += int(p.channels);
   for (const auto &p : d.outputs)
     description.numOutputChannels += int(p.channels);
-  if (description.numInputChannels > 256 ||
-      description.numOutputChannels > 256) {
-    throw std::runtime_error("Plugin exceeds 256 channels");
+  if (description.numInputChannels > 64 ||
+      description.numOutputChannels > 64) {
+    throw std::runtime_error("Plugin exceeds the SDK isolation limit of 64 channels per direction");
   }
   description.isInstrument =
       description.numInputChannels == 0 && !d.noteInputs.empty();
@@ -147,14 +166,20 @@ void NativeHostedPlugin::prepareToPlay(double rate, int frames) {
     p->sent = std::numeric_limits<double>::quiet_NaN();
 }
 void NativeHostedPlugin::releaseResources() {
+  if (audioPending_) {
+    (void)plugin_.discard(audioTicket_);
+    audioPending_ = false;
+  }
   if (plugin_.lifecycle() == PluginLifecycle::processing)
     (void)plugin_.stop();
   if (plugin_.lifecycle() == PluginLifecycle::active)
     (void)plugin_.deactivate();
   prepared_ = false;
 }
-void NativeHostedPlugin::processBlock(audio::SampleBuffer<float> &buffer,
-                                      midi::EventBuffer &midi) {
+void NativeHostedPlugin::submitBlock(audio::SampleBuffer<float> &buffer,
+                                     midi::EventBuffer &midi) {
+  if (audioPending_)
+    throw std::runtime_error("Plugin already has an outstanding audio block");
   const auto frames = unsigned(buffer.getNumSamples());
   if (!prepared_ || frames > options_.maximumFrames) {
     buffer.clear();
@@ -198,12 +223,28 @@ void NativeHostedPlugin::processBlock(audio::SampleBuffer<float> &buffer,
   }
   PluginProcess<float> process{inputs_,  outputs_, frames,
                                &events_, &result_, transport_};
-  const auto status = plugin_.process(process);
+  const auto status = plugin_.submit(process, audioTicket_);
+  if (status != Status::ok)
+    throw std::runtime_error(failure(status).toStdString());
+  audioPending_ = true;
+}
+cyaudio::Status
+NativeHostedPlugin::collectBlock(audio::SampleBuffer<float> &buffer,
+                                 midi::EventBuffer &midi) {
+  if (!audioPending_)
+    return Status::invalid_argument;
+  const auto frames = unsigned(buffer.getNumSamples());
+  PluginProcess<float> process{inputs_,  outputs_, frames,
+                               &events_, &result_, transport_};
+  const auto status = plugin_.collect(process, audioTicket_);
+  if (status == Status::would_block)
+    return status;
+  audioPending_ = false;
   buffer.clear();
   midi.clear();
   if (status != Status::ok)
     throw std::runtime_error(failure(status).toStdString());
-  channel = 0;
+  unsigned channel = 0;
   for (const auto &bus : outputs_)
     for (std::size_t ch = 0; ch < bus.channels(); ++ch, ++channel)
       if (channel < unsigned(buffer.getNumChannels()))
@@ -234,6 +275,25 @@ void NativeHostedPlugin::processBlock(audio::SampleBuffer<float> &buffer,
             break;
           }
     }
+  return Status::ok;
+}
+void NativeHostedPlugin::processBlock(audio::SampleBuffer<float> &buffer,
+                                      midi::EventBuffer &midi) {
+  submitBlock(buffer, midi);
+  if (!audioPending_)
+    return;
+  // Probe/test owner only. Realtime uses submitBlock/collectBlock in its event
+  // loop.
+  const auto deadline =
+      std::chrono::steady_clock::now() + std::chrono::seconds(5);
+  while (collectBlock(buffer, midi) == Status::would_block) {
+    if (std::chrono::steady_clock::now() >= deadline) {
+      (void)plugin_.discard(audioTicket_);
+      audioPending_ = false;
+      throw std::runtime_error("Plugin validation audio timeout");
+    }
+    std::this_thread::sleep_for(std::chrono::microseconds(100));
+  }
 }
 void NativeHostedPlugin::getStateInformation(base::MemoryBlock &block) {
   const bool resume = prepared_;
@@ -321,24 +381,36 @@ std::unique_ptr<NativePluginEditor> NativeHostedPlugin::createEditor() {
   return hasEditor() ? std::make_unique<NativePluginEditor>(*this) : nullptr;
 }
 void NativeHostedPlugin::pump() {
+  // Defer reconfiguration until the outstanding ticket has been consumed.
+  if (audioPending_)
+    return;
   // The worker serializes this main-thread handoff with audio processing.
-  // Core reports requests; the host must perform the deactivate/refresh/restart.
+  // Core reports requests; the host must perform the
+  // deactivate/refresh/restart.
   std::uint32_t flags{};
-  if(plugin_.pumpMainThread(flags)!=Status::ok)return;
-  if(flags&(pluginRestart|pluginParametersChanged|pluginPortsChanged)){
-    const bool resume=prepared_;const auto options=options_;
+  if (plugin_.pumpMainThread(flags) != Status::ok)
+    return;
+  if (flags & (pluginRestart | pluginParametersChanged | pluginPortsChanged)) {
+    const bool resume = prepared_;
+    const auto options = options_;
     releaseResources();
-    const auto status=plugin_.refresh();
-    if(status!=Status::ok)throw std::runtime_error(failure(status).toStdString());
+    const auto status = plugin_.refresh();
+    if (status != Status::ok)
+      throw std::runtime_error(failure(status).toStdString());
     refreshDescription();
-    if(editor_)editor_->refreshParameters();
-    if(resume)prepareToPlay(options.sampleRate,int(options.maximumFrames));
+    if (editor_)
+      editor_->refreshParameters();
+    if (resume)
+      prepareToPlay(options.sampleRate, int(options.maximumFrames));
   }
-  latency_=int(plugin_.timing().latencyFrames);
-  if(editor_){
-    if(flags&pluginEditorClosed)editor_->closeRequested();
-    else if(flags&pluginEditorShow)editor_->setVisible(true);
-    else if(flags&pluginEditorHide)editor_->setVisible(false);
+  latency_ = int(plugin_.timing().latencyFrames);
+  if (editor_) {
+    if (flags & pluginEditorClosed)
+      editor_->closeRequested();
+    else if (flags & pluginEditorShow)
+      editor_->setVisible(true);
+    else if (flags & pluginEditorHide)
+      editor_->setVisible(false);
   }
 }
 
@@ -404,7 +476,7 @@ void NativePluginFormat::findAllTypesForFile(
     return;
   }
   std::unique_ptr<PluginProvider> provider;
-  if (createPluginProvider(format_, provider) != Status::ok)
+  if (createPluginProvider(format_, provider, isolationOptions()) != Status::ok)
     return;
   std::vector<PluginDescriptor> list;
   if (provider->scan(pathFor(base::File(path)), list) != Status::ok)

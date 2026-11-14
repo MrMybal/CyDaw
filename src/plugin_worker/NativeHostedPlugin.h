@@ -76,7 +76,8 @@ class NativeHostedPlugin {
   std::vector<cyaudio::AudioBlock<float>> outputs_;
   cyaudio::PluginEventBuffer events_, result_;
   cyaudio::PluginPrepareOptions options_;
-  bool prepared_{}, offline_{};
+  bool prepared_{}, offline_{}, audioPending_{};
+  std::uint64_t audioTicket_{};
   int latency_{}, preset_ = -1;
   const cyaudio::PluginTransport *transport_{};
   NativePluginEditor *editor_{};
@@ -111,6 +112,12 @@ public:
   void setTransport(const cyaudio::PluginTransport *t) { transport_ = t; }
   void prepareToPlay(double, int);
   void releaseResources();
+  // Worker event loop: submit once, then poll collect while servicing UI.
+  // These operations never wait. The device callback lives in the parent.
+  void submitBlock(audio::SampleBuffer<float> &, midi::EventBuffer &);
+  cyaudio::Status collectBlock(audio::SampleBuffer<float> &,
+                               midi::EventBuffer &);
+  // Synchronous convenience for offline validation only, not the realtime loop.
   void processBlock(audio::SampleBuffer<float> &, midi::EventBuffer &);
   void getStateInformation(base::MemoryBlock &);
   void setStateInformation(const void *, int);

@@ -1,14 +1,19 @@
 #include "NativeHostedPlugin.h"
+#include <chrono>
+#include <cyaudio/plugins/PluginWorker.h>
 #include <cydaw/base/LegacyPluginState.h>
 #include <cydaw/base/Utilities.h>
 #include <iostream>
 #include <stdexcept>
+#include <thread>
 using namespace cydaw;
 void require(bool okay, const char *reason) {
   if (!okay)
     throw std::runtime_error(reason);
 }
 int main(int argc, char **argv) {
+  if (argc == 3 && std::string_view(argv[1]) == "--cydsp-worker")
+    return cyaudio::runPluginWorker(argv[2]);
   try {
     base::MemoryBlock decoded;
     require(base::decodeLegacyStateBytes("3.AIzP", decoded) &&
@@ -32,9 +37,8 @@ int main(int argc, char **argv) {
         "test script writes");
     plugins::NativeHostedPlugin plugin;
     base::Text error;
-    require(
-        plugin.load(script, "jsfx", cyaudio::PluginFormat::jsfx, "JSFX", error),
-        error.toRawUTF8());
+    const auto loaded = plugin.load(script, "jsfx", cyaudio::PluginFormat::jsfx, "JSFX", error);
+    require(loaded, error.toRawUTF8());
     cyaudio::PluginTransport time;
     time.hasTempo = true;
     time.tempo = 60;
@@ -52,6 +56,30 @@ int main(int argc, char **argv) {
     time.tempo = 120;
     require(std::abs(render() - .25f) < 1e-6f,
             "JSFX tempo returns to 120 without attenuation");
+    // The realtime bridge uses these two nonblocking calls, including variable
+    // sizes.
+    audio::SampleBuffer<float> shortBlock(2, 17);
+    for (int ch = 0; ch < 2; ++ch)
+      std::fill_n(shortBlock.getWritePointer(ch), 17, .5f);
+    plugin.submitBlock(shortBlock, events);
+    plugin
+        .pump(); // Reconfiguration must not invalidate the outstanding ticket.
+    auto collected = cyaudio::Status::would_block;
+    for (int attempt = 0;
+         attempt < 500 && collected == cyaudio::Status::would_block;
+         ++attempt) {
+      collected = plugin.collectBlock(shortBlock, events);
+      if (collected == cyaudio::Status::would_block)
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    require(collected == cyaudio::Status::ok,
+            "variable block returns same ticket");
+    for (int ch = 0; ch < 2; ++ch)
+      for (int i = 0; i < 17; ++i)
+        require(std::abs(shortBlock.getSample(ch, i) - .5f) < 1e-6f,
+                "same-cycle samples have no fixed pipeline delay");
+    require(plugin.getLatencySamples() == 0,
+            "no additional SDK pipeline block");
     base::MemoryBlock state;
     plugin.getStateInformation(state);
     require(state.getSize() > 0, "native script state saves");
@@ -61,9 +89,9 @@ int main(int argc, char **argv) {
     plugin.releaseResources();
     if (argc > 1) {
       plugins::NativeHostedPlugin lv2;
-      require(lv2.load(base::File(argv[1]), "urn:cydaw:0x43594457:0x47505253",
-                       cyaudio::PluginFormat::lv2, "LV2", error),
-              error.toRawUTF8());
+      const auto lv2Loaded = lv2.load(base::File(argv[1]), "urn:cydaw:0x43594457:0x47505253",
+                                     cyaudio::PluginFormat::lv2, "LV2", error);
+      require(lv2Loaded, error.toRawUTF8());
       require(lv2.getNumPrograms() >= 2, "LV2 presets discovered");
       base::MemoryBlock a, b;
       lv2.getStateInformation(a);

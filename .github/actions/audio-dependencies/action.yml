@@ -10,14 +10,14 @@ runs:
     - uses: actions/checkout@v4
       with:
         repository: MrMybal/CyAudioCore
-        ref: 1a68279dfa9bf228bfc6ed4c6c11dd4952c1a075
+        ref: 4e5710999acbd88ab3d1ce87f4101ec73abe54b6
         path: .dependencies/CyAudioCore
         token: ${{ inputs.token }}
         persist-credentials: false
     - uses: actions/checkout@v4
       with:
         repository: MrMybal/CyDSP
-        ref: ea56508ad3e26d790e491140b7f18a95e4411d5d
+        ref: 0d67c6a60749ef241a87bc3592fa63c61998a5e2
         path: .dependencies/CyDSP
         token: ${{ inputs.token }}
         persist-credentials: false
