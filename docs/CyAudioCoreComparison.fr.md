@@ -1,5 +1,7 @@
 # Comparaison JUCE / CyAudioCore — CyDaw Windows
 
+> **Mesures actualisées du moteur (14 novembre 2026)** : [comparatif après les mises à jour CyAudioCore/CyDSP/CyUI](CyAudioCoreCurrentPair.fr.md). Le dessin est désactivé des deux côtés ; les tableaux ci-dessous restent historiques.
+
 > **Rectificatif du 14 novembre 2026 :** voir la [comparaison directe des interfaces](CyAudioCoreUiPair.fr.md). La disposition n’était pas entièrement isolée dans la référence JUCE et la cadence hors écran différait. Le cas historique nommé « 16 pistes × FX » insérait en réalité48 effets en série sur la première piste portant le nom commun `long` ; les 8 VST3 étaient réunis sur la première des8pistes. Ces relevés restent conservés, mais ne constituent pas une comparaison du même travail visuel ni de 16 chaînes indépendantes. Le nouveau banc utilise les index et vérifie les topologies.
 
 

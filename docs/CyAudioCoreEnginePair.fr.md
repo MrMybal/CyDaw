@@ -1,5 +1,7 @@
 # Moteur audio JUCE / CyAudioCore : mesure séparée de l’interface
 
+> **Mesures actualisées du moteur (14 novembre 2026)** : [comparatif après les mises à jour CyAudioCore/CyDSP/CyUI](CyAudioCoreCurrentPair.fr.md). Le dessin est désactivé des deux côtés ; les tableaux ci-dessous restent historiques.
+
 **Le correctif FPS précédent ne mesurait pas une accélération du moteur audio.** Cette campagne compare le rendu réel des deux moteurs avec le dessin désactivé, puis livre une correction du cache de lecture dans l’intégration CyDAW. Elle ne modifie ni CyAudioCore ni CyDSP.
 
 ## Résultat du moteur, avant le correctif de cache
