@@ -1,10 +1,10 @@
 # CyDAW 2 — modular CyUI integration
 
-CyUI is pinned to `8367401fe45fc22bfed5e227cb3de343177f676b` (1.2.0),
-from https://github.com/MrMybal/CyUI, under its [MIT licence](https://github.com/MrMybal/CyUI/blob/8367401fe45fc22bfed5e227cb3de343177f676b/LICENSE).
+CyUI is pinned to `7a793e9281e78572818d85e9cf856d779a7792a1` (1.2.0),
+from https://github.com/MrMybal/CyUI, under its [MIT licence](https://github.com/MrMybal/CyUI/blob/7a793e9281e78572818d85e9cf856d779a7792a1/LICENSE).
 The complete licence and upstream notices are shipped in `Licenses/CyUI`, so
 reading them does not require access to the source repository.
-Integration uses FetchContent, like JUCE;
+Integration uses FetchContent;
 there is no copied CyUI implementation in the application. `src/v2/CyUI.cmake`
 selects modules before adding the library and supplies the host's `cydaw_imgui`
 target. No second ImGui library, demo, gallery, browser/CEF or Unreal adapter is
@@ -16,7 +16,7 @@ built. The existing Windows ImGui/D3D11 host and its context lifecycle remain.
 | --- | --- |
 | Core | Common palettes, all five themes, DPI/density metrics, fonts, icons, numeric fields, toolbar buttons, tooltips, clipped/empty-state text, notifications and locale |
 | Audio | Knobs, faders, peak/RMS/hold meters throughout the studio, graph cards, device windows and native plugin UI |
-| AudioViews | Prepared before/after spectra and oscilloscopes; no audio decoding or FFT runs in CyUI |
+| AudioViews | Prepared before/after spectra with gradient fills, oscilloscopes, chronological spectrograms and persistent stereo density; no audio decoding or FFT runs in CyUI |
 | Canvas / Plots | Double-precision graph transforms/grid and anchored timeline-band navigation; linear/log axes for automation |
 | Nodes | Deterministic, cycle-tolerant graph arrangement; positions commit once through the existing graph history |
 | Code / CodeEditor | Native JSFX/EEL2, processing, JSON interface and C++ component source editors; syntax, keyboard editing and editor Undo |
@@ -129,3 +129,62 @@ Verified on this revision:
 The user manual now uses CyDoc's local browser reader. CyUI DocumentViews is no
 longer selected or linked. Images remains available for Cinema. Native exported
 plugins retain their smaller explicit module closure. See [CyDoc integration](../.CyDocBuild/README.md).
+
+
+## AudioViews update — 2026-11-14
+
+The pinned update adds spectral fills and persistent spatial displays. CyDaw now
+uses these in its existing analyzers; it does not add fictitious measurements or
+change the audio processors:
+
+- Before/after spectrum: the processed spectrum uses a translucent gradient area
+  down to the existing dB floor; the input remains a line for comparison.
+- Spectrometer: CyUI renders the host's 256-bin, 240-row history in vertical time,
+  with newest data at the top, a logarithmic frequency axis, historical-cell
+  tooltips and a legend in the large view. CyDaw repacks the ring only when the
+  analysis history revision changes. Drawing is capped at 16,384 cells. The
+  existing spectrum, peak hold, floor, tilt, smoothing and history controls stay
+  available; double-click still clears held peaks.
+- Stereoscope: the goniometer uses CyUI's persistent density view. Fresh analysis
+  revisions feed points once, even for repeated identical audio samples; drawing
+  the same revision again does not increase its energy. Small/large panels use
+  bounded 64×64/96×96 grids with separate state per ImGui context and panel.
+  Channel projection preserves CyDaw's existing R-L horizontal orientation.
+  Persistence, wheel zoom, double-click reset, polar mode and correlation history
+  remain available. The polar mode keeps its specialized host renderer.
+
+FFT, measurements, prepared audio taps and processor state remain in CyDaw /
+CyAudioCore / CyDSP. The update adds no work or allocations to the audio callback
+and does not enable another CyUI module. Spatial frequency maps, LUFS and true
+peak displays are not added without the corresponding host measurements.
+
+The renderer-independent CyUI test also covers chronological history wrap,
+vertical spectrogram rendering, gradient spectrum rendering, bounded stereo
+storage, independent states and suppression of duplicate input revisions.
+
+
+Validation of this update (Windows x64, MSVC 19.40, Release):
+
+- Seven targeted CTest checks pass: CyUI integration, frame pacing, no-JUCE
+  production graph, Cinema layout, routing, mixing and creative effects.
+- Silent isolated sessions rendered compact and expanded analyzers with English
+  and French application navigation. Captures were visually inspected, including
+  the spectrogram legend and the preserved polar view. Device interiors retain
+  the application's existing English-only module policy.
+- A real wheel gesture changes stereo zoom from 1 to 1.10517; double-click
+  restores 1. The two-analyzer chain's offline level difference is below
+  0.000001 dB. ASIO output-only QA sessions use 48 kHz / 1024 frames with speaker
+  output silenced; no capture channels are enabled.
+- Local evidence (configuration/build logs, JUnit, images, source/binary SHA-256,
+  dependency revisions) is in `output/cyui-audioviews/2026-11-14`.
+
+The targeted tests can be rerun after building the desktop and test targets:
+
+```text
+ctest --test-dir build/cyui-audioviews -C Release --output-on-failure -R "^(cydaw_cyui_tests|cydaw_frame_pacing_tests|cydaw_no_juce_production_graph|cydaw2_(routing|creative|mixing|cinema_layout)_check)$"
+```
+
+Run application checks in an isolated QA profile, as for the existing native
+suite. This update does not establish a CPU performance improvement or validate
+Linux/macOS execution; the bounded draw budgets are implementation limits, not
+benchmark results. The earlier DSP comparison evidence remains unchanged.

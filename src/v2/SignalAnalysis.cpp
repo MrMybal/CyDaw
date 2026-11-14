@@ -214,6 +214,7 @@ void Spectrometer::update(const engine::AudioAnalysisFrame* frame, const double 
     while (nowSeconds - lastRow_ >= interval && rows < rowCount) {
         lastRow_ += interval;
         newestRow_ = (newestRow_ + 1) % rowCount;
+        ++historyRevision_;
         std::copy(levels_.begin(), levels_.end(), rows_.begin() + static_cast<std::ptrdiff_t>(newestRow_) * binCount);
         ++rows;
     }

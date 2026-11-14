@@ -291,6 +291,9 @@ struct StereoscopeMemory {
     int newest { -1 };
     int stored {};
     double fingerprint {};
+    std::uint64_t sequence {}, densityRevision {};
+    std::array<cyui::Point, utilityd::stereoscopePairCount> densityPoints {};
+    std::map<std::pair<ImGuiContext*, ImGuiID>, cyui::StereoDensityState> densityViews;
     double lastAdded {};
     std::array<float, utilityd::stereoscopeAngleBins> angles {};
     std::array<float, historySize> history {};
@@ -319,7 +322,15 @@ void stereoscopeFeed(StereoscopeMemory& memory, const Live& live)
     auto fingerprint = static_cast<double>(readings[utilityd::stereoscopeReadingCorrelation]);
     for (int index = 0; index < values; index += 7)
         fingerprint += static_cast<double>(pairs[index]) * (index + 1);
-    if (fingerprint != memory.fingerprint && now - memory.lastAdded >= 1.0 / 70.0) {
+    const auto sequence = live.afterFrame != nullptr ? live.afterFrame->sequence : 0;
+    if ((memory.stored == 0 || sequence != memory.sequence || fingerprint != memory.fingerprint)
+        && now - memory.lastAdded >= 1.0 / 70.0) {
+        memory.sequence = sequence;
+        ++memory.densityRevision;
+        // CyDaw's side axis is R-L. Swap input channels for CyUI's L-R
+        // projection to preserve the existing left/right screen orientation.
+        for (int pair = 0; pair < utilityd::stereoscopePairCount; ++pair)
+            memory.densityPoints[pair] = {pairs[2 * pair + 1], pairs[2 * pair]};
         memory.fingerprint = fingerprint;
         memory.lastAdded = now;
         memory.newest = (memory.newest + 1) % utilityd::stereoscopeTrailMost;
@@ -377,7 +388,7 @@ void stereoscopeCorrelationBar(ImDrawList* list, const Box& bar, const float now
 // The goniometer (or its polar view), its trail fading by the persistence;
 // the wheel zooms.
 bool stereoscopeScope(std::vector<Param>& parameters, const Pane& pane, const Box& square,
-                      const std::array<float, utilityd::stereoscopeParameterCount>& values, const StereoscopeMemory& memory, const ImU32 colour,
+                      const std::array<float, utilityd::stereoscopeParameterCount>& values, StereoscopeMemory& memory, const ImU32 colour,
                       const Setter& set, const bool large)
 {
     const auto& p = theme::palette();
@@ -388,6 +399,34 @@ bool stereoscopeScope(std::vector<Param>& parameters, const Pane& pane, const Bo
     list->AddRectFilled(square.min, square.max, theme::alpha(kDark, 0.55f), dp(3.0f));
     const auto polar = whole(values[utilityd::stereoscopeDisplayMode], utilityd::stereoscopeDisplayModeCount) == 1;
     const auto zoom = std::clamp(values[utilityd::stereoscopeZoom], 0.5f, 4.0f);
+    if (!polar) {
+        auto& state = memory.densityViews[{ImGui::GetCurrentContext(), ImGui::GetID("##stereoscopeScope")}];
+        const double extent = 1.0 / zoom;
+        state.view.x.range = state.view.y.range = {-extent, extent};
+        cyui::StereoDensityOptions options;
+        options.persistence.resolution = large ? 96 : 64;
+        options.persistence.navigation = false;
+        options.persistence.halfLife = utilityd::stereoscopeTrailSecondsOf(values[utilityd::stereoscopePersistence]) * .25;
+        options.persistence.pointRadius = large ? 1.1f : .8f;
+        const cyui::ArrayView<cyui::Point> points {memory.densityPoints.data(), memory.stored ? memory.densityPoints.size() : 0};
+        const auto cursor = ImGui::GetCursorScreenPos();
+        ImGui::SetCursorScreenPos(square.min);
+        const auto result = cyui::stereoDensity("##stereoscopeScope", state, points, memory.densityRevision,
+                                               ImVec2(std::max(1.0f, square.width()), std::max(1.0f, square.height())), options);
+        ImGui::SetCursorScreenPos(cursor);
+        bool changed = false;
+        if (result.hovered) {
+            auto* parameter = at(parameters, pane, utilityd::stereoscopeZoom);
+            if (io.MouseWheel != 0 && parameter != nullptr) {
+                changed |= apply(parameter, parameter->value * std::exp(io.MouseWheel * .1), set);
+                ui::takeWheel();
+            }
+            if (ImGui::IsMouseDoubleClicked(0) && parameter != nullptr)
+                changed |= apply(parameter, parameter->defaultValue, set);
+            ImGui::SetTooltip("%s", L("Molette : zoom  ·  double clic : zoom d'origine", "Wheel: zoom  ·  double click: zoom back"));
+        }
+        return changed;
+    }
     const auto size = square.width();
     // Where a pair goes: the middle up from `origin`, the side across.
     ImVec2 origin((square.min.x + square.max.x) * 0.5f, (square.min.y + square.max.y) * 0.5f);

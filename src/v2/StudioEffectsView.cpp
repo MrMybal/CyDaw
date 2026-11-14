@@ -1,6 +1,7 @@
 #include <cydaw/base/Utilities.h>
 #include <cydaw/base/Text.h>
 #include "StudioEffectsView.h"
+#include <cyui/modules/AudioViews.h>
 
 #include "Theme.h"
 #include "Widgets.h"

@@ -377,6 +377,8 @@ const char* paneTitleOf(const Pane& pane)
 // binding of its first value), updated once a frame whichever view draws it.
 struct SpectrometerView {
     Spectrometer analysis;
+    std::vector<float> waterfall;
+    std::uint64_t waterfallRevision {};
     int frame { -1 };
 };
 
@@ -384,26 +386,6 @@ SpectrometerView& spectrometerView(const cydaw::base::Text& key)
 {
     static std::map<cydaw::base::Text, SpectrometerView> views;
     return views[key];
-}
-
-// From silence (0) to full scale (1): night blue, violet, magenta, orange,
-// pale yellow, as a waterfall's heat.
-ImU32 heatColour(const float t)
-{
-    static constexpr std::array<std::array<float, 3>, 6> stops { {
-        { 0.05f, 0.05f, 0.10f },
-        { 0.16f, 0.07f, 0.36f },
-        { 0.45f, 0.10f, 0.52f },
-        { 0.78f, 0.22f, 0.42f },
-        { 0.97f, 0.52f, 0.20f },
-        { 0.99f, 0.94f, 0.62f },
-    } };
-    const auto x = std::clamp(t, 0.0f, 1.0f) * static_cast<float>(stops.size() - 1);
-    const auto index = std::min(static_cast<int>(x), static_cast<int>(stops.size()) - 2);
-    const auto f = x - static_cast<float>(index);
-    const auto& a = stops[static_cast<std::size_t>(index)];
-    const auto& b = stops[static_cast<std::size_t>(index + 1)];
-    return ImGui::GetColorU32(ImVec4(a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f, 1.0f));
 }
 
 // "A#3" for a frequency.
@@ -476,39 +458,33 @@ bool spectrometerPlot(const Plot& plot, std::vector<Param>& parameters, const Pa
                               dp(1.0f));
     }
 
-    // The waterfall: the spectrum over the last seconds, the newest on top,
-    // drawn at the size of the pixels it has (cells of one colour merged).
-    list->AddRectFilled(fallPlot.min, fallPlot.max, heatColour(0.0f));
-    const auto rows = std::clamp(static_cast<int>(fallPlot.height() / dp(2.0f)), 1, Spectrometer::rowCount);
-    const auto columns = std::clamp(static_cast<int>(fallPlot.width() / dp(2.5f)), 1, Spectrometer::binCount);
-    const auto cellWidth = fallPlot.width() / static_cast<float>(columns);
-    const auto cellHeight = fallPlot.height() / static_cast<float>(rows);
-    const auto range = std::max(1.0f, ceilingDb - floorDb);
-    for (auto row = 0; row < rows; ++row) {
-        const auto* values = analysis.row(row * Spectrometer::rowCount / rows);
-        const auto y = fallPlot.min.y + cellHeight * static_cast<float>(row);
-        auto runStart = 0;
-        auto runLevel = -1;
-        for (auto column = 0; column <= columns; ++column) {
-            auto level = -1;
-            if (column < columns) {
-                const auto from = column * Spectrometer::binCount / columns;
-                const auto to = std::max(from + 1, (column + 1) * Spectrometer::binCount / columns);
-                auto db = -1'000.0f;
-                for (auto bin = from; bin < to; ++bin)
-                    db = std::max(db, values[bin]);
-                level = std::clamp(static_cast<int>((db - floorDb) / range * 40.0f), 0, 40);
-            }
-            if (level != runLevel) {
-                if (runLevel > 0)
-                    list->AddRectFilled(ImVec2(fallPlot.min.x + cellWidth * static_cast<float>(runStart), y),
-                                        ImVec2(fallPlot.min.x + cellWidth * static_cast<float>(column), y + cellHeight + 0.5f),
-                                        heatColour(static_cast<float>(runLevel) / 40.0f));
-                runStart = column;
-                runLevel = level;
-            }
-        }
+    // Chronological matrix for CyUI. Repack only when the host inserts a row,
+    // not once per panel/render. No analysis is performed by the widget.
+    if (view.waterfall.empty() || view.waterfallRevision != analysis.historyRevision()) {
+        view.waterfall.resize(Spectrometer::rowCount * Spectrometer::binCount);
+        for (int age = 0; age < Spectrometer::rowCount; ++age)
+            std::copy_n(analysis.row(age), Spectrometer::binCount,
+                        view.waterfall.data() + (Spectrometer::rowCount - 1 - age) * Spectrometer::binCount);
+        view.waterfallRevision = analysis.historyRevision();
     }
+    const cyui::SpectrogramData data {view.waterfall, Spectrometer::rowCount, Spectrometer::binCount,
+                                     {-settings.historySeconds, 0}, {20, 20000}, true};
+    cyui::PlotState waterfallView {{{-settings.historySeconds, 0}, false}, {{20, 20000}, true}};
+    cyui::SpectrogramOptions options;
+    options.intensity = {floorDb, ceilingDb};
+    options.orientation = cyui::SpectrogramOrientation::timeVertical;
+    options.navigation = false; // existing history/peak controls keep ownership
+    options.axes = false;
+    options.maxCells = 16384;
+    options.legend = large;
+    options.ramp.style = cyui::RampStyle::intensity;
+    const auto cursor = ImGui::GetCursorScreenPos();
+    ImGui::SetCursorScreenPos(fallPlot.min);
+    const auto waterfallResult = cyui::spectrogram("##spectrometerHistory", waterfallView, data,
+                      ImVec2(std::max(1.0f, fallPlot.width()), std::max(1.0f, fallPlot.height())), options);
+    ImGui::SetCursorScreenPos(cursor);
+    if (waterfallResult.hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+        view.analysis.clearPeaks();
     const auto seconds = cydaw::base::Text(cydaw::base::roundToInt(settings.historySeconds)) + " s";
     smallText(list, ImVec2(fallPlot.max.x - smallTextSize(seconds.toRawUTF8(), 0.62f).x - dp(3.0f), fallPlot.max.y - ImGui::GetFontSize() * 0.72f),
               theme::alpha(p.text, 0.7f), seconds.toRawUTF8(), 0.62f);
@@ -520,7 +496,7 @@ bool spectrometerPlot(const Plot& plot, std::vector<Param>& parameters, const Pa
     // click lets the held peaks go.
     const auto mouse = ImGui::GetIO().MousePos;
     if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem)
-        && (curvePlot.contains(mouse) || fallPlot.contains(mouse))) {
+        && curvePlot.contains(mouse)) {
         const auto hz = hzOfX(curvePlot, mouse.x);
         const auto bin = std::clamp(static_cast<int>(std::lround(std::log(hz / 20.0f) / std::log(1'000.0f)
                                                                  * static_cast<float>(Spectrometer::binCount - 1))),
@@ -556,7 +532,12 @@ bool spectrumPlot(const Plot& bounds, ImU32 colour, const Live& live)
             prepared.push_back({Spectrum::frequencyOfBin(float(bin)), Spectrum::floorDb +
                 signals[channel]->levels()[std::size_t(bin)] * (Spectrum::ceilingDb - Spectrum::floorDb)});
         series.push_back({std::uint64_t(channel + 1), channel ? L("après", "after") : L("avant", "before"),
-                          prepared, cyui::PlotStyle::line, channel});
+                          prepared, channel ? cyui::PlotStyle::area : cyui::PlotStyle::line, channel});
+        if (channel) {
+            series.back().baseline = Spectrum::floorDb;
+            series.back().gradient = true;
+            series.back().fillAlpha = .3f;
+        }
     }
     cyui::PlotState view {{{20, 20000}, true}, {{Spectrum::floorDb, Spectrum::ceilingDb}, false}};
     cyui::PlotOptions options;
