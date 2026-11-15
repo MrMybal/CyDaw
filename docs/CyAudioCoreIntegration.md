@@ -18,6 +18,12 @@ and [13 November integration report](CyAudioCoreIntegrationReport.fr.md) describ
 their dated revisions and acceptance results. They are preserved as historical
 evidence, not substituted for testing this newer build.
 
+The [example-project audio comparison](CyAudioCoreProjectAudio.fr.md) records
+100 callback renders against frozen JUCE, plus controlled effect/MIDI checks.
+It confirms signal output and near-identical isolated effects while retaining
+measured differences in full-project execution; this is not blanket audio
+equivalence approval.
+
 ## Production architecture
 
 - The Win32 main window, message loop and D3D11 ImGui surface are native. CyUI
