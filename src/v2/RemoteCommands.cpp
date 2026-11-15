@@ -6043,7 +6043,7 @@ cydaw::base::Value Commands::onEditAudioClip()
 cydaw::base::Value Commands::onAutomation()
 {
     std::optional<RemoteTrack> track;
-    if (auto error = trackOrFail(track); !error.isVoid())
+    if (auto error = trackOrFail(track, true); !error.isVoid())
         return error;
     // A plugin parameter as the target, on an audio track: "plugin" (its
     // index) and "parameter" (index or name).

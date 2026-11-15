@@ -1186,7 +1186,7 @@ cydaw::base::Result Studio::publishGraph(const TrackRef& track, const bool struc
     slot->setLastCompileError(result.failed() ? result.getErrorMessage() : cydaw::base::Text());
     // The nodes the compiler makes inside a module can take other ids when
     // the graph's shape changes: their lanes follow.
-    if (structural && !track.master)
+    if (structural)
         publishParameterAutomation(track);
     // Its inputs changed (one added, one removed in the graph): what is
     // routed into them follows.
@@ -1480,6 +1480,8 @@ cydaw::base::Text Studio::instrumentOfCard(const cydaw::base::Text& key)
 {
     if (const auto model = engine::synth::modelForType(key.toStdString()); model != engine::synth::Model::none)
         return cydaw::base::Text(engine::synth::info(model).instrument);
+    if (key == "sampler")
+        return "sampler-instrument";
     if (key == "prism-synth")
         return "prism-instrument";
     if (key == "kick-synth")
@@ -2143,8 +2145,8 @@ void Studio::setTrackColour(const TrackRef& track, const std::uint32_t argb)
 
 int Studio::laneHeight(const TrackRef& track) const
 {
-    if (track.master)
-        return 88;
+    if (track.isMaster()) return masterLaneHeight_;
+    if (track.master) return 88;
     if (track.midi) {
         const auto found = midiTracks_.find(track.midiId);
         return found != midiTracks_.end() ? found->second.laneHeight : 88;
@@ -2154,8 +2156,8 @@ int Studio::laneHeight(const TrackRef& track) const
 
 void Studio::setLaneHeight(const TrackRef& track, const int height)
 {
-    if (track.master)
-        return;
+    if (track.isMaster()) { masterLaneHeight_ = std::clamp(height, 40, 420); return; }
+    if (track.master) return;
     const auto clamped = cydaw::base::limit(40, 420, height);
     if (track.midi) {
         if (const auto found = midiTracks_.find(track.midiId); found != midiTracks_.end())
@@ -2169,8 +2171,8 @@ void Studio::setLaneHeight(const TrackRef& track, const int height)
 
 bool Studio::automationVisible(const TrackRef& track) const
 {
-    if (track.master)
-        return false;
+    if (track.isMaster()) return masterAutomationVisible_;
+    if (track.master) return false;
     if (track.midi) {
         const auto found = midiTracks_.find(track.midiId);
         return found != midiTracks_.end() && found->second.automationVisible;
@@ -2180,8 +2182,13 @@ bool Studio::automationVisible(const TrackRef& track) const
 
 void Studio::setAutomationVisible(const TrackRef& track, const bool visible)
 {
-    if (track.master)
+    if (track.isMaster()) {
+        masterAutomationVisible_ = visible;
+        masterLaneHeight_ = visible ? std::max(172, masterLaneHeight_) : 88;
+        dirty_ = true;
         return;
+    }
+    if (track.master) return;
     bool* flag = nullptr;
     int* height = nullptr;
     if (track.midi) {
@@ -2205,6 +2212,7 @@ void Studio::setAutomationVisible(const TrackRef& track, const bool visible)
 
 std::vector<Studio::AutomationPoint> Studio::automationPoints(const TrackRef& track) const
 {
+    if (track.isMaster()) { return lanePoints(track, masterGainLane); }
     if (track.master)
         return {};
     if (!isValid(track))
@@ -2214,6 +2222,7 @@ std::vector<Studio::AutomationPoint> Studio::automationPoints(const TrackRef& tr
 
 std::uint64_t Studio::addAutomationPoint(const TrackRef& track, const double seconds, const float valueDb)
 {
+    if (track.isMaster()) { return addLanePoint(track, masterGainLane, seconds, valueDb); }
     if (track.master)
         return 0;
     if (!isValid(track))
@@ -2225,6 +2234,7 @@ std::uint64_t Studio::addAutomationPoint(const TrackRef& track, const double sec
 
 bool Studio::updateAutomationPoint(const TrackRef& track, const std::uint64_t id, const double seconds, const float valueDb)
 {
+    if (track.isMaster()) { return updateLanePoint(track, masterGainLane, id, seconds, valueDb); }
     if (track.master)
         return false;
     if (!isValid(track))
@@ -2237,6 +2247,7 @@ bool Studio::updateAutomationPoint(const TrackRef& track, const std::uint64_t id
 bool Studio::setAutomationPointCurve(const TrackRef& track, const std::uint64_t id, const AutomationCurve curve,
                                      const float amount)
 {
+    if (track.isMaster()) { return setLanePointCurve(track, masterGainLane, id, curve, amount); }
     if (track.master)
         return false;
     if (!isValid(track))
@@ -2248,6 +2259,7 @@ bool Studio::setAutomationPointCurve(const TrackRef& track, const std::uint64_t 
 
 bool Studio::removeAutomationPoint(const TrackRef& track, const std::uint64_t id)
 {
+    if (track.isMaster()) { return removeLanePoint(track, masterGainLane, id); }
     if (track.master)
         return false;
     if (!isValid(track))
@@ -2259,6 +2271,7 @@ bool Studio::removeAutomationPoint(const TrackRef& track, const std::uint64_t id
 
 void Studio::setAutomationPoints(const TrackRef& track, const std::vector<AutomationPoint>& points)
 {
+    if (track.isMaster()) { setLanePoints(track, masterGainLane, points); return; }
     if (track.master)
         return;
     if (!isValid(track))
@@ -2275,8 +2288,8 @@ void Studio::setAutomationPoints(const TrackRef& track, const std::vector<Automa
 
 ParameterLanes* Studio::lanesOf(const TrackRef& track)
 {
-    if (track.master)
-        return nullptr;
+    if (track.isMaster()) return &masterArrangementLanes_;
+    if (track.master) return nullptr;
     if (track.midi) {
         const auto found = midiTracks_.find(track.midiId);
         return found != midiTracks_.end() ? &found->second.parameterLanes : nullptr;
@@ -2579,8 +2592,11 @@ std::string Studio::learnPrefix(const TrackRef& track) const
 
 bool Studio::canAutomate(const TrackRef& track, const cydaw::base::Text& binding) const
 {
-    if (track.master)
-        return false;
+    if (track.isMaster()) {
+        const auto* slot = graphFor(track);
+        return binding == masterGainLane || modulation::nativeTargetFor(nativeBinding(slot, binding)).has_value();
+    }
+    if (track.master) return false;
     std::size_t plugin {};
     std::uint32_t parameter {};
     if (parsePluginLane(binding, plugin, parameter))
@@ -2716,6 +2732,7 @@ std::vector<Studio::MasterLaneChoice> Studio::clipLaneChoices(const TrackRef& tr
 
 void Studio::publishParameterAutomation(const TrackRef& track)
 {
+    if (track.isMaster()) { publishMasterClip(); return; }
     const auto* stored = lanesOf(track);
     if (stored == nullptr || !isValid(track))
         return;
@@ -4343,6 +4360,25 @@ void Studio::publishMasterClip()
     std::vector<app::NativeDspRuntime::AutomationLane> lanes;
     const auto tempo = std::max(20.0, engine_.tempo());
     masterPublishedTempo_ = tempo;
+    const auto* masterSlot = graphFor(masterTrack());
+    for (const auto& [binding, points] : masterArrangementLanes_.lanes) {
+        if (binding == masterGainLane || points.empty()) continue;
+        const auto target = modulation::nativeTargetFor(nativeBinding(masterSlot, binding));
+        if (!target) continue;
+        app::NativeDspRuntime::AutomationLane lane;
+        lane.nodeId = target->nodeId; lane.field = target->field; lane.slot = target->slot;
+        lane.minimum = target->minimum; lane.maximum = target->maximum;
+        lane.logarithmic = logarithmicParameter(masterTrack(), binding);
+        for (const auto& p : points)
+            lane.points.push_back({p.timeSeconds, std::clamp(p.valueDb, lane.minimum, lane.maximum), int(p.curve), p.curveAmount, p.handles});
+        lanes.push_back(std::move(lane));
+    }
+    std::vector<app::NativeDspRuntime::AutomationPoint> gain;
+    const auto* activeClip = masterClip(masterPlaying_);
+    if (!activeClip || !activeClip->lanes.contains(masterGainLane))
+        for (const auto& p : lanePoints(masterTrack(), masterGainLane))
+            gain.push_back({p.timeSeconds, std::clamp(p.valueDb, -60.0f, 12.0f), int(p.curve), p.curveAmount, p.handles});
+    engine_.setMasterGainAutomation(std::move(gain));
     if (const auto* clip = masterClip(masterPlaying_)) {
         const auto* slot = graphFor(masterTrack());
         const auto secondsPerBeat = 60.0 / tempo;
@@ -4370,6 +4406,7 @@ void Studio::publishMasterClip()
             lane.clipStartSeconds = masterStartSeconds_;
             lane.clipLengthSeconds = clip->lengthBeats * secondsPerBeat;
             lane.clipLooping = clip->looping;
+            std::erase_if(lanes, [&](const auto& other) { return other.nodeId == lane.nodeId && other.field == lane.field && other.slot == lane.slot; });
             lanes.push_back(std::move(lane));
         }
     }
@@ -5819,6 +5856,10 @@ void Studio::clearSession()
     engine_.stopLauncher();
     clipsAtStop_.clear();
     masterClips_.clear();
+    masterArrangementLanes_ = {};
+    masterAutomationVisible_ = false;
+    masterLaneHeight_ = 88;
+    engine_.setMasterGainAutomation({});
     masterPlaying_ = -1;
     masterAtStop_ = -1;
     masterGainBeforeClip_.reset();
@@ -5891,6 +5932,7 @@ cydaw::base::Result Studio::finishApplying(const cydaw::base::File& file, const 
     loading_ = false;
     for (const auto& track : allTracks())
         publishParameterAutomation(track);
+    publishParameterAutomation(masterTrack());
     // Projects shipped next to the application are opened as new work: a
     // plain save must not overwrite the template.
     const auto templatesFolder = cydaw::base::File::getSpecialLocation(cydaw::base::File::currentExecutableFile)

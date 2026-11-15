@@ -689,7 +689,7 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
         if (clip.lengthBeats > visibleBeats * 0.95)
             pixelsPerBeat_ = std::clamp(static_cast<float>((gridMax_.x - gridMin_.x) / ImGui::GetStyle().FontScaleDpi
                                                            / (clip.lengthBeats + 0.5)),
-                                        8.0f, 400.0f);
+                                        1.0e-6f, 600.0f);
     }
     scrollY_ = std::clamp(scrollY_, 0.0f, std::max(0.0f, 128.0f * rowH - (gridMax_.y - gridMin_.y)));
 
@@ -1062,13 +1062,13 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
     if ((hovered || (gesture && ImGui::IsItemActive())) && io.MouseWheel != 0.0f) {
         if (io.KeyCtrl) {
             const auto before = xToBeat(mouse.x);
-            pixelsPerBeat_ = std::clamp(pixelsPerBeat_ * (io.MouseWheel > 0.0f ? 1.15f : 1.0f / 1.15f), 6.0f, 600.0f);
+            pixelsPerBeat_ = std::clamp(pixelsPerBeat_ * (io.MouseWheel > 0.0f ? 1.15f : 1.0f / 1.15f), 1.0e-6f, 600.0f);
             scrollBeats_ = before - static_cast<double>(mouse.x - gridMin_.x) / (pixelsPerBeat_ * ImGui::GetStyle().FontScaleDpi);
         } else if (io.KeyShift) {
             scrollBeats_ -= io.MouseWheel * 40.0 / ppb;
         } else if (io.KeyAlt) {
             const auto noteAtMouse = yToNote(mouse.y);
-            rowHeight_ = std::clamp(rowHeight_ + io.MouseWheel, 6.0f, 30.0f);
+            rowHeight_ = std::clamp(rowHeight_ + io.MouseWheel, 1.0f, 30.0f);
             scrollY_ = (127 - noteAtMouse) * dp(rowHeight_) - (mouse.y - gridMin_.y);
         } else {
             scrollY_ -= io.MouseWheel * rowH * 3.0f;
@@ -1355,16 +1355,16 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
         auto position = scrollBeats_;
         auto zoom = static_cast<double>(ppb);
         if (ui::timelineBand("##timeBand", ImVec2(gridMin_.x, origin.y), ImVec2(gridMax_.x, origin.y + navigatorHeight), position, zoom,
-                             6.0 * ImGui::GetStyle().FontScaleDpi, 600.0 * ImGui::GetStyle().FontScaleDpi, 1.0,
+                             1.0e-6 * ImGui::GetStyle().FontScaleDpi, 600.0 * ImGui::GetStyle().FontScaleDpi, 1.0,
                              studio_.engine().beatsPerBar(), -1.0e6)) {
             // Double click: the whole clip.
-            zoom = std::clamp((gridMax_.x - gridMin_.x) / (clip.lengthBeats + 0.5), 6.0 * ImGui::GetStyle().FontScaleDpi,
+            zoom = std::clamp((gridMax_.x - gridMin_.x) / (clip.lengthBeats + 0.5), 1.0e-6 * ImGui::GetStyle().FontScaleDpi,
                               600.0 * ImGui::GetStyle().FontScaleDpi);
             position = -0.25;
         }
         scrollBeats_ = position;
         pixelsPerBeat_ = static_cast<float>(zoom / ImGui::GetStyle().FontScaleDpi);
-        if (ui::rowsBand("##rowsBand", ImVec2(keysRight, gridMin_.y), ImVec2(gridMin_.x, gridMax_.y), scrollY_, rowHeight_, 6.0f, 30.0f,
+        if (ui::rowsBand("##rowsBand", ImVec2(keysRight, gridMin_.y), ImVec2(gridMin_.x, gridMax_.y), scrollY_, rowHeight_, 1.0f, 30.0f,
                          true)) {
             rowHeight_ = 13.0f;
             scrollY_ = -1.0f;
@@ -1372,7 +1372,7 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
         if (ui::bandCorner("##bandCorner", ImVec2(keysRight, origin.y), ImVec2(gridMin_.x, origin.y + navigatorHeight))) {
             // The whole clip, the rows at their size round its notes.
             pixelsPerBeat_ = std::clamp(static_cast<float>((gridMax_.x - gridMin_.x) / (clip.lengthBeats + 0.5) / ImGui::GetStyle().FontScaleDpi),
-                                        6.0f, 600.0f);
+                                        1.0e-6f, 600.0f);
             scrollBeats_ = -0.25;
             rowHeight_ = 13.0f;
             scrollY_ = -1.0f;
@@ -1395,8 +1395,9 @@ void ClipEditorView::drawMidi(const TrackRef& track, const MidiClip& clip)
         // Before the clip too, as the audio editor counts them: -1, -2…
         // (dimmer).
         const auto barBeats = std::max(1.0, static_cast<double>(studio_.engine().beatsPerBar()));
-        const auto bar = static_cast<int>(std::floor(beat / barBeats + 1.0e-9));
-        std::snprintf(text, sizeof(text), "%d.%d", bar >= 0 ? bar + 1 : bar, static_cast<int>(beat - bar * barBeats + 1.0e-9) + 1);
+        const auto bar = static_cast<std::int64_t>(std::floor(beat / barBeats + 1.0e-9));
+        std::snprintf(text, sizeof(text), "%lld.%d", static_cast<long long>(bar >= 0 ? bar + 1 : bar),
+                      static_cast<int>(beat - static_cast<double>(bar) * barBeats + 1.0e-9) + 1);
         list->AddLine(ImVec2(x, gridMin_.y - dp(5.0f)), ImVec2(x, gridMin_.y), p.textFaint);
         list->AddText(ImVec2(x + dp(2.0f), rulerTop + dp(2.0f)), beat < 0.0 ? p.textFaint : p.textDim, text);
     }

@@ -127,6 +127,8 @@ double ArrangementView::contentEndSeconds() const
             for (const auto& clip : *clips)
                 if (clip.launcherScene < 0)
                     end = std::max(end, (clip.startBeats + clip.lengthBeats) * secondsPerBeat());
+    for (const auto& [binding, points] : studio_.masterArrangementLanes().lanes)
+        for (const auto& p : points) end = std::max(end, p.timeSeconds);
     return end;
 }
 
@@ -307,7 +309,8 @@ void ArrangementView::drawCanvas()
     const auto zoomBefore = state_.pixelsPerSecond;
 
     // Lanes and their content height (a folded group's tracks left out).
-    const auto tracks = studio_.shownTracks();
+    auto tracks = studio_.shownTracks();
+    tracks.push_back(Studio::masterTrack());
     std::vector<LaneHit> lanes;
     auto y = lanesMin_.y - state_.scrollY;
     for (const auto& track : tracks) {
@@ -394,10 +397,11 @@ void ArrangementView::drawCanvas()
         list->AddRectFilled(ImVec2(x0, lanesMin_.y), ImVec2(x1, lanesMax_.y), theme::alpha(p.accent, 0.045f));
     }
 
-    // Clips.
+    // Clips. The master holds timeline automation only.
     std::vector<ClipHit> hits;
     const auto spb = secondsPerBeat();
     for (const auto& lane : lanes) {
+        if (lane.track.master) continue;
         if (lane.bottom < lanesMin_.y || lane.top > lanesMax_.y)
             continue;
         const auto top = lane.top + dp(1.0f);
@@ -543,7 +547,7 @@ void ArrangementView::drawCanvas()
         state_.scrollY -= io.MouseWheel * dp(48.0f);
 
     // Empty session: what to do first.
-    if (tracks.empty()) {
+    if (tracks.size() == 1) {
         const ImVec2 centre((lanesMin_.x + lanesMax_.x) * 0.5f, (lanesMin_.y + lanesMax_.y) * 0.45f);
         ImGui::PushFont(theme::boldFont(), ImGui::GetStyle().FontSizeBase * 1.1f);
         ui::centredText(list, ImVec2(lanesMin_.x, centre.y - dp(26.0f)), ImVec2(lanesMax_.x, centre.y), p.textDim,
@@ -560,8 +564,8 @@ void ArrangementView::drawCanvas()
     list->AddRectFilled(origin, ImVec2(headersRight, lanesMin_.y), p.bg1);
     ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 0.86f);
     char header[64];
-    std::snprintf(header, sizeof(header), "%d %s", static_cast<int>(tracks.size()),
-                  tracks.size() > 1 ? L("pistes", "tracks") : L("piste", "track"));
+    std::snprintf(header, sizeof(header), "%d %s", static_cast<int>(tracks.size() - 1),
+                  tracks.size() > 2 ? L("pistes", "tracks") : L("piste", "track"));
     list->AddText(ImVec2(origin.x + dp(8.0f), origin.y + (rulerHeight - ImGui::GetFontSize()) * 0.5f), p.textFaint, header);
     ImGui::PopFont();
 
@@ -1083,7 +1087,7 @@ void ArrangementView::drawHeader(const TrackRef& track, const ImVec2 min, const 
             ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 0.78f);
             const auto hybrid = studio_.companionOf(track).has_value();
             list->AddText(ImVec2(max.x - dp(30.0f), min.y + dp(7.0f)), hybrid ? p.accent : track.midi ? p.midi : p.audio,
-                          hybrid ? "HYB" : track.midi ? "MIDI" : "AUDIO");
+                          track.isMaster() ? "MAIN" : studio_.isBusTrack(track) ? "BUS" : hybrid ? "HYB" : track.midi ? "MIDI" : "AUDIO");
             ImGui::PopFont();
         }
     }
@@ -1104,15 +1108,19 @@ void ArrangementView::drawHeader(const TrackRef& track, const ImVec2 min, const 
         {
             const auto [key, name] = control_targets::forTrackLearn(studio_, track, "solo", "Solo");
             const ui::LearnScope learn(key, name);
+            ImGui::BeginDisabled(track.master);
             changed |= ui::toggle("S", &mix.solo, p.solo, size, L("Solo", "Solo"));
+            ImGui::EndDisabled();
         }
         ImGui::SameLine(0.0f, dp(3.0f));
         {
             const auto [key, name] = control_targets::forTrackLearn(studio_, track, "arm", ui::Ls("Armer", "Arm"));
             const ui::LearnScope learn(key, name);
+            ImGui::BeginDisabled(track.master || studio_.isBusTrack(track));
             changed |= ui::toggle("R", &mix.armed, p.record, size,
                                   track.midi ? L("Armer : le clavier joue cette piste", "Arm: the keyboard plays this track")
                                              : L("Armer pour l'enregistrement", "Arm for recording"));
+            ImGui::EndDisabled();
         }
         ImGui::SameLine(0.0f, dp(3.0f));
         auto automation = studio_.automationVisible(track);
@@ -1246,7 +1254,9 @@ void ArrangementView::handleLaneInput(const std::vector<ClipHit>& clips, const s
         if (under != nullptr) {
             openInEditor(under->ref);
         } else if (const auto* lane = laneAt(lanes, mouse.y); lane != nullptr && mouse.y < lane->clipBottom) {
-            if (lane->track.midi)
+            if (lane->track.isMaster())
+                studio_.setAutomationVisible(lane->track, true);
+            else if (lane->track.midi)
                 createMidiClipAt(lane->track, xToTime(mouse.x));
             else if (studio_.isBusTrack(lane->track))
                 createAutomationClipAt(lane->track, xToTime(mouse.x));
@@ -1356,7 +1366,7 @@ void ArrangementView::applyDrag(const std::vector<LaneHit>& lanes)
         // Any track's lane takes the clips (a hybrid track's companion the
         // other kind); a bus, its own kind only.
         if (const auto* lane = laneAt(lanes, io.MousePos.y);
-            lane != nullptr && (lane->track.midi == lead.ref.track.midi || !studio_.isBusTrack(lane->track)))
+            lane != nullptr && !lane->track.master && (lane->track.midi == lead.ref.track.midi || !studio_.isBusTrack(lane->track)))
             dragLaneTrack_ = lane->track;
         studio_.markDirty();
     } else if (drag_ == Drag::trimRight) {
@@ -1819,7 +1829,7 @@ ArrangementView::LaneScale ArrangementView::laneScale(const TrackRef& track, cyd
     std::size_t plugin {};
     std::uint32_t parameterIndex {};
     if (Studio::parsePluginLane(lane, plugin, parameterIndex)) {
-        const auto plugins = track.midi ? std::vector<app::AudioTrackController::TrackInfo::PluginInfo> {}
+        const auto plugins = (track.midi || track.master) ? std::vector<app::AudioTrackController::TrackInfo::PluginInfo> {}
                                         : studio_.engine().trackPlugins(track.audioIndex);
         if (plugin >= plugins.size()) {
             lane.clear();
@@ -1948,14 +1958,15 @@ void ArrangementView::unfocusCurves()
 void ArrangementView::drawCurveBar()
 {
     const auto& p = theme::palette();
-    const auto tracks = studio_.tracks();
+    auto tracks = studio_.tracks();
+    tracks.push_back(Studio::masterTrack());
     if (std::none_of(tracks.begin(), tracks.end(), [this](const TrackRef& track) { return studio_.automationVisible(track); })) {
         unfocusCurves();
         return;
     }
     ImGui::AlignTextToFramePadding();
     const auto found = curveEditors_.find(focusedCurve_);
-    if (found == curveEditors_.end() || !focusedCurveTrack_ || !studio_.isValid(*focusedCurveTrack_)
+    if (found == curveEditors_.end() || !focusedCurveTrack_ || (!focusedCurveTrack_->isMaster() && !studio_.isValid(*focusedCurveTrack_))
         || !studio_.automationVisible(*focusedCurveTrack_)) {
         ImGui::TextDisabled("%s", L("Automation : cliquez un point d'un couloir pour lire et modifier ses valeurs, encadrez-en plusieurs pour les modifier ensemble.",
                                     "Automation: click a lane's point to read and edit its values, frame several to edit them together."));
@@ -2201,7 +2212,7 @@ bool ArrangementView::undoAutomation()
         return false;
     auto edit = std::move(automationUndo_.back());
     automationUndo_.pop_back();
-    if (!studio_.isValid(edit.track))
+    if (!edit.track.isMaster() && !studio_.isValid(edit.track))
         return undoAutomation();
     automationRedo_.push_back({ edit.track, edit.lane, studio_.lanePoints(edit.track, edit.lane) });
     studio_.setLanePoints(edit.track, edit.lane, edit.points);
@@ -2217,7 +2228,7 @@ bool ArrangementView::redoAutomation()
         return false;
     auto edit = std::move(automationRedo_.back());
     automationRedo_.pop_back();
-    if (!studio_.isValid(edit.track))
+    if (!edit.track.isMaster() && !studio_.isValid(edit.track))
         return redoAutomation();
     automationUndo_.push_back({ edit.track, edit.lane, studio_.lanePoints(edit.track, edit.lane) });
     studio_.setLanePoints(edit.track, edit.lane, edit.points);
@@ -2269,7 +2280,7 @@ void ArrangementView::laneChooserMenu()
 {
     if (!ImGui::BeginPopup("##laneChooser"))
         return;
-    if (!laneChooserTrack_ || !studio_.isValid(*laneChooserTrack_)) {
+    if (!laneChooserTrack_ || (!laneChooserTrack_->isMaster() && !studio_.isValid(*laneChooserTrack_))) {
         ImGui::EndPopup();
         return;
     }
@@ -2359,7 +2370,7 @@ void ArrangementView::laneChooserMenu()
         ImGui::PopID();
     }
     // The plugins of an audio track, with what their workers report.
-    const auto plugins = track.midi ? std::vector<app::AudioTrackController::TrackInfo::PluginInfo> {}
+    const auto plugins = (track.midi || track.master) ? std::vector<app::AudioTrackController::TrackInfo::PluginInfo> {}
                                     : studio_.engine().trackPlugins(track.audioIndex);
     if (!plugins.empty()) {
         ImGui::Separator();
@@ -2394,7 +2405,14 @@ void ArrangementView::trackContextMenu()
 {
     if (!ImGui::BeginPopup("##trackContext"))
         return;
-    if (contextTrack_ && studio_.isValid(*contextTrack_)) {
+    if (contextTrack_ && contextTrack_->isMaster()) {
+        if (ImGui::MenuItem(L("Automation du master", "Master automation"), nullptr, studio_.automationVisible(*contextTrack_)))
+            studio_.setAutomationVisible(*contextTrack_, !studio_.automationVisible(*contextTrack_));
+        if (ImGui::MenuItem(L("Choisir le paramètre…", "Choose parameter…"))) {
+            studio_.setAutomationVisible(*contextTrack_, true);
+            chooseLaneFor_ = *contextTrack_;
+        }
+    } else if (contextTrack_ && studio_.isValid(*contextTrack_)) {
         const auto track = *contextTrack_;
         ImGui::TextDisabled("%s", studio_.trackName(track).toRawUTF8());
         ImGui::Separator();

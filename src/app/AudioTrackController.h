@@ -583,6 +583,9 @@ public:
     [[nodiscard]] bool tryPopAnalysisFrame(
         cydaw::engine::AudioAnalysisFrame& frame) noexcept;
     void setGain(float linearGain) noexcept;
+    void setGainAutomation(std::vector<NativeDspRuntime::AutomationPoint> points) {
+        gainAutomation_.store(std::make_shared<const std::vector<NativeDspRuntime::AutomationPoint>>(std::move(points)));
+    }
     // The master track's devices, before its fader: what its graph does to
     // the tracks mixed. Passes the sound as it is while it has none.
     cydaw::base::Result setChainGraph(const cydaw::engine::NativeDspGraph& graph);
@@ -628,6 +631,7 @@ private:
         cydaw::engine::AudioAnalysisFrame, 8>> analysisFrames_;
     std::uint64_t analysisSequence_ {};
     std::atomic<float> gain_ { 1.0f };
+    cydaw::realtime::RtPublisher<std::vector<NativeDspRuntime::AutomationPoint>> gainAutomation_;
     NativeDspRuntime chain_;
     std::atomic<bool> chainActive_ {};
     std::atomic<int> blockSize_ { 512 };
@@ -1198,6 +1202,9 @@ public:
                                          cydaw::engine::AudioAnalysisFrame& frame) const;
     void setTrackMixer(std::size_t index, float gainDb, float pan, bool muted);
     void setMasterGain(float gainDb) noexcept;
+    void setMasterGainAutomation(std::vector<NativeDspRuntime::AutomationPoint> points) {
+        masterOutput_.setGainAutomation(std::move(points));
+    }
     // The master silenced without losing its level.
     void setMasterMuted(bool muted) noexcept;
     // The master track's devices (a graph from the tracks mixed to the

@@ -47,11 +47,13 @@ public:
         double extractMs {};
         double frameMs {};
         std::vector<std::pair<cydaw::base::Text, std::vector<std::pair<cydaw::base::Text, int>>>> facets;
+        cydaw::base::Value entries; // Visible device rows with their actual metadata.
         cydaw::base::TextList names; // the first rows
     };
     // A search shown: text, semantic, a facet's values chosen by key.
     void setSampleQuery(const cydaw::base::Text& text, bool semantic, const std::vector<std::pair<int, cydaw::base::TextList>>& chosen,
                         int sortColumn, bool ascending);
+    void setDeviceQuery(int content, int role, const cydaw::base::Text* query = nullptr);
     [[nodiscard]] Probe probe();
 
 private:
@@ -130,12 +132,15 @@ private:
     bool downloading_ {};
     char instrumentSearch_[120] {};
     int selectedInstrument_ { -1 };
+    int instrumentContent_ {}; // all, native modules, presets, samples, user devices
     std::unique_ptr<Facets> effectFacets_;
     std::vector<EffectRow> effects_;
     std::optional<TrackRef> effectsFor_;
     double effectsTime_ { -100.0 };
     char effectSearch_[120] {};
     int selectedEffect_ { -1 };
+    int effectContent_ {}; // devices (default), presets, all
+    int effectRole_ {}; // all, audio, MIDI, instrument, control
     std::unique_ptr<PluginScan> plugins_;
 };
 

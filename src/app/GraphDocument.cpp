@@ -11289,10 +11289,27 @@ GraphDocument::deviceCatalogue() const {
                                        : cydaw::base::Text(),
          type.descriptionKey.isNotEmpty() ? tr(type.descriptionKey)
                                           : cydaw::base::Text(),
-         type.hasInput && type.inputKind == PortKind::midi &&
-             type.outputKind == PortKind::audio,
+         type.outputKind == PortKind::audio &&
+             ((type.hasInput && type.inputKind == PortKind::midi) ||
+              cydaw::engine::synth::modelForType(type.key.toStdString()) !=
+                  cydaw::engine::synth::Model::none ||
+              cydaw::engine::instrument_container::isContainerType(type.key.toStdString()) ||
+              type.key == "sampler" || type.key == "batterie" ||
+              type.key == "prism-synth" || type.key == "kick-synth"),
          portKindName(type.hasInput, type.inputKind),
          portKindName(type.hasOutput, type.outputKind)});
+    if (entries.back().description.isEmpty()) {
+      if (const auto model = cydaw::engine::synth::modelForType(type.key.toStdString());
+          model != cydaw::engine::synth::Model::none) {
+        const auto& info = cydaw::engine::synth::info(model);
+        entries.back().description = Localization::instance().languageCode() == "fr"
+            ? info.frenchHint : info.englishHint;
+      } else {
+        const auto descriptionKey = "library.device." + type.key;
+        const auto description = tr(descriptionKey);
+        if (description != descriptionKey) entries.back().description = description;
+      }
+    }
     entries.back().categoryKey = type.categoryKey;
     entries.back().englishName =
         type.title.isNotEmpty()

@@ -4176,7 +4176,7 @@ bool drawPane(const char* id, const Pane& pane, std::vector<Param>& parameters, 
             if (eqBand >= 0 && slot != engine::eqProBands * engine::eqProValuesPerBand) {
                 // A band's field: its own colour, "Gain" for "Bande 3 · Gain".
                 auto shown = *parameter;
-                shown.label = parameter->label.fromLastOccurrenceOf(cydaw::base::Text::fromUTF8("\xc2\xb7 "), false, false);
+                shown.label = parameter->label.contains(cydaw::base::Text::fromUTF8("\xc2\xb7 ")) ? parameter->label.fromLastOccurrenceOf(cydaw::base::Text::fromUTF8("\xc2\xb7 "), false, false) : parameter->label;
                 if (valueField("##value", shown, width, kBandColours[eqBand], set)) {
                     parameter->value = shown.value;
                     changed = true;
@@ -4275,7 +4275,8 @@ bool nativeLarge(const Pane& pane, std::vector<Param>& parameters, const ImVec2 
         for (std::size_t at = shown; at-- > 0;) {
             const auto& parameter = parameters[static_cast<std::size_t>(main[at])];
             const auto value = formatValue(parameter, parameter.value);
-            const auto label = parameter.label.fromLastOccurrenceOf(cydaw::base::Text::fromUTF8("\xc2\xb7 "), false, false);
+            const auto label = parameter.label.contains(cydaw::base::Text::fromUTF8("\xc2\xb7 "))
+                ? parameter.label.fromLastOccurrenceOf(cydaw::base::Text::fromUTF8("\xc2\xb7 "), false, false) : parameter.label;
             const auto valueSize = smallTextSize(value.toRawUTF8(), 1.0f);
             const auto labelSize = smallTextSize(label.toRawUTF8(), 0.6f);
             const auto width = std::max(valueSize.x, labelSize.x);

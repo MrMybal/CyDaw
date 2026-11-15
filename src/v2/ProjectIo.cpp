@@ -1974,6 +1974,12 @@ cydaw::base::Value buildDocument(Studio& studio, const cydaw::base::File& projec
     document->setProperty(keys::tempo, engine.tempo());
     document->setProperty("timeSignatureNumerator", engine.timeSignatureNumerator());
     document->setProperty("timeSignatureDenominator", engine.timeSignatureDenominator());
+    auto masterArrangement = makeObject();
+    masterArrangement->setProperty(keys::parameterAutomation, parameterLanesToVar(studio.masterArrangementLanes()));
+    masterArrangement->setProperty(keys::shownAutomation, studio.masterArrangementLanes().shown);
+    masterArrangement->setProperty(keys::automationVisible, studio.automationVisible(Studio::masterTrack()));
+    masterArrangement->setProperty("laneHeight", studio.laneHeight(Studio::masterTrack()));
+    document->setProperty("masterArrangement", cydaw::base::Value(masterArrangement.get()));
     document->setProperty(keys::masterGainDb, engine.masterGainDb());
     document->setProperty(keys::masterMuted, engine.isMasterMuted());
     if (masterGraph.getDynamicObject() != nullptr)
@@ -2294,6 +2300,11 @@ bool DocumentLoad::next()
         engine.setMasterMuted(static_cast<bool>(root.getProperty(keys::masterMuted)));
         // The master's devices; a project from before them gets the limiter.
         studio.restoreMasterGraph(root.getProperty("masterGraph"));
+        if (const auto* master = root.getProperty("masterArrangement").getDynamicObject()) {
+            readParameterLanes(*master, studio.masterArrangementLanes());
+            studio.setAutomationVisible(Studio::masterTrack(), static_cast<bool>(master->getProperty(keys::automationVisible)));
+            studio.setLaneHeight(Studio::masterTrack(), master->hasProperty("laneHeight") ? static_cast<int>(master->getProperty("laneHeight")) : 88);
+        }
         engine.setArrangementPlaybackEnabled(!root.hasProperty(keys::arrangementPlayback)
                                              || static_cast<bool>(root.getProperty(keys::arrangementPlayback)));
         restoreInterfaceState(studio, root);

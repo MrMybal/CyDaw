@@ -2570,5 +2570,22 @@
   "container.parameter.generator": "Sound",
   "container.parameter.pitch": "Pitch",
   "container.parameter.layerWord": "Layer",
-  "container.parameter.chainWord": "Chain"
+  "container.parameter.chainWord": "Chain",
+  "library.device.sampler": "Lecteur d’échantillons polyphonique, avec zones de notes et de vélocité.",
+  "library.device.batterie": "Instrument de batterie avec sons répartis sur les touches MIDI.",
+  "library.device.drum-rack": "Conteneur de batterie : un instrument et ses effets par pad.",
+  "library.device.instrument-layer": "Superpose plusieurs instruments selon les notes et les vélocités.",
+  "library.device.instrument-selector": "Sélectionne un instrument parmi plusieurs couches.",
+  "library.device.prism-synth": "Synthétiseur à tables d’ondes avec deux oscillateurs et modulation.",
+  "library.device.kick-synth": "Synthétiseur de grosse caisse avec hauteur et enveloppe réglables.",
+  "library.device.poly-oscillator": "Oscillateur polyphonique piloté en MIDI.",
+  "library.device.poly-synth": "Synthétiseur polyphonique historique.",
+  "library.device.reverb": "Réverbération avec réglages de pièce et de mélange.",
+  "library.device.gain": "Ajuste le niveau du signal audio.",
+  "library.device.oscillator": "Générateur de formes d’onde piloté par une fréquence.",
+  "library.device.noise": "Générateur de bruit audio.",
+  "library.device.wavetable": "Oscillateur à table d’ondes.",
+  "library.device.sound-model": "Générateur utilisant un modèle sonore.",
+  "library.device.mono-to-stereo": "Convertit un signal mono en stéréo.",
+  "library.device.stereo-to-mono": "Réduit un signal stéréo en mono."
 }

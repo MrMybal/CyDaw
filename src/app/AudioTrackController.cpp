@@ -1946,10 +1946,21 @@ void MasterOutputAudioSource::getNextAudioBlock(
     // The master track's devices, then its fader.
     if (bufferToFill.buffer != nullptr && bufferToFill.numSamples > 0 && chainActive_.load(std::memory_order_acquire))
         (void) chain_.process(*bufferToFill.buffer, bufferToFill.startSample, bufferToFill.numSamples, blockStart);
-    if (bufferToFill.buffer != nullptr && bufferToFill.numSamples > 0)
-        bufferToFill.buffer->applyGain(
-            bufferToFill.startSample, bufferToFill.numSamples,
-            gain_.load(std::memory_order_relaxed));
+    if (bufferToFill.buffer != nullptr && bufferToFill.numSamples > 0) {
+        const auto envelope = gainAutomation_.read();
+        const auto baseGain = gain_.load(std::memory_order_relaxed);
+        const auto rate = sampleRate_.load(std::memory_order_relaxed);
+        if (envelope && !envelope->empty() && std::isfinite(blockStart) && rate > 0.0 && baseGain != 0.0f) {
+            for (int frame = 0; frame < bufferToFill.numSamples; ++frame) {
+                const auto db = std::clamp(NativeDspRuntime::automationValueAt(*envelope, blockStart + frame / rate), -60.0f, 12.0f);
+                const auto gain = cydaw::audio::Decibels::decibelsToGain(db);
+                for (int channel = 0; channel < bufferToFill.buffer->getNumChannels(); ++channel)
+                    bufferToFill.buffer->getWritePointer(channel, bufferToFill.startSample)[frame] *= gain;
+            }
+        } else {
+            bufferToFill.buffer->applyGain(bufferToFill.startSample, bufferToFill.numSamples, baseGain);
+        }
+    }
     publishAnalysisFrame(bufferToFill);
     if (bufferToFill.buffer == nullptr || bufferToFill.numSamples <= 0
         || bufferToFill.buffer->getNumChannels() <= 0

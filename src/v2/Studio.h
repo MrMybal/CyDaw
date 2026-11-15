@@ -539,6 +539,8 @@ public:
     [[nodiscard]] std::uint32_t trackColour(const TrackRef& track) const;
     void setTrackName(const TrackRef& track, const cydaw::base::Text& name);
     void setTrackColour(const TrackRef& track, std::uint32_t argb);
+    ParameterLanes& masterArrangementLanes() noexcept { return masterArrangementLanes_; }
+    const ParameterLanes& masterArrangementLanes() const noexcept { return masterArrangementLanes_; }
     [[nodiscard]] int laneHeight(const TrackRef& track) const;
     void setLaneHeight(const TrackRef& track, int height);
 
@@ -1479,6 +1481,9 @@ private:
     std::vector<std::pair<TrackRef, int>> clipsAtStop_;
     // The master's clips, the one playing (and since when on the master's
     // clock), the one remembered at a stop, the level before it moved it.
+    ParameterLanes masterArrangementLanes_;
+    bool masterAutomationVisible_ {};
+    int masterLaneHeight_ { 88 };
     std::map<int, MasterClip> masterClips_;
     int masterPlaying_ { -1 };
     int masterAtStop_ { -1 };

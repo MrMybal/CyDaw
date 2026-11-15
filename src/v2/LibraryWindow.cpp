@@ -213,6 +213,7 @@ struct LibraryWindow::InstrumentRow {
     cydaw::base::File file;
     bool missing {};
     bool model {};
+    bool preset {};
     std::int64_t missingBytes {};
     cydaw::base::TextList banks;
 };
@@ -1246,6 +1247,14 @@ void LibraryWindow::drawInstruments()
 {
     const auto& p = theme::palette();
     auto& facets = *instrumentFacets_;
+    ImGui::SetNextItemWidth(dp(255.0f));
+    if (ImGui::Combo(L("Afficher##instrumentContent", "Show##instrumentContent"), &instrumentContent_,
+                     L("Tous les instruments\0Modules d’instruments\0Presets d’instruments\0Instruments échantillonnés\0Mes instruments\0",
+                       "All instruments\0Instrument modules\0Instrument presets\0Sampled instruments\0My instruments\0"))) {
+        instrumentsTime_ = -100.0;
+        for (auto& selected : facets.selected) std::fill(selected.begin(), selected.end(), 0);
+        selectedInstrument_ = -1;
+    }
     const auto download = studio_.banks().progress();
     // Read again now and then (a download ends, a device saved).
     if (ImGui::GetTime() - instrumentsTime_ > 5.0 || (downloading_ && !download.running)) {
@@ -1270,21 +1279,25 @@ void LibraryWindow::drawInstruments()
                 row.bank = instrument.source.isNotEmpty() ? instrument.source : instrument.bank;
             row.range = instrument.range;
             row.licence = instrument.licence;
+            row.description = instrument.name + " — " + instrument.categoryName + " · " + row.bank;
             row.model = instrument.model != cydaw::base::File();
             instruments_.push_back(std::move(row));
         }
         for (const auto& entry : studio_.deviceCatalogue()) {
-            if (!entry.soundSource || entry.kind == "node")
+            if (!entry.soundSource)
                 continue;
             InstrumentRow row;
             row.kind = InstrumentRow::native;
             row.key = entry.key;
             row.name = entry.name;
             row.category = entry.kind == "preset" ? plainText("Synthés (chaînes)", "Synths (chains)") : plainText("Synthés", "Synths");
-            row.genre = plainText("Synthé de CyDAW", "CyDAW synth");
+            row.preset = entry.kind == "preset";
+            row.genre = row.preset ? plainText("Preset d’instrument", "Instrument preset") : plainText("Module d’instrument", "Instrument module");
             row.state = plainText("Prêt", "Ready");
             row.bank = "CyDAW";
-            row.description = entry.description;
+            row.description = entry.description.isNotEmpty() ? entry.description
+                : entry.kind == "preset" ? plainText("Preset d’instrument avec sa chaîne de traitement.", "Instrument preset with its processing chain.")
+                                         : plainText("Module natif : ", "Native module: ") + entry.name + " (" + entry.input + " → " + entry.output + ").";
             instruments_.push_back(std::move(row));
         }
         for (const auto& device : studio_.libraryDevices()) {
@@ -1302,6 +1315,12 @@ void LibraryWindow::drawInstruments()
             instruments_.push_back(std::move(row));
         }
         facets.begin();
+        std::erase_if(instruments_, [this](const InstrumentRow& r) {
+            return instrumentContent_ == 1 ? r.kind != InstrumentRow::native || r.preset
+                 : instrumentContent_ == 2 ? !r.preset
+                 : instrumentContent_ == 3 ? r.kind != InstrumentRow::factory
+                 : instrumentContent_ == 4 ? r.kind != InstrumentRow::mine : false;
+        });
         for (const auto& row : instruments_)
             facets.addRow({ row.category, row.genre, row.state, row.bank },
                           row.name + " " + row.category + " " + row.genre + " " + row.bank + " " + row.description);
@@ -1369,7 +1388,7 @@ void LibraryWindow::drawInstruments()
             track = studio_.addFactoryInstrument(row.key, error, model, on);
         } else if (row.kind == InstrumentRow::native) {
             if (on) {
-                if (const auto replaced = studio_.replaceInstrument(*on, row.key, row.name); replaced.wasOk())
+                if (const auto replaced = studio_.insertDevice(*on, row.key); replaced.wasOk())
                     track = on;
                 else
                     error = replaced.getErrorMessage();
@@ -1389,7 +1408,7 @@ void LibraryWindow::drawInstruments()
         }
     };
     auto rows = facetRows;
-    if (ImGui::BeginTable("##libraryInstruments", 5,
+    if (ImGui::BeginTable("##libraryInstrumentsV2", 7,
                           ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV
                               | ImGuiTableFlags_Hideable | ImGuiTableFlags_Reorderable | ImGuiTableFlags_Sortable,
                           tableSize)) {
@@ -1398,14 +1417,16 @@ void LibraryWindow::drawInstruments()
         ImGui::TableSetupColumn(L("Catégorie", "Category"), ImGuiTableColumnFlags_WidthStretch | ImGuiTableColumnFlags_DefaultSort, 1.2f);
         ImGui::TableSetupColumn(L("Source", "Source"), ImGuiTableColumnFlags_WidthStretch, 1.0f);
         ImGui::TableSetupColumn(L("Étendue", "Range"), ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoSort, dp(90.0f));
-        ImGui::TableSetupColumn(L("État", "State"), ImGuiTableColumnFlags_WidthFixed, dp(120.0f));
+        ImGui::TableSetupColumn(L("État", "State"), ImGuiTableColumnFlags_WidthFixed, dp(100.0f));
+        ImGui::TableSetupColumn(L("Type", "Type"), ImGuiTableColumnFlags_WidthStretch, 1.2f);
+        ImGui::TableSetupColumn(L("Description", "Description"), ImGuiTableColumnFlags_WidthStretch, 2.8f);
         ImGui::TableHeadersRow();
         if (const auto* specs = ImGui::TableGetSortSpecs(); specs != nullptr && specs->SpecsCount > 0) {
             const auto column = specs->Specs[0].ColumnIndex;
             const auto ascending = specs->Specs[0].SortDirection != ImGuiSortDirection_Descending;
             const auto field = [this, column](const int index) -> const cydaw::base::Text& {
                 const auto& row = instruments_[static_cast<std::size_t>(index)];
-                return column == 1 ? row.category : column == 2 ? row.bank : column == 4 ? row.state : row.name;
+                return column == 1 ? row.category : column == 2 ? row.bank : column == 4 ? row.state : column == 5 ? row.genre : column == 6 ? row.description : row.name;
             };
             std::stable_sort(rows.begin(), rows.end(), [&](const int a, const int b) {
                 const auto order = field(a).compareNatural(field(b));
@@ -1438,6 +1459,11 @@ void LibraryWindow::drawInstruments()
                 ImGui::TableSetColumnIndex(4);
                 const auto state = row.missing ? row.state + " " + ui::sizeText(row.missingBytes) : row.state;
                 ImGui::TextColored(theme::vec(row.missing ? p.accent : p.textFaint), "%s", state.toRawUTF8());
+                ImGui::TableSetColumnIndex(5);
+                ImGui::TextUnformatted(row.genre.toRawUTF8());
+                ImGui::TableSetColumnIndex(6);
+                ImGui::TextUnformatted(row.description.toRawUTF8());
+                if (ImGui::IsItemHovered()) ui::tooltip(row.description.toRawUTF8());
                 ImGui::PopID();
             }
         ImGui::EndTable();
@@ -1501,6 +1527,19 @@ void LibraryWindow::drawEffects()
     const auto& p = theme::palette();
     auto& facets = *effectFacets_;
     const auto track = target();
+    ImGui::SetNextItemWidth(dp(220.0f));
+    bool refilter = ImGui::Combo(L("Contenu##effects", "Content##effects"), &effectContent_,
+        L("Modules et plug-ins\0Presets uniquement\0Tout\0", "Modules and plug-ins\0Presets only\0All\0"));
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(dp(200.0f));
+    refilter |= ImGui::Combo(L("Rôle##effects", "Role##effects"), &effectRole_,
+        L("Tous les rôles\0Effets audio\0Effets MIDI\0Instruments\0Modulation et utilitaires\0",
+          "All roles\0Audio effects\0MIDI effects\0Instruments\0Modulation and utilities\0"));
+    if (refilter) {
+        effectsTime_ = -100.0;
+        for (auto& selected : facets.selected) std::fill(selected.begin(), selected.end(), 0);
+        selectedEffect_ = -1;
+    }
     const auto pluginFolders = cydaw::base::TextList::fromLines(studio_.samples().setting("pluginFolders", cydaw::base::Text()).toString());
     if (!plugins_->done() && !plugins_->scanning())
         plugins_->start(pluginFolders);
@@ -1517,24 +1556,22 @@ void LibraryWindow::drawEffects()
         for (const auto& entry : catalogue) {
             if (audioTarget && entry.soundSource)
                 continue;
-            if (entry.key == "mono-to-stereo" || entry.key == "stereo-to-mono")
-                continue;
-            // A whole chain of effects would take every card's place: the
-            // track's preset button (in Devices) has them.
-            if (entry.kind == "preset" && !entry.soundSource)
-                continue;
             EffectRow row;
             row.kind = entry.kind == "preset" ? EffectRow::preset : entry.kind == "module" ? EffectRow::module : EffectRow::node;
             row.key = entry.key;
             row.name = entry.name;
-            row.description = entry.description;
+            row.description = entry.description.isNotEmpty() ? entry.description
+                : entry.kind == "preset" ? entry.soundSource
+                    ? plainText("Preset d’instrument avec sa chaîne de traitement.", "Instrument preset with its processing chain.")
+                    : plainText("Preset de chaîne d’effets : remplace la chaîne de la piste audio, du bus ou du master.", "Effect chain preset: replaces the audio track, bus or master chain.")
+                                         : plainText("Module natif : ", "Native module: ") + entry.name + " (" + entry.input + " → " + entry.output + ").";
             row.soundSource = entry.soundSource;
-            row.category = entry.kind == "preset" ? plainText("Instruments", "Instruments")
+            row.category = entry.kind == "preset" ? entry.soundSource ? plainText("Instruments", "Instruments") : plainText("Chaînes d’effets", "Effect chains")
                            : entry.category.isNotEmpty() ? entry.category
                                                          : plainText("Utilitaires", "Utilities");
-            row.genre = row.kind == EffectRow::preset   ? plainText("Instrument de CyDAW", "CyDAW instrument")
-                        : row.kind == EffectRow::module ? plainText("Périphérique de CyDAW", "CyDAW device")
-                                                        : plainText("Nœud", "Node");
+            row.genre = row.kind == EffectRow::preset   ? plainText("Preset", "Preset")
+                        : row.kind == EffectRow::module ? plainText("Module", "Module")
+                                                        : plainText("Module natif", "Native module");
             row.role = entry.soundSource          ? plainText("Instrument", "Instrument")
                        : entry.input == "midi"    ? plainText("Effet MIDI", "MIDI effect")
                        : entry.input == "audio"   ? plainText("Effet audio", "Audio effect")
@@ -1570,6 +1607,14 @@ void LibraryWindow::drawEffects()
             row.description = plugin.file.getFullPathName();
             effects_.push_back(std::move(row));
         }
+        std::erase_if(effects_, [this](const EffectRow& r) {
+            if (effectContent_ == 0 && r.kind == EffectRow::preset) return true;
+            if (effectContent_ == 1 && r.kind != EffectRow::preset) return true;
+            return effectRole_ == 1 ? r.role != plainText("Effet audio", "Audio effect")
+                 : effectRole_ == 2 ? r.role != plainText("Effet MIDI", "MIDI effect")
+                 : effectRole_ == 3 ? !r.soundSource
+                 : effectRole_ == 4 ? r.role != plainText("Modulation, utilitaire", "Modulation, utility") : false;
+        });
         const auto place = [](const EffectRow& row) {
             switch (row.kind) {
             case EffectRow::module: return 0;
@@ -1680,6 +1725,8 @@ void LibraryWindow::drawEffects()
                 result = cydaw::base::Result::fail(ui::Ls("Les plug-ins externes vont sur les pistes audio", "External plug-ins go on audio tracks"));
             else
                 result = studio_.engine().setTrackPlugin(track->audioIndex, row.file);
+        } else if (row.kind == EffectRow::preset && !row.soundSource) {
+            result = studio_.applyFactoryChain(*track, row.key);
         } else if (row.kind == EffectRow::mine) {
             result = studio_.insertLibraryDeviceBefore(*track, row.file, before);
         } else {
@@ -1695,7 +1742,7 @@ void LibraryWindow::drawEffects()
     };
     const auto previewWidth = dp(330.0f);
     const ImVec2 tableSize(ImGui::GetContentRegionAvail().x - previewWidth - dp(8.0f), ImGui::GetContentRegionAvail().y);
-    if (ImGui::BeginTable("##libraryEffects", 4,
+    if (ImGui::BeginTable("##libraryEffectsV2", 6,
                           ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersInnerV
                               | ImGuiTableFlags_Hideable | ImGuiTableFlags_Reorderable | ImGuiTableFlags_Sortable
                               | ImGuiTableFlags_SortTristate,
@@ -1704,7 +1751,9 @@ void LibraryWindow::drawEffects()
         ImGui::TableSetupColumn(L("Nom", "Name"), ImGuiTableColumnFlags_WidthStretch, 2.0f);
         ImGui::TableSetupColumn(L("Catégorie", "Category"), ImGuiTableColumnFlags_WidthStretch, 1.2f);
         ImGui::TableSetupColumn(L("Genre", "Kind"), ImGuiTableColumnFlags_WidthStretch, 1.0f);
-        ImGui::TableSetupColumn(L("Fabricant", "Maker"), ImGuiTableColumnFlags_WidthStretch, 0.9f);
+        ImGui::TableSetupColumn(L("Fabricant", "Maker"), ImGuiTableColumnFlags_WidthStretch, 0.8f);
+        ImGui::TableSetupColumn(L("Rôle", "Role"), ImGuiTableColumnFlags_WidthStretch, 1.1f);
+        ImGui::TableSetupColumn(L("Description", "Description"), ImGuiTableColumnFlags_WidthStretch, 3.0f);
         ImGui::TableHeadersRow();
         // Unsorted, the useful first: CyDAW's devices, mine, plug-ins, chains, nodes.
         if (const auto* specs = ImGui::TableGetSortSpecs(); specs != nullptr && specs->SpecsCount > 0) {
@@ -1712,7 +1761,7 @@ void LibraryWindow::drawEffects()
             const auto ascending = specs->Specs[0].SortDirection != ImGuiSortDirection_Descending;
             const auto field = [this, column](const int index) -> const cydaw::base::Text& {
                 const auto& row = effects_[static_cast<std::size_t>(index)];
-                return column == 1 ? row.category : column == 2 ? row.genre : column == 3 ? row.maker : row.name;
+                return column == 1 ? row.category : column == 2 ? row.genre : column == 3 ? row.maker : column == 4 ? row.role : column == 5 ? row.description : row.name;
             };
             std::stable_sort(rows.begin(), rows.end(), [&](const int a, const int b) {
                 const auto order = field(a).compareNatural(field(b));
@@ -1748,6 +1797,11 @@ void LibraryWindow::drawEffects()
                 ImGui::TextColored(theme::vec(p.textFaint), "%s", row.genre.toRawUTF8());
                 ImGui::TableSetColumnIndex(3);
                 ImGui::TextColored(theme::vec(p.textFaint), "%s", row.maker.toRawUTF8());
+                ImGui::TableSetColumnIndex(4);
+                ImGui::TextUnformatted(row.role.toRawUTF8());
+                ImGui::TableSetColumnIndex(5);
+                ImGui::TextUnformatted(row.description.toRawUTF8());
+                if (ImGui::IsItemHovered()) ui::tooltip(row.description.toRawUTF8());
                 ImGui::PopID();
             }
         ImGui::EndTable();
@@ -1768,10 +1822,12 @@ void LibraryWindow::drawEffects()
             ImGui::PopTextWrapPos();
         }
         if (row.kind == EffectRow::preset)
-            ImGui::TextColored(theme::vec(p.accent), "%s", L("Il remplace l'instrument de la piste ; ses effets restent.",
-                                                             "It replaces the track's instrument; its effects stay."));
+            ImGui::TextColored(theme::vec(p.accent), "%s", row.soundSource ? L("Il remplace l'instrument de la piste ; ses effets restent.",
+                                                             "It replaces the track's instrument; its effects stay.")
+                : L("Remplace toute la chaîne d’effets. Pour une piste audio, un bus ou le master.",
+                    "Replaces the entire effects chain. For an audio track, bus or master."));
         ImGui::Spacing();
-        const auto label = track ? ui::Ls("Ajouter à ", "Add to ") + studio_.trackName(*track) : ui::Ls("Choisissez une piste", "Choose a track");
+        const auto label = track ? (row.kind == EffectRow::preset && !row.soundSource ? ui::Ls("Remplacer la chaîne de ", "Replace chain of ") : ui::Ls("Ajouter à ", "Add to ")) + studio_.trackName(*track) : ui::Ls("Choisissez une piste", "Choose a track");
         ImGui::BeginDisabled(!track);
         if (ImGui::Button(label.toRawUTF8(), ImVec2(-1.0f, 0.0f)))
             insert(row);
@@ -1788,6 +1844,19 @@ void LibraryWindow::drawEffects()
 
 // ---- The control port --------------------------------------------------------------------------------
 
+void LibraryWindow::setDeviceQuery(int content, int role, const cydaw::base::Text* query)
+{
+    const auto instrument = state_.libraryTab == 1;
+    auto& selection = instrument ? instrumentContent_ : effectContent_;
+    if (content >= 0) selection = std::clamp(content, 0, instrument ? 4 : 2);
+    if (role >= 0) effectRole_ = std::clamp(role, 0, 4);
+    if (query) query->copyToUTF8(instrument ? instrumentSearch_ : effectSearch_, 120);
+    auto& facets = instrument ? *instrumentFacets_ : *effectFacets_;
+    for (auto& values : facets.selected) std::fill(values.begin(), values.end(), 0);
+    if (instrument) { instrumentsTime_ = -100.0; selectedInstrument_ = -1; }
+    else { effectsTime_ = -100.0; selectedEffect_ = -1; }
+}
+
 LibraryWindow::Probe LibraryWindow::probe()
 {
     requery();
@@ -1800,6 +1869,33 @@ LibraryWindow::Probe LibraryWindow::probe()
     probe.buildMs = data_ != nullptr ? data_->buildMs : 0.0;
     probe.extractMs = data_ != nullptr ? data_->extractMs : 0.0;
     probe.frameMs = frameMs_;
+    if (probe.tab != 0) {
+        probe.names.clear();
+        probe.facets.clear();
+        const auto& facets = probe.tab == 1 ? *instrumentFacets_ : *effectFacets_;
+        std::vector<std::vector<int>> counts;
+        const auto rows = facets.filter(probe.tab == 1 ? instrumentSearch_ : effectSearch_, counts);
+        probe.rows = static_cast<int>(rows.size());
+        probe.total = static_cast<int>(facets.rowValues.size());
+        cydaw::base::Array<cydaw::base::Value> entries;
+        for (const auto i : rows) {
+            auto* e = new cydaw::base::Object();
+            const auto add = [&](const char* key, const cydaw::base::Text& value) { e->setProperty(key, value); };
+            if (probe.tab == 1) {
+                const auto& r = instruments_[static_cast<std::size_t>(i)];
+                add("name", r.name); add("key", r.key); add("type", r.genre); add("role", "Instrument");
+                add("category", r.category); add("description", r.description);
+            } else {
+                const auto& r = effects_[static_cast<std::size_t>(i)];
+                add("name", r.name); add("key", r.key); add("type", r.genre); add("role", r.role);
+                add("category", r.category); add("description", r.description);
+            }
+            probe.names.add(e->getProperty("name").toString());
+            entries.add(cydaw::base::Value(e));
+        }
+        probe.entries = entries;
+        return probe;
+    }
     if (data_ != nullptr) {
         for (auto facet = 0; facet < SampleCatalog::facetCount; ++facet) {
             std::vector<std::pair<cydaw::base::Text, int>> values;

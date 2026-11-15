@@ -2781,7 +2781,10 @@ cydaw::base::Value AppUi::library(const cydaw::base::Text& command, const cydaw:
     }
     if (request.hasProperty("detached"))
         ui::setDetached("###library", static_cast<bool>(request.getProperty("detached", false)));
-    if (request.hasProperty("query") || request.hasProperty("filters") || request.hasProperty("sort")) {
+    if (state_.libraryTab != 0 && (request.hasProperty("content") || request.hasProperty("role") || request.hasProperty("query"))) {
+        const auto query = request.getProperty("query", {}).toString();
+        library_->setDeviceQuery(static_cast<int>(request.getProperty("content", -1)), static_cast<int>(request.getProperty("role", -1)), request.hasProperty("query") ? &query : nullptr);
+    } else if (state_.libraryTab == 0 && (request.hasProperty("query") || request.hasProperty("filters") || request.hasProperty("sort"))) {
         std::vector<std::pair<int, cydaw::base::TextList>> chosen;
         if (const auto* filters = request.getProperty("filters", {}).getDynamicObject())
             for (auto facet = 0; facet < SampleCatalog::facetCount; ++facet)
@@ -2821,6 +2824,7 @@ cydaw::base::Value AppUi::library(const cydaw::base::Text& command, const cydaw:
     for (const auto& name : probe.names)
         names.add(name);
     result->setProperty("names", names);
+    result->setProperty("entries", probe.entries);
     return answer;
 }
 

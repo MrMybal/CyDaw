@@ -178,6 +178,7 @@ bool knobCell(const ImVec2 origin, const float width, Param* parameter, const ch
     ui::KnobStyle style;
     style.diameter = diameter;
     style.label = label;
+    style.flags = ui::knobNoLabel; // Name is drawn persistently across the cell below.
     style.labelWidth = width;
     style.colour = colour;
     style.format = parameter->maximum - parameter->minimum >= 100.0 ? "%.0f" : parameter->maximum - parameter->minimum >= 10.0 ? "%.1f" : "%.2f";
@@ -202,6 +203,10 @@ bool knobCell(const ImVec2 origin, const float width, Param* parameter, const ch
     if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
         openParameterMenu(*parameter);
     ImGui::PopID();
+    const auto nameSize = textSize(label, 0.72f);
+    const auto labelScale = std::min(0.72f, 0.72f * (width - dp(4.0f)) / std::max(1.0f, nameSize.x));
+    const auto fitted = textSize(label, labelScale);
+    text(list, ImVec2(origin.x + (width - fitted.x) * 0.5f, origin.y + dp(diameter)), p.textDim, label, labelScale);
     const auto shown = formatValue(*parameter, parameter->value);
     const auto size = textSize(shown.toRawUTF8(), 0.7f);
     const auto valueTop = origin.y + dp(diameter) + ImGui::GetFontSize() * 0.88f;
@@ -2681,7 +2686,8 @@ bool nativeSection(std::vector<Param>& parameters, const ControlSection& part, c
         const auto column = static_cast<int>(at) % perRow;
         auto& parameter = parameters[static_cast<std::size_t>(knobs[at])];
         // The label without the device's name before it ("Chorus · Rate").
-        const auto label = parameter.label.fromLastOccurrenceOf(cydaw::base::Text::fromUTF8("\xc2\xb7 "), false, false).toStdString();
+        const auto tail = parameter.label.fromLastOccurrenceOf(cydaw::base::Text::fromUTF8("\xc2\xb7 "), false, false);
+        const auto label = (tail.isNotEmpty() ? tail : parameter.label).toStdString();
         changed |= knobCell(ImVec2(origin.x + cell * static_cast<float>(column), y + static_cast<float>(row) * (knobHeight(diameter) + dp(8.0f))),
                             cell, &parameter, label.c_str(), colour, live, set, diameter);
     }
@@ -2761,7 +2767,8 @@ namespace {
 // first letter up.
 cydaw::base::Text ownLabel(const Param& parameter)
 {
-    const auto label = parameter.label.fromLastOccurrenceOf(cydaw::base::Text::fromUTF8("\xc2\xb7 "), false, false);
+    const auto tail = parameter.label.fromLastOccurrenceOf(cydaw::base::Text::fromUTF8("\xc2\xb7 "), false, false);
+    const auto label = tail.isNotEmpty() ? tail : parameter.label;
     return label.substring(0, 1).toUpperCase() + label.substring(1);
 }
 

@@ -2181,7 +2181,7 @@ void DevicesView::drawParameterMenu()
 {
     if (!ImGui::BeginPopup("##parameterMenu"))
         return;
-    if (menuTrack_ && studio_.isValid(*menuTrack_)) {
+    if (menuTrack_ && (menuTrack_->isMaster() || studio_.isValid(*menuTrack_))) {
         const auto track = *menuTrack_;
         ImGui::TextDisabled("%s", menuLabel_.toRawUTF8());
         ImGui::Separator();

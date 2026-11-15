@@ -2570,5 +2570,22 @@
   "container.parameter.generator": "Sound",
   "container.parameter.pitch": "Pitch",
   "container.parameter.layerWord": "Layer",
-  "container.parameter.chainWord": "Chain"
+  "container.parameter.chainWord": "Chain",
+  "library.device.sampler": "Polyphonic sample player with key and velocity zones.",
+  "library.device.batterie": "Drum instrument with sounds mapped to MIDI keys.",
+  "library.device.drum-rack": "Drum container with an instrument and its effects on each pad.",
+  "library.device.instrument-layer": "Layers instruments across key and velocity ranges.",
+  "library.device.instrument-selector": "Selects one instrument from several layers.",
+  "library.device.prism-synth": "Wavetable synthesizer with two oscillators and modulation.",
+  "library.device.kick-synth": "Kick drum synthesizer with adjustable pitch and envelope.",
+  "library.device.poly-oscillator": "MIDI-controlled polyphonic oscillator.",
+  "library.device.poly-synth": "Legacy polyphonic synthesizer.",
+  "library.device.reverb": "Reverberation with room and wet/dry controls.",
+  "library.device.gain": "Adjusts the audio signal level.",
+  "library.device.oscillator": "Waveform generator controlled by frequency.",
+  "library.device.noise": "Audio noise generator.",
+  "library.device.wavetable": "Wavetable oscillator.",
+  "library.device.sound-model": "Sound generator driven by a sound model.",
+  "library.device.mono-to-stereo": "Converts a mono signal to stereo.",
+  "library.device.stereo-to-mono": "Downmixes a stereo signal to mono."
 }
