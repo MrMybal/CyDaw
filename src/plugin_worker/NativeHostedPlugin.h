@@ -20,11 +20,14 @@ class NativeHostedPlugin;
 class NativeParameter {
   friend class NativeHostedPlugin;
   NativeHostedPlugin *owner{};
+  // Main-thread text cache, invalidated by value changes or metadata rebuild.
+  mutable double textValue_ = std::numeric_limits<double>::quiet_NaN();
+  mutable base::Text text_;
 
 public:
   cyaudio::PluginParameter info;
   std::atomic<double> value{};
-  double sent = std::numeric_limits<double>::quiet_NaN();
+  std::atomic<double> sent{std::numeric_limits<double>::quiet_NaN()};
   float getValue() const {
     return info.maximum > info.minimum ? float((value.load() - info.minimum) /
                                                (info.maximum - info.minimum))
@@ -88,14 +91,46 @@ class NativeHostedPlugin {
   };
   std::vector<Program> programs_;
   int currentProgram_{};
+  base::File workerExecutable_;
+  void *handoffContext_{};
+  void (*handoff_)(void *, bool) noexcept {};
+  unsigned controlDepth_{};
+  bool polling_{}, deferredEditorControl_{};
+  void beginControl();
+  void endControl();
+  unsigned streamFill_{};
+  bool streamReady_{};
+  cyaudio::PluginTransport streamTransport_;
+  std::atomic<std::uint64_t> streamMissed_{};
+  std::atomic<int> streamFailure_{};
   void loadLv2Programs(const base::File &);
   void syncValues();
   void flushValues();
 
 public:
+  // Main-thread editor/control handoff. The parent owns the audio callback
+  // gate.
+  class ControlScope final {
+    NativeHostedPlugin &owner_;
+
+  public:
+    explicit ControlScope(NativeHostedPlugin &owner) : owner_(owner) {
+      owner_.beginControl();
+    }
+    ~ControlScope() { owner_.endControl(); }
+    ControlScope(const ControlScope &) = delete;
+    ControlScope &operator=(const ControlScope &) = delete;
+  };
+  void setControlHandoff(void *context,
+                         void (*handoff)(void *, bool) noexcept) {
+    handoffContext_ = context;
+    handoff_ = handoff;
+  }
+  void resetRealtimePipeline() noexcept;
   HostedMetadata description;
   NativeHostedPlugin();
   ~NativeHostedPlugin();
+  void setWorkerExecutable(const base::File &file) { workerExecutable_ = file; }
   bool load(const base::File &, const base::Text &id, cyaudio::PluginFormat,
             const base::Text &format, base::Text &error);
   const base::Text &getName() const { return description.name; }
@@ -119,6 +154,16 @@ public:
                                midi::EventBuffer &);
   // Synchronous convenience for offline validation only, not the realtime loop.
   void processBlock(audio::SampleBuffer<float> &, midi::EventBuffer &);
+  // Prepared fixed-latency streaming: no wait, allocation or throw. Partial
+  // application blocks share one maximumFrames-sized SDK quantum.
+  bool processRealtime(audio::SampleBuffer<float> &, int start, int count,
+                       const cyaudio::PluginTransport &) noexcept;
+  std::uint64_t missedBlocks() const noexcept { return streamMissed_.load(); }
+  cyaudio::Status realtimeFailure() const noexcept {
+    return static_cast<cyaudio::Status>(streamFailure_.load());
+  }
+  cyaudio::Status pollRequests(std::uint32_t &) noexcept;
+  void applyRequests(std::uint32_t);
   void getStateInformation(base::MemoryBlock &);
   void setStateInformation(const void *, int);
   bool hasEditor() const;

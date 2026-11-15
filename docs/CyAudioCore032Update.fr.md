@@ -2,6 +2,8 @@
 
 Campagne locale du 15 novembre 2026, branche `CyDSP-CORE`, base `1e4695d`. Aucun push ni workflow distant. Les dépôts voisins restent en lecture seule.
 
+Mise à jour ultérieure : le [rapport du passage à un worker natif unique](CyAudioCoreSingleWorker.fr.md) remplace le constat de double IPC ci-dessous pour le chemin natif Windows. Ce rapport conserve les résultats de sa révision d’origine.
+
 ## Résultat validé
 
 Application, worker et tests reconstruits ; **123/123 tests passent**. Les quatre formats de plugins et les cinq fenêtres natives testées fonctionnent. Le corpus DSP de 98 cas est identique bit à bit au précédent moteur Core. **Aucun nouveau comparatif de performances ASIO n’est retenu** : des compilations et une session Unreal extérieures ont perturbé les fenêtres ; les données brutes sont conservées, sans présenter leur différence comme une régression ou un gain du SDK.

@@ -35,14 +35,23 @@ evidence, not substituted for testing this newer build.
 - Aligned sample storage, vector operations, FFTs, resampling and numerical DSP
   use CyDSP through CyAudioCore. Existing musical processors retain their sound
   and parameter identities. New SDK algorithms are not automatically new UI nodes.
-- `CyDAWPluginWorker` bridges the existing parent shared-memory/wake IPC to
-  Core's mandatory isolated VST3/CLAP/LV2/JSFX provider. Its `--cydsp-worker`
-  entry point also runs the SDK child. This currently means two child processes
-  per plugin, with a single outer pipeline block: SDK `sameCycle` uses nonblocking
-  submit/collect in the bridge event loop. No wait is added to the device callback.
-  Reconfiguration is deferred while a ticket is outstanding. Historical project
-  state keeps its independent bounded compatibility codec. The remaining IPC
-  duplication and its measured cost are documented in the update campaign.
+- Native VST3/CLAP/LV2/JSFX instances use the SDK isolated provider directly
+  from the application. `CyDAWPluginWorker --cydsp-worker` is the sole child
+  containing foreign plugin code: one persistent worker per instance. The
+  parent owns a prepared, nonblocking `sameCycle` stream adapter, with one
+  declared quantum of pipeline latency plus the plugin's intrinsic latency.
+  Partial application blocks retain their sample positions and automation
+  offsets; late tickets are discarded rather than played at another position.
+  State/preset/reconfiguration waits happen only on the quiesced control owner.
+  Editor commands also hand off the audio owner because current SDK window RPCs
+  invalidate pending same-cycle tickets. Application event/frame dispatch is
+  deferred while SDK controls pump native messages. The Windows worker avoids
+  an extra console-host process without losing redirected CLI probe output.
+  The old file-backed bridge is retained for the passthrough fixture and the
+  optional Linux Wine/UMU Windows-guest path; that cross-OS path still nests
+  isolation and has not been migrated or tested by this Windows campaign.
+  Historical project state keeps its bounded compatibility codec. See the
+  [single-worker acceptance](CyAudioCoreSingleWorker.fr.md).
 - LV2 preset discovery uses the Core-bundled Lilv runtime. Detailed JSFX syntax
   diagnostics use the same Core-bundled ysfx runtime. These workarounds should
   become public Core APIs; they do not add a second VM or host implementation.

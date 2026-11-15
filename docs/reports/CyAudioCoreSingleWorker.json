@@ -1,0 +1,2017 @@
+{
+  "date": "2026-11-15",
+  "branch": "CyDSP-CORE",
+  "baseRevision": "1f187e649f4d622d0a0878a8fd7bdcc1154ef994",
+  "dependencies": {
+    "CyAudioCore": {
+      "revision": "4e5710999acbd88ab3d1ce87f4101ec73abe54b6",
+      "archiveSha256": "c94ca028aa392aebdf236f7a7651e4b2f058ed5d1394bd660347f7d5370aff7a",
+      "path": "D:\\_Project\\CyDAW_Project\\output\\cyaudio-032\\2026-11-15\\sdk\\CyAudioCore"
+    },
+    "CyDSP": {
+      "revision": "0d67c6a60749ef241a87bc3592fa63c61998a5e2",
+      "archiveSha256": "89988100aadeb94e6699323b1707c94d3bca5a768637935dc9769639d8a0b208",
+      "path": "D:\\_Project\\CyDAW_Project\\output\\cyaudio-032\\2026-11-15\\sdk\\CyDSP"
+    }
+  },
+  "build": {
+    "directory": "build/cyaudio-032",
+    "compiler": "MSVC 19.40 x64, Visual Studio 2022",
+    "config": "Release",
+    "options": "/O2 /Ob2 /MD; SDK /fp:strict; automatic SIMD; LTO disabled",
+    "productionDependencyProjectsWithoutJuce": 41,
+    "workerSubsystem": "Windows GUI, mainCRTStartup; redirected self-test stdout verified"
+  },
+  "architecture": {
+    "before": "native CyDaw IPC bridge -> SDK isolated worker -> plugin",
+    "after": "CyDaw -> one SDK isolated worker -> plugin",
+    "persistentNativeWorkersPerPlugin": 1,
+    "auxiliaryConsoleHosts": 0,
+    "pipelineFrames": "one prepared quantum + intrinsic plugin latency",
+    "mainControlPollHz": {
+      "editorHidden": 10,
+      "editorVisible": 50
+    },
+    "foreignLibrariesLoadedInParent": false,
+    "callback": "prepared sameCycle adapter; no wait, logging or C++ allocation",
+    "compatibilityException": "Wine/UMU guest path retains legacy nested bridge; not tested"
+  },
+  "sources": [
+    {
+      "path": "CMakeLists.txt",
+      "sha256": "9813d894e3a2d8c23e2520d9e67d6c36b4f413e19fbd41120267b87e704c052f"
+    },
+    {
+      "path": "include/cydaw/base/DispatchPause.h",
+      "sha256": "649f2b7d649e1d7c9af016bb78786e7d76b2d757acc86b36e0e76479c2c68c34"
+    },
+    {
+      "path": "src/app/IsolatedPluginHost.cpp",
+      "sha256": "8c8a0662ad5208fbecc8ae03d361c0ab79ed57d44658047e12e89c80e4dd4fa2"
+    },
+    {
+      "path": "src/app/IsolatedPluginHost.h",
+      "sha256": "2115a9c6e5c76aa9f0fb0c37ec7e560226e8c9cd46282a75cf48124632513ae0"
+    },
+    {
+      "path": "src/base/EventLoop.cpp",
+      "sha256": "8f8f72a249765aa80471e80aa895c22e563a3411fb8b3d3c4c516f9c2d6a7316"
+    },
+    {
+      "path": "src/plugin_worker/NativeHostedPlugin.cpp",
+      "sha256": "3858020a1c4fe401d87898b4515bb89d4074a0496b197a253f7f8e5b5a466167"
+    },
+    {
+      "path": "src/plugin_worker/NativeHostedPlugin.h",
+      "sha256": "52062e05e59faf08223693b4485e087df9b6200eb1a5adc55d5dc28dc4320e0e"
+    },
+    {
+      "path": "src/plugin_worker/NativePluginEditor.cpp",
+      "sha256": "a4de5f6d3e88c13f6feace332e95fb5a29a70a45b0bed64bec7eb02dfdc9b5d6"
+    },
+    {
+      "path": "src/v2/ImGuiHost.cpp",
+      "sha256": "31bb08846314c4be739cb1b0124aa9e0ab7086307aee4851cef9f58fae5e472e"
+    },
+    {
+      "path": "tests/EventLoopTests.cpp",
+      "sha256": "cdc7a188b72491a3da59554fac5996809be2c0ff29a00b2b25965f4aa7ef60e6"
+    },
+    {
+      "path": "tests/PluginIpcTests.cpp",
+      "sha256": "a4ead4bddaf6773a1c3d02b0efbfc31c0c5640f0d2371b3a532f776a66102d75"
+    },
+    {
+      "path": "tests/cyaudio_sdk_plugin_pair.py",
+      "sha256": "c4c3bc0485db6a83cd86fed65e94c733796767e8b43d0b0892a37f2737c69b12"
+    },
+    {
+      "path": "tests/cyaudio_single_worker_check.py",
+      "sha256": "d19144097de8b69e1ada88725765531dfb2a2526c2cccda718effc009302b736"
+    }
+  ],
+  "binaryAndFixtureHashes": [
+    {
+      "path": "D:\\_Project\\CyDAW_Project\\build\\cyaudio-032\\CyDAW2_artefacts\\Release\\CyDAW 2.exe",
+      "sha256": "965c151886375c67687e2ff9a32a28ac3a894f916673589e91441cce61c8ebd6"
+    },
+    {
+      "path": "D:\\_Project\\CyDAW_Project\\build\\cyaudio-032\\CyDAW2_artefacts\\Release\\CyDAWPluginWorker.exe",
+      "sha256": "d06c6db0c2df0ce053b506a49600e5094b4b6563d86be63cacd85f797bfb72d3"
+    },
+    {
+      "path": "D:\\_Project\\CyDAW_Project\\build\\cyaudio-desktop\\CyDAWTestGain_artefacts\\Release\\VST3\\CyDAW Test Gain.vst3\\Contents\\Resources\\moduleinfo.json",
+      "sha256": "f6a36fe5b12d4263e0882a8fd5f81c267fb7670713288b95397f9d6a7cfc72ca"
+    },
+    {
+      "path": "D:\\_Project\\CyDAW_Project\\build\\cyaudio-desktop\\CyDAWTestGain_artefacts\\Release\\VST3\\CyDAW Test Gain.vst3\\Contents\\x86_64-win\\CyDAW Test Gain.vst3",
+      "sha256": "4b6b5ada156f9c09a77899065ed9b596d7acbf728776be48dc75fe3bc268fedc"
+    },
+    {
+      "path": "D:\\_Project\\CyDAW_Project\\output\\plugin-cross-export-final\\4811c5cc25524f40b895c04319ca0a61\\exports\\Windows\\CLAP\\CyCrossGain.clap",
+      "sha256": "21702bd5e9961a2c833133cf24acb603b0dca0bf9d07071968afe710ee3606be"
+    },
+    {
+      "path": "D:\\_Project\\CyDAW_Project\\output\\plugin-cross-export-final\\4811c5cc25524f40b895c04319ca0a61\\exports\\Windows\\LV2\\CyCrossGain.lv2\\cydaw_native.dll",
+      "sha256": "6c20380e306dbbee3e609cffc7f74ffdde5d8c7e6dbfddbaeb9730b8fa906c8b"
+    },
+    {
+      "path": "D:\\_Project\\CyDAW_Project\\output\\plugin-cross-export-final\\4811c5cc25524f40b895c04319ca0a61\\exports\\Windows\\LV2\\CyCrossGain.lv2\\Licenses\\CyDAW-Engine.txt",
+      "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0"
+    },
+    {
+      "path": "D:\\_Project\\CyDAW_Project\\output\\plugin-cross-export-final\\4811c5cc25524f40b895c04319ca0a61\\exports\\Windows\\LV2\\CyCrossGain.lv2\\Licenses\\Dear-ImGui.txt",
+      "sha256": "f20418b409e53c8c9f4e90917ff395554a60320d4dfbf833da89b339cad8628a"
+    },
+    {
+      "path": "D:\\_Project\\CyDAW_Project\\output\\plugin-cross-export-final\\4811c5cc25524f40b895c04319ca0a61\\exports\\Windows\\LV2\\CyCrossGain.lv2\\Licenses\\LV2-SDK.txt",
+      "sha256": "e8a03162f1538dd01c43a936ab107c49475c19135b01e638ac91916b39e94b40"
+    },
+    {
+      "path": "D:\\_Project\\CyDAW_Project\\output\\plugin-cross-export-final\\4811c5cc25524f40b895c04319ca0a61\\exports\\Windows\\LV2\\CyCrossGain.lv2\\manifest.ttl",
+      "sha256": "623296cd376e3852725b7358e51c01b81fd58c73e564072916d3f1f1118cb17a"
+    },
+    {
+      "path": "D:\\_Project\\CyDAW_Project\\output\\plugin-cross-export-final\\4811c5cc25524f40b895c04319ca0a61\\exports\\Windows\\LV2\\CyCrossGain.lv2\\plugin.ttl",
+      "sha256": "9acacff5c8b6fbacc35637d7088f59075dff185ddea3531c83329869a7935a5b"
+    }
+  ],
+  "functional": {
+    "evidence": "output/cyaudio-single-worker/2026-11-15/application-4/acceptance.json",
+    "evidenceSha256": "e17e88f25d470fde3a13c6f9600bb22df9bf82b5520a856b882d0d811ec7dd2a",
+    "filesStable": true,
+    "speakersSilenced": true,
+    "audioInputs": [],
+    "audioBackend": "ASIO",
+    "sampleRate": 48000.0,
+    "frames": 1024,
+    "cases": {
+      "eightVst3": {
+        "children": 8,
+        "tree": [
+          {
+            "pid": 21016,
+            "parent": 16016,
+            "image": "CyDAWPluginWorker.exe"
+          },
+          {
+            "pid": 26148,
+            "parent": 16016,
+            "image": "CyDAWPluginWorker.exe"
+          },
+          {
+            "pid": 38496,
+            "parent": 16016,
+            "image": "CyDAWPluginWorker.exe"
+          },
+          {
+            "pid": 42324,
+            "parent": 16016,
+            "image": "CyDAWPluginWorker.exe"
+          },
+          {
+            "pid": 45636,
+            "parent": 16016,
+            "image": "CyDAWPluginWorker.exe"
+          },
+          {
+            "pid": 50468,
+            "parent": 16016,
+            "image": "CyDAWPluginWorker.exe"
+          },
+          {
+            "pid": 56488,
+            "parent": 16016,
+            "image": "CyDAWPluginWorker.exe"
+          },
+          {
+            "pid": 61756,
+            "parent": 16016,
+            "image": "CyDAWPluginWorker.exe"
+          }
+        ],
+        "missedBlocks": 0,
+        "privateMiB": 484.5,
+        "sampleCount": 12,
+        "positionDeltaSeconds": 2.282666666666632,
+        "maximumTrackPeakDb": -18.8,
+        "latencySamples": [
+          1024
+        ]
+      },
+      "projectRestore": {
+        "children": 8,
+        "tree": [
+          {
+            "pid": 7324,
+            "parent": 16016,
+            "image": "CyDAWPluginWorker.exe"
+          },
+          {
+            "pid": 20272,
+            "parent": 16016,
+            "image": "CyDAWPluginWorker.exe"
+          },
+          {
+            "pid": 26056,
+            "parent": 16016,
+            "image": "CyDAWPluginWorker.exe"
+          },
+          {
+            "pid": 45356,
+            "parent": 16016,
+            "image": "CyDAWPluginWorker.exe"
+          },
+          {
+            "pid": 59436,
+            "parent": 16016,
+            "image": "CyDAWPluginWorker.exe"
+          },
+          {
+            "pid": 61084,
+            "parent": 16016,
+            "image": "CyDAWPluginWorker.exe"
+          },
+          {
+            "pid": 63652,
+            "parent": 16016,
+            "image": "CyDAWPluginWorker.exe"
+          },
+          {
+            "pid": 67652,
+            "parent": 16016,
+            "image": "CyDAWPluginWorker.exe"
+          }
+        ],
+        "missedBlocks": null,
+        "privateMiB": null
+      },
+      "fourFormats": {
+        "children": 4,
+        "tree": [
+          {
+            "pid": 29496,
+            "parent": 16016,
+            "image": "CyDAWPluginWorker.exe"
+          },
+          {
+            "pid": 36116,
+            "parent": 16016,
+            "image": "CyDAWPluginWorker.exe"
+          },
+          {
+            "pid": 51128,
+            "parent": 16016,
+            "image": "CyDAWPluginWorker.exe"
+          },
+          {
+            "pid": 55632,
+            "parent": 16016,
+            "image": "CyDAWPluginWorker.exe"
+          }
+        ],
+        "missedBlocks": 0,
+        "privateMiB": 541.6328125,
+        "sampleCount": 12,
+        "positionDeltaSeconds": 2.282666666666606,
+        "maximumTrackPeakDb": -18.8,
+        "latencySamples": [
+          1024
+        ]
+      },
+      "crash": {
+        "running": 3,
+        "total": 4,
+        "survivingInstances": [
+          {
+            "index": 0,
+            "name": "CyDAW Test Gain",
+            "file": "D:\\_Project\\CyDAW_Project\\build\\cyaudio-desktop\\CyDAWTestGain_artefacts\\Release\\VST3\\CyDAW Test Gain.vst3",
+            "running": true,
+            "latencySamples": 1024,
+            "missedBlocks": 0
+          },
+          {
+            "index": 0,
+            "name": "CyCrossGain",
+            "file": "D:\\_Project\\CyDAW_Project\\output\\plugin-cross-export-final\\4811c5cc25524f40b895c04319ca0a61\\exports\\Windows\\CLAP\\CyCrossGain.clap",
+            "running": false,
+            "latencySamples": 0,
+            "missedBlocks": 0
+          },
+          {
+            "index": 0,
+            "name": "CyCrossGain",
+            "file": "D:\\_Project\\CyDAW_Project\\output\\plugin-cross-export-final\\4811c5cc25524f40b895c04319ca0a61\\exports\\Windows\\LV2\\CyCrossGain.lv2",
+            "running": true,
+            "latencySamples": 1024,
+            "missedBlocks": 0
+          },
+          {
+            "index": 0,
+            "name": "Single SDK sparse gain",
+            "file": "D:\\_Project\\CyDAW_Project\\output\\cyaudio-single-worker\\2026-11-15\\application-4\\sparse-gain.jsfx",
+            "running": true,
+            "latencySamples": 1024,
+            "missedBlocks": 0
+          }
+        ]
+      }
+    },
+    "allChildrenClosedOnReset": true,
+    "shutdown": {
+      "ms": 584.9617999992915,
+      "forced": false
+    }
+  },
+  "nativeClientTest": {
+    "formats": [
+      "JSFX",
+      "VST3"
+    ],
+    "variablePcmFramesPerChannel": 2048,
+    "quantumFrames": 64,
+    "fragments": [
+      1,
+      7,
+      17,
+      39,
+      47,
+      32,
+      63
+    ],
+    "automationOffset": 17,
+    "callbackCppAllocations": 0,
+    "crash": "test-owned child termination and dry bypass",
+    "editor": "opened with an outstanding ticket; processing remains active",
+    "forcedTerminationGraceMs": 2000,
+    "vst3Final": {
+      "passed": true,
+      "log": {
+        "path": "output/cyaudio-single-worker/2026-11-15/ipc-vst3-close.log",
+        "sha256": "89522d3839038ab97c4f120962d8f40fe97555acb646af35229a37ac7bf1c759"
+      }
+    },
+    "limitation": "paced fake caller, no physical latency or xrun claim; malloc/foreign allocations not intercepted"
+  },
+  "testRuns": {
+    "initial": {
+      "path": "output/cyaudio-single-worker/2026-11-15/ctest-all.log",
+      "sha256": "4c18b8692b7f87b378e635164ed46c288f7cf129f1e7b6221154b919df9bdd0a",
+      "completed": true,
+      "total": 122,
+      "passed": 122,
+      "failed": [],
+      "seconds": 515.51,
+      "rows": [
+        {
+          "number": 1,
+          "name": "cydaw_frame_pacing_tests",
+          "status": "Passed",
+          "seconds": 0.01
+        },
+        {
+          "number": 2,
+          "name": "cydaw_core_tests",
+          "status": "Passed",
+          "seconds": 0.09
+        },
+        {
+          "number": 3,
+          "name": "cydaw_transport_timecode_tests",
+          "status": "Passed",
+          "seconds": 0.16
+        },
+        {
+          "number": 4,
+          "name": "cydaw_dsp_adapter_tests",
+          "status": "Passed",
+          "seconds": 0.01
+        },
+        {
+          "number": 5,
+          "name": "cydaw_full_dsp_reuse_tests",
+          "status": "Passed",
+          "seconds": 1.09
+        },
+        {
+          "number": 6,
+          "name": "cydaw_dsp_reuse_tests",
+          "status": "Passed",
+          "seconds": 1.71
+        },
+        {
+          "number": 7,
+          "name": "cydaw_engine_tests",
+          "status": "Passed",
+          "seconds": 17.05
+        },
+        {
+          "number": 8,
+          "name": "cydaw_cyaudio_services_tests",
+          "status": "Passed",
+          "seconds": 0.46
+        },
+        {
+          "number": 9,
+          "name": "cydaw_cyaudio_dsp_tests",
+          "status": "Passed",
+          "seconds": 0.01
+        },
+        {
+          "number": 10,
+          "name": "cydaw_asio_tests",
+          "status": "Passed",
+          "seconds": 0.01
+        },
+        {
+          "number": 11,
+          "name": "cydaw_native_osc_tests",
+          "status": "Passed",
+          "seconds": 0.21
+        },
+        {
+          "number": 12,
+          "name": "cydaw_native_plugin_ipc_tests",
+          "status": "Passed",
+          "seconds": 2.56
+        },
+        {
+          "number": 13,
+          "name": "cydaw_native_hosted_plugin_tests",
+          "status": "Passed",
+          "seconds": 0.57
+        },
+        {
+          "number": 14,
+          "name": "cydaw_native_device_manager_tests",
+          "status": "Passed",
+          "seconds": 0.02
+        },
+        {
+          "number": 15,
+          "name": "cydaw_native_device_ports_tests",
+          "status": "Passed",
+          "seconds": 0.07
+        },
+        {
+          "number": 16,
+          "name": "cydaw_live_midi_tests",
+          "status": "Passed",
+          "seconds": 0.01
+        },
+        {
+          "number": 17,
+          "name": "cydaw_instrument_renderer_tests",
+          "status": "Passed",
+          "seconds": 0.02
+        },
+        {
+          "number": 18,
+          "name": "cydaw_audio_source_tests",
+          "status": "Passed",
+          "seconds": 0.2
+        },
+        {
+          "number": 19,
+          "name": "cydaw_sample_buffer_tests",
+          "status": "Passed",
+          "seconds": 0.01
+        },
+        {
+          "number": 20,
+          "name": "cydaw_remote_native_tests",
+          "status": "Passed",
+          "seconds": 0.07
+        },
+        {
+          "number": 21,
+          "name": "cydaw_process_tests",
+          "status": "Passed",
+          "seconds": 0.08
+        },
+        {
+          "number": 22,
+          "name": "cydaw_event_loop_tests",
+          "status": "Passed",
+          "seconds": 0.09
+        },
+        {
+          "number": 23,
+          "name": "cydaw_midi_file_tests",
+          "status": "Passed",
+          "seconds": 0.01
+        },
+        {
+          "number": 24,
+          "name": "cydaw_graph_document_tests",
+          "status": "Passed",
+          "seconds": 0.35
+        },
+        {
+          "number": 25,
+          "name": "cydaw_asset_services_tests",
+          "status": "Passed",
+          "seconds": 0.05
+        },
+        {
+          "number": 26,
+          "name": "cydaw_compression_tests",
+          "status": "Passed",
+          "seconds": 0.02
+        },
+        {
+          "number": 27,
+          "name": "cydaw_localization_tests",
+          "status": "Passed",
+          "seconds": 0.12
+        },
+        {
+          "number": 28,
+          "name": "cydaw_thread_tests",
+          "status": "Passed",
+          "seconds": 0.01
+        },
+        {
+          "number": 29,
+          "name": "cydaw_audio_files_tests",
+          "status": "Passed",
+          "seconds": 0.02
+        },
+        {
+          "number": 30,
+          "name": "cydaw_native_platform_tests",
+          "status": "Passed",
+          "seconds": 0.7
+        },
+        {
+          "number": 31,
+          "name": "cydaw_base_tests",
+          "status": "Passed",
+          "seconds": 0.02
+        },
+        {
+          "number": 32,
+          "name": "cydaw_help_routes",
+          "status": "Passed",
+          "seconds": 0.03
+        },
+        {
+          "number": 33,
+          "name": "cydaw_help_preservation",
+          "status": "Passed",
+          "seconds": 0.16
+        },
+        {
+          "number": 34,
+          "name": "cydaw_help_export",
+          "status": "Passed",
+          "seconds": 0.13
+        },
+        {
+          "number": 35,
+          "name": "cydaw_manual_reference",
+          "status": "Passed",
+          "seconds": 0.38
+        },
+        {
+          "number": 36,
+          "name": "cydaw_help_entrypoints",
+          "status": "Passed",
+          "seconds": 2.83
+        },
+        {
+          "number": 37,
+          "name": "cydaw_cyui_tests",
+          "status": "Passed",
+          "seconds": 0.03
+        },
+        {
+          "number": 38,
+          "name": "cydaw_no_juce_production_graph",
+          "status": "Passed",
+          "seconds": 0.11
+        },
+        {
+          "number": 40,
+          "name": "cydaw2_transport_jack_check",
+          "status": "Passed",
+          "seconds": 2.07
+        },
+        {
+          "number": 41,
+          "name": "cydaw2_cinema_layout_check",
+          "status": "Passed",
+          "seconds": 6.61
+        },
+        {
+          "number": 42,
+          "name": "cydaw2_cinema_codecs_check",
+          "status": "Passed",
+          "seconds": 9.09
+        },
+        {
+          "number": 43,
+          "name": "cydaw2_cinema_check",
+          "status": "Passed",
+          "seconds": 12.88
+        },
+        {
+          "number": 44,
+          "name": "cydaw2_roundtrip_01-synthe-et-filtre",
+          "status": "Passed",
+          "seconds": 0.57
+        },
+        {
+          "number": 45,
+          "name": "cydaw2_roundtrip_02-basse-et-nappes",
+          "status": "Passed",
+          "seconds": 0.69
+        },
+        {
+          "number": 46,
+          "name": "cydaw2_roundtrip_03-arpege",
+          "status": "Passed",
+          "seconds": 0.58
+        },
+        {
+          "number": 47,
+          "name": "cydaw2_roundtrip_04-ambiance",
+          "status": "Passed",
+          "seconds": 0.73
+        },
+        {
+          "number": 48,
+          "name": "cydaw2_roundtrip_05-rythmique",
+          "status": "Passed",
+          "seconds": 0.89
+        },
+        {
+          "number": 49,
+          "name": "cydaw2_roundtrip_06-tipper-glitch",
+          "status": "Passed",
+          "seconds": 0.88
+        },
+        {
+          "number": 50,
+          "name": "cydaw2_roundtrip_07-egaliseur-pro",
+          "status": "Passed",
+          "seconds": 0.87
+        },
+        {
+          "number": 51,
+          "name": "cydaw2_roundtrip_08-echos-et-mouvement",
+          "status": "Passed",
+          "seconds": 0.55
+        },
+        {
+          "number": 52,
+          "name": "cydaw2_roundtrip_09-glitch-dynamique",
+          "status": "Passed",
+          "seconds": 0.84
+        },
+        {
+          "number": 53,
+          "name": "cydaw2_roundtrip_10-compresseur-pro",
+          "status": "Passed",
+          "seconds": 0.82
+        },
+        {
+          "number": 54,
+          "name": "cydaw2_roundtrip_11-echantillons-et-modeles",
+          "status": "Passed",
+          "seconds": 2.04
+        },
+        {
+          "number": 55,
+          "name": "cydaw2_roundtrip_13-prisme",
+          "status": "Passed",
+          "seconds": 1.5
+        },
+        {
+          "number": 56,
+          "name": "cydaw2_roundtrip_14-pas-de-cinq",
+          "status": "Passed",
+          "seconds": 1.54
+        },
+        {
+          "number": 57,
+          "name": "cydaw2_roundtrip_15-calle-luna",
+          "status": "Passed",
+          "seconds": 0.63
+        },
+        {
+          "number": 58,
+          "name": "cydaw2_roundtrip_16-greve-de-l-ouest",
+          "status": "Passed",
+          "seconds": 0.63
+        },
+        {
+          "number": 59,
+          "name": "cydaw2_roundtrip_17-neons",
+          "status": "Passed",
+          "seconds": 0.63
+        },
+        {
+          "number": 60,
+          "name": "cydaw2_roundtrip_18-cycles-lents",
+          "status": "Passed",
+          "seconds": 0.64
+        },
+        {
+          "number": 61,
+          "name": "cydaw2_roundtrip_19-effets-studio",
+          "status": "Passed",
+          "seconds": 1.71
+        },
+        {
+          "number": 62,
+          "name": "cydaw2_roundtrip_19-medellin-comparaison-midi",
+          "status": "Passed",
+          "seconds": 1.6
+        },
+        {
+          "number": 63,
+          "name": "cydaw2_roundtrip_20-this-old-tune-comparaison-midi",
+          "status": "Passed",
+          "seconds": 3.32
+        },
+        {
+          "number": 64,
+          "name": "cydaw2_roundtrip_21-kick-et-batteries-electro",
+          "status": "Passed",
+          "seconds": 1.55
+        },
+        {
+          "number": 65,
+          "name": "cydaw2_roundtrip_22-amplis-et-micros",
+          "status": "Passed",
+          "seconds": 1.24
+        },
+        {
+          "number": 66,
+          "name": "cydaw2_roundtrip_23-instruments-et-effets-natifs",
+          "status": "Passed",
+          "seconds": 2.9
+        },
+        {
+          "number": 67,
+          "name": "cydaw2_roundtrip_24-catalogue-instruments-et-effets",
+          "status": "Passed",
+          "seconds": 6.05
+        },
+        {
+          "number": 68,
+          "name": "cydaw2_modulation",
+          "status": "Passed",
+          "seconds": 0.55
+        },
+        {
+          "number": 69,
+          "name": "cydaw2_effects",
+          "status": "Passed",
+          "seconds": 3.31
+        },
+        {
+          "number": 70,
+          "name": "cydaw2_device_taps_01-synthe-et-filtre",
+          "status": "Passed",
+          "seconds": 0.25
+        },
+        {
+          "number": 71,
+          "name": "cydaw2_device_taps_02-basse-et-nappes",
+          "status": "Passed",
+          "seconds": 0.29
+        },
+        {
+          "number": 72,
+          "name": "cydaw2_device_taps_03-arpege",
+          "status": "Passed",
+          "seconds": 0.25
+        },
+        {
+          "number": 73,
+          "name": "cydaw2_device_taps_04-ambiance",
+          "status": "Passed",
+          "seconds": 0.28
+        },
+        {
+          "number": 74,
+          "name": "cydaw2_device_taps_05-rythmique",
+          "status": "Passed",
+          "seconds": 0.34
+        },
+        {
+          "number": 75,
+          "name": "cydaw2_device_taps_06-tipper-glitch",
+          "status": "Passed",
+          "seconds": 0.4
+        },
+        {
+          "number": 76,
+          "name": "cydaw2_device_taps_07-egaliseur-pro",
+          "status": "Passed",
+          "seconds": 0.33
+        },
+        {
+          "number": 77,
+          "name": "cydaw2_device_taps_08-echos-et-mouvement",
+          "status": "Passed",
+          "seconds": 0.24
+        },
+        {
+          "number": 78,
+          "name": "cydaw2_device_taps_09-glitch-dynamique",
+          "status": "Passed",
+          "seconds": 0.39
+        },
+        {
+          "number": 79,
+          "name": "cydaw2_device_taps_10-compresseur-pro",
+          "status": "Passed",
+          "seconds": 0.33
+        },
+        {
+          "number": 80,
+          "name": "cydaw2_device_taps_11-echantillons-et-modeles",
+          "status": "Passed",
+          "seconds": 0.84
+        },
+        {
+          "number": 81,
+          "name": "cydaw2_device_taps_13-prisme",
+          "status": "Passed",
+          "seconds": 0.63
+        },
+        {
+          "number": 82,
+          "name": "cydaw2_device_taps_14-pas-de-cinq",
+          "status": "Passed",
+          "seconds": 0.84
+        },
+        {
+          "number": 83,
+          "name": "cydaw2_device_taps_15-calle-luna",
+          "status": "Passed",
+          "seconds": 0.3
+        },
+        {
+          "number": 84,
+          "name": "cydaw2_device_taps_16-greve-de-l-ouest",
+          "status": "Passed",
+          "seconds": 0.26
+        },
+        {
+          "number": 85,
+          "name": "cydaw2_device_taps_17-neons",
+          "status": "Passed",
+          "seconds": 0.28
+        },
+        {
+          "number": 86,
+          "name": "cydaw2_device_taps_18-cycles-lents",
+          "status": "Passed",
+          "seconds": 0.29
+        },
+        {
+          "number": 87,
+          "name": "cydaw2_device_taps_19-effets-studio",
+          "status": "Passed",
+          "seconds": 0.83
+        },
+        {
+          "number": 88,
+          "name": "cydaw2_device_taps_19-medellin-comparaison-midi",
+          "status": "Passed",
+          "seconds": 0.83
+        },
+        {
+          "number": 89,
+          "name": "cydaw2_device_taps_20-this-old-tune-comparaison-midi",
+          "status": "Passed",
+          "seconds": 1.72
+        },
+        {
+          "number": 90,
+          "name": "cydaw2_device_taps_21-kick-et-batteries-electro",
+          "status": "Passed",
+          "seconds": 0.88
+        },
+        {
+          "number": 91,
+          "name": "cydaw2_device_taps_22-amplis-et-micros",
+          "status": "Passed",
+          "seconds": 0.63
+        },
+        {
+          "number": 92,
+          "name": "cydaw2_device_taps_23-instruments-et-effets-natifs",
+          "status": "Passed",
+          "seconds": 1.64
+        },
+        {
+          "number": 93,
+          "name": "cydaw2_device_taps_24-catalogue-instruments-et-effets",
+          "status": "Passed",
+          "seconds": 2.87
+        },
+        {
+          "number": 94,
+          "name": "cydaw2_mcp_check",
+          "status": "Passed",
+          "seconds": 16.67
+        },
+        {
+          "number": 95,
+          "name": "cydaw2_sound_model_check",
+          "status": "Passed",
+          "seconds": 9.22
+        },
+        {
+          "number": 96,
+          "name": "cydaw2_sampler_check",
+          "status": "Passed",
+          "seconds": 7.28
+        },
+        {
+          "number": 97,
+          "name": "cydaw2_launcher_check",
+          "status": "Passed",
+          "seconds": 14.87
+        },
+        {
+          "number": 98,
+          "name": "cydaw2_routing_check",
+          "status": "Passed",
+          "seconds": 9.75
+        },
+        {
+          "number": 99,
+          "name": "cydaw2_banks_check",
+          "status": "Passed",
+          "seconds": 2.8
+        },
+        {
+          "number": 100,
+          "name": "cydaw2_electro_check",
+          "status": "Passed",
+          "seconds": 4.14
+        },
+        {
+          "number": 101,
+          "name": "cydaw2_sample_search_check",
+          "status": "Passed",
+          "seconds": 35.98
+        },
+        {
+          "number": 102,
+          "name": "cydaw2_amps_check",
+          "status": "Passed",
+          "seconds": 2.54
+        },
+        {
+          "number": 103,
+          "name": "cydaw2_editing_check",
+          "status": "Passed",
+          "seconds": 16.62
+        },
+        {
+          "number": 104,
+          "name": "cydaw2_mixing_check",
+          "status": "Passed",
+          "seconds": 42.62
+        },
+        {
+          "number": 105,
+          "name": "cydaw2_mix_effects_check",
+          "status": "Passed",
+          "seconds": 2.33
+        },
+        {
+          "number": 106,
+          "name": "cydaw2_synths_check",
+          "status": "Passed",
+          "seconds": 12.35
+        },
+        {
+          "number": 107,
+          "name": "cydaw2_creative_check",
+          "status": "Passed",
+          "seconds": 27.24
+        },
+        {
+          "number": 108,
+          "name": "cydaw2_dj_check",
+          "status": "Passed",
+          "seconds": 27.05
+        },
+        {
+          "number": 109,
+          "name": "cydaw2_foundry_check",
+          "status": "Passed",
+          "seconds": 4.03
+        },
+        {
+          "number": 110,
+          "name": "cydaw2_processing_check",
+          "status": "Passed",
+          "seconds": 3.4
+        },
+        {
+          "number": 111,
+          "name": "cydaw2_controllers_check",
+          "status": "Passed",
+          "seconds": 3.92
+        },
+        {
+          "number": 112,
+          "name": "cydaw2_value_list_check",
+          "status": "Passed",
+          "seconds": 1.95
+        },
+        {
+          "number": 113,
+          "name": "cydaw2_modulators_check",
+          "status": "Passed",
+          "seconds": 4.3
+        },
+        {
+          "number": 114,
+          "name": "cydaw2_containers_check",
+          "status": "Passed",
+          "seconds": 5.59
+        },
+        {
+          "number": 116,
+          "name": "cydaw2_project_import_check",
+          "status": "Passed",
+          "seconds": 4.74
+        },
+        {
+          "number": 117,
+          "name": "cydaw2_batterie_check",
+          "status": "Passed",
+          "seconds": 12.51
+        },
+        {
+          "number": 118,
+          "name": "cydaw2_sfz_live_check",
+          "status": "Passed",
+          "seconds": 4.24
+        },
+        {
+          "number": 119,
+          "name": "cydaw2_tempo_audition_check",
+          "status": "Passed",
+          "seconds": 29.59
+        },
+        {
+          "number": 120,
+          "name": "cydaw2_bypass_check",
+          "status": "Passed",
+          "seconds": 14.62
+        },
+        {
+          "number": 121,
+          "name": "cydaw2_knob_glide_check",
+          "status": "Passed",
+          "seconds": 18.19
+        },
+        {
+          "number": 122,
+          "name": "cydaw2_voice_live_check",
+          "status": "Passed",
+          "seconds": 4.52
+        },
+        {
+          "number": 123,
+          "name": "cydaw2_presets_check",
+          "status": "Passed",
+          "seconds": 2.76
+        },
+        {
+          "number": 124,
+          "name": "cydaw2_companion_analysis",
+          "status": "Passed",
+          "seconds": 9.79
+        }
+      ]
+    },
+    "final": {
+      "path": "output/cyaudio-single-worker/2026-11-15/ctest-final.log",
+      "sha256": "98b7ee74bb2cfc4949b9f37796572f14dc2b79404332e14b9da15fe992c4c46f",
+      "completed": true,
+      "total": 124,
+      "passed": 124,
+      "failed": [],
+      "seconds": 670.62,
+      "rows": [
+        {
+          "number": 1,
+          "name": "cydaw_frame_pacing_tests",
+          "status": "Passed",
+          "seconds": 0.02
+        },
+        {
+          "number": 2,
+          "name": "cydaw_core_tests",
+          "status": "Passed",
+          "seconds": 0.61
+        },
+        {
+          "number": 3,
+          "name": "cydaw_transport_timecode_tests",
+          "status": "Passed",
+          "seconds": 0.25
+        },
+        {
+          "number": 4,
+          "name": "cydaw_dsp_adapter_tests",
+          "status": "Passed",
+          "seconds": 0.3
+        },
+        {
+          "number": 5,
+          "name": "cydaw_full_dsp_reuse_tests",
+          "status": "Passed",
+          "seconds": 1.97
+        },
+        {
+          "number": 6,
+          "name": "cydaw_dsp_reuse_tests",
+          "status": "Passed",
+          "seconds": 4.42
+        },
+        {
+          "number": 7,
+          "name": "cydaw_engine_tests",
+          "status": "Passed",
+          "seconds": 19.93
+        },
+        {
+          "number": 8,
+          "name": "cydaw_cyaudio_services_tests",
+          "status": "Passed",
+          "seconds": 0.49
+        },
+        {
+          "number": 9,
+          "name": "cydaw_cyaudio_dsp_tests",
+          "status": "Passed",
+          "seconds": 0.05
+        },
+        {
+          "number": 10,
+          "name": "cydaw_asio_tests",
+          "status": "Passed",
+          "seconds": 0.01
+        },
+        {
+          "number": 11,
+          "name": "cydaw_native_osc_tests",
+          "status": "Passed",
+          "seconds": 0.25
+        },
+        {
+          "number": 12,
+          "name": "cydaw_native_plugin_ipc_tests",
+          "status": "Passed",
+          "seconds": 2.71
+        },
+        {
+          "number": 13,
+          "name": "cydaw_native_hosted_plugin_tests",
+          "status": "Passed",
+          "seconds": 0.6
+        },
+        {
+          "number": 14,
+          "name": "cydaw_native_device_manager_tests",
+          "status": "Passed",
+          "seconds": 0.05
+        },
+        {
+          "number": 15,
+          "name": "cydaw_native_device_ports_tests",
+          "status": "Passed",
+          "seconds": 0.14
+        },
+        {
+          "number": 16,
+          "name": "cydaw_live_midi_tests",
+          "status": "Passed",
+          "seconds": 0.05
+        },
+        {
+          "number": 17,
+          "name": "cydaw_instrument_renderer_tests",
+          "status": "Passed",
+          "seconds": 0.08
+        },
+        {
+          "number": 18,
+          "name": "cydaw_audio_source_tests",
+          "status": "Passed",
+          "seconds": 0.18
+        },
+        {
+          "number": 19,
+          "name": "cydaw_sample_buffer_tests",
+          "status": "Passed",
+          "seconds": 0.05
+        },
+        {
+          "number": 20,
+          "name": "cydaw_remote_native_tests",
+          "status": "Passed",
+          "seconds": 0.14
+        },
+        {
+          "number": 21,
+          "name": "cydaw_process_tests",
+          "status": "Passed",
+          "seconds": 0.14
+        },
+        {
+          "number": 22,
+          "name": "cydaw_event_loop_tests",
+          "status": "Passed",
+          "seconds": 0.14
+        },
+        {
+          "number": 23,
+          "name": "cydaw_midi_file_tests",
+          "status": "Passed",
+          "seconds": 0.07
+        },
+        {
+          "number": 24,
+          "name": "cydaw_graph_document_tests",
+          "status": "Passed",
+          "seconds": 0.36
+        },
+        {
+          "number": 25,
+          "name": "cydaw_asset_services_tests",
+          "status": "Passed",
+          "seconds": 0.15
+        },
+        {
+          "number": 26,
+          "name": "cydaw_compression_tests",
+          "status": "Passed",
+          "seconds": 0.19
+        },
+        {
+          "number": 27,
+          "name": "cydaw_localization_tests",
+          "status": "Passed",
+          "seconds": 0.14
+        },
+        {
+          "number": 28,
+          "name": "cydaw_thread_tests",
+          "status": "Passed",
+          "seconds": 0.06
+        },
+        {
+          "number": 29,
+          "name": "cydaw_audio_files_tests",
+          "status": "Passed",
+          "seconds": 0.13
+        },
+        {
+          "number": 30,
+          "name": "cydaw_native_platform_tests",
+          "status": "Passed",
+          "seconds": 0.75
+        },
+        {
+          "number": 31,
+          "name": "cydaw_base_tests",
+          "status": "Passed",
+          "seconds": 0.1
+        },
+        {
+          "number": 32,
+          "name": "cydaw_help_routes",
+          "status": "Passed",
+          "seconds": 0.06
+        },
+        {
+          "number": 33,
+          "name": "cydaw_help_preservation",
+          "status": "Passed",
+          "seconds": 0.17
+        },
+        {
+          "number": 34,
+          "name": "cydaw_help_export",
+          "status": "Passed",
+          "seconds": 0.13
+        },
+        {
+          "number": 35,
+          "name": "cydaw_manual_reference",
+          "status": "Passed",
+          "seconds": 0.38
+        },
+        {
+          "number": 36,
+          "name": "cydaw_help_entrypoints",
+          "status": "Passed",
+          "seconds": 3.35
+        },
+        {
+          "number": 37,
+          "name": "cydaw_cyui_tests",
+          "status": "Passed",
+          "seconds": 0.08
+        },
+        {
+          "number": 38,
+          "name": "cydaw_no_juce_production_graph",
+          "status": "Passed",
+          "seconds": 0.13
+        },
+        {
+          "number": 39,
+          "name": "cydaw2_transport_sync_check",
+          "status": "Passed",
+          "seconds": 5.3
+        },
+        {
+          "number": 40,
+          "name": "cydaw2_transport_jack_check",
+          "status": "Passed",
+          "seconds": 2.19
+        },
+        {
+          "number": 41,
+          "name": "cydaw2_cinema_layout_check",
+          "status": "Passed",
+          "seconds": 8.12
+        },
+        {
+          "number": 42,
+          "name": "cydaw2_cinema_codecs_check",
+          "status": "Passed",
+          "seconds": 8.63
+        },
+        {
+          "number": 43,
+          "name": "cydaw2_cinema_check",
+          "status": "Passed",
+          "seconds": 14.06
+        },
+        {
+          "number": 44,
+          "name": "cydaw2_roundtrip_01-synthe-et-filtre",
+          "status": "Passed",
+          "seconds": 0.58
+        },
+        {
+          "number": 45,
+          "name": "cydaw2_roundtrip_02-basse-et-nappes",
+          "status": "Passed",
+          "seconds": 0.62
+        },
+        {
+          "number": 46,
+          "name": "cydaw2_roundtrip_03-arpege",
+          "status": "Passed",
+          "seconds": 0.61
+        },
+        {
+          "number": 47,
+          "name": "cydaw2_roundtrip_04-ambiance",
+          "status": "Passed",
+          "seconds": 0.64
+        },
+        {
+          "number": 48,
+          "name": "cydaw2_roundtrip_05-rythmique",
+          "status": "Passed",
+          "seconds": 0.9
+        },
+        {
+          "number": 49,
+          "name": "cydaw2_roundtrip_06-tipper-glitch",
+          "status": "Passed",
+          "seconds": 1.45
+        },
+        {
+          "number": 50,
+          "name": "cydaw2_roundtrip_07-egaliseur-pro",
+          "status": "Passed",
+          "seconds": 1.26
+        },
+        {
+          "number": 51,
+          "name": "cydaw2_roundtrip_08-echos-et-mouvement",
+          "status": "Passed",
+          "seconds": 0.72
+        },
+        {
+          "number": 52,
+          "name": "cydaw2_roundtrip_09-glitch-dynamique",
+          "status": "Passed",
+          "seconds": 1.18
+        },
+        {
+          "number": 53,
+          "name": "cydaw2_roundtrip_10-compresseur-pro",
+          "status": "Passed",
+          "seconds": 1.1
+        },
+        {
+          "number": 54,
+          "name": "cydaw2_roundtrip_11-echantillons-et-modeles",
+          "status": "Passed",
+          "seconds": 2.42
+        },
+        {
+          "number": 55,
+          "name": "cydaw2_roundtrip_13-prisme",
+          "status": "Passed",
+          "seconds": 1.61
+        },
+        {
+          "number": 56,
+          "name": "cydaw2_roundtrip_14-pas-de-cinq",
+          "status": "Passed",
+          "seconds": 1.93
+        },
+        {
+          "number": 57,
+          "name": "cydaw2_roundtrip_15-calle-luna",
+          "status": "Passed",
+          "seconds": 1.08
+        },
+        {
+          "number": 58,
+          "name": "cydaw2_roundtrip_16-greve-de-l-ouest",
+          "status": "Passed",
+          "seconds": 1.04
+        },
+        {
+          "number": 59,
+          "name": "cydaw2_roundtrip_17-neons",
+          "status": "Passed",
+          "seconds": 1.03
+        },
+        {
+          "number": 60,
+          "name": "cydaw2_roundtrip_18-cycles-lents",
+          "status": "Passed",
+          "seconds": 1.17
+        },
+        {
+          "number": 61,
+          "name": "cydaw2_roundtrip_19-effets-studio",
+          "status": "Passed",
+          "seconds": 3.07
+        },
+        {
+          "number": 62,
+          "name": "cydaw2_roundtrip_19-medellin-comparaison-midi",
+          "status": "Passed",
+          "seconds": 2.73
+        },
+        {
+          "number": 63,
+          "name": "cydaw2_roundtrip_20-this-old-tune-comparaison-midi",
+          "status": "Passed",
+          "seconds": 5.47
+        },
+        {
+          "number": 64,
+          "name": "cydaw2_roundtrip_21-kick-et-batteries-electro",
+          "status": "Passed",
+          "seconds": 1.77
+        },
+        {
+          "number": 65,
+          "name": "cydaw2_roundtrip_22-amplis-et-micros",
+          "status": "Passed",
+          "seconds": 1.75
+        },
+        {
+          "number": 66,
+          "name": "cydaw2_roundtrip_23-instruments-et-effets-natifs",
+          "status": "Passed",
+          "seconds": 4.67
+        },
+        {
+          "number": 67,
+          "name": "cydaw2_roundtrip_24-catalogue-instruments-et-effets",
+          "status": "Passed",
+          "seconds": 8.7
+        },
+        {
+          "number": 68,
+          "name": "cydaw2_modulation",
+          "status": "Passed",
+          "seconds": 0.69
+        },
+        {
+          "number": 69,
+          "name": "cydaw2_effects",
+          "status": "Passed",
+          "seconds": 4.36
+        },
+        {
+          "number": 70,
+          "name": "cydaw2_device_taps_01-synthe-et-filtre",
+          "status": "Passed",
+          "seconds": 0.32
+        },
+        {
+          "number": 71,
+          "name": "cydaw2_device_taps_02-basse-et-nappes",
+          "status": "Passed",
+          "seconds": 0.33
+        },
+        {
+          "number": 72,
+          "name": "cydaw2_device_taps_03-arpege",
+          "status": "Passed",
+          "seconds": 0.29
+        },
+        {
+          "number": 73,
+          "name": "cydaw2_device_taps_04-ambiance",
+          "status": "Passed",
+          "seconds": 0.36
+        },
+        {
+          "number": 74,
+          "name": "cydaw2_device_taps_05-rythmique",
+          "status": "Passed",
+          "seconds": 0.47
+        },
+        {
+          "number": 75,
+          "name": "cydaw2_device_taps_06-tipper-glitch",
+          "status": "Passed",
+          "seconds": 0.56
+        },
+        {
+          "number": 76,
+          "name": "cydaw2_device_taps_07-egaliseur-pro",
+          "status": "Passed",
+          "seconds": 0.47
+        },
+        {
+          "number": 77,
+          "name": "cydaw2_device_taps_08-echos-et-mouvement",
+          "status": "Passed",
+          "seconds": 0.39
+        },
+        {
+          "number": 78,
+          "name": "cydaw2_device_taps_09-glitch-dynamique",
+          "status": "Passed",
+          "seconds": 0.59
+        },
+        {
+          "number": 79,
+          "name": "cydaw2_device_taps_10-compresseur-pro",
+          "status": "Passed",
+          "seconds": 0.47
+        },
+        {
+          "number": 80,
+          "name": "cydaw2_device_taps_11-echantillons-et-modeles",
+          "status": "Passed",
+          "seconds": 1.42
+        },
+        {
+          "number": 81,
+          "name": "cydaw2_device_taps_13-prisme",
+          "status": "Passed",
+          "seconds": 0.96
+        },
+        {
+          "number": 82,
+          "name": "cydaw2_device_taps_14-pas-de-cinq",
+          "status": "Passed",
+          "seconds": 1.33
+        },
+        {
+          "number": 83,
+          "name": "cydaw2_device_taps_15-calle-luna",
+          "status": "Passed",
+          "seconds": 0.41
+        },
+        {
+          "number": 84,
+          "name": "cydaw2_device_taps_16-greve-de-l-ouest",
+          "status": "Passed",
+          "seconds": 0.43
+        },
+        {
+          "number": 85,
+          "name": "cydaw2_device_taps_17-neons",
+          "status": "Passed",
+          "seconds": 0.48
+        },
+        {
+          "number": 86,
+          "name": "cydaw2_device_taps_18-cycles-lents",
+          "status": "Passed",
+          "seconds": 0.6
+        },
+        {
+          "number": 87,
+          "name": "cydaw2_device_taps_19-effets-studio",
+          "status": "Passed",
+          "seconds": 1.46
+        },
+        {
+          "number": 88,
+          "name": "cydaw2_device_taps_19-medellin-comparaison-midi",
+          "status": "Passed",
+          "seconds": 1.39
+        },
+        {
+          "number": 89,
+          "name": "cydaw2_device_taps_20-this-old-tune-comparaison-midi",
+          "status": "Passed",
+          "seconds": 2.85
+        },
+        {
+          "number": 90,
+          "name": "cydaw2_device_taps_21-kick-et-batteries-electro",
+          "status": "Passed",
+          "seconds": 1.13
+        },
+        {
+          "number": 91,
+          "name": "cydaw2_device_taps_22-amplis-et-micros",
+          "status": "Passed",
+          "seconds": 0.97
+        },
+        {
+          "number": 92,
+          "name": "cydaw2_device_taps_23-instruments-et-effets-natifs",
+          "status": "Passed",
+          "seconds": 2.42
+        },
+        {
+          "number": 93,
+          "name": "cydaw2_device_taps_24-catalogue-instruments-et-effets",
+          "status": "Passed",
+          "seconds": 4.76
+        },
+        {
+          "number": 94,
+          "name": "cydaw2_mcp_check",
+          "status": "Passed",
+          "seconds": 20.08
+        },
+        {
+          "number": 95,
+          "name": "cydaw2_sound_model_check",
+          "status": "Passed",
+          "seconds": 9.78
+        },
+        {
+          "number": 96,
+          "name": "cydaw2_sampler_check",
+          "status": "Passed",
+          "seconds": 8.83
+        },
+        {
+          "number": 97,
+          "name": "cydaw2_launcher_check",
+          "status": "Passed",
+          "seconds": 18.14
+        },
+        {
+          "number": 98,
+          "name": "cydaw2_routing_check",
+          "status": "Passed",
+          "seconds": 14.78
+        },
+        {
+          "number": 99,
+          "name": "cydaw2_banks_check",
+          "status": "Passed",
+          "seconds": 3.65
+        },
+        {
+          "number": 100,
+          "name": "cydaw2_electro_check",
+          "status": "Passed",
+          "seconds": 7.03
+        },
+        {
+          "number": 101,
+          "name": "cydaw2_sample_search_check",
+          "status": "Passed",
+          "seconds": 40.98
+        },
+        {
+          "number": 102,
+          "name": "cydaw2_amps_check",
+          "status": "Passed",
+          "seconds": 3.57
+        },
+        {
+          "number": 103,
+          "name": "cydaw2_editing_check",
+          "status": "Passed",
+          "seconds": 17.56
+        },
+        {
+          "number": 104,
+          "name": "cydaw2_mixing_check",
+          "status": "Passed",
+          "seconds": 45.41
+        },
+        {
+          "number": 105,
+          "name": "cydaw2_mix_effects_check",
+          "status": "Passed",
+          "seconds": 4.11
+        },
+        {
+          "number": 106,
+          "name": "cydaw2_synths_check",
+          "status": "Passed",
+          "seconds": 21.03
+        },
+        {
+          "number": 107,
+          "name": "cydaw2_creative_check",
+          "status": "Passed",
+          "seconds": 30.57
+        },
+        {
+          "number": 108,
+          "name": "cydaw2_dj_check",
+          "status": "Passed",
+          "seconds": 31.47
+        },
+        {
+          "number": 109,
+          "name": "cydaw2_foundry_check",
+          "status": "Passed",
+          "seconds": 7.08
+        },
+        {
+          "number": 110,
+          "name": "cydaw2_processing_check",
+          "status": "Passed",
+          "seconds": 5.44
+        },
+        {
+          "number": 111,
+          "name": "cydaw2_controllers_check",
+          "status": "Passed",
+          "seconds": 7.37
+        },
+        {
+          "number": 112,
+          "name": "cydaw2_value_list_check",
+          "status": "Passed",
+          "seconds": 2.38
+        },
+        {
+          "number": 113,
+          "name": "cydaw2_modulators_check",
+          "status": "Passed",
+          "seconds": 4.82
+        },
+        {
+          "number": 114,
+          "name": "cydaw2_containers_check",
+          "status": "Passed",
+          "seconds": 7.54
+        },
+        {
+          "number": 115,
+          "name": "cydaw2_instrument_containers_check",
+          "status": "Passed",
+          "seconds": 46.76
+        },
+        {
+          "number": 116,
+          "name": "cydaw2_project_import_check",
+          "status": "Passed",
+          "seconds": 13.68
+        },
+        {
+          "number": 117,
+          "name": "cydaw2_batterie_check",
+          "status": "Passed",
+          "seconds": 31.0
+        },
+        {
+          "number": 118,
+          "name": "cydaw2_sfz_live_check",
+          "status": "Passed",
+          "seconds": 8.96
+        },
+        {
+          "number": 119,
+          "name": "cydaw2_tempo_audition_check",
+          "status": "Passed",
+          "seconds": 41.99
+        },
+        {
+          "number": 120,
+          "name": "cydaw2_bypass_check",
+          "status": "Passed",
+          "seconds": 16.36
+        },
+        {
+          "number": 121,
+          "name": "cydaw2_knob_glide_check",
+          "status": "Passed",
+          "seconds": 19.19
+        },
+        {
+          "number": 122,
+          "name": "cydaw2_voice_live_check",
+          "status": "Passed",
+          "seconds": 5.14
+        },
+        {
+          "number": 123,
+          "name": "cydaw2_presets_check",
+          "status": "Passed",
+          "seconds": 3.74
+        },
+        {
+          "number": 124,
+          "name": "cydaw2_companion_analysis",
+          "status": "Passed",
+          "seconds": 16.95
+        }
+      ]
+    },
+    "clientFinal": {
+      "path": "output/cyaudio-single-worker/2026-11-15/ctest-client-final.log",
+      "sha256": "d3f9c006a1f7607c78df03e681b5a012f93e084971fe5a354bb486499f18e6b1",
+      "completed": false,
+      "total": 2,
+      "passed": 2,
+      "failed": [],
+      "seconds": null,
+      "rows": [
+        {
+          "number": 12,
+          "name": "cydaw_native_plugin_ipc_tests",
+          "status": "Passed",
+          "seconds": 2.63
+        },
+        {
+          "number": 22,
+          "name": "cydaw_event_loop_tests",
+          "status": "Passed",
+          "seconds": 0.13
+        }
+      ]
+    }
+  },
+  "failuresRetained": [
+    {
+      "evidence": "ctest-all.log",
+      "issue": "exact transport equality: 12 versus 11.999999999999993; assertion unchanged"
+    },
+    {
+      "evidence": "ctest-all.log",
+      "issue": "application disconnected while drawing plugin value list; SDK message-pump reentrancy protected"
+    },
+    {
+      "evidence": "application-2/acceptance.json",
+      "issue": "eight SDK workers plus eight console hosts; GUI worker subsystem removes console hosts"
+    },
+    {
+      "evidence": "application-3/acceptance.json",
+      "issue": "window commands invalidate pending SDK tickets; audio/editor handoff added"
+    },
+    {
+      "evidence": "ipc-vst3-final.log and ipc-vst3-live-count.log",
+      "issue": "immediate Toolhelp count preceded completion of forced Windows termination; final test checks zero live workers after a bounded 2-second grace period"
+    }
+  ],
+  "sdkFollowUps": [
+    {
+      "file": "CyAudioCore/src/plugins/PluginWorker.cpp",
+      "function": "State::rpc",
+      "issue": "window command clears sameCycle pending ticket; current host parks/reset pipeline"
+    },
+    {
+      "file": "CyAudioCore/src/plugins/IsolatedPlugin.cpp",
+      "function": "IsolatedBackend::pumpMainThread",
+      "issue": "poll is followed by synchronous pump RPC; no cheap public notices-only provider poll"
+    },
+    {
+      "file": "CyAudioCore/src/plugins/Vst3Plugin.cpp",
+      "function": "flush/saveState",
+      "issue": "pending uiToAudio edits require rendering before state save; current control owner may drain one silent quantum"
+    }
+  ],
+  "limits": [
+    "No new accepted CPU or JUCE performance comparison",
+    "Short functional ASIO windows; no xrun-free or human listening claim",
+    "Editor controls reset pipeline and may briefly interrupt output",
+    "Silent state-drain quantum may advance internal DSP state",
+    "Linux/macOS/Wine not validated",
+    "Historical Cinema DC and CUE ASIO issues remain open; assertions unchanged"
+  ],
+  "publication": {
+    "push": false,
+    "githubActions": false
+  },
+  "rawLogs": [
+    {
+      "path": "output/cyaudio-single-worker/2026-11-15/application-2.log",
+      "sha256": "37e194c3a191065820d3005730f29e99219cee49c58e42aa82dde60c93c4d4ed"
+    },
+    {
+      "path": "output/cyaudio-single-worker/2026-11-15/application-3.log",
+      "sha256": "a1d7df5e774f0e5fe5bec5b749333129f4dd1e249999e7b850048d5157058b75"
+    },
+    {
+      "path": "output/cyaudio-single-worker/2026-11-15/application-4.log",
+      "sha256": "e190dc8849d252bf40f7d53086c896444373df7a7f41c050932073b0819357d7"
+    },
+    {
+      "path": "output/cyaudio-single-worker/2026-11-15/application.log",
+      "sha256": "7837fc26b42c0e065f7fb002ccf6ae140040a58b1d94264d198680988c51ff5c"
+    },
+    {
+      "path": "output/cyaudio-single-worker/2026-11-15/build-dispatch.log",
+      "sha256": "959ec709f78ddd8d121865f46037d6dc56106c4b1c5d5684da3888d054638348"
+    },
+    {
+      "path": "output/cyaudio-single-worker/2026-11-15/build-editor-handoff.log",
+      "sha256": "2bc739941935196c189e6a6f7da3b4d5958f92dfd6079089d93913468cb5f671"
+    },
+    {
+      "path": "output/cyaudio-single-worker/2026-11-15/build-final.log",
+      "sha256": "2c2c8e63b7f88a771a972ba3b41f74d26815c80082280ea5a588ca81d1055778"
+    },
+    {
+      "path": "output/cyaudio-single-worker/2026-11-15/build-ipc-close.log",
+      "sha256": "984a10d7737c44e6fcf917f6a226fe8a4850488f0ce7e6034dc302dadd5746f5"
+    },
+    {
+      "path": "output/cyaudio-single-worker/2026-11-15/build-ipc-final.log",
+      "sha256": "15870894ca4bee45a7ff8cd8d83a37032e36766d8723a90d587b63605673846c"
+    },
+    {
+      "path": "output/cyaudio-single-worker/2026-11-15/build-ipc-live-count.log",
+      "sha256": "d8681e370ea9441ea407619d389a853719e019b2beb83664669be55dd81cbf67"
+    },
+    {
+      "path": "output/cyaudio-single-worker/2026-11-15/build-ipc.log",
+      "sha256": "fcdeb1d2e830e71f4438886e1825d3dd678ea8dcecb719fb405829edc0019ea8"
+    },
+    {
+      "path": "output/cyaudio-single-worker/2026-11-15/build-worker-gui.log",
+      "sha256": "923504cbeccc39a5a71ba9341d57bec1c4df4e9a3b8e7ac47b397a28f6cdffa8"
+    },
+    {
+      "path": "output/cyaudio-single-worker/2026-11-15/build.log",
+      "sha256": "9741670dbb117479da9a74d78be424a199602e7748f5e3035b0bddab7d701b98"
+    },
+    {
+      "path": "output/cyaudio-single-worker/2026-11-15/ctest-all.log",
+      "sha256": "4c18b8692b7f87b378e635164ed46c288f7cf129f1e7b6221154b919df9bdd0a"
+    },
+    {
+      "path": "output/cyaudio-single-worker/2026-11-15/ctest-client-final.log",
+      "sha256": "d3f9c006a1f7607c78df03e681b5a012f93e084971fe5a354bb486499f18e6b1"
+    },
+    {
+      "path": "output/cyaudio-single-worker/2026-11-15/ctest-final.log",
+      "sha256": "98b7ee74bb2cfc4949b9f37796572f14dc2b79404332e14b9da15fe992c4c46f"
+    },
+    {
+      "path": "output/cyaudio-single-worker/2026-11-15/ipc-initial.log",
+      "sha256": "c03c0bae3a10dc52bb4479d85b5f0d1d9e444d0d5e6699540d9f3c21ac3868a0"
+    },
+    {
+      "path": "output/cyaudio-single-worker/2026-11-15/ipc-initial2.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "output/cyaudio-single-worker/2026-11-15/ipc-vst3-close.log",
+      "sha256": "89522d3839038ab97c4f120962d8f40fe97555acb646af35229a37ac7bf1c759"
+    },
+    {
+      "path": "output/cyaudio-single-worker/2026-11-15/ipc-vst3-final.log",
+      "sha256": "90ce710ea00893f0c005f313bd00cdb89e954b05819cca0882ad2fc8a2a695f0"
+    },
+    {
+      "path": "output/cyaudio-single-worker/2026-11-15/ipc-vst3-live-count.log",
+      "sha256": "90ce710ea00893f0c005f313bd00cdb89e954b05819cca0882ad2fc8a2a695f0"
+    }
+  ]
+}

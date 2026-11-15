@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cydaw/base/EventLoop.h>
+#include <cydaw/base/DispatchPause.h>
 #include <mutex>
 namespace cydaw::base {
 namespace {
@@ -32,6 +33,13 @@ void EventLoop::postAfter(int ms, std::function<void()> callback) {
                      ++q.order, std::move(callback)});
 }
 void EventLoop::dispatchPending() {
+  static thread_local bool dispatching{};
+  if (eventDispatchPaused() || dispatching) return;
+  struct Guard {
+    bool& flag;
+    explicit Guard(bool& value) : flag(value) { flag = true; }
+    ~Guard() { flag = false; }
+  } guard(dispatching);
   std::vector<Task> ready;
   auto &q = queue();
   const auto now = Clock::now();

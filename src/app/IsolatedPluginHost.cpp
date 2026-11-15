@@ -4,13 +4,19 @@
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
 #include "IsolatedPluginHost.h"
+#include <cydaw/base/DispatchPause.h>
+#include "NativeHostedPlugin.h"
+#include <filesystem>
 
 #include <algorithm>
 #include <cstring>
 #include <thread>
 
 #if defined(_WIN32)
-extern "C" __declspec(dllimport) unsigned long __stdcall GetCurrentProcessId();
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <tlhelp32.h>
 #else
 #include <unistd.h>
 #endif
@@ -37,6 +43,8 @@ void IsolatedPluginHost::setSessionMetre(const int numerator, const int denomina
     sessionNumerator.store(std::max(1, numerator), std::memory_order_relaxed);
     sessionDenominator.store(std::max(1, denominator), std::memory_order_relaxed);
 }
+
+IsolatedPluginHost::IsolatedPluginHost() = default;
 
 IsolatedPluginHost::~IsolatedPluginHost()
 {
@@ -94,6 +102,12 @@ cydaw::base::Result IsolatedPluginHost::startWorker(PluginWorkerLaunch launch,
         || channelCount > static_cast<int>(cydaw::plugins::maximumSharedAudioChannels))
         return cydaw::base::Result::fail("The current audio block or channel configuration exceeds the worker limit");
 
+    if (!passthrough && launch.runtime == PluginWorkerRuntime::native)
+        return startNative(cydaw::base::File(launch.command[0]), pluginFile,
+                           sampleRate, maximumBlockSize, channelCount);
+
+    // The file-backed bridge remains for the passthrough fixture and Linux
+    // Wine/UMU guest path. Native plugins use only the SDK worker above.
     sharedFile_ = cydaw::base::File::getSpecialLocation(cydaw::base::File::tempDirectory)
                       .getNonexistentChildFile("cydaw-plugin-instance", ".ipc", true);
     {
@@ -194,12 +208,135 @@ cydaw::base::Result IsolatedPluginHost::startWorker(PluginWorkerLaunch launch,
     return cydaw::base::Result::ok();
 }
 
+cydaw::base::Result IsolatedPluginHost::startNative(const cydaw::base::File& worker,
+    const cydaw::base::File& requested, double rate, int frames, int channels)
+{
+    using namespace cydaw::base;
+    auto file = requested;
+    Text id;
+    if (file.hasFileExtension("cyplugin")) {
+        const auto descriptor = JSON::parse(file);
+        const auto path = descriptor.getProperty("file", {}).toString();
+        if (!File::isAbsolutePath(path)) return Result::fail("Invalid plugin descriptor");
+        file = File(path);
+        id = descriptor.getProperty("id", {}).toString();
+        if (file.hasFileExtension("cyplugin")) return Result::fail("Nested descriptors are unsupported");
+    }
+    cyaudio::PluginFormat format;
+    Text name;
+    if (file.hasFileExtension("vst3")) { format = cyaudio::PluginFormat::vst3; name = "VST3"; }
+    else if (file.hasFileExtension("clap")) { format = cyaudio::PluginFormat::clap; name = "CLAP"; }
+    else if (file.hasFileExtension("lv2")) { format = cyaudio::PluginFormat::lv2; name = "LV2"; }
+    else if (file.hasFileExtension("jsfx") || file.getFileExtension().isEmpty()) {
+        format = cyaudio::PluginFormat::jsfx; name = "JSFX";
+        if (id.isEmpty()) id = "jsfx";
+    } else if (file.hasFileExtension("dll;so;vst"))
+        return Result::fail("VST2 hosting is unavailable. Supported formats: VST3, CLAP, LV2, JSFX.");
+    else return Result::fail("Unsupported plugin format");
+#if defined(_WIN32)
+    FILETIME loadStarted{};
+    GetSystemTimeAsFileTime(&loadStarted);
+#endif
+    Text stage = "load";
+    try {
+        auto instance = std::make_unique<cydaw::plugins::NativeHostedPlugin>();
+        instance->setWorkerExecutable(worker);
+        Text error;
+        if (!instance->load(file, id, format, name, error)) return Result::fail(error);
+        stage = "prepare";
+        instance->prepareToPlay(rate, frames);
+        sampleRate_ = rate;
+        blockSize_ = frames;
+        startedChannels_ = channels;
+        nativeLatency_ = frames + instance->getLatencySamples();
+        pluginFile_ = requested;
+        pluginName_ = instance->getName();
+        if (requested.hasFileExtension("cyplugin"))
+            pluginName_ = JSON::parse(requested).getProperty("name", pluginName_).toString();
+        stage = "initial state";
+        instance->getStateInformation(cachedState_);
+        native_ = std::move(instance);
+        native_->setControlHandoff(this, [](void* context, bool entering) noexcept {
+            auto& host = *static_cast<IsolatedPluginHost*>(context);
+            if (entering) {
+                host.nativeActive_.store(nullptr);
+                while (host.callbacksInFlight_.load() != 0) std::this_thread::yield();
+                host.native_->resetRealtimePipeline();
+            } else if (host.nativePresent_.load()) {
+                host.nativeActive_.store(host.native_.get());
+            }
+        });
+#if defined(_WIN32)
+        // Hold the owned SDK child, solely for explicit crash-injection tests.
+        // Existing instances already own handles to their own children; select
+        // the newest matching direct child created by this serial load.
+        auto snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        FILETIME newest = loadStarted;
+        if (snapshot != INVALID_HANDLE_VALUE) {
+            PROCESSENTRY32W entry{}; entry.dwSize = sizeof(entry);
+            for (BOOL more = Process32FirstW(snapshot, &entry); more;
+                 more = Process32NextW(snapshot, &entry)) {
+                if (entry.th32ParentProcessID != GetCurrentProcessId()) continue;
+                auto handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE | PROCESS_TERMINATE,
+                                          FALSE, entry.th32ProcessID);
+                if (!handle) continue;
+                wchar_t path[32768]; DWORD length = 32768;
+                FILETIME creation{}, exit{}, kernel{}, user{};
+                if (QueryFullProcessImageNameW(handle, 0, path, &length) &&
+                    File(Text(path)) == worker && GetProcessTimes(handle, &creation, &exit, &kernel, &user) &&
+                    CompareFileTime(&creation, &newest) > 0) {
+                    if (nativeWorkerHandle_) CloseHandle(nativeWorkerHandle_);
+                    nativeWorkerHandle_ = handle;
+                    newest = creation;
+                } else CloseHandle(handle);
+            }
+            CloseHandle(snapshot);
+        }
+#endif
+        missedBlocks_ = 0;
+        heartbeatSince_ = cydaw::base::Time::getMillisecondCounterHiRes() * .001;
+        stateStaleSince_ = 0;
+        nativePresent_.store(true);
+        nativeActive_.store(native_.get());
+        lastStatus_ = "Running in one CyAudioCore isolated worker";
+        return Result::ok();
+    } catch (const std::exception& e) {
+        stop();
+        lastStatus_ = stage + ": " + e.what();
+        return Result::fail(lastStatus_);
+    }
+}
+
+cydaw::base::Result IsolatedPluginHost::nativeControl(const std::function<void()>& operation)
+{
+    // Lifecycle and metadata mutations require an idle audio owner. Only the
+    // main thread may wait; the callback sees silence throughout this handoff.
+    cydaw::base::ScopedEventDispatchPause pause;
+    cydaw::plugins::NativeHostedPlugin::ControlScope control(*native_);
+    auto result = cydaw::base::Result::ok();
+    try { operation(); }
+    catch (const std::exception& e) { result = cydaw::base::Result::fail(e.what()); }
+    nativeLatency_.store(blockSize_ + native_->getLatencySamples());
+    return result;
+}
+
 void IsolatedPluginHost::stop()
 {
+    cydaw::base::ScopedEventDispatchPause pause;
+    nativePresent_.store(false);
+    nativeActive_.store(nullptr);
     active_.store(nullptr);
     while (callbacksInFlight_.load() != 0)
         std::this_thread::yield();
 
+    nativeEditor_.reset();
+    native_.reset();
+    nativeLatency_.store(0);
+#if defined(_WIN32)
+    if (nativeWorkerHandle_)
+        CloseHandle(nativeWorkerHandle_);
+#endif
+    nativeWorkerHandle_ = nullptr;
     if (mapping_ != nullptr) {
         if (auto* shared = static_cast<cydaw::plugins::SharedPluginAudio*>(mapping_->getData())) {
             cydaw::plugins::sharedAtomic(shared->shutdownRequested).store(1, std::memory_order_release);
@@ -233,6 +370,47 @@ void IsolatedPluginHost::stop()
 
 void IsolatedPluginHost::pollWorkerHealth()
 {
+    if (native_) {
+        // The SDK worker pumps its own foreign UI. Parent notices/health need
+        // not perform a synchronous RPC at the application's frame rate.
+        const auto now = cydaw::base::Time::getMillisecondCounterHiRes() * .001;
+        if (now < heartbeatSince_) return;
+        heartbeatSince_ = now + (nativeEditor_ && nativeEditor_->isVisible() ? .02 : .1);
+        std::uint32_t flags{};
+        auto status = native_->pollRequests(flags);
+        if (status == cyaudio::Status::ok)
+            status = native_->realtimeFailure();
+        if (status == cyaudio::Status::ok) {
+            const auto operation = [&] { native_->applyRequests(flags); };
+            if (flags & (cyaudio::pluginRestart | cyaudio::pluginParametersChanged |
+                         cyaudio::pluginPortsChanged))
+                (void)nativeControl(operation);
+            else
+                operation();
+            nativeLatency_.store(blockSize_ + native_->getLatencySamples());
+            if (flags & cyaudio::pluginStateDirty)
+                stateStaleSince_ = cydaw::base::Time::getMillisecondCounterHiRes() * .001;
+            if (stateStaleSince_ > 0 &&
+                cydaw::base::Time::getMillisecondCounterHiRes() * .001 - stateStaleSince_ > .4) {
+                stateStaleSince_ = 0;
+                cydaw::base::MemoryBlock fresh;
+                (void)getState(fresh);
+            }
+        } else {
+            const auto file = pluginFile_;
+            const auto name = pluginName_;
+            const auto state = cachedState_;
+            const auto misses = missedBlockCount();
+            stop();
+            pluginFile_ = file;
+            pluginName_ = name;
+            cachedState_ = state;
+            missedBlocks_ = misses;
+            lastStatus_ = "CyAudioCore worker unavailable - safety bypass active (status " +
+                          cydaw::base::Text(int(status)) + ")";
+        }
+        return;
+    }
     auto* shared = active_.load(std::memory_order_acquire);
     if (shared == nullptr)
         return;
@@ -287,6 +465,12 @@ void IsolatedPluginHost::pollWorkerHealth()
 
 void IsolatedPluginHost::terminateWorkerForTest()
 {
+#if defined(_WIN32)
+    if (nativeWorkerHandle_) {
+        TerminateProcess(nativeWorkerHandle_, 99);
+        return;
+    }
+#endif
     if (process_.isRunning())
         process_.kill();
 }
@@ -324,6 +508,12 @@ cydaw::base::Result IsolatedPluginHost::sendCommand(const cydaw::plugins::Shared
 
 cydaw::base::Result IsolatedPluginHost::getState(cydaw::base::MemoryBlock& destination)
 {
+    if (native_) {
+        const auto result = nativeControl([&] { native_->getStateInformation(destination); });
+        if (result.wasOk()) cachedState_ = destination;
+        else if (!cachedState_.isEmpty()) { destination = cachedState_; return cydaw::base::Result::ok(); }
+        return result;
+    }
     const auto result = sendCommand(cydaw::plugins::SharedPluginCommand::getState);
     auto* shared = active_.load(std::memory_order_acquire);
     if (result.wasOk() && shared != nullptr
@@ -356,6 +546,15 @@ bool IsolatedPluginHost::controlBusy(cydaw::plugins::SharedPluginAudio& shared) 
 
 cydaw::base::Result IsolatedPluginHost::setState(const cydaw::base::MemoryBlock& state)
 {
+    if (native_) {
+        if (state.isEmpty() || state.getSize() > 16 * 1024 * 1024)
+            return cydaw::base::Result::fail("Invalid plugin state (maximum 16 MiB)");
+        const auto result = nativeControl([&] {
+            native_->setStateInformation(state.getData(), int(state.getSize()));
+        });
+        if (result.wasOk()) cachedState_ = state;
+        return result;
+    }
     auto* shared = active_.load(std::memory_order_acquire);
     if (shared == nullptr)
         return cydaw::base::Result::fail("Plugin worker is not running");
@@ -375,6 +574,14 @@ cydaw::base::Result IsolatedPluginHost::setState(const cydaw::base::MemoryBlock&
 cydaw::base::Result IsolatedPluginHost::refreshParameters(std::vector<ParameterSnapshot>& destination)
 {
     destination.clear();
+    if (native_) {
+        std::uint32_t index = 0;
+        for (auto* p : native_->getParameters()) {
+            destination.push_back({ index++, p->getName(128), p->getLabel(), p->getValue(),
+                p->isAutomatable(), p->isDiscrete(), p->isBoolean(), p->getCurrentValueAsText() });
+        }
+        return cydaw::base::Result::ok();
+    }
     const auto result = sendCommand(cydaw::plugins::SharedPluginCommand::refreshParameters);
     auto* shared = active_.load(std::memory_order_acquire);
     if (result.failed() || shared == nullptr)
@@ -400,6 +607,12 @@ cydaw::base::Result IsolatedPluginHost::getPrograms(cydaw::base::TextList& names
 {
     names.clear();
     current = -1;
+    if (native_) {
+        for (int i = 0; i < native_->getNumPrograms(); ++i)
+            names.add(native_->getProgramName(i));
+        current = native_->getCurrentProgram();
+        return cydaw::base::Result::ok();
+    }
     const auto result = sendCommand(cydaw::plugins::SharedPluginCommand::getPrograms);
     auto* shared = active_.load(std::memory_order_acquire);
     if (result.failed() || shared == nullptr)
@@ -419,6 +632,13 @@ cydaw::base::Result IsolatedPluginHost::getPrograms(cydaw::base::TextList& names
 
 cydaw::base::Result IsolatedPluginHost::setProgram(const int index)
 {
+    if (native_) {
+        if (index < 0 || index >= native_->getNumPrograms())
+            return cydaw::base::Result::fail("Unknown plugin program");
+        const auto result = nativeControl([&] { native_->setCurrentProgram(index); });
+        if (result.wasOk()) { cydaw::base::MemoryBlock state; (void)getState(state); }
+        return result;
+    }
     auto* shared = active_.load(std::memory_order_acquire);
     if (shared == nullptr)
         return cydaw::base::Result::fail("Plugin worker is not running");
@@ -438,6 +658,14 @@ cydaw::base::Result IsolatedPluginHost::setProgram(const int index)
 cydaw::base::Result IsolatedPluginHost::setParameter(const std::uint32_t index,
                                                const float normalisedValue)
 {
+    if (native_) {
+        const auto& parameters = native_->getParameters();
+        if (!std::isfinite(normalisedValue) || index >= unsigned(parameters.size()))
+            return cydaw::base::Result::fail("Invalid plugin parameter");
+        parameters[int(index)]->setValue(normalisedValue);
+        stateStaleSince_ = cydaw::base::Time::getMillisecondCounterHiRes() * .001;
+        return cydaw::base::Result::ok();
+    }
     auto* shared = active_.load(std::memory_order_acquire);
     if (shared == nullptr)
         return cydaw::base::Result::fail("Plugin worker is not running");
@@ -471,11 +699,22 @@ void IsolatedPluginHost::publishRealtimeParameters(const RealtimeParameterValue*
 
 cydaw::base::Result IsolatedPluginHost::showEditor()
 {
+    if (native_) {
+        return nativeControl([&] {
+            if (!nativeEditor_) nativeEditor_ = native_->createEditor();
+            if (!nativeEditor_) throw std::runtime_error("Plugin has no editor");
+            nativeEditor_->setVisible(true);
+            nativeEditor_->toFront(true);
+        });
+    }
     return sendCommand(cydaw::plugins::SharedPluginCommand::showEditor, 5'000);
 }
 
 cydaw::base::Result IsolatedPluginHost::hideEditor()
 {
+    if (native_) {
+        return nativeControl([&] { if (nativeEditor_) nativeEditor_->setVisible(false); });
+    }
     return sendCommand(cydaw::plugins::SharedPluginCommand::hideEditor);
 }
 
@@ -484,6 +723,33 @@ bool IsolatedPluginHost::processBlock(cydaw::audio::SampleBuffer<float>& buffer,
                                       const int numSamples, double timelineSeconds, double tempo, bool playing) noexcept
 {
     callbacksInFlight_.fetch_add(1);
+    if (auto* native = nativeActive_.load()) {
+        const auto& parameters = native->getParameters();
+        for (std::size_t i = 0; i < pendingRealtimeParameterCount_; ++i)
+            if (pendingRealtimeParameters_[i].index < unsigned(parameters.size()))
+                parameters[int(pendingRealtimeParameters_[i].index)]->setValue(pendingRealtimeParameters_[i].value);
+        pendingRealtimeParameterCount_ = 0;
+        cyaudio::PluginTransport time;
+        time.seconds = std::isfinite(timelineSeconds) ? timelineSeconds : 0.;
+        time.songFrame = std::int64_t(time.seconds * sampleRate_);
+        time.tempo = std::isfinite(tempo) && tempo > 0 ? tempo : 120.;
+        time.beats = time.seconds * time.tempo / 60.;
+        time.playing = playing;
+        time.numerator = std::uint16_t(sessionNumerator.load());
+        time.denominator = std::uint16_t(sessionDenominator.load());
+        time.hasSeconds = time.hasSongFrame = time.hasBeats = time.hasTempo = time.hasSignature = true;
+        const auto processed = native->processRealtime(buffer, startSample, numSamples, time);
+        missedBlocks_.store(native->missedBlocks(), std::memory_order_relaxed);
+        callbacksInFlight_.fetch_sub(1);
+        return processed;
+    }
+    if (nativePresent_.load()) {
+        // Main-thread lifecycle handoff: never leak dry audio into an active
+        // effect chain while its SDK instance is temporarily unavailable.
+        buffer.clear(startSample, numSamples);
+        callbacksInFlight_.fetch_sub(1);
+        return false;
+    }
     auto* shared = active_.load();
     if (shared == nullptr || numSamples <= 0
         || numSamples > static_cast<int>(cydaw::plugins::maximumSharedAudioFrames)) {
@@ -566,7 +832,7 @@ bool IsolatedPluginHost::processBlock(cydaw::audio::SampleBuffer<float>& buffer,
 
 bool IsolatedPluginHost::isRunning() const noexcept
 {
-    return active_.load(std::memory_order_acquire) != nullptr;
+    return nativePresent_.load(std::memory_order_acquire) || active_.load(std::memory_order_acquire) != nullptr;
 }
 
 cydaw::base::File IsolatedPluginHost::pluginFile() const { return pluginFile_; }
@@ -580,6 +846,7 @@ std::uint64_t IsolatedPluginHost::missedBlockCount() const noexcept
 
 int IsolatedPluginHost::latencySamples() const noexcept
 {
+    if (nativePresent_.load()) return nativeLatency_.load();
     if (auto* shared = active_.load(std::memory_order_acquire)) {
         const auto pluginLatency = cydaw::plugins::sharedAtomic(shared->latencySamples)
                                        .load(std::memory_order_acquire);

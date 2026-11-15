@@ -1,6 +1,7 @@
 #include "NativeHostedPlugin.h"
 #include <chrono>
 #include <cstring>
+#include <cydaw/base/DispatchPause.h>
 #include <cydaw/base/LegacyPluginState.h>
 #include <filesystem>
 #include <stdexcept>
@@ -11,10 +12,12 @@ namespace {
 std::filesystem::path pathFor(const base::File &file) {
   return std::filesystem::u8path(file.getFullPathName().toStdString());
 }
-PluginIsolationOptions isolationOptions() {
+PluginIsolationOptions isolationOptions(const base::File &worker = {}) {
   PluginIsolationOptions options;
   options.workerExecutable = pathFor(
-      base::File::getSpecialLocation(base::File::currentExecutableFile));
+      worker == base::File{}
+          ? base::File::getSpecialLocation(base::File::currentExecutableFile)
+          : worker);
   options.scheduling = PluginScheduling::sameCycle;
   options.maximumChannelsPerDirection = 64;
   options.maximumPayloadBytes = 256 * 1024;
@@ -25,10 +28,17 @@ base::Text failure(Status status) {
 }
 } // namespace
 base::Text NativeParameter::getCurrentValueAsText() const {
+  base::ScopedEventDispatchPause pause;
+  const auto current = value.load();
+  if (current == textValue_)
+    return text_;
   std::string text;
-  return owner->plugin_.parameterText(info.id, value.load(), text) == Status::ok
-             ? base::Text(text)
-             : base::Text(value.load(), 3);
+  if (owner->plugin_.parameterText(info.id, current, text) == Status::ok) {
+    textValue_ = current;
+    text_ = base::Text(text);
+    return text_;
+  }
+  return base::Text(current, 3);
 }
 NativeHostedPlugin::NativeHostedPlugin() {
   if (events_.prepare(4096, 256 * 1024) != Status::ok ||
@@ -36,10 +46,29 @@ NativeHostedPlugin::NativeHostedPlugin() {
     throw std::bad_alloc();
 }
 NativeHostedPlugin::~NativeHostedPlugin() { releaseResources(); }
+void NativeHostedPlugin::beginControl() {
+  if (controlDepth_++ == 0 && handoff_)
+    handoff_(handoffContext_, true);
+}
+void NativeHostedPlugin::endControl() {
+  if (--controlDepth_ == 0 && handoff_)
+    handoff_(handoffContext_, false);
+}
+void NativeHostedPlugin::resetRealtimePipeline() noexcept {
+  if (audioPending_) {
+    (void)plugin_.discard(audioTicket_);
+    audioPending_ = false;
+  }
+  streamFill_ = 0;
+  streamReady_ = false;
+}
+
 bool NativeHostedPlugin::load(const base::File &file, const base::Text &id,
                               PluginFormat format, const base::Text &formatName,
                               base::Text &error) {
-  auto status = createPluginProvider(format, provider_, isolationOptions());
+  base::ScopedEventDispatchPause pause;
+  auto status = createPluginProvider(format, provider_,
+                                     isolationOptions(workerExecutable_));
   PluginHostCallbacks host;
   host.context = this;
   host.resizeEditor = [](void *context, PluginEditorSize size) noexcept {
@@ -47,6 +76,12 @@ bool NativeHostedPlugin::load(const base::File &file, const base::Text &id,
     if (!p.editor_ || !size.width || !size.height || size.width > 16384 ||
         size.height > 16384)
       return false;
+    // Core completes its resize RPC after the host callback returns. Keep the
+    // callback owner parked until the outer main-thread pump has finished too.
+    if (p.polling_ && !p.deferredEditorControl_) {
+      p.beginControl();
+      p.deferredEditorControl_ = true;
+    }
     p.editor_->resize(size.width, size.height);
     return true;
   };
@@ -60,8 +95,17 @@ bool NativeHostedPlugin::load(const base::File &file, const base::Text &id,
           break;
         }
   };
+  auto selectedId = id.toStdString();
+  if (status == Status::ok && selectedId.empty()) {
+    std::vector<PluginDescriptor> descriptors;
+    status = provider_->scan(pathFor(file), descriptors);
+    if (status == Status::ok && descriptors.empty())
+      status = Status::unsupported_format;
+    if (status == Status::ok)
+      selectedId = descriptors.front().id;
+  }
   if (status == Status::ok)
-    status = provider_->create(pathFor(file), id.toStdString(), host, plugin_);
+    status = provider_->create(pathFor(file), selectedId, host, plugin_);
   if (status != Status::ok) {
     error = format == PluginFormat::jsfx ? nativeScriptDiagnostics(file)
                                          : base::Text{};
@@ -95,9 +139,9 @@ void NativeHostedPlugin::refreshDescription() {
     description.numInputChannels += int(p.channels);
   for (const auto &p : d.outputs)
     description.numOutputChannels += int(p.channels);
-  if (description.numInputChannels > 64 ||
-      description.numOutputChannels > 64) {
-    throw std::runtime_error("Plugin exceeds the SDK isolation limit of 64 channels per direction");
+  if (description.numInputChannels > 64 || description.numOutputChannels > 64) {
+    throw std::runtime_error(
+        "Plugin exceeds the SDK isolation limit of 64 channels per direction");
   }
   description.isInstrument =
       description.numInputChannels == 0 && !d.noteInputs.empty();
@@ -110,6 +154,7 @@ void NativeHostedPlugin::refreshDescription() {
     double value;
     if (plugin_.parameterValue(info.id, value) == Status::ok)
       p->value = value;
+    p->sent = p->value.load();
     if (preset_ < 0 && info.stepped &&
         base::Text(info.name).equalsIgnoreCase("Preset") &&
         info.maximum - info.minimum < 2048)
@@ -131,9 +176,11 @@ void NativeHostedPlugin::syncValues() {
     if (plugin_.parameterValue(p->info.id, value) == Status::ok)
       p->value = value;
     p->sent = std::numeric_limits<double>::quiet_NaN();
+    p->textValue_ = std::numeric_limits<double>::quiet_NaN();
   }
 }
 void NativeHostedPlugin::prepareToPlay(double rate, int frames) {
+  base::ScopedEventDispatchPause pause;
   releaseResources();
   if (frames <= 0 || !std::isfinite(rate) || rate <= 0)
     throw std::invalid_argument("Invalid plugin audio configuration");
@@ -161,11 +208,21 @@ void NativeHostedPlugin::prepareToPlay(double rate, int frames) {
     throw std::runtime_error(failure(status).toStdString());
   }
   prepared_ = true;
+  streamFill_ = 0;
+  streamReady_ = false;
+  streamFailure_ = int(Status::ok);
+  for (std::size_t i = 0; i < inputs_.size(); ++i)
+    inputs_[i] = inputStorage_[i].block(unsigned(frames));
+  for (std::size_t i = 0; i < outputs_.size(); ++i) {
+    outputs_[i] = outputStorage_[i].block(unsigned(frames));
+    for (std::size_t ch = 0; ch < outputs_[i].channels(); ++ch)
+      std::fill(outputs_[i].channel(ch).begin(), outputs_[i].channel(ch).end(),
+                0.f);
+  }
   latency_ = int(plugin_.timing().latencyFrames);
-  for (auto *p : parameters_)
-    p->sent = std::numeric_limits<double>::quiet_NaN();
 }
 void NativeHostedPlugin::releaseResources() {
+  base::ScopedEventDispatchPause pause;
   if (audioPending_) {
     (void)plugin_.discard(audioTicket_);
     audioPending_ = false;
@@ -295,20 +352,161 @@ void NativeHostedPlugin::processBlock(audio::SampleBuffer<float> &buffer,
     std::this_thread::sleep_for(std::chrono::microseconds(100));
   }
 }
+bool NativeHostedPlugin::processRealtime(audio::SampleBuffer<float> &buffer,
+                                         int start, int count,
+                                         const PluginTransport &time) noexcept {
+  if (start < 0 || count <= 0 || start > buffer.getNumSamples() - count)
+    return false;
+  if (!prepared_) {
+    buffer.clear(start, count);
+    streamFailure_ = int(Status::not_prepared);
+    return false;
+  }
+  const auto quantum = options_.maximumFrames;
+  bool allReady = true;
+  int consumed = 0;
+  while (consumed < count) {
+    if (streamFill_ == 0) {
+      streamReady_ = false;
+      if (audioPending_) {
+        PluginProcess<float> process{inputs_,  outputs_, quantum,
+                                     &events_, &result_, &streamTransport_};
+        const auto status = plugin_.collect(process, audioTicket_);
+        if (status == Status::would_block) {
+          // A late reply must never be played at a later timeline position.
+          (void)plugin_.discard(audioTicket_);
+          streamMissed_.fetch_add(1, std::memory_order_relaxed);
+        } else if (status != Status::ok) {
+          streamFailure_.store(int(status), std::memory_order_relaxed);
+        } else {
+          streamReady_ = true;
+          for (std::size_t i = 0; i < result_.size(); ++i)
+            if (const auto *e = result_.event(i);
+                e && e->kind == PluginEventKind::parameterValue)
+              for (auto *p : parameters_)
+                if (p->info.id == e->id) {
+                  // Do not overwrite a more recent host automation value with
+                  // a response belonging to the preceding quantum.
+                  double expected = p->sent.load();
+                  if (p->value.compare_exchange_strong(expected, e->value))
+                    p->sent = e->value;
+                  break;
+                }
+        }
+        audioPending_ = false;
+      }
+      events_.reset();
+      streamTransport_ = time;
+      streamTransport_.seconds += consumed / options_.sampleRate;
+      streamTransport_.songFrame += consumed;
+      streamTransport_.beats +=
+          consumed / options_.sampleRate * time.tempo / 60.;
+    }
+    const unsigned frames =
+        std::min(quantum - streamFill_, unsigned(count - consumed));
+    for (auto *p : parameters_) {
+      const double value = p->value.load(std::memory_order_relaxed);
+      if (!p->info.readOnly &&
+          value != p->sent.load(std::memory_order_relaxed)) {
+        PluginEvent event;
+        event.id = p->info.id;
+        event.value = value;
+        event.frame = streamFill_;
+        if (events_.add(event) == Status::ok)
+          p->sent = value;
+      }
+    }
+    unsigned channel = 0;
+    for (auto &storage : inputStorage_) {
+      auto bus = storage.block(quantum);
+      for (std::size_t ch = 0; ch < bus.channels(); ++ch, ++channel) {
+        auto *destination = bus.channel(ch).data() + streamFill_;
+        if (channel < unsigned(buffer.getNumChannels()))
+          std::copy_n(buffer.getReadPointer(int(channel), start + consumed),
+                      frames, destination);
+        else
+          std::fill_n(destination, frames, 0.f);
+      }
+    }
+    // Input has been copied before in-place replacement by delayed output.
+    channel = 0;
+    for (const auto &bus : outputs_)
+      for (std::size_t ch = 0; ch < bus.channels(); ++ch, ++channel)
+        if (channel < unsigned(buffer.getNumChannels())) {
+          auto *destination =
+              buffer.getWritePointer(int(channel), start + consumed);
+          if (streamReady_)
+            std::copy_n(bus.channel(ch).data() + streamFill_, frames,
+                        destination);
+          else
+            std::fill_n(destination, frames, 0.f);
+        }
+    for (; channel < unsigned(buffer.getNumChannels()); ++channel)
+      std::fill_n(buffer.getWritePointer(int(channel), start + consumed),
+                  frames, 0.f);
+    allReady = allReady && streamReady_;
+    streamFill_ += frames;
+    consumed += int(frames);
+    if (streamFill_ == quantum) {
+      PluginProcess<float> process{inputs_,  outputs_, quantum,
+                                   &events_, &result_, &streamTransport_};
+      const auto status = plugin_.submit(process, audioTicket_);
+      audioPending_ = status == Status::ok;
+      if (!audioPending_) {
+        streamMissed_.fetch_add(1, std::memory_order_relaxed);
+        if (status != Status::would_block)
+          streamFailure_.store(int(status), std::memory_order_relaxed);
+        for (auto *p : parameters_)
+          p->sent = std::numeric_limits<double>::quiet_NaN();
+      }
+      streamFill_ = 0;
+    }
+  }
+  return allReady;
+}
 void NativeHostedPlugin::getStateInformation(base::MemoryBlock &block) {
+  base::ScopedEventDispatchPause pause;
   const bool resume = prepared_;
+  const auto options = options_;
+  const auto drainEdits = [&] {
+    if (audioPending_) {
+      (void)plugin_.discard(audioTicket_);
+      audioPending_ = false;
+    }
+    // VST3 flush queues processor changes for its next block. Drain on this
+    // quiesced control owner, never wait in the device callback.
+    audio::SampleBuffer<float> silence(
+        std::max({2, getTotalNumInputChannels(), getTotalNumOutputChannels()}),
+        int(options.maximumFrames));
+    silence.clear();
+    midi::EventBuffer midi;
+    processBlock(silence, midi);
+  };
+  if (resume &&
+      std::any_of(parameters_.begin(), parameters_.end(), [](auto *p) {
+        return !p->info.readOnly && p->value.load() != p->sent.load();
+      }))
+    drainEdits();
   releaseResources();
   std::vector<std::uint8_t> state;
-  const auto status = plugin_.saveState(state);
+  auto status = plugin_.saveState(state);
+  if (resume && status == Status::would_block) {
+    // An editor may have queued a change directly inside the isolated plugin.
+    prepareToPlay(options.sampleRate, int(options.maximumFrames));
+    drainEdits();
+    releaseResources();
+    status = plugin_.saveState(state);
+  }
   block.reset();
   if (status == Status::ok)
     block.append(state.data(), state.size());
   if (resume)
-    prepareToPlay(options_.sampleRate, int(options_.maximumFrames));
+    prepareToPlay(options.sampleRate, int(options.maximumFrames));
   if (status != Status::ok)
     throw std::runtime_error(failure(status).toStdString());
 }
 void NativeHostedPlugin::setStateInformation(const void *data, int size) {
+  base::ScopedEventDispatchPause pause;
   if (!data || size <= 0 || size > 64 * 1024 * 1024)
     return;
   const bool resume = prepared_;
@@ -388,8 +586,22 @@ void NativeHostedPlugin::pump() {
   // Core reports requests; the host must perform the
   // deactivate/refresh/restart.
   std::uint32_t flags{};
-  if (plugin_.pumpMainThread(flags) != Status::ok)
+  if (pollRequests(flags) != Status::ok)
     return;
+  applyRequests(flags);
+}
+Status NativeHostedPlugin::pollRequests(std::uint32_t &flags) noexcept {
+  base::ScopedEventDispatchPause pause;
+  polling_ = true;
+  const auto status = plugin_.pumpMainThread(flags);
+  polling_ = false;
+  if (deferredEditorControl_) {
+    deferredEditorControl_ = false;
+    endControl();
+  }
+  return status;
+}
+void NativeHostedPlugin::applyRequests(std::uint32_t flags) {
   if (flags & (pluginRestart | pluginParametersChanged | pluginPortsChanged)) {
     const bool resume = prepared_;
     const auto options = options_;
@@ -432,6 +644,7 @@ int NativeHostedPlugin::getCurrentProgram() const {
                     0, getNumPrograms() - 1);
 }
 base::Text NativeHostedPlugin::getProgramName(int i) const {
+  base::ScopedEventDispatchPause pause;
   if (!programs_.empty())
     return i >= 0 && i < int(programs_.size()) ? programs_[i].name
                                                : base::Text{};
@@ -447,6 +660,7 @@ base::Text NativeHostedPlugin::getProgramName(int i) const {
              : base::Text(i + 1);
 }
 void NativeHostedPlugin::setCurrentProgram(int i) {
+  base::ScopedEventDispatchPause pause;
   if (!programs_.empty()) {
     if (i >= 0 && i < int(programs_.size())) {
       const auto &state = programs_[i].state;

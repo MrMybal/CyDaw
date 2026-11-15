@@ -1,4 +1,5 @@
 #include <cydaw/base/EventLoop.h>
+#include <cydaw/base/DispatchPause.h>
 #include <cydaw/base/FileDialog.h>
 #include <cydaw/base/Thread.h>
 #include <iostream>
@@ -43,6 +44,28 @@ int main() {
             "callbacks enqueued during dispatch wait until next turn");
     EventLoop::dispatchPending();
     require(count == 2, "next dispatch performs queued callbacks");
+    bool deferred = false;
+    EventLoop::post([&] { deferred = true; });
+    {
+      ScopedEventDispatchPause pause;
+      { ScopedEventDispatchPause nested; EventLoop::dispatchPending(); }
+      EventLoop::dispatchPending();
+      require(!deferred && eventDispatchPaused(),
+              "nested foreign-message pumps defer application callbacks");
+    }
+    EventLoop::dispatchPending();
+    require(deferred && !eventDispatchPaused(), "deferred work resumes after foreign control returns");
+    bool outerRunning = false, reentered = false, innerRan = false;
+    EventLoop::post([&] {
+      outerRunning = true;
+      EventLoop::post([&] { reentered = outerRunning; innerRan = true; });
+      EventLoop::dispatchPending();
+      outerRunning = false;
+    });
+    EventLoop::dispatchPending();
+    require(!innerRan, "a timer cannot recursively drain application tasks");
+    EventLoop::dispatchPending();
+    require(innerRan && !reentered, "queued callback runs after its owner returns");
     int timers = 0, updates = 0;
     {
       Probe probe(timers, updates);

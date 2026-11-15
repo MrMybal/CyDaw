@@ -1,4 +1,5 @@
 #include "NativeHostedPlugin.h"
+#include <cydaw/base/DispatchPause.h>
 #include <stdexcept>
 #if defined(_WIN32)
 #ifndef NOMINMAX
@@ -20,6 +21,7 @@ struct NativePluginEditor::Impl {
   HWND window{};
   std::vector<HWND> labels, sliders, values;
   static LRESULT CALLBACK proc(HWND window, UINT message, WPARAM w, LPARAM l) {
+  base::ScopedEventDispatchPause pause;
     auto *p =
         reinterpret_cast<Impl *>(GetWindowLongPtrW(window, GWLP_USERDATA));
     if (message == WM_NCCREATE) {
@@ -43,6 +45,7 @@ struct NativePluginEditor::Impl {
       p->width = LOWORD(l);
       p->height = HIWORD(l);
       if (p->native && !p->resizing) {
+        NativeHostedPlugin::ControlScope control(p->plugin);
         cyaudio::PluginEditorSize size{p->width, p->height};
         p->resizing = true;
         (void)p->plugin.plugin_.resizeEditor(size);
@@ -54,8 +57,10 @@ struct NativePluginEditor::Impl {
       return 0;
     }
     if (message == WM_SETFOCUS || message == WM_KILLFOCUS) {
-      if (p->native)
+      if (p->native) {
+        NativeHostedPlugin::ControlScope control(p->plugin);
         (void)p->plugin.plugin_.focusEditor(message == WM_SETFOCUS);
+      }
     }
     if (message == WM_HSCROLL) {
       auto child = reinterpret_cast<HWND>(l);
@@ -69,9 +74,10 @@ struct NativePluginEditor::Impl {
     }
     if (message == WM_MOUSEWHEEL) {
       const auto delta = GET_WHEEL_DELTA_WPARAM(w);
-      if (p->native)
+      if (p->native) {
+        NativeHostedPlugin::ControlScope control(p->plugin);
         (void)p->plugin.plugin_.wheelEditor(float(delta) / WHEEL_DELTA);
-      else {
+      } else {
         p->scroll = std::clamp(
             p->scroll - delta / 4, 0,
             std::max(0, int(p->sliders.size()) * 44 - int(p->height) + 16));
@@ -110,6 +116,7 @@ struct NativePluginEditor::Impl {
     }
     if ((message == WM_KEYDOWN || message == WM_KEYUP || message == WM_CHAR) &&
         p->native) {
+      NativeHostedPlugin::ControlScope control(p->plugin);
       cyaudio::PluginEditorKey key;
       key.down = message != WM_KEYUP;
       key.character = message == WM_CHAR ? std::uint16_t(w) : 0;
@@ -161,6 +168,7 @@ struct NativePluginEditor::Impl {
     return DefWindowProcW(window, message, w, l);
   }
   void updateValues() {
+    if (!visible) return;
     for (std::size_t i = 0; i < sliders.size(); ++i) {
       auto *c = plugin.parameters_[i];
       const auto text = c->getCurrentValueAsText() + " " + c->getLabel();
@@ -193,6 +201,8 @@ struct NativePluginEditor::Impl {
 };
 NativePluginEditor::NativePluginEditor(NativeHostedPlugin &plugin)
     : impl_(std::make_unique<Impl>(plugin, *this)) {
+  base::ScopedEventDispatchPause pause;
+  NativeHostedPlugin::ControlScope control(plugin);
 #if defined(_WIN32)
   auto &p = *impl_;
   WNDCLASSEXW c{sizeof(c)};
@@ -234,6 +244,8 @@ NativePluginEditor::NativePluginEditor(NativeHostedPlugin &plugin)
 #endif
 }
 NativePluginEditor::~NativePluginEditor() {
+  base::ScopedEventDispatchPause pause;
+  NativeHostedPlugin::ControlScope control(impl_->plugin);
   auto &p = *impl_;
 #if defined(_WIN32)
   if (p.native)
@@ -274,15 +286,20 @@ int NativePluginEditor::getWidth() const { return int(impl_->width); }
 int NativePluginEditor::getHeight() const { return int(impl_->height); }
 bool NativePluginEditor::isVisible() const { return impl_->visible; }
 void NativePluginEditor::setVisible(bool visible) {
+  base::ScopedEventDispatchPause pause;
+  NativeHostedPlugin::ControlScope control(impl_->plugin);
   auto &p = *impl_;
   p.visible = visible;
 #if defined(_WIN32)
+  if (!p.native && visible) p.updateValues();
   if (p.native)
     (void)p.plugin.plugin_.showEditor(visible);
   ShowWindow(p.window, visible ? SW_SHOWNOACTIVATE : SW_HIDE);
 #endif
 }
 void NativePluginEditor::toFront(bool focus) {
+  base::ScopedEventDispatchPause pause;
+  NativeHostedPlugin::ControlScope control(impl_->plugin);
 #if defined(_WIN32)
   auto &p = *impl_;
   SetWindowPos(p.window, HWND_TOP, 0, 0, 0, 0,
@@ -294,6 +311,8 @@ void NativePluginEditor::toFront(bool focus) {
 #endif
 }
 void NativePluginEditor::resize(unsigned width, unsigned height) {
+  base::ScopedEventDispatchPause pause;
+  NativeHostedPlugin::ControlScope control(impl_->plugin);
   auto &p = *impl_;
 #if defined(_WIN32)
   if (!width || !height || width > 16384 || height > 16384)

@@ -1,3 +1,4 @@
+#include <cydaw/base/DispatchPause.h>
 #include <cydaw/base/EventLoop.h>
 #include <cydaw/base/Thread.h>
 #include <cydaw/base/File.h>
@@ -542,7 +543,7 @@ void ImGuiHost::renderNow()
 void ImGuiHost::frame()
 {
     auto& n = *native_;
-    if (n.rendering)
+    if (n.rendering || cydaw::base::eventDispatchPaused())
         return;
     const cydaw::base::ScopedValueSetter<bool> guard(n.rendering, true);
     ImGui::SetCurrentContext(n.imgui);

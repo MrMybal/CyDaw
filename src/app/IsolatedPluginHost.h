@@ -15,6 +15,9 @@
 #include <array>
 #include <memory>
 #include <vector>
+#include <functional>
+
+namespace cydaw::plugins { class NativeHostedPlugin; class NativePluginEditor; }
 
 namespace cydaw::app {
 
@@ -39,7 +42,7 @@ public:
         float value {};
     };
 
-    IsolatedPluginHost() = default;
+    IsolatedPluginHost();
     ~IsolatedPluginHost();
 
     [[nodiscard]] cydaw::base::Result startPlugin(const cydaw::base::File& pluginFile,
@@ -91,6 +94,15 @@ public:
     [[nodiscard]] int preparedBlockSize() const noexcept { return blockSize_; }
 
 private:
+    cydaw::base::Result startNative(const cydaw::base::File& worker,
+        const cydaw::base::File& plugin, double rate, int frames, int channels);
+    cydaw::base::Result nativeControl(const std::function<void()>& operation);
+    std::unique_ptr<cydaw::plugins::NativeHostedPlugin> native_;
+    std::unique_ptr<cydaw::plugins::NativePluginEditor> nativeEditor_;
+    std::atomic<cydaw::plugins::NativeHostedPlugin*> nativeActive_{};
+    std::atomic<bool> nativePresent_{};
+    std::atomic<int> nativeLatency_{};
+    void* nativeWorkerHandle_{}; // Owned child handle, Windows test crash injection.
     [[nodiscard]] cydaw::base::Result startWorker(PluginWorkerLaunch launch,
                                            const cydaw::base::File& pluginFile,
                                            bool passthrough,

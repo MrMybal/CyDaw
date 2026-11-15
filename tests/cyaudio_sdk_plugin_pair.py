@@ -6,6 +6,7 @@ from pathlib import Path
 from cyaudio_cpu_diagnostic import CpuSession,scope_deltas,descendants,image
 from cyaudio_comparison import ROOT,assets,write_json,process_sample,K,Entry
 p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--rounds',type=int,default=3);p.add_argument('--seconds',type=float,default=5)
+p.add_argument('--current-workers',type=int,choices=[8,16],default=8,help='8 native SDK workers; 16 only for the historical nested-bridge build')
 a=p.parse_args();out=a.output.resolve();assert out.is_relative_to(ROOT/'output') and a.rounds>=3 and a.seconds>=4
 m=json.loads((out/'build-manifest.json').read_text(encoding='utf-8'));result=out/'results.json';assert not result.exists()
 asset=assets(out/'assets');plugin=ROOT/'build/cyaudio-desktop/CyDAWTestGain_artefacts/Release/VST3/CyDAW Test Gain.vst3';assert plugin.is_dir()
@@ -45,9 +46,9 @@ for iteration in range(a.rounds):
    for _ in range(8):
     index=s.q(cmd='add_audio_track',file=str(asset/'long.wav'))['index'];s.q(cmd='add_plugin',track=index,file=str(plugin))
    topology=s.q(cmd='status')['audioTracks'];assert len(topology)==8 and all(len(t['plugins'])==1 for t in topology)
-   expectedWorkers=16 if label=='CyAudioCore' else 8
+   expectedWorkers=a.current_workers if label=='CyAudioCore' else 8
    s.wait(lambda:sum(image(pid)=='CyDAWPluginWorker.exe' for pid in descendants(s.process.pid))==expectedWorkers)
-   pp=parents();r['workerRoles']={str(pid):('bridge' if pp.get(pid)==s.process.pid else 'SDK') for pid in descendants(s.process.pid) if pid!=s.process.pid}
+   pp=parents();r['workerRoles']={str(pid):('SDK' if label=='CyAudioCore' and a.current_workers==8 else 'bridge' if pp.get(pid)==s.process.pid else 'SDK') for pid in descendants(s.process.pid) if pid!=s.process.pid}
    r['topologies']['plugins8']=topology
    r['cases']['plugins8Stopped']=measure(s,r.get('workerRoles',{}))
    assert sum(v['image']=='CyDAWPluginWorker.exe' for v in r['cases']['plugins8Stopped']['processes'])==expectedWorkers
@@ -87,5 +88,5 @@ for case in rows[0]['cases']:
   summary[case][label]={metric:dict(median=statistics.median(v[metric] for v in samples),min=min(v[metric] for v in samples),max=max(v[metric] for v in samples),values=[v[metric] for v in samples]) for metric in ['renderUs','renderCallsPerSecond','parentCpu','workerCpu','audioMillionCyclesPerBlock','systemOtherCorePercent','bridgeCpu','sdkCpu','privateMiB']}
  if 'Before' in m['variants']:summary[case]['migrationDeltaPercent']=(summary[case]['CyAudioCore']['renderUs']['median']/summary[case]['Before']['renderUs']['median']-1)*100
  summary[case]['renderDeltaPercent']=(summary[case]['CyAudioCore']['renderUs']['median']/summary[case]['JUCE']['renderUs']['median']-1)*100
-write_json(out/'summary.json',dict(performanceAccepted=all(v['noiseAccepted'] for r in rows for v in r['cases'].values()),summary=summary,sourceRevision=m['sourceRevision'],executables=m['variants'],allInputsStable=stable(),protocol=dict(rounds=a.rounds,warmupSeconds=2,measureSeconds=a.seconds,mode='real ASIO Fireface USB, 48000 Hz, 1024 frames, zero input, two silent outputs',ui='drawing suppressed in both QA copies',cpu='100%=one logical core',topologies='8 gain VST3 plugins stopped/playing, then four DJ decks after complete worker shutdown; previous/JUCE 8 worker processes, current 16 (outer IPC + mandatory SDK isolation)',scope='one full-render root timer, no algorithm changes; mean per block, not p95 or physical latency',knownIssues='Cinema DC and CUE ASIO remain open; not tested or masked by this campaign')))
+write_json(out/'summary.json',dict(performanceAccepted=all(v['noiseAccepted'] for r in rows for v in r['cases'].values()),summary=summary,sourceRevision=m['sourceRevision'],executables=m['variants'],allInputsStable=stable(),protocol=dict(rounds=a.rounds,warmupSeconds=2,measureSeconds=a.seconds,mode='real ASIO Fireface USB, 48000 Hz, 1024 frames, zero input, two silent outputs',ui='drawing suppressed in both QA copies',cpu='100%=one logical core',topologies=f'8 gain VST3 plugins stopped/playing, then four DJ decks after complete worker shutdown; previous/JUCE 8 worker processes, current {a.current_workers}; 16 selects the historical nested bridge only',scope='one full-render root timer, no algorithm changes; mean per block, not p95 or physical latency',knownIssues='Cinema DC and CUE ASIO remain open; not tested or masked by this campaign')))
 print(json.dumps(summary,indent=2),flush=True)

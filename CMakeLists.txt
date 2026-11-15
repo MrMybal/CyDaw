@@ -269,6 +269,17 @@ target_compile_definitions(cydaw_plugin_host PRIVATE LILV_STATIC)
 target_compile_features(cydaw_plugin_host PUBLIC cxx_std_20)
 add_executable(CyDAWPluginWorker src/plugin_worker/NativePluginWorkerMain.cpp src/plugin_worker/WorkerWake.cpp)
 target_link_libraries(CyDAWPluginWorker PRIVATE cydaw_plugin_host)
+if(WIN32)
+    # SDK CreateProcess launches this utility directly. A GUI subsystem avoids
+    # one otherwise unnecessary conhost.exe per plugin; retain the argv main
+    # entry and inherited stdout/stderr used by command-line probes.
+    set_target_properties(CyDAWPluginWorker PROPERTIES WIN32_EXECUTABLE TRUE)
+    if(MSVC)
+        target_link_options(CyDAWPluginWorker PRIVATE /ENTRY:mainCRTStartup)
+    else()
+        target_link_options(CyDAWPluginWorker PRIVATE -Wl,-e,mainCRTStartup)
+    endif()
+endif()
 set_target_properties(CyDAWPluginWorker PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/CyDAWPluginWorker_artefacts/$<CONFIG>")
 if(WIN32)
     target_link_libraries(cydaw_plugin_host PRIVATE winmm comctl32 ole32)
@@ -280,7 +291,7 @@ if(MSVC)
     target_compile_options(CyDAWPluginWorker PRIVATE /utf-8 /EHsc)
 endif()
 add_library(cydaw_plugin_client STATIC src/app/IsolatedPluginHost.cpp src/app/WindowsPluginBridge.cpp src/plugin_worker/WorkerWake.cpp)
-target_link_libraries(cydaw_plugin_client PUBLIC CyDAW::Core)
+target_link_libraries(cydaw_plugin_client PUBLIC CyDAW::Core PRIVATE cydaw_plugin_host)
 target_include_directories(cydaw_plugin_client PUBLIC src/app)
 target_compile_features(cydaw_plugin_client PUBLIC cxx_std_20)
 if(MSVC)
@@ -428,6 +439,9 @@ if(CYDAW_BUILD_TESTS)
     endif()
     add_executable(cydaw_native_plugin_ipc_tests tests/PluginIpcTests.cpp src/v2/HiddenDesktop.cpp)
     target_link_libraries(cydaw_native_plugin_ipc_tests PRIVATE cydaw_plugin_client)
+    add_test(NAME cydaw_native_plugin_ipc_tests COMMAND cydaw_native_plugin_ipc_tests
+        $<TARGET_FILE:CyDAWPluginWorker> --jsfx-fixture --silent)
+    cydaw_configure_test(cydaw_native_plugin_ipc_tests 40)
     add_executable(cydaw_native_hosted_plugin_tests tests/NativeHostedPluginTests.cpp)
     target_link_libraries(cydaw_native_hosted_plugin_tests PRIVATE cydaw_plugin_host)
     add_test(NAME cydaw_native_hosted_plugin_tests COMMAND cydaw_native_hosted_plugin_tests)
@@ -880,6 +894,7 @@ if(CYDAW_BUILD_DESKTOP AND CYDAW_BUILD_LEGACY_JUCE_TESTS)
             )
             cydaw_configure_plugin_formats(cydaw_plugin_ipc_tests)
             target_link_libraries(cydaw_plugin_ipc_tests PRIVATE
+                cydaw_plugin_host
                 CyDAW::Core
                 juce::juce_audio_basics
                 juce::juce_core
@@ -967,7 +982,7 @@ if(CYDAW_BUILD_DESKTOP AND WIN32)
             # The logo inside the interface (menu bar, About, opening a project).
             target_link_libraries(CyDAW2 PRIVATE cydaw_zstd)
             # The Processing mode runs JSFX (ysfx) and note scripts (its EEL2) offline.
-            target_link_libraries(CyDAW2 PRIVATE CyAudioCore::Plugins)
+            target_link_libraries(CyDAW2 PRIVATE CyAudioCore::Plugins cydaw_plugin_host)
             target_include_directories(CyDAW2 PRIVATE "${CYDAW_CYAUDIOCORE_SOURCE_DIR}/third_party/ysfx/include" "${CYDAW_CYAUDIOCORE_SOURCE_DIR}/third_party/ysfx/thirdparty/WDL/source")
             target_sources(CyDAW2 PRIVATE
                 src/v2/HelpDocumentation.cpp
