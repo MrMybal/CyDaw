@@ -208,6 +208,8 @@ public:
     bool openProcessing(const TrackRef& track, std::uint64_t clipId) override;
     cydaw::base::Value cinema(const cydaw::base::Value& request) override;
     cydaw::base::Text appMode(const cydaw::base::Text& mode) override;
+    cydaw::base::Array<cydaw::base::File> modeTemplateFiles() const override;
+    cydaw::base::Text loadModeTemplate(const cydaw::base::File& file) override;
     bool showDeviceEditor(std::uint64_t nodeId, int pane, bool detached = false) override;
     void showWorkshop() override { state_.bringToFront = Panel::workshop; }
     void showDeviceCatalogue() override { state_.openDeviceCatalogue = true; }

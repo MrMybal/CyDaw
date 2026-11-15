@@ -1,4 +1,17 @@
-# Local piano MIDI templates
+# Local project templates
+
+## Foundry, Cinema and DJ Mix
+
+`build_mode_examples.py` synthesises original audio and a short reference video,
+then builds two templates for each mode. Pass `--control-port` for an isolated
+development instance to attach the native processing graphs and cinema bus sends.
+`--install <executable-folder>/templates` stages the mode folders and their shared
+media next to the app. See [usage and verification](../../docs/ModeTemplates.fr.md).
+
+These examples use no personal banks or external recordings. Generated sessions
+and media stay in the ignored `templates/` and `output/` directories.
+
+## Piano MIDI replacement
 
 `replace_piano_midi.py` replaces the notes of an existing two-piano comparison
 template with a Standard MIDI file. It requires the Python `mido` package.

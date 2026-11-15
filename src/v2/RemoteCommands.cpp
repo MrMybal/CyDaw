@@ -2052,7 +2052,7 @@ cydaw::base::Value Commands::onSaveProject()
 
 cydaw::base::Value Commands::onTemplates()
 {
-    const auto files = studio_.templates();
+    const auto files = ui_.modeTemplateFiles();
     if (command_ == "list_templates") {
         cydaw::base::Array<cydaw::base::Value> entries;
         for (const auto& file : files) {
@@ -2083,12 +2083,8 @@ cydaw::base::Value Commands::onTemplates()
     }
     if (looseMatches != 1 || chosen == cydaw::base::File {})
         return fail("no single template matches \"" + name + "\"; list_templates gives their names");
-    if (studio_.isRecording())
-        (void) studio_.stopRecording(false);
-    const auto loaded = studio_.loadProject(chosen);
-    ui_.sessionReplaced();
-    if (loaded.failed())
-        return fail(loaded.getErrorMessage());
+    if (const auto error = ui_.loadModeTemplate(chosen); error.isNotEmpty())
+        return fail(error);
     return ok(status());
 }
 

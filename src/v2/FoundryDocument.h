@@ -41,6 +41,7 @@ public:
     [[nodiscard]] const Session& session() const noexcept { return *session_; }
     [[nodiscard]] std::shared_ptr<const Session> shared() const noexcept { return session_; }
     [[nodiscard]] cydaw::base::Text name() const;
+    void makeTemplateCopy(const cydaw::base::Text& name);
     [[nodiscard]] bool dirty() const noexcept { return dirty_; }
     [[nodiscard]] int bitsPerSample() const noexcept { return bits_; }
     // The sound file it is (one clip, untouched in its place), else none.

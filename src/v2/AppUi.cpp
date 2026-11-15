@@ -1411,6 +1411,46 @@ cydaw::base::Value AppUi::cinema(const cydaw::base::Value& request)
     return cinema_->command(request);
 }
 
+cydaw::base::Array<cydaw::base::File> AppUi::modeTemplateFiles() const
+{
+    if (state_.mode != AppMode::foundry && state_.mode != AppMode::cinema && state_.mode != AppMode::dj)
+        return studio_.templates();
+    const auto mode = state_.mode == AppMode::foundry ? "foundry" : state_.mode == AppMode::cinema ? "cinema" : "dj";
+    const auto pattern = state_.mode == AppMode::foundry ? "*.cyfoundry" : state_.mode == AppMode::cinema ? "*.cycinema" : "*.cydjtemplate";
+    cydaw::base::Array<cydaw::base::File> files;
+    cydaw::base::File::getSpecialLocation(cydaw::base::File::currentExecutableFile)
+        .getSiblingFile("templates").getChildFile(mode)
+        .findChildFiles(files, cydaw::base::File::findFiles, false, pattern);
+    files.sort();
+    return files;
+}
+
+cydaw::base::Text AppUi::loadModeTemplate(const cydaw::base::File& file)
+{
+    if (file.hasFileExtension("cyfoundry;cycinema")) {
+        const auto cinema = file.hasFileExtension("cycinema");
+        auto* view = cinema ? cinema_.get() : foundry_.get();
+        if (!view->open(file, true))
+            return state_.status;
+        (void) appMode(cinema ? "cinema" : "foundry");
+        return {};
+    }
+    if (file.hasFileExtension("cydjtemplate")) {
+        const auto result = dj_->loadTemplate(file);
+        if (result.failed())
+            return result.getErrorMessage();
+        (void) appMode("dj");
+        return {};
+    }
+    if (studio_.isRecording())
+        (void) studio_.stopRecording(false);
+    const auto loaded = studio_.loadProject(file);
+    if (loaded.failed())
+        return loaded.getErrorMessage();
+    sessionReplaced();
+    return {};
+}
+
 cydaw::base::Text AppUi::appMode(const cydaw::base::Text& mode)
 {
     static constexpr std::pair<const char*, AppMode> modes[] { { "studio", AppMode::studio },
@@ -2945,10 +2985,13 @@ void AppUi::drawMenuBar()
             if(fileView)fileView->chooseOpen();else whenSaved([this] { chooseOpenProject(); });
         }
         if (ImGui::BeginMenu(L("Modèles", "Templates"))) {
-            const auto templates = studio_.templates();
+            const auto templates = modeTemplateFiles();
             for (const auto& file : templates)
                 if (ImGui::MenuItem(file.getFileNameWithoutExtension().toRawUTF8()))
-                    whenSaved([this, file] { openProject(file); });
+                    if (file.hasFileExtension("cydaw"))
+                        whenSaved([this, file] { openProject(file); });
+                    else if (const auto error = loadModeTemplate(file); error.isNotEmpty())
+                        notify(error, true);
             if (templates.isEmpty())
                 ImGui::TextDisabled("%s", L("Aucun modèle à côté de l'application", "No templates next to the application"));
             ImGui::EndMenu();

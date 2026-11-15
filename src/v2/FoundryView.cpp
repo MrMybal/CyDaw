@@ -145,22 +145,29 @@ cydaw::base::TextList FoundryView::unsaved() const
 
 // ---- Files -------------------------------------------------------------------------------------
 
-bool FoundryView::open(const cydaw::base::File& file)
+bool FoundryView::open(const cydaw::base::File& file, const bool asTemplate)
 {
     if(cinema_&&file.hasFileExtension("mp4;mov;m4v;avi;wmv;mkv;webm;mpeg;mpg;mxf;ts;mts;m2ts;m2v;vob;ogv;flv;3gp;3g2;dv;nut;rm;rmvb"))return openCinemaVideo(file);
-    for (std::size_t i = 0; i < tabs_.size(); ++i)
+    if (!asTemplate) for (std::size_t i = 0; i < tabs_.size(); ++i)
         if ((tabs_[i].document->file() == file || tabs_[i].document->sessionFile() == file) && file != cydaw::base::File()) {
             current_ = static_cast<int>(i);barSelected_=-1;
             return true;
         }
     cydaw::base::Text error;
     auto document = FoundryDocument::open(file, error);
-    if (document == nullptr) {
+    if (asTemplate && document != nullptr && !document->session().picture.file.empty()) {
+        const cydaw::base::File video(cydaw::base::Text::fromUTF8(document->session().picture.file.c_str()));
+        if (!video.existsAsFile())
+            error = ui::Ls("Vidéo introuvable : ", "Video not found: ") + video.getFullPathName();
+    }
+    if (document == nullptr || (asTemplate && error.isNotEmpty())) {
         report(error, true);
         return false;
     }
     Tab tab;
     tab.document = std::move(document);
+    if (asTemplate)
+        tab.document->makeTemplateCopy(file.getFileNameWithoutExtension());
     if(cinema_)ensureCinema(tab);
     saveBits_ = tab.document->bitsPerSample();
     tabs_.push_back(std::move(tab));

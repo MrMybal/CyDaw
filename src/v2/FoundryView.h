@@ -49,7 +49,7 @@ public:
     void drawTransport();
     [[nodiscard]] cydaw::base::Value command(const cydaw::base::Value& request);
     // A sound file or a session in a tab of its own.
-    bool open(const cydaw::base::File& file);
+    bool open(const cydaw::base::File& file, bool asTemplate = false);
     // Files into the session shown: on the track under (x, y), else new
     // tracks; with no session, the first opens and the others join it.
     bool dropFiles(const cydaw::base::TextList& files, float x = -1.0f, float y = -1.0f);

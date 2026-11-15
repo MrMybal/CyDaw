@@ -248,6 +248,76 @@ void DjView::loadFile(const int deck, const cydaw::base::File& file)
     ui.wasPlaying = false;
 }
 
+cydaw::base::Result DjView::loadTemplate(const cydaw::base::File& file)
+{
+    const auto preset = cydaw::base::JSON::parse(file);
+    const auto count = static_cast<int>(preset.getProperty("deckCount", 2));
+    const auto* entries = preset.getProperty("decks", {}).getArray();
+    if (preset.getProperty("format", {}).toString() != "CyDAW DJ template"
+        || static_cast<int>(preset.getProperty("version", 0)) != 1
+        || (count != 2 && count != 4) || entries == nullptr || entries->size() != count)
+        return cydaw::base::Result::fail(ui::Ls("Modèle DJ invalide", "Invalid DJ template"));
+    // Check every resource before stopping or replacing the current decks.
+    std::array<cydaw::base::File, 4> sources;
+    for (int i = 0; i < count; ++i) {
+        const auto path = (*entries)[i].getProperty("file", {}).toString();
+        sources[i] = file.getSiblingFile(path);
+        if (path.isEmpty() || !sources[i].existsAsFile())
+            return cydaw::base::Result::fail(ui::Ls("Son introuvable : ", "Sound not found: ") + sources[i].getFullPathName());
+    }
+    ensureLoaded();
+    auto& dj = studio_.engine().dj();
+    if (dj.recording())
+        return cydaw::base::Result::fail(ui::Ls("Arrêtez l'enregistrement avant de charger un modèle", "Stop recording before loading a template"));
+    for (int i = 0; i < 4; ++i) {
+        dj.setPlaying(i, false);
+        dj.eject(i);
+        DjEngine::Channel channel;
+        channel.side = i % 2 == 0 ? 0 : 2;
+        dj.setChannel(i, channel);
+        dj.setTempo(i, 1.0);
+        dj.setBend(i, 0.0);
+        dj.setSync(i, false);
+        dj.setKeylock(i, true);
+        decks_[i] = {};
+    }
+    processing_->restore(preset.getProperty("processing", {}));
+    for (int i = 0; i < 4; ++i)
+        processing_->ensureInput(i + 1, cydaw::base::Text("Deck ") + deckLetter(i));
+    autoGain_ = false;
+    dj.setDeckCount(count);
+    dj.setMaster(0);
+    dj.setCrossfader(static_cast<float>(number(preset, "crossfader", 0.0)));
+    dj.setCrossfaderCurve(0.0f);
+    dj.setMasterGainDb(static_cast<float>(number(preset, "masterDb", -3.0)));
+    dj.setCueMode(DjEngine::CueMode::off);
+    dj.setCueMix(0.5f);
+    dj.setLimiter(true);
+    dj.setQuantize(true);
+    for (int i = 0; i < count; ++i) {
+        const auto& entry = (*entries)[i];
+        DjEngine::Known known;
+        known.bpm = number(entry, "bpm", 120.0);
+        known.firstBeat = number(entry, "firstBeat", 0.0);
+        known.hasGrid = known.bpm >= 20 && known.bpm <= 400;
+        known.cuePoint = std::max(0.0, number(entry, "cuePoint", 0.0));
+        if (const auto* cues = entry.getProperty("hotCues", {}).getArray())
+            for (int c = 0; c < std::min(cues->size(), DjEngine::hotCueCount); ++c)
+                known.hotCues[c] = static_cast<double>((*cues)[c]);
+        library_->remember(sources[i]);
+        dj.load(i, sources[i], known);
+        auto& ui = decks_[i];
+        ui.cues = known.hotCues;
+        ui.cuePoint = known.cuePoint;
+        auto channel = dj.channel(i);
+        channel.trimDb = static_cast<float>(number(entry, "trimDb", -3.0));
+        channel.fader = static_cast<float>(number(entry, "fader", i < 2 ? 1.0 : 0.0));
+        dj.setChannel(i, channel);
+    }
+    saveProcessing();
+    return cydaw::base::Result::ok();
+}
+
 bool DjView::dropFiles(const cydaw::base::TextList& files)
 {
     auto deck = freeDeck();

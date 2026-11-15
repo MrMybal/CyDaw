@@ -166,6 +166,15 @@ std::unique_ptr<FoundryDocument> FoundryDocument::create(const double rate, cons
     return document;
 }
 
+void FoundryDocument::makeTemplateCopy(const cydaw::base::Text& name)
+{
+    name_ = name;
+    file_ = {};
+    sessionFile_ = {};
+    dirty_ = true;
+    ++revision_;
+}
+
 cydaw::base::Text FoundryDocument::name() const
 {
     if (sessionFile_ != cydaw::base::File())
@@ -510,6 +519,8 @@ std::unique_ptr<FoundryDocument> FoundryDocument::openSession(const cydaw::base:
     session.cinema=format=="CyDAW Cinema session";
     const auto picture=document.getProperty("picture",{});
     session.picture.file=picture.getProperty("file",{}).toString().toStdString();
+    if (!session.picture.file.empty())
+        session.picture.file = file.getSiblingFile(fromUtf8(session.picture.file)).getFullPathName().toStdString();
     session.picture.start=std::max(0.0,number(picture,"start"));
     session.picture.sourceIn=std::max(0.0,number(picture,"sourceIn"));
     session.picture.duration=std::max(0.0,number(picture,"duration"));
@@ -555,7 +566,8 @@ std::unique_ptr<FoundryDocument> FoundryDocument::openSession(const cydaw::base:
                     if(track.midi) {track.clips.push_back(std::move(clip));continue;}
                     const auto own = item.getProperty("sound", cydaw::base::Value()).toString();
                     clip.edited = own.isNotEmpty();
-                    const auto source = own.isNotEmpty() ? file.getSiblingFile(own) : cydaw::base::File(fromUtf8(clip.file));
+                    const auto source = file.getSiblingFile(own.isNotEmpty() ? own : fromUtf8(clip.file));
+                    clip.file = utf8(source.getFullPathName());
                     auto& sound = read[source.getFullPathName()];
                     if (sound == nullptr) {
                         cydaw::base::Text problem;

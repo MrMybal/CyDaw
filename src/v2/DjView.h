@@ -41,6 +41,7 @@ public:
     // The control port's "dj" command.
     [[nodiscard]] cydaw::base::Value command(const cydaw::base::Value& request);
     void loadFile(int deck, const cydaw::base::File& file);
+    [[nodiscard]] cydaw::base::Result loadTemplate(const cydaw::base::File& file);
     // Files dropped on the window: the first deck that is not playing.
     bool dropFiles(const cydaw::base::TextList& files);
     [[nodiscard]] DjLibrary& library();

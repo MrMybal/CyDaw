@@ -105,6 +105,8 @@ public:
         cydaw::base::ignoreUnused(mode);
         return {};
     }
+    virtual cydaw::base::Array<cydaw::base::File> modeTemplateFiles() const { return {}; }
+    virtual cydaw::base::Text loadModeTemplate(const cydaw::base::File&) { return "Templates unavailable"; }
     virtual cydaw::base::Value midiInputs(const cydaw::base::Text& command, const cydaw::base::Value& request)
     {
         cydaw::base::ignoreUnused(command, request);

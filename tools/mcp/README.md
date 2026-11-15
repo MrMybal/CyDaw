@@ -50,7 +50,7 @@ Dans `claude_desktop_config.json` :
 | `launch` | Lance CyDAW s'il est fermé |
 | `status` | Projet, tempo, transport, boucle, vue, pistes, clips, périphériques |
 | `open_project`, `save_project` | Fichiers `.cydaw` |
-| `list_templates`, `load_template` | Les modèles livrés (`templates/`) |
+| `list_templates`, `load_template` | Les modèles du mode actif (Studio, Fonderie, Cinéma, DJ) ; chargement en copie éditable pour Fonderie/Cinéma |
 | `import_project` | Un projet Ableton (`.als`), Bitwig (`.bwproject`), Studio One (`.song`) ou DAWproject (`.dawproject`) ouvert dans un nouveau projet CyDAW, avec un rapport de ce qui n'est pas passé |
 | `transport` | `play`, `stop`, `toggle`, `rewind`, position en secondes |
 | `set_tempo`, `set_loop`, `set_master_gain` | Tempo, boucle, master |
