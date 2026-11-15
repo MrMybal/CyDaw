@@ -10,7 +10,7 @@ runs:
     - uses: actions/checkout@v4
       with:
         repository: MrMybal/CyAudioCore
-        ref: 4e5710999acbd88ab3d1ce87f4101ec73abe54b6
+        ref: f9b0c813c233e9d5d3cfdef6c8492bbe8f5548ea
         path: .dependencies/CyAudioCore
         token: ${{ inputs.token }}
         persist-credentials: false

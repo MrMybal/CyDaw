@@ -8047,7 +8047,7 @@ AudioTrackController::TrackInfo AudioTrackController::trackInfo(const std::size_
     for (std::size_t pluginIndex = 0; pluginIndex < track->gainPanSource.pluginCount(); ++pluginIndex)
         if (const auto* host = track->gainPanSource.pluginHost(pluginIndex))
             result.plugins.push_back({ host->pluginFile(), host->pluginName(), host->isRunning(),
-                                       host->missedBlockCount(), host->latencySamples() });
+                                       host->missedBlockCount(), host->latencySamples(), host->sleepInfo() });
     return result;
 }
 
@@ -8102,7 +8102,7 @@ AudioTrackController::trackPlugins(const std::size_t index) const
         if (const auto* host = track->gainPanSource.pluginHost(pluginIndex))
             plugins.push_back({ host->pluginFile(), host->pluginName(),
                                 host->isRunning(), host->missedBlockCount(),
-                                host->latencySamples() });
+                                host->latencySamples(), host->sleepInfo() });
     return plugins;
 }
 

@@ -189,6 +189,9 @@ void NativeHostedPlugin::prepareToPlay(double rate, int frames) {
   options_.maximumFrames = unsigned(frames);
   options_.maximumEvents = 4096;
   options_.offline = offline_;
+  // Let each format's native contract decide whether suspension is safe.
+  // In particular, do not force unknown-tail effects or instruments to sleep.
+  options_.sleep.mode = PluginSleepMode::automatic;
   const auto &d = *plugin_.description();
   inputStorage_.resize(d.inputs.size());
   outputStorage_.resize(d.outputs.size());

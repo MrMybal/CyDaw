@@ -1014,6 +1014,7 @@ public:
             bool running {};
             std::uint64_t missedBlocks {};
             int latencySamples {};
+            IsolatedPluginHost::SleepSnapshot sleep;
         };
 
         cydaw::base::File file;

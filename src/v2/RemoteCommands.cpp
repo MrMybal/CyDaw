@@ -250,6 +250,11 @@ private:
                 set(pluginEntry, "running", info.plugins[plugin].running);
                 set(pluginEntry, "latencySamples", info.plugins[plugin].latencySamples);
                 set(pluginEntry, "missedBlocks", static_cast<std::int64_t>(info.plugins[plugin].missedBlocks));
+                const auto& sleep = info.plugins[plugin].sleep;
+                set(pluginEntry, "sleepAvailable", sleep.available);
+                set(pluginEntry, "sleeping", sleep.sleeping);
+                set(pluginEntry, "processedBlocks", static_cast<std::int64_t>(sleep.processedBlocks));
+                set(pluginEntry, "skippedBlocks", static_cast<std::int64_t>(sleep.skippedBlocks));
                 plugins.add(pluginEntry);
             }
             set(entry, "plugins", plugins);

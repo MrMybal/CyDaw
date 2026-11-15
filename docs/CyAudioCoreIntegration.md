@@ -5,9 +5,10 @@ build without JUCE. CyAudioCore owns the CyDSP numerical dependency. The DAW
 uses `cyaudio` service APIs and `cydsp` processors, including internal/exported
 instruments and effects. Neither sibling repository is modified by this port.
 
-Current dependency revisions: CyAudioCore `4e5710999acbd88ab3d1ce87f4101ec73abe54b6`,
+Current dependency revisions: CyAudioCore `f9b0c813c233e9d5d3cfdef6c8492bbe8f5548ea`,
 CyDSP `0d67c6a60749ef241a87bc3592fa63c61998a5e2` (0.3.2). See the
-[15 November SDK update campaign](CyAudioCore032Update.fr.md) for this build. The earlier
+[plugin sleep acceptance](CyAudioCorePluginSleep.fr.md) for this build. The earlier
+[15 November SDK update campaign](CyAudioCore032Update.fr.md) and the
 [14 November numerical integration campaign](CyDSPNumericalReuse.fr.md) rebuilds
 both libraries, desktop and worker from immutable source snapshots and records
 its numerical/RT tests and actual kernel costs. It migrates the base compressor,
@@ -149,3 +150,11 @@ The [application CPU diagnostic](CyAudioCoreCpuDiagnostic.fr.md) separates the U
 ## Direct UI comparison and benchmark corrections
 
 The [paired UI investigation](CyAudioCoreUiPair.fr.md) measures both frozen executables with matching layout, panels and a common frame ceiling. It identifies hidden-window pacing and Windows special-folder layout resolution differences. It also corrects duplicate-name workload targeting: the historical FX case was a serial 48-effect chain, while the new indexed case checks three effects on each of 16 tracks. Historical numbers remain evidence of those original processes; they do not establish identical visual workload or a DSP-kernel regression.
+
+## Automatic plugin sleep
+
+CyAudioCore `f9b0c81` is now the minimum for sleep diagnostics. Rebuild the parent
+and SDK worker together. The [sleep integration acceptance](CyAudioCorePluginSleep.fr.md)
+checks silent suspension, audio/automation/transport wake, finite tails, offline
+processing and application state restore. Native status counters describe skipped
+DSP blocks; they are not CPU percentages.

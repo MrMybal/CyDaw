@@ -158,6 +158,7 @@ public:
   // application blocks share one maximumFrames-sized SDK quantum.
   bool processRealtime(audio::SampleBuffer<float> &, int start, int count,
                        const cyaudio::PluginTransport &) noexcept;
+  cyaudio::PluginSleepInfo sleepInfo() const noexcept { return plugin_.sleepInfo(); }
   std::uint64_t missedBlocks() const noexcept { return streamMissed_.load(); }
   cyaudio::Status realtimeFailure() const noexcept {
     return static_cast<cyaudio::Status>(streamFailure_.load());

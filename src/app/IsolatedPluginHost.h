@@ -25,6 +25,12 @@ class IsolatedPluginHost final {
 public:
     // The session's metre, told to every plug-in with the tempo (4/4 until set).
     static void setSessionMetre(int numerator, int denominator) noexcept;
+    struct SleepSnapshot {
+        bool available {}, sleeping {};
+        std::uint32_t processedBlocks {}, skippedBlocks {};
+    };
+    // Control-thread snapshot only. Reading these counters never wakes a worker.
+    [[nodiscard]] SleepSnapshot sleepInfo() const noexcept;
     struct ParameterSnapshot {
         std::uint32_t index {};
         cydaw::base::Text name;

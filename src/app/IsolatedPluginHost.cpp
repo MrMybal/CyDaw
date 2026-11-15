@@ -844,6 +844,13 @@ std::uint64_t IsolatedPluginHost::missedBlockCount() const noexcept
     return missedBlocks_.load(std::memory_order_relaxed);
 }
 
+IsolatedPluginHost::SleepSnapshot IsolatedPluginHost::sleepInfo() const noexcept
+{
+    if (!native_) return {}; // Historical Wine bridge has no sleep telemetry.
+    const auto info = native_->sleepInfo();
+    return { true, info.sleeping, info.processedBlocks, info.skippedBlocks };
+}
+
 int IsolatedPluginHost::latencySamples() const noexcept
 {
     if (nativePresent_.load()) return nativeLatency_.load();

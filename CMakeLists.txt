@@ -442,6 +442,17 @@ if(CYDAW_BUILD_TESTS)
     add_test(NAME cydaw_native_plugin_ipc_tests COMMAND cydaw_native_plugin_ipc_tests
         $<TARGET_FILE:CyDAWPluginWorker> --jsfx-fixture --silent)
     cydaw_configure_test(cydaw_native_plugin_ipc_tests 40)
+    add_library(cydaw_plugin_sleep_fixture MODULE tests/PluginSleepFixture.cpp)
+    target_compile_features(cydaw_plugin_sleep_fixture PRIVATE cxx_std_20)
+    target_include_directories(cydaw_plugin_sleep_fixture SYSTEM PRIVATE
+        "${CYDAW_CYAUDIOCORE_SOURCE_DIR}/third_party/clap/include")
+    set_target_properties(cydaw_plugin_sleep_fixture PROPERTIES PREFIX "" SUFFIX ".clap")
+    add_executable(cydaw_native_plugin_sleep_tests tests/NativePluginSleepTests.cpp)
+    target_link_libraries(cydaw_native_plugin_sleep_tests PRIVATE cydaw_plugin_host)
+    add_dependencies(cydaw_native_plugin_sleep_tests cydaw_plugin_sleep_fixture CyDAWPluginWorker)
+    add_test(NAME cydaw_native_plugin_sleep_tests COMMAND cydaw_native_plugin_sleep_tests
+        $<TARGET_FILE:cydaw_plugin_sleep_fixture> $<TARGET_FILE:CyDAWPluginWorker>)
+    cydaw_configure_test(cydaw_native_plugin_sleep_tests 30)
     add_executable(cydaw_native_hosted_plugin_tests tests/NativeHostedPluginTests.cpp)
     target_link_libraries(cydaw_native_hosted_plugin_tests PRIVATE cydaw_plugin_host)
     add_test(NAME cydaw_native_hosted_plugin_tests COMMAND cydaw_native_hosted_plugin_tests)
