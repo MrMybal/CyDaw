@@ -28,6 +28,8 @@
 #include <objbase.h>
 #include <shellapi.h>
 #include <mmsystem.h>
+#include <dwmapi.h>
+#include <windowsx.h>
 // clang-format on
 #undef min
 #undef max
@@ -144,13 +146,58 @@ class MainWindow final {
     std::unique_ptr<MainContent> content_;
     bool hidden_{};
     std::function<void()> close_;
+    int hitTest(const int x, const int y) const {
+        RECT bounds{};GetWindowRect(window_, &bounds);
+        if (!IsZoomed(window_)) {
+            const auto dpi=GetDpiForWindow(window_);
+            const auto edge=GetSystemMetricsForDpi(SM_CXSIZEFRAME,dpi)+GetSystemMetricsForDpi(SM_CXPADDEDBORDER,dpi);
+            const auto top=y<bounds.top+edge, bottom=y>=bounds.bottom-edge;
+            const auto left=x<bounds.left+edge, right=x>=bounds.right-edge;
+            if(top)return left?HTTOPLEFT:right?HTTOPRIGHT:HTTOP;
+            if(bottom)return left?HTBOTTOMLEFT:right?HTBOTTOMRIGHT:HTBOTTOM;
+            if(left)return HTLEFT;
+            if(right)return HTRIGHT;
+        }
+        if(content_) {
+            POINT point{x,y};ScreenToClient(static_cast<HWND>(content_->host().nativeHandle()),&point);
+            if(content_->host().windowDragRegion.contains(cydaw::base::Point<int>{point.x,point.y}))return HTCAPTION;
+        }
+        return HTCLIENT;
+    }
+
     static LRESULT CALLBACK proc(HWND window,UINT message,WPARAM w,LPARAM l){
         auto* self=reinterpret_cast<MainWindow*>(GetWindowLongPtrW(window,GWLP_USERDATA));
         if(message==WM_NCCREATE){self=static_cast<MainWindow*>(reinterpret_cast<CREATESTRUCTW*>(l)->lpCreateParams);self->window_=window;SetWindowLongPtrW(window,GWLP_USERDATA,reinterpret_cast<LONG_PTR>(self));}
         if(self){
+            if(message==WM_NCCALCSIZE) {
+                // Keep overlapped-window styles for the taskbar and native move,
+                // resize and snap behaviour, but draw the caption in the client.
+                if(w && IsZoomed(window)) {
+                    MONITORINFO monitor{sizeof(monitor)};
+                    if(GetMonitorInfoW(MonitorFromWindow(window,MONITOR_DEFAULTTONEAREST),&monitor))
+                        reinterpret_cast<NCCALCSIZE_PARAMS*>(l)->rgrc[0]=monitor.rcWork;
+                }
+                return 0;
+            }
+            if(message==WM_NCHITTEST)return self->hitTest(GET_X_LPARAM(l),GET_Y_LPARAM(l));
+            if(message==WM_ACTIVATE || message==WM_DWMCOMPOSITIONCHANGED) {
+                const MARGINS shadow{1,1,1,1};DwmExtendFrameIntoClientArea(window,&shadow);
+            }
             if(message==WM_CLOSE){if(self->close_)self->close_();return 0;}
             if(message==WM_SIZE&&w!=SIZE_MINIMIZED){if(self->content_)self->content_->host().setBounds({0,0,int(LOWORD(l)),int(HIWORD(l))});return 0;}
-            if(message==WM_GETMINMAXINFO){auto* info=reinterpret_cast<MINMAXINFO*>(l);info->ptMinTrackSize={960,600};return 0;}
+            if(message==WM_GETMINMAXINFO){
+                auto* info=reinterpret_cast<MINMAXINFO*>(l);
+                const auto dpi=GetDpiForWindow(window);const auto scale=dpi?dpi:96;
+                info->ptMinTrackSize={MulDiv(960,scale,96),MulDiv(600,scale,96)};
+                MONITORINFO monitor{sizeof(monitor)};
+                if(GetMonitorInfoW(MonitorFromWindow(window,MONITOR_DEFAULTTONEAREST),&monitor)) {
+                    info->ptMaxPosition={monitor.rcWork.left-monitor.rcMonitor.left,monitor.rcWork.top-monitor.rcMonitor.top};
+                    info->ptMaxSize={monitor.rcWork.right-monitor.rcWork.left,monitor.rcWork.bottom-monitor.rcWork.top};
+                    info->ptMinTrackSize.x=std::min(info->ptMinTrackSize.x,info->ptMaxSize.x);
+                    info->ptMinTrackSize.y=std::min(info->ptMinTrackSize.y,info->ptMaxSize.y);
+                }
+                return 0;
+            }
             if(message==WM_SETFOCUS&&self->content_&&!self->hidden_){if(auto child=self->content_->host().nativeHandle())SetFocus(static_cast<HWND>(child));return 0;}
             if(message==WM_DPICHANGED){const auto* r=reinterpret_cast<const RECT*>(l);SetWindowPos(window,nullptr,r->left,r->top,r->right-r->left,r->bottom-r->top,SWP_NOZORDER|SWP_NOACTIVATE);return 0;}
             if(message==WM_ERASEBKGND)return 1;
@@ -161,13 +208,22 @@ class MainWindow final {
 public:
     MainWindow(Studio& studio,const LaunchOptions& options,std::function<void()> close,std::function<void()> forceQuit)
         :content_(std::make_unique<MainContent>(studio)),hidden_(options.hidden),close_(std::move(close)) {
-        WNDCLASSEXW type{sizeof(type)};type.lpfnWndProc=proc;type.hInstance=GetModuleHandleW(nullptr);type.hCursor=LoadCursorW(nullptr,MAKEINTRESOURCEW(32512));type.hbrBackground=static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH));type.lpszClassName=L"CyDaw.Desktop";type.hIcon=LoadIconW(type.hInstance,MAKEINTRESOURCEW(101));RegisterClassExW(&type);
+        WNDCLASSEXW type{sizeof(type)};type.style=CS_DBLCLKS;type.lpfnWndProc=proc;type.hInstance=GetModuleHandleW(nullptr);type.hCursor=LoadCursorW(nullptr,MAKEINTRESOURCEW(32512));type.hbrBackground=static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH));type.lpszClassName=L"CyDaw.Desktop";type.hIcon=LoadIconW(type.hInstance,MAKEINTRESOURCEW(101));RegisterClassExW(&type);
         const DWORD style=WS_OVERLAPPEDWINDOW|WS_CLIPCHILDREN;const DWORD extra=hidden_?WS_EX_TOOLWINDOW|WS_EX_NOACTIVATE:WS_EX_APPWINDOW;
-        RECT bounds{0,0,options.width,options.height};AdjustWindowRectEx(&bounds,style,FALSE,extra);
+        RECT bounds{0,0,options.width,options.height};
         const int x=hidden_?-20000:std::max<LONG>(0,(GetSystemMetrics(SM_CXSCREEN)-(bounds.right-bounds.left))/2);
         const int y=hidden_?-20000:std::max<LONG>(0,(GetSystemMetrics(SM_CYSCREEN)-(bounds.bottom-bounds.top))/2);
         window_=CreateWindowExW(extra,type.lpszClassName,L"CyDaw",style,x,y,bounds.right-bounds.left,bounds.bottom-bounds.top,nullptr,nullptr,type.hInstance,this);
         if(!window_)throw std::runtime_error("CyDaw main window creation failed");
+        SetWindowPos(window_,nullptr,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOZORDER|SWP_NOACTIVATE|SWP_FRAMECHANGED);
+        const MARGINS shadow{1,1,1,1};DwmExtendFrameIntoClientArea(window_,&shadow);
+        content_->host().onWindowHitTest=[this](int x,int y){return hitTest(x,y);};
+        content_->host().windowMaximized=[this]{return IsZoomed(window_)!=FALSE;};
+        content_->host().onWindowAction=[this](ImGuiHost::WindowAction action){
+            const auto command=action==ImGuiHost::WindowAction::minimize?SC_MINIMIZE:
+                action==ImGuiHost::WindowAction::maximizeRestore?(IsZoomed(window_)?SC_RESTORE:SC_MAXIMIZE):SC_CLOSE;
+            PostMessageW(window_,WM_SYSCOMMAND,command,0);
+        };
         content_->ui().onQuit=close_;content_->ui().onQuitNow=std::move(forceQuit);
         content_->ui().onTitle=[this](const cydaw::base::Text& title){SetWindowTextW(window_,title.toWideCharPointer());};
         content_->host().background=hidden_;RECT client{};GetClientRect(window_,&client);content_->host().create(window_,client.right,client.bottom);

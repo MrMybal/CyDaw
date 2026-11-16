@@ -235,6 +235,12 @@ LRESULT CALLBACK surfaceProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPar
         app::key_latency::window(static_cast<int>(wParam));
     auto* host = NativeAccess::hostFor(hwnd);
     auto* native = host != nullptr ? NativeAccess::native(*host) : nullptr;
+    if (message == WM_NCHITTEST && host && host->onWindowHitTest) {
+        const auto x = static_cast<int>(static_cast<short>(LOWORD(lParam)));
+        const auto y = static_cast<int>(static_cast<short>(HIWORD(lParam)));
+        if (host->onWindowHitTest(x, y) != HTCLIENT) return HTTRANSPARENT;
+    }
+
     if (native != nullptr && native->imgui != nullptr && native->backendsReady) {
         ImGui::SetCurrentContext(native->imgui);
         if (ImGui_ImplWin32_WndProcHandler(hwnd, message, wParam, lParam))
@@ -304,8 +310,11 @@ LRESULT CALLBACK surfaceProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPar
         }
         case WM_SYSCOMMAND:
             // Alt alone must not open the system menu of the parent window.
-            if ((wParam & 0xfff0) == SC_KEYMENU)
+            if ((wParam & 0xfff0) == SC_KEYMENU) {
+                if (lParam == VK_SPACE && host && host->onWindowAction)
+                    PostMessageW(GetParent(hwnd), WM_SYSCOMMAND, wParam, lParam);
                 return 0;
+            }
             break;
         default:
             break;

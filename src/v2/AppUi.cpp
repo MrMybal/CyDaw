@@ -1204,7 +1204,7 @@ void AppUi::frame()
     }
     {
         const auto name = studio_.projectName().isNotEmpty() ? studio_.projectName() : ui::Ls("Sans titre", "Untitled");
-        const auto title = name + (studio_.isDirty() ? " *" : "") + " - CyDAW 2";
+        const auto title = name + (studio_.isDirty() ? " *" : "") + " - CyDAW";
         if (title != title_) {
             title_ = title;
             if (onTitle)
@@ -2845,8 +2845,12 @@ void AppUi::openContextHelp()
 
 void AppUi::drawMenuBar()
 {
-    if (!ImGui::BeginMainMenuBar())
+    const auto integrated=static_cast<bool>(host_.onWindowAction);
+    if(integrated)ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,ImVec2(dp(6),std::max(0.0f,(dp(30)-ImGui::GetFontSize())*.5f)));
+    if (!ImGui::BeginMainMenuBar()) {
+        if(integrated)ImGui::PopStyleVar();
         return;
+    }
     {
         const auto height = ImGui::GetFrameHeight() * 0.86f;
         if (const auto texture = logo(height * ImGui::GetIO().DisplayFramebufferScale.x)) {
@@ -3225,13 +3229,57 @@ void AppUi::drawMenuBar()
             showAbout_ = true;
         ImGui::EndMenu();
     }
-    // The project's name, centred.
+    // One integrated caption: menus stay client controls; only the unused
+    // title region is handed to Windows for dragging/double-click/system menu.
     const auto name = studio_.projectName().isNotEmpty() ? studio_.projectName() : ui::Ls("Sans titre", "Untitled");
     const auto title = name + (studio_.isDirty() ? " *" : "");
     const auto width = ImGui::CalcTextSize(title.toRawUTF8()).x;
-    ImGui::SameLine((ImGui::GetWindowWidth() - width) * 0.5f);
-    ImGui::TextColored(theme::vec(theme::palette().textDim), "%s", title.toRawUTF8());
+    if(integrated) {
+        const auto& p=theme::palette();
+        const auto at=ImGui::GetWindowPos();
+        const auto size=ImGui::GetWindowSize();
+        const auto buttons=at.x+size.x-dp(44)*3;
+        const auto left=ImGui::GetItemRectMax().x+dp(12);
+        const auto right=buttons-dp(8);
+        auto* draw=ImGui::GetWindowDrawList();
+        if(right>left) {
+            draw->PushClipRect(ImVec2(left,at.y),ImVec2(right,at.y+size.y),true);
+            draw->AddText(ImVec2(std::max(left,at.x+(size.x-width)*.5f),at.y+(size.y-ImGui::GetFontSize())*.5f),p.textDim,title.toRawUTF8());
+            draw->PopClipRect();
+        }
+        const auto viewport=ImGui::GetMainViewport()->Pos;
+        host_.windowDragRegion=ImGui::IsPopupOpen(nullptr,ImGuiPopupFlags_AnyPopup)?cydaw::base::Rectangle<int>{}:
+            cydaw::base::Rectangle<int>{int(left-viewport.x),int(at.y-viewport.y),std::max(0,int(right-left)),int(size.y)};
+        const auto maximized=host_.windowMaximized && host_.windowMaximized();
+        const char* ids[]={"##windowMinimize","##windowMaximize","##windowClose"};
+        const char* tips[]={L("Réduire","Minimize"),maximized?L("Restaurer","Restore"):L("Agrandir","Maximize"),L("Fermer","Close")};
+        for(int i=0;i<3;++i) {
+            const ImVec2 pos(buttons+dp(44)*i,at.y);
+            ImGui::SetCursorScreenPos(pos);
+            const auto clicked=ImGui::InvisibleButton(ids[i],ImVec2(dp(44),size.y));
+            const auto hovered=ImGui::IsItemHovered();
+            if(hovered)draw->AddRectFilled(pos,ImVec2(pos.x+dp(44),pos.y+size.y),i==2?p.record:p.bg3);
+            const ImVec2 centre(pos.x+dp(22),pos.y+size.y*.5f);
+            const auto colour=hovered&&i==2?IM_COL32_WHITE:p.text;
+            const auto r=dp(4.5f),line=dp(1.0f);
+            if(i==0)draw->AddLine(ImVec2(centre.x-r,centre.y),ImVec2(centre.x+r,centre.y),colour,line);
+            else if(i==2) {
+                draw->AddLine(ImVec2(centre.x-r,centre.y-r),ImVec2(centre.x+r,centre.y+r),colour,line);
+                draw->AddLine(ImVec2(centre.x-r,centre.y+r),ImVec2(centre.x+r,centre.y-r),colour,line);
+            } else {
+                if(maximized)draw->AddRect(ImVec2(centre.x-r+dp(2),centre.y-r-dp(2)),ImVec2(centre.x+r+dp(2),centre.y+r-dp(2)),colour,0,0,line);
+                if(maximized)draw->AddRectFilled(ImVec2(centre.x-r,centre.y-r),ImVec2(centre.x+r,centre.y+r),hovered?p.bg3:ImGui::GetColorU32(ImGuiCol_MenuBarBg));
+                draw->AddRect(ImVec2(centre.x-r,centre.y-r),ImVec2(centre.x+r,centre.y+r),colour,0,0,line);
+            }
+            ui::tooltip(tips[i]);
+            if(clicked)host_.onWindowAction(static_cast<ImGuiHost::WindowAction>(i));
+        }
+    } else {
+        ImGui::SameLine((ImGui::GetWindowWidth() - width) * 0.5f);
+        ImGui::TextColored(theme::vec(theme::palette().textDim), "%s", title.toRawUTF8());
+    }
     ImGui::EndMainMenuBar();
+    if(integrated)ImGui::PopStyleVar();
 }
 
 void AppUi::drawTransportBar()

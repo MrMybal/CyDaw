@@ -5,7 +5,7 @@ description: Retrouver les panneaux, parcourir le temps et ajuster le zoom.
 section: Manuel / Bien démarrer
 parent: welcome
 order: 2
-sourceRevision: bb673d952fca7236
+sourceRevision: 0e4d5feb7323a1eb
 ---
 
 ## Vue d’ensemble {#overview}
@@ -19,6 +19,9 @@ Le sélecteur en haut change de tâche ; il ne convertit pas les formats de sess
 
 *Studio avec clips audio/MIDI et panneaux périphériques.*
 
+
+## Fenêtre principale {#window}
+Sous Windows, la fenêtre principale de l'application utilise une barre de titre sombre intégrée. Glisser dans l'espace libre autour du nom du projet déplace la fenêtre ; un double-clic l'agrandit ou la restaure. Les boutons en haut à droite réduisent, agrandissent/restaurent et ferment la fenêtre. Tirer ses bords ou coins la redimensionne. Les menus restent cliquables. La fermeture d'un projet modifié demande toujours s'il faut enregistrer. Les éditeurs de plugins exportés conservent le cadre de leur application hôte.
 
 ## Organiser les panneaux {#panels}
 

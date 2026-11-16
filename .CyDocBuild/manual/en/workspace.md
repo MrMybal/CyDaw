@@ -5,7 +5,7 @@ description: Find panels, navigate time and adjust zoom.
 section: Manual / Start here
 parent: welcome
 order: 2
-revision: bb673d952fca7236
+revision: 0e4d5feb7323a1eb
 ---
 
 ## Overview {#overview}
@@ -19,6 +19,9 @@ The top mode switch changes the main task; it does not convert session formats. 
 
 *Studio with audio and MIDI clips and surrounding panels.*
 
+
+## Main window {#window}
+On Windows, the main desktop window uses an integrated dark title bar. Drag the empty area around the project title to move it; double-click there to maximize or restore it. The buttons at the top right minimize, maximize/restore and close the window. Drag its edges or corners to resize it. Menus stay clickable. Closing a modified project still asks whether to save. Exported plugin editors keep their host application's frame.
 
 ## Arrange panels {#panels}
 Drag supported panel tabs to rearrange or detach them; drag separators to resize. Hide beside the bottom tabs, Ctrl+J or View > Bottom panel frees vertical space. Inspector and Browser have their own hide and restore controls. Hiding a panel does not remove its devices or stop processing. Relevant layouts and lower-panel visibility are remembered per mode.

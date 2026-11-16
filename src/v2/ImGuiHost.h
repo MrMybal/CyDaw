@@ -39,6 +39,17 @@ public:
     // its own, which would make its window the active one.
     bool background {};
 
+    // Optional desktop window chrome. Embedded/exported plugin editors leave
+    // these callbacks empty and keep the host application's window frame.
+    enum class WindowAction { minimize, maximizeRestore, close };
+    std::function<void(WindowAction)> onWindowAction;
+    std::function<bool()> windowMaximized;
+    // Native screen coordinates -> Windows non-client hit-test code. The
+    // child surface passes non-client points through to its desktop parent.
+    std::function<int(int, int)> onWindowHitTest;
+    cydaw::base::Rectangle<int> windowDragRegion;
+
+
     // Keeps the selected frame rate for a while (input, a change on screen).
     void wake(int frames = 12);
     // Selected rate for as long as it is set (playback, meters moving).
