@@ -14,18 +14,20 @@
 // controllers, the assignments for every project) and in the project (its
 // tracks' and cards' assignments).
 //
-// Everything runs on the message thread; the devices' own threads only
-// queue what they hear.
+// Configuration, DAW commands and feedback run on the application thread.
+// Input/service threads convert mapped MIDI before queueing UI monitoring and
+// DAW commands. The audio callback never executes controller configuration.
 
 namespace cydaw::v2 {
 
 class Studio;
 struct UiState;
 class ImGuiHost;
+class ComputerKeyboard;
 
 class Controllers final {
 public:
-    Controllers(Studio& studio, UiState& state, ImGuiHost& host, bool keepSettings);
+    Controllers(Studio& studio, UiState& state, ImGuiHost& host, bool keepSettings, ComputerKeyboard* keyboard = nullptr);
     ~Controllers();
 
     // The window.

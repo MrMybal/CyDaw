@@ -4,6 +4,7 @@
 #include "Studio.h"
 #include "UiState.h"
 #include "Widgets.h"
+#include <cydaw/control/DirectMidiBridge.h>
 
 #include <cmath>
 
@@ -164,6 +165,8 @@ std::optional<TrackRef> ControlTargets::trackOf(const std::string& part) const
 
 std::optional<ControlTargets::Info> ControlTargets::describe(const std::string& key) const
 {
+    if (control::DirectMidiBridge::isTarget(key))
+        return Info { ui::Ls("MIDI direct · ", "Direct MIDI · ") + cydaw::base::Text(control::DirectMidiBridge::midiAddress(key)), Kind::continuous, false };
     const auto p = parts(key);
     if (p.empty())
         return std::nullopt;
@@ -318,6 +321,11 @@ std::optional<double> ControlTargets::value(const std::string& key) const
 
 bool ControlTargets::apply(const std::string& key, const double unit, const bool pressed, const bool released, const bool momentary)
 {
+    if (control::DirectMidiBridge::isTarget(key)) {
+        const auto bytes=control::toMidi({control::DirectMidiBridge::midiAddress(key),unit});
+        studio_.engine().controllerMidiMessage(cydaw::midi::Message(bytes.data(),static_cast<int>(bytes.size())));
+        return true;
+    }
     const auto p = parts(key);
     if (p.empty())
         return false;

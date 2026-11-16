@@ -1060,6 +1060,9 @@ cydaw::base::Value Commands::run()
     if (command == "key_latency") {
         namespace probe = app::key_latency;
         if (!probe::enabled) return fail("Start the isolated diagnostic session with CYDAW_KEY_LATENCY_PROBE=1");
+        // Opt-in diagnostic: occupy the application dispatcher, never the audio thread.
+        if(const auto stall=std::clamp(int(number("stallMs",0)),0,500);stall>0)
+            cydaw::base::Thread::sleep(stall);
         if (flag("arm", false)) probe::arm(static_cast<int>(number("virtualKey", 65)));
         auto result = object();
         set(result, "nowNs", static_cast<std::int64_t>(probe::now()));

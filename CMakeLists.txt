@@ -235,6 +235,7 @@ add_library(cydaw_core STATIC
     src/engine/Sampler.cpp
     src/engine/VoiceAssetsFile.cpp
     src/control/Control.cpp
+    src/control/DirectMidiBridge.cpp
     src/engine/AudioAnalysis.cpp
     src/engine/GraphDefinitionCompiler.cpp
     src/engine/GraphInstrumentCompiler.cpp
@@ -393,6 +394,10 @@ if(CYDAW_BUILD_TESTS)
     target_link_libraries(cydaw_dsp_reuse_tests PRIVATE CyDAW::Core)
     add_test(NAME cydaw_dsp_reuse_tests COMMAND cydaw_dsp_reuse_tests)
     cydaw_configure_test(cydaw_dsp_reuse_tests 120)
+    add_executable(cydaw_direct_midi_tests tests/DirectMidiBridgeTests.cpp)
+    target_link_libraries(cydaw_direct_midi_tests PRIVATE CyDAW::Core)
+    add_test(NAME cydaw_direct_midi_tests COMMAND cydaw_direct_midi_tests)
+    cydaw_configure_test(cydaw_direct_midi_tests 30)
     add_executable(cydaw_engine_tests tests/EngineTests.cpp)
     target_link_libraries(cydaw_engine_tests PRIVATE CyDAW::Core)
     if(MSVC)
@@ -1016,6 +1021,7 @@ if(CYDAW_BUILD_DESKTOP AND WIN32)
                 src/v2/ControlTargets.cpp
                 src/v2/ControlTargets.h
                 src/v2/Controllers.cpp
+                src/v2/NativeControllerInput.cpp
                 src/v2/Controllers.h
                 src/v2/ControllersImpl.h
                 src/v2/ControllersView.cpp

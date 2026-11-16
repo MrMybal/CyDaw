@@ -47,6 +47,7 @@ Les **modifications** s'appliquent dans l'ordre, de l'appareil vers CyDAW, puis 
 | Plage d'entrée | seule la partie [a, b] de la course compte | a, b |
 | Inverser | le haut devient le bas | |
 | Courbe | négative : lente au début ; positive : rapide | a (-1..1) |
+| Courbe dessinée | réponse interpolée entre 17 points déplaçables ; double-clic : droite | points |
 | Relatif (encodeur) | chaque cran avance ou recule depuis la valeur actuelle | codage : complément à deux, décalé de 64, ou bit de signe ; taille d'un cran |
 | Bascule | un appui allume, le suivant éteint | |
 | Seuil (bouton) | 1 au-dessus du seuil, 0 en dessous | a |
@@ -149,3 +150,15 @@ Test : `tests/v2_controllers_check.py` (ctest `cydaw2_controllers_check`, silenc
 - Les manettes passent par XInput (Xbox et compatibles) ; les autres manettes demandent un plug-in d'application.
 - Un périphérique ne s'exporte pas encore en fichier pour être partagé.
 - Les plug-ins des pistes (VST3, CLAP, LV2, JSFX) et les pads d'un rack ne sont pas encore des cibles.
+
+## MIDI direct et macros
+
+Dans une règle, utiliser **+ Destination MIDI directe**, choisir CC, Note, Pitch bend ou Pression, puis régler canal et numéro. Les messages entrent dans le MIDI live de CyDAW ; sélectionner/armer la piste instrument et régler son entrée live comme d'habitude. Cela n'installe pas de port MIDI virtuel pour les autres logiciels.
+
+Une macro est une règle avec plusieurs destinations. Par exemple, relier le stick gauche d'une manette au pitch bend et au CC 74, ainsi qu'à un paramètre de piste. Chaque destination possède sa propre plage de sortie ; les transformations précédentes sont communes. Clavier, MIDI, OSC et extensions d'application utilisent les mêmes règles. Ajouter **Courbe dessinée** aux modifications, déplacer ses 17 points ou double-cliquer pour retrouver une droite. La réponse est interpolée entre les points. Une courbe non monotone possède plusieurs inverses possibles ; le retour utilise son premier segment le plus proche.
+
+Sous Windows, l'application de bureau capture clavier et souris avec un service Raw Input dédié quand CyDAW a le focus. Les touches musicales et les destinations MIDI assignées n'attendent pas une frame d'interface. La saisie de texte et les raccourcis Ctrl/Alt/Windows inhibent les contrôles clavier. Perte du focus, retrait d'un appareil, changement d'assignation et fermeture relâchent les notes tenues. Les claviers et souris sont actuellement regroupés dans une source par famille. Les autres plateformes conservent le repli clavier par l'UI ; les plugins exportés n'enregistrent pas cette capture de bureau.
+
+Adresses souris : `button/left`, `button/right`, `button/middle`, `button/x1`, `button/x2`, position normalisée sur l'écran `axis/x`, `axis/y`, et molette relative `wheel`. Utiliser **Relatif** avec le codage complément à deux pour la molette. L'extension d'application XInput fournit chaque manette Xbox compatible connectée : sticks, gâchettes et boutons. Les autres matériels peuvent fournir leurs adresses via l'ABI publique d'extensions contrôleurs `.cyctl` ; les protocoles HID arbitraires ne sont pas décodés automatiquement.
+
+La conversion MIDI s'exécute sur le thread d'entrée/fournisseur. Les commandes qui modifient le logiciel passent par le thread d'application et peuvent attendre s'il est occupé. Le callback audio n'exécute ni configuration de contrôleur ni commande d'interface. Définitions des contrôleurs, courbes et assignations MIDI globales sont sauvegardées dans les réglages de l'application ; les assignations DAW propres à un projet restent dans ce projet.

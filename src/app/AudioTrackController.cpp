@@ -5992,6 +5992,13 @@ void AudioTrackController::publishMidiOutputs()
     midiOutputs_->setQueues(std::move(queues));
 }
 
+void AudioTrackController::controllerMidiMessage(const cydaw::midi::Message& message)
+{
+    if(message.isNoteOn())key_latency::queued(message.getNoteNumber());
+    midiInCount_.fetch_add(1,std::memory_order_relaxed);
+    midiCollector_.addMessageToQueue(message);
+}
+
 void AudioTrackController::computerKeyboardNote(const int note, const float velocity, const bool on)
 {
     if (on) key_latency::queued(note);

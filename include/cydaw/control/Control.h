@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -61,13 +62,15 @@ enum class ModifierKind : std::uint8_t {
     deadzone,  // a centred axis (a stick): within a of the middle, the middle
     steps,     // a = how many values it lands on (2 and more)
     scale,     // 0..1 onto [a, b]
+    drawnCurve, // editable transfer curve; 17 uniformly spaced knots
 };
-inline constexpr int modifierKindCount = 9;
+inline constexpr int modifierKindCount = 10;
 
 struct Modifier {
     ModifierKind kind { ModifierKind::range };
     double a {};
     double b { 1.0 };
+    std::array<double,17> points = [] { std::array<double,17> p{}; for(std::size_t i=0;i<p.size();++i)p[i]=double(i)/(p.size()-1);return p; }();
     bool operator==(const Modifier&) const = default;
 };
 

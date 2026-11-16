@@ -1820,6 +1820,7 @@ public:
     void setMidiTrackOutput(std::uint64_t trackId, const cydaw::base::Text& identifier);
     [[nodiscard]] cydaw::base::Text midiTrackOutput(std::uint64_t trackId) const;
     // The computer's keys: on the live track when it hears them.
+    void controllerMidiMessage(const cydaw::midi::Message& message);
     void computerKeyboardNote(int note, float velocity, bool on);
     // ---- Activity, for the lights: counters that move with each message ----
     [[nodiscard]] std::uint32_t midiInputActivity(const cydaw::base::Text& identifier) const noexcept;

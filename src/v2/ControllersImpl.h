@@ -11,6 +11,9 @@
 
 #include "ControlTargets.h"
 #include "Controllers.h"
+#include "NativeControllerInput.h"
+#include <cydaw/control/DirectMidiBridge.h>
+#include <atomic>
 
 #include <cydaw/control/Control.h>
 #include <cydaw/control/ControlPluginABI.h>
@@ -32,13 +35,13 @@ inline constexpr const char* computerKeyboardId = "keyboard:computer";
 
 class Controllers::Impl final : private cydaw::midi::InputCallback, private cydaw::base::AsyncUpdater, private cydaw::base::Timer {
 public:
-    Impl(Studio& studio, UiState& state, ImGuiHost& host, bool keepSettings);
+    Impl(Studio& studio, UiState& state, ImGuiHost& host, bool keepSettings, ComputerKeyboard* keyboard);
     ~Impl() override;
 
     // ---- RAW devices ----------------------------------------------------------------------
     // The computer's keyboard is one too: its keys ("key/F1"), while a
     // device listens to it.
-    enum class RawKind { midiIn, midiOut, osc, plugin, keyboard };
+    enum class RawKind { midiIn, midiOut, osc, plugin, keyboard, mouse };
     struct OscPort;
     struct RawDevice {
         std::string id;
@@ -69,6 +72,11 @@ public:
         std::set<std::string> touched;
     };
     std::vector<std::unique_ptr<RawDevice>> raw;
+    control::DirectMidiBridge directMidi;
+    std::unique_ptr<NativeControllerInput> nativeInput;
+    ComputerKeyboard* noteKeyboard {};
+    std::atomic<bool> nativeLearning {};
+    std::string directFingerprint;
     [[nodiscard]] RawDevice* rawDevice(std::string_view id);
     [[nodiscard]] const RawDevice* rawDevice(std::string_view id) const;
     void scanMidi();
@@ -81,7 +89,7 @@ public:
     [[nodiscard]] std::string feedbackFor(std::string_view inputDevice) const;
     void send(std::string_view device, const control::RawMessage& message);
     [[nodiscard]] static bool isInput(RawKind kind) noexcept { return kind != RawKind::midiOut; }
-    [[nodiscard]] static bool isOutput(RawKind kind) noexcept { return kind != RawKind::midiIn && kind != RawKind::keyboard; }
+    [[nodiscard]] static bool isOutput(RawKind kind) noexcept { return kind != RawKind::midiIn && kind != RawKind::keyboard && kind != RawKind::mouse; }
     // A raw device's name as shown (the computer's keyboard in the language).
     [[nodiscard]] cydaw::base::Text nameOf(std::string_view id) const;
     // The family it is shown under: MIDI, a plug-in's name (gamepads), OSC.
@@ -240,6 +248,7 @@ public:
     cydaw::base::Text newOscName { "OSC" };
     int newOscPort { 9000 };
     char targetFilter[96] {};
+    int midiKind {}, midiChannel {1}, midiNumber {74};
 
     cydaw::base::Value command(const cydaw::base::Value& request);
     [[nodiscard]] cydaw::base::Value describe() const;

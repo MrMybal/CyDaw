@@ -65,6 +65,7 @@ const char* modifierLabel(const Kind kind)
     case Kind::deadzone: return L("Zone morte", "Dead zone");
     case Kind::steps: return L("Pas", "Steps");
     case Kind::scale: return L("Plage de sortie", "Output range");
+    case Kind::drawnCurve: return L("Courbe dessinée", "Drawn curve");
     }
     return "";
 }
@@ -83,6 +84,7 @@ const char* modifierHelp(const Kind kind)
     case Kind::deadzone: return L("Un stick ou une pédale : le milieu reste immobile.", "A stick or a pedal: the middle stays still.");
     case Kind::steps: return L("La valeur se pose sur ce nombre de crans.", "The value lands on this many steps.");
     case Kind::scale: return L("Le contrôle ne couvre que cette partie de la cible.", "The control only covers this part of the target.");
+    case Kind::drawnCurve: return L("Dessinez la réponse ; double-clic : droite. 17 points interpolés.","Draw the response; double-click: straight line. 17 interpolated knots.");
     }
     return "";
 }
@@ -92,6 +94,7 @@ const char* rawKindLabel(const RawKind kind)
     switch (kind) {
     case RawKind::midiIn: return L("Entrées MIDI", "MIDI inputs");
     case RawKind::midiOut: return L("Sorties MIDI", "MIDI outputs");
+    case RawKind::mouse:
     case RawKind::keyboard: return L("Cet ordinateur", "This computer");
     case RawKind::plugin: return L("Plug-ins d'application (manettes…)", "Application plug-ins (gamepads…)");
     case RawKind::osc: return L("OSC (réseau)", "OSC (network)");
@@ -105,6 +108,7 @@ int familyRank(const RawKind kind)
     switch (kind) {
     case RawKind::midiIn:
     case RawKind::midiOut: return 0;
+    case RawKind::mouse:
     case RawKind::keyboard: return 1;
     case RawKind::plugin: return 2;
     case RawKind::osc: return 3;
@@ -872,6 +876,24 @@ void Controllers::Impl::drawControl(control::VirtualDevice& device, control::Vir
         case Kind::steps:
             edited |= ImGui::DragFloat("##a", &a, 0.1f, 2.0f, 128.0f, "%.0f");
             break;
+        case Kind::drawnCurve: {
+            const auto origin=ImGui::GetCursorScreenPos();
+            const ImVec2 size(std::max(dp(180.0f),ImGui::GetContentRegionAvail().x-dp(60.0f)),dp(105.0f));
+            ImGui::InvisibleButton("##drawnCurve",size);
+            auto* list=ImGui::GetWindowDrawList();list->AddRectFilled(origin,ImVec2(origin.x+size.x,origin.y+size.y),p.bg0);
+            for(int line=1;line<4;++line){const auto t=line/4.0f;list->AddLine(ImVec2(origin.x+size.x*t,origin.y),ImVec2(origin.x+size.x*t,origin.y+size.y),p.grid);list->AddLine(ImVec2(origin.x,origin.y+size.y*t),ImVec2(origin.x+size.x,origin.y+size.y*t),p.grid);}
+            if(ImGui::IsItemActive() && ImGui::IsMouseDown(0)) {
+                const auto& mouse=ImGui::GetIO().MousePos;
+                const auto knot=std::clamp(int(std::lround((mouse.x-origin.x)/size.x*16)),0,16);
+                modifier.points[std::size_t(knot)]=std::clamp(1.0-double((mouse.y-origin.y)/size.y),0.0,1.0);edited=true;
+            }
+            if(ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(0)){modifier.points=control::defaultModifier(Kind::drawnCurve).points;edited=true;}
+            for(std::size_t i=0;i+1<modifier.points.size();++i)
+                list->AddLine(ImVec2(origin.x+size.x*float(i)/16,origin.y+size.y*float(1-modifier.points[i])),ImVec2(origin.x+size.x*float(i+1)/16,origin.y+size.y*float(1-modifier.points[i+1])),p.accent,dp(2));
+            for(std::size_t i=0;i<modifier.points.size();++i)
+                list->AddCircleFilled(ImVec2(origin.x+size.x*float(i)/16,origin.y+size.y*float(1-modifier.points[i])),dp(2.5f),p.accent);
+            ui::tooltip(modifierHelp(Kind::drawnCurve));break;
+        }
         case Kind::invert:
         case Kind::toggle:
             ImGui::Dummy(ImVec2(dp(80.0f), 0.0f));
@@ -976,6 +998,18 @@ void Controllers::Impl::drawControlTargets(control::VirtualDevice& device, contr
         ImGui::TextDisabled("%s", L("Rien encore.", "Nothing yet."));
     if (removed)
         unassign(*removed);
+    // A macro is one control with several destinations, MIDI and/or DAW.
+    ImGui::Spacing();
+    ImGui::TextDisabled("%s",L("Macro : ajoutez plusieurs destinations, chacune avec sa plage.","Macro: add several destinations, each with its own range."));
+    ImGui::SetNextItemWidth(dp(125));
+    ImGui::Combo("##midiKind",&midiKind,"CC\0Note\0Pitch bend\0Pressure\0");
+    ImGui::SameLine();ImGui::SetNextItemWidth(dp(60));ImGui::InputInt(L("Canal##midi","Channel##midi"),&midiChannel,0);midiChannel=std::clamp(midiChannel,1,16);
+    if(midiKind<2){ImGui::SameLine();ImGui::SetNextItemWidth(dp(60));ImGui::InputInt(L("Numéro##midi","Number##midi"),&midiNumber,0);midiNumber=std::clamp(midiNumber,0,127);}
+    if(ImGui::Button(L("+ Destination MIDI directe","+ Direct MIDI destination"))) {
+        const auto address=std::string(midiKind==0?"cc/":midiKind==1?"note/":midiKind==2?"pb/":"at/")+std::to_string(midiChannel)+(midiKind<2?"/"+std::to_string(midiNumber):"");
+        assign(device.id,control.id,"midi/live/"+address,false);
+    }
+    ui::tooltip(L("Convertit sur le thread d’entrée, vers les pistes instrument écoutées. Les commandes du logiciel utilisent le dispatcher de l’application.","Converts on the input thread to the listening instrument tracks. DAW commands use the application's dispatcher."));
     // A target picked by a click in the interface, or found by name.
     ImGui::Spacing();
     const auto picking = pickTarget && pickTarget->first == device.id && pickTarget->second == control.id;
@@ -1045,7 +1079,7 @@ void Controllers::Impl::drawRaw()
         auto any = false;
         for (auto& owned : raw) {
             auto& device = *owned;
-            if (device.kind != kind)
+            if (device.kind != kind && !(kind==RawKind::keyboard && device.kind==RawKind::mouse))
                 continue;
             any = true;
             ImGui::PushID(device.id.c_str());
@@ -1318,6 +1352,8 @@ bool Controllers::Impl::keyboardWanted()
 
 void Controllers::Impl::pollKeys()
 {
+    nativeLearning.store(keyboardWanted(),std::memory_order_release);
+    const auto native = nativeInput && nativeInput->available();
     const auto& io = ImGui::GetIO();
     // Escape stops what the window is learning.
     if ((!learnHardware.empty() || !learnControls.empty() || learnSource) && !io.WantTextInput
@@ -1348,13 +1384,14 @@ void Controllers::Impl::pollKeys()
                 keys.insert(key);
     }
     const auto say = [this](const int key, const bool down) {
-        process({ Incoming::Kind::message, computerKeyboardId,
-                  { "key/" + std::string(ImGui::GetKeyName(static_cast<ImGuiKey>(key))), down ? 1.0 : 0.0 } });
+        const control::RawMessage message{"key/"+std::string(ImGui::GetKeyName(static_cast<ImGuiKey>(key))),down?1.0:0.0};
+        directMidi.receive(computerKeyboardId,message);
+        process({Incoming::Kind::message,computerKeyboardId,message});
     };
     // A key said down that is not listened to any more: let go.
     for (auto it = keysDown.begin(); it != keysDown.end();) {
         if (!keys.contains(it->first)) {
-            if (it->second)
+            if (it->second && !native)
                 say(it->first, false);
             it = keysDown.erase(it);
         } else {
@@ -1369,7 +1406,7 @@ void Controllers::Impl::pollKeys()
         auto& was = keysDown[key];
         if (down != was) {
             was = down;
-            say(key, down);
+            if (!native) say(key, down);
         }
     }
 }

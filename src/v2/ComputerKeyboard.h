@@ -3,6 +3,8 @@
 
 #include <imgui.h>
 
+#include <atomic>
+#include <mutex>
 #include <map>
 #include <string>
 #include <vector>
@@ -28,6 +30,9 @@ public:
     // false (a text being typed, a panel with letter shortcuts of its own):
     // nothing plays, the notes held stop.
     void update(bool allowed);
+    void useNativeInput(bool value) noexcept { nativeInput_ = value; }
+    void nativeKey(int scanCode, bool down, bool blocked = false);
+    [[nodiscard]] bool nativeControlsAllowed() const noexcept { return nativeControlsAllowed_.load(std::memory_order_acquire); }
     void allNotesOff();
 
     [[nodiscard]] bool enabled() const noexcept { return enabled_; }
@@ -48,6 +53,7 @@ public:
         ImGuiKey key { ImGuiKey_None };
         std::string label;
         int semitone {};
+        int scanCode {};
     };
     [[nodiscard]] const std::vector<Key>& keys() const noexcept { return keys_; }
     // The notes held now (MIDI numbers).
@@ -62,10 +68,12 @@ private:
     std::vector<Key> keys_;
     // The note each key down started (the octave may move while it is held).
     std::map<ImGuiKey, int> held_;
-    bool enabled_ { true };
-    int octave_ { 4 };
-    int velocity_ { 100 };
-    bool active_ {};
+    std::atomic<bool> enabled_ { true };
+    std::atomic<int> octave_ { 4 };
+    std::atomic<int> velocity_ { 100 };
+    std::atomic<bool> active_ {}, nativeInput_ {}, nativeAllowed_ {}, nativeSettingsDirty_ {};
+    std::atomic<bool> nativeControlsAllowed_ {true};
+    mutable std::recursive_mutex keyLock_;
 };
 
 } // namespace cydaw::v2

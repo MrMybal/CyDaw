@@ -8,6 +8,8 @@
 #include "ControllersImpl.h"
 
 #include "ImGuiHost.h"
+#include "ComputerKeyboard.h"
+#include "../app/KeyLatencyProbe.h"
 #include "Studio.h"
 #include "UiState.h"
 #include "Widgets.h"
@@ -61,6 +63,9 @@ cydaw::base::Value modifierVar(const control::Modifier& modifier)
     set(item, "kind", control::modifierName(modifier.kind));
     set(item, "a", modifier.a);
     set(item, "b", modifier.b);
+    if(modifier.kind==control::ModifierKind::drawnCurve) {
+        cydaw::base::Array<cydaw::base::Value> points;for(const auto p:modifier.points)points.add(p);set(item,"points",points);
+    }
     return item;
 }
 
@@ -72,6 +77,8 @@ std::optional<control::Modifier> modifierFrom(const cydaw::base::Value& value)
     auto modifier = control::defaultModifier(*kind);
     modifier.a = number(value, "a", modifier.a);
     modifier.b = number(value, "b", modifier.b);
+    if(const auto* points=value.getProperty("points",{}).getArray();points && points->size()==int(modifier.points.size()))
+        for(int i=0;i<points->size();++i){const auto p=static_cast<double>((*points)[i]);if(std::isfinite(p))modifier.points[std::size_t(i)]=std::clamp(p,0.0,1.0);}
     return modifier;
 }
 
@@ -128,6 +135,7 @@ const char* rawKindName(const RawKind kind)
     case RawKind::osc: return "osc";
     case RawKind::plugin: return "plugin";
     case RawKind::keyboard: return "keyboard";
+    case RawKind::mouse: return "mouse";
     }
     return "plugin";
 }
@@ -135,6 +143,7 @@ const char* rawKindName(const RawKind kind)
 RawKind rawKindNamed(const cydaw::base::Text& name)
 {
     return name == "midi-in" ? RawKind::midiIn : name == "midi-out" ? RawKind::midiOut : name == "osc" ? RawKind::osc
+           : name == "mouse" ? RawKind::mouse
            : name == "keyboard"                                                                          ? RawKind::keyboard
                                                                                                          : RawKind::plugin;
 }
@@ -187,6 +196,7 @@ cydaw::base::Text readableAddress(const std::string& address)
         return parts[1] == "left" ? ui::Ls("Gâchette gauche", "Left trigger") : ui::Ls("Gâchette droite", "Right trigger");
     if (parts.size() >= 2 && parts[0] == "axis") {
         const auto& name = parts[1];
+        if(name=="x" || name=="y")return ui::Ls("Position souris ","Mouse position ")+name.toUpperCase();
         const auto side = name.startsWith("left") ? ui::Ls("Stick gauche ", "Left stick ") : ui::Ls("Stick droit ", "Right stick ");
         return side + name.getLastCharacters(1);
     }
@@ -299,8 +309,10 @@ std::string pluginDeviceId(const Controllers::Impl& impl, const int index, const
 
 // ---- The whole --------------------------------------------------------------------------------
 
-Controllers::Impl::Impl(Studio& studioIn, UiState& state, ImGuiHost& hostIn, const bool keep)
-    : targets(studioIn, state), studio(studioIn), uiState(state), host(hostIn), keepSettings(keep)
+Controllers::Impl::Impl(Studio& studioIn, UiState& state, ImGuiHost& hostIn, const bool keep, ComputerKeyboard* keyboard)
+    : directMidi([&studioIn](std::span<const std::uint8_t> bytes) {
+          studioIn.engine().controllerMidiMessage(cydaw::midi::Message(bytes.data(), static_cast<int>(bytes.size())));
+      }), noteKeyboard(keyboard), targets(studioIn, state), studio(studioIn), uiState(state), host(hostIn), keepSettings(keep)
 {
     restoreGlobal(cydaw::base::JSON::parse(studio.settings().getValue("controllers")));
     // The computer's keyboard: always there.
@@ -313,6 +325,30 @@ Controllers::Impl::Impl(Studio& studioIn, UiState& state, ImGuiHost& hostIn, con
         keyboard->name = "Computer keyboard";
         keyboard->notes = false;
         keyboard->present = true;
+    }
+    if (rawDevice("mouse:computer") == nullptr) {
+        raw.push_back(std::make_unique<RawDevice>());raw.back()->id="mouse:computer";
+        raw.back()->name="Computer mouse";raw.back()->kind=RawKind::mouse;raw.back()->present=true;
+    }
+    if (host.ownWindows) {
+        nativeInput = std::make_unique<NativeControllerInput>([this](const NativeControllerInput::Event& event) {
+            if (event.address == "disconnect") {
+                directMidi.releaseSource(event.source);
+                if (event.keyboard && noteKeyboard) noteKeyboard->allNotesOff();
+                return;
+            }
+            if(event.keyboard && event.down && noteKeyboard && !noteKeyboard->nativeControlsAllowed()) {
+                directMidi.releaseSource(event.source);noteKeyboard->allNotesOff();return;
+            }
+            post({Incoming::Kind::message,event.source,{event.address,event.value}});
+            if (event.keyboard && noteKeyboard)
+                noteKeyboard->nativeKey(event.scan,event.down,nativeLearning.load() || directMidi.claims(event.source,event.address));
+        });
+        if (noteKeyboard) noteKeyboard->useNativeInput(nativeInput->available());
+    }
+    if(auto* mouse=rawDevice("mouse:computer")) {
+        mouse->kind=RawKind::mouse;
+        mouse->present=nativeInput && nativeInput->available();
     }
     scanMidi();
     loadPlugins();
@@ -327,6 +363,9 @@ Controllers::Impl::Impl(Studio& studioIn, UiState& state, ImGuiHost& hostIn, con
 
 Controllers::Impl::~Impl()
 {
+    nativeInput.reset();
+    directMidi.panic();
+    if (noteKeyboard) noteKeyboard->useNativeInput(false);
     stopTimer();
     cancelPendingUpdate();
     studio.engine().setMidiInputGate(nullptr);
@@ -403,9 +442,13 @@ void Controllers::Impl::scanMidi()
             if (device->kind == RawKind::midiIn && device->present)
                 midiNames[device->identifier] = device->id;
     }
-    for (auto& device : raw)
+    for (auto& device : raw) {
         if (device->kind == RawKind::midiOut && !device->present)
             device->output.reset();
+        if (device->kind == RawKind::midiIn && !device->present)
+            directMidi.releaseSource(device->id);
+    }
+    refreshGate();
 }
 
 void Controllers::Impl::handleIncomingMidiMessage(cydaw::midi::Input* source, const cydaw::midi::Message& message)
@@ -426,6 +469,13 @@ void Controllers::Impl::handleIncomingMidiMessage(cydaw::midi::Input* source, co
 
 void Controllers::Impl::refreshGate()
 {
+    const auto fingerprint=cydaw::base::JSON::toString(globalState(),true).toStdString()+cydaw::base::JSON::toString(projectAssignments(),true).toStdString();
+    if (fingerprint != directFingerprint) {
+        directFingerprint=fingerprint;
+        std::set<std::string> disabled;
+        for (const auto& device:raw) if(!device->enabled) disabled.insert(device->id);
+        directMidi.configure(router,std::move(disabled));
+    }
     std::set<std::string> silent;
     for (const auto& device : raw)
         if (device->kind == RawKind::midiIn && !device->notes)
@@ -526,6 +576,7 @@ void Controllers::Impl::removeRaw(const std::string_view id)
 
 cydaw::base::Text Controllers::Impl::nameOf(const std::string_view id) const
 {
+    if(id=="mouse:computer")return ui::Ls("Souris de l’ordinateur","Computer mouse");
     if (id == computerKeyboardId)
         return ui::Ls("Clavier de l'ordinateur", "Computer keyboard");
     if (const auto* device = rawDevice(id))
@@ -539,6 +590,7 @@ cydaw::base::Text Controllers::Impl::familyOf(const RawDevice& device) const
     case RawKind::midiIn:
     case RawKind::midiOut: return "MIDI";
     case RawKind::osc: return ui::Ls("OSC (r\xc3\xa9seau)", "OSC (network)");
+    case RawKind::mouse:
     case RawKind::keyboard: return ui::Ls("Cet ordinateur", "This computer");
     case RawKind::plugin: break;
     }
@@ -696,6 +748,11 @@ void Controllers::Impl::unloadPlugins()
 
 void Controllers::Impl::post(Incoming incoming)
 {
+    // Producer/service thread: MIDI conversion happens here, before any UI
+    // queue. Existing DAW commands/learning/monitoring are dispatched below.
+    if (incoming.kind == Incoming::Kind::message) directMidi.receive(incoming.device,incoming.message);
+    else if (incoming.kind == Incoming::Kind::removed)
+        directMidi.releaseSource(pluginDeviceId(*this,incoming.plugin,incoming.device.c_str()));
     {
         const std::scoped_lock hold(queueLock);
         // Flooded: the oldest half goes at once (not one by one, each time).
@@ -777,7 +834,7 @@ void Controllers::Impl::process(const Incoming& incoming)
 void Controllers::Impl::applyOrders(const std::vector<control::Router::Order>& orders)
 {
     for (const auto& order : orders)
-        if (targets.apply(order.target, order.value, order.pressed, order.released, order.momentary))
+        if (!control::DirectMidiBridge::isTarget(order.target) && targets.apply(order.target, order.value, order.pressed, order.released, order.momentary))
             if (const auto now = targets.value(order.target))
                 ordered[order.target] = { *now, secondsNow() };
 }
@@ -1369,6 +1426,8 @@ cydaw::base::Value Controllers::Impl::describe() const
     set(result, "learnHardware", cydaw::base::Text(learnHardware));
     set(result, "learnControls", cydaw::base::Text(learnControls));
     set(result, "learnStatus", learnStatus);
+    set(result, "nativeInputActive", nativeInput && nativeInput->available());
+    set(result, "directMidiMessages", static_cast<std::int64_t>(directMidi.sent()));
     return result;
 }
 
@@ -1390,6 +1449,12 @@ cydaw::base::Value Controllers::Impl::command(const cydaw::base::Value& request)
             selectedControl = router.findControl(device, controlId) != nullptr ? controlId : std::string();
             requestedTab = 0;
         }
+        return describe();
+    }
+    if (action == "probe_native") {
+        if(!app::key_latency::enabled || !nativeInput || !nativeInput->scheduleProbe(
+            int(number(request,"delayMs",100)),int(number(request,"scan",30)),int(number(request,"virtualKey",81))))
+            return fail("Native service probe unavailable (opt-in isolated diagnostic only)");
         return describe();
     }
     if (action == "status")
@@ -1437,7 +1502,9 @@ cydaw::base::Value Controllers::Impl::command(const cydaw::base::Value& request)
     if (action == "inject") {
         if (rawDevice(device) == nullptr)
             return fail("no raw device \"" + cydaw::base::Text(device) + "\"");
-        process({ Incoming::Kind::message, device, { text(request, "address").toStdString(), number(request, "value", 0.0) } });
+        const control::RawMessage message{text(request,"address").toStdString(),number(request,"value",0.0)};
+        directMidi.receive(device,message);
+        process({ Incoming::Kind::message, device, message });
         return describe();
     }
     if (action == "add_virtual") {
@@ -1628,8 +1695,8 @@ cydaw::base::Value Controllers::Impl::command(const cydaw::base::Value& request)
 
 // ---- The public face ---------------------------------------------------------------------------------
 
-Controllers::Controllers(Studio& studio, UiState& state, ImGuiHost& host, const bool keepSettings)
-    : impl_(std::make_unique<Impl>(studio, state, host, keepSettings))
+Controllers::Controllers(Studio& studio, UiState& state, ImGuiHost& host, const bool keepSettings, ComputerKeyboard* keyboard)
+    : impl_(std::make_unique<Impl>(studio, state, host, keepSettings, keyboard))
 {
 }
 

@@ -256,7 +256,7 @@ AppUi::AppUi(Studio& studio, ImGuiHost& host)
             }
             host_.wake();
         });
-    controllers_ = std::make_unique<Controllers>(studio_, state_, host_, studio_.keepsSettings());
+    controllers_ = std::make_unique<Controllers>(studio_, state_, host_, studio_.keepsSettings(), computerKeyboard_.get());
     pluginWindows_ = std::make_unique<PluginWindows>(studio_, state_);
     jsfx_ = std::make_unique<JsfxView>(studio_, state_);
     clipEditor_ = std::make_unique<ClipEditorView>(studio_, state_, waveforms_, host_);
