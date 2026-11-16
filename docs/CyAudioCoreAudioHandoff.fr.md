@@ -2,6 +2,8 @@
 
 Établi le 16 novembre 2026 à partir des campagnes existantes. Aucune nouvelle mesure audio n’a été exécutée pour ce bilan. « Ouvert » signifie que la correction n’a pas été démontrée : les constats historiques doivent être rejoués sur le build actuel. Aucun ne prouve à lui seul un défaut de CyAudioCore.
 
+> Mise à jour du 17 novembre 2026 : le CUE ASIO est maintenant revalidé avec le correctif `b2e4efb` et les SDK mis à jour ; un export synthétique de deux minutes passe aussi. Voir [la campagne actualisée](CyAudioCore040Update.fr.md). Les observations ci-dessous conservent leur contexte historique ; les autres points ne sont pas déclarés résolus.
+
 ## Versions
 
 - CyDaw : `a429389de25d0147c2bdff20dff1d058e613768a`, branche `CyDSP-CORE`.

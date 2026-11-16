@@ -1,0 +1,295 @@
+{
+  "date": "2026-11-17",
+  "applicationBase": "b2e4efb121b206eaf04cb04177f36bcd765f9750",
+  "sdkRevisions": {
+    "CyAudioCore": "8716ce67b0c3467017369cdc7745e8ff8ef147f2",
+    "CyDSP": "c1d9a52fce7ac90515b0e264545903fdad2901b4"
+  },
+  "sdkSnapshotsStable": {
+    "CyAudioCore": true,
+    "CyDSP": true
+  },
+  "nativeTests": {
+    "passed": 36,
+    "names": [
+      "cydaw_engine_tests",
+      "cydaw_audio_files_tests",
+      "cydaw_dj_cue_tests",
+      "cydaw_frame_pacing_tests",
+      "cydaw_core_tests",
+      "cydaw_transport_timecode_tests",
+      "cydaw_dsp_adapter_tests",
+      "cydaw_full_dsp_reuse_tests",
+      "cydaw_dsp_reuse_tests",
+      "cydaw_direct_midi_tests",
+      "cydaw_cyaudio_services_tests",
+      "cydaw_cyaudio_dsp_tests",
+      "cydaw_asio_tests",
+      "cydaw_native_osc_tests",
+      "cydaw_native_plugin_ipc_tests",
+      "cydaw_native_plugin_sleep_tests",
+      "cydaw_native_hosted_plugin_tests",
+      "cydaw_native_device_manager_tests",
+      "cydaw_native_device_ports_tests",
+      "cydaw_live_midi_tests",
+      "cydaw_instrument_renderer_tests",
+      "cydaw_audio_source_tests",
+      "cydaw_sample_buffer_tests",
+      "cydaw_remote_native_tests",
+      "cydaw_process_tests",
+      "cydaw_event_loop_tests",
+      "cydaw_midi_file_tests",
+      "cydaw_graph_document_tests",
+      "cydaw_asset_services_tests",
+      "cydaw_compression_tests",
+      "cydaw_localization_tests",
+      "cydaw_thread_tests",
+      "cydaw_native_platform_tests",
+      "cydaw_base_tests",
+      "cydaw_cyui_tests",
+      "cydaw_no_juce_production_graph"
+    ]
+  },
+  "asio": {
+    "settings": {
+      "inputChannels": [],
+      "outputChannels": [
+        "Analog 1 (1)",
+        "Analog 2 (1)"
+      ],
+      "availableInputs": 18,
+      "availableOutputs": 18,
+      "type": "ASIO",
+      "output": "ASIO Fireface USB",
+      "input": "ASIO Fireface USB",
+      "sampleRate": 48000.0,
+      "bufferSize": 1024,
+      "availableSampleRates": [
+        32000.0,
+        44100.0,
+        48000.0,
+        88200.0,
+        96000.0,
+        176400.0,
+        192000.0
+      ],
+      "availableBufferSizes": [
+        1024
+      ],
+      "outputLatencySamples": 1069,
+      "inputLatencySamples": 0,
+      "actualBufferSize": 1024,
+      "outputLatencyKnown": true,
+      "outputPeriodKnown": false,
+      "outputPeriodFrames": 0,
+      "outputPeriods": 0,
+      "latencyMs": 22.270833333333332,
+      "types": [
+        {
+          "type": "Windows Audio",
+          "outputs": [
+            "ADAT (5+6) (RME Fireface UCX)",
+            "Haut-parleurs (Steam Streaming Microphone)",
+            "ADAT (7+8) (RME Fireface UCX)",
+            "SPDIF coax. (RME Fireface UCX)",
+            "Casque (Oculus Virtual Audio Device)",
+            "Analog (7+8) (RME Fireface UCX)",
+            "Analog (3+4) (RME Fireface UCX)",
+            "Haut-parleurs (Steam Streaming Speakers)",
+            "SPDIF/ADAT (1+2) (RME Fireface UCX)",
+            "ADAT (3+4) (RME Fireface UCX)",
+            "Analog (5+6) (RME Fireface UCX)",
+            "Line 1 (Virtual Audio Cable)",
+            "Haut-parleurs (RME Fireface UCX)"
+          ],
+          "inputs": [
+            "Analog (1+2) (RME Fireface UCX)",
+            "Headset Microphone (Oculus Virtual Audio Device)",
+            "Line 1 (Virtual Audio Cable)",
+            "SPDIF coax. (RME Fireface UCX)",
+            "ADAT (7+8) (RME Fireface UCX)",
+            "ADAT (5+6) (RME Fireface UCX)",
+            "Microphone (Steam Streaming Microphone)",
+            "Analog (7+8) (RME Fireface UCX)",
+            "Analog (3+4) (RME Fireface UCX)",
+            "ADAT (3+4) (RME Fireface UCX)",
+            "Analog (5+6) (RME Fireface UCX)",
+            "SPDIF/ADAT (1+2) (RME Fireface UCX)"
+          ]
+        },
+        {
+          "type": "Windows Audio (Exclusive Mode)",
+          "outputs": [
+            "ADAT (5+6) (RME Fireface UCX)",
+            "Haut-parleurs (Steam Streaming Microphone)",
+            "ADAT (7+8) (RME Fireface UCX)",
+            "SPDIF coax. (RME Fireface UCX)",
+            "Casque (Oculus Virtual Audio Device)",
+            "Analog (7+8) (RME Fireface UCX)",
+            "Analog (3+4) (RME Fireface UCX)",
+            "Haut-parleurs (Steam Streaming Speakers)",
+            "SPDIF/ADAT (1+2) (RME Fireface UCX)",
+            "ADAT (3+4) (RME Fireface UCX)",
+            "Analog (5+6) (RME Fireface UCX)",
+            "Line 1 (Virtual Audio Cable)",
+            "Haut-parleurs (RME Fireface UCX)"
+          ],
+          "inputs": [
+            "Analog (1+2) (RME Fireface UCX)",
+            "Headset Microphone (Oculus Virtual Audio Device)",
+            "Line 1 (Virtual Audio Cable)",
+            "SPDIF coax. (RME Fireface UCX)",
+            "ADAT (7+8) (RME Fireface UCX)",
+            "ADAT (5+6) (RME Fireface UCX)",
+            "Microphone (Steam Streaming Microphone)",
+            "Analog (7+8) (RME Fireface UCX)",
+            "Analog (3+4) (RME Fireface UCX)",
+            "ADAT (3+4) (RME Fireface UCX)",
+            "Analog (5+6) (RME Fireface UCX)",
+            "SPDIF/ADAT (1+2) (RME Fireface UCX)"
+          ]
+        },
+        {
+          "type": "Windows Audio (Low Latency Mode)",
+          "outputs": [
+            "ADAT (5+6) (RME Fireface UCX)",
+            "Haut-parleurs (Steam Streaming Microphone)",
+            "ADAT (7+8) (RME Fireface UCX)",
+            "SPDIF coax. (RME Fireface UCX)",
+            "Casque (Oculus Virtual Audio Device)",
+            "Analog (7+8) (RME Fireface UCX)",
+            "Analog (3+4) (RME Fireface UCX)",
+            "Haut-parleurs (Steam Streaming Speakers)",
+            "SPDIF/ADAT (1+2) (RME Fireface UCX)",
+            "ADAT (3+4) (RME Fireface UCX)",
+            "Analog (5+6) (RME Fireface UCX)",
+            "Line 1 (Virtual Audio Cable)",
+            "Haut-parleurs (RME Fireface UCX)"
+          ],
+          "inputs": [
+            "Analog (1+2) (RME Fireface UCX)",
+            "Headset Microphone (Oculus Virtual Audio Device)",
+            "Line 1 (Virtual Audio Cable)",
+            "SPDIF coax. (RME Fireface UCX)",
+            "ADAT (7+8) (RME Fireface UCX)",
+            "ADAT (5+6) (RME Fireface UCX)",
+            "Microphone (Steam Streaming Microphone)",
+            "Analog (7+8) (RME Fireface UCX)",
+            "Analog (3+4) (RME Fireface UCX)",
+            "ADAT (3+4) (RME Fireface UCX)",
+            "Analog (5+6) (RME Fireface UCX)",
+            "SPDIF/ADAT (1+2) (RME Fireface UCX)"
+          ]
+        },
+        {
+          "type": "DirectSound",
+          "outputs": [
+            "Périphérique audio principal",
+            "Haut-parleurs (RME Fireface UCX)",
+            "ADAT (5+6) (RME Fireface UCX)",
+            "Haut-parleurs (Steam Streaming Microphone)",
+            "ADAT (7+8) (RME Fireface UCX)",
+            "SPDIF coax. (RME Fireface UCX)",
+            "Casque (Oculus Virtual Audio Device)",
+            "Analog (7+8) (RME Fireface UCX)",
+            "Analog (3+4) (RME Fireface UCX)",
+            "Haut-parleurs (Steam Streaming Speakers)",
+            "SPDIF/ADAT (1+2) (RME Fireface UCX)",
+            "ADAT (3+4) (RME Fireface UCX)",
+            "Analog (5+6) (RME Fireface UCX)",
+            "Line 1 (Virtual Audio Cable)"
+          ],
+          "inputs": [
+            "Pilote de capture audio principal",
+            "Analog (1+2) (RME Fireface UCX)",
+            "Headset Microphone (Oculus Virtual Audio Device)",
+            "Line 1 (Virtual Audio Cable)",
+            "SPDIF coax. (RME Fireface UCX)",
+            "ADAT (7+8) (RME Fireface UCX)",
+            "ADAT (5+6) (RME Fireface UCX)",
+            "Microphone (Steam Streaming Microphone)",
+            "Analog (7+8) (RME Fireface UCX)",
+            "Analog (3+4) (RME Fireface UCX)",
+            "ADAT (3+4) (RME Fireface UCX)",
+            "Analog (5+6) (RME Fireface UCX)",
+            "SPDIF/ADAT (1+2) (RME Fireface UCX)"
+          ]
+        },
+        {
+          "type": "ASIO",
+          "outputs": [
+            "ASIO Fireface USB"
+          ],
+          "inputs": [
+            "ASIO Fireface USB"
+          ]
+        }
+      ]
+    },
+    "cueTrials": 20,
+    "cueReturnsChecked": 40,
+    "maxCueDriftSeconds": 0.0,
+    "originalDjTestPassed": true,
+    "export": {
+      "expectedFrames": 5856000,
+      "frames": 5856000,
+      "sampleRate": 48000,
+      "finite": true,
+      "lengthSeconds": 120.0,
+      "maxError": 0.0,
+      "tailPeak": 0.0
+    },
+    "binariesStable": true,
+    "shutdown": {
+      "ms": 449.9442000014824,
+      "forced": false
+    }
+  },
+  "pluginSleep": {
+    "processedBlocks": [
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2
+    ],
+    "additionalSkippedBlocks": [
+      37,
+      37,
+      37,
+      37,
+      37,
+      37,
+      37,
+      37
+    ],
+    "cases": [
+      "idle",
+      "automationWake",
+      "playWake",
+      "stopSleep",
+      "restoreSleep"
+    ],
+    "allChildrenClosed": true
+  },
+  "files": {
+    "D:\\_Project\\CyDAW_Project\\build\\cyaudio-sleep\\CyDAW2_artefacts\\Release\\CyDAW 2.exe": "dde14dfc3a50fa1e698fc955209b515af92df028e2364e1f2613d5e4041e02f7",
+    "D:\\_Project\\CyDAW_Project\\build\\cyaudio-sleep\\CyDAW2_artefacts\\Release\\CyDAWPluginWorker.exe": "6224d58122e3582798460b7ba3ab495ac1ec85820904310cd70c72d8f36f50ac",
+    "D:\\_Project\\CyDAW_Project\\build\\cyaudio-sleep\\CyDAW2_artefacts\\Release\\avcodec-62.dll": "9023155e12aa1513da3db7ef7ccb93f4b22c3b1df91af4d9a9b0ee940a464f7f",
+    "D:\\_Project\\CyDAW_Project\\build\\cyaudio-sleep\\CyDAW2_artefacts\\Release\\avformat-62.dll": "07e1d9bdf240f9d91f608f9c0d8ec450ebb55c39d1ea0e58eafae99619724d54",
+    "D:\\_Project\\CyDAW_Project\\build\\cyaudio-sleep\\CyDAW2_artefacts\\Release\\avutil-60.dll": "7d43d70b89c4c3f819f168e572800d83ed359341359b5c52d708339fe25846f6",
+    "D:\\_Project\\CyDAW_Project\\build\\cyaudio-sleep\\CyDAW2_artefacts\\Release\\swresample-6.dll": "33ca7f7bb42e5bb721d6418b27a10d8c31b590ae7febaade1d363cad816440f4",
+    "D:\\_Project\\CyDAW_Project\\build\\cyaudio-sleep\\CyDAW2_artefacts\\Release\\swscale-9.dll": "7f0643d5e6741709b2e76b6b5533ce30ab7491aa613246b3531ceda24221e10f"
+  },
+  "evidenceRoot": "output/cyaudio-update-2026-11-17",
+  "limits": [
+    "Windows only, synthetic input, no audible listening, physical latency or CPU comparison",
+    "No new verification of post-Cinema DC, project 08 residuals or first-block reload difference",
+    "Two-minute synthetic export is not a reproduction of every historical long music export",
+    "Uncommitted CyDSP work excluded; committed CyDSP 0.4.0 used; no sibling repository modified",
+    "Final writer errors are covered at sink/native caller level; Studio tick still discards finishMasterExport result (source inspection, not a new fault injection)"
+  ]
+}
