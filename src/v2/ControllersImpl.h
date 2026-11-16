@@ -233,6 +233,7 @@ public:
     void drawOscSettings(RawDevice& device);
     // The hardware tab, every assignment, the monitor.
     void drawRaw();
+    void drawComputerKeyboard();
     void drawAssignments();
     void drawMonitor(const control::VirtualDevice* only);
     std::string selectedRaw;

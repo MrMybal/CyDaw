@@ -121,6 +121,10 @@ public:
             showTransportSync_ = true;
         else if (name == "audio")
             showAudioSettings_ = true;
+        else if (name == "controllers" || name == "midi-inputs")
+            openControllerInputs();
+        else if (name == "computer-keyboard")
+            openControllerInputs(true);
         else if (name == "soundcard")
             showAudioSettings_ = showSoundCard_ = true;
         else if (name == "companion")
@@ -341,13 +345,8 @@ private:
     void redo();
     void toggleRecording();
     void drawAudioSettings();
-    // The audio settings' MIDI tab: the devices, the computer's keyboard.
-    void drawMidiInputs();
-    void openMidiInputs()
-    {
-        showAudioSettings_ = true;
-        selectMidiTab_ = true;
-    }
+    // One entry point for physical inputs, virtual controllers and keyboard.
+    void openControllerInputs(bool keyboard = false);
     // Its device tab: driver, devices, rate, buffer.
     void drawAudioDevice();
     // Options › Compagnon Python: which Python, what it has, and setting up
@@ -428,15 +427,10 @@ private:
     [[nodiscard]] unsigned long long logo(float pixels);
     bool showWarnings_ {};
     bool showAudioSettings_ {};
-    bool selectMidiTab_ {};
-    bool selectMidiTabNow_ {};
     // The computer's keys as a MIDI keyboard.
     std::unique_ptr<ComputerKeyboard> computerKeyboard_;
     // The colour themes.
     std::unique_ptr<ThemesView> themes_;
-    // The MIDI devices, asked again now and then (asking is slow).
-    cydaw::base::Array<cydaw::midi::DeviceInfo> midiDevices_;
-    double midiDevicesTime_ { -100.0 };
     // The audio settings open on the card's inputs and outputs.
     bool showSoundCard_ {};
     bool selectSoundCardTab_ {};

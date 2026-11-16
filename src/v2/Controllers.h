@@ -4,7 +4,7 @@
 
 #include <memory>
 
-// The controllers tool (Options › Contrôleurs MIDI / OSC…). RAW devices: the
+// The controllers tool (Options › Contrôleurs et entrées…). RAW devices: the
 // MIDI ports, OSC sockets (local or on the network) and the devices that
 // application plug-ins (.cyctl) bring. Virtual controllers made from them,
 // a chain of modifiers between each raw address and its virtual control,
@@ -30,6 +30,8 @@ public:
     Controllers(Studio& studio, UiState& state, ImGuiHost& host, bool keepSettings, ComputerKeyboard* keyboard = nullptr);
     ~Controllers();
 
+    // Physical MIDI inputs share the same model as the controller editor.
+    bool setMidiInputEnabled(const cydaw::base::Text& identifier, bool enabled);
     // The window.
     void draw(bool& visible);
     // The toolbar's button: the window, and learning on a right click.

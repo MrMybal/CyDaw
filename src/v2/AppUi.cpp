@@ -1220,26 +1220,6 @@ void AppUi::frame()
     // (the graph, the workshop).
     computerKeyboard_->update(state_.selectedTrack && state_.selectedTrack->midi && state_.mode == AppMode::studio
                               && state_.focused != Panel::graph);
-    // A MIDI keyboard plugged in for the first time plays at once, as in
-    // Bitwig; one switched off in the MIDI inputs stays off.
-    if (ImGui::GetTime() - midiDevicesTime_ > 2.0) {
-        midiDevicesTime_ = ImGui::GetTime();
-        midiDevices_ = cydaw::midi::Input::getAvailableDevices();
-        auto& settings = studio_.settings();
-        auto known = cydaw::base::TextList::fromLines(settings.getValue("knownMidiInputs"));
-        auto changed = false;
-        // An automated session leaves the person's devices as they are.
-        for (const auto& device : midiDevices_)
-            if (studio_.keepsSettings() && !known.contains(device.identifier)) {
-                known.add(device.identifier);
-                studio_.engine().deviceManager().setMidiInputDeviceEnabled(device.identifier, true);
-                changed = true;
-            }
-        if (changed) {
-            settings.setValue("knownMidiInputs", known.joinIntoString("\n"));
-            studio_.saveAudioSetup();
-        }
-    }
     cinema_->tickCinemaVideo();
     handleShortcuts();
     drawMenuBar();
@@ -1693,7 +1673,6 @@ void AppUi::drawAudioSettings()
         showAudioSettings_ = false;
         selectSoundCardTab_ = showSoundCard_;
         showSoundCard_ = false;
-        selectMidiTabNow_ = std::exchange(selectMidiTab_, false);
     }
     // Large: the card's inputs and outputs are tables of their own.
     const auto* viewport = ImGui::GetMainViewport();
@@ -1730,14 +1709,6 @@ void AppUi::drawAudioSettings()
             ImGui::EndChild();
             ImGui::EndTabItem();
         }
-        // Asked for (the Options menu, the keyboard's right click): in front.
-        const auto midiTab = std::exchange(selectMidiTabNow_, false) ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
-        if (ImGui::BeginTabItem(ui::labelId(L("Entrées MIDI", "MIDI inputs"), "audioMidi").c_str(), nullptr, midiTab)) {
-            ImGui::BeginChild("##midi", ImVec2(0.0f, -footer));
-            drawMidiInputs();
-            ImGui::EndChild();
-            ImGui::EndTabItem();
-        }
         ImGui::EndTabBar();
     }
     ImGui::Spacing();
@@ -1749,111 +1720,23 @@ void AppUi::drawAudioSettings()
         studio_.saveAudioSetup();
         ImGui::CloseCurrentPopup();
     }
+    ImGui::SameLine();
+    if (ImGui::Button(L("Contrôleurs et entrées…", "Controllers and inputs…"))) {
+        studio_.saveAudioSetup();
+        ImGui::CloseCurrentPopup();
+        openControllerInputs();
+    }
     ImGui::EndPopup();
 }
 
-void AppUi::drawMidiInputs()
+void AppUi::openControllerInputs(const bool keyboard)
 {
-    const auto& p = theme::palette();
-    auto& manager = studio_.engine().deviceManager();
-    auto& keyboard = *computerKeyboard_;
-    ui::sectionTitle(L("Claviers et contrôleurs MIDI", "MIDI keyboards and controllers"));
-    if (midiDevices_.isEmpty())
-        ImGui::TextColored(theme::vec(p.textFaint), "%s",
-                           L("Aucun appareil MIDI branché (ils apparaissent ici dès qu'ils le sont).",
-                             "No MIDI device plugged in (they show here as soon as they are)."));
-    for (const auto& device : midiDevices_) {
-        auto on = manager.isMidiInputDeviceEnabled(device.identifier);
-        if (ImGui::Checkbox(ui::labelId(device.name.toRawUTF8(), device.identifier.toRawUTF8()).c_str(), &on)) {
-            manager.setMidiInputDeviceEnabled(device.identifier, on);
-            if (studio_.keepsSettings())
-                studio_.saveAudioSetup();
-        }
-    }
-    ImGui::TextColored(theme::vec(p.textDim), "%s",
-                       L("Ils jouent la piste instrument choisie (ou les pistes armées).",
-                         "They play the picked instrument track (or the armed tracks)."));
-    ImGui::Spacing();
-    ImGui::Spacing();
-
-    ui::sectionTitle(L("Clavier de l'ordinateur", "Computer keyboard"));
-    auto enabled = keyboard.enabled();
-    if (ImGui::Checkbox(L("Jouer des notes avec le clavier de l'ordinateur (Ctrl+K)", "Play notes with the computer keyboard (Ctrl+K)"),
-                        &enabled))
-        keyboard.setEnabled(enabled);
-    ImGui::BeginDisabled(!enabled);
-    auto octave = keyboard.octave();
-    ImGui::AlignTextToFramePadding();
-    ImGui::TextColored(theme::vec(p.textDim), "%s", L("Octave", "Octave"));
-    ImGui::SameLine(dp(110.0f));
-    ImGui::SetNextItemWidth(dp(140.0f));
-    if (ImGui::SliderInt("##keyboardOctave", &octave, -1, 8))
-        keyboard.setOctave(octave);
-    auto velocity = keyboard.velocity();
-    ImGui::AlignTextToFramePadding();
-    ImGui::TextColored(theme::vec(p.textDim), "%s", L("Vélocité", "Velocity"));
-    ImGui::SameLine(dp(110.0f));
-    ImGui::SetNextItemWidth(dp(140.0f));
-    if (ImGui::SliderInt("##keyboardVelocity", &velocity, 1, 127))
-        keyboard.setVelocity(velocity);
-
-    // Its keys drawn as a piano: what each one plays, as this keyboard has it.
-    ImGui::Spacing();
-    const auto origin = ImGui::GetCursorScreenPos();
-    auto* list = ImGui::GetWindowDrawList();
-    const auto white = dp(40.0f);
-    const auto height = dp(84.0f);
-    const auto blackHeight = dp(50.0f);
-    static constexpr int whiteOf[] = { 0, -1, 1, -1, 2, 3, -1, 4, -1, 5, -1, 6 };
-    const auto held = keyboard.heldNotes();
-    const auto base = (keyboard.octave() + 1) * 12;
-    const auto isHeld = [&held, base](const int semitone) { return std::find(held.begin(), held.end(), base + semitone) != held.end(); };
-    const auto whiteIndex = [](const int semitone) { return (semitone / 12) * 7 + whiteOf[semitone % 12]; };
-    for (const auto& key : keyboard.keys()) {
-        if (key.semitone < 0 || whiteOf[key.semitone % 12] < 0)
-            continue;
-        const auto x = origin.x + static_cast<float>(whiteIndex(key.semitone)) * white;
-        const ImVec2 min(x, origin.y);
-        const ImVec2 max(x + white - dp(2.0f), origin.y + height);
-        list->AddRectFilled(min, max, isHeld(key.semitone) ? p.accent : theme::mix(p.text, p.bg3, 0.12f), dp(3.0f));
-        char name[16];
-        const auto note = base + key.semitone;
-        static const char* namesFr[] = { "Do", "Do#", "Ré", "Ré#", "Mi", "Fa", "Fa#", "Sol", "Sol#", "La", "La#", "Si" };
-        static const char* namesEn[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
-        std::snprintf(name, sizeof(name), "%s%d", (ui::french() ? namesFr : namesEn)[note % 12], note / 12 - 1);
-        ui::centredText(list, ImVec2(min.x, max.y - dp(34.0f)), ImVec2(max.x, max.y - dp(18.0f)), p.bg0, key.label.c_str());
-        ui::centredText(list, ImVec2(min.x, max.y - dp(18.0f)), ImVec2(max.x, max.y - dp(2.0f)), theme::mix(p.bg0, p.text, 0.4f), name);
-    }
-    for (const auto& key : keyboard.keys()) {
-        if (key.semitone < 0 || whiteOf[key.semitone % 12] >= 0)
-            continue;
-        const auto x = origin.x + static_cast<float>(whiteIndex(key.semitone - 1) + 1) * white - white * 0.32f;
-        const ImVec2 min(x, origin.y);
-        const ImVec2 max(x + white * 0.62f, origin.y + blackHeight);
-        list->AddRectFilled(min, max, isHeld(key.semitone) ? p.accent : p.bg0, dp(3.0f));
-        list->AddRect(min, max, p.line, dp(3.0f));
-        ui::centredText(list, ImVec2(min.x, max.y - dp(20.0f)), ImVec2(max.x, max.y - dp(4.0f)), p.text, key.label.c_str());
-    }
-    ImGui::Dummy(ImVec2(white * 11.0f, height + dp(6.0f)));
-    std::string octaveKeys, velocityKeys;
-    for (const auto& key : keyboard.keys()) {
-        if (key.semitone == -1 || key.semitone == -2)
-            octaveKeys += (octaveKeys.empty() ? "" : " / ") + key.label;
-        if (key.semitone == -3 || key.semitone == -4)
-            velocityKeys += (velocityKeys.empty() ? "" : " / ") + key.label;
-    }
-    ImGui::TextColored(theme::vec(p.textDim), "%s %s    %s %s", L("Octave − / + :", "Octave − / +:"), octaveKeys.c_str(),
-                       L("Vélocité − / + :", "Velocity − / +:"), velocityKeys.c_str());
-    ImGui::EndDisabled();
-    ImGui::PushTextWrapPos(0.0f);
-    ImGui::TextColored(theme::vec(p.textFaint), "%s",
-                       L("Il joue la piste instrument choisie, comme un clavier MIDI. Ses touches passent avant les raccourcis "
-                         "d'une seule lettre (S, L…) tant qu'une piste instrument est choisie ; Ctrl et Alt gardent les leurs. "
-                         "Dans le graphe et l'atelier, les lettres restent des raccourcis.",
-                         "It plays the picked instrument track, as a MIDI keyboard does. Its keys come before the one-letter "
-                         "shortcuts (S, L…) while an instrument track is picked; Ctrl and Alt keep theirs. In the graph and "
-                         "the workshop, letters stay shortcuts."));
-    ImGui::PopTextWrapPos();
+    showControllers_ = true;
+    auto* request = new cydaw::base::Object();
+    request->setProperty("action", "show");
+    request->setProperty("tab", keyboard ? "keyboard" : "hardware");
+    request->setProperty("center", true);
+    controllers_->command(cydaw::base::Value(request));
 }
 
 cydaw::base::Value AppUi::themes(const cydaw::base::Value& request)
@@ -1941,9 +1824,7 @@ cydaw::base::Value AppUi::midiInputs(const cydaw::base::Text& command, const cyd
         auto found = false;
         for (const auto& device : devices)
             if (device.identifier == wanted || device.name == wanted) {
-                manager.setMidiInputDeviceEnabled(device.identifier, static_cast<bool>(request.getProperty("enabled", true)));
-                if (studio_.keepsSettings())
-                    studio_.saveAudioSetup();
+                controllers_->setMidiInputEnabled(device.identifier, static_cast<bool>(request.getProperty("enabled", true)));
                 found = true;
             }
         if (!found)
@@ -3258,16 +3139,12 @@ void AppUi::drawMenuBar()
             showAudioSettings_ = showSoundCard_ = true;
         if (ImGui::MenuItem(L("Synchronisation du transport…", "Transport synchronization…")))
             showTransportSync_ = true;
-        if (ImGui::MenuItem(L("Contrôleurs MIDI / OSC…", "MIDI / OSC controllers…")))
-            showControllers_ = true;
+        if (ImGui::MenuItem(L("Contrôleurs et entrées…", "Controllers and inputs…")))
+            openControllerInputs();
         ui::tooltip(L("Appareils MIDI, OSC et plug-ins d'application ; appareils virtuels ; assignations et apprentissage.",
                       "MIDI, OSC and application plug-in devices; virtual devices; assignments and learning."));
         if (ImGui::MenuItem(L("Apprendre une assignation", "Learn an assignment"), "Ctrl+M", controllers_->learning()))
             controllers_->setLearning(!controllers_->learning());
-        if (ImGui::MenuItem(L("Entrées MIDI…", "MIDI inputs…")))
-            openMidiInputs();
-        ui::tooltip(L("Les claviers et contrôleurs MIDI branchés, et le clavier de l'ordinateur comme clavier MIDI.",
-                      "The MIDI keyboards and controllers plugged in, and the computer's keyboard as a MIDI keyboard."));
         if (ImGui::MenuItem(L("Clavier de l'ordinateur (MIDI)", "Computer keyboard (MIDI)"), "Ctrl+K", computerKeyboard_->enabled()))
             computerKeyboard_->setEnabled(!computerKeyboard_->enabled());
         ui::tooltip(L("Les canaux ouverts de la carte, les bus d'entrée que les pistes enregistrent et les bus de sortie "
@@ -3509,22 +3386,22 @@ void AppUi::drawTransportBar()
             }
 
             // The computer's keys as a MIDI keyboard: on or off, its octave; a
-            // right click opens the MIDI inputs.
+            // right click opens the unified controllers window.
             {
                 ui::toolbarSeparator();
                 auto& keyboard = *computerKeyboard_;
                 const auto& p = theme::palette();
                 if (ui::iconButton(icon::keyboard,
                                    keyboard.enabled() ? L("Clavier de l'ordinateur : il joue la piste instrument choisie (Ctrl+K). "
-                                                          "Clic droit : les entrées MIDI.",
+                                                          "Clic droit : les contrôleurs et le clavier musical.",
                                                           "Computer keyboard: it plays the picked instrument track (Ctrl+K). "
-                                                          "Right click: the MIDI inputs.")
-                                                      : L("Clavier de l'ordinateur éteint (Ctrl+K). Clic droit : les entrées MIDI.",
-                                                          "Computer keyboard off (Ctrl+K). Right click: the MIDI inputs."),
+                                                          "Right click: controllers and musical keyboard.")
+                                                      : L("Clavier de l'ordinateur éteint (Ctrl+K). Clic droit : les contrôleurs et le clavier musical.",
+                                                          "Computer keyboard off (Ctrl+K). Right click: controllers and musical keyboard."),
                                    keyboard.enabled(), p.accent))
                     keyboard.setEnabled(!keyboard.enabled());
                 if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
-                    openMidiInputs();
+                    openControllerInputs(true);
                 if (keyboard.enabled()) {
                     ImGui::SameLine(0.0f, dp(4.0f));
                     ImGui::AlignTextToFramePadding();

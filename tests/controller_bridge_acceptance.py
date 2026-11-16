@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0,'tests')
 from cyaudio_comparison import Session,profile,write_json
 import v2_controllers_check as legacy
-root=Path.cwd();p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);a=p.parse_args()
+root=Path.cwd();p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--exe',type=Path,default=root/'build/cyaudio-sleep/CyDAW2_artefacts/Release/CyDAW 2.exe');a=p.parse_args()
 out=a.output.resolve();assert out.is_relative_to(root/'output');out.mkdir(parents=True,exist_ok=False)
 folder=out/'session';folder.mkdir();env=profile(folder,None)
 # Isolated persistence is enabled. Seed every known port OFF to suppress auto-enable.
@@ -21,7 +21,7 @@ for suffix in ('layout','processing'):
  props=E.Element('PROPERTIES')
  for k,v in [('audioDeviceState',E.tostring(dev,encoding='unicode')),('knownMidiInputs',known),('computerKeyboard','1')]:E.SubElement(props,'VALUE',name=k,val=v)
  E.ElementTree(props).write(folder/'Roaming/CyDAW'/('CyDAW.'+suffix+'.settings'),encoding='utf-8')
-s=Session.__new__(Session);s.port=48318;s.folder=folder;s.exe=root/'build/cyaudio-sleep/CyDAW2_artefacts/Release/CyDAW 2.exe'
+s=Session.__new__(Session);s.port=48318;s.folder=folder;s.exe=a.exe.resolve()
 report={'personalProfileSha256Before':before};running=False
 
 def start():
@@ -70,7 +70,30 @@ try:
  env['CYDAW_NO_RECOVERY']='1';start();state=ctl(action='status');restored=next(d for d in state['virtual'] if d['id']==box);assert restored['controls'][0]['chain'][0]['points']==points
  assert next(d for d in state['raw'] if d['id']=='mouse:computer')['present']
  before_count=state['directMidiMessages'];ctl(action='inject',device='mouse:computer',address='axis/x',value=.5);assert ctl(action='status')['directMidiMessages']==before_count+1
- report['settingsRoundtripPassed']=True;report['passed']=True
+ report['settingsRoundtripPassed']=True
+ # Legacy routes now open the one controller window, with the keyboard pane selected.
+ s.q(cmd='show_dialog',name='computer-keyboard');s.wait(lambda:ctl(action='status')['tab']=='keyboard',5)
+ s.q(cmd='snapshot',path=str(out/'unified-keyboard.png'))
+ s.q(cmd='show_dialog',name='midi-inputs');s.wait(lambda:ctl(action='status')['tab']=='hardware',5)
+ s.q(cmd='snapshot',path=str(out/'unified-hardware.png'))
+ # Disabling via the old automation API must update the unified model immediately.
+ inputs=s.q(cmd='midi_inputs')['devices']
+ if inputs:
+  s.q(cmd='midi_inputs',device=inputs[0]['identifier'],enabled=False)
+  assert not next(d for d in ctl(action='status')['raw'] if d['kind']=='midi-in' and d['name']==inputs[0]['name'])['enabled']
+ s.q(cmd='show_dialog',name='audio');time.sleep(.2);s.q(cmd='snapshot',path=str(out/'audio-settings.png'))
+ # Actual footer navigation closes the modal; controls in the unified window must then respond.
+ s.q(cmd='ui_input',events=[dict(type='move',x=400,y=808),dict(type='down',button=0),dict(type='up',button=0),dict(type='wait',frames=3)])
+ s.q(cmd='show_dialog',name='computer-keyboard');s.wait(lambda:ctl(action='status')['tab']=='keyboard',5)
+ enabled=s.q(cmd='computer_keyboard')['enabled']
+ for target in (not enabled,enabled):
+  s.q(cmd='ui_input',events=[dict(type='move',x=147,y=255),dict(type='down',button=0),dict(type='up',button=0),dict(type='wait',frames=3)])
+  assert s.q(cmd='computer_keyboard')['enabled']==target
+ before_devices=len(ctl(action='status')['virtual'])
+ s.q(cmd='ui_input',events=[dict(type='move',x=205,y=210),dict(type='down',button=0),dict(type='up',button=0),dict(type='wait',frames=3)])
+ s.wait(lambda:ctl(action='status')['tab']=='devices',5);assert len(ctl(action='status')['virtual'])==before_devices+1
+ s.q(cmd='snapshot',path=str(out/'keyboard-controller-created.png'))
+ report['unifiedInputsPassed']=True;report['passed']=True
 except BaseException:
  report['error']=traceback.format_exc();raise
 finally:

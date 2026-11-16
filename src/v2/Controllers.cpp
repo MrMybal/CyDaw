@@ -401,6 +401,8 @@ const Controllers::Impl::RawDevice* Controllers::Impl::rawDevice(const std::stri
 void Controllers::Impl::scanMidi()
 {
     auto& manager = studio.engine().deviceManager();
+    auto known = cydaw::base::TextList::fromLines(studio.settings().getValue("knownMidiInputs"));
+    bool discovered = false;
     for (auto& device : raw)
         if (device->kind == RawKind::midiIn || device->kind == RawKind::midiOut)
             device->present = false;
@@ -427,14 +429,24 @@ void Controllers::Impl::scanMidi()
                 if (kind == RawKind::midiIn)
                     manager.addMidiInputDeviceCallback(device->identifier, this);
             }
-            // An input is open while the device manager has it on (the
-            // MIDI inputs' tab, the transport sync share it).
-            if (kind == RawKind::midiIn)
+            // Discover and open new MIDI keyboards here, independently of frames.
+            // Known disabled ports stay disabled. Automated profiles never auto-open.
+            if (kind == RawKind::midiIn) {
+                if (keepSettings && !known.contains(device->identifier)) {
+                    known.add(device->identifier);
+                    manager.setMidiInputDeviceEnabled(device->identifier, true);
+                    discovered = true;
+                }
                 device->enabled = manager.isMidiInputDeviceEnabled(device->identifier);
+            }
         }
     };
     list(cydaw::midi::Input::getAvailableDevices(), RawKind::midiIn);
     list(cydaw::midi::Output::getAvailableDevices(), RawKind::midiOut);
+    if (discovered) {
+        studio.settings().setValue("knownMidiInputs", known.joinIntoString("\n"));
+        studio.saveAudioSetup();
+    }
     {
         const std::scoped_lock hold(gateLock);
         midiNames.clear();
@@ -510,8 +522,10 @@ void Controllers::Impl::applyRaw(RawDevice& device)
 {
     device.error.clear();
     if (device.kind == RawKind::midiIn) {
-        if (device.present)
+        if (device.present) {
             studio.engine().deviceManager().setMidiInputDeviceEnabled(device.identifier, device.enabled);
+            if (keepSettings) studio.saveAudioSetup();
+        }
     } else if (device.kind == RawKind::midiOut) {
         if (!device.enabled)
             device.output.reset();
@@ -1426,6 +1440,7 @@ cydaw::base::Value Controllers::Impl::describe() const
     set(result, "learnHardware", cydaw::base::Text(learnHardware));
     set(result, "learnControls", cydaw::base::Text(learnControls));
     set(result, "learnStatus", learnStatus);
+    set(result, "tab", tab == 1 ? "hardware" : tab == 2 ? "assignments" : tab == 3 ? "keyboard" : "devices");
     set(result, "nativeInputActive", nativeInput && nativeInput->available());
     set(result, "directMidiMessages", static_cast<std::int64_t>(directMidi.sent()));
     return result;
@@ -1443,7 +1458,7 @@ cydaw::base::Value Controllers::Impl::command(const cydaw::base::Value& request)
             centreWindow = true;
         const auto tabName = text(request, "tab");
         if (tabName.isNotEmpty())
-            requestedTab = tabName == "hardware" ? 1 : tabName == "assignments" ? 2 : 0;
+            requestedTab = tabName == "hardware" ? 1 : tabName == "assignments" ? 2 : tabName == "keyboard" ? 3 : 0;
         if (router.findDevice(device) != nullptr) {
             selectedDevice = device;
             selectedControl = router.findControl(device, controlId) != nullptr ? controlId : std::string();
@@ -1701,6 +1716,19 @@ Controllers::Controllers(Studio& studio, UiState& state, ImGuiHost& host, const 
 }
 
 Controllers::~Controllers() = default;
+
+bool Controllers::setMidiInputEnabled(const cydaw::base::Text& identifier, const bool enabled)
+{
+    impl_->scanMidi();
+    for (auto& device : impl_->raw)
+        if (device->kind == Impl::RawKind::midiIn && device->identifier == identifier) {
+            device->enabled = enabled;
+            impl_->applyRaw(*device);
+            impl_->changed(true, false);
+            return true;
+        }
+    return false;
+}
 
 void Controllers::draw(bool& visible)
 {

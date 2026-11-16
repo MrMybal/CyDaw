@@ -4,12 +4,12 @@ title: MIDI, OSC and hardware controllers
 description: Learn hardware controls and configure feedback.
 section: Manual / Build and connect
 order: 28
-revision: be7cf38d3e9d0314
+revision: 9fceb317e72d3788
 ---
 
 ## Overview {#overview}
 
-Open CTRL or Options > MIDI/OSC controllers. Devices identify hardware; rules translate its controls into CyDAW targets. This mapping is separate from simply enabling MIDI notes on an instrument track. Learning can start from hardware or from a highlighted software control.
+Open CTRL or Options > Controllers and inputs. Devices identify hardware; rules translate its controls into CyDAW targets. This mapping is separate from simply enabling MIDI notes on an instrument track. Learning can start from hardware or from a highlighted software control.
 
 
 ~~~image
@@ -18,6 +18,8 @@ Open CTRL or Options > MIDI/OSC controllers. Devices identify hardware; rules tr
 
 *A hardware rule changes a parameter; automation and modulation can also address it.*
 
+
+The same window contains **Devices**, **Detected hardware**, **All assignments** and **Musical keyboard**. Enable physical MIDI ports under Detected hardware. Musical keyboard contains the note-playing switch, octave, velocity and key preview, plus **Create a keyboard controller** for custom rules. Right-click the transport keyboard icon to open that pane. Audio settings now contain only the audio device and sound-card routing, with a button to open Controllers and inputs.
 
 ## Create and learn {#learn}
 Add a device, move a control to identify its input or select the input manually. MIDI, computer keyboard, supported gamepad plugin and OSC endpoints are distinct families. For OSC create a UDP endpoint and set listening/return host/ports; it is controller traffic, not audio streaming.

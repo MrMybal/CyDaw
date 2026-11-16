@@ -1,6 +1,8 @@
 #include <cydaw/base/File.h>
 #include <cydaw/base/Text.h>
 #include "ControllersImpl.h"
+#include "ComputerKeyboard.h"
+#include <cstdio>
 
 #include "Icons.h"
 #include "ImGuiHost.h"
@@ -217,7 +219,7 @@ void Controllers::Impl::drawButton(bool& visible)
     }
     if (learnMode)
         ImGui::PopStyleColor();
-    ui::tooltip(L("Contrôleurs MIDI / OSC (clic droit ou Ctrl+M : apprendre)", "MIDI / OSC controllers (right click or Ctrl+M: learn)"));
+    ui::tooltip(L("Contrôleurs et entrées (clic droit ou Ctrl+M : apprendre)", "Controllers and inputs (right click or Ctrl+M: learn)"));
 }
 
 // ---- The window ---------------------------------------------------------------------------------
@@ -238,7 +240,7 @@ void Controllers::Impl::draw(bool& visible)
         ImGui::SetNextWindowSize(ImVec2(std::min(dp(1240.0f), main->WorkSize.x - dp(40.0f)), std::min(dp(780.0f), main->WorkSize.y - dp(40.0f))),
                                  ImGuiCond_Always);
     }
-    if (!ImGui::Begin(L("Contrôleurs MIDI / OSC###controllers", "MIDI / OSC controllers###controllers"), &visible)) {
+    if (!ImGui::Begin(L("Contrôleurs et entrées###controllers", "Controllers and inputs###controllers"), &visible)) {
         ImGui::End();
         return;
     }
@@ -264,10 +266,12 @@ void Controllers::Impl::draw(bool& visible)
         ImGui::TextDisabled("%s", L("Un périphérique : son matériel, puis ses règles, apprises en bougeant ses contrôles.",
                                     "A device: its hardware, then its rules, learnt by moving its controls."));
     if (ImGui::BeginTabBar("##controllersTabs")) {
+        const auto requested = std::exchange(requestedTab, -1);
         const char* names[] { L("Périphériques###devices", "Devices###devices"), L("Matériel détecté###hardware", "Detected hardware###hardware"),
-                              L("Toutes les assignations###assignments", "All assignments###assignments") };
-        for (int index = 0; index < 3; ++index) {
-            const auto flags = requestedTab == index ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
+                              L("Toutes les assignations###assignments", "All assignments###assignments"),
+                              L("Clavier musical###keyboard", "Musical keyboard###keyboard") };
+        for (int index = 0; index < 4; ++index) {
+            const auto flags = requested == index ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
             if (!ImGui::BeginTabItem(names[index], nullptr, flags))
                 continue;
             tab = index;
@@ -303,18 +307,118 @@ void Controllers::Impl::draw(bool& visible)
                 if (ImGui::BeginChild("##raw", ImVec2(0.0f, 0.0f)))
                     drawRaw();
                 ImGui::EndChild();
-            } else {
+            } else if (index == 2) {
                 if (ImGui::BeginChild("##assignments", ImVec2(0.0f, 0.0f)))
                     drawAssignments();
+                ImGui::EndChild();
+            } else {
+                if (ImGui::BeginChild("##musicalKeyboard", ImVec2(0.0f, 0.0f)))
+                    drawComputerKeyboard();
                 ImGui::EndChild();
             }
             ImGui::EndTabItem();
         }
-        requestedTab = -1;
         ImGui::EndTabBar();
     }
     ImGui::End();
 }
+
+void Controllers::Impl::drawComputerKeyboard()
+{
+    const auto& p = theme::palette();
+    if (!noteKeyboard) { ImGui::TextDisabled("%s", L("Clavier indisponible", "Keyboard unavailable")); return; }
+    auto& keyboard = *noteKeyboard;
+    if (ImGui::Button(L("Créer un contrôleur clavier…", "Create a keyboard controller…"))) {
+        stopLearning();
+        selectedDevice = addVirtualDevice({}, computerKeyboardId);
+        selectedControl.clear();
+        learnControls = selectedDevice;
+        requestedTab = 0;
+    }
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", L("Personnalisez les touches, macros, CC et commandes dans ses règles.",
+                               "Customize keys, macros, CCs and commands in its rules."));
+    ImGui::Spacing();
+    ui::sectionTitle(L("Clavier de l'ordinateur", "Computer keyboard"));
+    auto enabled = keyboard.enabled();
+    if (ImGui::Checkbox(L("Jouer des notes avec le clavier de l'ordinateur (Ctrl+K)", "Play notes with the computer keyboard (Ctrl+K)"),
+                        &enabled))
+        keyboard.setEnabled(enabled);
+    ImGui::BeginDisabled(!enabled);
+    auto octave = keyboard.octave();
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextColored(theme::vec(p.textDim), "%s", L("Octave", "Octave"));
+    ImGui::SameLine(dp(110.0f));
+    ImGui::SetNextItemWidth(dp(140.0f));
+    if (ImGui::SliderInt("##keyboardOctave", &octave, -1, 8))
+        keyboard.setOctave(octave);
+    auto velocity = keyboard.velocity();
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextColored(theme::vec(p.textDim), "%s", L("Vélocité", "Velocity"));
+    ImGui::SameLine(dp(110.0f));
+    ImGui::SetNextItemWidth(dp(140.0f));
+    if (ImGui::SliderInt("##keyboardVelocity", &velocity, 1, 127))
+        keyboard.setVelocity(velocity);
+
+    // Its keys drawn as a piano: what each one plays, as this keyboard has it.
+    ImGui::Spacing();
+    const auto origin = ImGui::GetCursorScreenPos();
+    auto* list = ImGui::GetWindowDrawList();
+    const auto white = dp(40.0f);
+    const auto height = dp(84.0f);
+    const auto blackHeight = dp(50.0f);
+    static constexpr int whiteOf[] = { 0, -1, 1, -1, 2, 3, -1, 4, -1, 5, -1, 6 };
+    const auto held = keyboard.heldNotes();
+    const auto base = (keyboard.octave() + 1) * 12;
+    const auto isHeld = [&held, base](const int semitone) { return std::find(held.begin(), held.end(), base + semitone) != held.end(); };
+    const auto whiteIndex = [](const int semitone) { return (semitone / 12) * 7 + whiteOf[semitone % 12]; };
+    for (const auto& key : keyboard.keys()) {
+        if (key.semitone < 0 || whiteOf[key.semitone % 12] < 0)
+            continue;
+        const auto x = origin.x + static_cast<float>(whiteIndex(key.semitone)) * white;
+        const ImVec2 min(x, origin.y);
+        const ImVec2 max(x + white - dp(2.0f), origin.y + height);
+        list->AddRectFilled(min, max, isHeld(key.semitone) ? p.accent : theme::mix(p.text, p.bg3, 0.12f), dp(3.0f));
+        char name[16];
+        const auto note = base + key.semitone;
+        static const char* namesFr[] = { "Do", "Do#", "Ré", "Ré#", "Mi", "Fa", "Fa#", "Sol", "Sol#", "La", "La#", "Si" };
+        static const char* namesEn[] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+        std::snprintf(name, sizeof(name), "%s%d", (ui::french() ? namesFr : namesEn)[note % 12], note / 12 - 1);
+        ui::centredText(list, ImVec2(min.x, max.y - dp(34.0f)), ImVec2(max.x, max.y - dp(18.0f)), p.bg0, key.label.c_str());
+        ui::centredText(list, ImVec2(min.x, max.y - dp(18.0f)), ImVec2(max.x, max.y - dp(2.0f)), theme::mix(p.bg0, p.text, 0.4f), name);
+    }
+    for (const auto& key : keyboard.keys()) {
+        if (key.semitone < 0 || whiteOf[key.semitone % 12] >= 0)
+            continue;
+        const auto x = origin.x + static_cast<float>(whiteIndex(key.semitone - 1) + 1) * white - white * 0.32f;
+        const ImVec2 min(x, origin.y);
+        const ImVec2 max(x + white * 0.62f, origin.y + blackHeight);
+        list->AddRectFilled(min, max, isHeld(key.semitone) ? p.accent : p.bg0, dp(3.0f));
+        list->AddRect(min, max, p.line, dp(3.0f));
+        ui::centredText(list, ImVec2(min.x, max.y - dp(20.0f)), ImVec2(max.x, max.y - dp(4.0f)), p.text, key.label.c_str());
+    }
+    ImGui::Dummy(ImVec2(white * 11.0f, height + dp(6.0f)));
+    std::string octaveKeys, velocityKeys;
+    for (const auto& key : keyboard.keys()) {
+        if (key.semitone == -1 || key.semitone == -2)
+            octaveKeys += (octaveKeys.empty() ? "" : " / ") + key.label;
+        if (key.semitone == -3 || key.semitone == -4)
+            velocityKeys += (velocityKeys.empty() ? "" : " / ") + key.label;
+    }
+    ImGui::TextColored(theme::vec(p.textDim), "%s %s    %s %s", L("Octave − / + :", "Octave − / +:"), octaveKeys.c_str(),
+                       L("Vélocité − / + :", "Velocity − / +:"), velocityKeys.c_str());
+    ImGui::EndDisabled();
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextColored(theme::vec(p.textFaint), "%s",
+                       L("Il joue la piste instrument choisie, comme un clavier MIDI. Ses touches passent avant les raccourcis "
+                         "d'une seule lettre (S, L…) tant qu'une piste instrument est choisie ; Ctrl et Alt gardent les leurs. "
+                         "Dans le graphe et l'atelier, les lettres restent des raccourcis.",
+                         "It plays the picked instrument track, as a MIDI keyboard does. Its keys come before the one-letter "
+                         "shortcuts (S, L…) while an instrument track is picked; Ctrl and Alt keep theirs. In the graph and "
+                         "the workshop, letters stay shortcuts."));
+    ImGui::PopTextWrapPos();
+}
+
 
 // ---- Devices ------------------------------------------------------------------------------------
 
@@ -1109,6 +1213,10 @@ void Controllers::Impl::drawRaw()
                     device.notes = notes;
                     changed(true, false);
                 }
+            }
+            if (device.id == computerKeyboardId) {
+                ImGui::SameLine();
+                if (ImGui::SmallButton(L("Clavier musical…", "Musical keyboard…"))) requestedTab = 3;
             }
             if (const auto found = users.find(device.id); found != users.end()) {
                 ImGui::SameLine();

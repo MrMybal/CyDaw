@@ -4,12 +4,12 @@ title: Contrôleurs MIDI, OSC et matériels
 description: Apprendre les commandes matérielles et configurer leur retour.
 section: Manuel / Créer et connecter
 order: 28
-sourceRevision: be7cf38d3e9d0314
+sourceRevision: 9fceb317e72d3788
 ---
 
 ## Vue d’ensemble {#overview}
 
-CTRL ou Options > Contrôleurs MIDI/OSC ouvre les appareils. Un périphérique identifie le matériel ; ses règles transforment les contrôles vers les cibles CyDAW. Ce n'est pas simplement activer les notes d'une piste. L'apprentissage part du matériel ou d'un contrôle logiciel encadré.
+CTRL ou Options > Contrôleurs et entrées ouvre les appareils. Un périphérique identifie le matériel ; ses règles transforment les contrôles vers les cibles CyDAW. Ce n'est pas simplement activer les notes d'une piste. L'apprentissage part du matériel ou d'un contrôle logiciel encadré.
 
 
 ~~~image
@@ -18,6 +18,8 @@ CTRL ou Options > Contrôleurs MIDI/OSC ouvre les appareils. Un périphérique i
 
 *Une règle matérielle change un paramètre, aussi accessible à automation et modulation.*
 
+
+La même fenêtre rassemble **Périphériques**, **Matériel détecté**, **Toutes les assignations** et **Clavier musical**. Activer les ports MIDI physiques dans Matériel détecté. Clavier musical réunit activation du jeu, octave, vélocité, aperçu des touches et **Créer un contrôleur clavier** pour personnaliser ses règles. Le clic droit sur l’icône clavier du transport ouvre cet onglet. Les réglages audio contiennent désormais seulement le périphérique audio et le routage de la carte, avec un bouton vers Contrôleurs et entrées.
 
 ## Créer et apprendre {#learn}
 Ajouter un appareil puis bouger un contrôle pour identifier l'entrée, ou la choisir. MIDI, clavier, plugin manette et points OSC sont distincts. Pour OSC créer le point UDP et ses hôte/ports de retour : ce sont des contrôles, pas un flux audio.

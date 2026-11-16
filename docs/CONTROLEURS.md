@@ -1,13 +1,14 @@
 # Contrôleurs MIDI / OSC
 
-**Options → Contrôleurs MIDI / OSC…**, ou le bouton **CTRL** de la barre d'outils, ouvre la fenêtre. Un clic droit sur **CTRL**, ou **Ctrl+M**, passe en mode **Apprendre**.
+**Options → Contrôleurs et entrées…**, ou le bouton **CTRL** de la barre d'outils, ouvre la fenêtre. Un clic droit sur **CTRL**, ou **Ctrl+M**, passe en mode **Apprendre**.
 
 La fenêtre est faite autour des **périphériques**. Un périphérique, c'est un appareil que CyDAW écoute : votre clavier MIDI, une manette, une tablette OSC, le clavier de l'ordinateur. On le crée, on lui donne son matériel, puis on apprend ses règles en bougeant ses contrôles un par un.
 
-Trois onglets :
+Quatre onglets :
 - **Périphériques** : vos périphériques et leurs règles (l'essentiel) ;
 - **Matériel détecté** : ce que CyDAW voit tel quel ;
-- **Toutes les assignations** : tout ce que les règles pilotent, d'un coup d'œil.
+- **Toutes les assignations** : tout ce que les règles pilotent, d'un coup d'œil ;
+- **Clavier musical** : jeu de notes, octave, vélocité, aperçu des touches et création d’un contrôleur clavier personnalisé.
 
 ## Créer un périphérique
 
@@ -88,7 +89,7 @@ On clique une commande, puis on bouge un contrôle :
 ## Matériel détecté
 
 Ce que CyDAW voit tel quel :
-- **Entrées MIDI** : la case ouvre ou ferme le port (le même réglage que l'onglet *Entrées MIDI* des réglages audio), et **Notes** comme plus haut ;
+- **Entrées MIDI** : la case ouvre ou ferme le port (le même réglage que l’onglet *Matériel détecté* de cette fenêtre), et **Notes** comme plus haut ;
 - **Sorties MIDI** : ouvertes seulement au premier retour à envoyer ; un port déjà pris par un autre logiciel est signalé ;
 - **Cet ordinateur** : le clavier ;
 - **Plug-ins d'application** : leurs appareils, et les plug-ins chargés ;
@@ -162,3 +163,5 @@ Sous Windows, l'application de bureau capture clavier et souris avec un service 
 Adresses souris : `button/left`, `button/right`, `button/middle`, `button/x1`, `button/x2`, position normalisée sur l'écran `axis/x`, `axis/y`, et molette relative `wheel`. Utiliser **Relatif** avec le codage complément à deux pour la molette. L'extension d'application XInput fournit chaque manette Xbox compatible connectée : sticks, gâchettes et boutons. Les autres matériels peuvent fournir leurs adresses via l'ABI publique d'extensions contrôleurs `.cyctl` ; les protocoles HID arbitraires ne sont pas décodés automatiquement.
 
 La conversion MIDI s'exécute sur le thread d'entrée/fournisseur. Les commandes qui modifient le logiciel passent par le thread d'application et peuvent attendre s'il est occupé. Le callback audio n'exécute ni configuration de contrôleur ni commande d'interface. Définitions des contrôleurs, courbes et assignations MIDI globales sont sauvegardées dans les réglages de l'application ; les assignations DAW propres à un projet restent dans ce projet.
+
+Les réglages audio ne conservent plus de page MIDI séparée. Leur bouton **Contrôleurs et entrées…** ouvre cette fenêtre ; le clic droit sur l’icône clavier du transport ouvre directement **Clavier musical**. Les anciennes commandes d’automatisation `midi_inputs` et `computer_keyboard` restent compatibles et partagent les mêmes réglages.
