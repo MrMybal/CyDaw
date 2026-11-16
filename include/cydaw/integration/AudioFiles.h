@@ -139,6 +139,8 @@ public:
   virtual ~AudioFormatWriter() { delete output; }
   virtual bool write(const int **channels, int frames) = 0;
   virtual bool flush() { return true; }
+  // Control/worker only. Finalise the underlying stream and report close errors.
+  virtual bool finish() { return flush(); }
   bool writeFromFloatArrays(const float *const *channels, int n, int frames) {
     if (n < 0 || n > 256)
       return false;
@@ -161,12 +163,27 @@ public:
 // Bounded SPSC recorder queue; allocation and file IO stay on the
 // control/worker side.
 class AudioFormatWriter::ThreadedWriter {
+public:
+  struct Result {
+    std::uint64_t submittedFrames = 0, acceptedFrames = 0, writtenFrames = 0;
+    std::uint64_t rejectedFrames = 0, rejectedBlocks = 0;
+    bool failed = false;
+    // writtenFrames counts frames confirmed by successful sink writes; a failed
+    // write may have written a partial block and is never counted as confirmed.
+    bool complete() const noexcept {
+      return !failed && rejectedFrames == 0 && acceptedFrames == writtenFrames;
+    }
+  };
+
+private:
   std::unique_ptr<AudioFormatWriter> writer_;
   std::vector<float> ring_, scratch_;
   std::vector<const float *> pointers_;
   std::size_t capacity_;
   std::atomic<uint64_t> written_{0}, read_{0};
   std::atomic<bool> stopping_{false}, failed_{false};
+  std::atomic<std::uint64_t> submitted_{0}, rejected_{0}, rejectedBlocks_{0};
+  std::uint64_t confirmedWritten_ = 0; // Worker-owned; read only after join.
   std::thread worker_;
   void run() {
     while (!stopping_.load(std::memory_order_acquire) ||
@@ -184,13 +201,25 @@ class AudioFormatWriter::ThreadedWriter {
           out[i] = ring_[ch * capacity_ + (r + i) % capacity_];
         pointers_[ch] = out;
       }
-      if (!writer_->writeFromFloatArrays(pointers_.data(),
-                                         int(pointers_.size()), int(n)))
-        failed_ = true;
+      if (!failed_.load(std::memory_order_relaxed)) {
+        try {
+          if (writer_->writeFromFloatArrays(pointers_.data(),
+                                           int(pointers_.size()), int(n)))
+            confirmedWritten_ += n;
+          else
+            failed_.store(true, std::memory_order_release);
+        } catch (...) {
+          failed_.store(true, std::memory_order_release);
+        }
+      }
       read_.store(r + n, std::memory_order_release);
     }
-    if (!writer_->flush())
-      failed_ = true;
+    try {
+      if (!writer_->finish())
+        failed_.store(true, std::memory_order_release);
+    } catch (...) {
+      failed_.store(true, std::memory_order_release);
+    }
   }
 
 public:
@@ -200,18 +229,29 @@ public:
         scratch_(writer->numChannels * 4096), pointers_(writer->numChannels),
         capacity_(std::size_t(std::max(4096, samples))),
         worker_([this] { run(); }) {}
-  ~ThreadedWriter() {
+  ~ThreadedWriter() { (void)finish(); }
+  // Single control owner, producer already quiescent. Never call in the audio
+  // callback: drains, joins, closes and returns the final sticky sink outcome.
+  Result finish() {
     stopping_.store(true, std::memory_order_release);
     if (worker_.joinable())
       worker_.join();
+    return {submitted_.load(), written_.load(), confirmedWritten_,
+            rejected_.load(), rejectedBlocks_.load(), failed_.load()};
   }
   bool write(const float *const *channels, int frames) {
-    if (frames < 0 || failed_.load() || stopping_.load())
+    if (frames < 0 || stopping_.load(std::memory_order_acquire))
       return false;
+    submitted_.fetch_add(std::uint64_t(frames), std::memory_order_relaxed);
     auto w = written_.load(std::memory_order_relaxed),
          r = read_.load(std::memory_order_acquire);
-    if (std::size_t(frames) > capacity_ - (w - r))
+    if (failed_.load(std::memory_order_acquire) ||
+        std::size_t(frames) > capacity_ - (w - r)) {
+      rejected_.fetch_add(std::uint64_t(frames), std::memory_order_relaxed);
+      if (frames > 0)
+        rejectedBlocks_.fetch_add(1, std::memory_order_relaxed);
       return false;
+    }
     for (unsigned ch = 0; ch < writer_->numChannels; ++ch)
       for (int i = 0; i < frames; ++i)
         ring_[ch * capacity_ + (w + std::size_t(i)) % capacity_] =

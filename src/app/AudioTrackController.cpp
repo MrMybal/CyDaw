@@ -1813,12 +1813,15 @@ cydaw::base::Result MasterOutputAudioSource::startCapture(
     return cydaw::base::Result::ok();
 }
 
-void MasterOutputAudioSource::stopCapture()
+cydaw::audio::AudioFormatWriter::ThreadedWriter::Result MasterOutputAudioSource::stopCapture()
 {
     activeWriter_.store(nullptr);
     while (callbacksInFlight_.load() != 0)
         std::this_thread::yield();
+    const auto result = threadedWriter_ ? threadedWriter_->finish()
+        : cydaw::audio::AudioFormatWriter::ThreadedWriter::Result {};
     threadedWriter_.reset();
+    return result;
 }
 
 bool MasterOutputAudioSource::isCapturing() const noexcept
@@ -16518,10 +16521,14 @@ cydaw::base::Result AudioTrackController::finishMasterExport()
     if (!masterOutput_.isCapturing())
         return cydaw::base::Result::fail(tr("error.masterExportInactive"));
     const auto destination = masterExportDestination_;
-    const auto dropped = masterOutput_.droppedBlockCount();
+    cydaw::audio::AudioFormatWriter::ThreadedWriter::Result result;
+    int dropped = 0;
+    bool complete = false;
     {
         const cydaw::base::ScopedLock audioLock(deviceManager_.getAudioCallbackLock());
-        masterOutput_.stopCapture();
+        result = masterOutput_.stopCapture();
+        dropped = masterOutput_.droppedBlockCount();
+        complete = masterOutput_.captureComplete();
         stop();
         setPosition(0.0);
         setLooping(masterExportPreviousLooping_);
@@ -16533,6 +16540,8 @@ cydaw::base::Result AudioTrackController::finishMasterExport()
     if (dropped > 0)
         return cydaw::base::Result::fail(tr("error.masterExportDropped", "count",
                                      cydaw::base::Text(dropped)));
+    if (!complete || !result.complete())
+        return cydaw::base::Result::fail(tr("error.exportWrite"));
     return cydaw::base::Result::ok();
 }
 

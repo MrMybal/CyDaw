@@ -358,9 +358,19 @@ public:
         return writer_.open(stream_, format_, info, quality_, chunkFrames) == cyaudio::Status::ok;
     }
     void takeStream(cydaw::base::OutputStream* stream) { output = stream; }
-    ~Writer() override { (void) writer_.close(); }
+    ~Writer() override { (void) finish(); }
+    bool finish() override {
+        if (finished_) return finishResult_;
+        finished_ = true;
+        const auto status = writer_.close();
+        stream_->flush();
+        auto* file = dynamic_cast<cydaw::base::FileOutputStream*>(output);
+        const bool streamOk = !file || file->close().wasOk();
+        finishResult_ = status == cyaudio::Status::ok && *stream_ && !bridge_.failed() && streamOk;
+        return finishResult_;
+    }
     bool write(const int** samples, int frames) override {
-        if (!samples || frames < 0) return false;
+        if (finished_ || !samples || frames < 0) return false;
         unsigned provided = 0;
         while (provided < numChannels && samples[provided]) ++provided;
         for (int offset = 0; offset < frames;) {
@@ -373,6 +383,7 @@ public:
         return true;
     }
     bool flush() override {
+        if (finished_) return finishResult_;
         const auto status = writer_.flush();
         stream_->flush();
         return status == cyaudio::Status::ok && *stream_ && !bridge_.failed();
@@ -385,6 +396,7 @@ private:
     cyaudio::AudioFileWriter writer_;
     cyaudio::AudioFileFormat format_;
     std::string quality_;
+    bool finished_ = false, finishResult_ = false;
 };
 
 class ReadFormat final : public cydaw::audio::AudioFormat {

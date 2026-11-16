@@ -519,6 +519,8 @@ public:
   int64 getPosition() override;
   bool setPosition(int64) override;
   void flush() override;
+  // Control/worker only. Reports flush/physical file-close failure; idempotent.
+  Result close();
   Result truncate();
   Result getStatus() const { return result_; }
   bool openedOk() const { return result_.wasOk(); }

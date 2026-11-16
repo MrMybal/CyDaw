@@ -560,6 +560,15 @@ Result FileOutputStream::truncate() {
   std::filesystem::resize_file(file_.path(), uint64(position), e);
   return e ? Result::fail(e.message()) : Result::ok();
 }
+Result FileOutputStream::close() {
+  if (stream_.is_open()) {
+    flush();
+    stream_.close();
+    if (!stream_ && result_.wasOk())
+      result_ = Result::fail("File close failed");
+  }
+  return result_;
+}
 bool OutputStream::writeText(const Text &text, bool unicode, bool header,
                              const char *newlines) {
   auto s = newlines ? text.replace("\r\n", "\n").replace("\n", newlines) : text;

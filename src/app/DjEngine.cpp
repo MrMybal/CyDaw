@@ -741,6 +741,7 @@ void DjEngine::runCommand(Deck& deck, const Command& command)
     const auto nearestBeat = [&](const double seconds) { return first + std::round((seconds - first) / beat) * beat; };
     const auto beatBehind = [&](const double seconds) { return first + std::floor((seconds - first) / beat + 1.0e-6) * beat; };
     const auto jumpTo = [&](const double seconds) { deck.player.jump(std::clamp(seconds, 0.0, length) * rate); };
+    const auto stopAt = [&](const double seconds) { deck.player.stopAt(std::clamp(seconds, 0.0, length) * rate); };
     const auto master = currentMaster_.load(std::memory_order_relaxed);
     switch (command.type) {
     case Command::Type::play:
@@ -759,7 +760,7 @@ void DjEngine::runCommand(Deck& deck, const Command& command)
         const auto point = deck.cuePoint.load(std::memory_order_relaxed);
         if (deck.playingNow) {
             deck.playingNow = false;
-            jumpTo(point);
+            stopAt(point);
         } else {
             if (std::abs(at - point) > 0.001) {
                 const auto set = quantised ? std::max(0.0, nearestBeat(at)) : at;
@@ -774,7 +775,7 @@ void DjEngine::runCommand(Deck& deck, const Command& command)
         if (deck.cueHeld) {
             deck.cueHeld = false;
             if (!deck.playingNow)
-                jumpTo(deck.cuePoint.load(std::memory_order_relaxed));
+                stopAt(deck.cuePoint.load(std::memory_order_relaxed));
         }
         break;
     case Command::Type::seek:

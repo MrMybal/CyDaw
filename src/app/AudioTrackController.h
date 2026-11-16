@@ -575,7 +575,8 @@ public:
     // devices) is skipped, so the file starts with the song's first sample.
     [[nodiscard]] cydaw::base::Result startCapture(const cydaw::base::File& destination,
                                              double durationSeconds, int skipSamples = 0);
-    void stopCapture();
+    // Control only, after capture publication is detached; includes final I/O status.
+    cydaw::audio::AudioFormatWriter::ThreadedWriter::Result stopCapture();
     [[nodiscard]] bool isCapturing() const noexcept;
     [[nodiscard]] bool captureComplete() const noexcept;
     [[nodiscard]] double captureProgress() const noexcept;

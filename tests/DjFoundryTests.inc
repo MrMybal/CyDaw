@@ -56,6 +56,44 @@ void djDeckPlaysAtItsTempo()
     }
 }
 
+void djCueReturnHoldsItsPosition()
+{
+    using namespace cydaw::engine::dj;
+    for (const auto rate : { 44'100.0, 48'000.0 }) {
+        TrackAudio track;
+        track.sampleRate = rate;
+        track.channels = djTone(413.0, 10.0, rate);
+        for (const auto keylock : { false, true }) {
+            for (const auto count : { 1, 17, 64, 480, 1'024, 2'048 }) {
+                DeckPlayer deck;
+                deck.prepare(48'000.0, count);
+                deck.setTrack(&track);
+                deck.setLoop(rate, rate * 9);
+                std::vector<float> left(count), right(count);
+                deck.render(left.data(), right.data(), count, 1.0, keylock);
+                deck.render(left.data(), right.data(), count, 1.0, keylock);
+                const auto previous = left.back();
+                const auto cue = 8.21 * rate;
+                deck.stopAt(cue);
+                for (int done = 0; done < 512; done += count) {
+                    deck.render(left.data(), right.data(), count, 0.0, keylock);
+                    expect(deck.position() == cue, "CUE return remains exactly at its frame across callbacks");
+                    expect(std::all_of(left.begin(), left.end(), [](float v) { return std::isfinite(v); }), "CUE fade is finite");
+                    if (done == 0)
+                        expect(std::abs(left.front() - previous) <= std::abs(previous) / 140 + 1e-6f,
+                               "CUE release fades the last output instead of jumping to the new sample");
+                }
+                expect(left.back() == 0 && right.back() == 0, "CUE hold settles to actual silence");
+                expect(deck.looping() && deck.loopStart() == rate && deck.loopEnd() == rate * 9,
+                       "CUE return preserves the loop configuration");
+                deck.render(left.data(), right.data(), count, 1.0, keylock);
+                deck.render(left.data(), right.data(), count, 1.0, keylock);
+                expect(deck.position() > cue, "play resumes from the held CUE position");
+            }
+        }
+    }
+}
+
 void djChannelKillsItsBands()
 {
     using namespace cydaw::engine::dj;
