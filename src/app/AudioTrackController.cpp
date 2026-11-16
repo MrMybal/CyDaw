@@ -16,6 +16,7 @@
 #include "MidiEffectsHost.h"
 #include "AudioTrackController.h"
 #include "PlanSynthesiser.h"
+#include "KeyLatencyProbe.h"
 #include "Localization.h"
 
 #include <cydaw/engine/TimeStretch.h>
@@ -1961,6 +1962,8 @@ void MasterOutputAudioSource::getNextAudioBlock(
             bufferToFill.buffer->applyGain(bufferToFill.startSample, bufferToFill.numSamples, baseGain);
         }
     }
+    if (bufferToFill.buffer != nullptr)
+        key_latency::output(*bufferToFill.buffer, bufferToFill.startSample, bufferToFill.numSamples);
     publishAnalysisFrame(bufferToFill);
     if (bufferToFill.buffer == nullptr || bufferToFill.numSamples <= 0
         || bufferToFill.buffer->getNumChannels() <= 0
@@ -4485,8 +4488,10 @@ struct AudioTrackController::MidiSynthEngine final : public cydaw::audio::AudioS
             // What the keyboard holds down, to let go of it alone later.
             for (const auto metadata : midi) {
                 const auto message = metadata.getMessage();
-                if (message.isNoteOn())
+                if (message.isNoteOn()) {
                     ++liveNoteOns;
+                    key_latency::collected(message.getNoteNumber(), metadata.samplePosition);
+                }
                 const auto channel = static_cast<std::size_t>(cydaw::base::limit(1, 16, message.getChannel()) - 1);
                 if (message.isNoteOn())
                     liveHeld[channel].set(static_cast<std::size_t>(message.getNoteNumber()));
@@ -5989,6 +5994,7 @@ void AudioTrackController::publishMidiOutputs()
 
 void AudioTrackController::computerKeyboardNote(const int note, const float velocity, const bool on)
 {
+    if (on) key_latency::queued(note);
     keyboardCount_.fetch_add(1, std::memory_order_relaxed);
     midiInCount_.fetch_add(1, std::memory_order_relaxed);
     std::shared_ptr<const LiveMidiRoute> route;

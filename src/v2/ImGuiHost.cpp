@@ -5,6 +5,7 @@
 #include <cydaw/base/Text.h>
 #include "ImGuiHost.h"
 #include "FramePacing.h"
+#include "KeyLatencyProbe.h"
 
 #include "Theme.h"
 #include "Widgets.h"
@@ -230,6 +231,8 @@ const std::wstring& windowClassName()
 
 LRESULT CALLBACK surfaceProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
+    if (message == WM_KEYDOWN && (lParam & (1LL << 30)) == 0)
+        app::key_latency::window(static_cast<int>(wParam));
     auto* host = NativeAccess::hostFor(hwnd);
     auto* native = host != nullptr ? NativeAccess::native(*host) : nullptr;
     if (native != nullptr && native->imgui != nullptr && native->backendsReady) {

@@ -25,6 +25,7 @@
 #include "SoundModelFile.h"
 #include "GraphPolySynthRenderer.h"
 #include "NativeDspRuntime.h"
+#include "KeyLatencyProbe.h"
 
 #include "GraphLayout.h"
 #include "Localization.h"
@@ -1056,6 +1057,23 @@ cydaw::base::Value Commands::run()
         return onPing();
     if (command == "status")
         return ok(status());
+    if (command == "key_latency") {
+        namespace probe = app::key_latency;
+        if (!probe::enabled) return fail("Start the isolated diagnostic session with CYDAW_KEY_LATENCY_PROBE=1");
+        if (flag("arm", false)) probe::arm(static_cast<int>(number("virtualKey", 65)));
+        auto result = object();
+        set(result, "nowNs", static_cast<std::int64_t>(probe::now()));
+        set(result, "windowNs", static_cast<std::int64_t>(probe::windowNs.load()));
+        set(result, "queuedNs", static_cast<std::int64_t>(probe::queuedNs.load()));
+        set(result, "collectedNs", static_cast<std::int64_t>(probe::collectedNs.load()));
+        set(result, "outputNs", static_cast<std::int64_t>(probe::outputNs.load()));
+        set(result, "midiFrame", probe::offset.load());
+        set(result, "signalFrame", probe::firstSignalFrame.load());
+        set(result, "note", probe::note.load());
+        set(result, "preSignalPeak", static_cast<double>(probe::preSignalPeak.load()));
+        set(result, "armed", probe::armed.load());
+        return ok(result);
+    }
     // While a project opens, the session is not whole: only looking at it.
     if (studio_.openingProject() && command != "snapshot" && command != "quit" && command != "ui_input")
         return fail("a project is opening; try again once it is open (status: opening)");
@@ -6810,6 +6828,15 @@ cydaw::base::Value Commands::onAudioSettings()
             sizes.add(size);
         set(result, "availableSampleRates", rates);
         set(result, "availableBufferSizes", sizes);
+        set(result, "outputLatencySamples", device->getOutputLatencyInSamples());
+        set(result, "inputLatencySamples", device->getInputLatencyInSamples());
+        set(result, "actualBufferSize", device->getCurrentBufferSizeSamples());
+        if (const auto description = device->streamDescription()) {
+            set(result, "outputLatencyKnown", description->output.latency.valid);
+            set(result, "outputPeriodKnown", description->output.periodKnown);
+            set(result, "outputPeriodFrames", static_cast<std::int64_t>(description->output.periodFrames));
+            set(result, "outputPeriods", static_cast<int>(description->output.periods));
+        }
         set(result, "latencyMs", (device->getOutputLatencyInSamples() + device->getInputLatencyInSamples())
                                      / std::max(1.0, device->getCurrentSampleRate()) * 1000.0);
     }
