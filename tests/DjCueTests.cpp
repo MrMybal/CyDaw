@@ -54,6 +54,9 @@ int main() try {
         require(std::chrono::steady_clock::now() < deadline, "DJ load timeout");
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
+    render(1024);
+    require(output.getMagnitude(0, 3, 1024) < 1e-7f && output.getMagnitude(1, 3, 1024) < 1e-7f,
+            "a loaded paused deck at a nonzero sample is silent");
     for (bool keylock : {false, true}) for (int frames : {64, 480, 1024, 2048, 4097}) {
         engine.prepareToPlay(frames, 48000);
         engine.setKeylock(0, keylock);
@@ -73,6 +76,22 @@ int main() try {
         require(!state.playing && !state.previewing && std::abs(state.position - state.cuePoint) < 1e-8,
                 "CUE while playing stops exactly at the cue");
         engine.cue(0, false); render(frames);
+        engine.setPlaying(0, true); render(frames); render(frames);
+        const auto pauseAt = engine.deck(0).position;
+        engine.setPlaying(0, false); render(frames);
+        require(!engine.deck(0).playing && std::abs(engine.deck(0).position - pauseAt) < 1e-8,
+                "ordinary pause holds the current position without a speed-ramp drift");
+        for (int elapsed = 0; elapsed < 9600; elapsed += frames) render(frames);
+        require(output.getMagnitude(0, 3, frames) < 1e-7f && output.getMagnitude(1, 3, frames) < 1e-7f,
+                "ordinary pause settles to silence instead of a held DC sample");
+        engine.seek(0, 5.123); render(frames);
+        require(std::abs(engine.deck(0).position - 5.123) < 1e-8 &&
+                    output.getMagnitude(0, 3, frames) < 1e-7f && output.getMagnitude(1, 3, frames) < 1e-7f,
+                "seek while paused remains silent at the new position");
+        engine.setPlaying(0, true); render(frames); render(frames);
+        require(engine.deck(0).playing && engine.deck(0).position > 5.123 &&
+                    output.getMagnitude(0, 3, frames) > 1e-4f, "play resumes with real audio after pause and seek");
+        engine.setPlaying(0, false); render(frames);
         std::cout << "CUE frames=" << frames << " keylock=" << keylock << " drift=0\n";
     }
     std::cout << "Headless DJ command and published-position tests passed\n";

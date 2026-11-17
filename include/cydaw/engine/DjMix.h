@@ -90,7 +90,7 @@ public:
     [[nodiscard]] double position() const noexcept { return position_; }
     // Elsewhere at once (crossfaded when playing).
     void jump(double frame) noexcept;
-    // CUE return: hold the exact position and fade the last output to silence.
+    // Stop/CUE return: hold the exact position and fade the last output to silence.
     // Prepared/audio-owner operation; ordinary jumps retain their speed ramp.
     void stopAt(double frame) noexcept;
     // Played over and over between two frames; cleared, it plays on.
@@ -99,8 +99,8 @@ public:
     [[nodiscard]] bool looping() const noexcept { return loopEnd_ > loopStart_; }
     [[nodiscard]] double loopStart() const noexcept { return loopStart_; }
     [[nodiscard]] double loopEnd() const noexcept { return loopEnd_; }
-    // `count` frames at `speed` (1 normal, 0 held, negative backwards),
-    // reached from the last block's speed across this one. `keylock`: the
+    // `count` frames at `speed` (1 normal, 0 silent/held, negative backwards),
+    // nonzero speeds reached from the last block's speed across this one. `keylock`: the
     // pitch kept (forward between 0.3 and 3 times; otherwise read).
     void render(float* left, float* right, int count, double speed, bool keylock) noexcept;
 

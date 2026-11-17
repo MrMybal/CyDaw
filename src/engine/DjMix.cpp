@@ -196,6 +196,11 @@ void DeckPlayer::render(float* const left, float* const right, const int count, 
         lastOutput_ = {};
         return;
     }
+    // A stationary platter cannot produce a constant sample into the shared
+    // master. Fade its last output, hold the playhead and keep effects' tails
+    // outside the reader intact. This also covers initial load and paused seeks.
+    if (speed == 0.0 && !stoppedAt_)
+        stopAt(position_);
     if (stoppedAt_ && speed == 0.0) {
         for (int i = 0; i < count; ++i) {
             const auto gain = stopFadeLeft_ > 0

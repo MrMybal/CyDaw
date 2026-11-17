@@ -1,0 +1,1181 @@
+{
+  "date": "2026-11-17",
+  "baseRevision": "01773e0d598843f4c51a5129b0ec331871657ee5",
+  "scope": "Raw ASIO callback exports, synthetic fixtures, Windows Fireface 48000 Hz/1024 frames, zero audio/MIDI inputs, silent isolated profiles",
+  "cause": "Paused DJ reader at zero speed emitted the static sample under the playhead into the shared mixer; historical workflow had already played DJ before Cinema. Cinema-only was clean before the fix.",
+  "before": {
+    "files": {
+      "D:\\_Project\\CyDAW_Project\\build\\cyaudio-sleep\\CyDAW2_artefacts\\Release\\CyDAW 2.exe": "dde14dfc3a50fa1e698fc955209b515af92df028e2364e1f2613d5e4041e02f7",
+      "D:\\_Project\\CyDAW_Project\\build\\cyaudio-sleep\\CyDAW2_artefacts\\Release\\avcodec-62.dll": "9023155e12aa1513da3db7ef7ccb93f4b22c3b1df91af4d9a9b0ee940a464f7f",
+      "D:\\_Project\\CyDAW_Project\\build\\cyaudio-sleep\\CyDAW2_artefacts\\Release\\avformat-62.dll": "07e1d9bdf240f9d91f608f9c0d8ec450ebb55c39d1ea0e58eafae99619724d54",
+      "D:\\_Project\\CyDAW_Project\\build\\cyaudio-sleep\\CyDAW2_artefacts\\Release\\avutil-60.dll": "7d43d70b89c4c3f819f168e572800d83ed359341359b5c52d708339fe25846f6",
+      "D:\\_Project\\CyDAW_Project\\build\\cyaudio-sleep\\CyDAW2_artefacts\\Release\\swresample-6.dll": "33ca7f7bb42e5bb721d6418b27a10d8c31b590ae7febaade1d363cad816440f4",
+      "D:\\_Project\\CyDAW_Project\\build\\cyaudio-sleep\\CyDAW2_artefacts\\Release\\swscale-9.dll": "7f0643d5e6741709b2e76b6b5533ce30ab7491aa613246b3531ceda24221e10f"
+    },
+    "workflows": [
+      {
+        "workflow": "cinema-only",
+        "audio": {
+          "inputChannels": [],
+          "outputChannels": [
+            "Analog 1 (1)",
+            "Analog 2 (1)"
+          ],
+          "availableInputs": 18,
+          "availableOutputs": 18,
+          "type": "ASIO",
+          "output": "ASIO Fireface USB",
+          "input": "ASIO Fireface USB",
+          "sampleRate": 48000.0,
+          "bufferSize": 1024,
+          "availableSampleRates": [
+            32000.0,
+            44100.0,
+            48000.0,
+            88200.0,
+            96000.0,
+            176400.0,
+            192000.0
+          ],
+          "availableBufferSizes": [
+            1024
+          ],
+          "outputLatencySamples": 1069,
+          "inputLatencySamples": 0,
+          "actualBufferSize": 1024,
+          "outputLatencyKnown": true,
+          "outputPeriodKnown": false,
+          "outputPeriodFrames": 0,
+          "outputPeriods": 0,
+          "latencyMs": 22.270833333333332,
+          "types": [
+            {
+              "type": "Windows Audio",
+              "outputs": [
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Microphone)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "Casque (Oculus Virtual Audio Device)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Speakers)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "Line 1 (Virtual Audio Cable)",
+                "Haut-parleurs (RME Fireface UCX)"
+              ],
+              "inputs": [
+                "Analog (1+2) (RME Fireface UCX)",
+                "Headset Microphone (Oculus Virtual Audio Device)",
+                "Line 1 (Virtual Audio Cable)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Microphone (Steam Streaming Microphone)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)"
+              ]
+            },
+            {
+              "type": "Windows Audio (Exclusive Mode)",
+              "outputs": [
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Microphone)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "Casque (Oculus Virtual Audio Device)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Speakers)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "Line 1 (Virtual Audio Cable)",
+                "Haut-parleurs (RME Fireface UCX)"
+              ],
+              "inputs": [
+                "Analog (1+2) (RME Fireface UCX)",
+                "Headset Microphone (Oculus Virtual Audio Device)",
+                "Line 1 (Virtual Audio Cable)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Microphone (Steam Streaming Microphone)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)"
+              ]
+            },
+            {
+              "type": "Windows Audio (Low Latency Mode)",
+              "outputs": [
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Microphone)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "Casque (Oculus Virtual Audio Device)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Speakers)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "Line 1 (Virtual Audio Cable)",
+                "Haut-parleurs (RME Fireface UCX)"
+              ],
+              "inputs": [
+                "Analog (1+2) (RME Fireface UCX)",
+                "Headset Microphone (Oculus Virtual Audio Device)",
+                "Line 1 (Virtual Audio Cable)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Microphone (Steam Streaming Microphone)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)"
+              ]
+            },
+            {
+              "type": "DirectSound",
+              "outputs": [
+                "Périphérique audio principal",
+                "Haut-parleurs (RME Fireface UCX)",
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Microphone)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "Casque (Oculus Virtual Audio Device)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Speakers)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "Line 1 (Virtual Audio Cable)"
+              ],
+              "inputs": [
+                "Pilote de capture audio principal",
+                "Analog (1+2) (RME Fireface UCX)",
+                "Headset Microphone (Oculus Virtual Audio Device)",
+                "Line 1 (Virtual Audio Cable)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Microphone (Steam Streaming Microphone)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)"
+              ]
+            },
+            {
+              "type": "ASIO",
+              "outputs": [
+                "ASIO Fireface USB"
+              ],
+              "inputs": [
+                "ASIO Fireface USB"
+              ]
+            }
+          ]
+        },
+        "exports": [
+          {
+            "name": "fresh-studio",
+            "file": "D:\\_Project\\CyDAW_Project\\output\\cinema-dc-2026-11-17\\before\\cinema-only\\fresh-studio.wav",
+            "frames": 240000,
+            "rate": 48000,
+            "finite": true,
+            "mean": [
+              4.532426595687866e-07,
+              2.50646968682607e-07
+            ],
+            "tailMean": [
+              0.0,
+              0.0
+            ],
+            "tailPeak": 0.0,
+            "maxErrorFromInput": 6.1787849170436e-08,
+            "maxRawDifferenceFromFresh": 0.0
+          },
+          {
+            "name": "after-cinema-stop",
+            "file": "D:\\_Project\\CyDAW_Project\\output\\cinema-dc-2026-11-17\\before\\cinema-only\\after-cinema-stop.wav",
+            "frames": 240000,
+            "rate": 48000,
+            "finite": true,
+            "mean": [
+              4.532426595687866e-07,
+              2.50646968682607e-07
+            ],
+            "tailMean": [
+              0.0,
+              0.0
+            ],
+            "tailPeak": 0.0,
+            "maxErrorFromInput": 6.1787849170436e-08,
+            "maxRawDifferenceFromFresh": 0.0
+          }
+        ],
+        "shutdown": {
+          "ms": 503.30760000360897,
+          "forced": false
+        }
+      },
+      {
+        "workflow": "dj-then-cinema",
+        "audio": {
+          "inputChannels": [],
+          "outputChannels": [
+            "Analog 1 (1)",
+            "Analog 2 (1)"
+          ],
+          "availableInputs": 18,
+          "availableOutputs": 18,
+          "type": "ASIO",
+          "output": "ASIO Fireface USB",
+          "input": "ASIO Fireface USB",
+          "sampleRate": 48000.0,
+          "bufferSize": 1024,
+          "availableSampleRates": [
+            32000.0,
+            44100.0,
+            48000.0,
+            88200.0,
+            96000.0,
+            176400.0,
+            192000.0
+          ],
+          "availableBufferSizes": [
+            1024
+          ],
+          "outputLatencySamples": 1069,
+          "inputLatencySamples": 0,
+          "actualBufferSize": 1024,
+          "outputLatencyKnown": true,
+          "outputPeriodKnown": false,
+          "outputPeriodFrames": 0,
+          "outputPeriods": 0,
+          "latencyMs": 22.270833333333332,
+          "types": [
+            {
+              "type": "Windows Audio",
+              "outputs": [
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Microphone)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "Casque (Oculus Virtual Audio Device)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Speakers)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "Line 1 (Virtual Audio Cable)",
+                "Haut-parleurs (RME Fireface UCX)"
+              ],
+              "inputs": [
+                "Analog (1+2) (RME Fireface UCX)",
+                "Headset Microphone (Oculus Virtual Audio Device)",
+                "Line 1 (Virtual Audio Cable)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Microphone (Steam Streaming Microphone)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)"
+              ]
+            },
+            {
+              "type": "Windows Audio (Exclusive Mode)",
+              "outputs": [
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Microphone)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "Casque (Oculus Virtual Audio Device)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Speakers)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "Line 1 (Virtual Audio Cable)",
+                "Haut-parleurs (RME Fireface UCX)"
+              ],
+              "inputs": [
+                "Analog (1+2) (RME Fireface UCX)",
+                "Headset Microphone (Oculus Virtual Audio Device)",
+                "Line 1 (Virtual Audio Cable)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Microphone (Steam Streaming Microphone)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)"
+              ]
+            },
+            {
+              "type": "Windows Audio (Low Latency Mode)",
+              "outputs": [
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Microphone)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "Casque (Oculus Virtual Audio Device)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Speakers)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "Line 1 (Virtual Audio Cable)",
+                "Haut-parleurs (RME Fireface UCX)"
+              ],
+              "inputs": [
+                "Analog (1+2) (RME Fireface UCX)",
+                "Headset Microphone (Oculus Virtual Audio Device)",
+                "Line 1 (Virtual Audio Cable)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Microphone (Steam Streaming Microphone)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)"
+              ]
+            },
+            {
+              "type": "DirectSound",
+              "outputs": [
+                "Périphérique audio principal",
+                "Haut-parleurs (RME Fireface UCX)",
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Microphone)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "Casque (Oculus Virtual Audio Device)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Speakers)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "Line 1 (Virtual Audio Cable)"
+              ],
+              "inputs": [
+                "Pilote de capture audio principal",
+                "Analog (1+2) (RME Fireface UCX)",
+                "Headset Microphone (Oculus Virtual Audio Device)",
+                "Line 1 (Virtual Audio Cable)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Microphone (Steam Streaming Microphone)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)"
+              ]
+            },
+            {
+              "type": "ASIO",
+              "outputs": [
+                "ASIO Fireface USB"
+              ],
+              "inputs": [
+                "ASIO Fireface USB"
+              ]
+            }
+          ]
+        },
+        "exports": [
+          {
+            "name": "fresh-studio",
+            "file": "D:\\_Project\\CyDAW_Project\\output\\cinema-dc-2026-11-17\\before\\dj-then-cinema\\fresh-studio.wav",
+            "frames": 240000,
+            "rate": 48000,
+            "finite": true,
+            "mean": [
+              4.532426595687866e-07,
+              2.50646968682607e-07
+            ],
+            "tailMean": [
+              0.0,
+              0.0
+            ],
+            "tailPeak": 0.0,
+            "maxErrorFromInput": 6.1787849170436e-08,
+            "maxRawDifferenceFromFresh": 0.0
+          },
+          {
+            "name": "after-dj-stop",
+            "file": "D:\\_Project\\CyDAW_Project\\output\\cinema-dc-2026-11-17\\before\\dj-then-cinema\\after-dj-stop.wav",
+            "frames": 240000,
+            "rate": 48000,
+            "finite": true,
+            "mean": [
+              0.15772036003470422,
+              -0.04822138454814752
+            ],
+            "tailMean": [
+              0.1577199101448059,
+              -0.04822162538766861
+            ],
+            "tailPeak": 0.15772008895874023,
+            "maxErrorFromInput": 0.15772011577598902,
+            "maxRawDifferenceFromFresh": 0.15772008895874023
+          },
+          {
+            "name": "after-cinema-stop",
+            "file": "D:\\_Project\\CyDAW_Project\\output\\cinema-dc-2026-11-17\\before\\dj-then-cinema\\after-cinema-stop.wav",
+            "frames": 240000,
+            "rate": 48000,
+            "finite": true,
+            "mean": [
+              0.15772036003470422,
+              -0.04822138454814752
+            ],
+            "tailMean": [
+              0.1577199101448059,
+              -0.04822162538766861
+            ],
+            "tailPeak": 0.15772008895874023,
+            "maxErrorFromInput": 0.15772011577598902,
+            "maxRawDifferenceFromFresh": 0.15772008895874023
+          }
+        ],
+        "shutdown": {
+          "ms": 491.5294000020367,
+          "forced": false
+        }
+      }
+    ]
+  },
+  "after": {
+    "files": {
+      "D:\\_Project\\CyDAW_Project\\build\\cyaudio-sleep\\CyDAW2_artefacts\\Release\\CyDAW 2.exe": "cd5fde38e45b932125512cf1414c9aeed12ba9a7fcbf6c375fa226ce6edec1c0",
+      "D:\\_Project\\CyDAW_Project\\build\\cyaudio-sleep\\CyDAW2_artefacts\\Release\\avcodec-62.dll": "9023155e12aa1513da3db7ef7ccb93f4b22c3b1df91af4d9a9b0ee940a464f7f",
+      "D:\\_Project\\CyDAW_Project\\build\\cyaudio-sleep\\CyDAW2_artefacts\\Release\\avformat-62.dll": "07e1d9bdf240f9d91f608f9c0d8ec450ebb55c39d1ea0e58eafae99619724d54",
+      "D:\\_Project\\CyDAW_Project\\build\\cyaudio-sleep\\CyDAW2_artefacts\\Release\\avutil-60.dll": "7d43d70b89c4c3f819f168e572800d83ed359341359b5c52d708339fe25846f6",
+      "D:\\_Project\\CyDAW_Project\\build\\cyaudio-sleep\\CyDAW2_artefacts\\Release\\swresample-6.dll": "33ca7f7bb42e5bb721d6418b27a10d8c31b590ae7febaade1d363cad816440f4",
+      "D:\\_Project\\CyDAW_Project\\build\\cyaudio-sleep\\CyDAW2_artefacts\\Release\\swscale-9.dll": "7f0643d5e6741709b2e76b6b5533ce30ab7491aa613246b3531ceda24221e10f"
+    },
+    "workflows": [
+      {
+        "workflow": "cinema-only",
+        "audio": {
+          "inputChannels": [],
+          "outputChannels": [
+            "Analog 1 (1)",
+            "Analog 2 (1)"
+          ],
+          "availableInputs": 18,
+          "availableOutputs": 18,
+          "type": "ASIO",
+          "output": "ASIO Fireface USB",
+          "input": "ASIO Fireface USB",
+          "sampleRate": 48000.0,
+          "bufferSize": 1024,
+          "availableSampleRates": [
+            32000.0,
+            44100.0,
+            48000.0,
+            88200.0,
+            96000.0,
+            176400.0,
+            192000.0
+          ],
+          "availableBufferSizes": [
+            1024
+          ],
+          "outputLatencySamples": 1069,
+          "inputLatencySamples": 0,
+          "actualBufferSize": 1024,
+          "outputLatencyKnown": true,
+          "outputPeriodKnown": false,
+          "outputPeriodFrames": 0,
+          "outputPeriods": 0,
+          "latencyMs": 22.270833333333332,
+          "types": [
+            {
+              "type": "Windows Audio",
+              "outputs": [
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Microphone)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "Casque (Oculus Virtual Audio Device)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Speakers)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "Line 1 (Virtual Audio Cable)",
+                "Haut-parleurs (RME Fireface UCX)"
+              ],
+              "inputs": [
+                "Analog (1+2) (RME Fireface UCX)",
+                "Headset Microphone (Oculus Virtual Audio Device)",
+                "Line 1 (Virtual Audio Cable)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Microphone (Steam Streaming Microphone)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)"
+              ]
+            },
+            {
+              "type": "Windows Audio (Exclusive Mode)",
+              "outputs": [
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Microphone)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "Casque (Oculus Virtual Audio Device)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Speakers)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "Line 1 (Virtual Audio Cable)",
+                "Haut-parleurs (RME Fireface UCX)"
+              ],
+              "inputs": [
+                "Analog (1+2) (RME Fireface UCX)",
+                "Headset Microphone (Oculus Virtual Audio Device)",
+                "Line 1 (Virtual Audio Cable)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Microphone (Steam Streaming Microphone)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)"
+              ]
+            },
+            {
+              "type": "Windows Audio (Low Latency Mode)",
+              "outputs": [
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Microphone)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "Casque (Oculus Virtual Audio Device)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Speakers)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "Line 1 (Virtual Audio Cable)",
+                "Haut-parleurs (RME Fireface UCX)"
+              ],
+              "inputs": [
+                "Analog (1+2) (RME Fireface UCX)",
+                "Headset Microphone (Oculus Virtual Audio Device)",
+                "Line 1 (Virtual Audio Cable)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Microphone (Steam Streaming Microphone)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)"
+              ]
+            },
+            {
+              "type": "DirectSound",
+              "outputs": [
+                "Périphérique audio principal",
+                "Haut-parleurs (RME Fireface UCX)",
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Microphone)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "Casque (Oculus Virtual Audio Device)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Speakers)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "Line 1 (Virtual Audio Cable)"
+              ],
+              "inputs": [
+                "Pilote de capture audio principal",
+                "Analog (1+2) (RME Fireface UCX)",
+                "Headset Microphone (Oculus Virtual Audio Device)",
+                "Line 1 (Virtual Audio Cable)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Microphone (Steam Streaming Microphone)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)"
+              ]
+            },
+            {
+              "type": "ASIO",
+              "outputs": [
+                "ASIO Fireface USB"
+              ],
+              "inputs": [
+                "ASIO Fireface USB"
+              ]
+            }
+          ]
+        },
+        "exports": [
+          {
+            "name": "fresh-studio",
+            "file": "D:\\_Project\\CyDAW_Project\\output\\cinema-dc-2026-11-17\\after-verified\\cinema-only\\fresh-studio.wav",
+            "frames": 240000,
+            "rate": 48000,
+            "finite": true,
+            "mean": [
+              4.532426595687866e-07,
+              2.50646968682607e-07
+            ],
+            "tailMean": [
+              0.0,
+              0.0
+            ],
+            "tailPeak": 0.0,
+            "maxErrorFromInput": 6.1787849170436e-08,
+            "maxRawDifferenceFromFresh": 0.0
+          },
+          {
+            "name": "after-cinema-stop",
+            "file": "D:\\_Project\\CyDAW_Project\\output\\cinema-dc-2026-11-17\\after-verified\\cinema-only\\after-cinema-stop.wav",
+            "frames": 240000,
+            "rate": 48000,
+            "finite": true,
+            "mean": [
+              4.532426595687866e-07,
+              2.50646968682607e-07
+            ],
+            "tailMean": [
+              0.0,
+              0.0
+            ],
+            "tailPeak": 0.0,
+            "maxErrorFromInput": 6.1787849170436e-08,
+            "maxRawDifferenceFromFresh": 0.0
+          }
+        ],
+        "shutdown": {
+          "ms": 485.9682000023895,
+          "forced": false
+        }
+      },
+      {
+        "workflow": "dj-then-cinema",
+        "audio": {
+          "inputChannels": [],
+          "outputChannels": [
+            "Analog 1 (1)",
+            "Analog 2 (1)"
+          ],
+          "availableInputs": 18,
+          "availableOutputs": 18,
+          "type": "ASIO",
+          "output": "ASIO Fireface USB",
+          "input": "ASIO Fireface USB",
+          "sampleRate": 48000.0,
+          "bufferSize": 1024,
+          "availableSampleRates": [
+            32000.0,
+            44100.0,
+            48000.0,
+            88200.0,
+            96000.0,
+            176400.0,
+            192000.0
+          ],
+          "availableBufferSizes": [
+            1024
+          ],
+          "outputLatencySamples": 1069,
+          "inputLatencySamples": 0,
+          "actualBufferSize": 1024,
+          "outputLatencyKnown": true,
+          "outputPeriodKnown": false,
+          "outputPeriodFrames": 0,
+          "outputPeriods": 0,
+          "latencyMs": 22.270833333333332,
+          "types": [
+            {
+              "type": "Windows Audio",
+              "outputs": [
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Microphone)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "Casque (Oculus Virtual Audio Device)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Speakers)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "Line 1 (Virtual Audio Cable)",
+                "Haut-parleurs (RME Fireface UCX)"
+              ],
+              "inputs": [
+                "Analog (1+2) (RME Fireface UCX)",
+                "Headset Microphone (Oculus Virtual Audio Device)",
+                "Line 1 (Virtual Audio Cable)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Microphone (Steam Streaming Microphone)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)"
+              ]
+            },
+            {
+              "type": "Windows Audio (Exclusive Mode)",
+              "outputs": [
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Microphone)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "Casque (Oculus Virtual Audio Device)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Speakers)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "Line 1 (Virtual Audio Cable)",
+                "Haut-parleurs (RME Fireface UCX)"
+              ],
+              "inputs": [
+                "Analog (1+2) (RME Fireface UCX)",
+                "Headset Microphone (Oculus Virtual Audio Device)",
+                "Line 1 (Virtual Audio Cable)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Microphone (Steam Streaming Microphone)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)"
+              ]
+            },
+            {
+              "type": "Windows Audio (Low Latency Mode)",
+              "outputs": [
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Microphone)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "Casque (Oculus Virtual Audio Device)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Speakers)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "Line 1 (Virtual Audio Cable)",
+                "Haut-parleurs (RME Fireface UCX)"
+              ],
+              "inputs": [
+                "Analog (1+2) (RME Fireface UCX)",
+                "Headset Microphone (Oculus Virtual Audio Device)",
+                "Line 1 (Virtual Audio Cable)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Microphone (Steam Streaming Microphone)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)"
+              ]
+            },
+            {
+              "type": "DirectSound",
+              "outputs": [
+                "Périphérique audio principal",
+                "Haut-parleurs (RME Fireface UCX)",
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Microphone)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "Casque (Oculus Virtual Audio Device)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "Haut-parleurs (Steam Streaming Speakers)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "Line 1 (Virtual Audio Cable)"
+              ],
+              "inputs": [
+                "Pilote de capture audio principal",
+                "Analog (1+2) (RME Fireface UCX)",
+                "Headset Microphone (Oculus Virtual Audio Device)",
+                "Line 1 (Virtual Audio Cable)",
+                "SPDIF coax. (RME Fireface UCX)",
+                "ADAT (7+8) (RME Fireface UCX)",
+                "ADAT (5+6) (RME Fireface UCX)",
+                "Microphone (Steam Streaming Microphone)",
+                "Analog (7+8) (RME Fireface UCX)",
+                "Analog (3+4) (RME Fireface UCX)",
+                "ADAT (3+4) (RME Fireface UCX)",
+                "Analog (5+6) (RME Fireface UCX)",
+                "SPDIF/ADAT (1+2) (RME Fireface UCX)"
+              ]
+            },
+            {
+              "type": "ASIO",
+              "outputs": [
+                "ASIO Fireface USB"
+              ],
+              "inputs": [
+                "ASIO Fireface USB"
+              ]
+            }
+          ]
+        },
+        "exports": [
+          {
+            "name": "fresh-studio",
+            "file": "D:\\_Project\\CyDAW_Project\\output\\cinema-dc-2026-11-17\\after-verified\\dj-then-cinema\\fresh-studio.wav",
+            "frames": 240000,
+            "rate": 48000,
+            "finite": true,
+            "mean": [
+              4.532426595687866e-07,
+              2.50646968682607e-07
+            ],
+            "tailMean": [
+              0.0,
+              0.0
+            ],
+            "tailPeak": 0.0,
+            "maxErrorFromInput": 6.1787849170436e-08,
+            "maxRawDifferenceFromFresh": 0.0
+          },
+          {
+            "name": "after-dj-stop",
+            "file": "D:\\_Project\\CyDAW_Project\\output\\cinema-dc-2026-11-17\\after-verified\\dj-then-cinema\\after-dj-stop.wav",
+            "frames": 240000,
+            "rate": 48000,
+            "finite": true,
+            "mean": [
+              4.532426595687866e-07,
+              2.50646968682607e-07
+            ],
+            "tailMean": [
+              0.0,
+              0.0
+            ],
+            "tailPeak": 0.0,
+            "maxErrorFromInput": 6.1787849170436e-08,
+            "maxRawDifferenceFromFresh": 0.0
+          },
+          {
+            "name": "after-cinema-stop",
+            "file": "D:\\_Project\\CyDAW_Project\\output\\cinema-dc-2026-11-17\\after-verified\\dj-then-cinema\\after-cinema-stop.wav",
+            "frames": 240000,
+            "rate": 48000,
+            "finite": true,
+            "mean": [
+              4.532426595687866e-07,
+              2.50646968682607e-07
+            ],
+            "tailMean": [
+              0.0,
+              0.0
+            ],
+            "tailPeak": 0.0,
+            "maxErrorFromInput": 6.1787849170436e-08,
+            "maxRawDifferenceFromFresh": 0.0
+          }
+        ],
+        "shutdown": {
+          "ms": 488.92720000003465,
+          "forced": false
+        }
+      }
+    ]
+  },
+  "assetsIdenticalBeforeAfter": true,
+  "nativeRegressionRedLog": "output/cinema-dc-2026-11-17/red-test.log",
+  "nativeRegressionBeforeFixExitCode": 1,
+  "nativeTestsAfterFix": {
+    "names": [
+      "cydaw_engine_tests",
+      "cydaw_dj_cue_tests"
+    ],
+    "passed": 2,
+    "junit": "output/cinema-dc-2026-11-17/native-verified.xml"
+  },
+  "cinemaIntegration": {
+    "arrangementBusRowsAndCommonTimeline": true,
+    "groupGainDb": -6.000260322723712,
+    "groupNativeEffectDb": -5.999874068410634,
+    "masterAutomation": true,
+    "realtimePlaying": true,
+    "nativeMidiAutomation": true,
+    "uiDragTrimUndoFileDrop": true,
+    "videoFrameBoundaryAndOrientation": true,
+    "automaticWholeSoundtrackBus": true,
+    "soundtrackSplitAndUiMove": true,
+    "cinemaMtcMmc": true,
+    "silentVideoNoExtraBus": true,
+    "timedContainerMoveUndoAndListFocus": true,
+    "doubleClickCreatesContainer": true,
+    "containerBusAssignmentUndo": true,
+    "legacyCinemaSessionRetained": true,
+    "persistence": true,
+    "missingVideoRecoverable": true,
+    "studioUntouched": true
+  },
+  "cinemaIntegrationRuntime": {
+    "binarySha256": "cd5fde38e45b932125512cf1414c9aeed12ba9a7fcbf6c375fa226ce6edec1c0",
+    "audio": {
+      "inputChannels": [],
+      "outputChannels": [
+        "Analog 1 (1)",
+        "Analog 2 (1)"
+      ],
+      "availableInputs": 18,
+      "availableOutputs": 18,
+      "type": "ASIO",
+      "output": "ASIO Fireface USB",
+      "input": "ASIO Fireface USB",
+      "sampleRate": 48000.0,
+      "bufferSize": 1024,
+      "availableSampleRates": [
+        32000.0,
+        44100.0,
+        48000.0,
+        88200.0,
+        96000.0,
+        176400.0,
+        192000.0
+      ],
+      "availableBufferSizes": [
+        1024
+      ],
+      "outputLatencySamples": 1069,
+      "inputLatencySamples": 0,
+      "actualBufferSize": 1024,
+      "outputLatencyKnown": true,
+      "outputPeriodKnown": false,
+      "outputPeriodFrames": 0,
+      "outputPeriods": 0,
+      "latencyMs": 22.270833333333332,
+      "types": [
+        {
+          "type": "Windows Audio",
+          "outputs": [
+            "ADAT (5+6) (RME Fireface UCX)",
+            "Haut-parleurs (Steam Streaming Microphone)",
+            "ADAT (7+8) (RME Fireface UCX)",
+            "SPDIF coax. (RME Fireface UCX)",
+            "Casque (Oculus Virtual Audio Device)",
+            "Analog (7+8) (RME Fireface UCX)",
+            "Analog (3+4) (RME Fireface UCX)",
+            "Haut-parleurs (Steam Streaming Speakers)",
+            "SPDIF/ADAT (1+2) (RME Fireface UCX)",
+            "ADAT (3+4) (RME Fireface UCX)",
+            "Analog (5+6) (RME Fireface UCX)",
+            "Line 1 (Virtual Audio Cable)",
+            "Haut-parleurs (RME Fireface UCX)"
+          ],
+          "inputs": [
+            "Analog (1+2) (RME Fireface UCX)",
+            "Headset Microphone (Oculus Virtual Audio Device)",
+            "Line 1 (Virtual Audio Cable)",
+            "SPDIF coax. (RME Fireface UCX)",
+            "ADAT (7+8) (RME Fireface UCX)",
+            "ADAT (5+6) (RME Fireface UCX)",
+            "Microphone (Steam Streaming Microphone)",
+            "Analog (7+8) (RME Fireface UCX)",
+            "Analog (3+4) (RME Fireface UCX)",
+            "ADAT (3+4) (RME Fireface UCX)",
+            "Analog (5+6) (RME Fireface UCX)",
+            "SPDIF/ADAT (1+2) (RME Fireface UCX)"
+          ]
+        },
+        {
+          "type": "Windows Audio (Exclusive Mode)",
+          "outputs": [
+            "ADAT (5+6) (RME Fireface UCX)",
+            "Haut-parleurs (Steam Streaming Microphone)",
+            "ADAT (7+8) (RME Fireface UCX)",
+            "SPDIF coax. (RME Fireface UCX)",
+            "Casque (Oculus Virtual Audio Device)",
+            "Analog (7+8) (RME Fireface UCX)",
+            "Analog (3+4) (RME Fireface UCX)",
+            "Haut-parleurs (Steam Streaming Speakers)",
+            "SPDIF/ADAT (1+2) (RME Fireface UCX)",
+            "ADAT (3+4) (RME Fireface UCX)",
+            "Analog (5+6) (RME Fireface UCX)",
+            "Line 1 (Virtual Audio Cable)",
+            "Haut-parleurs (RME Fireface UCX)"
+          ],
+          "inputs": [
+            "Analog (1+2) (RME Fireface UCX)",
+            "Headset Microphone (Oculus Virtual Audio Device)",
+            "Line 1 (Virtual Audio Cable)",
+            "SPDIF coax. (RME Fireface UCX)",
+            "ADAT (7+8) (RME Fireface UCX)",
+            "ADAT (5+6) (RME Fireface UCX)",
+            "Microphone (Steam Streaming Microphone)",
+            "Analog (7+8) (RME Fireface UCX)",
+            "Analog (3+4) (RME Fireface UCX)",
+            "ADAT (3+4) (RME Fireface UCX)",
+            "Analog (5+6) (RME Fireface UCX)",
+            "SPDIF/ADAT (1+2) (RME Fireface UCX)"
+          ]
+        },
+        {
+          "type": "Windows Audio (Low Latency Mode)",
+          "outputs": [
+            "ADAT (5+6) (RME Fireface UCX)",
+            "Haut-parleurs (Steam Streaming Microphone)",
+            "ADAT (7+8) (RME Fireface UCX)",
+            "SPDIF coax. (RME Fireface UCX)",
+            "Casque (Oculus Virtual Audio Device)",
+            "Analog (7+8) (RME Fireface UCX)",
+            "Analog (3+4) (RME Fireface UCX)",
+            "Haut-parleurs (Steam Streaming Speakers)",
+            "SPDIF/ADAT (1+2) (RME Fireface UCX)",
+            "ADAT (3+4) (RME Fireface UCX)",
+            "Analog (5+6) (RME Fireface UCX)",
+            "Line 1 (Virtual Audio Cable)",
+            "Haut-parleurs (RME Fireface UCX)"
+          ],
+          "inputs": [
+            "Analog (1+2) (RME Fireface UCX)",
+            "Headset Microphone (Oculus Virtual Audio Device)",
+            "Line 1 (Virtual Audio Cable)",
+            "SPDIF coax. (RME Fireface UCX)",
+            "ADAT (7+8) (RME Fireface UCX)",
+            "ADAT (5+6) (RME Fireface UCX)",
+            "Microphone (Steam Streaming Microphone)",
+            "Analog (7+8) (RME Fireface UCX)",
+            "Analog (3+4) (RME Fireface UCX)",
+            "ADAT (3+4) (RME Fireface UCX)",
+            "Analog (5+6) (RME Fireface UCX)",
+            "SPDIF/ADAT (1+2) (RME Fireface UCX)"
+          ]
+        },
+        {
+          "type": "DirectSound",
+          "outputs": [
+            "Périphérique audio principal",
+            "Haut-parleurs (RME Fireface UCX)",
+            "ADAT (5+6) (RME Fireface UCX)",
+            "Haut-parleurs (Steam Streaming Microphone)",
+            "ADAT (7+8) (RME Fireface UCX)",
+            "SPDIF coax. (RME Fireface UCX)",
+            "Casque (Oculus Virtual Audio Device)",
+            "Analog (7+8) (RME Fireface UCX)",
+            "Analog (3+4) (RME Fireface UCX)",
+            "Haut-parleurs (Steam Streaming Speakers)",
+            "SPDIF/ADAT (1+2) (RME Fireface UCX)",
+            "ADAT (3+4) (RME Fireface UCX)",
+            "Analog (5+6) (RME Fireface UCX)",
+            "Line 1 (Virtual Audio Cable)"
+          ],
+          "inputs": [
+            "Pilote de capture audio principal",
+            "Analog (1+2) (RME Fireface UCX)",
+            "Headset Microphone (Oculus Virtual Audio Device)",
+            "Line 1 (Virtual Audio Cable)",
+            "SPDIF coax. (RME Fireface UCX)",
+            "ADAT (7+8) (RME Fireface UCX)",
+            "ADAT (5+6) (RME Fireface UCX)",
+            "Microphone (Steam Streaming Microphone)",
+            "Analog (7+8) (RME Fireface UCX)",
+            "Analog (3+4) (RME Fireface UCX)",
+            "ADAT (3+4) (RME Fireface UCX)",
+            "Analog (5+6) (RME Fireface UCX)",
+            "SPDIF/ADAT (1+2) (RME Fireface UCX)"
+          ]
+        },
+        {
+          "type": "ASIO",
+          "outputs": [
+            "ASIO Fireface USB"
+          ],
+          "inputs": [
+            "ASIO Fireface USB"
+          ]
+        }
+      ]
+    },
+    "command": [
+      "D:\\_Project\\CyDAW_Project\\output\\cyaudio-qa-python\\Scripts\\python.exe",
+      "tests/v2_cinema_check.py",
+      "--port",
+      "48325",
+      "--output",
+      "D:\\_Project\\CyDAW_Project\\output\\cinema-dc-2026-11-17\\integration",
+      "--ffmpeg",
+      "D:\\_Project\\CyDAW_Project\\output\\cyaudio-qa-python\\Lib\\site-packages\\imageio_ffmpeg\\binaries\\ffmpeg-win-x86_64-v7.1.exe"
+    ],
+    "exitCode": 0,
+    "shutdown": {
+      "ms": 621.4477999965311,
+      "forced": false
+    },
+    "binaryStable": true
+  },
+  "originalDjRegressionPassed": true,
+  "evidenceRoot": "output/cinema-dc-2026-11-17",
+  "limits": [
+    "Windows only; no new JUCE measurement or Linux/macOS coverage",
+    "No physical latency, audible listening or CPU performance measurement",
+    "No DC subtraction, high-pass filter, normalization or sample alignment in the comparisons",
+    "Closure covers the reproduced paused-DJ contamination, not every possible source of DC",
+    "Project 08 residual and first-block reload discrepancy remain separate open findings"
+  ]
+}

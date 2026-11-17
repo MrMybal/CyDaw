@@ -2,7 +2,7 @@
 
 Établi le 16 novembre 2026 à partir des campagnes existantes. Aucune nouvelle mesure audio n’a été exécutée pour ce bilan. « Ouvert » signifie que la correction n’a pas été démontrée : les constats historiques doivent être rejoués sur le build actuel. Aucun ne prouve à lui seul un défaut de CyAudioCore.
 
-> Mise à jour du 17 novembre 2026 : le CUE ASIO est maintenant revalidé avec le correctif `b2e4efb` et les SDK mis à jour ; un export synthétique de deux minutes passe aussi. Voir [la campagne actualisée](CyAudioCore040Update.fr.md). Les observations ci-dessous conservent leur contexte historique ; les autres points ne sont pas déclarés résolus.
+> Mise à jour du 17 novembre 2026 : le CUE ASIO et un export synthétique de deux minutes sont revalidés dans [la campagne SDK actualisée](CyAudioCore040Update.fr.md). La composante continue a ensuite été isolée au lecteur DJ à l’arrêt et corrigée dans CyDaw : [diagnostic et mesures avant/après](CinemaDcFix.fr.md). Cinéma seul est propre dans ce contrôle. Les observations ci-dessous conservent leur contexte historique ; les autres écarts ne sont pas déclarés résolus.
 
 ## Versions
 
