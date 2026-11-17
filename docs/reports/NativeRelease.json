@@ -270,7 +270,9 @@
   "gitleaks": {
     "newCommits": 40,
     "findings": 0,
-    "uncommittedDiffFindings": 0
+    "uncommittedDiffFindings": 0,
+    "publishedMainCommits": 43,
+    "publishedMainFindings": 0
   },
   "artifacts": [
     {
@@ -317,6 +319,11 @@
     "oversizedRender": [
       2816,
       1568
-    ]
+    ],
+    "localFullCases": 126,
+    "localFullFailures": 0,
+    "localFullJunitSha256": "6b6a2a6a23077b5a7623ca66d492ce6a90458da9db7380c49326c425e00837f1",
+    "sourceCommit": "daa48f6",
+    "alphaRun": 44009544166
   }
 }
