@@ -25,8 +25,18 @@ def version():
     return match.group(1)
 
 
+def reject_retired_framework_payload(directory):
+    # A reused build directory may contain stale framework DLLs or notices.
+    # Refuse the package instead of shipping them or silently deleting notices.
+    for file in directory.rglob('*'):
+        if file.is_file() and any(part.casefold().startswith('juce')
+                                  for part in file.relative_to(directory).parts):
+            raise ValueError('Retired JUCE payload in package input: ' + str(file))
+
+
 def package(build, output, alpha=False):
     build, output = Path(build).resolve(), Path(output).resolve()
+    reject_retired_framework_payload(build)
     output.mkdir(parents=True, exist_ok=True)
     name = 'CyDAW2-%s-Windows-x64-%s' % (version(), 'Alpha' if alpha else 'test')
     required = [build / 'CyDAW 2.exe', build / 'CyDAWPluginWorker.exe']

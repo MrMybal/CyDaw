@@ -4,7 +4,7 @@ title: Versions, licences et documentation
 description: Retrouver les licences de l’application, des plugins et des banques sonores.
 section: Manuel / Référence
 order: 36
-sourceRevision: 2a59486cab791db0
+sourceRevision: fe5c0abe106a0fdf
 ---
 
 ## Vue d’ensemble {#overview}
@@ -20,12 +20,12 @@ Ce manuel accompagne l'interface Windows CyDAW V2 et décrit les capacités Alph
 
 
 ## Application et dépendances {#licences}
-LICENSE distribué avec CyDAW est GNU AGPL version 3. JUCE garde ses conditions ; Dear ImGui et CyUI fournissent MIT. Le paquet contient licence CyUI et notices TextEditor/Lexilla/Scintilla dans Licenses/CyUI, avec les autres notices. FFmpeg est la version partagée LGPL épinglée, avec configuration et sources correspondantes dans son dossier. Lire les textes livrés pour la version utilisée.
+LICENSE distribué avec CyDAW est GNU AGPL version 3. L’application, son worker de plugins et les exports natifs utilisent CyAudioCore et CyDSP sans code ni bibliothèque JUCE. CyAudioCore, CyDSP, Dear ImGui et CyUI fournissent leurs licences MIT. Le paquet contient licence CyUI et notices TextEditor/Lexilla/Scintilla dans Licenses/CyUI, avec les autres notices. FFmpeg est la version partagée LGPL épinglée, avec configuration et sources correspondantes dans son dossier. Lire les textes livrés pour la version utilisée.
 
 SDK des formats, composants, dépendances de plugins, banques et échantillons gardent leurs conditions. Le choix du format d'export ne change pas la licence du code inclus. Les médias d'un instrument ont leurs conditions séparées de l'exécutable.
 
 ## Sources et fichiers hors ligne {#sources}
-Les [sources CyDAW](https://github.com/MrMybal/CyDaw) et [CyUI](https://github.com/MrMybal/CyUI) identifient les projets. La [licence MIT CyUI épinglée](https://github.com/MrMybal/CyUI/blob/8367401fe45fc22bfed5e227cb3de343177f676b/LICENSE) correspond à l'intégration. Un dépôt privé demande éventuellement l'accès ; les notices installées restent lisibles hors ligne.
+Les [sources CyDAW](https://github.com/MrMybal/CyDaw) et [CyUI](https://github.com/MrMybal/CyUI) identifient les projets. La [licence MIT CyUI épinglée](https://github.com/MrMybal/CyUI/blob/7a793e9281e78572818d85e9cf856d779a7792a1/LICENSE) correspond à l'intégration. Un dépôt privé demande éventuellement l'accès ; les notices installées restent lisibles hors ligne.
 
 Le manuel installé s’ouvre avec `Documentation/Documentation.html` ; ses ressources et notices de dépendances se trouvent dans `Documentation/DocData`. Garder ce dossier entier lors du déplacement de l’application.
 

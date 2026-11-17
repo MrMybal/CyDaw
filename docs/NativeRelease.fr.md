@@ -8,7 +8,7 @@ Les anciennes options CMake JUCE, les adaptateurs, les éditeurs abandonnés, le
 
 L’outil de conversion des banques utilise désormais les lecteurs/encodeurs CyAudioCore et les buffers natifs. Les exports natifs VST3/CLAP/LV2 et l’hébergement VST3/CLAP/LV2/JSFX sont conservés. Aucun traitement audio n’est changé par ce nettoyage.
 
-Le contrôle `tests/no_juce_build_check.py` parcourt les **41 projets** du desktop/worker et vérifie aussi les includes/types de toutes les sources actives `src`, `include` et des outils C++. Les anciens rapports et les petites fixtures de comparaison historique restent des preuves hors du graphe de production ; leurs révisions sont récupérables par Git.
+Le contrôle `tests/no_juce_build_check.py` parcourt les **41 projets** du desktop/worker et vérifie aussi les includes/types de toutes les sources actives `src`, `include` et des outils C++. Les anciens rapports de mesure sont conservés. Les fixtures dépendant de JUCE et les scripts de reconstruction/reliaison de l’ancienne version ont ensuite été supprimés du dépôt courant ; ils restent récupérables dans l’historique Git avec leurs notices originales.
 
 Révisions figées : CyAudioCore `8716ce67b0c3467017369cdc7745e8ff8ef147f2`, CyDSP `c1d9a52fce7ac90515b0e264545903fdad2901b4` (0.4.0), CyUI `7a793e9281e78572818d85e9cf856d779a7792a1`. Les dépôts frères n’ont pas été modifiés.
 
@@ -59,3 +59,13 @@ Les fenêtres masquées respectent maintenant `--window-size`, même au-delà de
 Les cinq contrôles concernés passent localement avec le backend virtuel, sans retirer leurs assertions de lecture, de niveau, de montage ou de vignettes. Preuves : `virtual-acceptance.log` conserve le premier constat de course à l’arrêt ; `virtual-verified.log/.xml` confirme les cinq contrôles corrigés ; `headless-regression/checks.json` conserve les dimensions du rendu. Le workflow Alpha garde les diagnostics et captures synthétiques en cas d’échec.
 
 La suite complète est ensuite rejouée avec ce mode virtuel : **126/126 tests passent, sans échec ni saut**, en 238,08 secondes sur la machine locale. Cela inclut instruments, effets, projets de test locaux, transport et Cinéma. Le JUnit `full-virtual.xml` et son empreinte sont conservés. Gitleaks vérifie les 43 commits publiés depuis l’ancien main : aucun secret trouvé. La seconde construction Alpha utilise la révision applicative `daa48f6` et l’exécution GitHub `44009544166`.
+
+## Suppression des derniers outils historiques JUCE
+
+À la demande de retirer aussi les sondes de comparaison, neuf fichiers historiques ont été supprimés : les deux fixtures CMake/patch, la sonde de voix conditionnelle et les six scripts qui reconstruisaient ou reliaient l’ancienne application et ses objets JUCE. Les tests du moteur natif et les résultats chiffrés ne sont pas supprimés. Les scripts Python de comparaison de deux exécutables sont du code de test CyDaw, sans code de la bibliothèque JUCE ; ils nécessitent désormais une référence déjà archivée. Les anciennes commandes de reconstruction présentes dans les rapports sont historiques et se consultent à leur révision d’origine.
+
+Le contrôle anti-régression couvre aussi les sources de tests et les sources tierces versionnées. Le packaging refuse désormais un répertoire de build contenant encore des fichiers ou notices JUCE. Les licences des dépendances toujours utilisées restent distribuées, ainsi que la licence propre de CyDaw. L’historique Git et les anciennes livraisons conservent leurs notices ; ils ne sont pas réécrits.
+
+L’audit étendu a également repéré l’ancien wrapper de plugin autonome JUCE dans la copie locale de ysfx. Son dossier de sources, son CMake de plugin, ses options et son workflow amont ont été retirés ; la bibliothèque JSFX et ses notices sont conservées. La documentation des dépendances LV2 et les pages de licences anglais/français du manuel ont été corrigées pour décrire CyAudioCore et CyDSP.
+
+Validation finale du nettoyage : **34 fichiers supprimés**, contrôle du graphe de 41 projets et des sources complet, **11/11 tests natifs**, **10/10 tests de packaging** et **3/3 tests de préparation/traduction** réussis. Le manuel de 90 pages est régénéré et installé à côté du binaire local. Un nouveau package local réel est vérifié sans fichiers/notices JUCE ; les assets de la publication Alpha existante ne sont pas remplacés. Le diff passe Gitleaks sans secret. [Audit final et empreinte du package](reports/JuceFinalRemoval.json).

@@ -35,3 +35,11 @@ make sure to follow these steps.
 - Commit these changes, and mention the new reference commit of the WDL.
   The headline can be formatted like this:
   `Update to WDL XXXXXXX from upstream`
+
+## CyDaw subset
+
+The optional upstream `plugin/` JUCE wrapper, `cmake.plugin.txt`, plugin CMake
+options and upstream plugin CI were removed on 2026-11-17. Retain only the hosting
+library when updating this copy; do not restore those optional plugin sources.
+CyDaw's active runtime comes from the pinned CyAudioCore dependency. Preserve the
+Apache-2.0 library licence and all WDL, stb and dr_libs notices.

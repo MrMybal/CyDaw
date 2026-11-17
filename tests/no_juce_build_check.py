@@ -1,4 +1,4 @@
-"""Check the generated production dependency graph, not just source spelling."""
+"""Reject framework code in the complete source tree and production dependency graph."""
 import pathlib
 import re
 import sys
@@ -30,9 +30,19 @@ assert not (build / "_deps/juce-src").exists(), "Strict build unexpectedly fetch
 print(f"Production desktop + worker: {len(seen)} generated dependency projects, no JUCE includes or libraries")
 
 source = pathlib.Path(__file__).resolve().parents[1]
-for folder in ("src", "include", "tools"):
+for folder in ("src", "include", "tools", "tests", "third_party", "cmake", "scripts"):
     for path in (source / folder).rglob("*"):
-        if path.suffix in {".h", ".hpp", ".cpp", ".mm"}:
+        if path.suffix.lower() in {".h", ".hpp", ".cpp", ".c", ".inl", ".mm", ".patch"}:
             assert not re.search(r"#\s*include\s*[<\"]juce_|\bjuce::", path.read_text("utf-8")), path
-assert not re.search(r"FetchContent_Declare\(JUCE|juce_add_|juce::", (source / "CMakeLists.txt").read_text("utf-8")), "Legacy CMake dependency returned"
-print("Active application and authoring tools contain no JUCE includes or types")
+for folder in (source, source / "cmake", source / "src", source / "third_party"):
+    paths = folder.glob("CMakeLists.txt") if folder == source else folder.rglob("*")
+    for path in paths:
+        if path.is_file() and (path.name == "CMakeLists.txt" or path.suffix == ".cmake"
+                               or path.name.startswith("cmake.") and path.suffix == ".txt"):
+            assert not re.search(r"FetchContent_Declare\(\s*JUCE|find_package\(\s*JUCE|juce_add_|juce::",
+                                 path.read_text("utf-8"), re.I), path
+for relative in ("tests/fixtures/juce-benchmark-optimization.cmake",
+                 "tests/fixtures/juce-benchmark-profile.patch",
+                 "tests/fixtures/project-audio/VoiceTimingProbe.cpp"):
+    assert not (source / relative).exists(), f"Retired framework fixture returned: {relative}"
+print("Application, authoring tools, tests and vendored sources contain no JUCE includes or types")

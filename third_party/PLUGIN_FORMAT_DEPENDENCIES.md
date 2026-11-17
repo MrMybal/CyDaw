@@ -12,7 +12,7 @@ Vendored sources, without nested Git repositories:
 | ysfx WDL | upstream snapshot distributed by ysfx | zlib-style, see `ysfx/thirdparty/WDL/LICENSE.txt` | EEL2 and LICE graphics |
 | ysfx stb | upstream snapshot distributed by ysfx | public domain or MIT | LICE image readers |
 
-LV2 hosting uses JUCE's bundled Lilv/Serd/Sord/Sratom implementation. Its notices remain in JUCE's `LV2_SDK` and JUCE's distribution notices. Native CLAP/LV2 exports do not link JUCE or ysfx.
+LV2 hosting uses CyAudioCore's separately vendored Lilv/Serd/Sord/Sratom implementation and its retained notices. It does not use a JUCE SDK. Native CLAP/LV2 exports do not link ysfx. The local ysfx copy contains only library functionality: the optional upstream JUCE plugin wrapper and its build/download configuration have been removed. CyDaw's active JSFX runtime is supplied by CyAudioCore.
 
 NASM enables EEL2 native code generation on MSVC x64. CMake finds `nasm` on PATH, accepts `-DNASM_PROGRAM=...`, and looks in `output/plugin-formats/tools/nasm-2.16.03` for this workspace's build. Without NASM it uses ysfx's portable interpreter. NASM is a build tool, not a plugin or DAW runtime dependency. The tested build uses NASM 2.16.03 from nasm.us. Exported native plugins do not require NASM.
 

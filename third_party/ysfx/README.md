@@ -1,8 +1,8 @@
 # ysfx
 
-Hosting library and audio plugin for JSFX
+JSFX hosting library — CyDaw vendored subset
 
-![capture](docs/capture.png)
+This copy retains the compiler/runtime library from [jpcima/ysfx](https://github.com/jpcima/ysfx). The optional upstream JUCE plugin wrapper, its build configuration and its CI workflow have been removed. CyDaw hosts JSFX through CyAudioCore; it does not build the upstream plugin. See LICENSE and the retained third-party notices.
 
 ## Description
 
@@ -11,8 +11,7 @@ language. These effects exist in source code form, and they are compiled and ran
 natively by hosting software.
 
 This contains a hosting library, providing a JSFX compiler and runtime.
-In addition, there is an audio plugin which can act as a JSFX host in a digital
-audio workstation.
+
 
 ## Remarks
 
@@ -31,9 +30,6 @@ bits of the WDL.
 
 # Usage notes
 
-The audio plugin will initially present the JSFX effects available in the REAPER
-user folders, if these exist.
-
 The effects are source code files which end with the extension `.jsfx`, or with
 no extension at all.
 
@@ -49,29 +45,10 @@ Example:
 - `My JSFX/Effects/guitar/amp-model`
 - `My JSFX/Data/amp_models/Marshall JCM800 - Marshall Stock 70.wav`
 
-## Download development builds
-
-- [32-bit Windows VST3](https://nightly.link/jpcima/ysfx/workflows/build/master/Windows%2032-bit%20VST3.zip)
-- [64-bit Windows VST3](https://nightly.link/jpcima/ysfx/workflows/build/master/Windows%2064-bit%20VST3.zip)
-- [64-bit GNU/Linux VST3](https://nightly.link/jpcima/ysfx/workflows/build/master/Linux%2064-bit%20VST3.zip)
-- [macOS Universal AU (**self-signed**)](https://nightly.link/jpcima/ysfx/workflows/build/master/macOS%20AU.zip)
-- [macOS Universal VST3 (**self-signed**)](https://nightly.link/jpcima/ysfx/workflows/build/master/macOS%20VST3.zip)
-
 ## Building
 
-To build the project, one must first set up a C++ development environment
-equipped with Git and CMake. One can then build the library and the audio
-plugin, by entering commands as follows:
-
-```
-git clone https://github.com/jpcima/ysfx.git
-cd ysfx
-git submodule update --init --recursive
-mkdir build
-cd build
-cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
-cmake --build .
-```
+CyDaw uses the runtime supplied by CyAudioCore. This vendored library subset
+keeps the library CMake entry point; it has no plugin export target.
 
 ## JSFX resources
 

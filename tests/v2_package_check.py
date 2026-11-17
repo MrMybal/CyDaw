@@ -89,6 +89,20 @@ class PackageTests(unittest.TestCase):
         with zipfile.ZipFile(archive) as bundle:
             self.assertFalse(any('private' in name for name in bundle.namelist()))
 
+    def test_stale_juce_payload_is_rejected(self):
+        for name in ('Licenses/JUCE/JUCE_LICENSE.md', 'JUCE_LICENSE.md',
+                     'juce_audio_basics.dll', 'tools/JUCE/modules/juce_core.h'):
+            with self.subTest(name=name):
+                file = self.root / 'build' / name
+                file.parent.mkdir(parents=True, exist_ok=True)
+                file.write_bytes(b'stale framework payload')
+                try:
+                    with self.assertRaisesRegex(ValueError, 'Retired JUCE payload'):
+                        pack.package(self.root / 'build', self.root / 'out', True)
+                finally:
+                    file.unlink()
+        self.assertFalse((self.root / 'out').exists())
+
     def test_missing_reader_data_fails(self):
         (self.root / 'build/Documentation/DocData/data.js').unlink()
         with self.assertRaises(ValueError):
